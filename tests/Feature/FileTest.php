@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\File;
+use App\Models\FileMetadata;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -58,5 +59,32 @@ class FileTest extends TestCase
         $this->assertEquals(100, $retrievedFile->download_progress);
 
         $this->assertInstanceOf(\Carbon\Carbon::class, $retrievedFile->seen_preview_at);
+    }
+
+    public function test_file_metadata_relationship(): void
+    {
+        // Create a file
+        $file = File::create([
+            'source' => 'YouTube',
+            'filename' => 'metadata-test.mp4',
+        ]);
+
+        // Create metadata for the file
+        $metadata = FileMetadata::create([
+            'file_id' => $file->id,
+            'payload' => ['duration' => '01:30:00', 'resolution' => '1080p'],
+            'is_review_required' => true,
+        ]);
+
+        // Test relationship from File to FileMetadata
+        $this->assertInstanceOf(FileMetadata::class, $file->metadata);
+        $this->assertEquals($metadata->id, $file->metadata->id);
+        $this->assertEquals(['duration' => '01:30:00', 'resolution' => '1080p'], $file->metadata->payload);
+        $this->assertTrue($file->metadata->is_review_required);
+
+        // Test relationship from FileMetadata to File
+        $this->assertInstanceOf(File::class, $metadata->file);
+        $this->assertEquals($file->id, $metadata->file->id);
+        $this->assertEquals('metadata-test.mp4', $metadata->file->filename);
     }
 }
