@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('source'); // Origin of file ("NAS", "YouTube", "Booru", etc.)
             $table->string('source_id')->nullable(); // Unique ID from source (if available)
-            $table->string('url'); // Direct file URL (for download)
+            $table->string('url')->nullable();
             $table->string('referrer_url')->nullable(); // Page URL where the file was discovered
             $table->string('path')->nullable(); // Local/NAS file path
             $table->string('filename'); // File name
@@ -35,6 +35,10 @@ return new class extends Migration
             $table->string('blacklist_reason')->nullable(); // Reason for blacklist
             $table->boolean('liked')->default(false); // Marked as favorite/liked
             $table->timestamp('liked_at')->nullable(); // When liked
+            $table->boolean('disliked')->default(false); // Marked as disliked
+            $table->timestamp('disliked_at')->nullable(); // When disliked
+            $table->boolean('loved')->default(false); // Added to favorites
+            $table->timestamp('loved_at')->nullable(); // When added to favorites
             $table->boolean('downloaded')->default(false); // Downloaded to local/NAS
             $table->integer('download_progress')->default(0); // % downloaded
             $table->timestamp('downloaded_at')->nullable(); // When download completed
