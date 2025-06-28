@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Builder;
 use Laravel\Scout\Searchable;
 
 class File extends Model
@@ -76,6 +77,17 @@ class File extends Model
     public function metadata(): HasOne
     {
         return $this->hasOne(FileMetadata::class);
+    }
+
+    /**
+     * Scope a query to only include audio files.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeAudio(Builder $query): Builder
+    {
+        return $query->where('mime_type', 'like', 'audio/%');
     }
 
     // Customize the data sent to Typesense
