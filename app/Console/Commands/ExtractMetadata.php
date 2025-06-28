@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ExtractFileMetadata;
 use App\Models\File;
-use FFMpeg\FFMpeg;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class ExtractMetadata extends Command
 {
@@ -28,27 +27,20 @@ class ExtractMetadata extends Command
      */
     public function handle()
     {
+        $count = 0;
+
         File::where('mime_type', 'like', 'audio/%')
-            ->chunk(100, function ($files) {
-            foreach ($files as $file) {
-                // execute node script /scripts/extract-metadata.js with file path as argument
-                $this->info("Extracting metadata for file: {$file->path}");
+            ->chunk(100, function ($files) use (&$count) {
+                foreach ($files as $file) {
+                    $this->info("Queuing metadata extraction for file: {$file->path}");
 
-                $output = shell_exec("node scripts/extract-metadata.js \"{$file->path}\"");
+                    // Dispatch the job to the queue
+                    ExtractFileMetadata::dispatch($file);
 
-                if ($output) {
-                    $this->info("Metadata extracted successfully: \"{$file->path}\"");
-
-                    Storage::put("metadata/{$file->id}.json", $output);
-
-                    $file->metadata()->updateOrCreate(
-                        ['file_id' => $file->id],
-                        ['is_extracted' => true]
-                    );
-                } else {
-                    $this->error("Failed to extract metadata for file: \"{$file->path}\"");
+                    $count++;
                 }
-            }
-        });
+            });
+
+        $this->info("Queued metadata extraction for {$count} files.");
     }
 }

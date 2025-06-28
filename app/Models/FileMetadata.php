@@ -19,6 +19,7 @@ class FileMetadata extends Model
         'file_id',
         'payload',
         'is_review_required',
+        'is_extracted',
     ];
 
     /**

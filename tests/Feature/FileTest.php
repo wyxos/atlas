@@ -1,90 +1,82 @@
 <?php
 
-namespace Tests\Feature;
-
 use App\Models\File;
 use App\Models\FileMetadata;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+use Carbon\Carbon;
 
-class FileTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_can_create_file(): void
-    {
-        $file = File::create([
-            'source' => 'YouTube',
-            'url' => 'https://example.com/video.mp4',
-            'filename' => 'example-video.mp4',
-        ]);
+it('can create a file', function () {
+    $file = File::create([
+        'source' => 'YouTube',
+        'url' => 'https://example.com/video.mp4',
+        'filename' => 'example-video.mp4',
+    ]);
 
-        $this->assertDatabaseHas('files', [
-            'id' => $file->id,
-            'source' => 'YouTube',
-            'url' => 'https://example.com/video.mp4',
-            'filename' => 'example-video.mp4',
-        ]);
-    }
+    expect(File::where([
+        'id' => $file->id,
+        'source' => 'YouTube',
+        'url' => 'https://example.com/video.mp4',
+        'filename' => 'example-video.mp4',
+    ])->exists())->toBeTrue();
+});
 
-    public function test_file_attributes_and_casts(): void
-    {
-        $file = File::create([
-            'source' => 'NAS',
-            'url' => 'https://nas.example.com/file.mp4',
-            'filename' => 'file.mp4',
-            'tags' => ['tag1', 'tag2'],
-            'is_blacklisted' => true,
-            'liked' => true,
-            'downloaded' => true,
-            'download_progress' => 100,
-            'seen_preview_at' => now(),
-        ]);
+it('has correct attributes and casts', function () {
+    $file = File::create([
+        'source' => 'NAS',
+        'url' => 'https://nas.example.com/file.mp4',
+        'filename' => 'file.mp4',
+        'tags' => ['tag1', 'tag2'],
+        'is_blacklisted' => true,
+        'liked' => true,
+        'downloaded' => true,
+        'download_progress' => 100,
+        'seen_preview_at' => now(),
+    ]);
 
-        $retrievedFile = File::find($file->id);
+    $retrievedFile = File::find($file->id);
 
-        $this->assertIsArray($retrievedFile->tags);
-        $this->assertEquals(['tag1', 'tag2'], $retrievedFile->tags);
+    expect($retrievedFile->tags)->toBeArray();
+    expect($retrievedFile->tags)->toEqual(['tag1', 'tag2']);
 
-        $this->assertIsBool($retrievedFile->is_blacklisted);
-        $this->assertTrue($retrievedFile->is_blacklisted);
+    expect($retrievedFile->is_blacklisted)->toBeBool();
+    expect($retrievedFile->is_blacklisted)->toBeTrue();
 
-        $this->assertIsBool($retrievedFile->liked);
-        $this->assertTrue($retrievedFile->liked);
+    expect($retrievedFile->liked)->toBeBool();
+    expect($retrievedFile->liked)->toBeTrue();
 
-        $this->assertIsBool($retrievedFile->downloaded);
-        $this->assertTrue($retrievedFile->downloaded);
+    expect($retrievedFile->downloaded)->toBeBool();
+    expect($retrievedFile->downloaded)->toBeTrue();
 
-        $this->assertIsInt($retrievedFile->download_progress);
-        $this->assertEquals(100, $retrievedFile->download_progress);
+    expect($retrievedFile->download_progress)->toBeInt();
+    expect($retrievedFile->download_progress)->toBe(100);
 
-        $this->assertInstanceOf(\Carbon\Carbon::class, $retrievedFile->seen_preview_at);
-    }
+    expect($retrievedFile->seen_preview_at)->toBeInstanceOf(Carbon::class);
+});
 
-    public function test_file_metadata_relationship(): void
-    {
-        // Create a file
-        $file = File::create([
-            'source' => 'YouTube',
-            'filename' => 'metadata-test.mp4',
-        ]);
+it('has a working metadata relationship', function () {
+    // Create a file
+    $file = File::create([
+        'source' => 'YouTube',
+        'filename' => 'metadata-test.mp4',
+    ]);
 
-        // Create metadata for the file
-        $metadata = FileMetadata::create([
-            'file_id' => $file->id,
-            'payload' => ['duration' => '01:30:00', 'resolution' => '1080p'],
-            'is_review_required' => true,
-        ]);
+    // Create metadata for the file
+    $metadata = FileMetadata::create([
+        'file_id' => $file->id,
+        'payload' => ['duration' => '01:30:00', 'resolution' => '1080p'],
+        'is_review_required' => true,
+    ]);
 
-        // Test relationship from File to FileMetadata
-        $this->assertInstanceOf(FileMetadata::class, $file->metadata);
-        $this->assertEquals($metadata->id, $file->metadata->id);
-        $this->assertEquals(['duration' => '01:30:00', 'resolution' => '1080p'], $file->metadata->payload);
-        $this->assertTrue($file->metadata->is_review_required);
+    // Test relationship from File to FileMetadata
+    expect($file->metadata)->toBeInstanceOf(FileMetadata::class);
+    expect($file->metadata->id)->toBe($metadata->id);
+    expect($file->metadata->payload)->toBe(['duration' => '01:30:00', 'resolution' => '1080p']);
+    expect($file->metadata->is_review_required)->toBeTrue();
 
-        // Test relationship from FileMetadata to File
-        $this->assertInstanceOf(File::class, $metadata->file);
-        $this->assertEquals($file->id, $metadata->file->id);
-        $this->assertEquals('metadata-test.mp4', $metadata->file->filename);
-    }
-}
+    // Test relationship from FileMetadata to File
+    expect($metadata->file)->toBeInstanceOf(File::class);
+    expect($metadata->file->id)->toBe($file->id);
+    expect($metadata->file->filename)->toBe('metadata-test.mp4');
+});
