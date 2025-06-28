@@ -1,6 +1,6 @@
 General guidelines:
 
-- Use Laravel artisan commands to scaffold new features or components.
+- Use Laravel ```php artisan``` command to scaffold new features or components.
 - Ensure to remove any logging statements you added before completing a task.
 - Favor type hints and type declaration for php code.
 - Ensure all javascript code contain type hints.

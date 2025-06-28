@@ -47,6 +47,15 @@ return [
             'report' => false,
         ],
 
+        'atlas' => [
+            'driver' => 'local',
+            'root' => env('ATLAS_STORAGE_PATH', storage_path('app/atlas')),
+            'url' => env('APP_URL').'/atlas',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
