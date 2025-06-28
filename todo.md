@@ -14,3 +14,6 @@
   - one click download and show progress via Laravel reverb
   - one click blacklist
   - abstract class for service browsing and allowing users to implement custom services to integrate with the system
+- accessible online
+- share link to files
+- streaming
