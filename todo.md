@@ -1,0 +1,6 @@
+- audio metadata cleanup
+  - loop through audio files and store metadata in json in a folder
+  - normalizing task, retrieve all valid info from metadata and save in database, flag entries without metadata and entries with invalid metadata for manual review
+  - review and fix/delete missing/invalid metadata
+  - second normalizing task re-use valid data from database, empty metadata from files, re-save metadata from valid data in database into files in valid format
+  - 
