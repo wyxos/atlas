@@ -13,14 +13,14 @@ class ImportFromNova extends Command
      *
      * @var string
      */
-    protected $signature = 'app:import-from-nova';
+    protected $signature = 'import:nova';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Import files from Nova database to the current application';
 
     /**
      * Execute the console command.
