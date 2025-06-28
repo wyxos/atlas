@@ -1,0 +1,39 @@
+{
+  "format": {
+    "container": "MPEG",
+    "codec": "MP3",
+    "lossless": false,
+    "numberOfChannels": 1,
+    "bitrate": 96000,
+    "sampleRate": 22050,
+    "duration": 12.345,
+    "tool": "LAME 3.96"
+  },
+  "native": {
+    "ID3v1": [
+      {
+        "id": "title",
+        "value": "Old Format Song"
+      },
+      {
+        "id": "artist",
+        "value": "Vintage Artist"
+      },
+      {
+        "id": "album",
+        "value": "Classic Album"
+      },
+      {
+        "id": "year",
+        "value": "1995"
+      },
+      {
+        "id": "track",
+        "value": "5"
+      }
+    ]
+  },
+  "quality": {
+    "warnings": ["Using legacy ID3v1 format"]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "format": {
+    "container": "MPEG",
+    "codec": "MP3",
+    "lossless": false,
+    "numberOfChannels": 2,
+    "bitrate": 320000,
+    "sampleRate": 44100,
+    "duration": 8.765,
+    "tool": "Unknown"
+  },
+  "native": {},
+  "quality": {
+    "warnings": ["No metadata tags found"]
+  }
+}
