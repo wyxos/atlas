@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Laravel\Scout\Searchable;
 
 class File extends Model
@@ -69,6 +70,14 @@ class File extends Model
         'downloaded_at' => 'datetime',
     ];
 
+    /**
+     * Get the metadata associated with the file.
+     */
+    public function metadata(): HasOne
+    {
+        return $this->hasOne(FileMetadata::class);
+    }
+
     // Customize the data sent to Typesense
     public function toSearchableArray()
     {
@@ -110,10 +119,10 @@ class File extends Model
 
         // Handle timestamp fields - convert to Unix timestamps
         $timestampFields = [
-            'seen_preview_at', 'seen_file_at', 'liked_at', 'disliked_at', 
+            'seen_preview_at', 'seen_file_at', 'liked_at', 'disliked_at',
             'loved_at', 'downloaded_at'
         ];
-        
+
         foreach ($timestampFields as $field) {
             $array[$field] = $this->{$field}?->timestamp;
         }
