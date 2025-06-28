@@ -1,0 +1,27 @@
+{
+  "format": {
+    "container": "MPEG",
+    "codec": "MP3",
+    "lossless": false,
+    "numberOfChannels": 2,
+    "bitrate": 192000,
+    "sampleRate": 44100,
+    "duration": 45.678,
+    "tool": "LAME 3.98.4"
+  },
+  "native": {
+    "ID3v2.3": [
+      {
+        "id": "TIT2",
+        "value": "Test Audio File"
+      },
+      {
+        "id": "TPE1",
+        "value": "Test Artist"
+      }
+    ]
+  },
+  "quality": {
+    "warnings": []
+  }
+}

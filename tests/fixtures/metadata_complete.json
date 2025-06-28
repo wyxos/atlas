@@ -1,0 +1,64 @@
+{
+  "format": {
+    "container": "MPEG",
+    "codec": "MP3",
+    "lossless": false,
+    "numberOfChannels": 2,
+    "bitrate": 128000,
+    "sampleRate": 44100,
+    "duration": 30.123,
+    "tool": "LAME 3.99.5"
+  },
+  "native": {
+    "ID3v2.3": [
+      {
+        "id": "TIT2",
+        "value": "Canon in D Major"
+      },
+      {
+        "id": "TPE1",
+        "value": "Johann Pachelbel"
+      },
+      {
+        "id": "TALB",
+        "value": "Classical Music for Relaxation"
+      },
+      {
+        "id": "TYER",
+        "value": "1680"
+      },
+      {
+        "id": "TRCK",
+        "value": "1/12"
+      },
+      {
+        "id": "TCON",
+        "value": "Classical"
+      },
+      {
+        "id": "TPE2",
+        "value": "Various Artists"
+      },
+      {
+        "id": "TPOS",
+        "value": "1/1"
+      },
+      {
+        "id": "TPUB",
+        "value": "Public Domain Records"
+      },
+      {
+        "id": "APIC",
+        "value": {
+          "format": "image/jpeg",
+          "type": "Cover (front)",
+          "description": "",
+          "data": [255, 216, 255, 224, 0, 16, 74, 70, 73, 70, 0, 1, 1, 1, 0, 72, 0, 72, 0, 0, 255, 219, 0, 67, 0, 8, 6, 6, 7, 6, 5, 8, 7, 7, 7, 9, 9, 8, 10, 12, 20, 13, 12, 11, 11, 12, 25, 18, 19, 15, 20, 29, 26, 31, 30, 29, 26, 28, 28, 32, 36, 46, 39, 32, 34, 44, 35, 28, 28, 40, 55, 41, 44, 48, 49, 52, 52, 52, 31, 39, 57, 61, 56, 50, 60, 46, 51, 52, 50, 255, 217]
+        }
+      }
+    ]
+  },
+  "quality": {
+    "warnings": []
+  }
+}

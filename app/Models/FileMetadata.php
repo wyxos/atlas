@@ -30,6 +30,7 @@ class FileMetadata extends Model
     protected $casts = [
         'payload' => 'array',
         'is_review_required' => 'boolean',
+        'is_extracted' => 'boolean',
     ];
 
     /**
