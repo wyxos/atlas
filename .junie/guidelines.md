@@ -8,6 +8,7 @@ General guidelines:
 - Create a test case or update existing test case after completing a task and ensure it passes before completing the
   task.
 - Run the full ```php artisan test``` after completing a task to ensure all tests pass.
+- Never make assumption or use placeholders. If in doubt, ask for clarification or halt the task with a comment.
 
 Project specific guidelines:
 
