@@ -2,12 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Models\Cover;
 use App\Models\File;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -130,12 +132,71 @@ class TranslateFileMetadata implements ShouldQueue
                         if (isset($tag['value']['data'])) {
                             $coverArtBinary = $this->decodeCoverArt($tag['value']['data']);
                             $coverArtMime = $tag['value']['format'] ?? 'image/jpeg';
+                            $extension = explode('/', $coverArtMime)[1];
 
-                            // Generate storage path (e.g. cover_art/{file_id}.jpg)
-                            $coverArtPath = "cover-art/{$file->id}." . explode('/', $coverArtMime)[1];
+                            // Generate temporary storage path
+                            $coverArtPath = "cover-art/{$file->id}.{$extension}";
 
                             // Save to storage
                             Storage::disk('public')->put($coverArtPath, $coverArtBinary);
+
+                            // Create hash of the file content
+                            $hash = md5($coverArtBinary);
+
+                            // Check if a cover with this hash already exists
+                            $existingCover = Cover::where('hash', $hash)->first();
+
+                            if ($existingCover) {
+                                // Associate the existing cover with the file
+                                $file->covers()->syncWithoutDetaching([$existingCover->id]);
+
+                                // Store the temporary path before updating
+                                $tempPath = $coverArtPath;
+
+                                // Update the cover path to point to the existing cover
+                                $coverArtPath = $existingCover->path;
+
+                                // Delete the duplicate file
+                                Storage::disk('public')->delete($tempPath);
+                            } else {
+                                // Create a new cover record
+                                DB::beginTransaction();
+
+                                try {
+                                    $cover = Cover::create([
+                                        'hash' => $hash,
+                                        'path' => $coverArtPath, // Temporary path
+                                    ]);
+
+                                    // Rename the file to follow the pattern cover-{coverId}.{ext}
+                                    $newPath = "covers/cover-{$cover->id}.{$extension}";
+
+                                    // Ensure the covers directory exists
+                                    if (!Storage::disk('public')->exists('covers')) {
+                                        Storage::disk('public')->makeDirectory('covers');
+                                    }
+
+                                    // Move the file to the new location
+                                    if (Storage::disk('public')->move($coverArtPath, $newPath)) {
+                                        // Update the cover record with the new path
+                                        $cover->path = $newPath;
+                                        $cover->save();
+
+                                        // Associate the cover with the file
+                                        $file->covers()->syncWithoutDetaching([$cover->id]);
+
+                                        // Update the cover path
+                                        $coverArtPath = $newPath;
+
+                                        DB::commit();
+                                    } else {
+                                        DB::rollBack();
+                                    }
+                                } catch (\Exception $e) {
+                                    Log::error("Error processing cover for file {$file->id}: " . $e->getMessage());
+                                    DB::rollBack();
+                                }
+                            }
                         }
                         break;
                     case 'TALB': // Album

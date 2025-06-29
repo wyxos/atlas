@@ -155,9 +155,13 @@ describe('TranslateFileMetadata Job', function () {
 
         $metadata = $audioFile->metadata()->first();
 
-        // Check that cover art was saved
-        expect($metadata->payload['cover_art_path'])->toContain("cover-art/{$audioFile->id}.jpeg");
+        // Check that cover art was saved and a path exists
+        expect($metadata->payload['cover_art_path'])->toContain("covers/cover-");
+        expect($metadata->payload['cover_art_path'])->toContain(".jpeg");
         Storage::disk('public')->assertExists($metadata->payload['cover_art_path']);
+
+        // Verify that a cover record was created and associated with the file
+        expect($audioFile->covers()->count())->toBe(1);
     });
 
     it('translates minimal metadata correctly', function () {
@@ -339,8 +343,12 @@ describe('Integration Tests', function () {
         expect($metadata->is_review_required)->toBeFalse();
 
         // Verify cover art was extracted
-        expect($metadata->payload['cover_art_path'])->toContain("cover-art/{$audioFile->id}.jpeg");
+        expect($metadata->payload['cover_art_path'])->toContain("covers/cover-");
+        expect($metadata->payload['cover_art_path'])->toContain(".jpeg");
         Storage::disk('public')->assertExists($metadata->payload['cover_art_path']);
+
+        // Verify that a cover record was created and associated with the file
+        expect($audioFile->covers()->count())->toBe(1);
     });
 
     it('handles files that require review in complete workflow', function () {

@@ -248,7 +248,7 @@ watch(query, (newQuery, oldQuery) => {
             <div class="p-4">
                 <Input type="search" placeholder="Search" v-model="query" />
             </div>
-            <div class="flex-1">
+            <div class="flex-1 md:p-4">
                 <!-- Loading spinner -->
                 <div v-if="isLoading" class="flex justify-center items-center h-[640px]">
                     <Loader2 class="animate-spin" :size="40" />
