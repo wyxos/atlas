@@ -7,9 +7,19 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::group(['auth', 'verified'], function () {
+    Route::get('dashboard', function () {
+        return Inertia::render('Dashboard');
+    })->name('dashboard');
+
+    Route::get('audio', function(){
+        return Inertia::render('Audio', [
+            'files' => \App\Models\File::audio()->select(['id'])->with('metadata')->get(),
+        ]);
+    })->name('audio');
+});
+
+
 
 
 
