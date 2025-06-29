@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AudioController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -31,14 +32,15 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
         return Inertia::render('Audio', [
             'files' => fn() => \App\Models\File::audio()
-                ->select(['id', 'mime_type'])
-                ->with('metadata')->get(),
+                ->select(['id'])
+                ->with('metadata')
+                ->get(),
             'search' => $search,
         ]);
     })->name('audio');
 
     // Audio streaming route
-    Route::get('audio/stream/{id}', [\App\Http\Controllers\AudioController::class, 'stream'])->name('audio.stream');
+    Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');
 });
 
 

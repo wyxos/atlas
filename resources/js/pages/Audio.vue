@@ -6,7 +6,7 @@ import { RecycleScroller } from 'vue-virtual-scroller';
 import { Play, Pause } from 'lucide-vue-next';
 import {ref, computed, watch} from 'vue';
 import { Input } from '@/components/ui/input';
-import { Loader2 } from 'lucide-vue-next';
+import { Loader2, Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
 import debounce from 'lodash/debounce';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -106,6 +106,94 @@ function seekTo(event: MouseEvent): void {
 const query = ref('');
 const isLoading = ref(false);
 
+// Swipe functionality
+const swipedItemId = ref<string | null>(null);
+const startX = ref<number | null>(null);
+const endX = ref<number | null>(null);
+const swipeThreshold = 50; // Minimum distance to trigger swipe
+const isDragging = ref(false);
+
+// Handle touch/mouse start
+function handleTouchStart(event: TouchEvent | MouseEvent): void {
+    if ('touches' in event) {
+        startX.value = event.touches[0].clientX;
+    } else {
+        isDragging.value = true;
+        startX.value = event.clientX;
+    }
+}
+
+// Handle touch/mouse move
+function handleTouchMove(event: TouchEvent | MouseEvent): void {
+    if ('touches' in event) {
+        endX.value = event.touches[0].clientX;
+    } else if (isDragging.value) {
+        endX.value = event.clientX;
+    }
+}
+
+// Handle touch/mouse end
+function handleTouchEnd(item: any): void {
+    if (!startX.value || !endX.value) return;
+
+    const swipeDistance = startX.value - endX.value;
+
+    // If swiped left beyond threshold
+    if (swipeDistance > swipeThreshold) {
+        // If this item is already open, close it
+        if (swipedItemId.value === item.id) {
+            swipedItemId.value = null;
+        } else {
+            // Open this item, closing any previously open item
+            swipedItemId.value = item.id;
+        }
+    }
+    // If swiped right beyond threshold
+    else if (swipeDistance < -swipeThreshold) {
+        // Close the item if it's open
+        if (swipedItemId.value === item.id) {
+            swipedItemId.value = null;
+        }
+    }
+
+    // Reset coordinates and dragging state
+    startX.value = null;
+    endX.value = null;
+    isDragging.value = false;
+}
+
+// Close any open item when clicking outside
+function handleGlobalClick(): void {
+    if (swipedItemId.value) {
+        swipedItemId.value = null;
+    }
+}
+
+// Action handlers
+function toggleFavorite(item: any, event: Event): void {
+    event.stopPropagation(); // Prevent triggering parent click events
+    // Implement favorite toggle logic here
+    console.log('Toggle favorite for item:', item.id);
+    // Close the swipe actions after action
+    swipedItemId.value = null;
+}
+
+function likeItem(item: any, event: Event): void {
+    event.stopPropagation(); // Prevent triggering parent click events
+    // Implement like logic here
+    console.log('Like item:', item.id);
+    // Close the swipe actions after action
+    swipedItemId.value = null;
+}
+
+function dislikeItem(item: any, event: Event): void {
+    event.stopPropagation(); // Prevent triggering parent click events
+    // Implement dislike logic here
+    console.log('Dislike item:', item.id);
+    // Close the swipe actions after action
+    swipedItemId.value = null;
+}
+
 const debouncedSearch = debounce((newQuery: string|null, oldQuery: string|null) => {
     if (newQuery && newQuery.trim()) {
         console.log('Searching for:', newQuery);
@@ -156,7 +244,7 @@ watch(query, (newQuery, oldQuery) => {
     <Head title="Audio" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="h-full flex flex-col">
+        <div class="h-full flex flex-col" @click="handleGlobalClick">
             <div>
                 <Input type="search" placeholder="Search" v-model="query" />
             </div>
@@ -173,15 +261,55 @@ watch(query, (newQuery, oldQuery) => {
 
                 <!-- Results list -->
                 <RecycleScroller v-else class="h-[640px]" :items="query ? search : files" :item-size="40 + 16 + 16" key-field="id" v-slot="{ item }">
-                    <div class="file p-4 flex justify-between items-center hover:bg-gray-100 rounded border-b-2 border-blue-200" :class="{ 'bg-blue-500': currentFile?.id === item.id }">
-                        <div class="flex flex-col">
-                            <span class="text-xs">{{ excerpt(item.metadata?.payload?.artist, 25) || 'Untitled' }}</span>
-                            <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
+                    <div class="relative overflow-hidden">
+                        <!-- Swipeable container -->
+                        <div
+                            class="file p-4 flex justify-between items-center hover:bg-gray-100 rounded border-b-2 border-blue-200 transition-transform duration-300 relative"
+                            :class="{
+                                'bg-blue-500': currentFile?.id === item.id,
+                                'transform -translate-x-32': swipedItemId === item.id
+                            }"
+                            @touchstart="handleTouchStart"
+                            @touchmove="handleTouchMove"
+                            @touchend="handleTouchEnd(item)"
+                            @mousedown="handleTouchStart"
+                            @mousemove="handleTouchMove"
+                            @mouseup="handleTouchEnd(item)"
+                            @mouseleave="isDragging && handleTouchEnd(item)"
+                        >
+                            <div class="flex flex-col">
+                                <span class="text-xs font-semibold">{{ excerpt(item.metadata?.payload?.artist, 25) || 'Untitled' }}</span>
+                                <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
+                            </div>
+                            <button class="cursor-pointer" @click="playAudio(item)">
+                                <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
+                                <Pause v-else :size="20" />
+                            </button>
+
+                            <!-- Action buttons container -->
+                            <div class="absolute top-0 left-full h-full items-center flex gap-4 p-4">
+                                <button
+                                    class=""
+                                    @click="toggleFavorite(item, $event)"
+                                >
+                                    <Heart :size="20" />
+                                </button>
+                                <button
+                                    class=""
+                                    @click="likeItem(item, $event)"
+                                >
+                                    <ThumbsUp :size="20" />
+                                </button>
+                                <button
+                                    class=""
+                                    @click="dislikeItem(item, $event)"
+                                >
+                                    <ThumbsDown :size="20" />
+                                </button>
+                            </div>
                         </div>
-                        <button class="cursor-pointer" @click="playAudio(item)">
-                            <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
-                            <Pause v-else :size="20" />
-                        </button>
+
+
                     </div>
                 </RecycleScroller>
             </div>
