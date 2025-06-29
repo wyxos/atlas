@@ -19,3 +19,4 @@
 - accessible online
 - share link to files
 - streaming
+- spotify integration
