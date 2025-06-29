@@ -5,16 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AudioController extends Controller
 {
-    /**
-     * Stream an audio file.
-     *
-     * @param int $id
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
-     */
     public function stream(int $id)
     {
         $file = File::findOrFail($id);
@@ -29,6 +24,15 @@ class AudioController extends Controller
             'Content-Type' => $file->mime_type,
             'Content-Disposition' => 'inline; filename="' . $file->filename . '"',
             'Accept-Ranges' => 'bytes',
+        ]);
+    }
+
+    public function show(File $file)
+    {
+        return Inertia::render('FileShow', [
+            'file' => $file,
+            'metadata' => $file->metadata,
+            'rawMetadata' => Storage::get('metadata/' . $file->id . '.json'),
         ]);
     }
 }

@@ -260,7 +260,7 @@ watch(query, (newQuery, oldQuery) => {
                 </div>
 
                 <!-- Results list -->
-                <RecycleScroller v-else class="h-[640px]" :items="query ? search : files" :item-size="40 + 16 + 16" key-field="id" v-slot="{ item }">
+                <RecycleScroller v-else class="h-[640px]" :items="query ? search : files" :item-size="48 + 16 + 16" key-field="id" v-slot="{ item }">
                     <div class="relative overflow-hidden">
                         <!-- Swipeable container -->
                         <div
@@ -276,12 +276,26 @@ watch(query, (newQuery, oldQuery) => {
                             @mousemove="handleTouchMove"
                             @mouseup="handleTouchEnd(item)"
                             @mouseleave="isDragging && handleTouchEnd(item)"
+                            @click="router.get(route('audio.show', { id: item.id }))"
                         >
-                            <div class="flex flex-col">
-                                <span class="text-xs font-semibold">{{ excerpt(item.metadata?.payload?.artist, 25) || 'Untitled' }}</span>
-                                <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
+                            <div class="flex gap-2 items-center">
+                                <div class="w-12 h-12 flex-shrink-0 overflow-hidden rounded">
+                                    <img
+                                        v-if="item.metadata?.payload?.cover_art_path"
+                                        :src="`/storage/${item.metadata.payload.cover_art_path}`"
+                                        alt="Cover"
+                                        class="w-full h-full object-cover"
+                                    />
+                                    <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
+                                        <span class="text-xs">No Cover</span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-xs font-semibold">{{ excerpt(item.metadata?.payload?.artist, 25) || 'Untitled' }}</span>
+                                    <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
+                                </div>
                             </div>
-                            <button class="cursor-pointer" @click="playAudio(item)">
+                            <button class="cursor-pointer" @click.stop="playAudio(item)">
                                 <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
                                 <Pause v-else :size="20" />
                             </button>
@@ -290,19 +304,19 @@ watch(query, (newQuery, oldQuery) => {
                             <div class="absolute top-0 left-full h-full items-center flex gap-4 p-4">
                                 <button
                                     class=""
-                                    @click="toggleFavorite(item, $event)"
+                                    @click.stop="toggleFavorite(item, $event)"
                                 >
                                     <Heart :size="20" />
                                 </button>
                                 <button
                                     class=""
-                                    @click="likeItem(item, $event)"
+                                    @click.stop="likeItem(item, $event)"
                                 >
                                     <ThumbsUp :size="20" />
                                 </button>
                                 <button
                                     class=""
-                                    @click="dislikeItem(item, $event)"
+                                    @click.stop="dislikeItem(item, $event)"
                                 >
                                     <ThumbsDown :size="20" />
                                 </button>
