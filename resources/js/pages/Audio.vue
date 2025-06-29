@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
+import { Play } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -32,8 +33,11 @@ function excerpt(text: string, length = 30): string {
         <div class="h-full flex flex-col overflow-hidden">
             <div class="flex-1 overflow-hidden">
                 <RecycleScroller class="h-[700px]" :items="files" :item-size="24 + 16 + 16" key-field="id" v-slot="{ item }">
-                    <div class="file p-4">
+                    <div class="file p-4 flex justify-between items-center">
                         {{ excerpt(item.metadata?.payload?.title) || 'Untilted' }}
+                        <button class="cursor-pointer">
+                            <Play :size="20"></Play>
+                        </button>
                     </div>
                 </RecycleScroller>
             </div>
