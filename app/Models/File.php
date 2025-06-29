@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Scout\Searchable;
 
@@ -79,6 +80,14 @@ class File extends Model
     public function metadata(): HasOne
     {
         return $this->hasOne(FileMetadata::class);
+    }
+
+    /**
+     * Get the covers associated with the file.
+     */
+    public function covers(): BelongsToMany
+    {
+        return $this->belongsToMany(Cover::class);
     }
 
     /**
