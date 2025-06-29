@@ -6,6 +6,7 @@ import { RecycleScroller } from 'vue-virtual-scroller';
 import { Play, Pause } from 'lucide-vue-next';
 import {ref, computed, watch} from 'vue';
 import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-vue-next';
 import debounce from 'lodash/debounce';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -103,19 +104,23 @@ function seekTo(event: MouseEvent): void {
 // }
 
 const query = ref('');
+const isLoading = ref(false);
 
 const debouncedSearch = debounce((newQuery: string|null, oldQuery: string|null) => {
     if (newQuery && newQuery.trim()) {
         console.log('Searching for:', newQuery);
+        isLoading.value = true;
         router.get(route('audio'), { query: newQuery }, {
             preserveState: true,
             only: ['search'],
             replace: true,
             onSuccess: () => {
                 console.log('Search completed');
+                isLoading.value = false;
             },
             onError: (error) => {
                 console.error('Search error:', error);
+                isLoading.value = false;
             }
         });
     }
@@ -125,15 +130,18 @@ const debouncedSearch = debounce((newQuery: string|null, oldQuery: string|null) 
     if(oldQuery && !newQuery) {
         console.log('Clearing search, resetting results');
         // If query is cleared, reset search results
+        isLoading.value = true;
         router.get(route('audio'), {}, {
             preserveState: true,
             only: ['search'],
             replace: true,
             onSuccess: () => {
                 console.log('Search reset');
+                isLoading.value = false;
             },
             onError: (error) => {
                 console.error('Reset error:', error);
+                isLoading.value = false;
             }
         });
     }
@@ -153,7 +161,18 @@ watch(query, (newQuery, oldQuery) => {
                 <Input type="search" placeholder="Search" v-model="query" />
             </div>
             <div class="flex-1">
-                <RecycleScroller class="h-[640px]" :items="query ? search : files" :item-size="40 + 16 + 16" key-field="id" v-slot="{ item }">
+                <!-- Loading spinner -->
+                <div v-if="isLoading" class="flex justify-center items-center h-[640px]">
+                    <Loader2 class="animate-spin" :size="40" />
+                </div>
+
+                <!-- No results message -->
+                <div v-else-if="query && search.length === 0" class="flex justify-center items-center h-[640px]">
+                    <p class="text-gray-500">No match was found for "{{ query }}"</p>
+                </div>
+
+                <!-- Results list -->
+                <RecycleScroller v-else class="h-[640px]" :items="query ? search : files" :item-size="40 + 16 + 16" key-field="id" v-slot="{ item }">
                     <div class="file p-4 flex justify-between items-center hover:bg-gray-100 rounded border-b-2 border-blue-200" :class="{ 'bg-blue-500': currentFile?.id === item.id }">
                         <div class="flex flex-col">
                             <span class="text-xs">{{ excerpt(item.metadata?.payload?.artist, 25) || 'Untitled' }}</span>
