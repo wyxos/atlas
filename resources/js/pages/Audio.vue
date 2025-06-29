@@ -245,7 +245,7 @@ watch(query, (newQuery, oldQuery) => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="h-full flex flex-col" @click="handleGlobalClick">
-            <div>
+            <div class="p-4">
                 <Input type="search" placeholder="Search" v-model="query" />
             </div>
             <div class="flex-1">
@@ -264,7 +264,7 @@ watch(query, (newQuery, oldQuery) => {
                     <div class="relative overflow-hidden">
                         <!-- Swipeable container -->
                         <div
-                            class="file p-4 flex justify-between items-center hover:bg-gray-100 rounded border-b-2 border-blue-200 transition-transform duration-300 relative"
+                            class="file p-4 flex justify-between items-center rounded border-b-2 border-blue-200 transition-transform duration-300 relative"
                             :class="{
                                 'bg-blue-500': currentFile?.id === item.id,
                                 'transform -translate-x-32': swipedItemId === item.id
@@ -314,7 +314,7 @@ watch(query, (newQuery, oldQuery) => {
                 </RecycleScroller>
             </div>
 
-            <div class="bg-blue-950 p-4 border-t fixed bottom-0 left-0 right-0">
+            <div class="bg-blue-950 p-4 border-t fixed bottom-0 left-0 right-0 md:static">
                 <audio
                     ref="audioPlayer"
                     class="hidden"
