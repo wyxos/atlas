@@ -13,4 +13,4 @@ General guidelines:
 
 Project specific guidelines:
 
-
+- Always run `php artisan db:backup` before performing any tasks that involve altering the database. This creates a backup of the database in the storage/backups directory.
