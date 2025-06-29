@@ -14,7 +14,7 @@ class TranslateMetadata extends Command
      *
      * @var string
      */
-    protected $signature = 'files:translate-metadata {--limit=100 : Number of files to process} {--force : Force reprocessing of already translated metadata}';
+    protected $signature = 'files:translate-metadata {--force : Force reprocessing of already translated metadata}';
 
     /**
      * The console command description.
@@ -28,7 +28,6 @@ class TranslateMetadata extends Command
      */
     public function handle()
     {
-        $limit = $this->option('limit');
         $force = $this->option('force');
 
         $this->info("Starting metadata translation process...");

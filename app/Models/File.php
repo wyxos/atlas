@@ -46,6 +46,7 @@ class File extends Model
         'downloaded',
         'download_progress',
         'downloaded_at',
+        'not_found',
     ];
 
     /**
@@ -63,6 +64,7 @@ class File extends Model
         'loved' => 'boolean',
         'downloaded' => 'boolean',
         'download_progress' => 'integer',
+        'not_found' => 'boolean',
         'seen_preview_at' => 'datetime',
         'seen_file_at' => 'datetime',
         'liked_at' => 'datetime',
@@ -117,6 +119,7 @@ class File extends Model
             'loved'            => $this->loved,
             'downloaded'       => $this->downloaded,
             'download_progress'=> $this->download_progress,
+            'not_found'        => $this->not_found,
             'created_at'       => $this->created_at?->timestamp,
             'updated_at'       => $this->updated_at?->timestamp,
         ];
