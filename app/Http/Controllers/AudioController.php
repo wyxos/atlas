@@ -32,7 +32,7 @@ class AudioController extends Controller
         return Inertia::render('FileShow', [
             'file' => $file,
             'metadata' => $file->metadata,
-            'rawMetadata' => Storage::get('metadata/' . $file->id . '.json'),
+            'rawMetadata' => Storage::json('metadata/' . $file->id . '.json'),
         ]);
     }
 }
