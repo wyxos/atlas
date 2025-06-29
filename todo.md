@@ -1,9 +1,11 @@
 - audio metadata cleanup
-  - loop through audio files and store metadata in json in a folder
-  - normalizing task, retrieve all valid info from metadata and save in database, flag entries without metadata and entries with invalid metadata for manual review
+  - ~~loop through audio files and store metadata in json in a folder~~
+  - ~~normalizing task, retrieve all valid info from metadata and save in database, flag entries without metadata and entries with invalid metadata for manual review~~
+  - create artist, album, composer, entity
+  - create an entity to represent cover and remove duplicates
   - review and fix/delete missing/invalid metadata
   - second normalizing task re-use valid data from database, empty metadata from files, re-save metadata from valid data in database into files in valid format
-- create infinite scroll list for audio files
+- ~~create infinite scroll list for audio files~~
 - create infinite scroll list for video files
 - design and implement playlist architecture
 - design and implement grouping via tags and relevant grouping methods
