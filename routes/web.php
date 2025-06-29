@@ -16,7 +16,17 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
         $search = [];
 
         if ($query = request()->input('query')) {
-            $search = \App\Models\File::search($query)->get();
+            // Filter search results to only include audio files
+            $search = \App\Models\File::search($query)
+                ->query(function ($builder) {
+                    $builder->where('mime_type', 'like', 'audio/%');
+                })
+                ->get();
+
+            // Load metadata relationship for search results
+            if ($search->isNotEmpty()) {
+                $search->load('metadata');
+            }
         }
 
         return Inertia::render('Audio', [

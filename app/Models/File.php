@@ -95,6 +95,11 @@ class File extends Model
     // Customize the data sent to Typesense
     public function toSearchableArray()
     {
+        // Load metadata relationship if not already loaded
+        if (!$this->relationLoaded('metadata')) {
+            $this->load('metadata');
+        }
+
         $array = [
             'id'               => (string) $this->id,
             'source'           => $this->source,
@@ -123,6 +128,40 @@ class File extends Model
             'created_at'       => $this->created_at?->timestamp,
             'updated_at'       => $this->updated_at?->timestamp,
         ];
+
+        // Include metadata fields if available
+        if ($this->metadata && $this->metadata->payload) {
+            $metadata = $this->metadata->payload;
+
+            // Add common audio metadata fields
+            if (isset($metadata['artist'])) {
+                $array['metadata_artist'] = $metadata['artist'];
+            }
+
+            if (isset($metadata['title'])) {
+                $array['metadata_title'] = $metadata['title'];
+            }
+
+            if (isset($metadata['album'])) {
+                $array['metadata_album'] = $metadata['album'];
+            }
+
+            if (isset($metadata['genre'])) {
+                $array['metadata_genre'] = $metadata['genre'];
+            }
+
+            if (isset($metadata['year'])) {
+                $array['metadata_year'] = $metadata['year'];
+            }
+
+            if (isset($metadata['comment'])) {
+                $array['metadata_comment'] = $metadata['comment'];
+            }
+
+            if (isset($metadata['track'])) {
+                $array['metadata_track'] = $metadata['track'];
+            }
+        }
 
         // Handle tags - ensure it's an array or null
         if ($this->tags) {
