@@ -57,9 +57,18 @@ class TranslateFileMetadata implements ShouldQueue
                 Log::error("Failed to parse metadata JSON for file ID: {$this->file->id}");
 
                 // Mark as review required
-                $this->file->metadata()->update([
-                    'is_review_required' => true
-                ]);
+                if($this->file->metadata()->exists()){
+                    Log::warning("Marking file {$this->file->id} as review required due to invalid metadata.");
+                    $this->file->metadata()->update([
+                        'is_review_required' => true
+                    ]);
+                } else {
+                    Log::warning("Creating metadata record for file {$this->file->id} with review required status.");
+                    $this->file->metadata()->create([
+                        'is_review_required' => true
+                    ]);
+                }
+
 
                 return;
             }

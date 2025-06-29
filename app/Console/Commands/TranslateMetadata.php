@@ -33,14 +33,11 @@ class TranslateMetadata extends Command
         $this->info("Starting metadata translation process...");
 
         // Get files with extracted metadata that haven't been processed yet
-        $query = File::audio()
-            ->whereDoesntHave('metadata');
+        $query = File::audio();
 
         // If not forcing reprocessing, exclude already processed files
         if (!$force) {
-            $query->whereDoesntHave('metadata', function ($query) {
-                $query->whereNotNull('payload');
-            });
+            $query->whereDoesntHave('metadata');
         }
 
         $count = 0;

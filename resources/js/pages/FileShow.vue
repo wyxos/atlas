@@ -34,7 +34,9 @@
         <div v-if="file.covers && file.covers.length > 0" class="mb-4">
             <h2 class="text-lg font-semibold mb-2">Cover Art</h2>
             <img
-                :src="`/storage/${file.covers[0].path}`"
+                v-for="cover in file.covers"
+                :key="cover.id"
+                :src="`/storage/${cover.path}`"
                 alt="Cover Art"
                 class="max-w-xs rounded shadow"
             />
