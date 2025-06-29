@@ -65,14 +65,13 @@ class TranslateFileMetadata implements ShouldQueue
             // Extract relevant fields from metadata
             $translatedData = $this->translateMetadata($metadata, $this->file);
 
-            // Update metadata record
-            $this->file->metadata()->update([
-                'payload' => $translatedData['file'] ?? [],
-                'is_review_required' => $translatedData['is_review_required']
-            ]);
-
-            Log::info("Metadata translated successfully for file: {$this->file->path}");
-
+            if($this->file->metadata()->exists()){
+                // If metadata already exists, update it
+                $this->file->metadata()->update($translatedData);
+            } else {
+                // Create new metadata record
+                $this->file->metadata()->create($translatedData);
+            }
         } catch (\Exception $e) {
             Log::error("Error processing file {$this->file->id}: " . $e->getMessage());
 
@@ -92,7 +91,7 @@ class TranslateFileMetadata implements ShouldQueue
      */
     protected function translateMetadata(array $metadata, File $file): array
     {
-        $fileData = [];
+        $payload = [];
         $isReviewRequired = false;
 
         // Default empty values
@@ -175,17 +174,17 @@ class TranslateFileMetadata implements ShouldQueue
 
         if (isset($metadata['format'])) {
             $format = $metadata['format'];
-            $fileData['codec'] = $format['codec'] ?? null;
-            $fileData['container'] = $format['container'] ?? null;
-            $fileData['sample_rate'] = $format['sampleRate'] ?? null;
-            $fileData['channels'] = $format['numberOfChannels'] ?? null;
-            $fileData['bitrate'] = $format['bitrate'] ?? null;
-            $fileData['encoder'] = $format['tool'] ?? null;
-            $fileData['duration'] = $format['duration'] ?? null;
+            $payload['codec'] = $format['codec'] ?? null;
+            $payload['container'] = $format['container'] ?? null;
+            $payload['sample_rate'] = $format['sampleRate'] ?? null;
+            $payload['channels'] = $format['numberOfChannels'] ?? null;
+            $payload['bitrate'] = $format['bitrate'] ?? null;
+            $payload['encoder'] = $format['tool'] ?? null;
+            $payload['duration'] = $format['duration'] ?? null;
         }
 
         if ($coverArtPath) {
-            $fileData['cover_art_path'] = $coverArtPath;
+            $payload['cover_art_path'] = $coverArtPath;
         }
 
         // If we couldn't extract basic metadata, mark for review
@@ -198,47 +197,51 @@ class TranslateFileMetadata implements ShouldQueue
             $title = $file->filename;
         }
 
-        // Update file data
-        $fileData['title'] = $title;
+        // Update payload data
+        $payload['title'] = $title;
 
-        // Add other metadata to tags if available
-        $tags = $file->tags ?? [];
-
+        // Add other metadata directly to payload if available
         if (!empty($artist)) {
-            $tags['artist'] = $artist;
+            $payload['artist'] = $artist;
         }
 
         if (!empty($album)) {
-            $tags['album'] = $album;
+            $payload['album'] = $album;
         }
 
         if (!empty($year)) {
-            $tags['year'] = $year;
+            $payload['year'] = $year;
         }
 
         if (!empty($track)) {
-            $tags['track'] = $track;
+            $payload['track'] = $track;
         }
 
         // Add format information if available
         if (isset($metadata['format'])) {
-            if (isset($metadata['format']['duration'])) {
-                $tags['duration'] = $metadata['format']['duration'];
+            if (isset($metadata['format']['duration']) && !isset($payload['duration'])) {
+                $payload['duration'] = $metadata['format']['duration'];
             }
 
-            if (isset($metadata['format']['bitrate'])) {
-                $tags['bitrate'] = $metadata['format']['bitrate'];
+            if (isset($metadata['format']['bitrate']) && !isset($payload['bitrate'])) {
+                $payload['bitrate'] = $metadata['format']['bitrate'];
             }
 
-            if (isset($metadata['format']['sampleRate'])) {
-                $tags['sampleRate'] = $metadata['format']['sampleRate'];
+            if (isset($metadata['format']['sampleRate']) && !isset($payload['sample_rate'])) {
+                $payload['sampleRate'] = $metadata['format']['sampleRate'];
             }
         }
 
-        $fileData['tags'] = $tags;
+        // Merge with existing file tags
+        $existingTags = $file->tags ?? [];
+        foreach ($existingTags as $key => $value) {
+            if (!isset($payload[$key])) {
+                $payload[$key] = $value;
+            }
+        }
 
         return [
-            'file' => $fileData,
+            'payload' => $payload,
             'is_review_required' => $isReviewRequired
         ];
     }

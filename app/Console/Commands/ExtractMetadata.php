@@ -29,7 +29,7 @@ class ExtractMetadata extends Command
     {
         $count = 0;
 
-        File::where('mime_type', 'like', 'audio/%')
+        File::audio()
             ->chunk(100, function ($files) use (&$count) {
                 foreach ($files as $file) {
                     $this->info("Queuing metadata extraction for file: {$file->path}");
