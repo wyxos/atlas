@@ -7,16 +7,19 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-Route::group(['auth', 'verified'], function () {
+Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('dashboard', function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
     Route::get('audio', function(){
         return Inertia::render('Audio', [
-            'files' => \App\Models\File::audio()->select(['id'])->with('metadata')->get(),
+            'files' => \App\Models\File::audio()->select(['id', 'mime_type'])->with('metadata')->get(),
         ]);
     })->name('audio');
+
+    // Audio streaming route
+    Route::get('audio/stream/{id}', [\App\Http\Controllers\AudioController::class, 'stream'])->name('audio.stream');
 });
 
 
