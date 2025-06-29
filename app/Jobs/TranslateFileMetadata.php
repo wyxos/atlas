@@ -129,16 +129,12 @@ class TranslateFileMetadata implements ShouldQueue
                         $publisher = $tag['value'] ?? null;
                         break;
                     case 'APIC':
+                    case 'PIC':
+                        // Process any tag that contains image data
                         if (isset($tag['value']['data'])) {
                             $coverArtBinary = $this->decodeCoverArt($tag['value']['data']);
                             $coverArtMime = $tag['value']['format'] ?? 'image/jpeg';
                             $extension = explode('/', $coverArtMime)[1];
-
-                            // Generate temporary storage path
-                            $coverArtPath = "cover-art/{$file->id}.{$extension}";
-
-                            // Save to storage
-                            Storage::disk('public')->put($coverArtPath, $coverArtBinary);
 
                             // Create hash of the file content
                             $hash = md5($coverArtBinary);
@@ -150,48 +146,33 @@ class TranslateFileMetadata implements ShouldQueue
                                 // Associate the existing cover with the file
                                 $file->covers()->syncWithoutDetaching([$existingCover->id]);
 
-                                // Store the temporary path before updating
-                                $tempPath = $coverArtPath;
-
                                 // Update the cover path to point to the existing cover
                                 $coverArtPath = $existingCover->path;
-
-                                // Delete the duplicate file
-                                Storage::disk('public')->delete($tempPath);
                             } else {
                                 // Create a new cover record
                                 DB::beginTransaction();
 
                                 try {
+                                    // Create a new cover record first to get the ID
                                     $cover = Cover::create([
                                         'hash' => $hash,
-                                        'path' => $coverArtPath, // Temporary path
+                                        'path' => '', // Will be updated after we know the ID
                                     ]);
 
-                                    // Rename the file to follow the pattern cover-{coverId}.{ext}
-                                    $newPath = "covers/cover-{$cover->id}.{$extension}";
+                                    // Generate the path using the cover ID
+                                    $coverArtPath = "covers/{$cover->id}.{$extension}";
 
-                                    // Ensure the covers directory exists
-                                    if (!Storage::disk('public')->exists('covers')) {
-                                        Storage::disk('public')->makeDirectory('covers');
-                                    }
+                                    // Save to storage
+                                    Storage::disk('public')->put($coverArtPath, $coverArtBinary);
 
-                                    // Move the file to the new location
-                                    if (Storage::disk('public')->move($coverArtPath, $newPath)) {
-                                        // Update the cover record with the new path
-                                        $cover->path = $newPath;
-                                        $cover->save();
+                                    // Update the cover record with the path
+                                    $cover->path = $coverArtPath;
+                                    $cover->save();
 
-                                        // Associate the cover with the file
-                                        $file->covers()->syncWithoutDetaching([$cover->id]);
+                                    // Associate the cover with the file
+                                    $file->covers()->syncWithoutDetaching([$cover->id]);
 
-                                        // Update the cover path
-                                        $coverArtPath = $newPath;
-
-                                        DB::commit();
-                                    } else {
-                                        DB::rollBack();
-                                    }
+                                    DB::commit();
                                 } catch (\Exception $e) {
                                     Log::error("Error processing cover for file {$file->id}: " . $e->getMessage());
                                     DB::rollBack();
@@ -244,9 +225,8 @@ class TranslateFileMetadata implements ShouldQueue
             $payload['duration'] = $format['duration'] ?? null;
         }
 
-        if ($coverArtPath) {
-            $payload['cover_art_path'] = $coverArtPath;
-        }
+        // We no longer store cover_art_path in the metadata payload
+        // since we're already creating a cover entry
 
         // If we couldn't extract basic metadata, mark for review
         if (empty($title) && empty($artist) && empty($album)) {

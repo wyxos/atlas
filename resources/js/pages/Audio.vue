@@ -260,7 +260,7 @@ watch(query, (newQuery, oldQuery) => {
                 </div>
 
                 <!-- Results list -->
-                <RecycleScroller v-else class="h-[640px]" :items="query ? search : files" :item-size="48 + 16 + 16" key-field="id" v-slot="{ item }">
+                <RecycleScroller v-else class="h-[600px]" :items="query ? search : files" :item-size="48 + 16 + 16" key-field="id" v-slot="{ item }">
                     <div class="relative overflow-hidden">
                         <!-- Swipeable container -->
                         <div
@@ -279,26 +279,27 @@ watch(query, (newQuery, oldQuery) => {
                             @click="router.get(route('audio.show', { id: item.id }))"
                         >
                             <div class="flex gap-2 items-center">
-                                <div class="w-12 h-12 flex-shrink-0 overflow-hidden rounded">
+                                <div class="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative">
                                     <img
-                                        v-if="item.metadata?.payload?.cover_art_path"
-                                        :src="`/storage/${item.metadata.payload.cover_art_path}`"
+                                        v-if="item.covers && item.covers.length > 0"
+                                        :src="`/storage/${item.covers[0].path}`"
                                         alt="Cover"
                                         class="w-full h-full object-cover"
                                     />
                                     <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
                                         <span class="text-xs">No Cover</span>
                                     </div>
+                                    <button class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0" @click.stop="playAudio(item)">
+                                        <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
+                                        <Pause v-else :size="20" />
+                                    </button>
                                 </div>
                                 <div class="flex flex-col">
                                     <span class="text-xs font-semibold">{{ excerpt(item.metadata?.payload?.artist, 25) || 'Untitled' }}</span>
                                     <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
                                 </div>
                             </div>
-                            <button class="cursor-pointer" @click.stop="playAudio(item)">
-                                <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
-                                <Pause v-else :size="20" />
-                            </button>
+
 
                             <!-- Action buttons container -->
                             <div class="absolute top-0 left-full h-full items-center flex gap-4 p-4">
@@ -338,34 +339,46 @@ watch(query, (newQuery, oldQuery) => {
                     @volumechange="volume = audioPlayer?.volume || 1"
                 ></audio>
 
-                <!-- Title and controls -->
-                <div class="flex items-center mb-2">
-                    <div class="flex-1">
-                        <div class="font-medium text-white">{{ excerpt(currentTitle) }}</div>
-                    </div>
-                    <div v-if="currentFile" class="flex items-center">
-                        <button class="cursor-pointer text-white" @click="playAudio(currentFile)">
+                <div class="flex gap-4 items-center">
+                    <div v-if="currentFile" class="flex items-center justify-center relative">
+                        <img
+                            v-if="currentFile.covers && currentFile.covers.length > 0"
+                            :src="`/storage/${currentFile.covers[0].path}`"
+                            alt="Cover"
+                            class="w-32 h-32 object-cover"
+                        />
+                        <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
+                            <span class="text-xs">No Cover</span>
+                        </div>
+                        <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white" @click="playAudio(currentFile)">
                             <Play v-if="!isPlaying" :size="24" />
                             <Pause v-else :size="24" />
                         </button>
                     </div>
-                </div>
 
-                <!-- Progress bar -->
-                <div v-if="currentFile" class="mb-2">
-                    <div
-                        class="h-2 bg-gray-700 rounded-full cursor-pointer mb-2"
-                        @click="seekTo($event)"
-                    >
-                        <div
-                            class="h-full bg-blue-500 rounded-full"
-                            :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
-                        ></div>
+                    <div class="flex-1">
+                        <div class="font-medium text-white mb-2">{{ excerpt(currentTitle) }}</div>
+
+
+                        <!-- Progress bar -->
+                        <div v-if="currentFile" class="mb-2">
+                            <div
+                                class="h-2 bg-gray-700 rounded-full cursor-pointer mb-2"
+                                @click="seekTo($event)"
+                            >
+                                <div
+                                    class="h-full bg-blue-500 rounded-full"
+                                    :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                                ></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-white mb-2">
+                                <span>{{ formatTime(currentTime) }}</span>
+                                <span>{{ formatTime(duration) }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex justify-between text-xs text-white mb-2">
-                        <span>{{ formatTime(currentTime) }}</span>
-                        <span>{{ formatTime(duration) }}</span>
-                    </div>
+
+
                 </div>
 
 <!--                &lt;!&ndash; Volume control &ndash;&gt;-->

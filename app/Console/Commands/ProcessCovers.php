@@ -33,18 +33,16 @@ class ProcessCovers extends Command
     {
         $this->info('Starting cover processing...');
 
-        // Get all file metadata that contains a cover path
-        $fileMetadata = FileMetadata::whereRaw("JSON_EXTRACT(payload, '$.cover_art_path') IS NOT NULL")
-            ->with('file')
-            ->get();
+        // Get all files that have covers
+        $files = File::has('covers')->with('covers')->get();
 
-        $this->info("Found {$fileMetadata->count()} files with cover art.");
+        $this->info("Found {$files->count()} files with cover art.");
 
         $processed = 0;
         $duplicates = 0;
 
-        foreach ($fileMetadata as $metadata) {
-            $this->processMetadata($metadata, $processed, $duplicates);
+        foreach ($files as $file) {
+            $this->processFile($file, $processed, $duplicates);
         }
 
         $this->info("Processed {$processed} covers.");
@@ -54,23 +52,21 @@ class ProcessCovers extends Command
     }
 
     /**
-     * Process a single metadata record
+     * Process a single file's covers
      *
-     * @param FileMetadata $metadata
+     * @param File $file
      * @param int $processed
      * @param int $duplicates
      * @return void
      */
-    protected function processMetadata(FileMetadata $metadata, &$processed, &$duplicates): void
+    protected function processFile(File $file, &$processed, &$duplicates): void
     {
-        $file = $metadata->file;
-        $payload = $metadata->payload;
-
-        if (!$file || !isset($payload['cover_art_path'])) {
+        if (!$file || $file->covers->isEmpty()) {
             return;
         }
 
-        $coverPath = $payload['cover_art_path'];
+        $cover = $file->covers->first();
+        $coverPath = $cover->path;
         $this->info("Processing cover for file: {$file->path}");
 
         // Check if the cover file exists
@@ -86,8 +82,10 @@ class ProcessCovers extends Command
         // Get file extension
         $extension = pathinfo($coverPath, PATHINFO_EXTENSION);
 
-        // Check if a cover with this hash already exists
-        $existingCover = Cover::where('hash', $hash)->first();
+        // Check if a cover with this hash already exists (other than the current cover)
+        $existingCover = Cover::where('hash', $hash)
+            ->where('id', '!=', $cover->id)
+            ->first();
 
         if ($existingCover) {
             $this->info("Found duplicate cover with hash: {$hash}");
@@ -96,57 +94,31 @@ class ProcessCovers extends Command
             // Associate the existing cover with the file
             $file->covers()->syncWithoutDetaching([$existingCover->id]);
 
-            // Update the metadata to point to the existing cover
-            $payload['cover_art_path'] = $existingCover->path;
-            $metadata->payload = $payload;
-            $metadata->save();
+            // Remove the association with the current cover
+            $file->covers()->detach($cover->id);
 
             // Delete the duplicate file
             Storage::disk('public')->delete($coverPath);
             $this->info("Deleted duplicate cover: {$coverPath}");
         } else {
-            // Create a new cover record
-            DB::beginTransaction();
+            // Rename the file to follow the pattern cover-{coverId}.{ext}
+            $newPath = "covers/cover-{$cover->id}.{$extension}";
 
-            try {
-                $cover = Cover::create([
-                    'hash' => $hash,
-                    'path' => $coverPath, // Temporary path
-                ]);
+            // Ensure the covers directory exists
+            if (!Storage::disk('public')->exists('covers')) {
+                Storage::disk('public')->makeDirectory('covers');
+            }
 
-                // Rename the file to follow the pattern cover-{coverId}.{ext}
-                $newPath = "covers/cover-{$cover->id}.{$extension}";
+            // Move the file to the new location
+            if (Storage::disk('public')->move($coverPath, $newPath)) {
+                // Update the cover record with the new path
+                $cover->path = $newPath;
+                $cover->save();
 
-                // Ensure the covers directory exists
-                if (!Storage::disk('public')->exists('covers')) {
-                    Storage::disk('public')->makeDirectory('covers');
-                }
-
-                // Move the file to the new location
-                if (Storage::disk('public')->move($coverPath, $newPath)) {
-                    // Update the cover record with the new path
-                    $cover->path = $newPath;
-                    $cover->save();
-
-                    // Associate the cover with the file
-                    $file->covers()->syncWithoutDetaching([$cover->id]);
-
-                    // Update the metadata to point to the new path
-                    $payload['cover_art_path'] = $newPath;
-                    $metadata->payload = $payload;
-                    $metadata->save();
-
-                    $this->info("Created new cover: {$newPath}");
-                    $processed++;
-
-                    DB::commit();
-                } else {
-                    $this->error("Failed to move cover file from {$coverPath} to {$newPath}");
-                    DB::rollBack();
-                }
-            } catch (\Exception $e) {
-                $this->error("Error processing cover: " . $e->getMessage());
-                DB::rollBack();
+                $this->info("Updated cover path to: {$newPath}");
+                $processed++;
+            } else {
+                $this->error("Failed to move cover file from {$coverPath} to {$newPath}");
             }
         }
     }

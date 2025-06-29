@@ -155,13 +155,14 @@ describe('TranslateFileMetadata Job', function () {
 
         $metadata = $audioFile->metadata()->first();
 
-        // Check that cover art was saved and a path exists
-        expect($metadata->payload['cover_art_path'])->toContain("covers/cover-");
-        expect($metadata->payload['cover_art_path'])->toContain(".jpeg");
-        Storage::disk('public')->assertExists($metadata->payload['cover_art_path']);
-
         // Verify that a cover record was created and associated with the file
         expect($audioFile->covers()->count())->toBe(1);
+
+        // Get the cover
+        $cover = $audioFile->covers->first();
+
+        // Verify the cover exists in storage
+        Storage::disk('public')->assertExists($cover->path);
     });
 
     it('translates minimal metadata correctly', function () {
@@ -342,13 +343,14 @@ describe('Integration Tests', function () {
         expect($metadata->payload['title'])->toBe('Canon in D Major');
         expect($metadata->is_review_required)->toBeFalse();
 
-        // Verify cover art was extracted
-        expect($metadata->payload['cover_art_path'])->toContain("covers/cover-");
-        expect($metadata->payload['cover_art_path'])->toContain(".jpeg");
-        Storage::disk('public')->assertExists($metadata->payload['cover_art_path']);
-
         // Verify that a cover record was created and associated with the file
         expect($audioFile->covers()->count())->toBe(1);
+
+        // Get the cover
+        $cover = $audioFile->covers->first();
+
+        // Verify the cover exists in storage
+        Storage::disk('public')->assertExists($cover->path);
     });
 
     it('handles files that require review in complete workflow', function () {

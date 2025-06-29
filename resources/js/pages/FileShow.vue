@@ -10,6 +10,11 @@
           type: string
           size: number
           created_at: string
+          covers: Array<{
+              id: number
+              path: string
+              hash: string
+          }>
       },
         metadata: {
             id: number
@@ -17,7 +22,7 @@
             key: string
             value: string
         },
-        rawMetadata: {}
+        rawMetadata: Record<string, any>
   }>()
 </script>
 
@@ -25,6 +30,16 @@
     <Head title="FileShow" />
 
     <AppLayout>
+        <!-- Display cover if available -->
+        <div v-if="file.covers && file.covers.length > 0" class="mb-4">
+            <h2 class="text-lg font-semibold mb-2">Cover Art</h2>
+            <img
+                :src="`/storage/${file.covers[0].path}`"
+                alt="Cover Art"
+                class="max-w-xs rounded shadow"
+            />
+        </div>
+
         <pre>{{ file }}</pre>
 
         <pre>{{ metadata }}</pre>

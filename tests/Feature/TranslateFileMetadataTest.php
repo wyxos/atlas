@@ -68,8 +68,7 @@ test('it creates cover record when processing metadata with cover art', function
     // Assert that the cover is associated with the file
     expect($file->covers)->toHaveCount(1);
 
-    // Assert that the metadata contains the cover path
-    expect($file->metadata->payload['cover_art_path'])->not->toBeNull();
+    // We no longer store cover_art_path in the metadata payload
 });
 
 test('it reuses existing cover when duplicate is found', function () {
@@ -146,4 +145,63 @@ test('it reuses existing cover when duplicate is found', function () {
     expect($file2->covers)->toHaveCount(1);
     expect($file1->covers->first()->id)->toBe($existingCover->id);
     expect($file2->covers->first()->id)->toBe($existingCover->id);
+});
+
+test('it processes PIC tag for cover art', function () {
+    // Create a test file
+    $file = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+    ]);
+
+    // Create a simple metadata structure with PIC tag for cover art
+    $metadata = [
+        'native' => [
+            'ID3v2.3' => [
+                [
+                    'id' => 'TIT2',
+                    'value' => 'Test Title'
+                ],
+                [
+                    'id' => 'TPE1',
+                    'value' => 'Test Artist'
+                ],
+                [
+                    'id' => 'PIC', // Using PIC instead of APIC
+                    'value' => [
+                        'format' => 'image/png',
+                        'data' => array_values(unpack('C*', $this->testCoverData))
+                    ]
+                ]
+            ]
+        ],
+        'format' => [
+            'duration' => 180,
+            'bitrate' => 320000
+        ]
+    ];
+
+    // Save the metadata
+    $metadataPath = "metadata/{$file->id}.json";
+    Storage::put($metadataPath, json_encode($metadata));
+
+    // Process the file
+    $job = new TranslateFileMetadata($file);
+    $job->handle();
+
+    // Assert that a cover record was created
+    $this->assertDatabaseHas('covers', [
+        'hash' => $this->testCoverHash
+    ]);
+
+    // Assert that the cover is associated with the file
+    expect($file->covers)->toHaveCount(1);
+
+    // Get the cover
+    $cover = $file->covers->first();
+
+    // Assert that the cover path follows the pattern covers/{$cover->id}.png
+    expect($cover->path)->toBe("covers/{$cover->id}.png");
+
+    // Assert that the cover file exists in storage
+    Storage::disk('public')->assertExists($cover->path);
 });

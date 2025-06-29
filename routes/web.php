@@ -24,16 +24,16 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
                 })
                 ->get();
 
-            // Load metadata relationship for search results
+            // Load metadata and covers relationships for search results
             if ($search->isNotEmpty()) {
-                $search->load('metadata');
+                $search->load(['metadata', 'covers']);
             }
         }
 
         return Inertia::render('Audio', [
             'files' => fn() => \App\Models\File::audio()
                 ->select(['id'])
-                ->with('metadata')
+                ->with(['metadata', 'covers'])
                 ->get(),
             'search' => $search,
         ]);
