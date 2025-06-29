@@ -22,68 +22,77 @@ class RemoveMetadataWarnings extends Command
     protected $description = 'Cycle through all metadata JSON files and remove warnings';
 
     /**
+     * Get a generator that yields JSON files to reduce memory usage
+     * Uses recursive directory traversal for extremely large directories
+     *
+     * @param string $directory Directory to scan
+     * @return \Generator
+     */
+    protected function getJsonFilesGenerator(string $directory): \Generator
+    {
+        $files = Storage::files($directory);
+
+        foreach ($files as $file) {
+            // Only process JSON files
+            if (pathinfo($file, PATHINFO_EXTENSION) === 'json') {
+                yield $file;
+            }
+        }
+
+        // Recursively process subdirectories
+        $directories = Storage::directories($directory);
+        foreach ($directories as $subDirectory) {
+            yield from $this->getJsonFilesGenerator($subDirectory);
+        }
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle()
     {
-        $this->info('Starting to remove warnings from metadata JSON files...');
+        $this->info("Starting metadata warnings removal process...");
 
-        // Check if metadata directory exists
-        if (!Storage::exists('metadata')) {
-            $this->error('Metadata directory not found!');
-            return 1;
-        }
+        $metadataDirectory = 'metadata';
+        $count = 0;
+        $modified = 0;
 
-        // Get all JSON files in the metadata directory
-        $files = Storage::files('metadata');
-        $jsonFiles = array_filter($files, function ($file) {
-            return pathinfo($file, PATHINFO_EXTENSION) === 'json';
-        });
+        foreach ($this->getJsonFilesGenerator($metadataDirectory) as $file) {
+            $count++;
 
-        if (empty($jsonFiles)) {
-            $this->info('No metadata JSON files found.');
-            return 0;
-        }
+            try {
+                // Read the JSON file
+                $metadataJson = Storage::get($file);
+                $metadata = json_decode($metadataJson, true);
 
-        $this->info('Found ' . count($jsonFiles) . ' metadata JSON files.');
+                if (!$metadata) {
+                    $this->warn("Failed to parse JSON for file: {$file}");
+                    continue;
+                }
 
-        $processedCount = 0;
-        $modifiedCount = 0;
+                $hasWarnings = false;
 
-        foreach ($jsonFiles as $file) {
-            $this->line("Processing file: {$file}");
+                // Check if there are warnings to remove
+                if (isset($metadata['quality']['warnings']) && !empty($metadata['quality']['warnings'])) {
+                    // Remove warnings by setting to empty array
+                    $metadata['quality']['warnings'] = [];
+                    $hasWarnings = true;
+                }
 
-            // Read the JSON file
-            $content = Storage::get($file);
-            $metadata = json_decode($content, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $this->warn("Error parsing JSON in file: {$file}. Skipping.");
-                continue;
-            }
-
-            $processedCount++;
-            $modified = false;
-
-            // Check if the file has warnings in the quality section
-            if (isset($metadata['quality']['warnings']) && !empty($metadata['quality']['warnings'])) {
-                // Remove warnings
-                $metadata['quality']['warnings'] = [];
-                $modified = true;
-                $modifiedCount++;
-                $this->line("  - Removed warnings from file: {$file}");
-            }
-
-            // Save the modified JSON back to the file if it was modified
-            if ($modified) {
-                Storage::put($file, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                // Only update the file if warnings were removed
+                if ($hasWarnings) {
+                    // Write the updated JSON back to the file
+                    Storage::put($file, json_encode($metadata, JSON_PRETTY_PRINT));
+                    $modified++;
+                    $this->info("Removed warnings from file: {$file}");
+                }
+            } catch (\Exception $e) {
+                $this->error("Error processing file {$file}: " . $e->getMessage());
             }
         }
 
-        $this->info("Processed {$processedCount} files.");
-        $this->info("Modified {$modifiedCount} files to remove warnings.");
-        $this->info('Operation completed successfully.');
-
-        return 0;
+        $this->info("Metadata warnings removal process completed.");
+        $this->info("Total files processed: {$count}");
+        $this->info("Files modified: {$modified}");
     }
 }
