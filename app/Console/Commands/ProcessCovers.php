@@ -17,7 +17,7 @@ class ProcessCovers extends Command
      *
      * @var string
      */
-    protected $signature = 'files:process-covers';
+    protected $signature = 'files:process-covers {--file= : Process only the specified file ID}';
 
     /**
      * The console command description.
@@ -33,16 +33,29 @@ class ProcessCovers extends Command
     {
         $this->info('Starting cover processing...');
 
-        // Get all files that have covers
-        $files = File::has('covers')->with('covers')->get();
-
-        $this->info("Found {$files->count()} files with cover art.");
-
+        $fileId = $this->option('file');
         $processed = 0;
         $duplicates = 0;
 
-        foreach ($files as $file) {
-            $this->processFile($file, $processed, $duplicates);
+        // If a specific file ID is provided, only process that file
+        if ($fileId) {
+            $this->info("Processing only file with ID: {$fileId}");
+            $file = File::has('covers')->with('covers')->where('id', $fileId)->first();
+
+            if ($file) {
+                $this->processFile($file, $processed, $duplicates);
+            } else {
+                $this->error("File with ID {$fileId} not found or has no covers.");
+                return Command::FAILURE;
+            }
+        } else {
+            // Get all files that have covers
+            $files = File::has('covers')->with('covers')->get();
+            $this->info("Found {$files->count()} files with cover art.");
+
+            foreach ($files as $file) {
+                $this->processFile($file, $processed, $duplicates);
+            }
         }
 
         $this->info("Processed {$processed} covers.");

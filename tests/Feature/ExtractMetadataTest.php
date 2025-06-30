@@ -66,6 +66,32 @@ it('dispatches jobs for audio files when command is run', function () {
     });
 });
 
+it('dispatches job only for the specified file when using --file option', function () {
+    // Fake the bus to catch dispatched jobs
+    Bus::fake();
+
+    // Create some audio files
+    $audioFile1 = File::factory()->create(['mime_type' => 'audio/mp3']);
+    $audioFile2 = File::factory()->create(['mime_type' => 'audio/wav']);
+
+    // Run the command with the --file option for audioFile1
+    $this->artisan(ExtractMetadata::class, ['--file' => $audioFile1->id])
+        ->expectsOutput("Processing only file with ID: {$audioFile1->id}")
+        ->expectsOutput("Queuing metadata extraction for file: {$audioFile1->path}")
+        ->expectsOutput("Queued metadata extraction for 1 files.")
+        ->assertSuccessful();
+
+    // Assert that a job was dispatched only for the specified file
+    Bus::assertDispatched(ExtractFileMetadata::class, function ($job) use ($audioFile1) {
+        return $job->getFile()->id === $audioFile1->id;
+    });
+
+    // Assert that no job was dispatched for the other file
+    Bus::assertNotDispatched(ExtractFileMetadata::class, function ($job) use ($audioFile2) {
+        return $job->getFile()->id === $audioFile2->id;
+    });
+});
+
 it('processes file and updates metadata when job is executed', function () {
     // Create an audio file
     $audioFile = File::factory()->create(['mime_type' => 'audio/mp3', 'path' => '/path/to/audio.mp3']);

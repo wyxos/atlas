@@ -73,7 +73,7 @@ const currentArtist = computed(() => {
     if (!currentFile.value) return 'Unknown Artist';
     return currentFile.value.artists && currentFile.value.artists.length > 0
         ? currentFile.value.artists[0].name
-        : (currentFile.value.metadata?.payload?.artist || 'Unknown Artist');
+        : 'Unknown Artist';
 });
 
 function excerpt(text: string, length = 30): string {
@@ -306,7 +306,7 @@ watch(query, (newQuery, oldQuery) => {
                                     <span class="text-xs font-semibold">{{
                                         item.artists && item.artists.length > 0
                                         ? excerpt(item.artists[0].name, 25)
-                                        : (excerpt(item.metadata?.payload?.artist, 25) || 'Untitled')
+                                        : 'Unknown Artist'
                                     }}</span>
                                     <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
                                 </div>

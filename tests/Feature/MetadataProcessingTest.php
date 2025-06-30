@@ -131,9 +131,12 @@ describe('TranslateFileMetadata Job', function () {
         expect($metadata->payload['bitrate'])->toBe(128000);
         expect($metadata->payload['duration'])->toBe(30.123);
 
-        // Check that tags were populated
-        expect($metadata->payload['artist'])->toBe('Johann Pachelbel');
-        expect($metadata->payload['album'])->toBe('Classical Music for Relaxation');
+        // Check that tags were populated (artist and album are no longer stored in payload)
+        // Instead, check that the artist and album relationships were created
+        expect($audioFile->artists()->count())->toBe(1);
+        expect($audioFile->artists()->first()->name)->toBe('Johann Pachelbel');
+        expect($audioFile->albums()->count())->toBe(1);
+        expect($audioFile->albums()->first()->name)->toBe('Classical Music for Relaxation');
         expect($metadata->payload['year'])->toBe('1680');
         expect($metadata->payload['track'])->toBe('1/12');
     });
@@ -185,8 +188,11 @@ describe('TranslateFileMetadata Job', function () {
 
         expect($metadata->is_review_required)->toBeFalse();
         expect($metadata->payload['title'])->toBe('Test Audio File');
-        expect($metadata->payload['artist'])->toBe('Test Artist');
         expect($metadata->payload['existing_tag'])->toBe('value'); // Should preserve existing tags
+
+        // Check that the artist relationship was created
+        expect($audioFile->artists()->count())->toBe(1);
+        expect($audioFile->artists()->first()->name)->toBe('Test Artist');
     });
 
     it('handles ID3v1 metadata correctly', function () {
@@ -208,10 +214,14 @@ describe('TranslateFileMetadata Job', function () {
 
         expect($metadata->is_review_required)->toBeFalse();
         expect($metadata->payload['title'])->toBe('Old Format Song');
-        expect($metadata->payload['artist'])->toBe('Vintage Artist');
-        expect($metadata->payload['album'])->toBe('Classic Album');
         expect($metadata->payload['year'])->toBe('1995');
         expect($metadata->payload['track'])->toBe('5');
+
+        // Check that the artist and album relationships were created
+        expect($audioFile->artists()->count())->toBe(1);
+        expect($audioFile->artists()->first()->name)->toBe('Vintage Artist');
+        expect($audioFile->albums()->count())->toBe(1);
+        expect($audioFile->albums()->first()->name)->toBe('Classic Album');
     });
 
     it('marks files with no metadata for review', function () {
@@ -308,8 +318,9 @@ describe('TranslateFileMetadata Job', function () {
         expect($metadata->payload['user_rating'])->toBe(5);
         expect($metadata->payload['custom_tag'])->toBe('custom_value');
 
-        // Metadata tags should overwrite existing ones
-        expect($metadata->payload['artist'])->toBe('Johann Pachelbel');
+        // Artist relationship should be created from metadata, not from file tags
+        expect($audioFile->artists()->count())->toBe(1);
+        expect($audioFile->artists()->first()->name)->toBe('Johann Pachelbel');
     });
 });
 

@@ -13,7 +13,7 @@ class ExtractMetadata extends Command
      *
      * @var string
      */
-    protected $signature = 'files:extract-metadata';
+    protected $signature = 'files:extract-metadata {--file= : Process only the specified file ID}';
 
     /**
      * The console command description.
@@ -28,18 +28,35 @@ class ExtractMetadata extends Command
     public function handle()
     {
         $count = 0;
+        $fileId = $this->option('file');
 
-        File::audio()
-            ->chunk(100, function ($files) use (&$count) {
-                foreach ($files as $file) {
-                    $this->info("Queuing metadata extraction for file: {$file->path}");
+        // If a specific file ID is provided, only process that file
+        if ($fileId) {
+            $this->info("Processing only file with ID: {$fileId}");
+            $file = File::audio()->where('id', $fileId)->first();
 
-                    // Dispatch the job to the queue
-                    ExtractFileMetadata::dispatch($file);
+            if ($file) {
+                $this->info("Queuing metadata extraction for file: {$file->path}");
+                ExtractFileMetadata::dispatch($file);
+                $count = 1;
+            } else {
+                $this->error("File with ID {$fileId} not found or is not an audio file.");
+                return Command::FAILURE;
+            }
+        } else {
+            // Process all audio files in chunks if no specific file ID is provided
+            File::audio()
+                ->chunk(100, function ($files) use (&$count) {
+                    foreach ($files as $file) {
+                        $this->info("Queuing metadata extraction for file: {$file->path}");
 
-                    $count++;
-                }
-            });
+                        // Dispatch the job to the queue
+                        ExtractFileMetadata::dispatch($file);
+
+                        $count++;
+                    }
+                });
+        }
 
         $this->info("Queued metadata extraction for {$count} files.");
     }

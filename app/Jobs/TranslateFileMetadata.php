@@ -252,16 +252,42 @@ class TranslateFileMetadata implements ShouldQueue
         // Update payload data
         $payload['title'] = $title;
 
-        // Create or find artist and associate with file
+        // Create or find artist(s) and associate with file
         if (!empty($artist)) {
-            $artistModel = Artist::firstOrCreate(['name' => $artist]);
-            $file->artists()->syncWithoutDetaching([$artistModel->id]);
+            // Check if there are multiple artists (separated by commas, semicolons, or '&')
+            $artistNames = preg_split('/[,;&]+/', $artist);
+            $artistIds = [];
+
+            foreach ($artistNames as $artistName) {
+                $artistName = trim($artistName);
+                if (!empty($artistName)) {
+                    $artistModel = Artist::firstOrCreate(['name' => $artistName]);
+                    $artistIds[] = $artistModel->id;
+                }
+            }
+
+            if (!empty($artistIds)) {
+                $file->artists()->syncWithoutDetaching($artistIds);
+            }
         }
 
-        // Create or find album and associate with file
+        // Create or find album(s) and associate with file
         if (!empty($album)) {
-            $albumModel = Album::firstOrCreate(['name' => $album]);
-            $file->albums()->syncWithoutDetaching([$albumModel->id]);
+            // Check if there are multiple albums (separated by commas, semicolons, or '&')
+            $albumNames = preg_split('/[,;&]+/', $album);
+            $albumIds = [];
+
+            foreach ($albumNames as $albumName) {
+                $albumName = trim($albumName);
+                if (!empty($albumName)) {
+                    $albumModel = Album::firstOrCreate(['name' => $albumName]);
+                    $albumIds[] = $albumModel->id;
+                }
+            }
+
+            if (!empty($albumIds)) {
+                $file->albums()->syncWithoutDetaching($albumIds);
+            }
         }
 
         if (!empty($year)) {
@@ -294,6 +320,12 @@ class TranslateFileMetadata implements ShouldQueue
                 $payload[$key] = $value;
             }
         }
+
+        // Explicitly remove artist and album from the payload as per requirements
+        unset($payload['artist']);
+        unset($payload['artists']);
+        unset($payload['album']);
+        unset($payload['albums']);
 
         return [
             'payload' => $payload,

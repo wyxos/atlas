@@ -56,3 +56,30 @@ test('command correctly identifies existing and non-existing files', function ()
     // The URL file should have not_found = false (as we assume URLs exist)
     expect($urlFile->not_found)->toBeFalse();
 });
+
+test('command processes only the specified file when using --file option', function () {
+    // Reset the not_found flags to false for all files
+    File::query()->update(['not_found' => false]);
+
+    // Get the non-existing file
+    $nonExistingFile = File::where('filename', 'non_existing_file.txt')->first();
+
+    // Run the command with the --file option for the non-existing file
+    $this->artisan('files:check-existence --file=' . $nonExistingFile->id)
+         ->expectsOutput('Checking file existence...')
+         ->expectsOutput('Processing only file with ID: ' . $nonExistingFile->id)
+         ->assertSuccessful();
+
+    // Refresh the models
+    $existingFile = File::where('filename', 'existing_file.txt')->first();
+    $nonExistingFile->refresh();
+    $urlFile = File::where('filename', 'some_url.txt')->first();
+
+    // Only the specified file should be processed
+    // The non-existing file should have not_found = true
+    expect($nonExistingFile->not_found)->toBeTrue();
+
+    // The other files should remain unchanged (not_found = false)
+    expect($existingFile->not_found)->toBeFalse();
+    expect($urlFile->not_found)->toBeFalse();
+});

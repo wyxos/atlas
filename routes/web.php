@@ -33,7 +33,6 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
         return Inertia::render('Audio', [
             'files' => fn() => \App\Models\File::audio()
                 ->select(['id'])
-                ->with(['metadata', 'covers', 'artists', 'albums'])
                 ->get(),
             'search' => $search,
         ]);

@@ -13,7 +13,7 @@ class CheckFilesExistence extends Command
      *
      * @var string
      */
-    protected $signature = 'files:check-existence';
+    protected $signature = 'files:check-existence {--file= : Process only the specified file ID}';
 
     /**
      * The console command description.
@@ -29,7 +29,20 @@ class CheckFilesExistence extends Command
     {
         $this->info('Checking file existence...');
 
-        $files = File::all();
+        $fileId = $this->option('file');
+
+        if ($fileId) {
+            $this->info("Processing only file with ID: {$fileId}");
+            $files = File::where('id', $fileId)->get();
+
+            if ($files->isEmpty()) {
+                $this->error("File with ID {$fileId} not found.");
+                return Command::FAILURE;
+            }
+        } else {
+            $files = File::all();
+        }
+
         $totalFiles = $files->count();
         $notFoundCount = 0;
         $foundCount = 0;

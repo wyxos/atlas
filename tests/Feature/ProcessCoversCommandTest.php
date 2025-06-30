@@ -153,3 +153,65 @@ test('process covers command handles missing cover files gracefully', function (
     // Assert that the cover still exists in the database
     $this->assertDatabaseCount('covers', 1);
 });
+
+test('process covers command processes only the specified file when using --file option', function () {
+    // Create test files with metadata containing cover paths
+    $file1 = File::factory()->create([
+        'path' => 'test/file1.mp3',
+        'filename' => 'file1',
+        'ext' => 'mp3',
+    ]);
+
+    $file2 = File::factory()->create([
+        'path' => 'test/file2.mp3',
+        'filename' => 'file2',
+        'ext' => 'mp3',
+    ]);
+
+    // Create metadata records
+    FileMetadata::create([
+        'file_id' => $file1->id,
+        'payload' => [],
+        'is_extracted' => true,
+    ]);
+
+    FileMetadata::create([
+        'file_id' => $file2->id,
+        'payload' => [],
+        'is_extracted' => true,
+    ]);
+
+    // Create cover records
+    $cover1 = Cover::create([
+        'hash' => md5('test cover content 1'),
+        'path' => 'cover-art/test1.jpg',
+    ]);
+
+    $cover2 = Cover::create([
+        'hash' => md5('test cover content 2'),
+        'path' => 'cover-art/test2.jpg',
+    ]);
+
+    // Associate covers with files
+    $file1->covers()->syncWithoutDetaching([$cover1->id]);
+    $file2->covers()->syncWithoutDetaching([$cover2->id]);
+
+    // Create test cover files
+    Storage::disk('public')->put('cover-art/test1.jpg', 'test cover content 1');
+    Storage::disk('public')->put('cover-art/test2.jpg', 'test cover content 2');
+
+    // Run the command with --file option for file1
+    $this->artisan('files:process-covers --file=' . $file1->id)
+         ->expectsOutput('Starting cover processing...')
+         ->expectsOutput('Processing only file with ID: ' . $file1->id)
+         ->assertSuccessful();
+
+    // Verify that only file1's cover was processed
+    // The cover path should be updated to follow the pattern cover-{coverId}.{ext}
+    $cover1->refresh();
+    $this->assertStringContainsString('covers/cover-' . $cover1->id, $cover1->path);
+
+    // Verify that file2's cover was not processed
+    $cover2->refresh();
+    $this->assertEquals('cover-art/test2.jpg', $cover2->path);
+});
