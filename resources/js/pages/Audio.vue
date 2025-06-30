@@ -6,6 +6,7 @@ import { RecycleScroller } from 'vue-virtual-scroller';
 import { Play, Pause } from 'lucide-vue-next';
 import {ref, computed, watch, reactive, onMounted, onBeforeUnmount} from 'vue';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
 import debounce from 'lodash/debounce';
 import axios from 'axios';
@@ -33,6 +34,7 @@ const isPlaying = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
 const volume = ref(1); // Default volume (0-1)
+const isPlayerLoading = ref(false); // Track when player is loading
 
 // Play the selected audio file
 async function playAudio(file: any): Promise<void> {
@@ -42,9 +44,11 @@ async function playAudio(file: any): Promise<void> {
 
     if (!fileData) {
         // If file data is not loaded yet, load it
+        isPlayerLoading.value = true; // Set loading state to true
         fileData = await loadFileDetails(fileId);
         if (!fileData) {
             console.error('Failed to load file data for playback');
+            isPlayerLoading.value = false; // Reset loading state on error
             return;
         }
     }
@@ -60,6 +64,7 @@ async function playAudio(file: any): Promise<void> {
         }
     } else {
         // Play a new file
+        isPlayerLoading.value = true; // Set loading state to true
         currentFile.value = fileData;
         if (audioPlayer.value) {
             // Use the streaming route instead of direct file path
@@ -67,10 +72,12 @@ async function playAudio(file: any): Promise<void> {
             audioPlayer.value.play()
                 .then(() => {
                     isPlaying.value = true;
+                    isPlayerLoading.value = false; // Reset loading state on success
                 })
                 .catch(error => {
                     console.error('Error playing audio:', error);
                     isPlaying.value = false;
+                    isPlayerLoading.value = false; // Reset loading state on error
                 });
         }
     }
@@ -358,27 +365,37 @@ watch(query, (newQuery, oldQuery) => {
                         >
                             <div class="flex gap-2 items-center">
                                 <div class="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative">
-                                    <img
-                                        v-if="loadedFiles[item.id]?.covers && loadedFiles[item.id].covers.length > 0"
-                                        :src="`/storage/${loadedFiles[item.id].covers[0].path}`"
-                                        alt="Cover"
-                                        class="w-full h-full object-cover"
-                                    />
-                                    <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
-                                        <span class="text-xs">No Cover</span>
-                                    </div>
+                                    <!-- Loading skeleton for cover -->
+                                    <Skeleton v-if="!loadedFiles[item.id]" class="w-full h-full" />
+                                    <!-- Actual cover image when loaded -->
+                                    <template v-else>
+                                        <img
+                                            v-if="loadedFiles[item.id].covers && loadedFiles[item.id].covers.length > 0"
+                                            :src="`/storage/${loadedFiles[item.id].covers[0].path}`"
+                                            alt="Cover"
+                                            class="w-full h-full object-cover"
+                                        />
+                                        <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
+                                            <span class="text-xs">No Cover</span>
+                                        </div>
+                                    </template>
                                     <button class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0" @click.stop="playAudio(getFileData(item))">
                                         <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
                                         <Pause v-else :size="20" />
                                     </button>
                                 </div>
                                 <div class="flex flex-col">
-                                    <span class="text-xs font-semibold">{{
-                                        loadedFiles[item.id]?.artists && loadedFiles[item.id].artists.length > 0
+                                    <!-- Loading skeleton for artist name -->
+                                    <Skeleton v-if="!loadedFiles[item.id]" class="h-4 w-24 mb-1" />
+                                    <span v-else class="text-xs font-semibold">{{
+                                        loadedFiles[item.id].artists && loadedFiles[item.id].artists.length > 0
                                         ? excerpt(loadedFiles[item.id].artists[0].name, 25)
                                         : 'Unknown Artist'
                                     }}</span>
-                                    <span>{{ excerpt(loadedFiles[item.id]?.metadata?.payload?.title, 25) || 'Untitled' }}</span>
+
+                                    <!-- Loading skeleton for title -->
+                                    <Skeleton v-if="!loadedFiles[item.id]" class="h-4 w-32" />
+                                    <span v-else>{{ excerpt(loadedFiles[item.id]?.metadata?.payload?.title, 25) || 'Untitled' }}</span>
                                 </div>
                             </div>
 
@@ -417,12 +434,17 @@ watch(query, (newQuery, oldQuery) => {
                     class="hidden"
                     @ended="isPlaying = false"
                     @timeupdate="currentTime = audioPlayer?.currentTime || 0"
-                    @loadedmetadata="duration = audioPlayer?.duration || 0"
+                    @loadedmetadata="duration = audioPlayer?.duration || 0; isPlayerLoading = false"
                     @volumechange="volume = audioPlayer?.volume || 1"
                 ></audio>
 
                 <div class="flex gap-4 items-center">
-                    <div v-if="currentFile" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
+                    <!-- Loading skeleton for player cover -->
+                    <div v-if="isPlayerLoading" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
+                        <Skeleton class="w-full h-full" />
+                    </div>
+                    <!-- Actual player cover when loaded -->
+                    <div v-else-if="currentFile" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
                         <img
                             v-if="currentFile.covers && currentFile.covers.length > 0"
                             :src="`/storage/${currentFile.covers[0].path}`"
@@ -439,14 +461,28 @@ watch(query, (newQuery, oldQuery) => {
                     </div>
 
                     <div class="flex-1">
-                        <div class="font-medium text-white mb-2 flex flex-col gap-1">
+                        <!-- Loading skeleton for player artist and title -->
+                        <div v-if="isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
+                            <Skeleton class="h-4 w-24" />
+                            <Skeleton class="h-5 w-32" />
+                        </div>
+                        <!-- Actual player artist and title when loaded -->
+                        <div v-else-if="currentFile" class="font-medium text-white mb-2 flex flex-col gap-1">
                             <span class="text-xs font-semibold">{{ excerpt(currentArtist) || 'Untitled' }}</span>
                             <span>{{ excerpt(currentTitle) }}</span>
                         </div>
 
 
-                        <!-- Progress bar -->
-                        <div v-if="currentFile" class="mb-2">
+                        <!-- Progress bar skeleton -->
+                        <div v-if="isPlayerLoading" class="mb-2">
+                            <Skeleton class="h-2 w-full mb-2" />
+                            <div class="flex justify-between text-xs text-white mb-2">
+                                <Skeleton class="h-3 w-10" />
+                                <Skeleton class="h-3 w-10" />
+                            </div>
+                        </div>
+                        <!-- Actual progress bar -->
+                        <div v-else-if="currentFile" class="mb-2">
                             <div
                                 class="h-2 bg-gray-700 rounded-full cursor-pointer mb-2"
                                 @click="seekTo($event)"
