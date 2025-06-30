@@ -91,6 +91,22 @@ class File extends Model
     }
 
     /**
+     * Get the artists associated with the file.
+     */
+    public function artists(): BelongsToMany
+    {
+        return $this->belongsToMany(Artist::class);
+    }
+
+    /**
+     * Get the albums associated with the file.
+     */
+    public function albums(): BelongsToMany
+    {
+        return $this->belongsToMany(Album::class);
+    }
+
+    /**
      * Scope a query to only include audio files.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query

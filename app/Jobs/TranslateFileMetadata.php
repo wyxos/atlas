@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Album;
+use App\Models\Artist;
 use App\Models\Cover;
 use App\Models\File;
 use Illuminate\Bus\Queueable;
@@ -250,13 +252,16 @@ class TranslateFileMetadata implements ShouldQueue
         // Update payload data
         $payload['title'] = $title;
 
-        // Add other metadata directly to payload if available
+        // Create or find artist and associate with file
         if (!empty($artist)) {
-            $payload['artist'] = $artist;
+            $artistModel = Artist::firstOrCreate(['name' => $artist]);
+            $file->artists()->syncWithoutDetaching([$artistModel->id]);
         }
 
+        // Create or find album and associate with file
         if (!empty($album)) {
-            $payload['album'] = $album;
+            $albumModel = Album::firstOrCreate(['name' => $album]);
+            $file->albums()->syncWithoutDetaching([$albumModel->id]);
         }
 
         if (!empty($year)) {

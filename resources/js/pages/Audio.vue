@@ -68,6 +68,14 @@ const currentTitle = computed(() => {
     return currentFile.value.metadata?.payload?.title || 'Untitled';
 });
 
+// Get the current file artist for display
+const currentArtist = computed(() => {
+    if (!currentFile.value) return 'Unknown Artist';
+    return currentFile.value.artists && currentFile.value.artists.length > 0
+        ? currentFile.value.artists[0].name
+        : (currentFile.value.metadata?.payload?.artist || 'Unknown Artist');
+});
+
 function excerpt(text: string, length = 30): string {
     if (!text) return '';
     return text.length > length ? text.substring(0, length) + '...' : text;
@@ -295,7 +303,11 @@ watch(query, (newQuery, oldQuery) => {
                                     </button>
                                 </div>
                                 <div class="flex flex-col">
-                                    <span class="text-xs font-semibold">{{ excerpt(item.metadata?.payload?.artist, 25) || 'Untitled' }}</span>
+                                    <span class="text-xs font-semibold">{{
+                                        item.artists && item.artists.length > 0
+                                        ? excerpt(item.artists[0].name, 25)
+                                        : (excerpt(item.metadata?.payload?.artist, 25) || 'Untitled')
+                                    }}</span>
                                     <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
                                 </div>
                             </div>
@@ -345,7 +357,7 @@ watch(query, (newQuery, oldQuery) => {
                             v-if="currentFile.covers && currentFile.covers.length > 0"
                             :src="`/storage/${currentFile.covers[0].path}`"
                             alt="Cover"
-                            class="w-32 h-32 object-cover"
+                            class="w-18 h-18 md:w-32 md:h-32 object-cover"
                         />
                         <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
                             <span class="text-xs">No Cover</span>
@@ -357,7 +369,10 @@ watch(query, (newQuery, oldQuery) => {
                     </div>
 
                     <div class="flex-1">
-                        <div class="font-medium text-white mb-2">{{ excerpt(currentTitle) }}</div>
+                        <div class="font-medium text-white mb-2 flex flex-col gap-1">
+                            <span class="text-xs font-semibold">{{ excerpt(currentArtist) || 'Untitled' }}</span>
+                            <span>{{ excerpt(currentTitle) }}</span>
+                        </div>
 
 
                         <!-- Progress bar -->
