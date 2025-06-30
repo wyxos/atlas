@@ -43,9 +43,9 @@ async function playAudio(file: any): Promise<void> {
     let fileData = loadedFiles[fileId];
 
     if (!fileData) {
-        // If file data is not loaded yet, load it
+        // If file data is not loaded yet, load it with priority
         isPlayerLoading.value = true; // Set loading state to true
-        fileData = await loadFileDetails(fileId);
+        fileData = await loadFileDetails(fileId, true); // Use priority loading
         if (!fileData) {
             console.error('Failed to load file data for playback');
             isPlayerLoading.value = false; // Reset loading state on error
@@ -138,18 +138,39 @@ const isLoading = ref(false);
 // Store for loaded file details
 const loadedFiles = reactive<Record<string, any>>({});
 
-// Function to load file details
-async function loadFileDetails(fileId: string | number) {
+// Store for in-progress requests
+const pendingRequests = reactive<Record<string | number, AbortController>>({});
+
+// Function to load file details with cancellation support
+async function loadFileDetails(fileId: string | number, priority: boolean = false) {
     if (loadedFiles[fileId]) {
         return loadedFiles[fileId]; // Return cached data if already loaded
     }
 
+    // Cancel any existing request for this file if not priority
+    if (pendingRequests[fileId] && !priority) {
+        pendingRequests[fileId].abort();
+        delete pendingRequests[fileId];
+    }
+
+    // Create a new abort controller for this request
+    const controller = new AbortController();
+    pendingRequests[fileId] = controller;
+
     try {
-        const response = await axios.get(route('audio.details', { file: fileId }));
+        const response = await axios.get(route('audio.details', { file: fileId }), {
+            signal: controller.signal
+        });
         loadedFiles[fileId] = response.data;
+        delete pendingRequests[fileId];
         return response.data;
     } catch (error) {
-        console.error('Error loading file details:', error);
+        if (axios.isCancel(error)) {
+            console.log('Request canceled for file:', fileId);
+        } else {
+            console.error('Error loading file details:', error);
+        }
+        delete pendingRequests[fileId];
         return null;
     }
 }
@@ -162,30 +183,97 @@ function getFileData(item: any) {
 // Intersection Observer setup
 const observer = ref<IntersectionObserver | null>(null);
 const observedItems = ref<Set<string | number>>(new Set());
+const visibleItems = ref<Set<string | number>>(new Set());
+const isScrolling = ref(false);
+const scrollTimeout = ref<number | null>(null);
 
 onMounted(() => {
     observer.value = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
+            const itemId = entry.target.getAttribute('data-item-id');
+            if (!itemId) return;
+
             if (entry.isIntersecting) {
-                const itemId = entry.target.getAttribute('data-item-id');
-                if (itemId && !observedItems.value.has(itemId)) {
+                // Item is now visible
+                visibleItems.value.add(itemId);
+
+                if (!observedItems.value.has(itemId)) {
                     observedItems.value.add(itemId);
-                    loadFileDetails(itemId);
+
+                    // If we're not scrolling, load with priority
+                    // If we are scrolling, only queue the request (will be prioritized when scrolling stops)
+                    if (!isScrolling.value) {
+                        loadFileDetails(itemId, true); // Priority load
+                    } else {
+                        // Low priority load that might get cancelled
+                        loadFileDetails(itemId, false);
+                    }
+                }
+            } else {
+                // Item is no longer visible
+                visibleItems.value.delete(itemId);
+
+                // If there's a pending request and we're scrolling, cancel it
+                if (pendingRequests[itemId] && isScrolling.value) {
+                    pendingRequests[itemId].abort();
+                    delete pendingRequests[itemId];
                 }
             }
         });
     }, { threshold: 0.1 });
+
+    // Add scroll event listener to detect scrolling
+    const scrollContainer = document.querySelector('.RecycleScroller');
+    if (scrollContainer) {
+        scrollContainer.addEventListener('scroll', handleScroll);
+    }
 });
 
 onBeforeUnmount(() => {
     if (observer.value) {
         observer.value.disconnect();
     }
+
+    // Clean up scroll event listener
+    const scrollContainer = document.querySelector('.RecycleScroller');
+    if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+    }
+
+    // Clear any pending timeout
+    if (scrollTimeout.value !== null) {
+        window.clearTimeout(scrollTimeout.value);
+    }
 });
+
+// Handle scroll events
+function handleScroll() {
+    isScrolling.value = true;
+
+    // Clear previous timeout
+    if (scrollTimeout.value !== null) {
+        window.clearTimeout(scrollTimeout.value);
+    }
+
+    // Set a timeout to detect when scrolling stops
+    scrollTimeout.value = window.setTimeout(() => {
+        isScrolling.value = false;
+        prioritizeVisibleItems();
+    }, 150); // Adjust timeout as needed
+}
+
+// Prioritize loading of currently visible items
+function prioritizeVisibleItems() {
+    visibleItems.value.forEach(itemId => {
+        if (!loadedFiles[itemId]) {
+            loadFileDetails(itemId, true); // Load with priority
+        }
+    });
+}
 
 // Function to set up observation for an item
 function observeItem(el: HTMLElement, itemId: string | number) {
-    if (observer.value && el && !observedItems.value.has(itemId)) {
+    if (observer.value && el) {
         el.setAttribute('data-item-id', String(itemId));
         observer.value.observe(el);
     }
@@ -345,7 +433,7 @@ watch(query, (newQuery, oldQuery) => {
                 </div>
 
                 <!-- Results list -->
-                <RecycleScroller v-else class="h-[600px]" :items="query ? search : files" :item-size="48 + 16 + 16" key-field="id" v-slot="{ item }">
+                <RecycleScroller v-else class="h-[600px] RecycleScroller" :items="query ? search : files" :item-size="48 + 16 + 16" key-field="id" v-slot="{ item }">
                     <div class="relative overflow-hidden" :ref="el => el && observeItem(el, item.id)">
                         <!-- Swipeable container -->
                         <div
