@@ -38,4 +38,12 @@ class AudioController extends Controller
             'rawMetadata' => Storage::json('metadata/' . $file->id . '.json'),
         ]);
     }
+
+    public function getDetails(File $file)
+    {
+        // Load the covers, artists, and albums relationships
+        $file->load(['metadata', 'covers', 'artists', 'albums']);
+
+        return response()->json($file);
+    }
 }

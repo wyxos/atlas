@@ -4,10 +4,11 @@ import type { BreadcrumbItem } from '@/types';
 import {Head, router} from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
 import { Play, Pause } from 'lucide-vue-next';
-import {ref, computed, watch} from 'vue';
+import {ref, computed, watch, reactive, onMounted, onBeforeUnmount} from 'vue';
 import { Input } from '@/components/ui/input';
 import { Loader2, Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
 import debounce from 'lodash/debounce';
+import axios from 'axios';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -34,8 +35,21 @@ const duration = ref(0);
 const volume = ref(1); // Default volume (0-1)
 
 // Play the selected audio file
-function playAudio(file: any): void {
-    if (currentFile.value && currentFile.value.id === file.id) {
+async function playAudio(file: any): Promise<void> {
+    // Ensure we have the full file data
+    const fileId = file.id;
+    let fileData = loadedFiles[fileId];
+
+    if (!fileData) {
+        // If file data is not loaded yet, load it
+        fileData = await loadFileDetails(fileId);
+        if (!fileData) {
+            console.error('Failed to load file data for playback');
+            return;
+        }
+    }
+
+    if (currentFile.value && currentFile.value.id === fileId) {
         // Toggle play/pause if it's the same file
         if (isPlaying.value) {
             audioPlayer.value?.pause();
@@ -46,10 +60,10 @@ function playAudio(file: any): void {
         }
     } else {
         // Play a new file
-        currentFile.value = file;
+        currentFile.value = fileData;
         if (audioPlayer.value) {
             // Use the streaming route instead of direct file path
-            audioPlayer.value.src = `/audio/stream/${file.id}`;
+            audioPlayer.value.src = `/audio/stream/${fileId}`;
             audioPlayer.value.play()
                 .then(() => {
                     isPlaying.value = true;
@@ -113,6 +127,62 @@ function seekTo(event: MouseEvent): void {
 
 const query = ref('');
 const isLoading = ref(false);
+
+// Store for loaded file details
+const loadedFiles = reactive<Record<string, any>>({});
+
+// Function to load file details
+async function loadFileDetails(fileId: string | number) {
+    if (loadedFiles[fileId]) {
+        return loadedFiles[fileId]; // Return cached data if already loaded
+    }
+
+    try {
+        const response = await axios.get(route('audio.details', { file: fileId }));
+        loadedFiles[fileId] = response.data;
+        return response.data;
+    } catch (error) {
+        console.error('Error loading file details:', error);
+        return null;
+    }
+}
+
+// Function to get file data (either from cache or props)
+function getFileData(item: any) {
+    return loadedFiles[item.id] || item;
+}
+
+// Intersection Observer setup
+const observer = ref<IntersectionObserver | null>(null);
+const observedItems = ref<Set<string | number>>(new Set());
+
+onMounted(() => {
+    observer.value = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const itemId = entry.target.getAttribute('data-item-id');
+                if (itemId && !observedItems.value.has(itemId)) {
+                    observedItems.value.add(itemId);
+                    loadFileDetails(itemId);
+                }
+            }
+        });
+    }, { threshold: 0.1 });
+});
+
+onBeforeUnmount(() => {
+    if (observer.value) {
+        observer.value.disconnect();
+    }
+});
+
+// Function to set up observation for an item
+function observeItem(el: HTMLElement, itemId: string | number) {
+    if (observer.value && el && !observedItems.value.has(itemId)) {
+        el.setAttribute('data-item-id', String(itemId));
+        observer.value.observe(el);
+    }
+}
 
 // Swipe functionality
 const swipedItemId = ref<string | null>(null);
@@ -269,7 +339,7 @@ watch(query, (newQuery, oldQuery) => {
 
                 <!-- Results list -->
                 <RecycleScroller v-else class="h-[600px]" :items="query ? search : files" :item-size="48 + 16 + 16" key-field="id" v-slot="{ item }">
-                    <div class="relative overflow-hidden">
+                    <div class="relative overflow-hidden" :ref="el => el && observeItem(el, item.id)">
                         <!-- Swipeable container -->
                         <div
                             class="file p-4 flex justify-between items-center rounded border-b-2 border-blue-200 transition-transform duration-300 relative"
@@ -284,31 +354,31 @@ watch(query, (newQuery, oldQuery) => {
                             @mousemove="handleTouchMove"
                             @mouseup="handleTouchEnd(item)"
                             @mouseleave="isDragging && handleTouchEnd(item)"
-                            @click="router.get(route('audio.show', { id: item.id }))"
+                            @click="router.get(route('audio.show', { file: item.id }))"
                         >
                             <div class="flex gap-2 items-center">
                                 <div class="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative">
                                     <img
-                                        v-if="item.covers && item.covers.length > 0"
-                                        :src="`/storage/${item.covers[0].path}`"
+                                        v-if="loadedFiles[item.id]?.covers && loadedFiles[item.id].covers.length > 0"
+                                        :src="`/storage/${loadedFiles[item.id].covers[0].path}`"
                                         alt="Cover"
                                         class="w-full h-full object-cover"
                                     />
                                     <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
                                         <span class="text-xs">No Cover</span>
                                     </div>
-                                    <button class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0" @click.stop="playAudio(item)">
+                                    <button class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0" @click.stop="playAudio(getFileData(item))">
                                         <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
                                         <Pause v-else :size="20" />
                                     </button>
                                 </div>
                                 <div class="flex flex-col">
                                     <span class="text-xs font-semibold">{{
-                                        item.artists && item.artists.length > 0
-                                        ? excerpt(item.artists[0].name, 25)
+                                        loadedFiles[item.id]?.artists && loadedFiles[item.id].artists.length > 0
+                                        ? excerpt(loadedFiles[item.id].artists[0].name, 25)
                                         : 'Unknown Artist'
                                     }}</span>
-                                    <span>{{ excerpt(item.metadata?.payload?.title, 25) || 'Untitled' }}</span>
+                                    <span>{{ excerpt(loadedFiles[item.id]?.metadata?.payload?.title, 25) || 'Untitled' }}</span>
                                 </div>
                             </div>
 
@@ -352,17 +422,17 @@ watch(query, (newQuery, oldQuery) => {
                 ></audio>
 
                 <div class="flex gap-4 items-center">
-                    <div v-if="currentFile" class="flex items-center justify-center relative">
+                    <div v-if="currentFile" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
                         <img
                             v-if="currentFile.covers && currentFile.covers.length > 0"
                             :src="`/storage/${currentFile.covers[0].path}`"
                             alt="Cover"
-                            class="w-18 h-18 md:w-32 md:h-32 object-cover"
+                            class="w-full h-full object-cover"
                         />
                         <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
                             <span class="text-xs">No Cover</span>
                         </div>
-                        <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white" @click="playAudio(currentFile)">
+                        <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white" @click="playAudio({id: currentFile.id})">
                             <Play v-if="!isPlaying" :size="24" />
                             <Pause v-else :size="24" />
                         </button>

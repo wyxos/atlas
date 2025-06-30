@@ -40,6 +40,9 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     Route::get('audio/{file}', [AudioController::class, 'show'])->name('audio.show');
 
+    // Audio details route for AJAX loading
+    Route::get('audio/{file}/details', [AudioController::class, 'getDetails'])->name('audio.details');
+
     // Audio streaming route
     Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');
 });
