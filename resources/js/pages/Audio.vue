@@ -149,6 +149,10 @@ onBeforeUnmount(() => {
         scrollContainer.removeEventListener('scroll', handleScroll);
     }
 });
+
+const initialQuery = window.location.search
+    ? new URLSearchParams(window.location.search).get('query') || ''
+    : '';
 </script>
 
 <template>
@@ -157,7 +161,7 @@ onBeforeUnmount(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="h-full flex flex-col" @click="handleGlobalClick">
             <!-- Search component -->
-            <AudioSearch :initial-query="props.search?.query">
+            <AudioSearch :initial-query="initialQuery">
                 <template #noResults="{ query }">
                     <p class="text-gray-500">No match was found for "{{ query }}"</p>
                 </template>
