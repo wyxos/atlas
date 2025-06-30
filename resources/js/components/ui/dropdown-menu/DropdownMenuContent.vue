@@ -7,7 +7,7 @@ import {
   DropdownMenuPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
-import { computed, type HTMLAttributes } from 'vue'
+import { computed, reactive, type HTMLAttributes } from 'vue'
 
 const props = withDefaults(
   defineProps<DropdownMenuContentProps & { class?: HTMLAttributes['class'] }>(),
@@ -23,7 +23,8 @@ const delegatedProps = computed(() => {
   return delegated
 })
 
-const forwarded = useForwardPropsEmits(delegatedProps, emits)
+// Convert computed to reactive before passing to useForwardPropsEmits
+const forwarded = useForwardPropsEmits(reactive(delegatedProps), emits)
 </script>
 
 <template>

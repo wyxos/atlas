@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import {Head, router} from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
-import { Play, Pause } from 'lucide-vue-next';
-import {ref, computed, watch, reactive, onMounted, onBeforeUnmount} from 'vue';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
-import debounce from 'lodash/debounce';
-import axios from 'axios';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+
+// Import our new components and composables
+import AudioPlayer from '@/components/audio/AudioPlayer.vue';
+import AudioListItem from '@/components/audio/AudioListItem.vue';
+import AudioSearch from '@/components/audio/AudioSearch.vue';
+import { useAudioFileLoader } from '@/components/audio/useAudioFileLoader';
+import { useAudioSwipeHandler } from '@/components/audio/useAudioSwipeHandler';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -22,19 +23,37 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-defineProps<{
+const props = defineProps<{
     files: any[];
     search: any[];
 }>();
 
 // Audio player state
-const audioPlayer = ref<HTMLAudioElement | null>(null);
 const currentFile = ref<any>(null);
 const isPlaying = ref(false);
-const currentTime = ref(0);
-const duration = ref(0);
-const volume = ref(1); // Default volume (0-1)
 const isPlayerLoading = ref(false); // Track when player is loading
+
+// Use our composables
+const {
+  loadedFiles,
+  loadFileDetails,
+  getFileData,
+  handleScroll,
+  observeItem: baseObserveItem,
+  createObserver,
+  cleanup: cleanupFileLoader
+} = useAudioFileLoader();
+
+const {
+  swipedItemId,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
+  handleGlobalClick
+} = useAudioSwipeHandler();
+
+// Intersection Observer setup
+const observer = ref<IntersectionObserver | null>(null);
 
 // Play the selected audio file
 async function playAudio(file: any): Promise<void> {
@@ -51,295 +70,32 @@ async function playAudio(file: any): Promise<void> {
             isPlayerLoading.value = false; // Reset loading state on error
             return;
         }
+        // No need to reset isPlayerLoading here as it will be reset after setting the current file
     }
 
     if (currentFile.value && currentFile.value.id === fileId) {
         // Toggle play/pause if it's the same file
         if (isPlaying.value) {
-            audioPlayer.value?.pause();
             isPlaying.value = false;
         } else {
-            audioPlayer.value?.play();
             isPlaying.value = true;
         }
     } else {
         // Play a new file
         isPlayerLoading.value = true; // Set loading state to true
         currentFile.value = fileData;
-        if (audioPlayer.value) {
-            // Use the streaming route instead of direct file path
-            audioPlayer.value.src = `/audio/stream/${fileId}`;
-            audioPlayer.value.play()
-                .then(() => {
-                    isPlaying.value = true;
-                    isPlayerLoading.value = false; // Reset loading state on success
-                })
-                .catch(error => {
-                    console.error('Error playing audio:', error);
-                    isPlaying.value = false;
-                    isPlayerLoading.value = false; // Reset loading state on error
-                });
-        }
+        isPlaying.value = true;
+        isPlayerLoading.value = false; // Reset loading state after setting the current file
     }
 }
 
-// Get the current file title for display
-const currentTitle = computed(() => {
-    if (!currentFile.value) return 'No file selected';
-    return currentFile.value.metadata?.payload?.title || 'Untitled';
-});
-
-// Get the current file artist for display
-const currentArtist = computed(() => {
-    if (!currentFile.value) return 'Unknown Artist';
-    return currentFile.value.artists && currentFile.value.artists.length > 0
-        ? currentFile.value.artists[0].name
-        : 'Unknown Artist';
-});
-
-function excerpt(text: string, length = 30): string {
-    if (!text) return '';
-    return text.length > length ? text.substring(0, length) + '...' : text;
+// Handle player events
+function handlePlayerEnded(): void {
+    isPlaying.value = false;
 }
 
-// Format time in MM:SS format
-function formatTime(seconds: number): string {
-    if (isNaN(seconds) || !isFinite(seconds)) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Seek to a specific position in the audio
-function seekTo(event: MouseEvent): void {
-    if (!audioPlayer.value || !duration.value) return;
-
-    const progressBar = event.currentTarget as HTMLElement;
-    const rect = progressBar.getBoundingClientRect();
-    const offsetX = event.clientX - rect.left;
-    const percentage = offsetX / rect.width;
-
-    audioPlayer.value.currentTime = percentage * duration.value;
-}
-
-// Set volume
-// function setVolume(value: number): void {
-//     if (!audioPlayer.value) return;
-//
-//     // Ensure volume is between 0 and 1
-//     const newVolume = Math.max(0, Math.min(1, value));
-//     audioPlayer.value.volume = newVolume;
-//     volume.value = newVolume;
-// }
-
-const query = ref('');
-const isLoading = ref(false);
-
-// Store for loaded file details
-const loadedFiles = reactive<Record<string, any>>({});
-
-// Store for in-progress requests
-const pendingRequests = reactive<Record<string | number, AbortController>>({});
-
-// Function to load file details with cancellation support
-async function loadFileDetails(fileId: string | number, priority: boolean = false) {
-    if (loadedFiles[fileId]) {
-        return loadedFiles[fileId]; // Return cached data if already loaded
-    }
-
-    // Cancel any existing request for this file if not priority
-    if (pendingRequests[fileId] && !priority) {
-        pendingRequests[fileId].abort();
-        delete pendingRequests[fileId];
-    }
-
-    // Create a new abort controller for this request
-    const controller = new AbortController();
-    pendingRequests[fileId] = controller;
-
-    try {
-        const response = await axios.get(route('audio.details', { file: fileId }), {
-            signal: controller.signal
-        });
-        loadedFiles[fileId] = response.data;
-        delete pendingRequests[fileId];
-        return response.data;
-    } catch (error) {
-        if (axios.isCancel(error)) {
-            console.log('Request canceled for file:', fileId);
-        } else {
-            console.error('Error loading file details:', error);
-        }
-        delete pendingRequests[fileId];
-        return null;
-    }
-}
-
-// Function to get file data (either from cache or props)
-function getFileData(item: any) {
-    return loadedFiles[item.id] || item;
-}
-
-// Intersection Observer setup
-const observer = ref<IntersectionObserver | null>(null);
-const observedItems = ref<Set<string | number>>(new Set());
-const visibleItems = ref<Set<string | number>>(new Set());
-const isScrolling = ref(false);
-const scrollTimeout = ref<number | null>(null);
-
-onMounted(() => {
-    observer.value = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            const itemId = entry.target.getAttribute('data-item-id');
-            if (!itemId) return;
-
-            if (entry.isIntersecting) {
-                // Item is now visible
-                visibleItems.value.add(itemId);
-
-                if (!observedItems.value.has(itemId)) {
-                    observedItems.value.add(itemId);
-
-                    // If we're not scrolling, load with priority
-                    // If we are scrolling, only queue the request (will be prioritized when scrolling stops)
-                    if (!isScrolling.value) {
-                        loadFileDetails(itemId, true); // Priority load
-                    } else {
-                        // Low priority load that might get cancelled
-                        loadFileDetails(itemId, false);
-                    }
-                }
-            } else {
-                // Item is no longer visible
-                visibleItems.value.delete(itemId);
-
-                // If there's a pending request and we're scrolling, cancel it
-                if (pendingRequests[itemId] && isScrolling.value) {
-                    pendingRequests[itemId].abort();
-                    delete pendingRequests[itemId];
-                }
-            }
-        });
-    }, { threshold: 0.1 });
-
-    // Add scroll event listener to detect scrolling
-    const scrollContainer = document.querySelector('.RecycleScroller');
-    if (scrollContainer) {
-        scrollContainer.addEventListener('scroll', handleScroll);
-    }
-});
-
-onBeforeUnmount(() => {
-    if (observer.value) {
-        observer.value.disconnect();
-    }
-
-    // Clean up scroll event listener
-    const scrollContainer = document.querySelector('.RecycleScroller');
-    if (scrollContainer) {
-        scrollContainer.removeEventListener('scroll', handleScroll);
-    }
-
-    // Clear any pending timeout
-    if (scrollTimeout.value !== null) {
-        window.clearTimeout(scrollTimeout.value);
-    }
-});
-
-// Handle scroll events
-function handleScroll() {
-    isScrolling.value = true;
-
-    // Clear previous timeout
-    if (scrollTimeout.value !== null) {
-        window.clearTimeout(scrollTimeout.value);
-    }
-
-    // Set a timeout to detect when scrolling stops
-    scrollTimeout.value = window.setTimeout(() => {
-        isScrolling.value = false;
-        prioritizeVisibleItems();
-    }, 150); // Adjust timeout as needed
-}
-
-// Prioritize loading of currently visible items
-function prioritizeVisibleItems() {
-    visibleItems.value.forEach(itemId => {
-        if (!loadedFiles[itemId]) {
-            loadFileDetails(itemId, true); // Load with priority
-        }
-    });
-}
-
-// Function to set up observation for an item
-function observeItem(el: HTMLElement, itemId: string | number) {
-    if (observer.value && el) {
-        el.setAttribute('data-item-id', String(itemId));
-        observer.value.observe(el);
-    }
-}
-
-// Swipe functionality
-const swipedItemId = ref<string | null>(null);
-const startX = ref<number | null>(null);
-const endX = ref<number | null>(null);
-const swipeThreshold = 50; // Minimum distance to trigger swipe
-const isDragging = ref(false);
-
-// Handle touch/mouse start
-function handleTouchStart(event: TouchEvent | MouseEvent): void {
-    if ('touches' in event) {
-        startX.value = event.touches[0].clientX;
-    } else {
-        isDragging.value = true;
-        startX.value = event.clientX;
-    }
-}
-
-// Handle touch/mouse move
-function handleTouchMove(event: TouchEvent | MouseEvent): void {
-    if ('touches' in event) {
-        endX.value = event.touches[0].clientX;
-    } else if (isDragging.value) {
-        endX.value = event.clientX;
-    }
-}
-
-// Handle touch/mouse end
-function handleTouchEnd(item: any): void {
-    if (!startX.value || !endX.value) return;
-
-    const swipeDistance = startX.value - endX.value;
-
-    // If swiped left beyond threshold
-    if (swipeDistance > swipeThreshold) {
-        // If this item is already open, close it
-        if (swipedItemId.value === item.id) {
-            swipedItemId.value = null;
-        } else {
-            // Open this item, closing any previously open item
-            swipedItemId.value = item.id;
-        }
-    }
-    // If swiped right beyond threshold
-    else if (swipeDistance < -swipeThreshold) {
-        // Close the item if it's open
-        if (swipedItemId.value === item.id) {
-            swipedItemId.value = null;
-        }
-    }
-
-    // Reset coordinates and dragging state
-    startX.value = null;
-    endX.value = null;
-    isDragging.value = false;
-}
-
-// Close any open item when clicking outside
-function handleGlobalClick(): void {
-    if (swipedItemId.value) {
-        swipedItemId.value = null;
-    }
+function handlePlayerPause(): void {
+    isPlaying.value = false;
 }
 
 // Action handlers
@@ -367,49 +123,31 @@ function dislikeItem(item: any, event: Event): void {
     swipedItemId.value = null;
 }
 
-const debouncedSearch = debounce((newQuery: string|null, oldQuery: string|null) => {
-    if (newQuery && newQuery.trim()) {
-        console.log('Searching for:', newQuery);
-        isLoading.value = true;
-        router.get(route('audio'), { query: newQuery }, {
-            preserveState: true,
-            only: ['search'],
-            replace: true,
-            onSuccess: () => {
-                console.log('Search completed');
-                isLoading.value = false;
-            },
-            onError: (error) => {
-                console.error('Search error:', error);
-                isLoading.value = false;
-            }
-        });
+// Wrap the observeItem function to include our observer
+function observeItem(el: HTMLElement, itemId: string | number): void {
+    if (observer.value) {
+        baseObserveItem(el, itemId, observer.value);
     }
+}
 
-    console.log('Old query:', oldQuery, 'New query:', newQuery);
+onMounted(() => {
+    observer.value = createObserver();
 
-    if(oldQuery && !newQuery) {
-        console.log('Clearing search, resetting results');
-        // If query is cleared, reset search results
-        isLoading.value = true;
-        router.get(route('audio'), {}, {
-            preserveState: true,
-            only: ['search'],
-            replace: true,
-            onSuccess: () => {
-                console.log('Search reset');
-                isLoading.value = false;
-            },
-            onError: (error) => {
-                console.error('Reset error:', error);
-                isLoading.value = false;
-            }
-        });
+    // Add scroll event listener to detect scrolling
+    const scrollContainer = document.querySelector('.RecycleScroller');
+    if (scrollContainer) {
+        scrollContainer.addEventListener('scroll', handleScroll);
     }
-}, 500); // adjust delay as needed (ms)
+});
 
-watch(query, (newQuery, oldQuery) => {
-    debouncedSearch(newQuery, oldQuery);
+onBeforeUnmount(() => {
+    cleanupFileLoader(observer.value);
+
+    // Clean up scroll event listener
+    const scrollContainer = document.querySelector('.RecycleScroller');
+    if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+    }
 });
 </script>
 
@@ -418,192 +156,53 @@ watch(query, (newQuery, oldQuery) => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="h-full flex flex-col" @click="handleGlobalClick">
-            <div class="p-4">
-                <Input type="search" placeholder="Search" v-model="query" />
-            </div>
-            <div class="flex-1 md:p-4">
-                <!-- Loading spinner -->
-                <div v-if="isLoading" class="flex justify-center items-center h-[640px]">
-                    <Loader2 class="animate-spin" :size="40" />
-                </div>
-
-                <!-- No results message -->
-                <div v-else-if="query && search.length === 0" class="flex justify-center items-center h-[640px]">
+            <!-- Search component -->
+            <AudioSearch :initial-query="props.search?.query">
+                <template #noResults="{ query }">
                     <p class="text-gray-500">No match was found for "{{ query }}"</p>
-                </div>
+                </template>
 
-                <!-- Results list -->
-                <RecycleScroller v-else class="h-[600px] RecycleScroller" :items="query ? search : files" :item-size="48 + 16 + 16" key-field="id" v-slot="{ item }">
-                    <div class="relative overflow-hidden" :ref="el => el && observeItem(el, item.id)">
-                        <!-- Swipeable container -->
-                        <div
-                            class="file p-4 flex justify-between items-center rounded border-b-2 border-blue-200 transition-transform duration-300 relative"
-                            :class="{
-                                'bg-blue-500': currentFile?.id === item.id,
-                                'transform -translate-x-32': swipedItemId === item.id
-                            }"
-                            @touchstart="handleTouchStart"
-                            @touchmove="handleTouchMove"
-                            @touchend="handleTouchEnd(item)"
-                            @mousedown="handleTouchStart"
-                            @mousemove="handleTouchMove"
-                            @mouseup="handleTouchEnd(item)"
-                            @mouseleave="isDragging && handleTouchEnd(item)"
-                            @click="router.get(route('audio.show', { file: item.id }))"
+                <template #default="{ query }">
+                    <!-- Results list -->
+                    <div class="flex-1 md:p-4">
+                        <RecycleScroller
+                            class="h-[600px] RecycleScroller"
+                            :items="query ? props.search : props.files"
+                            :item-size="74"
+                            key-field="id"
+                            v-slot="{ item }"
                         >
-                            <div class="flex gap-2 items-center">
-                                <div class="w-12 h-12 flex-shrink-0 overflow-hidden rounded relative">
-                                    <!-- Loading skeleton for cover -->
-                                    <Skeleton v-if="!loadedFiles[item.id]" class="w-full h-full" />
-                                    <!-- Actual cover image when loaded -->
-                                    <template v-else>
-                                        <img
-                                            v-if="loadedFiles[item.id].covers && loadedFiles[item.id].covers.length > 0"
-                                            :src="`/storage/${loadedFiles[item.id].covers[0].path}`"
-                                            alt="Cover"
-                                            class="w-full h-full object-cover"
-                                        />
-                                        <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
-                                            <span class="text-xs">No Cover</span>
-                                        </div>
-                                    </template>
-                                    <button class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0" @click.stop="playAudio(getFileData(item))">
-                                        <Play v-if="!isPlaying || currentFile?.id !== item.id" :size="20" />
-                                        <Pause v-else :size="20" />
-                                    </button>
-                                </div>
-                                <div class="flex flex-col">
-                                    <!-- Loading skeleton for artist name -->
-                                    <Skeleton v-if="!loadedFiles[item.id]" class="h-4 w-24 mb-1" />
-                                    <span v-else class="text-xs font-semibold">{{
-                                        loadedFiles[item.id].artists && loadedFiles[item.id].artists.length > 0
-                                        ? excerpt(loadedFiles[item.id].artists[0].name, 25)
-                                        : 'Unknown Artist'
-                                    }}</span>
-
-                                    <!-- Loading skeleton for title -->
-                                    <Skeleton v-if="!loadedFiles[item.id]" class="h-4 w-32" />
-                                    <span v-else>{{ excerpt(loadedFiles[item.id]?.metadata?.payload?.title, 25) || 'Untitled' }}</span>
-                                </div>
+                            <div class="relative overflow-hidden" :ref="el => el && observeItem(el, item.id)">
+                                <!-- List item component -->
+                                <AudioListItem
+                                    :item="item"
+                                    :loaded-file="loadedFiles[item.id]"
+                                    :is-playing="isPlaying"
+                                    :current-file-id="currentFile ? currentFile.id : null"
+                                    :is-swiped-open="swipedItemId === item.id"
+                                    @play="playAudio(getFileData(item))"
+                                    @touch-start="handleTouchStart"
+                                    @touch-move="handleTouchMove"
+                                    @touch-end="handleTouchEnd"
+                                    @favorite="toggleFavorite"
+                                    @like="likeItem"
+                                    @dislike="dislikeItem"
+                                />
                             </div>
-
-
-                            <!-- Action buttons container -->
-                            <div class="absolute top-0 left-full h-full items-center flex gap-4 p-4">
-                                <button
-                                    class=""
-                                    @click.stop="toggleFavorite(item, $event)"
-                                >
-                                    <Heart :size="20" />
-                                </button>
-                                <button
-                                    class=""
-                                    @click.stop="likeItem(item, $event)"
-                                >
-                                    <ThumbsUp :size="20" />
-                                </button>
-                                <button
-                                    class=""
-                                    @click.stop="dislikeItem(item, $event)"
-                                >
-                                    <ThumbsDown :size="20" />
-                                </button>
-                            </div>
-                        </div>
-
-
+                        </RecycleScroller>
                     </div>
-                </RecycleScroller>
-            </div>
+                </template>
+            </AudioSearch>
 
-            <div class="bg-blue-950 p-4 border-t fixed bottom-0 left-0 right-0 md:static">
-                <audio
-                    ref="audioPlayer"
-                    class="hidden"
-                    @ended="isPlaying = false"
-                    @timeupdate="currentTime = audioPlayer?.currentTime || 0"
-                    @loadedmetadata="duration = audioPlayer?.duration || 0; isPlayerLoading = false"
-                    @volumechange="volume = audioPlayer?.volume || 1"
-                ></audio>
-
-                <div class="flex gap-4 items-center">
-                    <!-- Loading skeleton for player cover -->
-                    <div v-if="isPlayerLoading" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
-                        <Skeleton class="w-full h-full" />
-                    </div>
-                    <!-- Actual player cover when loaded -->
-                    <div v-else-if="currentFile" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
-                        <img
-                            v-if="currentFile.covers && currentFile.covers.length > 0"
-                            :src="`/storage/${currentFile.covers[0].path}`"
-                            alt="Cover"
-                            class="w-full h-full object-cover"
-                        />
-                        <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
-                            <span class="text-xs">No Cover</span>
-                        </div>
-                        <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white" @click="playAudio({id: currentFile.id})">
-                            <Play v-if="!isPlaying" :size="24" />
-                            <Pause v-else :size="24" />
-                        </button>
-                    </div>
-
-                    <div class="flex-1">
-                        <!-- Loading skeleton for player artist and title -->
-                        <div v-if="isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
-                            <Skeleton class="h-4 w-24" />
-                            <Skeleton class="h-5 w-32" />
-                        </div>
-                        <!-- Actual player artist and title when loaded -->
-                        <div v-else-if="currentFile" class="font-medium text-white mb-2 flex flex-col gap-1">
-                            <span class="text-xs font-semibold">{{ excerpt(currentArtist) || 'Untitled' }}</span>
-                            <span>{{ excerpt(currentTitle) }}</span>
-                        </div>
-
-
-                        <!-- Progress bar skeleton -->
-                        <div v-if="isPlayerLoading" class="mb-2">
-                            <Skeleton class="h-2 w-full mb-2" />
-                            <div class="flex justify-between text-xs text-white mb-2">
-                                <Skeleton class="h-3 w-10" />
-                                <Skeleton class="h-3 w-10" />
-                            </div>
-                        </div>
-                        <!-- Actual progress bar -->
-                        <div v-else-if="currentFile" class="mb-2">
-                            <div
-                                class="h-2 bg-gray-700 rounded-full cursor-pointer mb-2"
-                                @click="seekTo($event)"
-                            >
-                                <div
-                                    class="h-full bg-blue-500 rounded-full"
-                                    :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
-                                ></div>
-                            </div>
-                            <div class="flex justify-between text-xs text-white mb-2">
-                                <span>{{ formatTime(currentTime) }}</span>
-                                <span>{{ formatTime(duration) }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-
-                </div>
-
-<!--                &lt;!&ndash; Volume control &ndash;&gt;-->
-<!--                <div v-if="currentFile" class="flex items-center">-->
-<!--                    <span class="text-xs text-white mr-2">Volume</span>-->
-<!--                    <input-->
-<!--                        type="range"-->
-<!--                        min="0"-->
-<!--                        max="1"-->
-<!--                        step="0.01"-->
-<!--                        :value="volume"-->
-<!--                        @input="setVolume(parseFloat(($event.target as HTMLInputElement).value))"-->
-<!--                        class="w-24"-->
-<!--                    />-->
-<!--                </div>-->
-            </div>
+            <!-- Audio player component -->
+            <AudioPlayer
+                :current-file="currentFile"
+                :is-playing="isPlaying"
+                :is-player-loading="isPlayerLoading"
+                @play="playAudio"
+                @pause="handlePlayerPause"
+                @ended="handlePlayerEnded"
+            />
         </div>
     </AppLayout>
 </template>
