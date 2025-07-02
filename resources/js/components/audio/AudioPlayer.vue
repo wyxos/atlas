@@ -328,8 +328,8 @@ onBeforeUnmount(() => {
       <!-- End of player desktop -->
 
       <!-- Start of mobile player -->
-      <div>
-          <div class="flex gap-2 items-center md:hidden mb-4">
+      <div class="md:hidden">
+          <div class="flex gap-2 items-center  mb-4">
               <!-- Loading skeleton for player cover -->
               <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-12 h-12">
                   <Skeleton class="w-full h-full" />
@@ -364,16 +364,15 @@ onBeforeUnmount(() => {
 
               <div class="flex items-center justify-center gap-4">
                   <button
-                      class="btn-atlas-primary p-3 transition-colors"
+                      class="btn-atlas-primary p-2 transition-colors"
                       @click="togglePlayPause"
                       title="Play/Pause"
                   >
-                      <Play v-if="!audioStore.isPlaying" :size="24" />
-                      <Pause v-else :size="24" />
+                      <Play v-if="!audioStore.isPlaying" :size="20" />
+                      <Pause v-else :size="20" />
                   </button>
               </div>
           </div>
-
 
           <!-- Progress bar skeleton -->
           <div v-if="audioStore.isPlayerLoading" class="mb-2">
