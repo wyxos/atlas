@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AudioController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -45,6 +46,9 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     // Audio streaming route
     Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');
+
+    // Users route
+    Route::get('users', [UserController::class, 'index'])->name('users.index');
 });
 
 require __DIR__.'/settings.php';
