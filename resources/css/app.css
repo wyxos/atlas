@@ -122,39 +122,40 @@
 }
 
 .dark {
-    --background: hsl(0 0% 3.9%);
-    --foreground: hsl(0 0% 98%);
-    --card: hsl(0 0% 3.9%);
-    --card-foreground: hsl(0 0% 98%);
-    --popover: hsl(0 0% 3.9%);
-    --popover-foreground: 0 0% 98%;
-    --primary: hsl(0 0% 98%);
-    --primary-foreground: hsl(0 0% 9%);
-    --secondary: hsl(0 0% 14.9%);
-    --secondary-foreground: hsl(0 0% 98%);
-    --muted: hsl(0 0% 16.08%);
-    --muted-foreground: hsl(0 0% 63.9%);
-    --accent: hsl(0 0% 14.9%);
-    --accent-foreground: hsl(0 0% 98%);
-    --destructive: hsl(0 84% 60%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --border: hsl(0 0% 14.9%);
-    --input: hsl(0 0% 14.9%);
-    --ring: hsl(0 0% 83.1%);
-    --chart-1: hsl(220 70% 50%);
-    --chart-2: hsl(160 60% 45%);
-    --chart-3: hsl(30 80% 55%);
-    --chart-4: hsl(280 65% 60%);
-    --chart-5: hsl(340 75% 55%);
-    --sidebar-background: hsl(0 0% 7%);
-    --sidebar-foreground: hsl(0 0% 95.9%);
-    --sidebar-primary: hsl(360, 100%, 100%);
+    /* Custom Atlas Dark Theme */
+    --background: hsl(216 100% 2.5%); /* Rich Black */
+    --foreground: hsl(0 0% 100%); /* Pure White */
+    --card: hsl(214 100% 11.8%); /* Oxford Blue */
+    --card-foreground: hsl(0 0% 100%);
+    --popover: hsl(214 100% 11.8%); /* Oxford Blue */
+    --popover-foreground: hsl(0 0% 100%);
+    --primary: hsl(207 100% 20%); /* Yale Blue */
+    --primary-foreground: hsl(0 0% 100%);
+    --secondary: hsl(205 43% 49%); /* Steel Blue */
+    --secondary-foreground: hsl(0 0% 100%);
+    --muted: hsl(214 100% 8%); /* Darker Oxford Blue */
+    --muted-foreground: hsl(0 0% 70%);
+    --accent: hsl(205 43% 49%); /* Steel Blue */
+    --accent-foreground: hsl(0 0% 100%);
+    --destructive: hsl(349 100% 38%); /* Fire Brick */
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(214 100% 15%); /* Slightly lighter Oxford Blue */
+    --input: hsl(214 100% 15%); /* Slightly lighter Oxford Blue */
+    --ring: hsl(205 43% 49%); /* Steel Blue */
+    --chart-1: hsl(207 100% 20%); /* Yale Blue */
+    --chart-2: hsl(205 43% 49%); /* Steel Blue */
+    --chart-3: hsl(45 100% 50%); /* Gold accent */
+    --chart-4: hsl(349 100% 38%); /* Fire Brick */
+    --chart-5: hsl(45 100% 47%); /* Mikado Yellow */
+    --sidebar-background: hsl(216 100% 2.5%); /* Rich Black */
+    --sidebar-foreground: hsl(0 0% 100%);
+    --sidebar-primary: hsl(207 100% 20%); /* Yale Blue */
     --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(0 0% 15.9%);
-    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-    --sidebar-border: hsl(0 0% 15.9%);
-    --sidebar-ring: hsl(217.2 91.2% 59.8%);
-    --sidebar: hsl(240 5.9% 10%);
+    --sidebar-accent: hsl(214 100% 11.8%); /* Oxford Blue */
+    --sidebar-accent-foreground: hsl(0 0% 100%);
+    --sidebar-border: hsl(214 100% 15%); /* Border color */
+    --sidebar-ring: hsl(205 43% 49%); /* Steel Blue */
+    --sidebar: hsl(216 100% 2.5%); /* Rich Black */
 }
 
 @layer base {
@@ -163,5 +164,93 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+/* Atlas Custom Branding Styles */
+@layer components {
+    /* Enhanced button styling with Atlas colors */
+    .btn-atlas-primary {
+        @apply bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium transition-colors;
+    }
+    
+    .btn-atlas-secondary {
+        @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground px-4 py-2 rounded-md font-medium transition-colors;
+    }
+    
+    .btn-atlas-destructive {
+        @apply bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-md font-medium transition-colors;
+    }
+    
+    /* Atlas card styling */
+    .card-atlas {
+        @apply bg-card border border-border rounded-lg shadow-sm;
+    }
+    
+    /* Atlas navigation styling */
+    .nav-atlas {
+        @apply bg-card border-b border-border;
+    }
+    
+    /* Atlas sidebar enhancements */
+    .sidebar-atlas {
+        @apply bg-sidebar border-r border-sidebar-border;
+    }
+    
+    /* Atlas form styling */
+    .input-atlas {
+        @apply bg-input border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring;
+    }
+    
+    /* Atlas accent gradients */
+    .gradient-atlas-primary {
+        background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+    }
+    
+    .gradient-atlas-accent {
+        background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
+    }
+    
+    /* Atlas text colors */
+    .text-atlas-primary {
+        @apply text-primary;
+    }
+    
+    .text-atlas-secondary {
+        @apply text-secondary;
+    }
+    
+    .text-atlas-accent {
+        @apply text-accent;
+    }
+    
+    /* Atlas focus styles */
+    .focus-atlas {
+        @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+    }
+    
+    /* Dark mode specific enhancements */
+    .dark {
+        /* Improved scrollbar styling */
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+    }
+    
+    .dark ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    .dark ::-webkit-scrollbar-track {
+        background: hsl(var(--background));
+    }
+    
+    .dark ::-webkit-scrollbar-thumb {
+        background: hsl(var(--muted));
+        border-radius: 4px;
+    }
+    
+    .dark ::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--accent));
     }
 }

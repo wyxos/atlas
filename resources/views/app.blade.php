@@ -19,14 +19,14 @@
             })();
         </script>
 
-        {{-- Inline style to set the HTML background color based on our theme in app.css --}}
+        {{-- Inline style to set the HTML background color based on our Atlas theme in app.css --}}
         <style>
             html {
-                background-color: oklch(1 0 0);
+                background-color: hsl(0 0% 100%); /* Light mode white */
             }
 
             html.dark {
-                background-color: oklch(0.145 0 0);
+                background-color: hsl(216 100% 2.5%); /* Atlas Rich Black */
             }
         </style>
 
