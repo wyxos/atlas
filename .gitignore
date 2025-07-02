@@ -23,3 +23,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Personal commands - user-specific workflow scripts
+/app/Console/Commands/Personal
