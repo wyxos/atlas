@@ -49,6 +49,13 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // Record login history
+        $user = Auth::user();
+        $user->loginHistories()->create([
+            'ip_address' => $this->ip(),
+            'user_agent' => $this->header('User-Agent'),
+        ]);
+
         RateLimiter::clear($this->throttleKey());
     }
 

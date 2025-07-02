@@ -25,6 +25,8 @@ interface User {
   name: string;
   email: string;
   created_at: string;
+  last_login_at: string | null;
+  last_login_ip: string | null;
 }
 
 defineProps<{
@@ -50,6 +52,7 @@ defineProps<{
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Created At</TableHead>
+              <TableHead>Last Login</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -57,6 +60,7 @@ defineProps<{
               <TableCell class="font-medium">{{ user.name }}</TableCell>
               <TableCell>{{ user.email }}</TableCell>
               <TableCell>{{ formatDate(user.created_at) }}</TableCell>
+              <TableCell>{{ user.last_login_at ? formatDate(user.last_login_at) : 'Never' }}</TableCell>
             </TableRow>
           </TableBody>
         </Table>

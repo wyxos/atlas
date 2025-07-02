@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\NewUserRegistered;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -44,7 +46,17 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
 
+        // Notify super admins about the new user registration
+        $superAdmins = User::where('is_super_admin', true)->get();
+        Notification::send($superAdmins, new NewUserRegistered($user));
+
         Auth::login($user);
+
+        // Record login history
+        $user->loginHistories()->create([
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->header('User-Agent'),
+        ]);
 
         return to_route('dashboard');
     }

@@ -47,4 +47,20 @@ class User extends Authenticatable
             'is_super_admin' => 'boolean',
         ];
     }
+
+    /**
+     * Get the login histories for the user.
+     */
+    public function loginHistories()
+    {
+        return $this->hasMany(LoginHistory::class);
+    }
+
+    /**
+     * Get the last login time for the user.
+     */
+    public function lastLogin()
+    {
+        return $this->loginHistories()->latest()->first();
+    }
 }

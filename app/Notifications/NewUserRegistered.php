@@ -15,7 +15,9 @@ class NewUserRegistered extends Notification
     /**
      * Create a new notification instance.
      */
-    public function __construct()
+    public function __construct(
+        protected User $user
+    )
     {
         //
     }
@@ -35,9 +37,22 @@ class NewUserRegistered extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $loginHistory = $this->user->lastLogin();
+
         return (new MailMessage)
-            ->line('The introduction to the notification.')
-            ->action('Notification Action', url('/'))
+            ->subject('New User Registration')
+            ->greeting('Hello Super Admin!')
+            ->line('A new user has registered on the platform.')
+            ->line('User Details:')
+            ->line('Name: ' . $this->user->name)
+            ->line('Email: ' . $this->user->email)
+            ->line('Registered at: ' . $this->user->created_at->format('Y-m-d H:i:s'))
+            ->when($loginHistory, function (MailMessage $message) use ($loginHistory) {
+                return $message
+                    ->line('First login from IP: ' . $loginHistory->ip_address)
+                    ->line('Browser: ' . $loginHistory->user_agent);
+            })
+            ->action('View User', url('/users'))
             ->line('Thank you for using our application!');
     }
 
