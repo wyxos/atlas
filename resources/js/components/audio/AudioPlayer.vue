@@ -228,7 +228,8 @@ onBeforeUnmount(() => {
       @volumechange="volume = audioPlayer?.volume || 1"
     ></audio>
 
-    <div class="flex gap-4 items-center">
+<!-- Start of player desktop -->
+    <div class="hidden md:flex gap-4 items-center">
       <!-- Loading skeleton for player cover -->
       <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
         <Skeleton class="w-full h-full" />
@@ -285,26 +286,26 @@ onBeforeUnmount(() => {
             <span>{{ formatTime(currentTime) }}</span>
             <span>{{ formatTime(duration) }}</span>
           </div>
-          
+
           <!-- Player controls -->
           <div class="flex items-center justify-center gap-4 mt-2">
-            <button 
+            <button
               class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
               @click="handleShuffle"
               title="Shuffle"
             >
               <Shuffle :size="16" />
             </button>
-            
-            <button 
+
+            <button
               class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
               @click="handlePrevious"
               title="Previous"
             >
               <SkipBack :size="20" />
             </button>
-            
-            <button 
+
+            <button
               class="btn-atlas-primary p-3 rounded-full hover:bg-primary/90 transition-colors"
               @click="togglePlayPause"
               title="Play/Pause"
@@ -312,8 +313,8 @@ onBeforeUnmount(() => {
               <Play v-if="!audioStore.isPlaying" :size="24" />
               <Pause v-else :size="24" />
             </button>
-            
-            <button 
+
+            <button
               class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
               @click="handleNext"
               title="Next"
@@ -324,5 +325,81 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+      <!-- End of player desktop -->
+
+      <!-- Start of mobile player -->
+      <div>
+          <div class="flex gap-2 items-center md:hidden mb-4">
+              <!-- Loading skeleton for player cover -->
+              <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-12 h-12">
+                  <Skeleton class="w-full h-full" />
+              </div>
+              <!-- Actual player cover when loaded -->
+              <div v-else-if="audioStore.currentFile" class="flex items-center justify-center relative w-12 h-12">
+                  <img
+                      v-if="audioStore.currentFile.covers && audioStore.currentFile.covers.length > 0"
+                      :src="`/storage/${audioStore.currentFile.covers[0].path}`"
+                      alt="Cover"
+                      class="w-full h-full object-cover"
+                  />
+                  <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
+                      <span class="text-xs">No Cover</span>
+                  </div>
+                  <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white transition-opacity" @click="togglePlayPause">
+                      <Play v-if="!audioStore.isPlaying" :size="24" />
+                      <Pause v-else :size="24" />
+                  </button>
+              </div>
+
+              <!-- Loading skeleton for player artist and title -->
+              <div v-if="audioStore.isPlayerLoading" class="font-medium text-white flex flex-col gap-2 flex-1">
+                  <Skeleton class="h-4 w-24" />
+                  <Skeleton class="h-5 w-32" />
+              </div>
+              <!-- Actual player artist and title when loaded -->
+              <div v-else-if="audioStore.currentFile" class="font-medium text-foreground mb-2 flex flex-col gap-1 flex-1">
+                  <span class="text-xs font-semibold text-muted-foreground">{{ excerpt(currentArtist) || 'Unknown Artist' }}</span>
+                  <span class="text-foreground font-semibold">{{ excerpt(currentTitle) }}</span>
+              </div>
+
+              <div class="flex items-center justify-center gap-4">
+                  <button
+                      class="btn-atlas-primary p-3 transition-colors"
+                      @click="togglePlayPause"
+                      title="Play/Pause"
+                  >
+                      <Play v-if="!audioStore.isPlaying" :size="24" />
+                      <Pause v-else :size="24" />
+                  </button>
+              </div>
+          </div>
+
+
+          <!-- Progress bar skeleton -->
+          <div v-if="audioStore.isPlayerLoading" class="mb-2">
+              <Skeleton class="h-2 w-full mb-2" />
+<!--              <div class="flex justify-between text-xs text-white mb-2">-->
+<!--                  <Skeleton class="h-3 w-10" />-->
+<!--                  <Skeleton class="h-3 w-10" />-->
+<!--              </div>-->
+          </div>
+          <!-- Actual progress bar -->
+          <div v-else-if="audioStore.currentFile" class="mb-2">
+              <div
+                  class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
+                  @click="seekTo($event)"
+              >
+                  <div
+                      class="h-full bg-primary rounded-full transition-all"
+                      :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                  ></div>
+              </div>
+<!--              <div class="flex justify-between text-xs text-muted-foreground mb-2">-->
+<!--                  <span>{{ formatTime(currentTime) }}</span>-->
+<!--                  <span>{{ formatTime(duration) }}</span>-->
+<!--              </div>-->
+          </div>
+      </div>
+      <!-- End of mobile player -->
   </div>
 </template>

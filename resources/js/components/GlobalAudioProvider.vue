@@ -14,11 +14,11 @@ const loadFileDetails = async (id: number, priority: boolean = false): Promise<a
         'X-Requested-With': 'XMLHttpRequest'
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to load file details: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -32,9 +32,5 @@ provide('loadFileDetails', loadFileDetails);
 </script>
 
 <template>
-  <div v-if="audioStore.isPlayerVisible" class="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-    <div class="pointer-events-auto">
-      <AudioPlayer />
-    </div>
-  </div>
+    <AudioPlayer  v-if="audioStore.isPlayerVisible"/>
 </template>
