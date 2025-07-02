@@ -1,44 +1,32 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
+import { audioStore, audioActions } from '@/stores/audioStore';
 import { Play, Pause, SkipBack, SkipForward, Shuffle } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const props = defineProps<{
-  currentFile: any | null;
-  isPlaying: boolean;
-  isPlayerLoading: boolean;
-}>();
-
-const emit = defineEmits<{
-  (e: 'play', file: any): void;
-  (e: 'pause'): void;
-  (e: 'timeUpdate', time: number): void;
-  (e: 'durationChange', duration: number): void;
-  (e: 'ended'): void;
-  (e: 'previous'): void;
-  (e: 'next'): void;
-  (e: 'shuffle'): void;
-}>();
 
 const audioPlayer = ref<HTMLAudioElement | null>(null);
-const currentTime = ref(0);
-const duration = ref(0);
-const volume = ref(1); // Default volume (0-1)
+const currentTime = ref(audioStore.currentTime);
+const duration = ref(audioStore.duration);
+const volume = ref(audioStore.volume);
 const pendingOperations = ref<(() => void)[]>([]);
 const observer = ref<MutationObserver | null>(null);
 const observerTimeout = ref<number | null>(null);
 
+// Try to get loadFileDetails function from parent context
+const loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>('loadFileDetails', () => Promise.resolve(null));
+
 // Get the current file title for display
 const currentTitle = computed(() => {
-  if (!props.currentFile) return 'No file selected';
-  return props.currentFile.metadata?.payload?.title || 'Untitled';
+  if (!audioStore.currentFile) return 'No file selected';
+  return audioStore.currentFile.metadata?.payload?.title || 'Untitled';
 });
 
 // Get the current file artist for display
 const currentArtist = computed(() => {
-  if (!props.currentFile) return 'Unknown Artist';
-  return props.currentFile.artists && props.currentFile.artists.length > 0
-    ? props.currentFile.artists[0].name
+  if (!audioStore.currentFile) return 'Unknown Artist';
+  return audioStore.currentFile.artists && audioStore.currentFile.artists.length > 0
+    ? audioStore.currentFile.artists[0].name
     : 'Unknown Artist';
 });
 
@@ -59,7 +47,9 @@ function seekTo(event: MouseEvent): void {
   const offsetX = event.clientX - rect.left;
   const percentage = offsetX / rect.width;
 
-  audioPlayer.value.currentTime = percentage * duration.value;
+    const newTime = percentage * duration.value;
+    audioPlayer.value.currentTime = newTime;
+    audioActions.updateTime(newTime);
 }
 
 function excerpt(text: string, length = 30): string {
@@ -69,26 +59,33 @@ function excerpt(text: string, length = 30): string {
 
 // Toggle play/pause
 function togglePlayPause(): void {
-  if (props.isPlaying) {
-    emit('pause');
-  } else if (props.currentFile) {
-    emit('play', props.currentFile);
+  if (audioStore.isPlaying) {
+    audioActions.setPlaying(false);
+  } else if (audioStore.currentFile) {
+    audioActions.setPlaying(true);
+    updatePlayState(true);
   }
 }
 
 // Handle previous track
-function handlePrevious(): void {
-  emit('previous');
+async function handlePrevious(): Promise<void> {
+  const previousTrack = await audioActions.moveToPrevious(loadFileDetails);
+  if (previousTrack) {
+    audioActions.setPlaying(true);
+  }
 }
 
 // Handle next track
-function handleNext(): void {
-  emit('next');
+async function handleNext(): Promise<void> {
+  const nextTrack = await audioActions.moveToNext(loadFileDetails);
+  if (nextTrack) {
+    audioActions.setPlaying(true);
+  }
 }
 
 // Handle shuffle
 function handleShuffle(): void {
-  emit('shuffle');
+  audioActions.shufflePlaylist();
 }
 
 // Function to handle play/pause based on isPlaying prop
@@ -112,6 +109,7 @@ function updatePlayState(newIsPlaying: boolean): void {
   } else {
     audioPlayer.value.pause();
   }
+  audioActions.setPlaying(newIsPlaying);
 }
 
 // Function to update the current file
@@ -126,7 +124,7 @@ function updateCurrentFile(newFile: any): void {
     audioPlayer.value.src = `/audio/stream/${newFile.id}`;
     // Explicitly load the audio before attempting to play
     audioPlayer.value.load();
-    if (props.isPlaying) {
+    if (audioStore.isPlaying) {
       // Use a promise to ensure play() is called after the audio is loaded
       const playPromise = audioPlayer.value.play();
 
@@ -138,6 +136,7 @@ function updateCurrentFile(newFile: any): void {
       }
     }
   }
+  audioActions.setCurrentFile(newFile);
 }
 
 // Function to process pending operations
@@ -149,13 +148,13 @@ function processPendingOperations(): void {
 }
 
 // Watch for changes to isPlaying and currentFile
-watch(() => props.isPlaying, updatePlayState);
-watch(() => props.currentFile, updateCurrentFile);
+watch(() => audioStore.isPlaying, updatePlayState);
+watch(() => audioStore.currentFile, updateCurrentFile);
 
 // Initialize the audio player when the component is mounted
 onMounted(() => {
   // If audioPlayer is already available, process pending operations
-  if (audioPlayer.value) {
+  if (!audioPlayer.value) {
     processPendingOperations();
     return;
   }
@@ -192,6 +191,11 @@ onMounted(() => {
     }
     observerTimeout.value = null;
   }, 5000);
+
+  // Sync audio element state with global store
+  watch(currentTime, newVal => audioActions.updateTime(newVal));
+  watch(duration, newVal => audioActions.updateDuration(newVal));
+  watch(volume, newVal => audioActions.updateVolume(newVal));
 });
 
 // Clean up resources when the component is unmounted
@@ -214,26 +218,26 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="fixed bottom-0 left-0 bg-card border-t border-border p-4 w-full md:static" v-if="isPlayerLoading || currentFile">
+  <div class="fixed bottom-0 left-0 bg-card border-t border-border p-4 w-full md:static" v-if="audioStore.isPlayerLoading || audioStore.currentFile">
     <audio
       ref="audioPlayer"
       class="hidden"
-      @ended="emit('ended')"
-      @timeupdate="currentTime = audioPlayer?.currentTime || 0; emit('timeUpdate', currentTime)"
-      @loadedmetadata="duration = audioPlayer?.duration || 0; emit('durationChange', duration)"
+      @ended="handleNext"
+      @timeupdate="currentTime = audioPlayer?.currentTime || 0"
+      @loadedmetadata="duration = audioPlayer?.duration || 0"
       @volumechange="volume = audioPlayer?.volume || 1"
     ></audio>
 
     <div class="flex gap-4 items-center">
       <!-- Loading skeleton for player cover -->
-      <div v-if="isPlayerLoading" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
+      <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
         <Skeleton class="w-full h-full" />
       </div>
       <!-- Actual player cover when loaded -->
-      <div v-else-if="currentFile" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
+      <div v-else-if="audioStore.currentFile" class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
         <img
-          v-if="currentFile.covers && currentFile.covers.length > 0"
-          :src="`/storage/${currentFile.covers[0].path}`"
+          v-if="audioStore.currentFile.covers && audioStore.currentFile.covers.length > 0"
+          :src="`/storage/${audioStore.currentFile.covers[0].path}`"
           alt="Cover"
           class="w-full h-full object-cover"
         />
@@ -241,25 +245,25 @@ onBeforeUnmount(() => {
           <span class="text-xs">No Cover</span>
         </div>
         <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white transition-opacity" @click="togglePlayPause">
-          <Play v-if="!isPlaying" :size="24" />
+          <Play v-if="!audioStore.isPlaying" :size="24" />
           <Pause v-else :size="24" />
         </button>
       </div>
 
       <div class="flex-1">
         <!-- Loading skeleton for player artist and title -->
-        <div v-if="isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
+        <div v-if="audioStore.isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
           <Skeleton class="h-4 w-24" />
           <Skeleton class="h-5 w-32" />
         </div>
         <!-- Actual player artist and title when loaded -->
-        <div v-else-if="currentFile" class="font-medium text-foreground mb-2 flex flex-col gap-1">
-          <span class="text-xs font-semibold text-muted-foreground">{{ excerpt(currentArtist) || 'Untitled' }}</span>
-          <span class="text-primary">{{ excerpt(currentTitle) }}</span>
+        <div v-else-if="audioStore.currentFile" class="font-medium text-foreground mb-2 flex flex-col gap-1">
+          <span class="text-xs font-semibold text-muted-foreground">{{ excerpt(currentArtist) || 'Unknown Artist' }}</span>
+          <span class="text-foreground font-semibold">{{ excerpt(currentTitle) }}</span>
         </div>
 
         <!-- Progress bar skeleton -->
-        <div v-if="isPlayerLoading" class="mb-2">
+        <div v-if="audioStore.isPlayerLoading" class="mb-2">
           <Skeleton class="h-2 w-full mb-2" />
           <div class="flex justify-between text-xs text-white mb-2">
             <Skeleton class="h-3 w-10" />
@@ -267,7 +271,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <!-- Actual progress bar -->
-        <div v-else-if="currentFile" class="mb-2">
+        <div v-else-if="audioStore.currentFile" class="mb-2">
           <div
             class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
             @click="seekTo($event)"
@@ -305,7 +309,7 @@ onBeforeUnmount(() => {
               @click="togglePlayPause"
               title="Play/Pause"
             >
-              <Play v-if="!isPlaying" :size="24" />
+              <Play v-if="!audioStore.isPlaying" :size="24" />
               <Pause v-else :size="24" />
             </button>
             

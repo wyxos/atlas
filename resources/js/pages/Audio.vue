@@ -3,7 +3,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, provide } from 'vue';
+import { audioStore, audioActions } from '@/stores/audioStore';
 
 // Import our new components and composables
 import AudioPlayer from '@/components/audio/AudioPlayer.vue';
@@ -28,13 +29,7 @@ const props = defineProps<{
     search: any[];
 }>();
 
-// Audio player state
-const currentFile = ref<any>(null);
-const isPlaying = ref(false);
-const isPlayerLoading = ref(false); // Track when player is loading
-const playlist = ref<any[]>([]); // Current playlist
-const currentIndex = ref(-1); // Current track index in playlist
-const isShuffled = ref(false); // Track if playlist is shuffled
+// Use global audio store instead of local state
 
 // Use our composables
 const {
@@ -65,139 +60,58 @@ async function playAudio(file: any): Promise<void> {
     let fileData = loadedFiles[fileId];
 
     if (!fileData) {
-        isPlayerLoading.value = true;
+        audioActions.setLoading(true);
         fileData = await loadFileDetails(fileId, true);
         if (!fileData) {
             console.error('Failed to load file data for playback');
-            isPlayerLoading.value = false;
+            audioActions.setLoading(false);
             return;
         }
     }
 
-    if (currentFile.value && currentFile.value.id === fileId) {
-        if (isPlaying.value) {
-            isPlaying.value = false;
+    if (audioStore.currentFile && audioStore.currentFile.id === fileId) {
+        // Same file - just toggle play/pause
+        if (audioStore.isPlaying) {
+            audioActions.setPlaying(false);
         } else {
-            isPlaying.value = true;
+            audioActions.setPlaying(true);
         }
     } else {
-        isPlayerLoading.value = true;
-        currentFile.value = fileData;
-        isPlaying.value = true;
-        isPlayerLoading.value = false;
+        // Different file - set up new playlist with ALL tracks
+        audioActions.setLoading(true);
         
-        // Set up playlist if not already set or if it's a different list
-        if (playlist.value.length === 0 || !isCurrentPlaylist(filesToQueue)) {
-            setPlaylist(filesToQueue, fileData);
-        } else {
-            // Update current index if playing from existing playlist
-            currentIndex.value = playlist.value.findIndex(track => track.id === fileData.id);
+        // Always queue the entire visible list when playing a new track
+        const playlistData = [];
+        for (const item of filesToQueue) {
+            let itemData = loadedFiles[item.id];
+            if (!itemData) {
+                // Load essential data for playlist - we'll load full data when needed
+                itemData = item;
+            }
+            playlistData.push(itemData);
         }
+        
+        // Set up the complete playlist
+        audioActions.setPlaylist(playlistData, fileData);
+        // Set current file which will also make player visible
+        await audioActions.setCurrentFile(fileData, loadFileDetails);
+        audioActions.setPlaying(true);
+        audioActions.setLoading(false);
     }
 }
 
 // Check if the given list is the current playlist
 function isCurrentPlaylist(tracks: any[]): boolean {
-    if (playlist.value.length !== tracks.length) return false;
+    if (audioStore.playlist.length !== tracks.length) return false;
     return tracks.every((track, index) => {
-        const playlistTrack = playlist.value.find(p => p.id === track.id);
+        const playlistTrack = audioStore.playlist.find(p => p.id === track.id);
         return playlistTrack !== undefined;
     });
 }
 
-// Set up the playlist
-function setPlaylist(tracks: any[], currentTrack: any) {
-    playlist.value = [...tracks];
-    currentIndex.value = playlist.value.findIndex(track => track.id === currentTrack.id);
-    isShuffled.value = false;
-}
-
-// Shuffle the current playlist
-function shuffleTracks() {
-    if (playlist.value.length === 0) {
-        // If no playlist, create one from current list
-        const filesToShuffle = props.search.length ? props.search : props.files;
-        playlist.value = [...filesToShuffle];
-    }
-    
-    // Keep current track in place, shuffle the rest
-    const currentTrack = currentFile.value;
-    const otherTracks = playlist.value.filter(track => track.id !== currentTrack?.id);
-    const shuffledOthers = otherTracks.sort(() => Math.random() - 0.5);
-    
-    if (currentTrack) {
-        playlist.value = [currentTrack, ...shuffledOthers];
-        currentIndex.value = 0;
-    } else {
-        playlist.value = shuffledOthers;
-    }
-    
-    isShuffled.value = true;
-}
-
-// Play next track
-async function playNext() {
-    if (playlist.value.length === 0 || currentIndex.value >= playlist.value.length - 1) {
-        return; // No next track
-    }
-    
-    currentIndex.value++;
-    const nextTrack = playlist.value[currentIndex.value];
-    
-    // Load track data if needed
-    let trackData = loadedFiles[nextTrack.id];
-    if (!trackData) {
-        isPlayerLoading.value = true;
-        trackData = await loadFileDetails(nextTrack.id, true);
-        if (!trackData) {
-            console.error('Failed to load next track data');
-            isPlayerLoading.value = false;
-            return;
-        }
-    }
-    
-    isPlayerLoading.value = true;
-    currentFile.value = trackData;
-    isPlaying.value = true;
-    isPlayerLoading.value = false;
-}
-
-// Play previous track
-async function playPrevious() {
-    if (playlist.value.length === 0 || currentIndex.value <= 0) {
-        return; // No previous track
-    }
-    
-    currentIndex.value--;
-    const prevTrack = playlist.value[currentIndex.value];
-    
-    // Load track data if needed
-    let trackData = loadedFiles[prevTrack.id];
-    if (!trackData) {
-        isPlayerLoading.value = true;
-        trackData = await loadFileDetails(prevTrack.id, true);
-        if (!trackData) {
-            console.error('Failed to load previous track data');
-            isPlayerLoading.value = false;
-            return;
-        }
-    }
-    
-    isPlayerLoading.value = true;
-    currentFile.value = trackData;
-    isPlaying.value = true;
-    isPlayerLoading.value = false;
-}
-
 // Handle player events
-function handlePlayerEnded(): void {
-    isPlaying.value = false;
-    // Automatically play next track when current track ends
-    playNext();
-}
-
 function handlePlayerPause(): void {
-    isPlaying.value = false;
+    audioActions.setPlaying(false);
 }
 
 // Action handlers
@@ -240,6 +154,9 @@ onMounted(() => {
     if (scrollContainer) {
         scrollContainer.addEventListener('scroll', handleScroll);
     }
+    
+    // Provide the loadFileDetails function for the AudioPlayer
+    provide('loadFileDetails', loadFileDetails);
 });
 
 onBeforeUnmount(() => {
@@ -283,8 +200,8 @@ const initialQuery = window.location.search
                                 <AudioListItem
                                     :item="item"
                                     :loaded-file="loadedFiles[item.id]"
-                                    :is-playing="isPlaying"
-                                    :current-file-id="currentFile ? currentFile.id : null"
+                                    :is-playing="audioStore.isPlaying"
+                                    :current-file-id="audioStore.currentFile ? audioStore.currentFile.id : null"
                                     :is-swiped-open="swipedItemId === item.id"
                                     @play="playAudio(getFileData(item))"
                                     @touch-start="handleTouchStart"
@@ -300,18 +217,6 @@ const initialQuery = window.location.search
                 </template>
             </AudioSearch>
 
-            <!-- Audio player component -->
-            <AudioPlayer
-                :current-file="currentFile"
-                :is-playing="isPlaying"
-                :is-player-loading="isPlayerLoading"
-                @play="playAudio"
-                @pause="handlePlayerPause"
-                @ended="handlePlayerEnded"
-                @previous="playPrevious"
-                @next="playNext"
-                @shuffle="shuffleTracks"
-            />
         </div>
     </AppLayout>
 </template>
