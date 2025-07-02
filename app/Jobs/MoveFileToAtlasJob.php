@@ -40,6 +40,19 @@ class MoveFileToAtlasJob implements ShouldQueue
             return;
         }
 
+        // Sanitize the file path to remove problematic Unicode characters
+        $sanitizedPath = $this->sanitizePath($this->file->path);
+        if ($sanitizedPath !== $this->file->path) {
+            Log::info("Path sanitized for file ID {$this->file->id}", [
+                'original_path' => $this->file->path,
+                'sanitized_path' => $sanitizedPath,
+            ]);
+            
+            // Update the file record with sanitized path
+            $this->file->path = $sanitizedPath;
+            $this->file->save();
+        }
+
         // Generate a new path on the atlas disk
         $filename = $this->file->filename ?: basename($this->file->path);
         $extension = $this->file->ext ?: pathinfo($this->file->path, PATHINFO_EXTENSION);
@@ -194,5 +207,44 @@ class MoveFileToAtlasJob implements ShouldQueue
                 'marking_error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Sanitize file path by removing problematic Unicode characters.
+     */
+    private function sanitizePath(string $path): string
+    {
+        // Remove Unicode directional marks and other problematic invisible characters
+        $problematicChars = [
+            "\u{200E}", // Left-to-Right Mark (LRM)
+            "\u{200F}", // Right-to-Left Mark (RLM)
+            "\u{202A}", // Left-to-Right Embedding (LRE)
+            "\u{202B}", // Right-to-Left Embedding (RLE)
+            "\u{202C}", // Pop Directional Formatting (PDF)
+            "\u{202D}", // Left-to-Right Override (LRO)
+            "\u{202E}", // Right-to-Left Override (RLO)
+            "\u{2066}", // Left-to-Right Isolate (LRI)
+            "\u{2067}", // Right-to-Left Isolate (RLI)
+            "\u{2068}", // First Strong Isolate (FSI)
+            "\u{2069}", // Pop Directional Isolate (PDI)
+            "\u{FEFF}", // Zero Width No-Break Space (BOM)
+            "\u{200B}", // Zero Width Space
+            "\u{200C}", // Zero Width Non-Joiner
+            "\u{200D}", // Zero Width Joiner
+        ];
+
+        // Remove all problematic characters
+        $sanitized = str_replace($problematicChars, '', $path);
+
+        // Also remove any other invisible/control characters (U+0000 to U+001F and U+007F to U+009F)
+        $sanitized = preg_replace('/[\x00-\x1F\x7F-\x9F]/u', '', $sanitized);
+
+        // Normalize multiple spaces to single spaces
+        $sanitized = preg_replace('/\s+/', ' ', $sanitized);
+
+        // Trim whitespace from the beginning and end
+        $sanitized = trim($sanitized);
+
+        return $sanitized;
     }
 }
