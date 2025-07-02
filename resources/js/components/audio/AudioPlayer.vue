@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
-import { Play, Pause } from 'lucide-vue-next';
+import { Play, Pause, SkipBack, SkipForward, Shuffle } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const props = defineProps<{
@@ -15,6 +15,9 @@ const emit = defineEmits<{
   (e: 'timeUpdate', time: number): void;
   (e: 'durationChange', duration: number): void;
   (e: 'ended'): void;
+  (e: 'previous'): void;
+  (e: 'next'): void;
+  (e: 'shuffle'): void;
 }>();
 
 const audioPlayer = ref<HTMLAudioElement | null>(null);
@@ -71,6 +74,21 @@ function togglePlayPause(): void {
   } else if (props.currentFile) {
     emit('play', props.currentFile);
   }
+}
+
+// Handle previous track
+function handlePrevious(): void {
+  emit('previous');
+}
+
+// Handle next track
+function handleNext(): void {
+  emit('next');
+}
+
+// Handle shuffle
+function handleShuffle(): void {
+  emit('shuffle');
 }
 
 // Function to handle play/pause based on isPlaying prop
@@ -196,7 +214,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="fixed  bottom-0 left-0 bg-blue-950 p-4 border-t w-full md:static" v-if="isPlayerLoading || currentFile">
+  <div class="fixed bottom-0 left-0 bg-card border-t border-border p-4 w-full md:static" v-if="isPlayerLoading || currentFile">
     <audio
       ref="audioPlayer"
       class="hidden"
@@ -219,10 +237,10 @@ onBeforeUnmount(() => {
           alt="Cover"
           class="w-full h-full object-cover"
         />
-        <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
+        <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
           <span class="text-xs">No Cover</span>
         </div>
-        <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white" @click="togglePlayPause">
+        <button class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white transition-opacity" @click="togglePlayPause">
           <Play v-if="!isPlaying" :size="24" />
           <Pause v-else :size="24" />
         </button>
@@ -235,9 +253,9 @@ onBeforeUnmount(() => {
           <Skeleton class="h-5 w-32" />
         </div>
         <!-- Actual player artist and title when loaded -->
-        <div v-else-if="currentFile" class="font-medium text-white mb-2 flex flex-col gap-1">
-          <span class="text-xs font-semibold">{{ excerpt(currentArtist) || 'Untitled' }}</span>
-          <span>{{ excerpt(currentTitle) }}</span>
+        <div v-else-if="currentFile" class="font-medium text-foreground mb-2 flex flex-col gap-1">
+          <span class="text-xs font-semibold text-muted-foreground">{{ excerpt(currentArtist) || 'Untitled' }}</span>
+          <span class="text-primary">{{ excerpt(currentTitle) }}</span>
         </div>
 
         <!-- Progress bar skeleton -->
@@ -251,17 +269,53 @@ onBeforeUnmount(() => {
         <!-- Actual progress bar -->
         <div v-else-if="currentFile" class="mb-2">
           <div
-            class="h-2 bg-gray-700 rounded-full cursor-pointer mb-2"
+            class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
             @click="seekTo($event)"
           >
             <div
-              class="h-full bg-blue-500 rounded-full"
+              class="h-full bg-primary rounded-full transition-all"
               :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
             ></div>
           </div>
-          <div class="flex justify-between text-xs text-white mb-2">
+          <div class="flex justify-between text-xs text-muted-foreground mb-2">
             <span>{{ formatTime(currentTime) }}</span>
             <span>{{ formatTime(duration) }}</span>
+          </div>
+          
+          <!-- Player controls -->
+          <div class="flex items-center justify-center gap-4 mt-2">
+            <button 
+              class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+              @click="handleShuffle"
+              title="Shuffle"
+            >
+              <Shuffle :size="16" />
+            </button>
+            
+            <button 
+              class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+              @click="handlePrevious"
+              title="Previous"
+            >
+              <SkipBack :size="20" />
+            </button>
+            
+            <button 
+              class="btn-atlas-primary p-3 rounded-full hover:bg-primary/90 transition-colors"
+              @click="togglePlayPause"
+              title="Play/Pause"
+            >
+              <Play v-if="!isPlaying" :size="24" />
+              <Pause v-else :size="24" />
+            </button>
+            
+            <button 
+              class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+              @click="handleNext"
+              title="Next"
+            >
+              <SkipForward :size="20" />
+            </button>
           </div>
         </div>
       </div>

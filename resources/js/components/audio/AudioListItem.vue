@@ -59,9 +59,9 @@ function navigateToDetails(): void {
 
 <template>
   <div
-    class="file px-4 py-1 flex justify-between items-center rounded border-b-2 border-blue-200 transition-transform duration-300 relative"
+    class="file px-4 py-1 flex justify-between items-center rounded border-b border-border transition-all duration-300 relative hover:bg-accent/50"
     :class="{
-      'bg-blue-500': currentFileId === item.id,
+      'bg-primary text-primary-foreground': currentFileId === item.id,
       'transform -translate-x-32': isSwipedOpen
     }"
     @touchstart="emit('touchStart', $event)"
@@ -85,12 +85,12 @@ function navigateToDetails(): void {
             alt="Cover"
             class="w-full h-full object-cover"
           />
-          <div v-else class="w-full h-full bg-blue-300 flex items-center justify-center text-blue-800">
+          <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
             <span class="text-xs">No Cover</span>
           </div>
         </template>
         <button
-          class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0"
+          class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0 transition-opacity text-white"
           @click.stop="handlePlay($event)"
         >
           <Play v-if="!isPlaying || currentFileId !== item.id" :size="20" />
@@ -115,19 +115,19 @@ function navigateToDetails(): void {
     <!-- Action buttons container -->
     <div class="absolute top-0 left-full h-full items-center flex gap-4 p-4">
       <button
-        class=""
+        class="text-foreground hover:text-destructive transition-colors p-1 rounded"
         @click.stop="handleFavorite($event)"
       >
         <Heart :size="20" />
       </button>
       <button
-        class=""
+        class="text-foreground hover:text-secondary transition-colors p-1 rounded"
         @click.stop="handleLike($event)"
       >
         <ThumbsUp :size="20" />
       </button>
       <button
-        class=""
+        class="text-foreground hover:text-destructive transition-colors p-1 rounded"
         @click.stop="handleDislike($event)"
       >
         <ThumbsDown :size="20" />

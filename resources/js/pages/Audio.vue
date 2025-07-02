@@ -32,6 +32,9 @@ const props = defineProps<{
 const currentFile = ref<any>(null);
 const isPlaying = ref(false);
 const isPlayerLoading = ref(false); // Track when player is loading
+const playlist = ref<any[]>([]); // Current playlist
+const currentIndex = ref(-1); // Current track index in playlist
+const isShuffled = ref(false); // Track if playlist is shuffled
 
 // Use our composables
 const {
@@ -55,43 +58,142 @@ const {
 // Intersection Observer setup
 const observer = ref<IntersectionObserver | null>(null);
 
-// Play the selected audio file
+// Queue the entire list when playing a new track
 async function playAudio(file: any): Promise<void> {
-    // Ensure we have the full file data
+    const filesToQueue = props.search.length ? props.search : props.files;
     const fileId = file.id;
     let fileData = loadedFiles[fileId];
 
     if (!fileData) {
-        // If file data is not loaded yet, load it with priority
-        isPlayerLoading.value = true; // Set loading state to true
-        fileData = await loadFileDetails(fileId, true); // Use priority loading
+        isPlayerLoading.value = true;
+        fileData = await loadFileDetails(fileId, true);
         if (!fileData) {
             console.error('Failed to load file data for playback');
-            isPlayerLoading.value = false; // Reset loading state on error
+            isPlayerLoading.value = false;
             return;
         }
-        // No need to reset isPlayerLoading here as it will be reset after setting the current file
     }
 
     if (currentFile.value && currentFile.value.id === fileId) {
-        // Toggle play/pause if it's the same file
         if (isPlaying.value) {
             isPlaying.value = false;
         } else {
             isPlaying.value = true;
         }
     } else {
-        // Play a new file
-        isPlayerLoading.value = true; // Set loading state to true
+        isPlayerLoading.value = true;
         currentFile.value = fileData;
         isPlaying.value = true;
-        isPlayerLoading.value = false; // Reset loading state after setting the current file
+        isPlayerLoading.value = false;
+        
+        // Set up playlist if not already set or if it's a different list
+        if (playlist.value.length === 0 || !isCurrentPlaylist(filesToQueue)) {
+            setPlaylist(filesToQueue, fileData);
+        } else {
+            // Update current index if playing from existing playlist
+            currentIndex.value = playlist.value.findIndex(track => track.id === fileData.id);
+        }
     }
+}
+
+// Check if the given list is the current playlist
+function isCurrentPlaylist(tracks: any[]): boolean {
+    if (playlist.value.length !== tracks.length) return false;
+    return tracks.every((track, index) => {
+        const playlistTrack = playlist.value.find(p => p.id === track.id);
+        return playlistTrack !== undefined;
+    });
+}
+
+// Set up the playlist
+function setPlaylist(tracks: any[], currentTrack: any) {
+    playlist.value = [...tracks];
+    currentIndex.value = playlist.value.findIndex(track => track.id === currentTrack.id);
+    isShuffled.value = false;
+}
+
+// Shuffle the current playlist
+function shuffleTracks() {
+    if (playlist.value.length === 0) {
+        // If no playlist, create one from current list
+        const filesToShuffle = props.search.length ? props.search : props.files;
+        playlist.value = [...filesToShuffle];
+    }
+    
+    // Keep current track in place, shuffle the rest
+    const currentTrack = currentFile.value;
+    const otherTracks = playlist.value.filter(track => track.id !== currentTrack?.id);
+    const shuffledOthers = otherTracks.sort(() => Math.random() - 0.5);
+    
+    if (currentTrack) {
+        playlist.value = [currentTrack, ...shuffledOthers];
+        currentIndex.value = 0;
+    } else {
+        playlist.value = shuffledOthers;
+    }
+    
+    isShuffled.value = true;
+}
+
+// Play next track
+async function playNext() {
+    if (playlist.value.length === 0 || currentIndex.value >= playlist.value.length - 1) {
+        return; // No next track
+    }
+    
+    currentIndex.value++;
+    const nextTrack = playlist.value[currentIndex.value];
+    
+    // Load track data if needed
+    let trackData = loadedFiles[nextTrack.id];
+    if (!trackData) {
+        isPlayerLoading.value = true;
+        trackData = await loadFileDetails(nextTrack.id, true);
+        if (!trackData) {
+            console.error('Failed to load next track data');
+            isPlayerLoading.value = false;
+            return;
+        }
+    }
+    
+    isPlayerLoading.value = true;
+    currentFile.value = trackData;
+    isPlaying.value = true;
+    isPlayerLoading.value = false;
+}
+
+// Play previous track
+async function playPrevious() {
+    if (playlist.value.length === 0 || currentIndex.value <= 0) {
+        return; // No previous track
+    }
+    
+    currentIndex.value--;
+    const prevTrack = playlist.value[currentIndex.value];
+    
+    // Load track data if needed
+    let trackData = loadedFiles[prevTrack.id];
+    if (!trackData) {
+        isPlayerLoading.value = true;
+        trackData = await loadFileDetails(prevTrack.id, true);
+        if (!trackData) {
+            console.error('Failed to load previous track data');
+            isPlayerLoading.value = false;
+            return;
+        }
+    }
+    
+    isPlayerLoading.value = true;
+    currentFile.value = trackData;
+    isPlaying.value = true;
+    isPlayerLoading.value = false;
 }
 
 // Handle player events
 function handlePlayerEnded(): void {
     isPlaying.value = false;
+    // Automatically play next track when current track ends
+    playNext();
 }
 
 function handlePlayerPause(): void {
@@ -206,6 +308,9 @@ const initialQuery = window.location.search
                 @play="playAudio"
                 @pause="handlePlayerPause"
                 @ended="handlePlayerEnded"
+                @previous="playPrevious"
+                @next="playNext"
+                @shuffle="shuffleTracks"
             />
         </div>
     </AppLayout>
