@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { Play, Pause } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -21,6 +21,9 @@ const audioPlayer = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(0);
 const duration = ref(0);
 const volume = ref(1); // Default volume (0-1)
+const pendingOperations = ref<(() => void)[]>([]);
+const observer = ref<MutationObserver | null>(null);
+const observerTimeout = ref<number | null>(null);
 
 // Get the current file title for display
 const currentTitle = computed(() => {
@@ -70,24 +73,125 @@ function togglePlayPause(): void {
   }
 }
 
-// Watch for changes to isPlaying and currentFile
-watch(() => props.isPlaying, (newIsPlaying) => {
-  if (audioPlayer.value) {
-    if (newIsPlaying) {
-      audioPlayer.value.play();
-    } else {
-      audioPlayer.value.pause();
+// Function to handle play/pause based on isPlaying prop
+function updatePlayState(newIsPlaying: boolean): void {
+  if (!audioPlayer.value) {
+    // Queue the operation for when the audio player is available
+    pendingOperations.value.push(() => updatePlayState(newIsPlaying));
+    return;
+  }
+
+  if (newIsPlaying) {
+    // Use a promise to ensure play() is handled properly
+    const playPromise = audioPlayer.value.play();
+
+    // Handle play promise to catch any errors
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Silently handle the error
+      });
+    }
+  } else {
+    audioPlayer.value.pause();
+  }
+}
+
+// Function to update the current file
+function updateCurrentFile(newFile: any): void {
+  if (!audioPlayer.value) {
+    // Queue the operation for when the audio player is available
+    pendingOperations.value.push(() => updateCurrentFile(newFile));
+    return;
+  }
+
+  if (newFile) {
+    audioPlayer.value.src = `/audio/stream/${newFile.id}`;
+    // Explicitly load the audio before attempting to play
+    audioPlayer.value.load();
+    if (props.isPlaying) {
+      // Use a promise to ensure play() is called after the audio is loaded
+      const playPromise = audioPlayer.value.play();
+
+      // Handle play promise to catch any errors
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Silently handle the error
+        });
+      }
     }
   }
+}
+
+// Function to process pending operations
+function processPendingOperations(): void {
+  while (pendingOperations.value.length > 0) {
+    const operation = pendingOperations.value.shift();
+    if (operation) operation();
+  }
+}
+
+// Watch for changes to isPlaying and currentFile
+watch(() => props.isPlaying, updatePlayState);
+watch(() => props.currentFile, updateCurrentFile);
+
+// Initialize the audio player when the component is mounted
+onMounted(() => {
+  // If audioPlayer is already available, process pending operations
+  if (audioPlayer.value) {
+    processPendingOperations();
+    return;
+  }
+
+  // Set up a MutationObserver to detect when the audioPlayer ref is attached
+  observer.value = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' && audioPlayer.value) {
+        // audioPlayer is now available, process pending operations
+        processPendingOperations();
+        // Disconnect the observer as we no longer need it
+        if (observer.value) {
+          observer.value.disconnect();
+          observer.value = null;
+        }
+        // Clear the timeout
+        if (observerTimeout.value !== null) {
+          clearTimeout(observerTimeout.value);
+          observerTimeout.value = null;
+        }
+        break;
+      }
+    }
+  });
+
+  // Start observing the document body for changes
+  observer.value.observe(document.body, { childList: true, subtree: true });
+
+  // Clean up the observer after a reasonable timeout (e.g., 5 seconds)
+  observerTimeout.value = window.setTimeout(() => {
+    if (observer.value) {
+      observer.value.disconnect();
+      observer.value = null;
+    }
+    observerTimeout.value = null;
+  }, 5000);
 });
 
-watch(() => props.currentFile, (newFile) => {
-  if (audioPlayer.value && newFile) {
-    audioPlayer.value.src = `/audio/stream/${newFile.id}`;
-    if (props.isPlaying) {
-      audioPlayer.value.play();
-    }
+// Clean up resources when the component is unmounted
+onBeforeUnmount(() => {
+  // Clean up the observer if it exists
+  if (observer.value) {
+    observer.value.disconnect();
+    observer.value = null;
   }
+
+  // Clear the timeout if it exists
+  if (observerTimeout.value !== null) {
+    clearTimeout(observerTimeout.value);
+    observerTimeout.value = null;
+  }
+
+  // Clear any pending operations
+  pendingOperations.value = [];
 });
 </script>
 
