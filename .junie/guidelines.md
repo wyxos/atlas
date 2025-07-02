@@ -9,6 +9,7 @@ General guidelines:
 - After completing a task, create a new PEST test case or update existing test cases as needed, and ensure all tests pass before marking the task as complete.
 - Run the full ```php artisan test``` after completing a task to ensure all tests pass.
 - Never make assumptions or use placeholders. If in doubt, ask for clarification or halt the task with a comment.
+- Any created command/logic that deals with looping through a consequent amount of data or performs intensive disk operations should be queued in a job to avoid blocking the main thread.
 
 Project specific guidelines:
 

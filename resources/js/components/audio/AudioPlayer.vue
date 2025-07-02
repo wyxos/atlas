@@ -92,7 +92,7 @@ watch(() => props.currentFile, (newFile) => {
 </script>
 
 <template>
-  <div class="fixed  bottom-0 left-0 bg-blue-950 p-4 border-t w-full" v-if="isPlayerLoading || currentFile">
+  <div class="fixed  bottom-0 left-0 bg-blue-950 p-4 border-t w-full md:static" v-if="isPlayerLoading || currentFile">
     <audio
       ref="audioPlayer"
       class="hidden"

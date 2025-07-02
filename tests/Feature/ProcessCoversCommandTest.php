@@ -61,20 +61,20 @@ test('process covers command processes covers correctly', function () {
         'is_extracted' => true,
     ]);
 
-    // Create cover records
+    // Create cover records with temporary hashes (will be recalculated by command)
     $cover1 = Cover::create([
-        'hash' => md5('test cover content 1'),
         'path' => 'cover-art/test1.jpg',
+        'hash' => 'temp1', // Temporary hash, will be updated by command
     ]);
 
     $cover2 = Cover::create([
-        'hash' => md5('test cover content 2'),
         'path' => 'cover-art/test2.jpg',
+        'hash' => 'temp2', // Temporary hash, will be updated by command
     ]);
 
     $cover3 = Cover::create([
-        'hash' => md5('test cover content 1'), // Same hash as cover1
-        'path' => 'cover-art/test3.jpg',
+        'path' => 'cover-art/test3.jpg', // Will have same content as test1.jpg for duplicate testing
+        'hash' => 'temp3', // Temporary hash, will be updated by command
     ]);
 
     // Associate covers with files
@@ -88,22 +88,7 @@ test('process covers command processes covers correctly', function () {
          ->expectsOutput('Found 3 files with cover art.')
          ->assertSuccessful();
 
-    // Assert that covers were created
-    $this->assertDatabaseCount('covers', 3); // We now have 3 covers because we're creating them in the test setup
-
-    // Get the covers
-    $covers = Cover::all();
-
-    // Since we're mocking the storage, we can't actually check if the files were moved
-    // Instead, we'll just check that the covers still exist in the database
-    $this->assertDatabaseHas('covers', ['id' => $cover1->id]);
-    $this->assertDatabaseHas('covers', ['id' => $cover2->id]);
-    $this->assertDatabaseHas('covers', ['id' => $cover3->id]);
-
-    // Assert that the original files were moved or deleted
-    // We don't need to check for the original files since they've been moved or deleted
-
-    // Assert that the metadata was updated
+    // Refresh the files to get updated associations
     $file1->refresh();
     $file2->refresh();
     $file3->refresh();
@@ -113,11 +98,27 @@ test('process covers command processes covers correctly', function () {
     $this->assertCount(1, $file2->covers);
     $this->assertCount(1, $file3->covers);
 
-    // Assert that file1 and file3 have the same cover (duplicate detection)
+    // After duplicate detection:
+    // - file1 should keep cover1 (the original) 
+    // - file2 should keep cover2 (unique)
+    // - file3 should now be associated with cover1 (duplicate of cover3 was removed)
+    // So file1 and file3 should have the same cover ID
     $this->assertEquals(
         $file1->covers->first()->id,
-        $file3->covers->first()->id
+        $file3->covers->first()->id,
+        'file1 and file3 should have the same cover after duplicate detection'
     );
+
+    // file2 should have a different cover
+    $this->assertNotEquals(
+        $file1->covers->first()->id,
+        $file2->covers->first()->id,
+        'file1 and file2 should have different covers'
+    );
+    
+    // After processing, we should have 3 covers in the database still
+    // (the command doesn't delete Cover records, only the duplicate files)
+    $this->assertDatabaseCount('covers', 3);
 });
 
 test('process covers command handles missing cover files gracefully', function () {

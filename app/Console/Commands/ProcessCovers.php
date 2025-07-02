@@ -124,8 +124,9 @@ class ProcessCovers extends Command
 
             // Move the file to the new location
             if (Storage::disk('public')->move($coverPath, $newPath)) {
-                // Update the cover record with the new path
+                // Update the cover record with the new path and hash
                 $cover->path = $newPath;
+                $cover->hash = $hash;
                 $cover->save();
 
                 $this->info("Updated cover path to: {$newPath}");

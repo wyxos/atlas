@@ -15,12 +15,14 @@ class AudioController extends Controller
         $file = File::findOrFail($id);
 
         // Ensure the file exists and is an audio file
-        if (!file_exists($file->path) || !str_starts_with($file->mime_type, 'audio/')) {
+        $path = Storage::disk('atlas')->path($file->path);
+
+        if (!file_exists($path) || !str_starts_with($file->mime_type, 'audio/')) {
             abort(404, 'Audio file not found');
         }
 
         // Stream the file with proper headers for audio streaming
-        return response()->file($file->path, [
+        return response()->file($path, [
             'Content-Type' => $file->mime_type,
             'Content-Disposition' => 'inline; filename="' . $file->filename . '"',
             'Accept-Ranges' => 'bytes',
