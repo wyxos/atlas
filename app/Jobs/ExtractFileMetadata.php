@@ -20,13 +20,10 @@ class ExtractFileMetadata implements ShouldQueue
      */
     public function __construct(
         protected File $file
-    ) {
-    }
+    ) {}
 
     /**
      * Get the file associated with this job.
-     *
-     * @return File
      */
     public function getFile(): File
     {
@@ -43,7 +40,7 @@ class ExtractFileMetadata implements ShouldQueue
 
         if ($output) {
             // Store the metadata JSON in storage
-            Storage::put("metadata/{$this->file->id}.json", $output);
+            Storage::disk('atlas')->put("metadata/{$this->file->id}.json", $output);
 
             // Update or create the metadata record
             $this->file->metadata()->updateOrCreate(
@@ -59,9 +56,6 @@ class ExtractFileMetadata implements ShouldQueue
 
     /**
      * Execute the metadata extraction script.
-     *
-     * @param string $filePath
-     * @return string|null
      */
     protected function executeMetadataScript(string $filePath): ?string
     {

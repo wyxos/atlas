@@ -220,7 +220,7 @@ return [
                     'default_sorting_field' => 'created_at',
                 ],
                 'search-parameters' => [
-                    'query_by' => 'filename,title,description,tags'
+                    'query_by' => 'filename,title,description,tags',
                 ],
             ],
         ],

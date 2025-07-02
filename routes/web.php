@@ -13,7 +13,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
-    Route::get('audio', function(){
+    Route::get('audio', function () {
         $search = [];
 
         if ($query = request()->input('query')) {
@@ -31,7 +31,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
         }
 
         return Inertia::render('Audio', [
-            'files' => fn() => \App\Models\File::audio()
+            'files' => fn () => \App\Models\File::audio()
                 ->select(['id'])
                 ->get(),
             'search' => $search,
@@ -46,7 +46,6 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     // Audio streaming route
     Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');
 });
-
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

@@ -4,11 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\Cover;
 use App\Models\File;
-use App\Models\FileMetadata;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class ProcessCovers extends Command
 {
@@ -46,6 +43,7 @@ class ProcessCovers extends Command
                 $this->processFile($file, $processed, $duplicates);
             } else {
                 $this->error("File with ID {$fileId} not found or has no covers.");
+
                 return Command::FAILURE;
             }
         } else {
@@ -67,14 +65,12 @@ class ProcessCovers extends Command
     /**
      * Process a single file's covers
      *
-     * @param File $file
-     * @param int $processed
-     * @param int $duplicates
-     * @return void
+     * @param  int  $processed
+     * @param  int  $duplicates
      */
     protected function processFile(File $file, &$processed, &$duplicates): void
     {
-        if (!$file || $file->covers->isEmpty()) {
+        if (! $file || $file->covers->isEmpty()) {
             return;
         }
 
@@ -83,8 +79,9 @@ class ProcessCovers extends Command
         $this->info("Processing cover for file: {$file->path}");
 
         // Check if the cover file exists
-        if (!Storage::disk('public')->exists($coverPath)) {
+        if (! Storage::disk('public')->exists($coverPath)) {
             $this->warn("Cover file not found: {$coverPath}");
+
             return;
         }
 
@@ -118,7 +115,7 @@ class ProcessCovers extends Command
             $newPath = "covers/cover-{$cover->id}.{$extension}";
 
             // Ensure the covers directory exists
-            if (!Storage::disk('public')->exists('covers')) {
+            if (! Storage::disk('public')->exists('covers')) {
                 Storage::disk('public')->makeDirectory('covers');
             }
 

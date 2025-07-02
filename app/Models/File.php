@@ -2,16 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Laravel\Scout\Searchable;
 
 class File extends Model
 {
     use HasFactory, Searchable;
+
     /**
      * The attributes that are mass assignable.
      *
@@ -108,9 +109,6 @@ class File extends Model
 
     /**
      * Scope a query to only include audio files.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeAudio(Builder $query): Builder
     {
@@ -121,37 +119,37 @@ class File extends Model
     public function toSearchableArray()
     {
         // Load metadata relationship if not already loaded
-        if (!$this->relationLoaded('metadata')) {
+        if (! $this->relationLoaded('metadata')) {
             $this->load('metadata');
         }
 
         $array = [
-            'id'               => (string) $this->id,
-            'source'           => $this->source,
-            'source_id'        => $this->source_id,
-            'url'              => $this->url,
-            'referrer_url'     => $this->referrer_url,
-            'path'             => $this->path,
-            'filename'         => $this->filename,
-            'ext'              => $this->ext,
-            'size'             => $this->size,
-            'mime_type'        => $this->mime_type,
-            'hash'             => $this->hash,
-            'title'            => $this->title,
-            'description'      => $this->description,
-            'thumbnail_url'    => $this->thumbnail_url,
-            'parent_id'        => $this->parent_id,
-            'chapter'          => $this->chapter,
-            'is_blacklisted'   => $this->is_blacklisted,
+            'id' => (string) $this->id,
+            'source' => $this->source,
+            'source_id' => $this->source_id,
+            'url' => $this->url,
+            'referrer_url' => $this->referrer_url,
+            'path' => $this->path,
+            'filename' => $this->filename,
+            'ext' => $this->ext,
+            'size' => $this->size,
+            'mime_type' => $this->mime_type,
+            'hash' => $this->hash,
+            'title' => $this->title,
+            'description' => $this->description,
+            'thumbnail_url' => $this->thumbnail_url,
+            'parent_id' => $this->parent_id,
+            'chapter' => $this->chapter,
+            'is_blacklisted' => $this->is_blacklisted,
             'blacklist_reason' => $this->blacklist_reason,
-            'liked'            => $this->liked,
-            'disliked'         => $this->disliked,
-            'loved'            => $this->loved,
-            'downloaded'       => $this->downloaded,
-            'download_progress'=> $this->download_progress,
-            'not_found'        => $this->not_found,
-            'created_at'       => $this->created_at?->timestamp,
-            'updated_at'       => $this->updated_at?->timestamp,
+            'liked' => $this->liked,
+            'disliked' => $this->disliked,
+            'loved' => $this->loved,
+            'downloaded' => $this->downloaded,
+            'download_progress' => $this->download_progress,
+            'not_found' => $this->not_found,
+            'created_at' => $this->created_at?->timestamp,
+            'updated_at' => $this->updated_at?->timestamp,
         ];
 
         // Include metadata fields if available
@@ -199,7 +197,7 @@ class File extends Model
         // Handle timestamp fields - convert to Unix timestamps
         $timestampFields = [
             'seen_preview_at', 'seen_file_at', 'liked_at', 'disliked_at',
-            'loved_at', 'downloaded_at'
+            'loved_at', 'downloaded_at',
         ];
 
         foreach ($timestampFields as $field) {
@@ -220,6 +218,7 @@ class File extends Model
             if (in_array($key, ['size', 'parent_id', 'download_progress']) && $value === 0) {
                 return true;
             }
+
             // Remove null/empty values for optional fields
             return $value !== null && $value !== '';
         }, ARRAY_FILTER_USE_BOTH);

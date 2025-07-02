@@ -39,8 +39,9 @@ class CheckFilesExistence extends Command
             $this->info("Processing only file with ID: {$fileId}");
             $file = File::find($fileId);
 
-            if (!$file) {
+            if (! $file) {
                 $this->error("File with ID {$fileId} not found.");
+
                 return Command::FAILURE;
             }
 
@@ -48,6 +49,7 @@ class CheckFilesExistence extends Command
             $this->processSingleFile($file);
 
             $this->info("File existence check completed for file ID: {$fileId}");
+
             return Command::SUCCESS;
         }
 
@@ -56,6 +58,7 @@ class CheckFilesExistence extends Command
 
         if ($totalFiles === 0) {
             $this->info('No files found in the database.');
+
             return Command::SUCCESS;
         }
 
@@ -81,7 +84,7 @@ class CheckFilesExistence extends Command
                     }
                 } catch (\Exception $e) {
                     $errorCount++;
-                    $this->error("Error processing file ID {$file->id}: " . $e->getMessage());
+                    $this->error("Error processing file ID {$file->id}: ".$e->getMessage());
                 }
 
                 $bar->advance();
@@ -91,7 +94,7 @@ class CheckFilesExistence extends Command
         $bar->finish();
         $this->newLine(2);
 
-        $this->info("File existence check completed:");
+        $this->info('File existence check completed:');
         $this->info("- Total files: {$totalFiles}");
         $this->info("- Files found: {$foundCount}");
         $this->info("- Files not found: {$notFoundCount}");
@@ -131,12 +134,12 @@ class CheckFilesExistence extends Command
         }
 
         // Update the not_found flag
-        $file->not_found = !$exists;
+        $file->not_found = ! $exists;
         $file->save();
 
         return [
             'exists' => $exists,
-            'path' => $path
+            'path' => $path,
         ];
     }
 }

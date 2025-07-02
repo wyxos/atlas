@@ -25,8 +25,7 @@ class RemoveMetadataWarnings extends Command
      * Get a generator that yields JSON files to reduce memory usage
      * Uses recursive directory traversal for extremely large directories
      *
-     * @param string $directory Directory to scan
-     * @return \Generator
+     * @param  string  $directory  Directory to scan
      */
     protected function getJsonFilesGenerator(string $directory): \Generator
     {
@@ -49,10 +48,9 @@ class RemoveMetadataWarnings extends Command
     /**
      * Process a single JSON file to remove warnings
      *
-     * @param string $file File path
-     * @param int $count Counter for processed files
-     * @param int $modified Counter for modified files
-     * @return void
+     * @param  string  $file  File path
+     * @param  int  $count  Counter for processed files
+     * @param  int  $modified  Counter for modified files
      */
     protected function processJsonFile(string $file, int &$count, int &$modified): void
     {
@@ -63,15 +61,16 @@ class RemoveMetadataWarnings extends Command
             $metadataJson = Storage::get($file);
             $metadata = json_decode($metadataJson, true);
 
-            if (!$metadata) {
+            if (! $metadata) {
                 $this->warn("Failed to parse JSON for file: {$file}");
+
                 return;
             }
 
             $hasWarnings = false;
 
             // Check if there are warnings to remove
-            if (isset($metadata['quality']['warnings']) && !empty($metadata['quality']['warnings'])) {
+            if (isset($metadata['quality']['warnings']) && ! empty($metadata['quality']['warnings'])) {
                 // Remove warnings by setting to empty array
                 $metadata['quality']['warnings'] = [];
                 $hasWarnings = true;
@@ -85,13 +84,13 @@ class RemoveMetadataWarnings extends Command
                 $this->info("Removed warnings from file: {$file}");
             }
         } catch (\Exception $e) {
-            $this->error("Error processing file {$file}: " . $e->getMessage());
+            $this->error("Error processing file {$file}: ".$e->getMessage());
         }
     }
 
     public function handle()
     {
-        $this->info("Starting metadata warnings removal process...");
+        $this->info('Starting metadata warnings removal process...');
 
         $metadataDirectory = 'metadata';
         $count = 0;
@@ -103,14 +102,16 @@ class RemoveMetadataWarnings extends Command
             $this->info("Processing only file: {$filePath}");
 
             // Check if the file exists
-            if (!Storage::exists($filePath)) {
+            if (! Storage::exists($filePath)) {
                 $this->error("File not found: {$filePath}");
+
                 return Command::FAILURE;
             }
 
             // Check if it's a JSON file
             if (pathinfo($filePath, PATHINFO_EXTENSION) !== 'json') {
                 $this->error("File is not a JSON file: {$filePath}");
+
                 return Command::FAILURE;
             }
 
@@ -122,7 +123,7 @@ class RemoveMetadataWarnings extends Command
             }
         }
 
-        $this->info("Metadata warnings removal process completed.");
+        $this->info('Metadata warnings removal process completed.');
         $this->info("Total files processed: {$count}");
         $this->info("Files modified: {$modified}");
 

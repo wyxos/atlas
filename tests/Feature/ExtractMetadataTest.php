@@ -49,7 +49,7 @@ it('dispatches jobs for audio files when command is run', function () {
     $this->artisan(ExtractMetadata::class)
         ->expectsOutput("Queuing metadata extraction for file: {$audioFile1->path}")
         ->expectsOutput("Queuing metadata extraction for file: {$audioFile2->path}")
-        ->expectsOutput("Queued metadata extraction for 2 files.")
+        ->expectsOutput('Queued metadata extraction for 2 files.')
         ->assertSuccessful();
 
     // Assert that jobs were dispatched for audio files only
@@ -78,7 +78,7 @@ it('dispatches job only for the specified file when using --file option', functi
     $this->artisan(ExtractMetadata::class, ['--file' => $audioFile1->id])
         ->expectsOutput("Processing only file with ID: {$audioFile1->id}")
         ->expectsOutput("Queuing metadata extraction for file: {$audioFile1->path}")
-        ->expectsOutput("Queued metadata extraction for 1 files.")
+        ->expectsOutput('Queued metadata extraction for 1 files.')
         ->assertSuccessful();
 
     // Assert that a job was dispatched only for the specified file

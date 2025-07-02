@@ -26,7 +26,7 @@ class TestExtractFileMetadataWithFixtures extends ExtractFileMetadata
     {
         $fixturePath = base_path("tests/fixtures/{$this->fixtureFile}");
 
-        if (!file_exists($fixturePath)) {
+        if (! file_exists($fixturePath)) {
             return null;
         }
 
@@ -44,7 +44,7 @@ describe('ExtractFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_complete_metadata.mp3'),
-            'filename' => 'test_complete_metadata.mp3'
+            'filename' => 'test_complete_metadata.mp3',
         ]);
 
         $job = new TestExtractFileMetadataWithFixtures($audioFile, 'metadata_complete.json');
@@ -68,7 +68,7 @@ describe('ExtractFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_minimal_tags.mp3'),
-            'filename' => 'test_minimal_tags.mp3'
+            'filename' => 'test_minimal_tags.mp3',
         ]);
 
         $job = new TestExtractFileMetadataWithFixtures($audioFile, 'metadata_minimal.json');
@@ -84,7 +84,7 @@ describe('ExtractFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => '/nonexistent/path/audio.mp3',
-            'filename' => 'nonexistent.mp3'
+            'filename' => 'nonexistent.mp3',
         ]);
 
         $job = new TestExtractFileMetadataWithFixtures($audioFile, 'nonexistent_fixture.json');
@@ -104,7 +104,7 @@ describe('TranslateFileMetadata Job', function () {
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_complete_metadata.mp3'),
             'filename' => 'test_complete_metadata.mp3',
-            'tags' => []
+            'tags' => [],
         ]);
 
         // Create metadata record
@@ -145,7 +145,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_complete_metadata.mp3'),
-            'filename' => 'test_complete_metadata.mp3'
+            'filename' => 'test_complete_metadata.mp3',
         ]);
 
         $audioFile->metadata()->create(['is_extracted' => true]);
@@ -173,7 +173,7 @@ describe('TranslateFileMetadata Job', function () {
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_minimal_tags.mp3'),
             'filename' => 'test_minimal_tags.mp3',
-            'tags' => ['existing_tag' => 'value']
+            'tags' => ['existing_tag' => 'value'],
         ]);
 
         $audioFile->metadata()->create(['is_extracted' => true]);
@@ -199,7 +199,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_jazz_sample.mp3'),
-            'filename' => 'test_jazz_sample.mp3'
+            'filename' => 'test_jazz_sample.mp3',
         ]);
 
         $audioFile->metadata()->create(['is_extracted' => true]);
@@ -228,7 +228,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_short_sample.mp3'),
-            'filename' => 'test_short_sample.mp3'
+            'filename' => 'test_short_sample.mp3',
         ]);
 
         $audioFile->metadata()->create(['is_extracted' => true]);
@@ -256,7 +256,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_minimal_tags.mp3'),
-            'filename' => 'test_minimal_tags.mp3'
+            'filename' => 'test_minimal_tags.mp3',
         ]);
 
         $audioFile->metadata()->create(['is_extracted' => true]);
@@ -277,7 +277,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_minimal_tags.mp3'),
-            'filename' => 'test_minimal_tags.mp3'
+            'filename' => 'test_minimal_tags.mp3',
         ]);
 
         $audioFile->metadata()->create(['is_extracted' => true]);
@@ -300,8 +300,8 @@ describe('TranslateFileMetadata Job', function () {
             'tags' => [
                 'user_rating' => 5,
                 'custom_tag' => 'custom_value',
-                'artist' => 'Original Artist' // This should be overwritten
-            ]
+                'artist' => 'Original Artist', // This should be overwritten
+            ],
         ]);
 
         $audioFile->metadata()->create(['is_extracted' => true]);
@@ -329,7 +329,7 @@ describe('Integration Tests', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_complete_metadata.mp3'),
-            'filename' => 'test_complete_metadata.mp3'
+            'filename' => 'test_complete_metadata.mp3',
         ]);
 
         // Step 1: Extract metadata
@@ -368,7 +368,7 @@ describe('Integration Tests', function () {
         $audioFile = File::factory()->create([
             'mime_type' => 'audio/mp3',
             'path' => base_path('tests/fixtures/audio/test_short_sample.mp3'),
-            'filename' => 'test_short_sample.mp3'
+            'filename' => 'test_short_sample.mp3',
         ]);
 
         // Extract and translate

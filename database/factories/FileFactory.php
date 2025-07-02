@@ -37,7 +37,7 @@ class FileFactory extends Factory
         ];
 
         $ext = $this->faker->randomElement($extensions);
-        $filename = $this->faker->word() . '-' . $this->faker->word() . '.' . $ext;
+        $filename = $this->faker->word().'-'.$this->faker->word().'.'.$ext;
 
         return [
             'source' => $this->faker->randomElement($sources),
@@ -55,7 +55,7 @@ class FileFactory extends Factory
             'thumbnail_url' => $this->faker->optional()->imageUrl(),
             'tags' => $this->faker->optional()->randomElements([
                 'funny', 'cute', 'anime', 'gaming', 'music', 'movie', 'series',
-                'documentary', 'tutorial', 'meme', 'art', 'nature', 'travel'
+                'documentary', 'tutorial', 'meme', 'art', 'nature', 'travel',
             ], $this->faker->numberBetween(0, 5)),
             'parent_id' => null, // Can be overridden in tests
             'chapter' => $this->faker->optional()->randomElement(['Chapter 1', 'Episode 1', 'Part 1']),
@@ -82,8 +82,8 @@ class FileFactory extends Factory
                 return $attributes['downloaded'] ? 100 : $this->faker->numberBetween(0, 99);
             },
             'downloaded_at' => function (array $attributes) {
-                return $attributes['downloaded'] && $attributes['download_progress'] === 100 
-                    ? $this->faker->dateTimeBetween('-1 month') 
+                return $attributes['downloaded'] && $attributes['download_progress'] === 100
+                    ? $this->faker->dateTimeBetween('-1 month')
                     : null;
             },
         ];
@@ -141,13 +141,13 @@ class FileFactory extends Factory
     {
         $videoExtensions = ['mp4', 'mkv', 'avi', 'webm'];
         $ext = $this->faker->randomElement($videoExtensions);
-        
+
         return $this->state(fn (array $attributes) => [
             'ext' => $ext,
-            'filename' => $this->faker->word() . '-video.' . $ext,
-            'mime_type' => match($ext) {
+            'filename' => $this->faker->word().'-video.'.$ext,
+            'mime_type' => match ($ext) {
                 'mp4' => 'video/mp4',
-                'mkv' => 'video/x-matroska', 
+                'mkv' => 'video/x-matroska',
                 'avi' => 'video/x-msvideo',
                 'webm' => 'video/webm',
                 default => 'video/mp4',
@@ -163,11 +163,11 @@ class FileFactory extends Factory
     {
         $imageExtensions = ['jpg', 'png', 'gif'];
         $ext = $this->faker->randomElement($imageExtensions);
-        
+
         return $this->state(fn (array $attributes) => [
             'ext' => $ext,
-            'filename' => $this->faker->word() . '-image.' . $ext,
-            'mime_type' => match($ext) {
+            'filename' => $this->faker->word().'-image.'.$ext,
+            'mime_type' => match ($ext) {
                 'jpg' => 'image/jpeg',
                 'png' => 'image/png',
                 'gif' => 'image/gif',

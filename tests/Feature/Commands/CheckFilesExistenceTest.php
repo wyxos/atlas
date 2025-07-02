@@ -39,8 +39,8 @@ beforeEach(function () {
 test('command correctly identifies existing and non-existing files', function () {
     // Run the command
     $this->artisan('files:check-existence')
-         ->expectsOutput('Checking file existence...')
-         ->assertSuccessful();
+        ->expectsOutput('Checking file existence...')
+        ->assertSuccessful();
 
     // Verify the results
     $existingFile = File::where('filename', 'existing_file.txt')->first();
@@ -65,10 +65,10 @@ test('command processes only the specified file when using --file option', funct
     $nonExistingFile = File::where('filename', 'non_existing_file.txt')->first();
 
     // Run the command with the --file option for the non-existing file
-    $this->artisan('files:check-existence --file=' . $nonExistingFile->id)
-         ->expectsOutput('Checking file existence...')
-         ->expectsOutput('Processing only file with ID: ' . $nonExistingFile->id)
-         ->assertSuccessful();
+    $this->artisan('files:check-existence --file='.$nonExistingFile->id)
+        ->expectsOutput('Checking file existence...')
+        ->expectsOutput('Processing only file with ID: '.$nonExistingFile->id)
+        ->assertSuccessful();
 
     // Refresh the models
     $existingFile = File::where('filename', 'existing_file.txt')->first();

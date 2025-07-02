@@ -25,13 +25,10 @@ class TranslateFileMetadata implements ShouldQueue
     public function __construct(
         protected File $file,
         protected bool $force = false
-    ) {
-    }
+    ) {}
 
     /**
      * Get the file associated with this job.
-     *
-     * @return File
      */
     public function getFile(): File
     {
@@ -47,30 +44,30 @@ class TranslateFileMetadata implements ShouldQueue
             // Get the metadata JSON file
             $metadataPath = "metadata/{$this->file->id}.json";
 
-            if (!Storage::exists($metadataPath)) {
+            if (! Storage::exists($metadataPath)) {
                 Log::warning("Metadata file not found for file ID: {$this->file->id}");
+
                 return;
             }
 
             $metadataJson = Storage::get($metadataPath);
             $metadata = json_decode($metadataJson, true);
 
-            if (!$metadata) {
+            if (! $metadata) {
                 Log::error("Failed to parse metadata JSON for file ID: {$this->file->id}");
 
                 // Mark as review required
-                if($this->file->metadata()->exists()){
+                if ($this->file->metadata()->exists()) {
                     Log::warning("Marking file {$this->file->id} as review required due to invalid metadata.");
                     $this->file->metadata()->update([
-                        'is_review_required' => true
+                        'is_review_required' => true,
                     ]);
                 } else {
                     Log::warning("Creating metadata record for file {$this->file->id} with review required status.");
                     $this->file->metadata()->create([
-                        'is_review_required' => true
+                        'is_review_required' => true,
                     ]);
                 }
-
 
                 return;
             }
@@ -78,7 +75,7 @@ class TranslateFileMetadata implements ShouldQueue
             // Extract relevant fields from metadata
             $translatedData = $this->translateMetadata($metadata, $this->file);
 
-            if($this->file->metadata()->exists()){
+            if ($this->file->metadata()->exists()) {
                 // If metadata already exists, update it
                 $this->file->metadata()->update($translatedData);
             } else {
@@ -86,11 +83,11 @@ class TranslateFileMetadata implements ShouldQueue
                 $this->file->metadata()->create($translatedData);
             }
         } catch (\Exception $e) {
-            Log::error("Error processing file {$this->file->id}: " . $e->getMessage());
+            Log::error("Error processing file {$this->file->id}: ".$e->getMessage());
 
             // Mark as review required
             $this->file->metadata()->update([
-                'is_review_required' => true
+                'is_review_required' => true,
             ]);
         }
     }
@@ -98,8 +95,8 @@ class TranslateFileMetadata implements ShouldQueue
     /**
      * Translate metadata into structured entities
      *
-     * @param array $metadata The raw metadata
-     * @param File $file The file being processed
+     * @param  array  $metadata  The raw metadata
+     * @param  File  $file  The file being processed
      * @return array Translated data and review status
      */
     protected function translateMetadata(array $metadata, File $file): array
@@ -185,7 +182,7 @@ class TranslateFileMetadata implements ShouldQueue
 
                                     DB::commit();
                                 } catch (\Exception $e) {
-                                    Log::error("Error processing cover for file {$file->id}: " . $e->getMessage());
+                                    Log::error("Error processing cover for file {$file->id}: ".$e->getMessage());
                                     DB::rollBack();
                                 }
                             }
@@ -253,62 +250,62 @@ class TranslateFileMetadata implements ShouldQueue
         $payload['title'] = $title;
 
         // Create or find artist(s) and associate with file
-        if (!empty($artist)) {
+        if (! empty($artist)) {
             // Check if there are multiple artists (separated by commas, semicolons, or '&')
             $artistNames = preg_split('/[,;&]+/', $artist);
             $artistIds = [];
 
             foreach ($artistNames as $artistName) {
                 $artistName = trim($artistName);
-                if (!empty($artistName)) {
+                if (! empty($artistName)) {
                     $artistModel = Artist::firstOrCreate(['name' => $artistName]);
                     $artistIds[] = $artistModel->id;
                 }
             }
 
-            if (!empty($artistIds)) {
+            if (! empty($artistIds)) {
                 $file->artists()->syncWithoutDetaching($artistIds);
             }
         }
 
         // Create or find album(s) and associate with file
-        if (!empty($album)) {
+        if (! empty($album)) {
             // Check if there are multiple albums (separated by commas, semicolons, or '&')
             $albumNames = preg_split('/[,;&]+/', $album);
             $albumIds = [];
 
             foreach ($albumNames as $albumName) {
                 $albumName = trim($albumName);
-                if (!empty($albumName)) {
+                if (! empty($albumName)) {
                     $albumModel = Album::firstOrCreate(['name' => $albumName]);
                     $albumIds[] = $albumModel->id;
                 }
             }
 
-            if (!empty($albumIds)) {
+            if (! empty($albumIds)) {
                 $file->albums()->syncWithoutDetaching($albumIds);
             }
         }
 
-        if (!empty($year)) {
+        if (! empty($year)) {
             $payload['year'] = $year;
         }
 
-        if (!empty($track)) {
+        if (! empty($track)) {
             $payload['track'] = $track;
         }
 
         // Add format information if available
         if (isset($metadata['format'])) {
-            if (isset($metadata['format']['duration']) && !isset($payload['duration'])) {
+            if (isset($metadata['format']['duration']) && ! isset($payload['duration'])) {
                 $payload['duration'] = $metadata['format']['duration'];
             }
 
-            if (isset($metadata['format']['bitrate']) && !isset($payload['bitrate'])) {
+            if (isset($metadata['format']['bitrate']) && ! isset($payload['bitrate'])) {
                 $payload['bitrate'] = $metadata['format']['bitrate'];
             }
 
-            if (isset($metadata['format']['sampleRate']) && !isset($payload['sample_rate'])) {
+            if (isset($metadata['format']['sampleRate']) && ! isset($payload['sample_rate'])) {
                 $payload['sampleRate'] = $metadata['format']['sampleRate'];
             }
         }
@@ -316,7 +313,7 @@ class TranslateFileMetadata implements ShouldQueue
         // Merge with existing file tags
         $existingTags = $file->tags ?? [];
         foreach ($existingTags as $key => $value) {
-            if (!isset($payload[$key])) {
+            if (! isset($payload[$key])) {
                 $payload[$key] = $value;
             }
         }
@@ -329,15 +326,12 @@ class TranslateFileMetadata implements ShouldQueue
 
         return [
             'payload' => $payload,
-            'is_review_required' => $isReviewRequired
+            'is_review_required' => $isReviewRequired,
         ];
     }
 
     /**
      * Decode cover art data
-     *
-     * @param array $data
-     * @return string
      */
     private function decodeCoverArt(array $data): string
     {

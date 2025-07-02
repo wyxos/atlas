@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\File;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -11,7 +12,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Exception;
 
 class MoveFileToAtlasJob implements ShouldQueue
 {
@@ -36,7 +36,7 @@ class MoveFileToAtlasJob implements ShouldQueue
     public function handle(): void
     {
         // Skip files that don't have a path or don't exist
-        if (empty($this->file->path) || !file_exists($this->file->path)) {
+        if (empty($this->file->path) || ! file_exists($this->file->path)) {
             return;
         }
 
@@ -47,7 +47,7 @@ class MoveFileToAtlasJob implements ShouldQueue
                 'original_path' => $this->file->path,
                 'sanitized_path' => $sanitizedPath,
             ]);
-            
+
             // Update the file record with sanitized path
             $this->file->path = $sanitizedPath;
             $this->file->save();
@@ -58,8 +58,8 @@ class MoveFileToAtlasJob implements ShouldQueue
         $extension = $this->file->ext ?: pathinfo($this->file->path, PATHINFO_EXTENSION);
         $newFilename = $filename;
 
-        if (!empty($extension) && !Str::endsWith($newFilename, '.' . $extension)) {
-            $newFilename .= '.' . $extension;
+        if (! empty($extension) && ! Str::endsWith($newFilename, '.'.$extension)) {
+            $newFilename .= '.'.$extension;
         }
 
         // Maintain the original file path structure
@@ -81,7 +81,7 @@ class MoveFileToAtlasJob implements ShouldQueue
             $newPath = $newFilename;
         } else {
             // Otherwise, maintain the directory structure
-            $newPath = $originalDirectory . '/' . $newFilename;
+            $newPath = $originalDirectory.'/'.$newFilename;
         }
 
         // Remove any leading slashes to avoid storing files at the root of the disk
@@ -94,7 +94,7 @@ class MoveFileToAtlasJob implements ShouldQueue
 
         // Stream the file to atlas storage to handle large files efficiently
         $sourceStream = fopen($this->file->path, 'r');
-        if (!$sourceStream) {
+        if (! $sourceStream) {
             throw new Exception("Could not open source file for reading: {$this->file->path}");
         }
 
@@ -120,7 +120,7 @@ class MoveFileToAtlasJob implements ShouldQueue
      */
     private function deleteOriginalFileWithRetry(string $filePath, int $maxRetries = 3): void
     {
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             return;
         }
 
@@ -130,7 +130,7 @@ class MoveFileToAtlasJob implements ShouldQueue
         while ($retryCount < $maxRetries) {
             try {
                 // Check if file is readable and writable
-                if (!is_readable($filePath) || !is_writable($filePath)) {
+                if (! is_readable($filePath) || ! is_writable($filePath)) {
                     throw new Exception("File is not readable or writable: {$filePath}");
                 }
 
@@ -140,6 +140,7 @@ class MoveFileToAtlasJob implements ShouldQueue
                         'file_path' => $filePath,
                         'file_id' => $this->file->id,
                     ]);
+
                     return;
                 }
 
@@ -187,21 +188,21 @@ class MoveFileToAtlasJob implements ShouldQueue
         try {
             // Add a note to the file record about the cleanup needed
             $cleanupNote = "MANUAL CLEANUP NEEDED: Original file could not be deleted at '{$originalPath}'. Error: {$error}";
-            
+
             // If the file has a notes field, append to it; otherwise create a new field or log it
             if ($this->file->hasAttribute('notes')) {
                 $existingNotes = $this->file->notes ?? '';
-                $this->file->notes = $existingNotes . ($existingNotes ? "\n" : '') . $cleanupNote;
+                $this->file->notes = $existingNotes.($existingNotes ? "\n" : '').$cleanupNote;
                 $this->file->save();
             } else {
                 // If no notes field exists, we'll just rely on the log entry above
-                Log::info("File marked for manual cleanup (no notes field available)", [
+                Log::info('File marked for manual cleanup (no notes field available)', [
                     'file_id' => $this->file->id,
                     'cleanup_note' => $cleanupNote,
                 ]);
             }
         } catch (Exception $e) {
-            Log::error("Failed to mark file for manual cleanup", [
+            Log::error('Failed to mark file for manual cleanup', [
                 'file_id' => $this->file->id,
                 'original_path' => $originalPath,
                 'marking_error' => $e->getMessage(),

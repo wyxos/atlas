@@ -33,8 +33,9 @@ class BackupDatabase extends Command
         // Get the database configuration
         $config = Config::get("database.connections.{$connection}");
 
-        if (!$config) {
+        if (! $config) {
             $this->error("Connection '{$connection}' not found in database configuration.");
+
             return 1;
         }
 
@@ -43,33 +44,37 @@ class BackupDatabase extends Command
             $databasePath = $config['database'];
 
             // Check if the database file exists
-            if (!File::exists($databasePath)) {
+            if (! File::exists($databasePath)) {
                 $this->error("Database file not found at: {$databasePath}");
+
                 return 1;
             }
 
             // Create backups directory if it doesn't exist
             $backupDir = storage_path('backups');
-            if (!File::exists($backupDir)) {
+            if (! File::exists($backupDir)) {
                 File::makeDirectory($backupDir, 0755, true);
             }
 
             // Generate backup filename with timestamp
             $timestamp = now()->format('Y-m-d_H-i-s');
-            $filename = Str::of(basename($databasePath))->beforeLast('.') . "_{$timestamp}.sqlite";
+            $filename = Str::of(basename($databasePath))->beforeLast('.')."_{$timestamp}.sqlite";
             $backupPath = "{$backupDir}/{$filename}";
 
             // Copy the database file
             try {
                 File::copy($databasePath, $backupPath);
                 $this->info("Database backup created successfully: {$backupPath}");
+
                 return 0;
             } catch (\Exception $e) {
-                $this->error("Failed to create database backup: " . $e->getMessage());
+                $this->error('Failed to create database backup: '.$e->getMessage());
+
                 return 1;
             }
         } else {
             $this->error("Backup for {$config['driver']} databases is not implemented yet.");
+
             return 1;
         }
     }

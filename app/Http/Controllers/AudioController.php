@@ -3,10 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\File;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AudioController extends Controller
 {
@@ -17,14 +15,14 @@ class AudioController extends Controller
         // Ensure the file exists and is an audio file
         $path = Storage::disk('atlas')->path($file->path);
 
-        if (!file_exists($path) || !str_starts_with($file->mime_type, 'audio/')) {
+        if (! file_exists($path) || ! str_starts_with($file->mime_type, 'audio/')) {
             abort(404, 'Audio file not found');
         }
 
         // Stream the file with proper headers for audio streaming
         return response()->file($path, [
             'Content-Type' => $file->mime_type,
-            'Content-Disposition' => 'inline; filename="' . $file->filename . '"',
+            'Content-Disposition' => 'inline; filename="'.$file->filename.'"',
             'Accept-Ranges' => 'bytes',
         ]);
     }
@@ -37,7 +35,7 @@ class AudioController extends Controller
         return Inertia::render('FileShow', [
             'file' => $file,
             'metadata' => $file->metadata,
-            'rawMetadata' => Storage::json('metadata/' . $file->id . '.json'),
+            'rawMetadata' => Storage::disk('atlas')->json('metadata/'.$file->id.'.json'),
         ]);
     }
 

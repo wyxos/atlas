@@ -31,25 +31,25 @@ test('it creates cover record when processing metadata with cover art', function
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title'
+                    'value' => 'Test Title',
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist'
+                    'value' => 'Test Artist',
                 ],
                 [
                     'id' => 'APIC',
                     'value' => [
                         'format' => 'image/png',
-                        'data' => array_values(unpack('C*', $this->testCoverData))
-                    ]
-                ]
-            ]
+                        'data' => array_values(unpack('C*', $this->testCoverData)),
+                    ],
+                ],
+            ],
         ],
         'format' => [
             'duration' => 180,
-            'bitrate' => 320000
-        ]
+            'bitrate' => 320000,
+        ],
     ];
 
     // Save the metadata
@@ -62,7 +62,7 @@ test('it creates cover record when processing metadata with cover art', function
 
     // Assert that a cover record was created
     $this->assertDatabaseHas('covers', [
-        'hash' => $this->testCoverHash
+        'hash' => $this->testCoverHash,
     ]);
 
     // Assert that the cover is associated with the file
@@ -75,7 +75,7 @@ test('it reuses existing cover when duplicate is found', function () {
     // Create a test cover using our test cover data
     $existingCover = Cover::create([
         'hash' => $this->testCoverHash,
-        'path' => 'covers/existing-cover.png'
+        'path' => 'covers/existing-cover.png',
     ]);
 
     Storage::disk('public')->put($existingCover->path, $this->testCoverData);
@@ -95,18 +95,18 @@ test('it reuses existing cover when duplicate is found', function () {
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title'
+                    'value' => 'Test Title',
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist'
-                ]
-            ]
+                    'value' => 'Test Artist',
+                ],
+            ],
         ],
         'format' => [
             'duration' => 180,
-            'bitrate' => 320000
-        ]
+            'bitrate' => 320000,
+        ],
     ];
 
     // Add the cover art to the metadata
@@ -114,8 +114,8 @@ test('it reuses existing cover when duplicate is found', function () {
         'id' => 'APIC',
         'value' => [
             'format' => 'image/png',
-            'data' => array_values(unpack('C*', $this->testCoverData))
-        ]
+            'data' => array_values(unpack('C*', $this->testCoverData)),
+        ],
     ];
 
     // Create metadata for both files
@@ -159,25 +159,25 @@ test('it processes PIC tag for cover art', function () {
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title'
+                    'value' => 'Test Title',
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist'
+                    'value' => 'Test Artist',
                 ],
                 [
                     'id' => 'PIC', // Using PIC instead of APIC
                     'value' => [
                         'format' => 'image/png',
-                        'data' => array_values(unpack('C*', $this->testCoverData))
-                    ]
-                ]
-            ]
+                        'data' => array_values(unpack('C*', $this->testCoverData)),
+                    ],
+                ],
+            ],
         ],
         'format' => [
             'duration' => 180,
-            'bitrate' => 320000
-        ]
+            'bitrate' => 320000,
+        ],
     ];
 
     // Save the metadata
@@ -190,7 +190,7 @@ test('it processes PIC tag for cover art', function () {
 
     // Assert that a cover record was created
     $this->assertDatabaseHas('covers', [
-        'hash' => $this->testCoverHash
+        'hash' => $this->testCoverHash,
     ]);
 
     // Assert that the cover is associated with the file

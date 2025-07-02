@@ -41,6 +41,7 @@ class ExtractMetadata extends Command
                 $count = 1;
             } else {
                 $this->error("File with ID {$fileId} not found or is not an audio file.");
+
                 return Command::FAILURE;
             }
         } else {

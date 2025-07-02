@@ -109,9 +109,10 @@ it('can generate searchable array without errors', function () {
     $searchableArray = null;
     expect(function () use ($file, &$searchableArray) {
         $searchableArray = $file->toSearchableArray();
+
         return $searchableArray;
     })->not->toThrow(Exception::class);
-    
+
     $searchableArray = $file->toSearchableArray();
     expect($searchableArray)->toBeArray();
     expect($searchableArray)->toHaveKey('id');
@@ -129,7 +130,7 @@ it('maintains data type consistency across multiple records', function () {
 
     foreach ($files as $file) {
         $searchableArray = $file->toSearchableArray();
-        
+
         // Verify consistent data types
         expect($searchableArray['id'])->toBeString();
         expect($searchableArray['size'])->toBeInt();
@@ -175,7 +176,7 @@ it('validates schema compatibility with typesense configuration', function () {
     ]);
 
     $searchableArray = $file->toSearchableArray();
-    
+
     // Get the expected schema from config
     $expectedSchema = config('scout.typesense.model-settings.App\Models\File.collection-schema.fields');
     $expectedFieldTypes = collect($expectedSchema)->pluck('type', 'name');
@@ -183,8 +184,8 @@ it('validates schema compatibility with typesense configuration', function () {
     // Validate each field matches expected type
     foreach ($searchableArray as $fieldName => $value) {
         $expectedType = $expectedFieldTypes->get($fieldName);
-        
-        if (!$expectedType) {
+
+        if (! $expectedType) {
             continue; // Skip fields not in schema
         }
 

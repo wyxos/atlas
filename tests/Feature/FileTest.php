@@ -2,8 +2,8 @@
 
 use App\Models\File;
 use App\Models\FileMetadata;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
