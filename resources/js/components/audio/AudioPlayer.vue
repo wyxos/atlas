@@ -411,9 +411,48 @@ onMounted(() => {
           </div>
 
           <!-- Player controls -->
-          <div class="flex items-center justify-center gap-4 mt-2">
-            <!-- Reaction controls -->
-            <div class="flex items-center gap-2 mr-2">
+          <div class="flex items-center justify-between gap-4 mt-2">
+            <!-- Left spacer -->
+            <div class="flex-1"></div>
+
+            <!-- Media controls (center) -->
+            <div class="flex items-center gap-4">
+              <button
+                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                @click="handleShuffle"
+                title="Shuffle"
+              >
+                <Shuffle :size="16" />
+              </button>
+
+              <button
+                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                @click="handlePrevious"
+                title="Previous"
+              >
+                <SkipBack :size="20" />
+              </button>
+
+              <button
+                class="btn-atlas-primary p-3 rounded-full hover:bg-primary/90 transition-colors"
+                @click="togglePlayPause"
+                title="Play/Pause"
+              >
+                <Play v-if="!audioStore.isPlaying" :size="24" />
+                <Pause v-else :size="24" />
+              </button>
+
+              <button
+                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                @click="handleNext"
+                title="Next"
+              >
+                <SkipForward :size="20" />
+              </button>
+            </div>
+
+            <!-- Love/Like controls (right) -->
+            <div class="flex items-center gap-2 flex-1 justify-end">
               <button
                 class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
                 :class="{ 'bg-red-500 text-white': isLoved }"
@@ -441,39 +480,6 @@ onMounted(() => {
                 <ThumbsDown :size="16" />
               </button>
             </div>
-
-            <button
-              class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
-              @click="handleShuffle"
-              title="Shuffle"
-            >
-              <Shuffle :size="16" />
-            </button>
-
-            <button
-              class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
-              @click="handlePrevious"
-              title="Previous"
-            >
-              <SkipBack :size="20" />
-            </button>
-
-            <button
-              class="btn-atlas-primary p-3 rounded-full hover:bg-primary/90 transition-colors"
-              @click="togglePlayPause"
-              title="Play/Pause"
-            >
-              <Play v-if="!audioStore.isPlaying" :size="24" />
-              <Pause v-else :size="24" />
-            </button>
-
-            <button
-              class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
-              @click="handleNext"
-              title="Next"
-            >
-              <SkipForward :size="20" />
-            </button>
           </div>
         </div>
       </div>
@@ -516,34 +522,6 @@ onMounted(() => {
               </div>
 
               <div class="flex items-center justify-center gap-2">
-                  <!-- Mobile reaction controls -->
-                  <button
-                      class="btn-atlas-secondary p-1 rounded-full transition-colors"
-                      :class="{ 'bg-red-500 text-white': isLoved }"
-                      @click="handleLove"
-                      title="Love"
-                  >
-                      <Heart :size="16" />
-                  </button>
-
-                  <button
-                      class="btn-atlas-secondary p-1 rounded-full transition-colors"
-                      :class="{ 'bg-blue-500 text-white': isLiked }"
-                      @click="handleLike"
-                      title="Like"
-                  >
-                      <ThumbsUp :size="16" />
-                  </button>
-
-                  <button
-                      class="btn-atlas-secondary p-1 rounded-full transition-colors"
-                      :class="{ 'bg-gray-500 text-white': isDisliked }"
-                      @click="handleDislike"
-                      title="Dislike"
-                  >
-                      <ThumbsDown :size="16" />
-                  </button>
-
                   <button
                       class="btn-atlas-primary p-2 transition-colors ml-2"
                       @click="togglePlayPause"
@@ -556,7 +534,7 @@ onMounted(() => {
           </div>
 
           <!-- Progress bar skeleton -->
-          <div v-if="audioStore.isPlayerLoading" class="mb-2">
+          <div v-if="audioStore.isPlayerLoading" class="mb-4">
               <Skeleton class="h-2 w-full mb-2" />
 <!--              <div class="flex justify-between text-xs text-white mb-2">-->
 <!--                  <Skeleton class="h-3 w-10" />-->
@@ -564,7 +542,7 @@ onMounted(() => {
 <!--              </div>-->
           </div>
           <!-- Actual progress bar -->
-          <div v-else-if="audioStore.currentFile" class="mb-2">
+          <div v-else-if="audioStore.currentFile" class="mb-4">
               <div
                   class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
                   @click="seekTo($event)"
@@ -578,6 +556,37 @@ onMounted(() => {
 <!--                  <span>{{ formatTime(currentTime) }}</span>-->
 <!--                  <span>{{ formatTime(duration) }}</span>-->
 <!--              </div>-->
+          </div>
+
+
+          <!-- Mobile reaction controls -->
+          <div class="flex items-center justify-center gap-6">
+              <button
+                  class="btn-atlas-secondary p-1 rounded-full transition-colors"
+                  :class="{ 'bg-red-500 text-white': isLoved }"
+                  @click="handleLove"
+                  title="Love"
+              >
+                  <Heart :size="24" />
+              </button>
+
+              <button
+                  class="btn-atlas-secondary p-1 rounded-full transition-colors"
+                  :class="{ 'bg-blue-500 text-white': isLiked }"
+                  @click="handleLike"
+                  title="Like"
+              >
+                  <ThumbsUp :size="24" />
+              </button>
+
+              <button
+                  class="btn-atlas-secondary p-1 rounded-full transition-colors"
+                  :class="{ 'bg-gray-500 text-white': isDisliked }"
+                  @click="handleDislike"
+                  title="Dislike"
+              >
+                  <ThumbsDown :size="24" />
+              </button>
           </div>
       </div>
       <!-- End of mobile player -->
