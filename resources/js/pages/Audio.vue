@@ -3,11 +3,10 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
-import { ref, onMounted, onBeforeUnmount, provide } from 'vue';
+import { onMounted, provide } from 'vue';
 import { audioStore, audioActions } from '@/stores/audioStore';
 
 // Import our new components and composables
-import AudioPlayer from '@/components/audio/AudioPlayer.vue';
 import AudioListItem from '@/components/audio/AudioListItem.vue';
 import AudioSearch from '@/components/audio/AudioSearch.vue';
 import { useAudioFileLoader } from '@/components/audio/useAudioFileLoader';
@@ -35,11 +34,7 @@ const props = defineProps<{
 const {
   loadedFiles,
   loadFileDetails,
-  getFileData,
-  handleScroll,
-  observeItem: baseObserveItem,
-  createObserver,
-  cleanup: cleanupFileLoader
+  getFileData
 } = useAudioFileLoader();
 
 const {
@@ -50,8 +45,6 @@ const {
   handleGlobalClick
 } = useAudioSwipeHandler();
 
-// Intersection Observer setup
-const observer = ref<IntersectionObserver | null>(null);
 
 // Queue the entire list when playing a new track
 async function playAudio(file: any): Promise<void> {
@@ -100,19 +93,6 @@ async function playAudio(file: any): Promise<void> {
     }
 }
 
-// Check if the given list is the current playlist
-function isCurrentPlaylist(tracks: any[]): boolean {
-    if (audioStore.playlist.length !== tracks.length) return false;
-    return tracks.every((track, index) => {
-        const playlistTrack = audioStore.playlist.find(p => p.id === track.id);
-        return playlistTrack !== undefined;
-    });
-}
-
-// Handle player events
-function handlePlayerPause(): void {
-    audioActions.setPlaying(false);
-}
 
 // Action handlers
 function toggleFavorite(item: any, event: Event): void {
@@ -226,45 +206,42 @@ function dislikeItem(item: any, event: Event): void {
     swipedItemId.value = null;
 }
 
-// Wrap the observeItem function to include our observer
-function observeItem(el: HTMLElement, itemId: string | number): void {
-    if (observer.value) {
-        baseObserveItem(el, itemId, observer.value);
-    }
-}
 
 onMounted(() => {
-    observer.value = createObserver();
-
-    // Add scroll event listener to detect scrolling
-    const scrollContainer = document.querySelector('.RecycleScroller');
-    if (scrollContainer) {
-        console.log('Adding scroll event listener to RecycleScroller');
-        scrollContainer.addEventListener('scroll', handleScroll);
-    }
-
     // Provide the loadFileDetails function for the AudioPlayer
     provide('loadFileDetails', loadFileDetails);
 });
 
-onBeforeUnmount(() => {
-    cleanupFileLoader(observer.value);
-
-    // Clean up scroll event listener
-    const scrollContainer = document.querySelector('.RecycleScroller');
-    if (scrollContainer) {
-        console.log('Removing scroll event listener from RecycleScroller');
-        scrollContainer.removeEventListener('scroll', handleScroll);
-    }
-});
 
 const initialQuery = window.location.search
     ? new URLSearchParams(window.location.search).get('query') || ''
     : '';
 
 
-function onScroll(startIndex, endIndex, visibleStartIndex, visibleEndIndex){
-    console.log(`onScroll called with startIndex: ${startIndex}, endIndex: ${endIndex}, visibleStartIndex: ${visibleStartIndex}, visibleEndIndex: ${visibleEndIndex}`);
+// Scroll timeout for debouncing
+let scrollTimeout: number | null = null;
+
+function onScroll(startIndex: number, endIndex: number, visibleStartIndex: number, visibleEndIndex: number): void {
+    // Clear previous timeout
+    if (scrollTimeout !== null) {
+        window.clearTimeout(scrollTimeout);
+    }
+
+    // Set a timeout to detect when scrolling stops (debounce)
+    scrollTimeout = window.setTimeout(() => {
+        // Get the current items list (search results or all files)
+        const currentItems = props.search.length ? props.search : props.files;
+
+        // Pre-load item details for visible items
+        for (let i = visibleStartIndex; i <= visibleEndIndex; i++) {
+            if (i >= 0 && i < currentItems.length) {
+                const item = currentItems[i];
+                if (item && !loadedFiles[item.id]) {
+                    loadFileDetails(item.id, true); // Load with priority
+                }
+            }
+        }
+    }, 500); // 500ms debounce to detect scroll stop
 }
 </script>
 
@@ -291,7 +268,7 @@ function onScroll(startIndex, endIndex, visibleStartIndex, visibleEndIndex){
                             @update="onScroll"
                             v-slot="{ item }"
                         >
-                            <div class="relative overflow-hidden" :ref="el => el && observeItem(el, item.id)">
+                            <div class="relative overflow-hidden">
                                 <!-- List item component -->
                                 <AudioListItem
                                     :item="item"
