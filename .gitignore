@@ -8,6 +8,7 @@
 /storage/pail
 /storage/backups
 /vendor
+composer.lock
 .env
 .env.backup
 .env.production
