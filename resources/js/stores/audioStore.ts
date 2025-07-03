@@ -1,5 +1,8 @@
 import { reactive } from 'vue';
 
+// Repeat modes
+export type RepeatMode = 'off' | 'all' | 'one';
+
 // Global audio player state
 export const audioStore = reactive({
   // Player state
@@ -11,6 +14,7 @@ export const audioStore = reactive({
   playlist: [] as any[],
   currentIndex: -1,
   isShuffled: false,
+  repeatMode: 'off' as RepeatMode,
 
   // Audio element state
   currentTime: 0,
@@ -99,7 +103,6 @@ export const audioActions = {
     }
 
     audioStore.isShuffled = true;
-    console.log('Playlist shuffled:', audioStore.playlist.length, 'tracks');
   },
 
   getNextTrack(): any | null {
@@ -117,12 +120,29 @@ export const audioActions = {
   },
 
   async moveToNext(loadFileDetails?: (id: number, priority?: boolean) => Promise<any>) {
+    // Handle repeat one mode - replay current track
+    if (audioStore.repeatMode === 'one' && audioStore.currentFile) {
+      await this.setCurrentFile(audioStore.currentFile, loadFileDetails);
+      return audioStore.currentFile;
+    }
+
+    // Normal next track logic
     if (audioStore.currentIndex < audioStore.playlist.length - 1) {
       audioStore.currentIndex++;
       const nextTrack = audioStore.playlist[audioStore.currentIndex];
       await this.setCurrentFile(nextTrack, loadFileDetails);
       return nextTrack;
     }
+
+    // Handle repeat all mode - go back to first track
+    if (audioStore.repeatMode === 'all' && audioStore.playlist.length > 0) {
+      audioStore.currentIndex = 0;
+      const firstTrack = audioStore.playlist[0];
+      await this.setCurrentFile(firstTrack, loadFileDetails);
+      return firstTrack;
+    }
+
+    // Repeat off mode or no tracks - return null
     return null;
   },
 
@@ -161,6 +181,21 @@ export const audioActions = {
     return false;
   },
 
+  toggleRepeat() {
+    // Cycle through repeat modes: off -> all -> one -> off
+    switch (audioStore.repeatMode) {
+      case 'off':
+        audioStore.repeatMode = 'all';
+        break;
+      case 'all':
+        audioStore.repeatMode = 'one';
+        break;
+      case 'one':
+        audioStore.repeatMode = 'off';
+        break;
+    }
+  },
+
   reset() {
     audioStore.currentFile = null;
     audioStore.isPlaying = false;
@@ -168,6 +203,7 @@ export const audioActions = {
     audioStore.playlist = [];
     audioStore.currentIndex = -1;
     audioStore.isShuffled = false;
+    audioStore.repeatMode = 'off';
     audioStore.currentTime = 0;
     audioStore.duration = 0;
     audioStore.isPlayerVisible = false;

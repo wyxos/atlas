@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
-import { Play, Pause, SkipBack, SkipForward, Heart, ThumbsUp, ThumbsDown, Shuffle } from 'lucide-vue-next';
+import { Play, Pause, SkipBack, SkipForward, Heart, ThumbsUp, ThumbsDown, Shuffle, Repeat, Repeat1 } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
 import { audioStore, audioActions } from '@/stores/audioStore';
@@ -15,7 +15,7 @@ if (typeof window !== 'undefined' && !window.globalAudioElement) {
   window.globalAudioElement.addEventListener('ended', () => {
     // When track ends, update the store state
     audioActions.setPlaying(false);
-    // Try to play the next track
+    // Try to play the next track (moveToNext already handles repeat modes)
     audioActions.moveToNext(window.loadFileDetails).then(nextTrack => {
       if (nextTrack) {
         audioActions.setPlaying(true);
@@ -238,6 +238,11 @@ function handleShuffle(): void {
   audioActions.shufflePlaylist();
 }
 
+// Handle repeat
+function handleRepeat(): void {
+  audioActions.toggleRepeat();
+}
+
 // Function to handle play/pause based on isPlaying prop
 function updatePlayState(newIsPlaying: boolean): void {
   if (typeof window === 'undefined' || !window.globalAudioElement) {
@@ -449,6 +454,19 @@ onMounted(() => {
               >
                 <SkipForward :size="20" />
               </button>
+
+              <button
+                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                :class="{
+                  'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
+                  'bg-blue-500 text-white': audioStore.repeatMode === 'one'
+                }"
+                @click="handleRepeat"
+                :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+              >
+                <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
+                <Repeat v-else :size="16" />
+              </button>
             </div>
 
             <!-- Love/Like controls (right) -->
@@ -558,6 +576,54 @@ onMounted(() => {
 <!--              </div>-->
           </div>
 
+          <!-- Mobile navigation controls -->
+          <div class="flex items-center justify-center gap-4 mb-4">
+              <button
+                  class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                  @click="handleShuffle"
+                  title="Shuffle"
+              >
+                  <Shuffle :size="16" />
+              </button>
+
+              <button
+                  class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                  @click="handlePrevious"
+                  title="Previous"
+              >
+                  <SkipBack :size="18" />
+              </button>
+
+              <button
+                  class="btn-atlas-primary p-3 rounded-full hover:bg-primary/90 transition-colors"
+                  @click="togglePlayPause"
+                  title="Play/Pause"
+              >
+                  <Play v-if="!audioStore.isPlaying" :size="22" />
+                  <Pause v-else :size="22" />
+              </button>
+
+              <button
+                  class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                  @click="handleNext"
+                  title="Next"
+              >
+                  <SkipForward :size="18" />
+              </button>
+
+              <button
+                  class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                  :class="{
+                    'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
+                    'bg-blue-500 text-white': audioStore.repeatMode === 'one'
+                  }"
+                  @click="handleRepeat"
+                  :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+              >
+                  <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
+                  <Repeat v-else :size="16" />
+              </button>
+          </div>
 
           <!-- Mobile reaction controls -->
           <div class="flex items-center justify-center gap-6">
