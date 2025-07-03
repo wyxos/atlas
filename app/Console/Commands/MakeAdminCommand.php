@@ -56,7 +56,7 @@ class MakeAdminCommand extends Command
             }
 
             // Update existing user to admin only if confirmed
-            $existingUser->admin = true;
+            $existingUser->is_admin = true;
             $existingUser->save();
 
             $this->info("User {$email} has been updated to admin successfully!");
@@ -81,7 +81,7 @@ class MakeAdminCommand extends Command
                 'name' => $name,
                 'email' => $email,
                 'password' => Hash::make($password),
-                'admin' => true,
+                'is_admin' => true,
             ]);
 
             $this->info('Admin created successfully!');
