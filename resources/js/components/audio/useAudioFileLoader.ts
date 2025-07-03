@@ -82,8 +82,30 @@ export function useAudioFileLoader() {
 
   // Prioritize loading of currently visible items
   function prioritizeVisibleItems() {
+    // First, clean up the visibleItems set by checking which items are actually still visible
+    const currentlyVisible = new Set<string | number>();
+    
+    // Check each observed item to see if it's actually still intersecting
+    observedItems.value.forEach(itemId => {
+      const element = document.querySelector(`[data-item-id="${itemId}"]`);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        
+        // Check if the element is actually visible in the viewport
+        if (rect.top < viewportHeight && rect.bottom > 0) {
+          currentlyVisible.add(itemId);
+        }
+      }
+    });
+    
+    // Update visibleItems to only include actually visible items
+    visibleItems.value = currentlyVisible;
+    
+    console.log(`Loading ${currentlyVisible.size} visible items out of ${observedItems.value.size} observed`);
+    
     // Only load details for items that are currently visible in the viewport
-    visibleItems.value.forEach(itemId => {
+    currentlyVisible.forEach(itemId => {
       if (!loadedFiles[itemId]) {
         loadFileDetails(itemId, true); // Load with priority
       }
@@ -91,7 +113,7 @@ export function useAudioFileLoader() {
 
     // Cancel any pending requests for items that are no longer visible
     Object.keys(pendingRequests).forEach(itemId => {
-      if (!visibleItems.value.has(itemId)) {
+      if (!currentlyVisible.has(itemId)) {
         pendingRequests[itemId].abort();
         delete pendingRequests[itemId];
       }
@@ -114,22 +136,24 @@ export function useAudioFileLoader() {
         if (!itemId) return;
 
         if (entry.isIntersecting) {
-          // Item is now visible
-          visibleItems.value.add(itemId);
+          // Item is now visible - but don't add to visibleItems during fast scrolling
+          // Only track it in observedItems for potential cleanup
           observedItems.value.add(itemId);
-
-          // Only load files when scrolling has completely stopped
-          // When scrolling, just mark the item as visible but don't load yet
+          
+          // Only add to visibleItems if we're not scrolling or scrolling slowly
           if (!isScrolling.value) {
+            visibleItems.value.add(itemId);
+            
             // Only load if not already loaded or loading
             if (!loadedFiles[itemId] && !pendingRequests[itemId]) {
               loadFileDetails(itemId, true); // Priority load when not scrolling
             }
           }
-          // No loading during scrolling - will be handled by prioritizeVisibleItems when scrolling stops
+          // During scrolling, don't add to visibleItems - prioritizeVisibleItems will handle it
         } else {
-          // Item is no longer visible
+          // Item is no longer visible - remove from both sets
           visibleItems.value.delete(itemId);
+          observedItems.value.delete(itemId);
 
           // If there's a pending request, cancel it
           if (pendingRequests[itemId]) {
