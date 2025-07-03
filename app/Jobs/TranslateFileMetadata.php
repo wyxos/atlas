@@ -44,13 +44,13 @@ class TranslateFileMetadata implements ShouldQueue
             // Get the metadata JSON file
             $metadataPath = "metadata/{$this->file->id}.json";
 
-            if (! Storage::exists($metadataPath)) {
+            if (! Storage::disk('atlas')->exists($metadataPath)) {
                 Log::warning("Metadata file not found for file ID: {$this->file->id}");
 
                 return;
             }
 
-            $metadataJson = Storage::get($metadataPath);
+            $metadataJson = Storage::disk('atlas')->get($metadataPath);
             $metadata = json_decode($metadataJson, true);
 
             if (! $metadata) {

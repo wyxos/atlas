@@ -27,7 +27,7 @@ test('login history is recorded when a user logs in', function () {
 });
 
 test('last login time is displayed on users list', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['is_admin' => true]);
 
     // Create a login history for the user
     $loginHistory = LoginHistory::create([
@@ -46,8 +46,8 @@ test('last login time is displayed on users list', function () {
     );
 
     // Get the response data and check if last_login_at is present
-    $responseData = $response->inertia()->toArray();
-    $users = $responseData['props']['users']['data'];
+    $responseData = $response->viewData('page')['props'];
+    $users = $responseData['users']['data'];
 
     // Find the user in the response
     $foundUser = null;
@@ -62,10 +62,10 @@ test('last login time is displayed on users list', function () {
     expect($foundUser)->toHaveKey('last_login_at');
 });
 
-test('super admin receives notification when a new user registers', function () {
+test('admin receives notification when a new user registers', function () {
     Notification::fake();
 
-    $superAdmin = User::factory()->create(['is_super_admin' => true]);
+    $admin = User::factory()->create(['is_admin' => true]);
 
     $this->post('/register', [
         'name' => 'Test User',
@@ -75,7 +75,7 @@ test('super admin receives notification when a new user registers', function () 
     ]);
 
     Notification::assertSentTo(
-        $superAdmin,
+        $admin,
         NewUserRegistered::class
     );
 });

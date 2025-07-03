@@ -32,6 +32,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     // Create a fake storage disk for metadata
     Storage::fake('local');
+    Storage::fake('atlas');
 });
 
 it('dispatches jobs for audio files when command is run', function () {
@@ -101,7 +102,7 @@ it('processes file and updates metadata when job is executed', function () {
     $job->handle();
 
     // Assert that metadata file was stored
-    Storage::disk('local')->assertExists("metadata/{$audioFile->id}.json");
+    Storage::disk('atlas')->assertExists("metadata/{$audioFile->id}.json");
 
     // Assert that metadata record was created with is_extracted = true
     expect(FileMetadata::where('file_id', $audioFile->id)->where('is_extracted', true)->exists())->toBeTrue();

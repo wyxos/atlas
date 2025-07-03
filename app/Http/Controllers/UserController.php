@@ -17,7 +17,7 @@ class UserController extends Controller
     public function index(): Response
     {
         // Check if the user is an admin
-        if (!Auth::user()->admin) {
+        if (!Auth::user()->is_admin) {
             abort(HttpResponse::HTTP_FORBIDDEN, 'Access denied. Only admins can access this page.');
         }
         $users = User::select('id', 'name', 'email', 'created_at')
@@ -50,7 +50,7 @@ class UserController extends Controller
     public function edit(User $user): Response
     {
         // Check if the user is an admin
-        if (!Auth::user()->admin) {
+        if (!Auth::user()->is_admin) {
             abort(HttpResponse::HTTP_FORBIDDEN, 'Access denied. Only admins can access this page.');
         }
 
@@ -65,7 +65,7 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         // Check if the user is an admin
-        if (!Auth::user()->admin) {
+        if (!Auth::user()->is_admin) {
             abort(HttpResponse::HTTP_FORBIDDEN, 'Access denied. Only admins can update users.');
         }
 
@@ -85,7 +85,7 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         // Check if the user is an admin
-        if (!Auth::user()->admin) {
+        if (!Auth::user()->is_admin) {
             abort(HttpResponse::HTTP_FORBIDDEN, 'Access denied. Only admins can delete users.');
         }
 
@@ -95,7 +95,7 @@ class UserController extends Controller
         }
 
         // Prevent deleting admin users (if not an admin)
-        if ($user->admin && !auth()->user()->admin) {
+        if ($user->is_admin && !auth()->user()->is_admin) {
             return redirect()->route('users.index')->with('error', 'You do not have permission to delete an admin.');
         }
 

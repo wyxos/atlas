@@ -13,6 +13,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     // Create a fake storage disk for testing
     Storage::fake('public');
+    Storage::fake('atlas');
 
     // Create a simple test cover image
     $this->testCoverData = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
@@ -54,7 +55,7 @@ test('it creates cover record when processing metadata with cover art', function
 
     // Save the metadata
     $metadataPath = "metadata/{$file->id}.json";
-    Storage::put($metadataPath, json_encode($metadata));
+    Storage::disk('atlas')->put($metadataPath, json_encode($metadata));
 
     // Process the file
     $job = new TranslateFileMetadata($file);
@@ -126,8 +127,8 @@ test('it reuses existing cover when duplicate is found', function () {
     $metadata1['native']['ID3v2.3'][] = $coverArtTag;
     $metadata2['native']['ID3v2.3'][] = $coverArtTag;
 
-    Storage::put("metadata/{$file1->id}.json", json_encode($metadata1));
-    Storage::put("metadata/{$file2->id}.json", json_encode($metadata2));
+    Storage::disk('atlas')->put("metadata/{$file1->id}.json", json_encode($metadata1));
+    Storage::disk('atlas')->put("metadata/{$file2->id}.json", json_encode($metadata2));
 
     // Process the first file
     $job1 = new TranslateFileMetadata($file1);
@@ -182,7 +183,7 @@ test('it processes PIC tag for cover art', function () {
 
     // Save the metadata
     $metadataPath = "metadata/{$file->id}.json";
-    Storage::put($metadataPath, json_encode($metadata));
+    Storage::disk('atlas')->put($metadataPath, json_encode($metadata));
 
     // Process the file
     $job = new TranslateFileMetadata($file);

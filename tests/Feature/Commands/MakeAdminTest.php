@@ -13,7 +13,7 @@ test('command creates an admin with provided email and password', function () {
     $password = 'secure_password123';
 
     // Run the command with email and password
-    $this->artisan("app:make-admin {$email} --password={$password}")
+    $this->artisan("make:admin {$email} --password={$password}")
         ->expectsOutput('Admin created successfully!')
         ->expectsOutput("Email: {$email}")
         ->expectsOutput('Password: [HIDDEN]')
@@ -32,7 +32,7 @@ test('command creates an admin with generated password when password is not prov
     $email = 'admin2@example.com';
 
     // Run the command with email only
-    $this->artisan("app:make-admin {$email}")
+    $this->artisan("make:admin {$email}")
         ->expectsOutput('Admin created successfully!')
         ->expectsOutput("Email: {$email}")
         ->expectsOutputToContain('Generated password:')
@@ -51,7 +51,7 @@ test('command fails with invalid email format', function () {
     $invalidEmail = 'invalid-email';
 
     // Run the command with invalid email
-    $this->artisan("app:make-admin {$invalidEmail}")
+    $this->artisan("make:admin {$invalidEmail}")
         ->expectsOutput('Invalid email format.')
         ->assertFailed();
 
@@ -70,7 +70,7 @@ test('command asks for confirmation when updating existing user to admin', funct
     ]);
 
     // Run the command with existing email and confirm "yes"
-    $this->artisan("app:make-admin {$email}")
+    $this->artisan("make:admin {$email}")
         ->expectsQuestion("User {$email} already exists. Are you sure you want to make this user an admin?", 'yes')
         ->expectsOutput("User {$email} has been updated to admin successfully!")
         ->assertSuccessful();

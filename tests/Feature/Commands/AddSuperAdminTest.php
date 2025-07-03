@@ -24,7 +24,7 @@ test('command creates a super admin with provided email and password', function 
 
     expect($user)->not->toBeNull();
     expect($user->name)->toBe('admin');
-    expect($user->is_super_admin)->toBeTrue();
+    expect($user->admin)->toBeTrue();
     expect(Hash::check($password, $user->password))->toBeTrue();
 });
 
@@ -44,7 +44,7 @@ test('command creates a super admin with generated password when password is not
 
     expect($user)->not->toBeNull();
     expect($user->name)->toBe('admin2');
-    expect($user->is_super_admin)->toBeTrue();
+    expect($user->admin)->toBeTrue();
 });
 
 test('command fails with invalid email format', function () {
@@ -66,7 +66,7 @@ test('command updates existing user to super admin', function () {
     // Create a user with the email (not a super admin)
     User::factory()->create([
         'email' => $email,
-        'is_super_admin' => false,
+        'admin' => false,
     ]);
 
     // Run the command with existing email
@@ -76,7 +76,7 @@ test('command updates existing user to super admin', function () {
 
     // Verify the user was updated to super admin
     $user = User::where('email', $email)->first();
-    expect($user->is_super_admin)->toBeTrue();
+    expect($user->admin)->toBeTrue();
 
     // Verify there's still only one user with this email
     $count = User::where('email', $email)->count();

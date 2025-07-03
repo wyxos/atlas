@@ -42,7 +42,7 @@ class AddSuperAdminCommand extends Command
 
         if ($existingUser) {
             // Update existing user to super admin
-            $existingUser->is_super_admin = true;
+            $existingUser->admin = true;
             $existingUser->save();
 
             $this->info("User {$email} has been updated to super admin successfully!");
@@ -67,7 +67,7 @@ class AddSuperAdminCommand extends Command
                 'name' => $name,
                 'email' => $email,
                 'password' => Hash::make($password),
-                'is_super_admin' => true,
+                'admin' => true,
             ]);
 
             $this->info('Super admin created successfully!');

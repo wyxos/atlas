@@ -57,15 +57,15 @@ test('file statistics endpoint returns correct data', function () {
     ]);
 });
 
-test('only super admin can access users list', function () {
+test('only admin can access users list', function () {
     // Create a regular user
     $regularUser = User::factory()->create([
-        'is_super_admin' => false
+        'is_admin' => false
     ]);
 
-    // Create a super admin user
-    $superAdmin = User::factory()->create([
-        'is_super_admin' => true
+    // Create an admin user
+    $admin = User::factory()->create([
+        'is_admin' => true
     ]);
 
     // Regular user should be denied access
@@ -73,8 +73,8 @@ test('only super admin can access users list', function () {
         ->get('/users')
         ->assertStatus(403);
 
-    // Super admin should have access
-    $this->actingAs($superAdmin)
+    // Admin should have access
+    $this->actingAs($admin)
         ->get('/users')
         ->assertStatus(200);
 });

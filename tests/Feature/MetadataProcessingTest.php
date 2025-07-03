@@ -36,6 +36,7 @@ class TestExtractFileMetadataWithFixtures extends ExtractFileMetadata
 
 beforeEach(function () {
     Storage::fake('local');
+    Storage::fake('atlas');
     Storage::fake('public');
 });
 
@@ -51,7 +52,7 @@ describe('ExtractFileMetadata Job', function () {
         $job->handle();
 
         // Assert metadata file was stored
-        Storage::disk('local')->assertExists("metadata/{$audioFile->id}.json");
+        Storage::disk('atlas')->assertExists("metadata/{$audioFile->id}.json");
 
         // Assert metadata record was created
         $metadata = FileMetadata::where('file_id', $audioFile->id)->first();
@@ -59,7 +60,7 @@ describe('ExtractFileMetadata Job', function () {
         expect($metadata->is_extracted)->toBeTrue();
 
         // Verify the content matches our fixture
-        $storedContent = Storage::disk('local')->get("metadata/{$audioFile->id}.json");
+        $storedContent = Storage::disk('atlas')->get("metadata/{$audioFile->id}.json");
         $fixtureContent = file_get_contents(base_path('tests/fixtures/metadata_complete.json'));
         expect($storedContent)->toBe($fixtureContent);
     });
@@ -74,7 +75,7 @@ describe('ExtractFileMetadata Job', function () {
         $job = new TestExtractFileMetadataWithFixtures($audioFile, 'metadata_minimal.json');
         $job->handle();
 
-        Storage::disk('local')->assertExists("metadata/{$audioFile->id}.json");
+        Storage::disk('atlas')->assertExists("metadata/{$audioFile->id}.json");
 
         $metadata = FileMetadata::where('file_id', $audioFile->id)->first();
         expect($metadata->is_extracted)->toBeTrue();
@@ -112,7 +113,7 @@ describe('TranslateFileMetadata Job', function () {
 
         // Store the metadata JSON file
         $metadataContent = file_get_contents(base_path('tests/fixtures/metadata_complete.json'));
-        Storage::disk('local')->put("metadata/{$audioFile->id}.json", $metadataContent);
+        Storage::disk('atlas')->put("metadata/{$audioFile->id}.json", $metadataContent);
 
         $job = new TranslateFileMetadata($audioFile);
         $job->handle();
@@ -151,7 +152,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile->metadata()->create(['is_extracted' => true]);
 
         $metadataContent = file_get_contents(base_path('tests/fixtures/metadata_complete.json'));
-        Storage::disk('local')->put("metadata/{$audioFile->id}.json", $metadataContent);
+        Storage::disk('atlas')->put("metadata/{$audioFile->id}.json", $metadataContent);
 
         $job = new TranslateFileMetadata($audioFile);
         $job->handle();
@@ -179,7 +180,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile->metadata()->create(['is_extracted' => true]);
 
         $metadataContent = file_get_contents(base_path('tests/fixtures/metadata_minimal.json'));
-        Storage::disk('local')->put("metadata/{$audioFile->id}.json", $metadataContent);
+        Storage::disk('atlas')->put("metadata/{$audioFile->id}.json", $metadataContent);
 
         $job = new TranslateFileMetadata($audioFile);
         $job->handle();
@@ -205,7 +206,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile->metadata()->create(['is_extracted' => true]);
 
         $metadataContent = file_get_contents(base_path('tests/fixtures/metadata_id3v1.json'));
-        Storage::disk('local')->put("metadata/{$audioFile->id}.json", $metadataContent);
+        Storage::disk('atlas')->put("metadata/{$audioFile->id}.json", $metadataContent);
 
         $job = new TranslateFileMetadata($audioFile);
         $job->handle();
@@ -234,7 +235,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile->metadata()->create(['is_extracted' => true]);
 
         $metadataContent = file_get_contents(base_path('tests/fixtures/metadata_no_tags.json'));
-        Storage::disk('local')->put("metadata/{$audioFile->id}.json", $metadataContent);
+        Storage::disk('atlas')->put("metadata/{$audioFile->id}.json", $metadataContent);
 
         $job = new TranslateFileMetadata($audioFile);
         $job->handle();
@@ -262,7 +263,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile->metadata()->create(['is_extracted' => true]);
 
         // Store invalid JSON
-        Storage::disk('local')->put("metadata/{$audioFile->id}.json", '{ invalid json content');
+        Storage::disk('atlas')->put("metadata/{$audioFile->id}.json", '{ invalid json content');
 
         $job = new TranslateFileMetadata($audioFile);
         $job->handle();
@@ -307,7 +308,7 @@ describe('TranslateFileMetadata Job', function () {
         $audioFile->metadata()->create(['is_extracted' => true]);
 
         $metadataContent = file_get_contents(base_path('tests/fixtures/metadata_complete.json'));
-        Storage::disk('local')->put("metadata/{$audioFile->id}.json", $metadataContent);
+        Storage::disk('atlas')->put("metadata/{$audioFile->id}.json", $metadataContent);
 
         $job = new TranslateFileMetadata($audioFile);
         $job->handle();
@@ -337,7 +338,7 @@ describe('Integration Tests', function () {
         $extractJob->handle();
 
         // Verify extraction worked
-        Storage::disk('local')->assertExists("metadata/{$audioFile->id}.json");
+        Storage::disk('atlas')->assertExists("metadata/{$audioFile->id}.json");
 
         $metadata = FileMetadata::where('file_id', $audioFile->id)->first();
         expect($metadata->is_extracted)->toBeTrue();
