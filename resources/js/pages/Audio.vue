@@ -79,7 +79,7 @@ async function playAudio(file: any): Promise<void> {
     } else {
         // Different file - set up new playlist with ALL tracks
         audioActions.setLoading(true);
-        
+
         // Always queue the entire visible list when playing a new track
         const playlistData = [];
         for (const item of filesToQueue) {
@@ -90,7 +90,7 @@ async function playAudio(file: any): Promise<void> {
             }
             playlistData.push(itemData);
         }
-        
+
         // Set up the complete playlist
         audioActions.setPlaylist(playlistData, fileData);
         // Set current file which will also make player visible
@@ -117,7 +117,7 @@ function handlePlayerPause(): void {
 // Action handlers
 function toggleFavorite(item: any, event: Event): void {
     event.stopPropagation(); // Prevent triggering parent click events
-    
+
     // Optimistically update the UI first
     if (loadedFiles[item.id]) {
         loadedFiles[item.id].loved = !loadedFiles[item.id].loved;
@@ -126,14 +126,14 @@ function toggleFavorite(item: any, event: Event): void {
             loadedFiles[item.id].disliked = false;
         }
     }
-    
+
     // Also update the current file in the audio store if it matches
     if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
     }
-    
+
     // Send request to backend
     router.post(`/audio/${item.id}/love`, {}, {
         preserveState: true,
@@ -147,14 +147,14 @@ function toggleFavorite(item: any, event: Event): void {
             console.error('Failed to toggle love status:', errors);
         }
     });
-    
+
     // Close the swipe actions after action
     swipedItemId.value = null;
 }
 
 function likeItem(item: any, event: Event): void {
     event.stopPropagation(); // Prevent triggering parent click events
-    
+
     // Optimistically update the UI first
     if (loadedFiles[item.id]) {
         loadedFiles[item.id].liked = !loadedFiles[item.id].liked;
@@ -163,14 +163,14 @@ function likeItem(item: any, event: Event): void {
             loadedFiles[item.id].disliked = false;
         }
     }
-    
+
     // Also update the current file in the audio store if it matches
     if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
     }
-    
+
     // Send request to backend
     router.post(`/audio/${item.id}/like`, {}, {
         preserveState: true,
@@ -184,14 +184,14 @@ function likeItem(item: any, event: Event): void {
             console.error('Failed to toggle like status:', errors);
         }
     });
-    
+
     // Close the swipe actions after action
     swipedItemId.value = null;
 }
 
 function dislikeItem(item: any, event: Event): void {
     event.stopPropagation(); // Prevent triggering parent click events
-    
+
     // Optimistically update the UI first
     if (loadedFiles[item.id]) {
         loadedFiles[item.id].disliked = !loadedFiles[item.id].disliked;
@@ -200,14 +200,14 @@ function dislikeItem(item: any, event: Event): void {
             loadedFiles[item.id].liked = false;
         }
     }
-    
+
     // Also update the current file in the audio store if it matches
     if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
     }
-    
+
     // Send request to backend
     router.post(`/audio/${item.id}/dislike`, {}, {
         preserveState: true,
@@ -221,7 +221,7 @@ function dislikeItem(item: any, event: Event): void {
             console.error('Failed to toggle dislike status:', errors);
         }
     });
-    
+
     // Close the swipe actions after action
     swipedItemId.value = null;
 }
@@ -239,9 +239,10 @@ onMounted(() => {
     // Add scroll event listener to detect scrolling
     const scrollContainer = document.querySelector('.RecycleScroller');
     if (scrollContainer) {
+        console.log('Adding scroll event listener to RecycleScroller');
         scrollContainer.addEventListener('scroll', handleScroll);
     }
-    
+
     // Provide the loadFileDetails function for the AudioPlayer
     provide('loadFileDetails', loadFileDetails);
 });
@@ -252,6 +253,7 @@ onBeforeUnmount(() => {
     // Clean up scroll event listener
     const scrollContainer = document.querySelector('.RecycleScroller');
     if (scrollContainer) {
+        console.log('Removing scroll event listener from RecycleScroller');
         scrollContainer.removeEventListener('scroll', handleScroll);
     }
 });
@@ -259,6 +261,11 @@ onBeforeUnmount(() => {
 const initialQuery = window.location.search
     ? new URLSearchParams(window.location.search).get('query') || ''
     : '';
+
+
+function onScroll(startIndex, endIndex, visibleStartIndex, visibleEndIndex){
+    console.log(`onScroll called with startIndex: ${startIndex}, endIndex: ${endIndex}, visibleStartIndex: ${visibleStartIndex}, visibleEndIndex: ${visibleEndIndex}`);
+}
 </script>
 
 <template>
@@ -280,6 +287,8 @@ const initialQuery = window.location.search
                             :items="query ? props.search : props.files"
                             :item-size="74"
                             key-field="id"
+                            :emit-update="true"
+                            @update="onScroll"
                             v-slot="{ item }"
                         >
                             <div class="relative overflow-hidden" :ref="el => el && observeItem(el, item.id)">

@@ -57,6 +57,7 @@ export function useAudioFileLoader() {
 
   // Handle scroll events
   function handleScroll() {
+      console.log('Scroll event detected',  isScrolling.value);
     isScrolling.value = true;
 
     // Cancel all pending requests when scrolling resumes
@@ -82,28 +83,29 @@ export function useAudioFileLoader() {
 
   // Prioritize loading of currently visible items
   function prioritizeVisibleItems() {
+      console.log('Prioritizing visible items', isScrolling.value);
     // First, clean up the visibleItems set by checking which items are actually still visible
     const currentlyVisible = new Set<string | number>();
-    
+
     // Check each observed item to see if it's actually still intersecting
     observedItems.value.forEach(itemId => {
       const element = document.querySelector(`[data-item-id="${itemId}"]`);
       if (element) {
         const rect = element.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
-        
+
         // Check if the element is actually visible in the viewport
         if (rect.top < viewportHeight && rect.bottom > 0) {
           currentlyVisible.add(itemId);
         }
       }
     });
-    
+
     // Update visibleItems to only include actually visible items
     visibleItems.value = currentlyVisible;
-    
+
     console.log(`Loading ${currentlyVisible.size} visible items out of ${observedItems.value.size} observed`);
-    
+
     // Only load details for items that are currently visible in the viewport
     currentlyVisible.forEach(itemId => {
       if (!loadedFiles[itemId]) {
@@ -139,11 +141,11 @@ export function useAudioFileLoader() {
           // Item is now visible - but don't add to visibleItems during fast scrolling
           // Only track it in observedItems for potential cleanup
           observedItems.value.add(itemId);
-          
+
           // Only add to visibleItems if we're not scrolling or scrolling slowly
           if (!isScrolling.value) {
             visibleItems.value.add(itemId);
-            
+
             // Only load if not already loaded or loading
             if (!loadedFiles[itemId] && !pendingRequests[itemId]) {
               loadFileDetails(itemId, true); // Priority load when not scrolling
