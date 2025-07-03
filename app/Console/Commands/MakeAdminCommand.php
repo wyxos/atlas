@@ -14,7 +14,7 @@ class MakeAdminCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:admin {email : The email address of the admin} {--password= : Optional password for the admin}';
+    protected $signature = 'make:admin {email? : The email address of the admin} {--password= : Optional password for the admin}';
 
     /**
      * The console command description.
@@ -30,6 +30,12 @@ class MakeAdminCommand extends Command
     {
         // Get the email from the command arguments
         $email = $this->argument('email');
+
+        // Check if email argument is provided
+        if (empty($email)) {
+            $this->error('Email argument is required.');
+            return 1;
+        }
 
         // Validate email format
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
