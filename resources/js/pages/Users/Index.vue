@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import {
@@ -12,6 +12,16 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { formatDate } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ref } from 'vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -36,6 +46,25 @@ defineProps<{
     meta: any;
   };
 }>();
+
+const userToDelete = ref<User | null>(null);
+const showDeleteDialog = ref(false);
+
+const confirmDelete = () => {
+  if (userToDelete.value) {
+    router.delete(`/users/${userToDelete.value.id}`, {
+      onSuccess: () => {
+        showDeleteDialog.value = false;
+        userToDelete.value = null;
+      }
+    });
+  }
+};
+
+const openDeleteDialog = (user: User) => {
+  userToDelete.value = user;
+  showDeleteDialog.value = true;
+};
 </script>
 
 <template>
@@ -53,6 +82,7 @@ defineProps<{
               <TableHead>Email</TableHead>
               <TableHead>Created At</TableHead>
               <TableHead>Last Login</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -61,10 +91,39 @@ defineProps<{
               <TableCell>{{ user.email }}</TableCell>
               <TableCell>{{ formatDate(user.created_at) }}</TableCell>
               <TableCell>{{ user.last_login_at ? formatDate(user.last_login_at) : 'Never' }}</TableCell>
+              <TableCell>
+                <div class="flex space-x-2">
+                  <Link :href="`/users/${user.id}/edit`" class="text-blue-600 hover:text-blue-800">
+                    Edit
+                  </Link>
+                  <button
+                    @click="openDeleteDialog(user)"
+                    class="text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </TableCell>
             </TableRow>
           </TableBody>
         </Table>
       </div>
     </div>
+
+    <!-- Delete Confirmation Dialog -->
+    <Dialog :open="showDeleteDialog" @update:open="showDeleteDialog = $event">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm Deletion</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete the user "{{ userToDelete?.name }}"? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" @click="showDeleteDialog = false">Cancel</Button>
+          <Button variant="destructive" @click="confirmDelete">Delete</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </AppLayout>
 </template>

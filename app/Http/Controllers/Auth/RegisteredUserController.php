@@ -46,9 +46,9 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
 
-        // Notify super admins about the new user registration
-        $superAdmins = User::where('is_super_admin', true)->get();
-        Notification::send($superAdmins, new NewUserRegistered($user));
+        // Notify admins about the new user registration
+        $admins = User::where('admin', true)->get();
+        Notification::send($admins, new NewUserRegistered($user));
 
         Auth::login($user);
 

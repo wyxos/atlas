@@ -10,9 +10,8 @@ Route::get('/', function () {
 })->name('home');
 
 Route::group(['middleware' => ['auth', 'verified']], function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('Dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    Route::get('dashboard/file-stats', [App\Http\Controllers\DashboardController::class, 'getFileStatsJson'])->name('dashboard.file-stats');
 
     Route::get('audio', function () {
         $search = [];
@@ -47,8 +46,11 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     // Audio streaming route
     Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');
 
-    // Users route
+    // Users routes
     Route::get('users', [UserController::class, 'index'])->name('users.index');
+    Route::get('users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
+    Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
+    Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 });
 
 require __DIR__.'/settings.php';
