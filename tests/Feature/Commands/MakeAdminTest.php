@@ -24,7 +24,7 @@ test('command creates an admin with provided email and password', function () {
 
     expect($user)->not->toBeNull();
     expect($user->name)->toBe('admin');
-    expect($user->admin)->toBeTrue();
+    expect($user->is_admin)->toBeTrue();
     expect(Hash::check($password, $user->password))->toBeTrue();
 });
 
@@ -44,7 +44,7 @@ test('command creates an admin with generated password when password is not prov
 
     expect($user)->not->toBeNull();
     expect($user->name)->toBe('admin2');
-    expect($user->admin)->toBeTrue();
+    expect($user->is_admin)->toBeTrue();
 });
 
 test('command fails with invalid email format', function () {
@@ -66,7 +66,7 @@ test('command asks for confirmation when updating existing user to admin', funct
     // Create a user with the email (not an admin)
     User::factory()->create([
         'email' => $email,
-        'admin' => false,
+        'is_admin' => false,
     ]);
 
     // Run the command with existing email and confirm "yes"
@@ -77,7 +77,7 @@ test('command asks for confirmation when updating existing user to admin', funct
 
     // Verify the user was updated to admin
     $user = User::where('email', $email)->first();
-    expect($user->admin)->toBeTrue();
+    expect($user->is_admin)->toBeTrue();
 
     // Verify there's still only one user with this email
     $count = User::where('email', $email)->count();
