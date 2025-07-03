@@ -1,4 +1,4 @@
-import { ref, reactive } from 'vue';
+import { reactive } from 'vue';
 
 // Global audio player state
 export const audioStore = reactive({
@@ -6,17 +6,17 @@ export const audioStore = reactive({
   currentFile: null as any,
   isPlaying: false,
   isPlayerLoading: false,
-  
+
   // Playlist state
   playlist: [] as any[],
   currentIndex: -1,
   isShuffled: false,
-  
+
   // Audio element state
   currentTime: 0,
   duration: 0,
   volume: 1,
-  
+
   // UI state
   isPlayerVisible: false,
 });
@@ -25,18 +25,18 @@ export const audioStore = reactive({
 export const audioActions = {
   async setCurrentFile(file: any, loadFileDetails?: (id: number, priority?: boolean) => Promise<any>) {
     audioStore.isPlayerVisible = !!file; // Set visibility immediately
-    
+
     // If the file doesn't have complete data (metadata, covers, artists, albums, love status) and we have a loader function, load it
     const needsFullData = file && (
-      !file.metadata || 
-      !file.covers || 
-      !file.artists || 
+      !file.metadata ||
+      !file.covers ||
+      !file.artists ||
       !file.albums ||
       file.loved === undefined ||
       file.liked === undefined ||
       file.disliked === undefined
     );
-    
+
     if (needsFullData && loadFileDetails) {
       try {
         const fullFileData = await loadFileDetails(file.id, true);
@@ -53,15 +53,15 @@ export const audioActions = {
       audioStore.currentFile = file;
     }
   },
-  
+
   setPlaying(playing: boolean) {
     audioStore.isPlaying = playing;
   },
-  
+
   setLoading(loading: boolean) {
     audioStore.isPlayerLoading = loading;
   },
-  
+
   setPlaylist(playlist: any[], currentTrack?: any) {
     audioStore.playlist = [...playlist];
     if (currentTrack) {
@@ -71,23 +71,23 @@ export const audioActions = {
     }
     audioStore.isShuffled = false;
   },
-  
+
   shufflePlaylist() {
     if (audioStore.playlist.length === 0) {
       console.warn('No playlist to shuffle');
       return;
     }
-    
+
     // Create a copy of the current playlist
     const playlistCopy = [...audioStore.playlist];
     const currentTrack = audioStore.currentFile;
-    
+
     // Remove current track from the copy to shuffle the rest
     const otherTracks = playlistCopy.filter(track => track.id !== currentTrack?.id);
-    
+
     // Shuffle the other tracks
     const shuffledOthers = otherTracks.sort(() => Math.random() - 0.5);
-    
+
     if (currentTrack) {
       // Keep current track at the beginning, shuffle the rest
       audioStore.playlist = [currentTrack, ...shuffledOthers];
@@ -97,25 +97,25 @@ export const audioActions = {
       audioStore.playlist = shuffledOthers;
       audioStore.currentIndex = 0;
     }
-    
+
     audioStore.isShuffled = true;
     console.log('Playlist shuffled:', audioStore.playlist.length, 'tracks');
   },
-  
+
   getNextTrack(): any | null {
     if (audioStore.playlist.length === 0 || audioStore.currentIndex >= audioStore.playlist.length - 1) {
       return null;
     }
     return audioStore.playlist[audioStore.currentIndex + 1];
   },
-  
+
   getPreviousTrack(): any | null {
     if (audioStore.playlist.length === 0 || audioStore.currentIndex <= 0) {
       return null;
     }
     return audioStore.playlist[audioStore.currentIndex - 1];
   },
-  
+
   async moveToNext(loadFileDetails?: (id: number, priority?: boolean) => Promise<any>) {
     if (audioStore.currentIndex < audioStore.playlist.length - 1) {
       audioStore.currentIndex++;
@@ -125,7 +125,7 @@ export const audioActions = {
     }
     return null;
   },
-  
+
   async moveToPrevious(loadFileDetails?: (id: number, priority?: boolean) => Promise<any>) {
     if (audioStore.currentIndex > 0) {
       audioStore.currentIndex--;
@@ -135,19 +135,32 @@ export const audioActions = {
     }
     return null;
   },
-  
+
   updateTime(time: number) {
     audioStore.currentTime = time;
   },
-  
+
   updateDuration(duration: number) {
     audioStore.duration = duration;
   },
-  
+
   updateVolume(volume: number) {
     audioStore.volume = volume;
   },
-  
+
+  findAndPlayInQueue(fileId: number, loadFileDetails?: (id: number, priority?: boolean) => Promise<any>): boolean {
+    // Find the file in the current playlist
+    const index = audioStore.playlist.findIndex(track => track.id === fileId);
+    if (index !== -1) {
+      // Found in queue, set as current and play
+      audioStore.currentIndex = index;
+      const track = audioStore.playlist[index];
+      this.setCurrentFile(track, loadFileDetails);
+      return true;
+    }
+    return false;
+  },
+
   reset() {
     audioStore.currentFile = null;
     audioStore.isPlaying = false;

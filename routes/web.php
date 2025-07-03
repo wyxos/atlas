@@ -17,10 +17,11 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
         $search = [];
 
         if ($query = request()->input('query')) {
-            // Filter search results to only include audio files
+            // Filter search results to only include audio files that exist
             $search = \App\Models\File::search($query)
                 ->query(function ($builder) {
-                    $builder->where('mime_type', 'like', 'audio/%');
+                    $builder->where('mime_type', 'like', 'audio/%')
+                            ->where('not_found', false);
                 })
                 ->get();
 
@@ -32,6 +33,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
         return Inertia::render('Audio', [
             'files' => fn () => \App\Models\File::audio()
+                ->where('not_found', false)
                 ->select(['id'])
                 ->get(),
             'search' => $search,
@@ -45,7 +47,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     // Audio streaming route
     Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');
-    
+
     // Audio interaction routes
     Route::post('audio/{file}/love', [AudioController::class, 'toggleLove'])->name('audio.love');
     Route::post('audio/{file}/like', [AudioController::class, 'toggleLike'])->name('audio.like');

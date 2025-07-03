@@ -46,9 +46,8 @@ const {
 } = useAudioSwipeHandler();
 
 
-// Queue the entire list when playing a new track
+// Play audio with smart queue management
 async function playAudio(file: any): Promise<void> {
-    const filesToQueue = props.search.length ? props.search : props.files;
     const fileId = file.id;
     let fileData = loadedFiles[fileId];
 
@@ -70,10 +69,24 @@ async function playAudio(file: any): Promise<void> {
             audioActions.setPlaying(true);
         }
     } else {
-        // Different file - set up new playlist with ALL tracks
-        audioActions.setLoading(true);
+        // Different file - check if we're searching and have an existing queue
+        const isSearching = props.search.length > 0;
+        const hasExistingQueue = audioStore.playlist.length > 0;
 
-        // Always queue the entire visible list when playing a new track
+        if (isSearching && hasExistingQueue) {
+            // Try to find the track in the existing queue first
+            const foundInQueue = audioActions.findAndPlayInQueue(fileId, loadFileDetails);
+            if (foundInQueue) {
+                audioActions.setPlaying(true);
+                return;
+            }
+        }
+
+        // If not found in queue or no existing queue, set up new playlist
+        audioActions.setLoading(true);
+        const filesToQueue = props.search.length ? props.search : props.files;
+
+        // Queue the entire visible list when playing a new track
         const playlistData = [];
         for (const item of filesToQueue) {
             let itemData = loadedFiles[item.id];
