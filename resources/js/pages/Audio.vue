@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
 import { ref, onMounted, onBeforeUnmount, provide } from 'vue';
 import { audioStore, audioActions } from '@/stores/audioStore';
@@ -117,24 +117,111 @@ function handlePlayerPause(): void {
 // Action handlers
 function toggleFavorite(item: any, event: Event): void {
     event.stopPropagation(); // Prevent triggering parent click events
-    // Implement favorite toggle logic here
-    console.log('Toggle favorite for item:', item.id);
+    
+    // Optimistically update the UI first
+    if (loadedFiles[item.id]) {
+        loadedFiles[item.id].loved = !loadedFiles[item.id].loved;
+        if (loadedFiles[item.id].loved) {
+            loadedFiles[item.id].liked = false;
+            loadedFiles[item.id].disliked = false;
+        }
+    }
+    
+    // Also update the current file in the audio store if it matches
+    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
+        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
+        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
+        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
+    }
+    
+    // Send request to backend
+    router.post(`/audio/${item.id}/love`, {}, {
+        preserveState: true,
+        preserveScroll: true,
+        only: [],
+        onError: (errors) => {
+            // Revert on error
+            if (loadedFiles[item.id]) {
+                loadedFiles[item.id].loved = !loadedFiles[item.id].loved;
+            }
+            console.error('Failed to toggle love status:', errors);
+        }
+    });
+    
     // Close the swipe actions after action
     swipedItemId.value = null;
 }
 
 function likeItem(item: any, event: Event): void {
     event.stopPropagation(); // Prevent triggering parent click events
-    // Implement like logic here
-    console.log('Like item:', item.id);
+    
+    // Optimistically update the UI first
+    if (loadedFiles[item.id]) {
+        loadedFiles[item.id].liked = !loadedFiles[item.id].liked;
+        if (loadedFiles[item.id].liked) {
+            loadedFiles[item.id].loved = false;
+            loadedFiles[item.id].disliked = false;
+        }
+    }
+    
+    // Also update the current file in the audio store if it matches
+    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
+        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
+        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
+        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
+    }
+    
+    // Send request to backend
+    router.post(`/audio/${item.id}/like`, {}, {
+        preserveState: true,
+        preserveScroll: true,
+        only: [],
+        onError: (errors) => {
+            // Revert on error
+            if (loadedFiles[item.id]) {
+                loadedFiles[item.id].liked = !loadedFiles[item.id].liked;
+            }
+            console.error('Failed to toggle like status:', errors);
+        }
+    });
+    
     // Close the swipe actions after action
     swipedItemId.value = null;
 }
 
 function dislikeItem(item: any, event: Event): void {
     event.stopPropagation(); // Prevent triggering parent click events
-    // Implement dislike logic here
-    console.log('Dislike item:', item.id);
+    
+    // Optimistically update the UI first
+    if (loadedFiles[item.id]) {
+        loadedFiles[item.id].disliked = !loadedFiles[item.id].disliked;
+        if (loadedFiles[item.id].disliked) {
+            loadedFiles[item.id].loved = false;
+            loadedFiles[item.id].liked = false;
+        }
+    }
+    
+    // Also update the current file in the audio store if it matches
+    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
+        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
+        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
+        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
+    }
+    
+    // Send request to backend
+    router.post(`/audio/${item.id}/dislike`, {}, {
+        preserveState: true,
+        preserveScroll: true,
+        only: [],
+        onError: (errors) => {
+            // Revert on error
+            if (loadedFiles[item.id]) {
+                loadedFiles[item.id].disliked = !loadedFiles[item.id].disliked;
+            }
+            console.error('Failed to toggle dislike status:', errors);
+        }
+    });
+    
     // Close the swipe actions after action
     swipedItemId.value = null;
 }

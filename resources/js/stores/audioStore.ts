@@ -26,8 +26,18 @@ export const audioActions = {
   async setCurrentFile(file: any, loadFileDetails?: (id: number, priority?: boolean) => Promise<any>) {
     audioStore.isPlayerVisible = !!file; // Set visibility immediately
     
-    // If the file doesn't have full metadata and we have a loader function, load it
-    if (file && !file.metadata && loadFileDetails) {
+    // If the file doesn't have complete data (metadata, covers, artists, albums, love status) and we have a loader function, load it
+    const needsFullData = file && (
+      !file.metadata || 
+      !file.covers || 
+      !file.artists || 
+      !file.albums ||
+      file.loved === undefined ||
+      file.liked === undefined ||
+      file.disliked === undefined
+    );
+    
+    if (needsFullData && loadFileDetails) {
       try {
         const fullFileData = await loadFileDetails(file.id, true);
         if (fullFileData) {

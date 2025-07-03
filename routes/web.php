@@ -45,6 +45,11 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     // Audio streaming route
     Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');
+    
+    // Audio interaction routes
+    Route::post('audio/{file}/love', [AudioController::class, 'toggleLove'])->name('audio.love');
+    Route::post('audio/{file}/like', [AudioController::class, 'toggleLike'])->name('audio.like');
+    Route::post('audio/{file}/dislike', [AudioController::class, 'toggleDislike'])->name('audio.dislike');
 
     // Users routes
     Route::get('users', [UserController::class, 'index'])->name('users.index');

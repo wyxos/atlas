@@ -1,20 +1,64 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
-import { audioStore, audioActions } from '@/stores/audioStore';
-import { Play, Pause, SkipBack, SkipForward, Shuffle } from 'lucide-vue-next';
+import { Play, Pause, SkipBack, SkipForward, Heart, ThumbsUp, ThumbsDown, Shuffle } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
+import { router } from '@inertiajs/vue3';
+import { audioStore, audioActions } from '@/stores/audioStore';
 
+
+// Create a single, persistent audio element that will be shared across all instances
+// This ensures the audio continues playing during navigation
+if (typeof window !== 'undefined' && !window.globalAudioElement) {
+  window.globalAudioElement = new Audio();
+
+  // Add global event listeners that persist across component instances
+  window.globalAudioElement.addEventListener('ended', () => {
+    // When track ends, update the store state
+    audioActions.setPlaying(false);
+    // Try to play the next track
+    audioActions.moveToNext(window.loadFileDetails).then(nextTrack => {
+      if (nextTrack) {
+        audioActions.setPlaying(true);
+      }
+    });
+  });
+}
+
+// Store the loadFileDetails function globally so it can be used by the audio element's event listeners
+if (typeof window !== 'undefined') {
+  window.loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>(
+    'loadFileDetails',
+    () => Promise.resolve(null)
+  );
+}
 
 const audioPlayer = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(audioStore.currentTime);
 const duration = ref(audioStore.duration);
 const volume = ref(audioStore.volume);
-const pendingOperations = ref<(() => void)[]>([]);
-const observer = ref<MutationObserver | null>(null);
-const observerTimeout = ref<number | null>(null);
 
-// Try to get loadFileDetails function from parent context
-const loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>('loadFileDetails', () => Promise.resolve(null));
+// Track user interactions with tracks
+const isLiked = ref(false);
+const isLoved = ref(false);
+const isDisliked = ref(false);
+
+// Function to load interaction states from file data
+function loadInteractionStates(file: any) {
+  if (file) {
+    // Load the love status from the file data
+    isLiked.value = !!file.liked;
+    isLoved.value = !!file.loved;
+    isDisliked.value = !!file.disliked;
+  } else {
+    // Reset when no file
+    isLiked.value = false;
+    isLoved.value = false;
+    isDisliked.value = false;
+  }
+}
+
+// Load interaction states when the current file changes
+watch(() => audioStore.currentFile, loadInteractionStates, { immediate: true });
 
 // Get the current file title for display
 const currentTitle = computed(() => {
@@ -40,16 +84,16 @@ function formatTime(seconds: number): string {
 
 // Seek to a specific position in the audio
 function seekTo(event: MouseEvent): void {
-  if (!audioPlayer.value || !duration.value) return;
+  if (typeof window === 'undefined' || !window.globalAudioElement || !duration.value) return;
 
   const progressBar = event.currentTarget as HTMLElement;
   const rect = progressBar.getBoundingClientRect();
   const offsetX = event.clientX - rect.left;
   const percentage = offsetX / rect.width;
 
-    const newTime = percentage * duration.value;
-    audioPlayer.value.currentTime = newTime;
-    audioActions.updateTime(newTime);
+  const newTime = percentage * duration.value;
+  window.globalAudioElement.currentTime = newTime;
+  audioActions.updateTime(newTime);
 }
 
 function excerpt(text: string, length = 30): string {
@@ -69,7 +113,7 @@ function togglePlayPause(): void {
 
 // Handle previous track
 async function handlePrevious(): Promise<void> {
-  const previousTrack = await audioActions.moveToPrevious(loadFileDetails);
+  const previousTrack = await audioActions.moveToPrevious(window.loadFileDetails);
   if (previousTrack) {
     audioActions.setPlaying(true);
   }
@@ -77,10 +121,116 @@ async function handlePrevious(): Promise<void> {
 
 // Handle next track
 async function handleNext(): Promise<void> {
-  const nextTrack = await audioActions.moveToNext(loadFileDetails);
+  const nextTrack = await audioActions.moveToNext(window.loadFileDetails || loadFileDetails);
   if (nextTrack) {
     audioActions.setPlaying(true);
   }
+}
+
+// Handle love/like/dislike actions
+function handleLove(): void {
+  if (!audioStore.currentFile) return;
+
+  // Optimistically update the UI first
+  isLoved.value = !isLoved.value;
+  if (isLoved.value) {
+    isLiked.value = false;
+    isDisliked.value = false;
+  }
+
+  // Update the current file in the store
+  if (audioStore.currentFile) {
+    audioStore.currentFile.loved = isLoved.value;
+    audioStore.currentFile.liked = isLiked.value;
+    audioStore.currentFile.disliked = isDisliked.value;
+  }
+
+  // Send request to backend
+  router.post(`/audio/${audioStore.currentFile.id}/love`, {}, {
+    preserveState: true,
+    preserveScroll: true,
+    only: [],
+    onError: (errors) => {
+      // Revert on error
+      isLoved.value = !isLoved.value;
+      if (audioStore.currentFile) {
+        audioStore.currentFile.loved = isLoved.value;
+      }
+      console.error('Failed to toggle love status:', errors);
+    }
+  });
+}
+
+function handleLike(): void {
+  if (!audioStore.currentFile) return;
+
+  // Optimistically update the UI first
+  isLiked.value = !isLiked.value;
+  if (isLiked.value) {
+    isLoved.value = false;
+    isDisliked.value = false;
+  }
+
+  // Update the current file in the store
+  if (audioStore.currentFile) {
+    audioStore.currentFile.loved = isLoved.value;
+    audioStore.currentFile.liked = isLiked.value;
+    audioStore.currentFile.disliked = isDisliked.value;
+  }
+
+  // Send request to backend
+  router.post(`/audio/${audioStore.currentFile.id}/like`, {}, {
+    preserveState: true,
+    preserveScroll: true,
+    only: [],
+    onError: (errors) => {
+      // Revert on error
+      isLiked.value = !isLiked.value;
+      if (audioStore.currentFile) {
+        audioStore.currentFile.liked = isLiked.value;
+      }
+      console.error('Failed to toggle like status:', errors);
+    }
+  });
+}
+
+function handleDislike(): void {
+  if (!audioStore.currentFile) return;
+
+  // Optimistically update the UI first
+  const wasDisliked = isDisliked.value;
+  isDisliked.value = !isDisliked.value;
+  if (isDisliked.value) {
+    isLoved.value = false;
+    isLiked.value = false;
+  }
+
+  // Update the current file in the store
+  if (audioStore.currentFile) {
+    audioStore.currentFile.loved = isLoved.value;
+    audioStore.currentFile.liked = isLiked.value;
+    audioStore.currentFile.disliked = isDisliked.value;
+  }
+
+  // Automatically go to next track when disliking
+  if (isDisliked.value) {
+    handleNext();
+  }
+
+  // Send request to backend
+  router.post(`/audio/${audioStore.currentFile.id}/dislike`, {}, {
+    preserveState: true,
+    preserveScroll: true,
+    only: [],
+    onError: (errors) => {
+      // Revert on error
+      isDisliked.value = wasDisliked;
+      if (audioStore.currentFile) {
+        audioStore.currentFile.disliked = wasDisliked;
+      }
+      console.error('Failed to toggle dislike status:', errors);
+    }
+  });
 }
 
 // Handle shuffle
@@ -90,48 +240,51 @@ function handleShuffle(): void {
 
 // Function to handle play/pause based on isPlaying prop
 function updatePlayState(newIsPlaying: boolean): void {
-  if (!audioPlayer.value) {
-    // Queue the operation for when the audio player is available
-    pendingOperations.value.push(() => updatePlayState(newIsPlaying));
+  if (typeof window === 'undefined' || !window.globalAudioElement) {
     return;
   }
 
   if (newIsPlaying) {
     // Use a promise to ensure play() is handled properly
-    const playPromise = audioPlayer.value.play();
+    const playPromise = window.globalAudioElement.play();
 
     // Handle play promise to catch any errors
     if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Silently handle the error
+      playPromise.catch((error) => {
+        console.error('Error playing audio:', error);
+        // If autoplay is blocked, update the store state
+        audioActions.setPlaying(false);
       });
     }
   } else {
-    audioPlayer.value.pause();
+    window.globalAudioElement.pause();
   }
   audioActions.setPlaying(newIsPlaying);
 }
 
 // Function to update the current file
 function updateCurrentFile(newFile: any): void {
-  if (!audioPlayer.value) {
-    // Queue the operation for when the audio player is available
-    pendingOperations.value.push(() => updateCurrentFile(newFile));
+  if (typeof window === 'undefined' || !window.globalAudioElement) {
     return;
   }
 
   if (newFile) {
-    audioPlayer.value.src = `/audio/stream/${newFile.id}`;
+    // Always reset currentTime to 0 when changing tracks
+    window.globalAudioElement.currentTime = 0;
+
+    window.globalAudioElement.src = `/audio/stream/${newFile.id}`;
     // Explicitly load the audio before attempting to play
-    audioPlayer.value.load();
+    window.globalAudioElement.load();
+
     if (audioStore.isPlaying) {
       // Use a promise to ensure play() is called after the audio is loaded
-      const playPromise = audioPlayer.value.play();
+      const playPromise = window.globalAudioElement.play();
 
       // Handle play promise to catch any errors
       if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // Silently handle the error
+        playPromise.catch((error) => {
+          console.error('Error playing audio after file change:', error);
+          audioActions.setPlaying(false);
         });
       }
     }
@@ -139,13 +292,8 @@ function updateCurrentFile(newFile: any): void {
   audioActions.setCurrentFile(newFile);
 }
 
-// Function to process pending operations
-function processPendingOperations(): void {
-  while (pendingOperations.value.length > 0) {
-    const operation = pendingOperations.value.shift();
-    if (operation) operation();
-  }
-}
+// Import additional icons for like/love/dislike
+import { Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
 
 // Watch for changes to isPlaying and currentFile
 watch(() => audioStore.isPlaying, updatePlayState);
@@ -153,80 +301,55 @@ watch(() => audioStore.currentFile, updateCurrentFile);
 
 // Initialize the audio player when the component is mounted
 onMounted(() => {
-  // If audioPlayer is already available, process pending operations
-  if (!audioPlayer.value) {
-    processPendingOperations();
+  if (typeof window === 'undefined' || !window.globalAudioElement) {
     return;
   }
 
-  // Set up a MutationObserver to detect when the audioPlayer ref is attached
-  observer.value = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === 'childList' && audioPlayer.value) {
-        // audioPlayer is now available, process pending operations
-        processPendingOperations();
-        // Disconnect the observer as we no longer need it
-        if (observer.value) {
-          observer.value.disconnect();
-          observer.value = null;
-        }
-        // Clear the timeout
-        if (observerTimeout.value !== null) {
-          clearTimeout(observerTimeout.value);
-          observerTimeout.value = null;
-        }
-        break;
-      }
-    }
+  // Set up event listeners for the global audio element
+  const audioEl = window.globalAudioElement;
+
+  // Update time display
+  const timeUpdateHandler = () => {
+    currentTime.value = audioEl.currentTime;
+    audioActions.updateTime(audioEl.currentTime);
+  };
+
+  // Update duration when metadata is loaded
+  const metadataLoadedHandler = () => {
+    duration.value = audioEl.duration;
+    audioActions.updateDuration(audioEl.duration);
+  };
+
+  // Update volume display
+  const volumeChangeHandler = () => {
+    volume.value = audioEl.volume;
+    audioActions.updateVolume(audioEl.volume);
+  };
+
+  // Add event listeners
+  audioEl.addEventListener('timeupdate', timeUpdateHandler);
+  audioEl.addEventListener('loadedmetadata', metadataLoadedHandler);
+  audioEl.addEventListener('volumechange', volumeChangeHandler);
+
+  // Clean up event listeners when component is unmounted
+  onBeforeUnmount(() => {
+    audioEl.removeEventListener('timeupdate', timeUpdateHandler);
+    audioEl.removeEventListener('loadedmetadata', metadataLoadedHandler);
+    audioEl.removeEventListener('volumechange', volumeChangeHandler);
   });
 
-  // Start observing the document body for changes
-  observer.value.observe(document.body, { childList: true, subtree: true });
-
-  // Clean up the observer after a reasonable timeout (e.g., 5 seconds)
-  observerTimeout.value = window.setTimeout(() => {
-    if (observer.value) {
-      observer.value.disconnect();
-      observer.value = null;
-    }
-    observerTimeout.value = null;
-  }, 5000);
-
-  // Sync audio element state with global store
-  watch(currentTime, newVal => audioActions.updateTime(newVal));
-  watch(duration, newVal => audioActions.updateDuration(newVal));
-  watch(volume, newVal => audioActions.updateVolume(newVal));
-});
-
-// Clean up resources when the component is unmounted
-onBeforeUnmount(() => {
-  // Clean up the observer if it exists
-  if (observer.value) {
-    observer.value.disconnect();
-    observer.value = null;
+  // If we have a current file but no src is set, initialize it
+  if (audioStore.currentFile && !audioEl.src) {
+    updateCurrentFile(audioStore.currentFile);
   }
-
-  // Clear the timeout if it exists
-  if (observerTimeout.value !== null) {
-    clearTimeout(observerTimeout.value);
-    observerTimeout.value = null;
-  }
-
-  // Clear any pending operations
-  pendingOperations.value = [];
 });
 </script>
 
 <template>
   <div class="fixed bottom-0 left-0 bg-card border-t border-border p-4 w-full md:static" v-if="audioStore.isPlayerLoading || audioStore.currentFile">
-    <audio
-      ref="audioPlayer"
-      class="hidden"
-      @ended="handleNext"
-      @timeupdate="currentTime = audioPlayer?.currentTime || 0"
-      @loadedmetadata="duration = audioPlayer?.duration || 0"
-      @volumechange="volume = audioPlayer?.volume || 1"
-    ></audio>
+    <!-- We're using a global audio element attached to window.globalAudioElement -->
+    <!-- This is a hidden placeholder for backward compatibility -->
+    <audio ref="audioPlayer" class="hidden"></audio>
 
 <!-- Start of player desktop -->
     <div class="hidden md:flex gap-4 items-center">
@@ -289,6 +412,36 @@ onBeforeUnmount(() => {
 
           <!-- Player controls -->
           <div class="flex items-center justify-center gap-4 mt-2">
+            <!-- Reaction controls -->
+            <div class="flex items-center gap-2 mr-2">
+              <button
+                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                :class="{ 'bg-red-500 text-white': isLoved }"
+                @click="handleLove"
+                title="Love"
+              >
+                <Heart :size="16" />
+              </button>
+
+              <button
+                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                :class="{ 'bg-blue-500 text-white': isLiked }"
+                @click="handleLike"
+                title="Like"
+              >
+                <ThumbsUp :size="16" />
+              </button>
+
+              <button
+                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                :class="{ 'bg-gray-500 text-white': isDisliked }"
+                @click="handleDislike"
+                title="Dislike"
+              >
+                <ThumbsDown :size="16" />
+              </button>
+            </div>
+
             <button
               class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
               @click="handleShuffle"
@@ -362,9 +515,37 @@ onBeforeUnmount(() => {
                   <span class="text-foreground font-semibold">{{ excerpt(currentTitle) }}</span>
               </div>
 
-              <div class="flex items-center justify-center gap-4">
+              <div class="flex items-center justify-center gap-2">
+                  <!-- Mobile reaction controls -->
                   <button
-                      class="btn-atlas-primary p-2 transition-colors"
+                      class="btn-atlas-secondary p-1 rounded-full transition-colors"
+                      :class="{ 'bg-red-500 text-white': isLoved }"
+                      @click="handleLove"
+                      title="Love"
+                  >
+                      <Heart :size="16" />
+                  </button>
+
+                  <button
+                      class="btn-atlas-secondary p-1 rounded-full transition-colors"
+                      :class="{ 'bg-blue-500 text-white': isLiked }"
+                      @click="handleLike"
+                      title="Like"
+                  >
+                      <ThumbsUp :size="16" />
+                  </button>
+
+                  <button
+                      class="btn-atlas-secondary p-1 rounded-full transition-colors"
+                      :class="{ 'bg-gray-500 text-white': isDisliked }"
+                      @click="handleDislike"
+                      title="Dislike"
+                  >
+                      <ThumbsDown :size="16" />
+                  </button>
+
+                  <button
+                      class="btn-atlas-primary p-2 transition-colors ml-2"
                       @click="togglePlayPause"
                       title="Play/Pause"
                   >

@@ -116,21 +116,24 @@ function navigateToDetails(): void {
     <div class="absolute top-0 left-full h-full items-center flex gap-4 p-4">
       <button
         class="text-foreground hover:text-destructive transition-colors p-1 rounded"
+        :class="{ 'text-red-500 bg-red-500/20': loadedFile?.loved }"
         @click.stop="handleFavorite($event)"
       >
-        <Heart :size="20" />
+        <Heart :size="20" :fill="loadedFile?.loved ? 'currentColor' : 'none'" />
       </button>
       <button
         class="text-foreground hover:text-secondary transition-colors p-1 rounded"
+        :class="{ 'text-blue-500 bg-blue-500/20': loadedFile?.liked }"
         @click.stop="handleLike($event)"
       >
-        <ThumbsUp :size="20" />
+        <ThumbsUp :size="20" :fill="loadedFile?.liked ? 'currentColor' : 'none'" />
       </button>
       <button
         class="text-foreground hover:text-destructive transition-colors p-1 rounded"
+        :class="{ 'text-gray-500 bg-gray-500/20': loadedFile?.disliked }"
         @click.stop="handleDislike($event)"
       >
-        <ThumbsDown :size="20" />
+        <ThumbsDown :size="20" :fill="loadedFile?.disliked ? 'currentColor' : 'none'" />
       </button>
     </div>
   </div>

@@ -46,4 +46,82 @@ class AudioController extends Controller
 
         return response()->json($file);
     }
+
+    public function toggleLove(File $file)
+    {
+        $file->loved = !$file->loved;
+        $file->loved_at = $file->loved ? now() : null;
+        
+        // Reset other statuses when loving
+        if ($file->loved) {
+            $file->liked = false;
+            $file->liked_at = null;
+            $file->disliked = false;
+            $file->disliked_at = null;
+        }
+        
+        $file->save();
+        
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+            ]);
+        }
+        
+        return back(303);
+    }
+
+    public function toggleLike(File $file)
+    {
+        $file->liked = !$file->liked;
+        $file->liked_at = $file->liked ? now() : null;
+        
+        // Reset other statuses when liking
+        if ($file->liked) {
+            $file->loved = false;
+            $file->loved_at = null;
+            $file->disliked = false;
+            $file->disliked_at = null;
+        }
+        
+        $file->save();
+        
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+            ]);
+        }
+        
+        return back(303);
+    }
+
+    public function toggleDislike(File $file)
+    {
+        $file->disliked = !$file->disliked;
+        $file->disliked_at = $file->disliked ? now() : null;
+        
+        // Reset other statuses when disliking
+        if ($file->disliked) {
+            $file->loved = false;
+            $file->loved_at = null;
+            $file->liked = false;
+            $file->liked_at = null;
+        }
+        
+        $file->save();
+        
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+            ]);
+        }
+        
+        return back(303);
+    }
 }

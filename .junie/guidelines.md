@@ -11,6 +11,7 @@ General guidelines:
 - Never make assumptions or use placeholders. If in doubt, ask for clarification or halt the task with a comment.
 - Any created command/logic that deals with looping through a consequent amount of data or performs intensive disk operations should be queued in a job to avoid blocking the main thread.
 - Never use Model::all() or similar methods that load entire datasets into memory; always use chunking (Model::chunk()) for processing large collections.
+- Always use Inertia router where applicable if present. Otherwise favor axios and never use fetch.
 
 Project specific guidelines:
 

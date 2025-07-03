@@ -24,3 +24,9 @@ declare module '@vue/runtime-core' {
         $headManager: ReturnType<typeof createHeadManager>;
     }
 }
+
+// Extend Window interface for our global audio player
+interface Window {
+    globalAudioElement?: HTMLAudioElement;
+    loadFileDetails?: (id: number, priority?: boolean) => Promise<any>;
+}
