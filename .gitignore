@@ -25,5 +25,7 @@ yarn-error.log
 /.vscode
 /.zed
 
-# Personal commands - user-specific workflow scripts
+# Personal commands and tests - user-specific workflow scripts
 /app/Console/Commands/Personal
+/tests/Feature/Personal
+/tests/Unit/Personal
