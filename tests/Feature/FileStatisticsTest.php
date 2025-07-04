@@ -26,19 +26,25 @@ test('dashboard displays file statistics', function () {
     $response->assertInertia(fn ($page) =>
         $page->component('Dashboard')
             ->has('fileStats', fn ($stats) =>
-                $stats->has('totalFiles')
+                $stats->has('audioFilesCount')
+                    ->has('audioSpaceUsed')
+                    ->has('audioNotFound')
+                    ->has('audioWithMetadata')
+                    ->has('audioWithoutMetadata')
+                    ->has('audioMetadataReviewRequired')
+                    ->has('audioMetadataReviewNotRequired')
+                    ->has('audioLoved')
+                    ->has('audioLiked')
+                    ->has('audioDisliked')
+                    ->has('audioNoRating')
                     ->has('audioFiles')
                     ->has('videoFiles')
                     ->has('imageFiles')
                     ->has('otherFiles')
-                    ->has('notFoundFiles')
-                    ->has('withoutMetadataFiles')
-                    ->has('requiresReviewFiles')
                     ->has('audioSize')
                     ->has('videoSize')
                     ->has('imageSize')
                     ->has('otherSize')
-                    ->where('totalFiles', 5)
                     ->where('audioFiles', 2)
                     ->where('videoFiles', 1)
                     ->where('imageFiles', 1)
@@ -56,29 +62,38 @@ test('file statistics endpoint returns correct data', function () {
 
     $response->assertStatus(200);
     $response->assertJsonStructure([
-        'totalFiles',
+        'audioFilesCount',
+        'audioSpaceUsed',
+        'audioNotFound',
+        'audioWithMetadata',
+        'audioWithoutMetadata',
+        'audioMetadataReviewRequired',
+        'audioMetadataReviewNotRequired',
+        'audioLoved',
+        'audioLiked',
+        'audioDisliked',
+        'audioNoRating',
         'audioFiles',
-        'videoFiles', 
+        'videoFiles',
         'imageFiles',
         'otherFiles',
-        'notFoundFiles',
-        'withoutMetadataFiles',
-        'requiresReviewFiles',
         'audioSize',
         'videoSize',
         'imageSize',
         'otherSize',
     ])
     ->assertJson([
-        'totalFiles' => 5,
         'audioFiles' => 2,
         'videoFiles' => 1,
         'imageFiles' => 1,
         'otherFiles' => 1,
-        'notFoundFiles' => 0,
-        'withoutMetadataFiles' => 5,  // All test files don't have metadata
-        'requiresReviewFiles' => 0,
-        // Note: Size values are dynamic based on test file sizes, so we don't assert exact values
+        'audioNotFound' => 0,
+        'audioWithoutMetadata' => 2,  // All test audio files don't have metadata
+        'audioMetadataReviewRequired' => 0,
+        'audioLoved' => 0,
+        'audioLiked' => 0,
+        'audioDisliked' => 0,
+        // Note: Size and count values are dynamic based on test files
     ]);
 });
 

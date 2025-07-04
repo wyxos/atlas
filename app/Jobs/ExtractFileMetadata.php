@@ -36,7 +36,7 @@ class ExtractFileMetadata implements ShouldQueue
     public function handle(): void
     {
         // Execute node script to extract metadata
-        $output = $this->executeMetadataScript($this->file->path);
+        $output = $this->executeMetadataScript(Storage::disk('atlas')->path($this->file->path));
 
         if ($output) {
             // Store the metadata JSON in storage

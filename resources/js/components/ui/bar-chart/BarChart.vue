@@ -8,6 +8,7 @@ interface BarChartProps {
     value: number;
   }[];
   className?: string;
+  colorScheme?: 'status' | 'metadata' | 'rating' | 'default';
 }
 
 const props = defineProps<BarChartProps>();
@@ -22,15 +23,38 @@ const getHeightPercentage = (value: number): number => {
   return maxValue.value > 0 ? (value / maxValue.value) * 100 : 0;
 };
 
-// Colors for each bar - use status-appropriate colors
+// Colors for each bar - use appropriate colors based on scheme
 const getBarColor = (index: number): string => {
-  const colors = [
-    'bg-red-500',      // Not Found - Red (error)
-    'bg-yellow-500',   // No Metadata - Yellow (warning)
-    'bg-orange-500',   // Needs Review - Orange (attention)
-    'bg-blue-500',     // Fallback
-    'bg-gray-500'      // Fallback
-  ];
+  const colorSchemes = {
+    status: [
+      'bg-red-500',      // Not Found - Red (error)
+      'bg-yellow-500',   // No Metadata - Yellow (warning)
+      'bg-orange-500',   // Needs Review - Orange (attention)
+      'bg-blue-500',     // Fallback
+    ],
+    metadata: [
+      'bg-green-500',    // With Metadata - Green (good)
+      'bg-gray-500',     // Without Metadata - Gray (neutral)
+      'bg-yellow-500',   // Review Required - Yellow (warning)
+      'bg-blue-500',     // Review Not Required - Blue (good)
+    ],
+    rating: [
+      'bg-red-500',      // Loved - Red (heart)
+      'bg-blue-500',     // Liked - Blue (thumbs up)
+      'bg-orange-500',   // Disliked - Orange (thumbs down)
+      'bg-gray-500',     // No Rating - Gray (neutral)
+    ],
+    default: [
+      'bg-blue-500',
+      'bg-green-500',
+      'bg-purple-500',
+      'bg-yellow-500',
+      'bg-gray-500'
+    ]
+  };
+  
+  const scheme = props.colorScheme || 'default';
+  const colors = colorSchemes[scheme];
   return colors[index % colors.length];
 };
 </script>

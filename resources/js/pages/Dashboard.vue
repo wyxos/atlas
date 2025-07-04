@@ -7,14 +7,52 @@ import { BarChart } from '@/components/ui/bar-chart';
 import { PieChart } from '@/components/ui/pie-chart';
 
 interface FileStats {
-    totalFiles: number;
+    // Audio Count & Space Usage
+    audioFilesCount: number;
+    audioSpaceUsed: number;
+    audioNotFound: number;
+    
+    // Audio Metadata Stats
+    audioWithMetadata: number;
+    audioWithoutMetadata: number;
+    audioMetadataReviewRequired: number;
+    audioMetadataReviewNotRequired: number;
+    
+    // Global Metadata Stats
+    globalWithMetadata: number;
+    globalWithoutMetadata: number;
+    globalMetadataReviewRequired: number;
+    globalMetadataReviewNotRequired: number;
+    
+    // Audio Rating Stats
+    audioLoved: number;
+    audioLiked: number;
+    audioDisliked: number;
+    audioNoRating: number;
+    
+    // Global Rating Stats
+    globalLoved: number;
+    globalLiked: number;
+    globalDisliked: number;
+    globalNoRating: number;
+    
+    // Video Rating Stats
+    videoLoved: number;
+    videoLiked: number;
+    videoDisliked: number;
+    videoNoRating: number;
+    
+    // Image Rating Stats
+    imageLoved: number;
+    imageLiked: number;
+    imageDisliked: number;
+    imageNoRating: number;
+    
+    // File Type Distribution (for pie chart)
     audioFiles: number;
     videoFiles: number;
     imageFiles: number;
     otherFiles: number;
-    notFoundFiles: number;
-    withoutMetadataFiles: number;
-    requiresReviewFiles: number;
     audioSize: number;
     videoSize: number;
     imageSize: number;
@@ -40,11 +78,48 @@ const fileTypeData = [
     { name: 'Other Files', value: props.fileStats.otherFiles, size: props.fileStats.otherSize },
 ];
 
-// Prepare data for the bar chart (file status breakdown)
-const fileStatusData = [
-    { name: 'Not Found', value: props.fileStats.notFoundFiles },
-    { name: 'No Metadata', value: props.fileStats.withoutMetadataFiles },
-    { name: 'Needs Review', value: props.fileStats.requiresReviewFiles },
+// Prepare data for the metadata with/without pie chart
+const metadataWithWithoutData = [
+    { name: 'With Metadata', value: props.fileStats.globalWithMetadata },
+    { name: 'Without Metadata', value: props.fileStats.globalWithoutMetadata },
+];
+
+// Prepare data for the metadata review status pie chart
+const metadataReviewData = [
+    { name: 'Review Required', value: props.fileStats.globalMetadataReviewRequired },
+    { name: 'Review Not Required', value: props.fileStats.globalMetadataReviewNotRequired },
+];
+
+// Prepare data for global rating bar chart
+const globalRatingData = [
+    { name: 'Loved', value: props.fileStats.globalLoved },
+    { name: 'Liked', value: props.fileStats.globalLiked },
+    { name: 'Disliked', value: props.fileStats.globalDisliked },
+    { name: 'No Rating', value: props.fileStats.globalNoRating },
+];
+
+// Prepare data for audio rating bar chart
+const audioRatingData = [
+    { name: 'Loved', value: props.fileStats.audioLoved },
+    { name: 'Liked', value: props.fileStats.audioLiked },
+    { name: 'Disliked', value: props.fileStats.audioDisliked },
+    { name: 'No Rating', value: props.fileStats.audioNoRating },
+];
+
+// Prepare data for video rating bar chart
+const videoRatingData = [
+    { name: 'Loved', value: props.fileStats.videoLoved },
+    { name: 'Liked', value: props.fileStats.videoLiked },
+    { name: 'Disliked', value: props.fileStats.videoDisliked },
+    { name: 'No Rating', value: props.fileStats.videoNoRating },
+];
+
+// Prepare data for image rating bar chart
+const imageRatingData = [
+    { name: 'Loved', value: props.fileStats.imageLoved },
+    { name: 'Liked', value: props.fileStats.imageLiked },
+    { name: 'Disliked', value: props.fileStats.imageDisliked },
+    { name: 'No Rating', value: props.fileStats.imageNoRating },
 ];
 
 // Helper function to format file sizes
@@ -69,83 +144,102 @@ const getSpacePercentage = (bytes: number): number => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <!-- Charts Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <!-- File Types Pie Chart -->
-                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
-                    <h2 class="text-lg font-semibold mb-4">File Distribution & Space Usage</h2>
-                    <PieChart :data="fileTypeData" />
-                    <!-- Space Usage Bar -->
-                    <div class="mt-4 space-y-3">
-                        <div class="flex justify-between items-center">
-                            <div class="text-sm font-medium">Space Usage</div>
-                            <div class="text-sm font-medium">{{ formatFileSize(fileStats.audioSize + fileStats.videoSize + fileStats.imageSize + fileStats.otherSize) }}</div>
-                        </div>
-                        
-                        <!-- Segmented Progress Bar -->
-                        <div class="w-full bg-sidebar-border/30 rounded-full h-3 overflow-hidden">
-                            <div class="h-full flex">
-                                <!-- Audio Segment -->
-                                <div 
-                                    class="bg-blue-600 transition-all duration-300"
-                                    :style="{ width: getSpacePercentage(fileStats.audioSize) + '%' }"
-                                    :title="`Audio: ${formatFileSize(fileStats.audioSize)}`"
-                                ></div>
-                                <!-- Video Segment -->
-                                <div 
-                                    class="bg-emerald-600 transition-all duration-300"
-                                    :style="{ width: getSpacePercentage(fileStats.videoSize) + '%' }"
-                                    :title="`Video: ${formatFileSize(fileStats.videoSize)}`"
-                                ></div>
-                                <!-- Image Segment -->
-                                <div 
-                                    class="bg-purple-600 transition-all duration-300"
-                                    :style="{ width: getSpacePercentage(fileStats.imageSize) + '%' }"
-                                    :title="`Images: ${formatFileSize(fileStats.imageSize)}`"
-                                ></div>
-                                <!-- Other Segment -->
-                                <div 
-                                    class="bg-red-600 transition-all duration-300"
-                                    :style="{ width: getSpacePercentage(fileStats.otherSize) + '%' }"
-                                    :title="`Other: ${formatFileSize(fileStats.otherSize)}`"
-                                ></div>
-                            </div>
-                        </div>
-                        
-                        <!-- Space Legend -->
-                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-blue-600 rounded-sm"></div>
-                                <span class="text-muted-foreground">Audio:</span>
-                                <span class="font-medium ml-auto">{{ formatFileSize(fileStats.audioSize) }}</span>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-emerald-600 rounded-sm"></div>
-                                <span class="text-muted-foreground">Video:</span>
-                                <span class="font-medium ml-auto">{{ formatFileSize(fileStats.videoSize) }}</span>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-purple-600 rounded-sm"></div>
-                                <span class="text-muted-foreground">Images:</span>
-                                <span class="font-medium ml-auto">{{ formatFileSize(fileStats.imageSize) }}</span>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <div class="w-3 h-3 bg-red-600 rounded-sm"></div>
-                                <span class="text-muted-foreground">Other:</span>
-                                <span class="font-medium ml-auto">{{ formatFileSize(fileStats.otherSize) }}</span>
-                            </div>
-                        </div>
+            <!-- Audio Count & Space Usage Block -->
+            <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                <h2 class="text-lg font-semibold mb-4">🎵 Audio Count & Space Usage</h2>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div class="space-y-1">
+                        <div class="text-2xl font-bold text-blue-600">{{ fileStats.audioFilesCount.toLocaleString() }}</div>
+                        <div class="text-sm text-muted-foreground">Audio Files</div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-2xl font-bold text-green-600">{{ formatFileSize(fileStats.audioSpaceUsed) }}</div>
+                        <div class="text-sm text-muted-foreground">Space Used</div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-2xl font-bold text-red-600">{{ fileStats.audioNotFound.toLocaleString() }}</div>
+                        <div class="text-sm text-muted-foreground">Not Found</div>
                     </div>
                 </div>
-                
-                <!-- File Status Bar Chart -->
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- File Types Pie Chart -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
-                    <h2 class="text-lg font-semibold mb-4">File Status Issues</h2>
-                    <BarChart :data="fileStatusData" />
+                    <h2 class="text-lg font-semibold mb-4">📊 File Distribution</h2>
+                    <PieChart :data="fileTypeData" />
+                </div>
+                
+                <!-- Metadata With/Without Block -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4">📄 Metadata Availability</h2>
+                    <PieChart :data="metadataWithWithoutData" />
                     <div class="mt-4 text-xs text-muted-foreground space-y-1">
-                        <div><strong>Not Found:</strong> Files flagged as missing/inaccessible</div>
-                        <div><strong>No Metadata:</strong> Files without extracted metadata</div>
-                        <div><strong>Needs Review:</strong> Files requiring manual review</div>
+                        <div><strong>With Metadata:</strong> Files with extracted metadata</div>
+                        <div><strong>Without Metadata:</strong> Files missing metadata</div>
+                    </div>
+                </div>
+
+                <!-- Metadata Review Status Block -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4">🔍 Metadata Review Status</h2>
+                    <PieChart :data="metadataReviewData" />
+                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                        <div><strong>Review Required:</strong> Metadata flagged for review</div>
+                        <div><strong>Review Not Required:</strong> Clean metadata</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Rating Blocks Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+                <!-- Global Ratings Block -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4 text-blue-700">⭐ Global Ratings</h2>
+                    <PieChart :data="globalRatingData" />
+                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                        <div><strong>Loved:</strong> ❤️ Most loved files</div>
+                        <div><strong>Liked:</strong> 👍 Liked files</div>
+                        <div><strong>Disliked:</strong> 👎 Disliked files</div>
+                        <div><strong>No Rating:</strong> Unrated files</div>
+                    </div>
+                </div>
+
+                <!-- Audio Ratings Block -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4">🎵 Audio Ratings</h2>
+                    <PieChart :data="audioRatingData" />
+                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                        <div><strong>Loved:</strong> ❤️ Favorite audio tracks</div>
+                        <div><strong>Liked:</strong> 👍 Liked audio tracks</div>
+                        <div><strong>Disliked:</strong> 👎 Disliked audio tracks</div>
+                        <div><strong>No Rating:</strong> Unrated audio tracks</div>
+                    </div>
+                </div>
+
+                <!-- Video Ratings Block -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4">🎥 Video Ratings</h2>
+                    <PieChart :data="videoRatingData" />
+                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                        <div><strong>Loved:</strong> 🌟 Most watched videos</div>
+                        <div><strong>Liked:</strong> 👍 Liked videos</div>
+                        <div><strong>Disliked:</strong> 👎 Disliked videos</div>
+                        <div><strong>No Rating:</strong> Unrated videos</div>
+                    </div>
+                </div>
+
+                <!-- Image Ratings Block -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4">🖼️ Image Ratings</h2>
+                    <PieChart :data="imageRatingData" />
+                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                        <div><strong>Loved:</strong> ❤️ Most loved images</div>
+                        <div><strong>Liked:</strong> 👍 Liked images</div>
+                        <div><strong>Disliked:</strong> 👎 Disliked images</div>
+                        <div><strong>No Rating:</strong> Unrated images</div>
                     </div>
                 </div>
             </div>
