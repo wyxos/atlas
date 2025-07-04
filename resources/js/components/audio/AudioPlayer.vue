@@ -570,6 +570,10 @@ onMounted(() => {
                     </div>
                 </div>
             </div>
+
+            <div class="w-100">
+                <!-- display incoming track -->
+            </div>
         </div>
         <!-- End of player desktop -->
 
