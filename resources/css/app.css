@@ -173,84 +173,112 @@
     .btn-atlas-primary {
         @apply bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium transition-colors;
     }
-    
+
     .btn-atlas-secondary {
         @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground px-4 py-2 rounded-md font-medium transition-colors;
     }
-    
+
     .btn-atlas-destructive {
         @apply bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-md font-medium transition-colors;
     }
-    
+
+    .button {
+        @apply bg-secondary cursor-pointer hover:bg-secondary/90 border-2 border-secondary p-4;
+
+        &.empty {
+            @apply bg-transparent text-secondary hover:bg-secondary hover:text-secondary-foreground border-2 border-secondary;
+        }
+
+        &.active {
+            @apply bg-primary text-primary-foreground hover:bg-primary/90 border-2 border-primary;
+        }
+
+        &.disabled {
+            @apply bg-muted text-muted-foreground cursor-not-allowed opacity-50 border-2 border-muted;
+        }
+
+        &.destructive {
+            @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 border-2 border-destructive;
+        }
+
+        &.circular {
+            @apply rounded-full;
+        }
+
+        &.small {
+            @apply text-xs p-2;
+        }
+    }
+
     /* Atlas card styling */
     .card-atlas {
         @apply bg-card border border-border rounded-lg shadow-sm;
     }
-    
+
     /* Atlas navigation styling */
     .nav-atlas {
         @apply bg-card border-b border-border;
     }
-    
+
     /* Atlas sidebar enhancements */
     .sidebar-atlas {
         @apply bg-sidebar border-r border-sidebar-border;
     }
-    
+
     /* Atlas form styling */
     .input-atlas {
         @apply bg-input border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring;
     }
-    
+
     /* Atlas accent gradients */
     .gradient-atlas-primary {
         background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
     }
-    
+
     .gradient-atlas-accent {
         background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
     }
-    
+
     /* Atlas text colors */
     .text-atlas-primary {
         @apply text-primary;
     }
-    
+
     .text-atlas-secondary {
         @apply text-secondary;
     }
-    
+
     .text-atlas-accent {
         @apply text-accent;
     }
-    
+
     /* Atlas focus styles */
     .focus-atlas {
         @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
     }
-    
+
     /* Dark mode specific enhancements */
     .dark {
         /* Improved scrollbar styling */
         scrollbar-width: thin;
         scrollbar-color: hsl(var(--muted)) hsl(var(--background));
     }
-    
+
     .dark ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
     }
-    
+
     .dark ::-webkit-scrollbar-track {
         background: hsl(var(--background));
     }
-    
+
     .dark ::-webkit-scrollbar-thumb {
         background: hsl(var(--border));
         border-radius: 4px;
         border: 1px solid hsl(var(--background));
     }
-    
+
     .dark ::-webkit-scrollbar-thumb:hover {
         background: hsl(var(--secondary));
     }

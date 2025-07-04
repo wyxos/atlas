@@ -423,7 +423,7 @@ onMounted(() => {
             <!-- Media controls (center) -->
             <div class="flex items-center gap-4">
               <button
-                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                class="button circular small empty"
                 @click="handleShuffle"
                 title="Shuffle"
               >
@@ -431,7 +431,7 @@ onMounted(() => {
               </button>
 
               <button
-                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                class="button circular small empty"
                 @click="handlePrevious"
                 title="Previous"
               >
@@ -439,7 +439,11 @@ onMounted(() => {
               </button>
 
               <button
-                class="btn-atlas-primary p-3 rounded-full hover:bg-primary/90 transition-colors"
+                class="button circular empty"
+                :class="{
+                  'active': audioStore.isPlaying,
+                  'secondary': !audioStore.isPlaying
+                }"
                 @click="togglePlayPause"
                 title="Play/Pause"
               >
@@ -448,7 +452,7 @@ onMounted(() => {
               </button>
 
               <button
-                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                class="button circular small empty"
                 @click="handleNext"
                 title="Next"
               >
@@ -456,7 +460,7 @@ onMounted(() => {
               </button>
 
               <button
-                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                class="button circular small empty"
                 :class="{
                   'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
                   'bg-blue-500 text-white': audioStore.repeatMode === 'one'
@@ -472,8 +476,8 @@ onMounted(() => {
             <!-- Love/Like controls (right) -->
             <div class="flex items-center gap-2 flex-1 justify-end">
               <button
-                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
-                :class="{ 'bg-red-500 text-white': isLoved }"
+                class="button circular small empty"
+                :class="{ 'destructive': isLoved }"
                 @click="handleLove"
                 title="Love"
               >
@@ -481,8 +485,8 @@ onMounted(() => {
               </button>
 
               <button
-                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
-                :class="{ 'bg-blue-500 text-white': isLiked }"
+                class="button circular small empty"
+                :class="{ 'active': isLiked }"
                 @click="handleLike"
                 title="Like"
               >
@@ -490,8 +494,8 @@ onMounted(() => {
               </button>
 
               <button
-                class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
-                :class="{ 'bg-gray-500 text-white': isDisliked }"
+                class="button circular small empty"
+                :class="{ 'disabled': isDisliked }"
                 @click="handleDislike"
                 title="Dislike"
               >
@@ -628,8 +632,8 @@ onMounted(() => {
           <!-- Mobile reaction controls -->
           <div class="flex items-center justify-center gap-6">
               <button
-                  class="btn-atlas-secondary p-1 rounded-full transition-colors"
-                  :class="{ 'bg-red-500 text-white': isLoved }"
+                  class="button circular small"
+                  :class="{ 'destructive': isLoved }"
                   @click="handleLove"
                   title="Love"
               >
@@ -637,7 +641,7 @@ onMounted(() => {
               </button>
 
               <button
-                  class="btn-atlas-secondary p-1 rounded-full transition-colors"
+                  class="button circular small"
                   :class="{ 'bg-blue-500 text-white': isLiked }"
                   @click="handleLike"
                   title="Like"
@@ -646,8 +650,8 @@ onMounted(() => {
               </button>
 
               <button
-                  class="btn-atlas-secondary p-1 rounded-full transition-colors"
-                  :class="{ 'bg-gray-500 text-white': isDisliked }"
+                  class="button circular small"
+                  :class="{ 'disabled': isDisliked }"
                   @click="handleDislike"
                   title="Dislike"
               >
