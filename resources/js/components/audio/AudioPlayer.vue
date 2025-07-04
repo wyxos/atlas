@@ -331,16 +331,58 @@ onMounted(() => {
     audioActions.updateVolume(audioEl.volume);
   };
 
+  // Handle mouse button events for next/previous track
+  const mouseButtonHandler = (event: MouseEvent) => {
+    // Only handle if player is active (has a current file) and is playing or paused
+    if (!audioStore.currentFile) return;
+
+    // Mouse button 3 (back button) - previous track
+    if (event.button === 3) {
+      event.preventDefault();
+      event.stopPropagation();
+      handlePrevious();
+    }
+    // Mouse button 4 (forward button) - next track
+    else if (event.button === 4) {
+      event.preventDefault();
+      event.stopPropagation();
+      handleNext();
+    }
+  };
+
+  // Also handle mouseup to catch any missed events
+  const mouseUpHandler = (event: MouseEvent) => {
+    // Only handle if player is active (has a current file) and is playing or paused
+    if (!audioStore.currentFile) return;
+
+    // Mouse button 3 (back button) - previous track
+    if (event.button === 3) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    // Mouse button 4 (forward button) - next track
+    else if (event.button === 4) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
   // Add event listeners
   audioEl.addEventListener('timeupdate', timeUpdateHandler);
   audioEl.addEventListener('loadedmetadata', metadataLoadedHandler);
   audioEl.addEventListener('volumechange', volumeChangeHandler);
+
+  // Add mouse button event listeners to the document
+  document.addEventListener('mousedown', mouseButtonHandler);
+  document.addEventListener('mouseup', mouseUpHandler);
 
   // Clean up event listeners when component is unmounted
   onBeforeUnmount(() => {
     audioEl.removeEventListener('timeupdate', timeUpdateHandler);
     audioEl.removeEventListener('loadedmetadata', metadataLoadedHandler);
     audioEl.removeEventListener('volumechange', volumeChangeHandler);
+    document.removeEventListener('mousedown', mouseButtonHandler);
+    document.removeEventListener('mouseup', mouseUpHandler);
   });
 
   // If we have a current file but no src is set, initialize it
