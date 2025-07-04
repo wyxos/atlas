@@ -1,11 +1,17 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/vue-starter-kit",
+    "name": "wyxos/atlas",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Atlas - Self-hosted media management and streaming platform with AI-powered features, multi-source content browsing, and advanced file organization capabilities",
     "keywords": [
+        "media-management",
+        "streaming",
+        "self-hosted",
         "laravel",
-        "framework"
+        "vue",
+        "content-management",
+        "file-manager",
+        "media-server"
     ],
     "license": "MIT",
     "require": {

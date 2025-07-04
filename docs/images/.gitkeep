@@ -1,0 +1,10 @@
+# Images Directory
+
+This directory contains screenshots and images for the documentation.
+
+## Screenshots needed:
+- dashboard.png - Main dashboard showing file statistics and distribution
+- file-browser.png - File browsing interface
+- metadata-viewer.png - Metadata display and editing interface
+
+Screenshots should be taken at a reasonable resolution (1920x1080 or similar) and optimized for web display.

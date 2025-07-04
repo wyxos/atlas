@@ -31,6 +31,13 @@ test('dashboard displays file statistics', function () {
                     ->has('videoFiles')
                     ->has('imageFiles')
                     ->has('otherFiles')
+                    ->has('notFoundFiles')
+                    ->has('withoutMetadataFiles')
+                    ->has('requiresReviewFiles')
+                    ->has('audioSize')
+                    ->has('videoSize')
+                    ->has('imageSize')
+                    ->has('otherSize')
                     ->where('totalFiles', 5)
                     ->where('audioFiles', 2)
                     ->where('videoFiles', 1)
@@ -48,12 +55,30 @@ test('file statistics endpoint returns correct data', function () {
         ->get('/dashboard/file-stats');
 
     $response->assertStatus(200);
-    $response->assertJson([
+    $response->assertJsonStructure([
+        'totalFiles',
+        'audioFiles',
+        'videoFiles', 
+        'imageFiles',
+        'otherFiles',
+        'notFoundFiles',
+        'withoutMetadataFiles',
+        'requiresReviewFiles',
+        'audioSize',
+        'videoSize',
+        'imageSize',
+        'otherSize',
+    ])
+    ->assertJson([
         'totalFiles' => 5,
         'audioFiles' => 2,
         'videoFiles' => 1,
         'imageFiles' => 1,
         'otherFiles' => 1,
+        'notFoundFiles' => 0,
+        'withoutMetadataFiles' => 5,  // All test files don't have metadata
+        'requiresReviewFiles' => 0,
+        // Note: Size values are dynamic based on test file sizes, so we don't assert exact values
     ]);
 });
 
