@@ -393,7 +393,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="fixed bottom-0 left-0 bg-card border-t border-border p-4 w-full md:static" v-if="audioStore.isPlayerLoading || audioStore.currentFile">
+  <div class="sticky bottom-0 left-0 bg-card border-t border-border p-4 w-full" v-if="audioStore.isPlayerLoading || audioStore.currentFile">
     <!-- We're using a global audio element attached to window.globalAudioElement -->
     <!-- This is a hidden placeholder for backward compatibility -->
     <audio ref="audioPlayer" class="hidden"></audio>
