@@ -175,7 +175,7 @@ const getSpacePercentage = (bytes: number): number => {
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4">📄 Metadata Availability</h2>
                     <PieChart :data="metadataWithWithoutData" />
-                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
                         <div><strong>With Metadata:</strong> Files with extracted metadata</div>
                         <div><strong>Without Metadata:</strong> Files missing metadata</div>
                     </div>
@@ -185,7 +185,7 @@ const getSpacePercentage = (bytes: number): number => {
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4">🔍 Metadata Review Status</h2>
                     <PieChart :data="metadataReviewData" />
-                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
                         <div><strong>Review Required:</strong> Metadata flagged for review</div>
                         <div><strong>Review Not Required:</strong> Clean metadata</div>
                     </div>
@@ -199,7 +199,7 @@ const getSpacePercentage = (bytes: number): number => {
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 text-blue-700">⭐ Global Ratings</h2>
                     <PieChart :data="globalRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
                         <div><strong>Loved:</strong> ❤️ Most loved files</div>
                         <div><strong>Liked:</strong> 👍 Liked files</div>
                         <div><strong>Disliked:</strong> 👎 Disliked files</div>
@@ -211,7 +211,7 @@ const getSpacePercentage = (bytes: number): number => {
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4">🎵 Audio Ratings</h2>
                     <PieChart :data="audioRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
                         <div><strong>Loved:</strong> ❤️ Favorite audio tracks</div>
                         <div><strong>Liked:</strong> 👍 Liked audio tracks</div>
                         <div><strong>Disliked:</strong> 👎 Disliked audio tracks</div>
@@ -223,7 +223,7 @@ const getSpacePercentage = (bytes: number): number => {
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4">🎥 Video Ratings</h2>
                     <PieChart :data="videoRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
                         <div><strong>Loved:</strong> 🌟 Most watched videos</div>
                         <div><strong>Liked:</strong> 👍 Liked videos</div>
                         <div><strong>Disliked:</strong> 👎 Disliked videos</div>
@@ -235,7 +235,7 @@ const getSpacePercentage = (bytes: number): number => {
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4">🖼️ Image Ratings</h2>
                     <PieChart :data="imageRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground space-y-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
                         <div><strong>Loved:</strong> ❤️ Most loved images</div>
                         <div><strong>Liked:</strong> 👍 Liked images</div>
                         <div><strong>Disliked:</strong> 👎 Disliked images</div>
