@@ -29,9 +29,12 @@ const segments = computed(() => {
     '#374151', // strong gray
   ];
 
+  // Keep all data but identify non-zero segments for rendering
+  const nonZeroCount = props.data.filter(item => item.value > 0).length;
+  
   return props.data.map((item, index) => {
     const percentage = totalValue.value > 0 ? (item.value / totalValue.value) * 100 : 0;
-    const angle = (item.value / totalValue.value) * 360;
+    const angle = totalValue.value > 0 ? (item.value / totalValue.value) * 360 : 0;
     const startAngle = cumulativeAngle;
     const endAngle = cumulativeAngle + angle;
     
@@ -40,24 +43,35 @@ const segments = computed(() => {
     const centerX = 100;
     const centerY = 100;
     
-    const startAngleRad = (startAngle * Math.PI) / 180;
-    const endAngleRad = (endAngle * Math.PI) / 180;
+    let pathData = '';
     
-    const x1 = centerX + radius * Math.cos(startAngleRad);
-    const y1 = centerY + radius * Math.sin(startAngleRad);
-    const x2 = centerX + radius * Math.cos(endAngleRad);
-    const y2 = centerY + radius * Math.sin(endAngleRad);
-    
-    const largeArcFlag = angle > 180 ? 1 : 0;
-    
-    const pathData = [
-      `M ${centerX} ${centerY}`,
-      `L ${x1} ${y1}`,
-      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-      'Z'
-    ].join(' ');
-    
-    cumulativeAngle += angle;
+    // Only create path data for segments with values > 0
+    if (item.value > 0) {
+      // Handle special case for full circle (single non-zero segment with 100%)
+      if (nonZeroCount === 1 && angle >= 359.9) {
+        // Draw a full circle
+        pathData = `M ${centerX} ${centerY} m -${radius}, 0 a ${radius},${radius} 0 1,0 ${radius*2},0 a ${radius},${radius} 0 1,0 -${radius*2},0`;
+      } else {
+        const startAngleRad = (startAngle * Math.PI) / 180;
+        const endAngleRad = (endAngle * Math.PI) / 180;
+        
+        const x1 = centerX + radius * Math.cos(startAngleRad);
+        const y1 = centerY + radius * Math.sin(startAngleRad);
+        const x2 = centerX + radius * Math.cos(endAngleRad);
+        const y2 = centerY + radius * Math.sin(endAngleRad);
+        
+        const largeArcFlag = angle > 180 ? 1 : 0;
+        
+        pathData = [
+          `M ${centerX} ${centerY}`,
+          `L ${x1} ${y1}`,
+          `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+          'Z'
+        ].join(' ');
+      }
+      
+      cumulativeAngle += angle;
+    }
     
     return {
       ...item,
@@ -86,6 +100,7 @@ const segments = computed(() => {
         <svg width="200" height="200" viewBox="0 0 200 200" class="transform -rotate-90">
           <g v-for="(segment, index) in segments" :key="index">
             <path
+              v-if="segment.pathData"
               :d="segment.pathData"
               :fill="segment.color"
               :stroke="'white'"
