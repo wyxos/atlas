@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import Icon from '@/components/Icon.vue';
@@ -12,8 +12,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { formatDate } from '@/lib/utils';
+import { router } from '@inertiajs/vue3';
 
 interface FileData {
     id: number;
@@ -92,10 +93,91 @@ const getFileTypeColor = (mimeType: string): string => {
     return 'text-gray-600';
 };
 
+// Carousel state
+const currentSlide = ref(0);
+const isDragging = ref(false);
+
+// Carousel functions
+const nextSlide = () => {
+    if (props.file.covers && props.file.covers.length > 0) {
+        currentSlide.value = (currentSlide.value + 1) % props.file.covers.length;
+    }
+};
+
+const prevSlide = () => {
+    if (props.file.covers && props.file.covers.length > 0) {
+        currentSlide.value = currentSlide.value === 0 ? props.file.covers.length - 1 : currentSlide.value - 1;
+    }
+};
+
+const goToSlide = (index: number) => {
+    currentSlide.value = index;
+};
+
+// Drag and drop functions
+const handleDragEnter = (event: DragEvent) => {
+    event.preventDefault();
+    isDragging.value = true;
+};
+
+const handleDragOver = (event: DragEvent) => {
+    event.preventDefault();
+};
+
+const handleDragLeave = (event: DragEvent) => {
+    event.preventDefault();
+    // Only set isDragging to false if we're actually leaving the drop zone
+    // Check if the related target is outside the current target
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
+
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        isDragging.value = false;
+    }
+};
+
+const handleDrop = async (event: DragEvent, coverIndex: number) => {
+    event.preventDefault();
+    isDragging.value = false;
+
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+        alert('Please drop an image file');
+        return;
+    }
+
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('cover', file);
+    formData.append('cover_index', coverIndex.toString());
+
+    try {
+        // Use Inertia router to upload the new cover
+        router.post(`/files/${props.file.id}/covers/${coverIndex}`, formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                // The page will be refreshed with updated covers
+            },
+            onError: (errors) => {
+                console.error('Error uploading cover:', errors);
+                alert('Failed to upload cover image');
+            }
+        });
+    } catch (error) {
+        console.error('Error uploading cover:', error);
+        alert('Failed to upload cover image');
+    }
+};
+
 // Filter and organize metadata
 const organizedMetadata = computed(() => {
     let metadataToProcess: Record<string, any> = {};
-    
+
     // Handle different metadata structures
     if (props.rawMetadata && typeof props.rawMetadata === 'object') {
         metadataToProcess = props.rawMetadata;
@@ -110,23 +192,23 @@ const organizedMetadata = computed(() => {
             metadataToProcess = props.metadata;
         }
     }
-    
+
     if (!metadataToProcess || Object.keys(metadataToProcess).length === 0) {
         return {};
     }
-    
+
     const organized: Record<string, Record<string, any>> = {
         'Basic Info': {},
         'Audio': {},
         'Technical': {},
         'Other': {}
     };
-    
+
     Object.entries(metadataToProcess).forEach(([key, value]) => {
         if (!value || value === '') return; // Skip empty values
-        
+
         const lowerKey = key.toLowerCase();
-        
+
         if (['title', 'artist', 'album', 'date', 'genre', 'track', 'albumartist'].includes(lowerKey)) {
             organized['Basic Info'][key] = value;
         } else if (['duration', 'bitrate', 'samplerate', 'channels', 'encoding'].includes(lowerKey)) {
@@ -137,10 +219,10 @@ const organizedMetadata = computed(() => {
             organized['Other'][key] = value;
         }
     });
-    
+
     // Remove empty sections
     return Object.fromEntries(
-        Object.entries(organized).filter(([_, section]) => Object.keys(section).length > 0)
+        Object.entries(organized).filter(([, section]) => Object.keys(section).length > 0)
     );
 });
 </script>
@@ -155,9 +237,9 @@ const organizedMetadata = computed(() => {
                 <CardHeader>
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
-                            <Icon 
-                                :name="getFileTypeIcon(file.mime_type || file.type)" 
-                                :class="`h-8 w-8 ${getFileTypeColor(file.mime_type || file.type)}`" 
+                            <Icon
+                                :name="getFileTypeIcon(file.mime_type || file.type)"
+                                :class="`h-8 w-8 ${getFileTypeColor(file.mime_type || file.type)}`"
                             />
                             <div>
                                 <CardTitle class="text-xl">{{ file.name }}</CardTitle>
@@ -170,48 +252,48 @@ const organizedMetadata = computed(() => {
                                 </CardDescription>
                             </div>
                         </div>
-                        
+
                         <!-- Action Buttons -->
                         <div class="flex items-center gap-2">
-                            <Button 
-                                v-if="file.url" 
-                                variant="outline" 
-                                size="sm" 
-                                asChild
-                            >
-                                <Link :href="file.url" target="_blank">
-                                    <Icon name="externalLink" class="h-4 w-4 mr-2" />
-                                    Open File
-                                </Link>
-                            </Button>
-                            <Button 
-                                v-else
-                                variant="outline" 
-                                size="sm" 
-                                disabled
-                            >
-                                <Icon name="fileX" class="h-4 w-4 mr-2" />
-                                File Not Available
-                            </Button>
-                            
+<!--                            <Button -->
+<!--                                v-if="file.url" -->
+<!--                                variant="outline" -->
+<!--                                size="sm" -->
+<!--                                asChild-->
+<!--                            >-->
+<!--                                <Link :href="file.url" target="_blank">-->
+<!--                                    <Icon name="externalLink" class="h-4 w-4 mr-2" />-->
+<!--                                    Open File-->
+<!--                                </Link>-->
+<!--                            </Button>-->
+<!--                            <Button -->
+<!--                                v-else-->
+<!--                                variant="outline" -->
+<!--                                size="sm" -->
+<!--                                disabled-->
+<!--                            >-->
+<!--                                <Icon name="fileX" class="h-4 w-4 mr-2" />-->
+<!--                                File Not Available-->
+<!--                            </Button>-->
+
                             <!-- Rating Buttons -->
                             <div class="flex items-center gap-1 ml-2">
-                                <Button 
-                                    variant="ghost" 
+                                <Button
+                                    variant="ghost"
                                     size="sm"
                                     :class="file.loved ? 'text-red-500' : 'text-muted-foreground'"
                                 >
                                     <Icon name="heart" class="h-4 w-4" />
                                 </Button>
-                                <Button 
-                                    variant="ghost" 
+                                <Button
+                                    variant="ghost"
                                     size="sm"
                                     :class="file.liked ? 'text-green-500' : 'text-muted-foreground'"
                                 >
                                     <Icon name="thumbsUp" class="h-4 w-4" />
                                 </Button>
-                                <Button 
-                                    variant="ghost" 
+                                <Button
+                                    variant="ghost"
                                     size="sm"
                                     :class="file.disliked ? 'text-red-500' : 'text-muted-foreground'"
                                 >
@@ -227,23 +309,71 @@ const organizedMetadata = computed(() => {
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Left Column: Cover Art & Details -->
                 <div class="space-y-6">
-                    <!-- Cover Art -->
+                    <!-- Cover Art Carousel -->
                     <Card v-if="file.covers && file.covers.length > 0">
-                        <CardHeader>
-                            <CardTitle class="flex items-center gap-2">
-                                <Icon name="image" class="h-5 w-5" />
-                                Cover Art
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div class="grid gap-4">
-                                <img
-                                    v-for="cover in file.covers"
-                                    :key="cover.id"
-                                    :src="`/storage/${cover.path}`"
-                                    alt="Cover Art"
-                                    class="w-full rounded-lg shadow-md hover:shadow-lg transition-shadow"
-                                />
+                        <CardContent class="p-0">
+                            <div class="relative overflow-hidden rounded-lg">
+                                <!-- Carousel Container -->
+                                <div class="relative aspect-square">
+                                    <!-- Current Image with Drag/Drop -->
+                                    <div
+                                        class="absolute inset-0 transition-all duration-300"
+                                        :class="isDragging ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''"
+                                        @dragenter="handleDragEnter"
+                                        @dragover="handleDragOver"
+                                        @dragleave="handleDragLeave"
+                                        @drop="(event) => handleDrop(event, currentSlide)"
+                                    >
+                                        <img
+                                            :src="`/storage/${file.covers[currentSlide].path}`"
+                                            alt="Cover Art"
+                                            class="w-full h-full object-cover rounded-lg"
+                                            :class="isDragging ? 'opacity-50' : ''"
+                                        />
+
+                                        <!-- Drag Overlay -->
+                                        <div
+                                            v-if="isDragging"
+                                            class="absolute inset-0 flex items-center justify-center bg-blue-50/80 rounded-lg"
+                                        >
+                                            <div class="text-center">
+                                                <Icon name="upload" class="h-12 w-12 text-blue-500 mx-auto mb-2" />
+                                                <p class="text-blue-700 font-medium">Drop image to replace</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Navigation Buttons -->
+                                    <div v-if="file.covers.length > 1" class="absolute inset-0 flex items-center justify-between p-4">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            class="bg-white/80 hover:bg-white/90 backdrop-blur-sm"
+                                            @click="prevSlide"
+                                        >
+                                            <Icon name="chevronLeft" class="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            class="bg-white/80 hover:bg-white/90 backdrop-blur-sm"
+                                            @click="nextSlide"
+                                        >
+                                            <Icon name="chevronRight" class="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <!-- Dots Indicator -->
+                                <div v-if="file.covers.length > 1" class="flex justify-center gap-2 p-4">
+                                    <button
+                                        v-for="(cover, index) in file.covers"
+                                        :key="cover.id"
+                                        class="w-2 h-2 rounded-full transition-colors"
+                                        :class="index === currentSlide ? 'bg-primary' : 'bg-muted-foreground/30'"
+                                        @click="goToSlide(index)"
+                                    />
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -258,8 +388,8 @@ const organizedMetadata = computed(() => {
                         </CardHeader>
                         <CardContent>
                             <div class="space-y-2">
-                                <div 
-                                    v-for="artist in file.artists" 
+                                <div
+                                    v-for="artist in file.artists"
                                     :key="artist.id"
                                     class="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition-colors"
                                 >
@@ -280,8 +410,8 @@ const organizedMetadata = computed(() => {
                         </CardHeader>
                         <CardContent>
                             <div class="space-y-2">
-                                <div 
-                                    v-for="album in file.albums" 
+                                <div
+                                    v-for="album in file.albums"
                                     :key="album.id"
                                     class="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition-colors"
                                 >
@@ -300,17 +430,17 @@ const organizedMetadata = computed(() => {
                         <Card v-for="(section, sectionName) in organizedMetadata" :key="sectionName">
                             <CardHeader>
                                 <CardTitle class="flex items-center gap-2">
-                                    <Icon 
-                                        :name="sectionName === 'Basic Info' ? 'info' : sectionName === 'Audio' ? 'music' : sectionName === 'Technical' ? 'settings' : 'moreHorizontal'" 
-                                        class="h-5 w-5" 
+                                    <Icon
+                                        :name="sectionName === 'Basic Info' ? 'info' : sectionName === 'Audio' ? 'music' : sectionName === 'Technical' ? 'settings' : 'moreHorizontal'"
+                                        class="h-5 w-5"
                                     />
                                     {{ sectionName }}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div 
-                                        v-for="(value, key) in section" 
+                                    <div
+                                        v-for="(value, key) in section"
                                         :key="key"
                                         class="flex flex-col space-y-1 p-3 rounded-md bg-muted/30"
                                     >
