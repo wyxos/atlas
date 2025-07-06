@@ -102,6 +102,14 @@ class File extends Model
     }
 
     /**
+     * Get the playlists associated with the file.
+     */
+    public function playlists(): BelongsToMany
+    {
+        return $this->belongsToMany(Playlist::class);
+    }
+
+    /**
      * Get all of the file's covers.
      * Ordered to prioritize album covers over artist covers.
      */
