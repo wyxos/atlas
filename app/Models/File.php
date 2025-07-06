@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Laravel\Scout\Searchable;
 
 class File extends Model
@@ -98,6 +99,14 @@ class File extends Model
     public function albums(): BelongsToMany
     {
         return $this->belongsToMany(Album::class);
+    }
+
+    /**
+     * Get all of the file's covers.
+     */
+    public function covers(): MorphMany
+    {
+        return $this->morphMany(Cover::class, 'coverable');
     }
 
     /**

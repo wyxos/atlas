@@ -86,7 +86,7 @@ test('it reuses existing cover when duplicate is found', function () {
         'coverable_type' => \App\Models\Artist::class,
     ]);
 
-    Storage::disk('public')->put($existingCover->path, $this->testCoverData);
+    Storage::disk('atlas')->put($existingCover->path, $this->testCoverData);
 
     // Create two test files
     $file1 = File::factory()->create([
@@ -216,5 +216,5 @@ test('it processes PIC tag for cover art', function () {
     $cover = $artist->covers->first();
 
     // Assert that the cover file exists in storage
-    Storage::disk('public')->assertExists($cover->path);
+    Storage::disk('atlas')->assertExists($cover->path);
 });

@@ -14,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TranslateFileMetadata implements ShouldQueue
 {
@@ -276,11 +277,11 @@ class TranslateFileMetadata implements ShouldQueue
 
                     if ($coverableId && $coverableType) {
                         // Generate the path using a temporary ID
-                        $tempId = uniqid();
+                        $tempId = Str::random(40);
                         $coverArtPath = "covers/{$tempId}.{$extension}";
 
                         // Save to storage
-                        Storage::disk('public')->put($coverArtPath, $coverArtData['binary']);
+                        Storage::disk('atlas')->put($coverArtPath, $coverArtData['binary']);
 
                         // Create a new cover record with polymorphic association
                         $cover = Cover::create([

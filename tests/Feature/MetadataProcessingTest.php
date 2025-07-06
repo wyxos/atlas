@@ -168,7 +168,7 @@ describe('TranslateFileMetadata Job', function () {
         $cover = $artist->covers->first();
 
         // Verify the cover exists in storage
-        Storage::disk('public')->assertExists($cover->path);
+        Storage::disk('atlas')->assertExists($cover->path);
     });
 
     it('translates minimal metadata correctly', function () {
@@ -366,7 +366,7 @@ describe('Integration Tests', function () {
         $cover = $artist->covers->first();
 
         // Verify the cover exists in storage
-        Storage::disk('public')->assertExists($cover->path);
+        Storage::disk('atlas')->assertExists($cover->path);
     });
 
     it('handles files that require review in complete workflow', function () {
