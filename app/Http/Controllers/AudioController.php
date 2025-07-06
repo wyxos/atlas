@@ -32,7 +32,7 @@ class AudioController extends Controller
     public function show(File $file)
     {
         // Load the covers, artists, and albums relationships
-        $file->load(['covers', 'artists', 'albums']);
+        $file->load(['covers', 'artists.covers', 'albums.covers']);
 
         return Inertia::render('FileShow', [
             'file' => $file,
