@@ -178,11 +178,10 @@ it('can update a cover associated with file album', function () {
     $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
 
     // Make request to update cover
-    $response = $this->post(route('files.covers.update', [
-        'file' => $file->id,
+    $response = $this->post(route('covers.update', [
         'coverId' => $cover->id
     ]), [
-        'cover' => $uploadedFile
+        'file' => $uploadedFile
     ]);
 
     $response->assertRedirect();
@@ -224,11 +223,10 @@ it('can update any cover regardless of association', function () {
     $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
 
     // Make request to update cover (should succeed with simplified logic)
-    $response = $this->post(route('files.covers.update', [
-        'file' => $file->id,
+    $response = $this->post(route('covers.update', [
         'coverId' => $cover->id
     ]), [
-        'cover' => $uploadedFile
+        'file' => $uploadedFile
     ]);
 
     $response->assertRedirect();
@@ -259,11 +257,10 @@ it('returns error for non-existent cover', function () {
     $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
 
     // Make request to update non-existent cover
-    $response = $this->post(route('files.covers.update', [
-        'file' => $file->id,
+    $response = $this->post(route('covers.update', [
         'coverId' => 999
     ]), [
-        'cover' => $uploadedFile
+        'file' => $uploadedFile
     ]);
 
     $response->assertRedirect();

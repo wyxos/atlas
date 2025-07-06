@@ -178,7 +178,7 @@ function handleLove(): void {
     }
 
     // Send request to backend
-    router.post(`/audio/${audioStore.currentFile.id}/love`, {}, {
+    router.post(route('audio.love', { file: audioStore.currentFile.id }), {}, {
         preserveState: true,
         preserveScroll: true,
         only: [],
@@ -211,7 +211,7 @@ function handleLike(): void {
     }
 
     // Send request to backend
-    router.post(`/audio/${audioStore.currentFile.id}/like`, {}, {
+    router.post(route('audio.like', { file: audioStore.currentFile.id }), {}, {
         preserveState: true,
         preserveScroll: true,
         only: [],
@@ -250,7 +250,7 @@ function handleDislike(): void {
     }
 
     // Send request to backend
-    router.post(`/audio/${audioStore.currentFile.id}/dislike`, {}, {
+    router.post(route('audio.dislike', { file: audioStore.currentFile.id }), {}, {
         preserveState: true,
         preserveScroll: true,
         only: [],

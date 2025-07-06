@@ -15,11 +15,11 @@ import { useAudioSwipeHandler } from '@/components/audio/useAudioSwipeHandler';
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
-        href: '/dashboard',
+        href: route('dashboard'),
     },
     {
         title: 'Audio',
-        href: '/audio',
+        href: route('audio'),
     },
 ];
 
@@ -128,7 +128,7 @@ function toggleFavorite(item: any, event: Event): void {
     }
 
     // Send request to backend
-    router.post(`/audio/${item.id}/love`, {}, {
+    router.post(route('audio.love', { file: item.id }), {}, {
         preserveState: true,
         preserveScroll: true,
         only: [],
@@ -165,7 +165,7 @@ function likeItem(item: any, event: Event): void {
     }
 
     // Send request to backend
-    router.post(`/audio/${item.id}/like`, {}, {
+    router.post(route('audio.like', { file: item.id }), {}, {
         preserveState: true,
         preserveScroll: true,
         only: [],
@@ -202,7 +202,7 @@ function dislikeItem(item: any, event: Event): void {
     }
 
     // Send request to backend
-    router.post(`/audio/${item.id}/dislike`, {}, {
+    router.post(route('audio.dislike', { file: item.id }), {}, {
         preserveState: true,
         preserveScroll: true,
         only: [],

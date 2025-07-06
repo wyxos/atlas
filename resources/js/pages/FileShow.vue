@@ -63,11 +63,11 @@ const props = defineProps<{
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Files',
-        href: '/files',
+        href: route('audio'),
     },
     {
         title: props.file.name,
-        href: `/files/${props.file.id}`,
+        href: route('files.show', { file: props.file.id }),
     },
 ];
 
@@ -175,7 +175,7 @@ const handleDrop = async (event: DragEvent, coverIndex: number) => {
 
     try {
         // Use Inertia router to upload the new cover
-        router.post(`/covers/${coverId}`, {
+        router.post(route('covers.update', { coverId: coverId }), {
             file: file,
         }, {
             forceFormData: true,
