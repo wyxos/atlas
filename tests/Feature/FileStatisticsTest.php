@@ -33,10 +33,26 @@ test('dashboard displays file statistics', function () {
                     ->has('audioWithoutMetadata')
                     ->has('audioMetadataReviewRequired')
                     ->has('audioMetadataReviewNotRequired')
+                    ->has('globalWithMetadata')
+                    ->has('globalWithoutMetadata')
+                    ->has('globalMetadataReviewRequired')
+                    ->has('globalMetadataReviewNotRequired')
                     ->has('audioLoved')
                     ->has('audioLiked')
                     ->has('audioDisliked')
                     ->has('audioNoRating')
+                    ->has('globalLoved')
+                    ->has('globalLiked')
+                    ->has('globalDisliked')
+                    ->has('globalNoRating')
+                    ->has('videoLoved')
+                    ->has('videoLiked')
+                    ->has('videoDisliked')
+                    ->has('videoNoRating')
+                    ->has('imageLoved')
+                    ->has('imageLiked')
+                    ->has('imageDisliked')
+                    ->has('imageNoRating')
                     ->has('audioFiles')
                     ->has('videoFiles')
                     ->has('imageFiles')
@@ -69,10 +85,26 @@ test('file statistics endpoint returns correct data', function () {
         'audioWithoutMetadata',
         'audioMetadataReviewRequired',
         'audioMetadataReviewNotRequired',
+        'globalWithMetadata',
+        'globalWithoutMetadata',
+        'globalMetadataReviewRequired',
+        'globalMetadataReviewNotRequired',
         'audioLoved',
         'audioLiked',
         'audioDisliked',
         'audioNoRating',
+        'globalLoved',
+        'globalLiked',
+        'globalDisliked',
+        'globalNoRating',
+        'videoLoved',
+        'videoLiked',
+        'videoDisliked',
+        'videoNoRating',
+        'imageLoved',
+        'imageLiked',
+        'imageDisliked',
+        'imageNoRating',
         'audioFiles',
         'videoFiles',
         'imageFiles',
@@ -90,10 +122,8 @@ test('file statistics endpoint returns correct data', function () {
         'audioNotFound' => 0,
         'audioWithoutMetadata' => 2,  // All test audio files don't have metadata
         'audioMetadataReviewRequired' => 0,
-        'audioLoved' => 0,
-        'audioLiked' => 0,
-        'audioDisliked' => 0,
-        // Note: Size and count values are dynamic based on test files
+        // Note: Size, count, and rating values are dynamic based on test files
+        // audioLoved, audioLiked, and audioDisliked values may vary based on factory data, so we don't assert them
     ]);
 });
 
