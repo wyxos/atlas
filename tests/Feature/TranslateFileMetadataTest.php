@@ -62,9 +62,7 @@ test('it creates cover record when processing metadata with cover art', function
     $job->handle();
 
     // Assert that a cover record was created
-    $this->assertDatabaseHas('covers', [
-        'hash' => $this->testCoverHash,
-    ]);
+    expect(Cover::where('hash', $this->testCoverHash)->exists())->toBeTrue();
 
     // Assert that the cover is associated with the artist
     expect($file->artists)->toHaveCount(1);
@@ -203,9 +201,7 @@ test('it processes PIC tag for cover art', function () {
     $job->handle();
 
     // Assert that a cover record was created
-    $this->assertDatabaseHas('covers', [
-        'hash' => $this->testCoverHash,
-    ]);
+    expect(Cover::where('hash', $this->testCoverHash)->exists())->toBeTrue();
 
     // Assert that the cover is associated with the artist
     expect($file->artists)->toHaveCount(1);
@@ -265,9 +261,7 @@ test('it prioritizes album over artist when associating covers', function () {
     $job->handle();
 
     // Assert that a cover record was created
-    $this->assertDatabaseHas('covers', [
-        'hash' => $this->testCoverHash,
-    ]);
+    expect(Cover::where('hash', $this->testCoverHash)->exists())->toBeTrue();
 
     // Assert that both artist and album were created
     expect($file->artists)->toHaveCount(1);
@@ -328,9 +322,7 @@ test('it associates cover with artist when no album is present', function () {
     $job->handle();
 
     // Assert that a cover record was created
-    $this->assertDatabaseHas('covers', [
-        'hash' => $this->testCoverHash,
-    ]);
+    expect(Cover::where('hash', $this->testCoverHash)->exists())->toBeTrue();
 
     // Assert that only artist was created (no album)
     expect($file->artists)->toHaveCount(1);
