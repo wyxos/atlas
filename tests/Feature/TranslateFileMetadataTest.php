@@ -66,17 +66,24 @@ test('it creates cover record when processing metadata with cover art', function
         'hash' => $this->testCoverHash,
     ]);
 
-    // Assert that the cover is associated with the file
-    expect($file->covers)->toHaveCount(1);
+    // Assert that the cover is associated with the artist
+    expect($file->artists)->toHaveCount(1);
+    $artist = $file->artists->first();
+    expect($artist->covers)->toHaveCount(1);
 
     // We no longer store cover_art_path in the metadata payload
 });
 
 test('it reuses existing cover when duplicate is found', function () {
+    // Create a test artist first to associate with the cover
+    $artist = \App\Models\Artist::create(['name' => 'Test Artist']);
+
     // Create a test cover using our test cover data
     $existingCover = Cover::create([
         'hash' => $this->testCoverHash,
         'path' => 'covers/existing-cover.png',
+        'coverable_id' => $artist->id,
+        'coverable_type' => \App\Models\Artist::class,
     ]);
 
     Storage::disk('public')->put($existingCover->path, $this->testCoverData);
@@ -141,11 +148,17 @@ test('it reuses existing cover when duplicate is found', function () {
     // Assert that only one cover record exists
     expect(Cover::count())->toBe(1);
 
-    // Assert that both files are associated with the same cover
-    expect($file1->covers)->toHaveCount(1);
-    expect($file2->covers)->toHaveCount(1);
-    expect($file1->covers->first()->id)->toBe($existingCover->id);
-    expect($file2->covers->first()->id)->toBe($existingCover->id);
+    // Assert that both files have artists and the artists are associated with the same cover
+    expect($file1->artists)->toHaveCount(1);
+    expect($file2->artists)->toHaveCount(1);
+
+    $artist1 = $file1->artists->first();
+    $artist2 = $file2->artists->first();
+
+    // Both should be the same artist since they have the same name
+    expect($artist1->id)->toBe($artist2->id);
+    expect($artist1->covers)->toHaveCount(1);
+    expect($artist1->covers->first()->id)->toBe($existingCover->id);
 });
 
 test('it processes PIC tag for cover art', function () {
@@ -194,14 +207,13 @@ test('it processes PIC tag for cover art', function () {
         'hash' => $this->testCoverHash,
     ]);
 
-    // Assert that the cover is associated with the file
-    expect($file->covers)->toHaveCount(1);
+    // Assert that the cover is associated with the artist
+    expect($file->artists)->toHaveCount(1);
+    $artist = $file->artists->first();
+    expect($artist->covers)->toHaveCount(1);
 
     // Get the cover
-    $cover = $file->covers->first();
-
-    // Assert that the cover path follows the pattern covers/{$cover->id}.png
-    expect($cover->path)->toBe("covers/{$cover->id}.png");
+    $cover = $artist->covers->first();
 
     // Assert that the cover file exists in storage
     Storage::disk('public')->assertExists($cover->path);

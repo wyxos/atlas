@@ -83,13 +83,6 @@ class File extends Model
         return $this->hasOne(FileMetadata::class);
     }
 
-    /**
-     * Get the covers associated with the file.
-     */
-    public function covers(): BelongsToMany
-    {
-        return $this->belongsToMany(Cover::class);
-    }
 
     /**
      * Get the artists associated with the file.

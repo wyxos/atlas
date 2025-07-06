@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class Cover extends Model
 {
@@ -17,14 +17,16 @@ class Cover extends Model
      */
     protected $fillable = [
         'path',
+        'coverable_id',
+        'coverable_type',
         'hash',
     ];
 
     /**
-     * Get the files associated with this cover.
+     * Get the parent coverable model (Artist or Album).
      */
-    public function files(): BelongsToMany
+    public function coverable(): MorphTo
     {
-        return $this->belongsToMany(File::class);
+        return $this->morphTo();
     }
 }

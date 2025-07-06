@@ -40,8 +40,8 @@ return new class extends Migration
             $table->boolean('loved')->default(false); // Added to favorites
             $table->timestamp('loved_at')->nullable(); // When added to favorites
             $table->boolean('downloaded')->default(false); // Downloaded to local/NAS
-            $table->integer('download_progress')->default(0); // % downloaded
             $table->timestamp('downloaded_at')->nullable(); // When download completed
+            $table->integer('download_progress')->default(0); // % downloaded
             $table->timestamps();
         });
     }

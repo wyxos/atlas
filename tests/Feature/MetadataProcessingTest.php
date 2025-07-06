@@ -159,11 +159,13 @@ describe('TranslateFileMetadata Job', function () {
 
         $metadata = $audioFile->metadata()->first();
 
-        // Verify that a cover record was created and associated with the file
-        expect($audioFile->covers()->count())->toBe(1);
+        // Verify that a cover record was created and associated with the artist
+        expect($audioFile->artists()->count())->toBe(1);
+        $artist = $audioFile->artists->first();
+        expect($artist->covers()->count())->toBe(1);
 
         // Get the cover
-        $cover = $audioFile->covers->first();
+        $cover = $artist->covers->first();
 
         // Verify the cover exists in storage
         Storage::disk('public')->assertExists($cover->path);
@@ -355,11 +357,13 @@ describe('Integration Tests', function () {
         expect($metadata->payload['title'])->toBe('Canon in D Major');
         expect($metadata->is_review_required)->toBeFalse();
 
-        // Verify that a cover record was created and associated with the file
-        expect($audioFile->covers()->count())->toBe(1);
+        // Verify that a cover record was created and associated with the artist
+        expect($audioFile->artists()->count())->toBe(1);
+        $artist = $audioFile->artists->first();
+        expect($artist->covers()->count())->toBe(1);
 
         // Get the cover
-        $cover = $audioFile->covers->first();
+        $cover = $artist->covers->first();
 
         // Verify the cover exists in storage
         Storage::disk('public')->assertExists($cover->path);

@@ -111,6 +111,7 @@ class TranslateFileMetadata implements ShouldQueue
         $year = null;
         $track = null;
         $coverArtPath = null; // default
+        $coverArtData = null; // Store cover data for later processing
 
         // Extract ID3 tags if available
         if (isset($metadata['native']['ID3v2.3'])) {
@@ -138,54 +139,12 @@ class TranslateFileMetadata implements ShouldQueue
                         break;
                     case 'APIC':
                     case 'PIC':
-                        // Process any tag that contains image data
+                        // Store cover data for later processing after artist/album creation
                         if (isset($tag['value']['data'])) {
-                            $coverArtBinary = $this->decodeCoverArt($tag['value']['data']);
-                            $coverArtMime = $tag['value']['format'] ?? 'image/jpeg';
-                            $extension = explode('/', $coverArtMime)[1];
-
-                            // Create hash of the file content
-                            $hash = md5($coverArtBinary);
-
-                            // Check if a cover with this hash already exists
-                            $existingCover = Cover::where('hash', $hash)->first();
-
-                            if ($existingCover) {
-                                // Associate the existing cover with the file
-                                $file->covers()->syncWithoutDetaching([$existingCover->id]);
-
-                                // Update the cover path to point to the existing cover
-                                $coverArtPath = $existingCover->path;
-                            } else {
-                                // Create a new cover record
-                                DB::beginTransaction();
-
-                                try {
-                                    // Create a new cover record first to get the ID
-                                    $cover = Cover::create([
-                                        'hash' => $hash,
-                                        'path' => '', // Will be updated after we know the ID
-                                    ]);
-
-                                    // Generate the path using the cover ID
-                                    $coverArtPath = "covers/{$cover->id}.{$extension}";
-
-                                    // Save to storage
-                                    Storage::disk('public')->put($coverArtPath, $coverArtBinary);
-
-                                    // Update the cover record with the path
-                                    $cover->path = $coverArtPath;
-                                    $cover->save();
-
-                                    // Associate the cover with the file
-                                    $file->covers()->syncWithoutDetaching([$cover->id]);
-
-                                    DB::commit();
-                                } catch (\Exception $e) {
-                                    Log::error("Error processing cover for file {$file->id}: ".$e->getMessage());
-                                    DB::rollBack();
-                                }
-                            }
+                            $coverArtData = [
+                                'binary' => $this->decodeCoverArt($tag['value']['data']),
+                                'mime' => $tag['value']['format'] ?? 'image/jpeg',
+                            ];
                         }
                         break;
                     case 'TALB': // Album
@@ -284,6 +243,59 @@ class TranslateFileMetadata implements ShouldQueue
 
             if (! empty($albumIds)) {
                 $file->albums()->syncWithoutDetaching($albumIds);
+            }
+        }
+
+        // Process cover art after artist/album creation
+        if ($coverArtData) {
+            $extension = explode('/', $coverArtData['mime'])[1];
+            $hash = md5($coverArtData['binary']);
+
+            // Check if a cover with this hash already exists
+            $existingCover = Cover::where('hash', $hash)->first();
+
+            if ($existingCover) {
+                // Update the cover path to point to the existing cover
+                $coverArtPath = $existingCover->path;
+            } else {
+                // Create a new cover record and associate with artist or album
+                DB::beginTransaction();
+
+                try {
+                    // Determine what to associate the cover with (prefer artist, then album)
+                    $coverableId = null;
+                    $coverableType = null;
+
+                    if (!empty($artistIds)) {
+                        $coverableId = $artistIds[0]; // Use first artist
+                        $coverableType = Artist::class;
+                    } elseif (!empty($albumIds)) {
+                        $coverableId = $albumIds[0]; // Use first album
+                        $coverableType = Album::class;
+                    }
+
+                    if ($coverableId && $coverableType) {
+                        // Generate the path using a temporary ID
+                        $tempId = uniqid();
+                        $coverArtPath = "covers/{$tempId}.{$extension}";
+
+                        // Save to storage
+                        Storage::disk('public')->put($coverArtPath, $coverArtData['binary']);
+
+                        // Create a new cover record with polymorphic association
+                        $cover = Cover::create([
+                            'hash' => $hash,
+                            'path' => $coverArtPath,
+                            'coverable_id' => $coverableId,
+                            'coverable_type' => $coverableType,
+                        ]);
+                    }
+
+                    DB::commit();
+                } catch (\Exception $e) {
+                    Log::error("Error processing cover for file {$file->id}: ".$e->getMessage());
+                    DB::rollBack();
+                }
             }
         }
 
