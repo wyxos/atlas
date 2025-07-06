@@ -40,6 +40,14 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
         ]);
     })->name('audio');
 
+    // Audio subitems routes (must come before audio/{file} route)
+    Route::get('audio/favorites', [AudioController::class, 'favorites'])->name('audio.favorites');
+    Route::get('audio/liked', [AudioController::class, 'liked'])->name('audio.liked');
+    Route::get('audio/disliked', [AudioController::class, 'disliked'])->name('audio.disliked');
+    Route::get('audio/artists', [AudioController::class, 'artists'])->name('audio.artists');
+    Route::get('audio/albums', [AudioController::class, 'albums'])->name('audio.albums');
+    Route::get('audio/playlists', [AudioController::class, 'playlists'])->name('audio.playlists');
+
     Route::get('audio/{file}', [AudioController::class, 'show'])->name('audio.show');
 
     // Audio details route for AJAX loading

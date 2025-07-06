@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Cover;
 use App\Models\File;
+use App\Models\Artist;
+use App\Models\Album;
+use App\Models\Playlist;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -165,5 +168,86 @@ class AudioController extends Controller
         Storage::disk('atlas')->delete($oldPath);
 
         return back()->with('success', 'Cover updated successfully');
+    }
+
+    public function favorites()
+    {
+        return Inertia::render('Audio', [
+            'files' => fn () => File::audio()
+                ->where('not_found', false)
+                ->where('loved', true)
+                ->select(['id'])
+                ->get(),
+            'search' => [],
+            'title' => 'Favorites',
+        ]);
+    }
+
+    public function liked()
+    {
+        return Inertia::render('Audio', [
+            'files' => fn () => File::audio()
+                ->where('not_found', false)
+                ->where('liked', true)
+                ->select(['id'])
+                ->get(),
+            'search' => [],
+            'title' => 'Liked',
+        ]);
+    }
+
+    public function disliked()
+    {
+        return Inertia::render('Audio', [
+            'files' => fn () => File::audio()
+                ->where('not_found', false)
+                ->where('disliked', true)
+                ->select(['id'])
+                ->get(),
+            'search' => [],
+            'title' => 'Disliked',
+        ]);
+    }
+
+    public function artists()
+    {
+        $artists = Artist::whereHas('files', function ($query) {
+            $query->audio()->where('not_found', false);
+        })->with('covers')->get();
+
+        return Inertia::render('Audio', [
+            'files' => collect([]), // Empty collection for now
+            'search' => [],
+            'title' => 'Artists',
+            'artists' => $artists,
+        ]);
+    }
+
+    public function albums()
+    {
+        $albums = Album::whereHas('files', function ($query) {
+            $query->audio()->where('not_found', false);
+        })->with('covers')->get();
+
+        return Inertia::render('Audio', [
+            'files' => collect([]), // Empty collection for now
+            'search' => [],
+            'title' => 'Albums',
+            'albums' => $albums,
+        ]);
+    }
+
+    public function playlists()
+    {
+        $playlists = Playlist::whereHas('files', function ($query) {
+            $query->audio()->where('not_found', false);
+        })->get();
+
+        return Inertia::render('Audio', [
+            'files' => collect([]), // Empty collection for now
+            'search' => [],
+            'title' => 'Playlists',
+            'playlists' => $playlists,
+        ]);
     }
 }

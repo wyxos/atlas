@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { Headset, LayoutGrid, Video, Image, Users } from 'lucide-vue-next';
+import { Headset, LayoutGrid, Video, Image, Users, Heart, ThumbsUp, ThumbsDown, Mic, Disc, ListMusic } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
@@ -18,6 +18,39 @@ const mainNavItems: NavItem[] = [
         title: 'Audio',
         href: '/audio',
         icon: Headset,
+        isCollapsible: true,
+        items: [
+            {
+                title: 'Favorites',
+                href: '/audio/favorites',
+                icon: Heart,
+            },
+            {
+                title: 'Liked',
+                href: '/audio/liked',
+                icon: ThumbsUp,
+            },
+            {
+                title: 'Disliked',
+                href: '/audio/disliked',
+                icon: ThumbsDown,
+            },
+            {
+                title: 'Artists',
+                href: '/audio/artists',
+                icon: Mic,
+            },
+            {
+                title: 'Albums',
+                href: '/audio/albums',
+                icon: Disc,
+            },
+            {
+                title: 'Playlists',
+                href: '/audio/playlists',
+                icon: ListMusic,
+            },
+        ],
     },
     {
         title: 'Video',

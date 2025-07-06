@@ -433,7 +433,7 @@ onMounted(() => {
 
         <!-- Start of player desktop -->
         <div class="hidden md:flex gap-4 items-center">
-            <div class="flex gap-2 items-center w-100">
+            <div class="flex gap-4 items-center w-100">
                 <!-- Loading skeleton for player cover -->
                 <div v-if="audioStore.isPlayerLoading"
                      class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
