@@ -84,6 +84,7 @@ return [
 
     'links' => [
         public_path('storage') => storage_path('app/public'),
+        public_path('atlas') => env('ATLAS_STORAGE_PATH', storage_path('app/atlas')),
     ],
 
 ];

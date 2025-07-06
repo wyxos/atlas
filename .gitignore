@@ -29,3 +29,4 @@ yarn-error.log
 /app/Console/Commands/Personal
 /tests/Feature/Personal
 /tests/Unit/Personal
+/public/atlas

@@ -102,7 +102,7 @@ function navigateToDetails(): void {
         <template v-else>
           <img
             v-if="coverImage"
-            :src="`/storage/${coverImage}`"
+            :src="`/atlas/${coverImage}`"
             alt="Cover"
             class="w-full h-full object-cover"
           />
