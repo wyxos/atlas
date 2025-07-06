@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { } from 'vue';
+import { computed } from 'vue';
 import { Play, Pause, Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
@@ -26,6 +26,27 @@ function excerpt(text: string, length = 25): string {
   if (!text) return '';
   return text.length > length ? text.substring(0, length) + '...' : text;
 }
+
+// Computed property to get the cover image with priority: album covers first, then file covers
+const coverImage = computed((): string | null => {
+  if (!props.loadedFile) return null;
+
+  // First check for album covers
+  if (props.loadedFile.albums && props.loadedFile.albums.length > 0) {
+    for (const album of props.loadedFile.albums) {
+      if (album.covers && album.covers.length > 0) {
+        return album.covers[0].path;
+      }
+    }
+  }
+
+  // Fall back to file covers
+  if (props.loadedFile.covers && props.loadedFile.covers.length > 0) {
+    return props.loadedFile.covers[0].path;
+  }
+
+  return null;
+});
 
 // Handle play button click
 function handlePlay(event: Event): void {
@@ -80,8 +101,8 @@ function navigateToDetails(): void {
         <!-- Actual cover image when loaded -->
         <template v-else>
           <img
-            v-if="loadedFile.covers && loadedFile.covers.length > 0"
-            :src="`/storage/${loadedFile.covers[0].path}`"
+            v-if="coverImage"
+            :src="`/storage/${coverImage}`"
             alt="Cover"
             class="w-full h-full object-cover"
           />

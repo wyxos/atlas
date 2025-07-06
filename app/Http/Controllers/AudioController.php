@@ -44,7 +44,7 @@ class AudioController extends Controller
     public function getDetails(File $file)
     {
         // Load the covers, artists, and albums relationships
-        $file->load(['metadata', 'covers', 'artists', 'albums']);
+        $file->load(['metadata', 'covers', 'artists.covers', 'albums.covers']);
 
         return response()->json($file);
     }
