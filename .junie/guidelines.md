@@ -14,6 +14,7 @@ General guidelines:
 - Always use Inertia router where applicable if present. Otherwise favor axios and never use fetch.
 - Never write custom files to test functionalities after a task.
 - Use laravel.log and Log class to debug issues, and ensure to remove any logging statements and to clear the laravel.log file before completing the task.
+- If the task completed is listed under todo.md, strike it out in the todo.md file.
 
 Project specific guidelines:
 

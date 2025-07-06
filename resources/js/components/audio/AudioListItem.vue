@@ -6,6 +6,7 @@ import { router } from '@inertiajs/vue3';
 
 const props = defineProps<{
   item: any;
+  index: number;
   loadedFile: any | null;
   isPlaying: boolean;
   currentFileId: number | null;
@@ -95,6 +96,18 @@ function navigateToDetails(): void {
     @click="navigateToDetails"
   >
     <div class="flex gap-2 items-center">
+        <button
+            class="cursor-pointer  text-white w-10 mr-6 flex items-center justify-center"
+            @click.stop="handlePlay($event)"
+        >
+
+            <span v-if="currentFileId !== item.id"
+                  @click.stop="handlePlay($event)">{{ index}}</span>
+            <template v-else>
+                <Play v-if="!isPlaying || currentFileId !== item.id" :size="20" />
+                <Pause v-else :size="20" />
+            </template>
+        </button>
       <div class="w-16 h-16 flex-shrink-0 overflow-hidden rounded relative">
         <!-- Loading skeleton for cover -->
         <Skeleton v-if="!loadedFile" class="w-full h-full" />
@@ -110,13 +123,6 @@ function navigateToDetails(): void {
             <span class="text-xs">No Cover</span>
           </div>
         </template>
-        <button
-          class="cursor-pointer opacity-0 bg-black/50 hover:opacity-100 flex items-center justify-center absolute h-full w-full left-0 top-0 transition-opacity text-white"
-          @click.stop="handlePlay($event)"
-        >
-          <Play v-if="!isPlaying || currentFileId !== item.id" :size="20" />
-          <Pause v-else :size="20" />
-        </button>
       </div>
       <div class="flex flex-col">
         <!-- Loading skeleton for artist name -->

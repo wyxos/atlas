@@ -451,12 +451,6 @@ onMounted(() => {
                     <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
                         <span class="text-xs">No Cover</span>
                     </div>
-                    <button
-                        class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white transition-opacity"
-                        @click="togglePlayPause">
-                        <Play v-if="!audioStore.isPlaying" :size="24" />
-                        <Pause v-else :size="24" />
-                    </button>
                 </div>
 
                 <div class="flex flex-col gap-2">
@@ -616,12 +610,6 @@ onMounted(() => {
                     <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
                         <span class="text-xs">No Cover</span>
                     </div>
-                    <button
-                        class="w-full h-full absolute top-0 left-0 bg-black/50 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-white transition-opacity"
-                        @click="togglePlayPause">
-                        <Play v-if="!audioStore.isPlaying" :size="24" />
-                        <Pause v-else :size="24" />
-                    </button>
                 </div>
 
                 <!-- Loading skeleton for player artist and title -->

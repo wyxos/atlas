@@ -279,12 +279,13 @@ function onScroll(startIndex: number, endIndex: number, visibleStartIndex: numbe
                             key-field="id"
                             :emit-update="true"
                             @update="onScroll"
-                            v-slot="{ item }"
+                            v-slot="{ item, index }"
                         >
                             <div class="relative overflow-hidden">
                                 <!-- List item component -->
                                 <AudioListItem
                                     :item="item"
+                                    :index="index + 1"
                                     :loaded-file="loadedFiles[item.id]"
                                     :is-playing="audioStore.isPlaying"
                                     :current-file-id="audioStore.currentFile ? audioStore.currentFile.id : null"
