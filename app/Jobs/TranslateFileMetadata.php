@@ -263,16 +263,16 @@ class TranslateFileMetadata implements ShouldQueue
                 DB::beginTransaction();
 
                 try {
-                    // Determine what to associate the cover with (prefer artist, then album)
+                    // Determine what to associate the cover with (prefer album, then artist)
                     $coverableId = null;
                     $coverableType = null;
 
-                    if (!empty($artistIds)) {
-                        $coverableId = $artistIds[0]; // Use first artist
-                        $coverableType = Artist::class;
-                    } elseif (!empty($albumIds)) {
+                    if (!empty($albumIds)) {
                         $coverableId = $albumIds[0]; // Use first album
                         $coverableType = Album::class;
+                    } elseif (!empty($artistIds)) {
+                        $coverableId = $artistIds[0]; // Use first artist
+                        $coverableType = Artist::class;
                     }
 
                     if ($coverableId && $coverableType) {

@@ -103,10 +103,12 @@ class File extends Model
 
     /**
      * Get all of the file's covers.
+     * Ordered to prioritize album covers over artist covers.
      */
     public function covers(): MorphMany
     {
-        return $this->morphMany(Cover::class, 'coverable');
+        return $this->morphMany(Cover::class, 'coverable')
+            ->orderByRaw("CASE WHEN coverable_type = ? THEN 0 ELSE 1 END", [Album::class]);
     }
 
     /**

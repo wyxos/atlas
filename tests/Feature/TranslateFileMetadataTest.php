@@ -218,3 +218,131 @@ test('it processes PIC tag for cover art', function () {
     // Assert that the cover file exists in storage
     Storage::disk('atlas')->assertExists($cover->path);
 });
+
+test('it prioritizes album over artist when associating covers', function () {
+    // Create a test file
+    $file = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+    ]);
+
+    // Create a simple metadata structure with both artist and album, plus cover art
+    $metadata = [
+        'native' => [
+            'ID3v2.3' => [
+                [
+                    'id' => 'TIT2',
+                    'value' => 'Test Title',
+                ],
+                [
+                    'id' => 'TPE1',
+                    'value' => 'Test Artist',
+                ],
+                [
+                    'id' => 'TALB',
+                    'value' => 'Test Album',
+                ],
+                [
+                    'id' => 'APIC',
+                    'value' => [
+                        'format' => 'image/png',
+                        'data' => array_values(unpack('C*', $this->testCoverData)),
+                    ],
+                ],
+            ],
+        ],
+        'format' => [
+            'duration' => 180,
+            'bitrate' => 320000,
+        ],
+    ];
+
+    // Save the metadata
+    $metadataPath = "metadata/{$file->id}.json";
+    Storage::disk('atlas')->put($metadataPath, json_encode($metadata));
+
+    // Process the file
+    $job = new TranslateFileMetadata($file);
+    $job->handle();
+
+    // Assert that a cover record was created
+    $this->assertDatabaseHas('covers', [
+        'hash' => $this->testCoverHash,
+    ]);
+
+    // Assert that both artist and album were created
+    expect($file->artists)->toHaveCount(1);
+    expect($file->albums)->toHaveCount(1);
+
+    $artist = $file->artists->first();
+    $album = $file->albums->first();
+
+    // Assert that the cover is associated with the album, not the artist
+    expect($album->covers)->toHaveCount(1);
+    expect($artist->covers)->toHaveCount(0);
+
+    // Verify the cover is correctly associated with the album
+    $cover = $album->covers->first();
+    expect($cover->coverable_type)->toBe(\App\Models\Album::class);
+    expect($cover->coverable_id)->toBe($album->id);
+});
+
+test('it associates cover with artist when no album is present', function () {
+    // Create a test file
+    $file = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+    ]);
+
+    // Create a simple metadata structure with only artist (no album), plus cover art
+    $metadata = [
+        'native' => [
+            'ID3v2.3' => [
+                [
+                    'id' => 'TIT2',
+                    'value' => 'Test Title',
+                ],
+                [
+                    'id' => 'TPE1',
+                    'value' => 'Test Artist',
+                ],
+                [
+                    'id' => 'APIC',
+                    'value' => [
+                        'format' => 'image/png',
+                        'data' => array_values(unpack('C*', $this->testCoverData)),
+                    ],
+                ],
+            ],
+        ],
+        'format' => [
+            'duration' => 180,
+            'bitrate' => 320000,
+        ],
+    ];
+
+    // Save the metadata
+    $metadataPath = "metadata/{$file->id}.json";
+    Storage::disk('atlas')->put($metadataPath, json_encode($metadata));
+
+    // Process the file
+    $job = new TranslateFileMetadata($file);
+    $job->handle();
+
+    // Assert that a cover record was created
+    $this->assertDatabaseHas('covers', [
+        'hash' => $this->testCoverHash,
+    ]);
+
+    // Assert that only artist was created (no album)
+    expect($file->artists)->toHaveCount(1);
+    expect($file->albums)->toHaveCount(0);
+
+    $artist = $file->artists->first();
+
+    // Assert that the cover is associated with the artist
+    expect($artist->covers)->toHaveCount(1);
+
+    // Verify the cover is correctly associated with the artist
+    $cover = $artist->covers->first();
+    expect($cover->coverable_type)->toBe(\App\Models\Artist::class);
+    expect($cover->coverable_id)->toBe($artist->id);
+});

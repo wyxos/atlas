@@ -159,13 +159,14 @@ describe('TranslateFileMetadata Job', function () {
 
         $metadata = $audioFile->metadata()->first();
 
-        // Verify that a cover record was created and associated with the artist
+        // Verify that a cover record was created and associated with the album (prioritized over artist)
         expect($audioFile->artists()->count())->toBe(1);
-        $artist = $audioFile->artists->first();
-        expect($artist->covers()->count())->toBe(1);
+        expect($audioFile->albums()->count())->toBe(1);
+        $album = $audioFile->albums->first();
+        expect($album->covers()->count())->toBe(1);
 
         // Get the cover
-        $cover = $artist->covers->first();
+        $cover = $album->covers->first();
 
         // Verify the cover exists in storage
         Storage::disk('atlas')->assertExists($cover->path);
@@ -357,13 +358,14 @@ describe('Integration Tests', function () {
         expect($metadata->payload['title'])->toBe('Canon in D Major');
         expect($metadata->is_review_required)->toBeFalse();
 
-        // Verify that a cover record was created and associated with the artist
+        // Verify that a cover record was created and associated with the album (prioritized over artist)
         expect($audioFile->artists()->count())->toBe(1);
-        $artist = $audioFile->artists->first();
-        expect($artist->covers()->count())->toBe(1);
+        expect($audioFile->albums()->count())->toBe(1);
+        $album = $audioFile->albums->first();
+        expect($album->covers()->count())->toBe(1);
 
         // Get the cover
-        $cover = $artist->covers->first();
+        $cover = $album->covers->first();
 
         // Verify the cover exists in storage
         Storage::disk('atlas')->assertExists($cover->path);
