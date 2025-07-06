@@ -146,3 +146,126 @@ it('returns 404 for non-existent file', function () {
 
     $response->assertStatus(404);
 });
+
+it('can update a cover associated with file album', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Create an album and associate with file
+    $album = Album::create(['name' => 'Test Album']);
+    $file->albums()->attach($album);
+
+    // Create a cover for the album
+    $cover = Cover::create([
+        'path' => 'covers/old-cover.jpg',
+        'hash' => 'old-cover-hash',
+        'coverable_id' => $album->id,
+        'coverable_type' => Album::class,
+    ]);
+
+    // Create a fake uploaded file
+    $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
+
+    // Make request to update cover
+    $response = $this->post(route('files.covers.update', [
+        'file' => $file->id,
+        'coverId' => $cover->id
+    ]), [
+        'cover' => $uploadedFile
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success', 'Cover updated successfully');
+
+    // Verify the cover was updated
+    $cover->refresh();
+    expect($cover->path)->not->toBe('covers/old-cover.jpg');
+    expect($cover->hash)->not->toBe('old-cover-hash');
+});
+
+it('can update any cover regardless of association', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Create an album NOT associated with the file
+    $unrelatedAlbum = Album::create(['name' => 'Unrelated Album']);
+
+    // Create a cover for the unrelated album
+    $cover = Cover::create([
+        'path' => 'covers/unrelated-cover.jpg',
+        'hash' => 'unrelated-cover-hash',
+        'coverable_id' => $unrelatedAlbum->id,
+        'coverable_type' => Album::class,
+    ]);
+
+    // Create a fake uploaded file
+    $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
+
+    // Make request to update cover (should succeed with simplified logic)
+    $response = $this->post(route('files.covers.update', [
+        'file' => $file->id,
+        'coverId' => $cover->id
+    ]), [
+        'cover' => $uploadedFile
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success', 'Cover updated successfully');
+
+    // Verify the cover was updated
+    $cover->refresh();
+    expect($cover->path)->not->toBe('covers/unrelated-cover.jpg');
+    expect($cover->hash)->not->toBe('unrelated-cover-hash');
+});
+
+it('returns error for non-existent cover', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Create a fake uploaded file
+    $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
+
+    // Make request to update non-existent cover
+    $response = $this->post(route('files.covers.update', [
+        'file' => $file->id,
+        'coverId' => 999
+    ]), [
+        'cover' => $uploadedFile
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHasErrors(['cover' => 'Cover not found']);
+});

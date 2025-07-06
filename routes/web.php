@@ -47,7 +47,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     // Files routes (using AudioController for consistency)
     Route::get('files/{file}', [AudioController::class, 'show'])->name('files.show');
-    Route::post('files/{file}/covers/{coverIndex}', [AudioController::class, 'updateCover'])->name('files.covers.update');
+    Route::post('covers/{coverId}', [AudioController::class, 'updateCover'])->name('covers.update');
 
     // Audio streaming route
     Route::get('audio/stream/{id}', [AudioController::class, 'stream'])->name('audio.stream');

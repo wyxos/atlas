@@ -171,14 +171,13 @@ const handleDrop = async (event: DragEvent, coverIndex: number) => {
         return;
     }
 
-    // Create FormData for file upload
-    const formData = new FormData();
-    formData.append('cover', file);
-    formData.append('cover_index', coverIndex.toString());
+    const coverId = availableCovers.value[coverIndex]?.id;
 
     try {
         // Use Inertia router to upload the new cover
-        router.post(`/files/${props.file.id}/covers/${coverIndex}`, formData, {
+        router.post(`/covers/${coverId}`, {
+            file: file,
+        }, {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -264,7 +263,7 @@ const organizedMetadata = computed(() => {
                             />
                             <div>
                                 <CardTitle class="text-xl">{{ file.name }}</CardTitle>
-                                <CardDescription class="flex items-center gap-2 mt-1">
+                                <CardDescription class="mt-1 flex items-center gap-2">
                                     <span>{{ formatFileSize(file.size) }}</span>
                                     <Separator orientation="vertical" class="h-4" />
                                     <span>{{ file.mime_type || file.type }}</span>
@@ -276,48 +275,36 @@ const organizedMetadata = computed(() => {
 
                         <!-- Action Buttons -->
                         <div class="flex items-center gap-2">
-<!--                            <Button -->
-<!--                                v-if="file.url" -->
-<!--                                variant="outline" -->
-<!--                                size="sm" -->
-<!--                                asChild-->
-<!--                            >-->
-<!--                                <Link :href="file.url" target="_blank">-->
-<!--                                    <Icon name="externalLink" class="h-4 w-4 mr-2" />-->
-<!--                                    Open File-->
-<!--                                </Link>-->
-<!--                            </Button>-->
-<!--                            <Button -->
-<!--                                v-else-->
-<!--                                variant="outline" -->
-<!--                                size="sm" -->
-<!--                                disabled-->
-<!--                            >-->
-<!--                                <Icon name="fileX" class="h-4 w-4 mr-2" />-->
-<!--                                File Not Available-->
-<!--                            </Button>-->
+                            <!--                            <Button -->
+                            <!--                                v-if="file.url" -->
+                            <!--                                variant="outline" -->
+                            <!--                                size="sm" -->
+                            <!--                                asChild-->
+                            <!--                            >-->
+                            <!--                                <Link :href="file.url" target="_blank">-->
+                            <!--                                    <Icon name="externalLink" class="h-4 w-4 mr-2" />-->
+                            <!--                                    Open File-->
+                            <!--                                </Link>-->
+                            <!--                            </Button>-->
+                            <!--                            <Button -->
+                            <!--                                v-else-->
+                            <!--                                variant="outline" -->
+                            <!--                                size="sm" -->
+                            <!--                                disabled-->
+                            <!--                            >-->
+                            <!--                                <Icon name="fileX" class="h-4 w-4 mr-2" />-->
+                            <!--                                File Not Available-->
+                            <!--                            </Button>-->
 
                             <!-- Rating Buttons -->
-                            <div class="flex items-center gap-1 ml-2">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    :class="file.loved ? 'text-red-500' : 'text-muted-foreground'"
-                                >
+                            <div class="ml-2 flex items-center gap-1">
+                                <Button variant="ghost" size="sm" :class="file.loved ? 'text-red-500' : 'text-muted-foreground'">
                                     <Icon name="heart" class="h-4 w-4" />
                                 </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    :class="file.liked ? 'text-green-500' : 'text-muted-foreground'"
-                                >
+                                <Button variant="ghost" size="sm" :class="file.liked ? 'text-green-500' : 'text-muted-foreground'">
                                     <Icon name="thumbsUp" class="h-4 w-4" />
                                 </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    :class="file.disliked ? 'text-red-500' : 'text-muted-foreground'"
-                                >
+                                <Button variant="ghost" size="sm" :class="file.disliked ? 'text-red-500' : 'text-muted-foreground'">
                                     <Icon name="thumbsDown" class="h-4 w-4" />
                                 </Button>
                             </div>
@@ -327,7 +314,7 @@ const organizedMetadata = computed(() => {
             </Card>
 
             <!-- Main Content Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <!-- Left Column: Cover Art & Details -->
                 <div class="space-y-6">
                     <!-- Cover Art Carousel -->
@@ -339,7 +326,7 @@ const organizedMetadata = computed(() => {
                                     <!-- Current Image with Drag/Drop -->
                                     <div
                                         class="absolute inset-0 transition-all duration-300"
-                                        :class="isDragging ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''"
+                                        :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
                                         @dragenter="handleDragEnter"
                                         @dragover="handleDragOver"
                                         @dragleave="handleDragLeave"
@@ -348,38 +335,25 @@ const organizedMetadata = computed(() => {
                                         <img
                                             :src="`/atlas/${availableCovers[currentSlide].path}`"
                                             alt="Cover Art"
-                                            class="w-full h-full object-cover rounded-lg"
+                                            class="h-full w-full rounded-lg object-cover"
                                             :class="isDragging ? 'opacity-50' : ''"
                                         />
 
                                         <!-- Drag Overlay -->
-                                        <div
-                                            v-if="isDragging"
-                                            class="absolute inset-0 flex items-center justify-center bg-blue-50/80 rounded-lg"
-                                        >
+                                        <div v-if="isDragging" class="absolute inset-0 flex items-center justify-center rounded-lg bg-blue-50/80">
                                             <div class="text-center">
-                                                <Icon name="upload" class="h-12 w-12 text-blue-500 mx-auto mb-2" />
-                                                <p class="text-blue-700 font-medium">Drop image to replace</p>
+                                                <Icon name="upload" class="mx-auto mb-2 h-12 w-12 text-blue-500" />
+                                                <p class="font-medium text-blue-700">Drop image to replace</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     <!-- Navigation Buttons -->
                                     <div v-if="availableCovers.length > 1" class="absolute inset-0 flex items-center justify-between p-4">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            class="bg-white/80 hover:bg-white/90 backdrop-blur-sm"
-                                            @click="prevSlide"
-                                        >
+                                        <Button variant="outline" size="sm" class="bg-white/80 backdrop-blur-sm hover:bg-white/90" @click="prevSlide">
                                             <Icon name="chevronLeft" class="h-4 w-4" />
                                         </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            class="bg-white/80 hover:bg-white/90 backdrop-blur-sm"
-                                            @click="nextSlide"
-                                        >
+                                        <Button variant="outline" size="sm" class="bg-white/80 backdrop-blur-sm hover:bg-white/90" @click="nextSlide">
                                             <Icon name="chevronRight" class="h-4 w-4" />
                                         </Button>
                                     </div>
@@ -390,7 +364,7 @@ const organizedMetadata = computed(() => {
                                     <button
                                         v-for="(cover, index) in availableCovers"
                                         :key="cover.id"
-                                        class="w-2 h-2 rounded-full transition-colors"
+                                        class="h-2 w-2 rounded-full transition-colors"
                                         :class="index === currentSlide ? 'bg-primary' : 'bg-muted-foreground/30'"
                                         @click="goToSlide(index)"
                                     />
@@ -412,7 +386,7 @@ const organizedMetadata = computed(() => {
                                 <div
                                     v-for="artist in file.artists"
                                     :key="artist.id"
-                                    class="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition-colors"
+                                    class="flex items-center gap-2 rounded-md p-2 transition-colors hover:bg-muted"
                                 >
                                     <Icon name="user" class="h-4 w-4 text-muted-foreground" />
                                     <span>{{ artist.name }}</span>
@@ -434,7 +408,7 @@ const organizedMetadata = computed(() => {
                                 <div
                                     v-for="album in file.albums"
                                     :key="album.id"
-                                    class="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition-colors"
+                                    class="flex items-center gap-2 rounded-md p-2 transition-colors hover:bg-muted"
                                 >
                                     <Icon name="disc" class="h-4 w-4 text-muted-foreground" />
                                     <span>{{ album.name }}</span>
@@ -445,27 +419,31 @@ const organizedMetadata = computed(() => {
                 </div>
 
                 <!-- Right Column: Metadata -->
-                <div class="lg:col-span-2 space-y-6">
+                <div class="space-y-6 lg:col-span-2">
                     <!-- Organized Metadata -->
                     <div v-if="Object.keys(organizedMetadata).length > 0" class="space-y-4">
                         <Card v-for="(section, sectionName) in organizedMetadata" :key="sectionName">
                             <CardHeader>
                                 <CardTitle class="flex items-center gap-2">
                                     <Icon
-                                        :name="sectionName === 'Basic Info' ? 'info' : sectionName === 'Audio' ? 'music' : sectionName === 'Technical' ? 'settings' : 'moreHorizontal'"
+                                        :name="
+                                            sectionName === 'Basic Info'
+                                                ? 'info'
+                                                : sectionName === 'Audio'
+                                                  ? 'music'
+                                                  : sectionName === 'Technical'
+                                                    ? 'settings'
+                                                    : 'moreHorizontal'
+                                        "
                                         class="h-5 w-5"
                                     />
                                     {{ sectionName }}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div
-                                        v-for="(value, key) in section"
-                                        :key="key"
-                                        class="flex flex-col space-y-1 p-3 rounded-md bg-muted/30"
-                                    >
-                                        <span class="text-sm font-medium text-muted-foreground uppercase tracking-wide">{{ key }}</span>
+                                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <div v-for="(value, key) in section" :key="key" class="flex flex-col space-y-1 rounded-md bg-muted/30 p-3">
+                                        <span class="text-sm font-medium tracking-wide text-muted-foreground uppercase">{{ key }}</span>
                                         <span class="text-sm">{{ value }}</span>
                                     </div>
                                 </div>
@@ -482,7 +460,7 @@ const organizedMetadata = computed(() => {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <pre class="text-xs bg-muted/50 p-4 rounded-md overflow-auto max-h-96">{{ JSON.stringify(rawMetadata, null, 2) }}</pre>
+                            <pre class="max-h-96 overflow-auto rounded-md bg-muted/50 p-4 text-xs">{{ JSON.stringify(rawMetadata, null, 2) }}</pre>
                         </CardContent>
                     </Card>
 
@@ -490,7 +468,7 @@ const organizedMetadata = computed(() => {
                     <Card v-else>
                         <CardContent class="flex items-center justify-center py-8">
                             <div class="text-center text-muted-foreground">
-                                <Icon name="fileQuestion" class="h-12 w-12 mx-auto mb-2" />
+                                <Icon name="fileQuestion" class="mx-auto mb-2 h-12 w-12" />
                                 <p>No metadata available for this file</p>
                             </div>
                         </CardContent>

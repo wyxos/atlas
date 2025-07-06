@@ -6,6 +6,7 @@ use App\Models\Cover;
 use App\Models\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class AudioController extends Controller
@@ -127,47 +128,41 @@ class AudioController extends Controller
         return back(303);
     }
 
-    public function updateCover(Request $request, File $file, int $coverIndex)
+    public function updateCover(Request $request, int $coverId)
     {
         $request->validate([
-            'cover' => 'required|image|mimes:jpeg,png,jpg,gif,webp', // 10MB max
+            'file' => 'required|image|mimes:jpeg,png,jpg,gif,webp',
         ]);
 
-        // Load covers to get the current cover at the specified index
-        $file->load('covers');
+        // Find the specific cover by ID
+        $oldCover = Cover::find($coverId);
 
-        if (!isset($file->covers[$coverIndex])) {
-            return back()->withErrors(['cover' => 'Invalid cover index']);
-        }
-
-        $oldCover = $file->covers[$coverIndex];
-
-        // Store the new cover image
-        $uploadedFile = $request->file('cover');
-        $hash = md5(file_get_contents($uploadedFile->getPathname()));
-
-        // Generate a unique filename
-        $extension = $uploadedFile->getClientOriginalExtension();
-        $filename = $hash . '.' . $extension;
-        $path = 'covers/' . $filename;
-
-        // Store the file
-        $storedPath = $uploadedFile->storeAs('covers', $filename, 'public');
-
-        if (!$storedPath) {
-            return back()->withErrors(['cover' => 'Failed to store cover image']);
+        if (!$oldCover) {
+            return back()->withErrors(['cover' => 'Cover not found']);
         }
 
         // Store the old path for deletion
         $oldPath = $oldCover->path;
 
+        // Store the new cover image
+        $uploadedFile = $request->file('file');
+        $hash = md5(file_get_contents($uploadedFile->getPathname()));
+
+        // Generate a random 40-character filename like in extract metadata
+        $extension = $uploadedFile->getClientOriginalExtension();
+        $randomFilename = Str::random(40);
+        $newPath = "covers/{$randomFilename}.{$extension}";
+
+        // Store the file
+        Storage::disk('atlas')->put($newPath, file_get_contents($uploadedFile->getPathname()));
+
         // Update the existing cover with new image data
-        $oldCover->path = $storedPath;
+        $oldCover->path = $newPath;
         $oldCover->hash = $hash;
         $oldCover->save();
 
         // Delete the old cover file
-        Storage::disk('public')->delete($oldPath);
+        Storage::disk('atlas')->delete($oldPath);
 
         return back()->with('success', 'Cover updated successfully');
     }
