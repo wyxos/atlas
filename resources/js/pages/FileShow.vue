@@ -39,6 +39,11 @@ interface FileData {
     albums: Array<{
         id: number;
         name: string;
+        covers?: Array<{
+            id: number;
+            path: string;
+            hash: string;
+        }>;
     }>;
 }
 
@@ -93,20 +98,36 @@ const getFileTypeColor = (mimeType: string): string => {
     return 'text-gray-600';
 };
 
+// Computed property to get all available covers with priority: album covers first, then file covers
+const availableCovers = computed(() => {
+    const covers: Array<{ id: number; path: string; hash: string }> = [];
+
+    // First add album covers
+    if (props.file.albums && props.file.albums.length > 0) {
+        for (const album of props.file.albums) {
+            if (album.covers && album.covers.length > 0) {
+                covers.push(...album.covers);
+            }
+        }
+    }
+
+    return covers;
+});
+
 // Carousel state
 const currentSlide = ref(0);
 const isDragging = ref(false);
 
 // Carousel functions
 const nextSlide = () => {
-    if (props.file.covers && props.file.covers.length > 0) {
-        currentSlide.value = (currentSlide.value + 1) % props.file.covers.length;
+    if (availableCovers.value.length > 0) {
+        currentSlide.value = (currentSlide.value + 1) % availableCovers.value.length;
     }
 };
 
 const prevSlide = () => {
-    if (props.file.covers && props.file.covers.length > 0) {
-        currentSlide.value = currentSlide.value === 0 ? props.file.covers.length - 1 : currentSlide.value - 1;
+    if (availableCovers.value.length > 0) {
+        currentSlide.value = currentSlide.value === 0 ? availableCovers.value.length - 1 : currentSlide.value - 1;
     }
 };
 
@@ -310,7 +331,7 @@ const organizedMetadata = computed(() => {
                 <!-- Left Column: Cover Art & Details -->
                 <div class="space-y-6">
                     <!-- Cover Art Carousel -->
-                    <Card v-if="file.covers && file.covers.length > 0">
+                    <Card v-if="availableCovers.length > 0">
                         <CardContent class="p-0">
                             <div class="relative overflow-hidden rounded-lg">
                                 <!-- Carousel Container -->
@@ -325,7 +346,7 @@ const organizedMetadata = computed(() => {
                                         @drop="(event) => handleDrop(event, currentSlide)"
                                     >
                                         <img
-                                            :src="`/storage/${file.covers[currentSlide].path}`"
+                                            :src="`/atlas/${availableCovers[currentSlide].path}`"
                                             alt="Cover Art"
                                             class="w-full h-full object-cover rounded-lg"
                                             :class="isDragging ? 'opacity-50' : ''"
@@ -344,7 +365,7 @@ const organizedMetadata = computed(() => {
                                     </div>
 
                                     <!-- Navigation Buttons -->
-                                    <div v-if="file.covers.length > 1" class="absolute inset-0 flex items-center justify-between p-4">
+                                    <div v-if="availableCovers.length > 1" class="absolute inset-0 flex items-center justify-between p-4">
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -365,9 +386,9 @@ const organizedMetadata = computed(() => {
                                 </div>
 
                                 <!-- Dots Indicator -->
-                                <div v-if="file.covers.length > 1" class="flex justify-center gap-2 p-4">
+                                <div v-if="availableCovers.length > 1" class="flex justify-center gap-2 p-4">
                                     <button
-                                        v-for="(cover, index) in file.covers"
+                                        v-for="(cover, index) in availableCovers"
                                         :key="cover.id"
                                         class="w-2 h-2 rounded-full transition-colors"
                                         :class="index === currentSlide ? 'bg-primary' : 'bg-muted-foreground/30'"
