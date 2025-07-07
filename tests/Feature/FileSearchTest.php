@@ -206,3 +206,56 @@ it('validates schema compatibility with typesense configuration', function () {
         }
     }
 });
+
+it('includes artist and album names in searchable array when relationships are loaded', function () {
+    $file = File::factory()->create([
+        'filename' => 'test-song.mp3',
+        'title' => 'Test Song',
+    ]);
+
+    // Create artists and albums
+    $artist1 = \App\Models\Artist::create(['name' => 'Test Artist 1']);
+    $artist2 = \App\Models\Artist::create(['name' => 'Test Artist 2']);
+    $album1 = \App\Models\Album::create(['name' => 'Test Album 1']);
+    $album2 = \App\Models\Album::create(['name' => 'Test Album 2']);
+
+    // Attach artists and albums to the file
+    $file->artists()->attach([$artist1->id, $artist2->id]);
+    $file->albums()->attach([$album1->id, $album2->id]);
+
+    // Refresh the file to load relationships
+    $file->refresh();
+
+    $searchableArray = $file->toSearchableArray();
+
+    // Test that artist names are included
+    expect($searchableArray)->toHaveKey('artist_name');
+    expect($searchableArray)->toHaveKey('artist_names');
+    expect($searchableArray['artist_name'])->toBe('Test Artist 1');
+    expect($searchableArray['artist_names'])->toBeArray();
+    expect($searchableArray['artist_names'])->toContain('Test Artist 1');
+    expect($searchableArray['artist_names'])->toContain('Test Artist 2');
+
+    // Test that album names are included
+    expect($searchableArray)->toHaveKey('album_name');
+    expect($searchableArray)->toHaveKey('album_names');
+    expect($searchableArray['album_name'])->toBe('Test Album 1');
+    expect($searchableArray['album_names'])->toBeArray();
+    expect($searchableArray['album_names'])->toContain('Test Album 1');
+    expect($searchableArray['album_names'])->toContain('Test Album 2');
+});
+
+it('handles files without artists or albums in searchable array', function () {
+    $file = File::factory()->create([
+        'filename' => 'test-song-no-relations.mp3',
+        'title' => 'Test Song Without Relations',
+    ]);
+
+    $searchableArray = $file->toSearchableArray();
+
+    // Test that artist and album fields are not included when no relationships exist
+    expect($searchableArray)->not->toHaveKey('artist_name');
+    expect($searchableArray)->not->toHaveKey('artist_names');
+    expect($searchableArray)->not->toHaveKey('album_name');
+    expect($searchableArray)->not->toHaveKey('album_names');
+});

@@ -135,6 +135,14 @@ class File extends Model
             $this->load('metadata');
         }
 
+        // Load artists and albums relationships if not already loaded
+        if (! $this->relationLoaded('artists')) {
+            $this->load('artists');
+        }
+        if (! $this->relationLoaded('albums')) {
+            $this->load('albums');
+        }
+
         $array = [
             'id' => (string) $this->id,
             'source' => $this->source,
@@ -196,6 +204,22 @@ class File extends Model
             if (isset($metadata['track'])) {
                 $array['metadata_track'] = $metadata['track'];
             }
+        }
+
+        // Include artist names from related artists
+        if ($this->artists && $this->artists->isNotEmpty()) {
+            $artistNames = $this->artists->pluck('name')->filter()->toArray();
+            $array['artist_names'] = $artistNames;
+            // Also include the first artist name for backward compatibility
+            $array['artist_name'] = $artistNames[0] ?? null;
+        }
+
+        // Include album names from related albums
+        if ($this->albums && $this->albums->isNotEmpty()) {
+            $albumNames = $this->albums->pluck('name')->filter()->toArray();
+            $array['album_names'] = $albumNames;
+            // Also include the first album name for backward compatibility
+            $array['album_name'] = $albumNames[0] ?? null;
         }
 
         // Handle tags - ensure it's an array or null

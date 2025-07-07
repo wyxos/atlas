@@ -44,6 +44,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('audio/favorites', [AudioController::class, 'favorites'])->name('audio.favorites');
     Route::get('audio/liked', [AudioController::class, 'liked'])->name('audio.liked');
     Route::get('audio/disliked', [AudioController::class, 'disliked'])->name('audio.disliked');
+    Route::get('audio/unrated', [AudioController::class, 'unrated'])->name('audio.unrated');
     Route::get('audio/artists', [AudioController::class, 'artists'])->name('audio.artists');
     Route::get('audio/albums', [AudioController::class, 'albums'])->name('audio.albums');
     Route::get('audio/playlists', [AudioController::class, 'playlists'])->name('audio.playlists');

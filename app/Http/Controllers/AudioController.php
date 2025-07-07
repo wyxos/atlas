@@ -209,6 +209,21 @@ class AudioController extends Controller
         ]);
     }
 
+    public function unrated()
+    {
+        return Inertia::render('Audio', [
+            'files' => fn () => File::audio()
+                ->where('not_found', false)
+                ->where('loved', false)
+                ->where('liked', false)
+                ->where('disliked', false)
+                ->select(['id'])
+                ->get(),
+            'search' => [],
+            'title' => 'Unrated',
+        ]);
+    }
+
     public function artists()
     {
         $artists = Artist::whereHas('files', function ($query) {

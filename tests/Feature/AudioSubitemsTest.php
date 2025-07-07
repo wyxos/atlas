@@ -79,6 +79,17 @@ test('audio playlists page can be accessed', function () {
     );
 });
 
+test('audio unrated page can be accessed', function () {
+    $response = $this->actingAs($this->user)->get('/audio/unrated');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->has('files')
+        ->where('title', 'Unrated')
+    );
+});
+
 test('favorites page shows only loved audio files', function () {
     // Create audio files with different statuses
     $lovedFile = File::factory()->create([
@@ -158,5 +169,56 @@ test('disliked page shows only disliked audio files', function () {
             return collect($files)->contains('id', $dislikedFile->id);
         })
         ->where('title', 'Disliked')
+    );
+});
+
+test('unrated page shows only unrated audio files', function () {
+    // Create audio files with different statuses
+    $unratedFile1 = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'loved' => false,
+        'liked' => false,
+        'disliked' => false,
+        'not_found' => false,
+    ]);
+
+    $unratedFile2 = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'not_found' => false,
+        // Default values will be false for rating fields
+    ]);
+
+    $lovedFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'loved' => true,
+        'not_found' => false,
+    ]);
+
+    $likedFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'liked' => true,
+        'not_found' => false,
+    ]);
+
+    $dislikedFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'disliked' => true,
+        'not_found' => false,
+    ]);
+
+    $response = $this->actingAs($this->user)->get('/audio/unrated');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->where('files', function ($files) use ($unratedFile1, $unratedFile2, $lovedFile, $likedFile, $dislikedFile) {
+            $fileIds = collect($files)->pluck('id');
+            return $fileIds->contains($unratedFile1->id) &&
+                   $fileIds->contains($unratedFile2->id) &&
+                   !$fileIds->contains($lovedFile->id) &&
+                   !$fileIds->contains($likedFile->id) &&
+                   !$fileIds->contains($dislikedFile->id);
+        })
+        ->where('title', 'Unrated')
     );
 });

@@ -133,7 +133,7 @@ function convertToDuration(seconds: number): string {
         <Skeleton v-if="!loadedFile" class="h-4 w-24 mb-1" />
         <span v-else class="text-xs font-semibold">{{
           loadedFile.artists && loadedFile.artists.length > 0
-            ? loadedFile.artists[0].name
+            ? loadedFile.artists[0]?.name
             : 'Unknown Artist'
         }}</span>
 
@@ -145,7 +145,7 @@ function convertToDuration(seconds: number): string {
         <div class="hidden md:block ml-auto w-100">
             <Skeleton v-if="!loadedFile" class="h-4 w-24 mb-1" />
             <span class="text-sm" v-else>
-                {{ loadedFile?.albums[0].name || 'Unknown Album' }}
+                {{ loadedFile?.albums[0]?.name || 'Unknown Album' }}
             </span>
         </div>
 
