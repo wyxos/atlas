@@ -43,14 +43,17 @@ function isItemActive(item: NavItem): boolean {
                     <SidebarMenuButton
                         :is-active="isItemActive(item)"
                         :tooltip="item.title"
-                        @click="toggleExpanded(item.title)"
+                        as-child
                     >
-                        <component :is="item.icon" />
-                        <span>{{ item.title }}</span>
-                        <ChevronRight
-                            class="ml-auto transition-transform duration-200"
-                            :class="{ 'rotate-90': isExpanded(item.title) }"
-                        />
+                        <Link :href="item.href" class="flex items-center w-full">
+                            <component :is="item.icon" />
+                            <span class="flex-1">{{ item.title }}</span>
+                            <ChevronRight
+                                class="ml-auto transition-transform duration-200 cursor-pointer"
+                                :class="{ 'rotate-90': isExpanded(item.title) }"
+                                @click.prevent.stop="toggleExpanded(item.title)"
+                            />
+                        </Link>
                     </SidebarMenuButton>
                     <SidebarMenuSub v-if="isExpanded(item.title)">
                         <SidebarMenuSubItem v-for="subItem in item.items" :key="subItem.title">

@@ -365,9 +365,6 @@ onMounted(() => {
 
     // Handle mouse button events for next/previous track
     const mouseButtonHandler = (event: MouseEvent) => {
-        // Only handle if player is active (has a current file) and is playing or paused
-        if (!audioStore.currentFile) return;
-
         // Mouse button 3 (back button) - previous track
         if (event.button === 3) {
             event.preventDefault();
@@ -384,9 +381,6 @@ onMounted(() => {
 
     // Also handle mouseup to catch any missed events
     const mouseUpHandler = (event: MouseEvent) => {
-        // Only handle if player is active (has a current file) and is playing or paused
-        if (!audioStore.currentFile) return;
-
         // Mouse button 3 (back button) - previous track
         if (event.button === 3) {
             event.preventDefault();

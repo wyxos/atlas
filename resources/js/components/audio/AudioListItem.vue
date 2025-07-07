@@ -77,6 +77,8 @@ function handleDislike(event: Event): void {
 function navigateToDetails(): void {
   router.get(route('audio.show', { file: props.item.id }));
 }
+
+
 </script>
 
 <template>
@@ -95,7 +97,7 @@ function navigateToDetails(): void {
     @mouseleave="$event.buttons && emit('touchEnd', item)"
     @click="navigateToDetails"
   >
-    <div class="flex gap-2 items-center">
+    <div class="flex gap-2 items-center group">
         <button
             class="cursor-pointer  text-white w-10 mr-6 flex items-center justify-center"
             @click.stop="handlePlay($event)"
@@ -103,7 +105,8 @@ function navigateToDetails(): void {
 
             <span v-if="currentFileId !== item.id"
                   @click.stop="handlePlay($event)">{{ index}}</span>
-            <template v-else>
+
+            <template>
                 <Play v-if="!isPlaying || currentFileId !== item.id" :size="20" />
                 <Pause v-else :size="20" />
             </template>

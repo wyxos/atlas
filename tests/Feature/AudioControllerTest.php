@@ -97,6 +97,22 @@ it('can get file details with all relationships loaded', function () {
     expect($data['albums'][0]['covers'][0]['path'])->toBe('covers/album-cover.jpg');
 });
 
+it('audio navigation route is accessible and returns audio page', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Test that the audio route is accessible
+    $response = $this->get('/audio');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->has('files')
+        ->has('search')
+    );
+});
+
 it('returns file details even when no covers exist', function () {
     // Create and authenticate a user
     $user = User::factory()->create();
