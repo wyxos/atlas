@@ -128,11 +128,6 @@ function seekTo(event: MouseEvent): void {
     audioActions.updateTime(newTime);
 }
 
-function excerpt(text: string, length = 30): string {
-    if (!text) return '';
-    return text.length > length ? text.substring(0, length) + '...' : text;
-}
-
 // Toggle play/pause
 function togglePlayPause(): void {
     if (audioStore.isPlaying) {
@@ -457,9 +452,9 @@ onMounted(() => {
                     <div v-else-if="audioStore.currentFile"
                          class="font-medium text-foreground mb-2 flex flex-col gap-1">
                         <span class="text-xs font-semibold text-muted-foreground">{{
-                                excerpt(currentArtist) || 'Unknown Artist'
+                                currentArtist || 'Unknown Artist'
                             }}</span>
-                        <span class="text-foreground font-semibold">{{ excerpt(currentTitle) }}</span>
+                        <span class="text-foreground font-semibold">{{ currentTitle }}</span>
                     </div>
 
                     <!-- Love/Like controls (right) -->
@@ -574,8 +569,6 @@ onMounted(() => {
                                 <Repeat v-else :size="16" />
                             </button>
                         </div>
-
-
                     </div>
                 </div>
             </div>
@@ -613,21 +606,40 @@ onMounted(() => {
                 </div>
                 <!-- Actual player artist and title when loaded -->
                 <div v-else-if="audioStore.currentFile"
-                     class="font-medium text-foreground mb-2 flex flex-col gap-1 flex-1">
+                     class="font-medium text-foreground mb-2 flex flex-col gap-1 flex-1 truncate">
                     <span class="text-xs font-semibold text-muted-foreground">{{
-                            excerpt(currentArtist) || 'Unknown Artist'
+                            currentArtist || 'Unknown Artist'
                         }}</span>
-                    <span class="text-foreground font-semibold">{{ excerpt(currentTitle) }}</span>
+                    <span class="text-foreground font-semibold truncate">{{ currentTitle }}</span>
                 </div>
 
-                <div class="flex items-center justify-center gap-2">
+                <!-- Mobile reaction controls -->
+                <div class="flex items-center justify-center gap-4">
                     <button
-                        class="btn-atlas-primary p-2 transition-colors ml-2"
-                        @click="togglePlayPause"
-                        title="Play/Pause"
+                        class="button circular small empty"
+                        :class="{ 'destructive': isLoved }"
+                        @click="handleLove"
+                        title="Love"
                     >
-                        <Play v-if="!audioStore.isPlaying" :size="20" />
-                        <Pause v-else :size="20" />
+                        <Heart :size="14" />
+                    </button>
+
+                    <button
+                        class="button circular small empty"
+                        :class="{ 'active': isLiked }"
+                        @click="handleLike"
+                        title="Like"
+                    >
+                        <ThumbsUp :size="14" />
+                    </button>
+
+                    <button
+                        class="button circular small empty"
+                        :class="{ 'disabled': isDisliked }"
+                        @click="handleDislike"
+                        title="Dislike"
+                    >
+                        <ThumbsDown :size="14" />
                     </button>
                 </div>
             </div>
@@ -660,79 +672,53 @@ onMounted(() => {
             <!-- Mobile navigation controls -->
             <div class="flex items-center justify-center gap-4 mb-4">
                 <button
-                    class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                    class="button circular small empty"
                     @click="handleShuffle"
                     title="Shuffle"
                 >
-                    <Shuffle :size="16" />
+                    <Shuffle :size="12" />
                 </button>
 
                 <button
-                    class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                    class="button circular small empty"
                     @click="handlePrevious"
                     title="Previous"
                 >
-                    <SkipBack :size="18" />
+                    <SkipBack :size="16" />
                 </button>
 
                 <button
-                    class="btn-atlas-primary p-3 rounded-full hover:bg-primary/90 transition-colors"
+                    class="button circular empty"
+                    :class="{
+                  'active': audioStore.isPlaying,
+                  'secondary': !audioStore.isPlaying
+                }"
                     @click="togglePlayPause"
                     title="Play/Pause"
                 >
-                    <Play v-if="!audioStore.isPlaying" :size="22" />
-                    <Pause v-else :size="22" />
+                    <Play v-if="!audioStore.isPlaying" :size="24" />
+                    <Pause v-else :size="18" />
                 </button>
 
                 <button
-                    class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                    class="button circular small empty"
                     @click="handleNext"
                     title="Next"
                 >
-                    <SkipForward :size="18" />
+                    <SkipForward :size="16" />
                 </button>
 
                 <button
-                    class="btn-atlas-secondary p-2 rounded-full hover:bg-secondary/80 transition-colors"
+                    class="button circular small empty"
                     :class="{
-                    'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
-                    'bg-blue-500 text-white': audioStore.repeatMode === 'one'
-                  }"
+                  'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
+                  'bg-blue-500 text-white': audioStore.repeatMode === 'one'
+                }"
                     @click="handleRepeat"
                     :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
                 >
                     <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
-                    <Repeat v-else :size="16" />
-                </button>
-            </div>
-
-            <!-- Mobile reaction controls -->
-            <div class="flex items-center justify-center gap-6">
-                <button
-                    class="button circular small"
-                    :class="{ 'destructive': isLoved }"
-                    @click="handleLove"
-                    title="Love"
-                >
-                    <Heart :size="24" />
-                </button>
-
-                <button
-                    class="button circular small"
-                    :class="{ 'bg-blue-500 text-white': isLiked }"
-                    @click="handleLike"
-                    title="Like"
-                >
-                    <ThumbsUp :size="24" />
-                </button>
-
-                <button
-                    class="button circular small"
-                    :class="{ 'disabled': isDisliked }"
-                    @click="handleDislike"
-                    title="Dislike"
-                >
-                    <ThumbsDown :size="24" />
+                    <Repeat v-else :size="12" />
                 </button>
             </div>
         </div>

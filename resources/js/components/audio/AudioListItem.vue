@@ -23,11 +23,6 @@ const emit = defineEmits<{
   (e: 'dislike', item: any, event: Event): void;
 }>();
 
-function excerpt(text: string, length = 25): string {
-  if (!text) return '';
-  return text.length > length ? text.substring(0, length) + '...' : text;
-}
-
 // Computed property to get the cover image with priority: album covers first, then file covers
 const coverImage = computed((): string | null => {
   if (!props.loadedFile) return null;
@@ -78,6 +73,13 @@ function navigateToDetails(): void {
   router.get(route('audio.show', { file: props.item.id }));
 }
 
+// Convert duration from e.g 177.99836734693878 to a human-readable format
+function convertToDuration(seconds: number): string {
+    const totalSeconds = Math.floor(seconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+}
 
 </script>
 
@@ -95,7 +97,6 @@ function navigateToDetails(): void {
     @mousemove="emit('touchMove', $event)"
     @mouseup="emit('touchEnd', item)"
     @mouseleave="$event.buttons && emit('touchEnd', item)"
-    @click="navigateToDetails"
   >
     <div class="flex gap-2 items-center group">
         <button
@@ -127,19 +128,31 @@ function navigateToDetails(): void {
           </div>
         </template>
       </div>
-      <div class="flex flex-col">
+      <div class="flex flex-col w-100">
         <!-- Loading skeleton for artist name -->
         <Skeleton v-if="!loadedFile" class="h-4 w-24 mb-1" />
         <span v-else class="text-xs font-semibold">{{
           loadedFile.artists && loadedFile.artists.length > 0
-            ? excerpt(loadedFile.artists[0].name)
+            ? loadedFile.artists[0].name
             : 'Unknown Artist'
         }}</span>
 
         <!-- Loading skeleton for title -->
         <Skeleton v-if="!loadedFile" class="h-4 w-32" />
-        <span v-else>{{ excerpt(loadedFile?.metadata?.payload?.title) || 'Untitled' }}</span>
+        <span v-else>{{ loadedFile?.metadata?.payload?.title || 'Untitled' }}</span>
       </div>
+
+        <div class="hidden md:block ml-auto w-100">
+            <span class="text-xs text-muted-foreground">
+                {{ loadedFile?.albums[0].name || 'Unknown Album' }}
+            </span>
+        </div>
+
+        <div class="hidden md:block">
+            <span class="text-xs text-muted-foreground">
+                {{ loadedFile?.metadata?.payload?.duration ? convertToDuration(loadedFile.metadata.payload.duration) : 'Unknown Duration' }}
+            </span>
+        </div>
     </div>
 
     <!-- Action buttons container -->
