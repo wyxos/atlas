@@ -143,20 +143,22 @@ function convertToDuration(seconds: number): string {
       </div>
 
         <div class="hidden md:block ml-auto w-100">
-            <span class="text-xs text-muted-foreground">
+            <Skeleton v-if="!loadedFile" class="h-4 w-24 mb-1" />
+            <span class="text-sm" v-else>
                 {{ loadedFile?.albums[0].name || 'Unknown Album' }}
             </span>
         </div>
 
         <div class="hidden md:block">
-            <span class="text-xs text-muted-foreground">
+            <Skeleton v-if="!loadedFile" class="h-4 w-16 mb-1" />
+            <span class="text-xs" v-else>
                 {{ loadedFile?.metadata?.payload?.duration ? convertToDuration(loadedFile.metadata.payload.duration) : 'Unknown Duration' }}
             </span>
         </div>
     </div>
 
     <!-- Action buttons container -->
-    <div class="absolute top-0 left-full h-full items-center flex gap-4 p-4">
+    <div class="absolute top-0 left-full md:static h-full items-center flex gap-4 p-4">
       <button
         class="text-foreground hover:text-destructive transition-colors p-1 rounded"
         :class="{ 'text-red-500 bg-red-500/20': loadedFile?.loved }"

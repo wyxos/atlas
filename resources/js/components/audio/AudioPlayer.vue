@@ -414,7 +414,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="sticky bottom-0 left-0 bg-card border-t border-border p-4 w-full"
+    <div class="sticky bottom-0 left-0 bg-card border-t border-border px-4 w-full py-2 md:p-4"
          v-if="audioStore.isPlayerLoading || audioStore.currentFile">
         <!-- We're using a global audio element attached to window.globalAudioElement -->
         <!-- This is a hidden placeholder for backward compatibility -->
@@ -430,7 +430,7 @@ onMounted(() => {
                 </div>
                 <!-- Actual player cover when loaded -->
                 <div v-else-if="audioStore.currentFile"
-                     class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
+                     class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32 shrink-0">
                     <img
                         v-if="coverImage"
                         :src="`/atlas/${coverImage}`"
@@ -442,7 +442,7 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-2 truncate">
                     <!-- Loading skeleton for player artist and title -->
                     <div v-if="audioStore.isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
                         <Skeleton class="h-4 w-24" />
@@ -451,10 +451,10 @@ onMounted(() => {
                     <!-- Actual player artist and title when loaded -->
                     <div v-else-if="audioStore.currentFile"
                          class="font-medium text-foreground mb-2 flex flex-col gap-1">
-                        <span class="text-xs font-semibold text-muted-foreground">{{
+                        <span class="text-xs font-semibold text-muted-foreground truncate">{{
                                 currentArtist || 'Unknown Artist'
                             }}</span>
-                        <span class="text-foreground font-semibold">{{ currentTitle }}</span>
+                        <span class="text-foreground font-semibold truncate">{{ currentTitle }}</span>
                     </div>
 
                     <!-- Love/Like controls (right) -->
@@ -583,11 +583,11 @@ onMounted(() => {
         <div class="md:hidden">
             <div class="flex gap-2 items-center  mb-4">
                 <!-- Loading skeleton for player cover -->
-                <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-12 h-12">
+                <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-16 h-16">
                     <Skeleton class="w-full h-full" />
                 </div>
                 <!-- Actual player cover when loaded -->
-                <div v-else-if="audioStore.currentFile" class="flex items-center justify-center relative w-12 h-12">
+                <div v-else-if="audioStore.currentFile" class="flex items-center justify-center relative w-16 h-16">
                     <img
                         v-if="coverImage"
                         :src="`/atlas/${coverImage}`"
@@ -606,54 +606,24 @@ onMounted(() => {
                 </div>
                 <!-- Actual player artist and title when loaded -->
                 <div v-else-if="audioStore.currentFile"
-                     class="font-medium text-foreground mb-2 flex flex-col gap-1 flex-1 truncate">
-                    <span class="text-xs font-semibold text-muted-foreground">{{
+                     class="font-medium text-foreground flex flex-col gap-1 flex-1 truncate">
+                    <span class="text-xs font-semibold text-muted-foreground truncate">{{
                             currentArtist || 'Unknown Artist'
                         }}</span>
                     <span class="text-foreground font-semibold truncate">{{ currentTitle }}</span>
                 </div>
-
-                <!-- Mobile reaction controls -->
-                <div class="flex items-center justify-center gap-4">
-                    <button
-                        class="button circular small empty"
-                        :class="{ 'destructive': isLoved }"
-                        @click="handleLove"
-                        title="Love"
-                    >
-                        <Heart :size="14" />
-                    </button>
-
-                    <button
-                        class="button circular small empty"
-                        :class="{ 'active': isLiked }"
-                        @click="handleLike"
-                        title="Like"
-                    >
-                        <ThumbsUp :size="14" />
-                    </button>
-
-                    <button
-                        class="button circular small empty"
-                        :class="{ 'disabled': isDisliked }"
-                        @click="handleDislike"
-                        title="Dislike"
-                    >
-                        <ThumbsDown :size="14" />
-                    </button>
-                </div>
             </div>
 
             <!-- Progress bar skeleton -->
-            <div v-if="audioStore.isPlayerLoading" class="mb-4">
+            <div v-if="audioStore.isPlayerLoading" class="mb-2">
                 <Skeleton class="h-2 w-full mb-2" />
-                <!--              <div class="flex justify-between text-xs text-white mb-2">-->
-                <!--                  <Skeleton class="h-3 w-10" />-->
-                <!--                  <Skeleton class="h-3 w-10" />-->
-                <!--              </div>-->
+                              <div class="flex justify-between text-xs text-white mb-2">
+                                  <Skeleton class="h-3 w-10" />
+                                  <Skeleton class="h-3 w-10" />
+                              </div>
             </div>
             <!-- Actual progress bar -->
-            <div v-else-if="audioStore.currentFile" class="mb-4">
+            <div v-else-if="audioStore.currentFile" class="mb-2">
                 <div
                     class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
                     @click="seekTo($event)"
@@ -663,14 +633,14 @@ onMounted(() => {
                         :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
                     ></div>
                 </div>
-                <!--              <div class="flex justify-between text-xs text-muted-foreground mb-2">-->
-                <!--                  <span>{{ formatTime(currentTime) }}</span>-->
-                <!--                  <span>{{ formatTime(duration) }}</span>-->
-                <!--              </div>-->
+                              <div class="flex justify-between text-xs text-muted-foreground mb-2">
+                                  <span>{{ formatTime(currentTime) }}</span>
+                                  <span>{{ formatTime(duration) }}</span>
+                              </div>
             </div>
 
             <!-- Mobile navigation controls -->
-            <div class="flex items-center justify-center gap-4 mb-4">
+            <div class="flex items-center justify-center gap-4">
                 <button
                     class="button circular small empty"
                     @click="handleShuffle"
