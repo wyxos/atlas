@@ -12,7 +12,7 @@ General guidelines:
 - Any created command/logic that deals with looping through a consequent amount of data or performs intensive disk operations should be queued in a job to avoid blocking the main thread.
 - Never use Model::all() or similar methods that load entire datasets into memory; always use chunking (Model::chunk()) for processing large collections.
 - Always use Inertia router where applicable if present. Otherwise favor axios and never use fetch.
-- Never write custom files to test functionalities after a task.
+- Do not create custom files to test functionalities. Use test cases as per project test framework.
 - Use laravel.log and Log class to debug issues, and ensure to remove any logging statements and to clear the laravel.log file before completing the task.
 - If the task completed is listed under todo.md, strike it out in the todo.md file.
 
