@@ -3,7 +3,7 @@
 use App\Models\File;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(RefreshDatabase::class);
+
 
 it('creates searchable array with correct data types for typesense', function () {
     $file = File::factory()->create([

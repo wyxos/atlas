@@ -7,7 +7,7 @@ use App\Models\FileMetadata;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
-uses(RefreshDatabase::class);
+
 
 /**
  * Test subclass of ExtractFileMetadata that uses fixture metadata instead of Node.js script

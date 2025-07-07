@@ -6,7 +6,7 @@ use App\Models\Cover;
 use App\Models\File;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(RefreshDatabase::class);
+
 
 it('can create a cover', function () {
     $cover = Cover::create([

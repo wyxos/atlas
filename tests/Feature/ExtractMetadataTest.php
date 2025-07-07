@@ -27,7 +27,7 @@ class TestExtractFileMetadata extends ExtractFileMetadata
     }
 }
 
-uses(RefreshDatabase::class);
+
 
 beforeEach(function () {
     // Create a fake storage disk for metadata

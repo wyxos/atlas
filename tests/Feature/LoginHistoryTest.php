@@ -6,7 +6,7 @@ use App\Notifications\NewUserRegistered;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 
-uses(RefreshDatabase::class);
+
 
 test('login history is recorded when a user logs in', function () {
     $user = User::factory()->create();

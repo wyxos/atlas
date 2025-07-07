@@ -2,10 +2,10 @@
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { ChevronRight } from 'lucide-vue-next';
 
-defineProps<{
+const props = defineProps<{
     items: NavItem[];
 }>();
 
@@ -31,6 +31,28 @@ function isItemActive(item: NavItem): boolean {
     }
     return false;
 }
+
+function initializeExpandedState(): void {
+    // Clear current expanded state
+    expandedItems.value.clear();
+
+    // Auto-expand parent items that have active sub-items
+    props.items.forEach(item => {
+        if (item.items && item.items.some(subItem => subItem.href === page.url)) {
+            expandedItems.value.add(item.title);
+        }
+    });
+}
+
+// Initialize expanded state on mount
+onMounted(() => {
+    initializeExpandedState();
+});
+
+// Watch for URL changes and update expanded state accordingly
+watch(() => page.url, () => {
+    initializeExpandedState();
+});
 </script>
 
 <template>

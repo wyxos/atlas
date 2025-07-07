@@ -5,7 +5,7 @@ use App\Models\FileMetadata;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(RefreshDatabase::class);
+
 
 it('can create a file', function () {
     $file = File::create([

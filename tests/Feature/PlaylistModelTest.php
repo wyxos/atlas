@@ -5,7 +5,7 @@ use App\Models\File;
 use App\Models\Playlist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(RefreshDatabase::class);
+
 
 it('can create a playlist', function () {
     $playlist = Playlist::create([

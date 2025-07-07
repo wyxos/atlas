@@ -8,7 +8,7 @@ use App\Models\File;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
-uses(RefreshDatabase::class);
+
 
 beforeEach(function () {
     // Create a fake storage disk for testing
