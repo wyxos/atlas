@@ -68,6 +68,14 @@ function handleDislike(event: Event): void {
   emit('dislike', props.item, event);
 }
 
+// Handle track title click to navigate to FileShow
+function handleTitleClick(event: Event): void {
+  event.stopPropagation();
+  if (props.loadedFile?.id) {
+    router.visit(route('files.show', { file: props.loadedFile.id }));
+  }
+}
+
 // Convert duration from e.g 177.99836734693878 to a human-readable format
 function convertToDuration(seconds: number): string {
     const totalSeconds = Math.floor(seconds);
@@ -246,7 +254,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
 
         <!-- Loading skeleton for title -->
         <Skeleton v-if="!loadedFile" class="h-4 w-32" />
-        <span v-else>{{ loadedFile?.metadata?.payload?.title || 'Untitled' }}</span>
+        <span v-else class="cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ loadedFile?.metadata?.payload?.title || 'Untitled' }}</span>
       </div>
 
         <div class="hidden md:block ml-auto w-100">

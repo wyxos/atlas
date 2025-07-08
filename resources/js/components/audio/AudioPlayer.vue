@@ -270,6 +270,13 @@ function handleRepeat(): void {
     audioActions.toggleRepeat();
 }
 
+// Handle track title click to navigate to FileShow
+function handleTitleClick(): void {
+    if (audioStore.currentFile?.id) {
+        router.visit(route('files.show', { file: audioStore.currentFile.id }));
+    }
+}
+
 // Function to handle play/pause based on isPlaying prop
 function updatePlayState(newIsPlaying: boolean): void {
     if (typeof window === 'undefined' || !window.globalAudioElement) {
@@ -564,7 +571,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                         <span class="text-xs font-semibold text-muted-foreground truncate">{{
                                 currentArtist || 'Unknown Artist'
                             }}</span>
-                        <span class="text-foreground font-semibold truncate">{{ currentTitle }}</span>
+                        <span class="text-foreground font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
                     </div>
 
                     <!-- Love/Like controls (right) -->
@@ -734,7 +741,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                     <span class="text-xs font-semibold text-muted-foreground truncate">{{
                             currentArtist || 'Unknown Artist'
                         }}</span>
-                    <span class="text-foreground font-semibold truncate">{{ currentTitle }}</span>
+                    <span class="text-foreground font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
                 </div>
             </div>
 
