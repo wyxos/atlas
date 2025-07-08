@@ -170,6 +170,55 @@ class AudioController extends Controller
         return back()->with('success', 'Cover updated successfully');
     }
 
+    public function createCover(Request $request, int $fileId)
+    {
+        $request->validate([
+            'file' => 'required|image|mimes:jpeg,png,jpg,gif,webp',
+        ]);
+
+        // Find the file
+        $file = File::with(['albums'])->find($fileId);
+
+        if (!$file) {
+            return back()->withErrors(['file' => 'File not found']);
+        }
+
+        // Store the new cover image
+        $uploadedFile = $request->file('file');
+        $hash = md5(file_get_contents($uploadedFile->getPathname()));
+
+        // Generate a random 40-character filename like in extract metadata
+        $extension = $uploadedFile->getClientOriginalExtension();
+        $randomFilename = Str::random(40);
+        $newPath = "covers/{$randomFilename}.{$extension}";
+
+        // Store the file
+        Storage::disk('atlas')->put($newPath, file_get_contents($uploadedFile->getPathname()));
+
+        // Determine where to attach the cover
+        // Priority: album if exists, otherwise file itself
+        if ($file->albums && $file->albums->count() > 0) {
+            // Attach to the first album
+            $album = $file->albums->first();
+            $cover = Cover::create([
+                'path' => $newPath,
+                'hash' => $hash,
+                'coverable_id' => $album->id,
+                'coverable_type' => Album::class,
+            ]);
+        } else {
+            // Attach to the file itself
+            $cover = Cover::create([
+                'path' => $newPath,
+                'hash' => $hash,
+                'coverable_id' => $file->id,
+                'coverable_type' => File::class,
+            ]);
+        }
+
+        return back()->with('success', 'Cover created successfully');
+    }
+
     public function favorites()
     {
         return Inertia::render('Audio', [

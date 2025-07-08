@@ -282,3 +282,96 @@ it('returns error for non-existent cover', function () {
     $response->assertRedirect();
     $response->assertSessionHasErrors(['cover' => 'Cover not found']);
 });
+
+it('can create a cover for file with album', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Create an album and associate with file
+    $album = Album::create(['name' => 'Test Album']);
+    $file->albums()->attach($album);
+
+    // Create a fake uploaded file
+    $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
+
+    // Make request to create cover
+    $response = $this->post(route('covers.create', [
+        'fileId' => $file->id
+    ]), [
+        'file' => $uploadedFile
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success', 'Cover created successfully');
+
+    // Verify the cover was created and attached to the album
+    $album->refresh();
+    expect($album->covers)->toHaveCount(1);
+    expect($album->covers->first()->coverable_type)->toBe(Album::class);
+    expect($album->covers->first()->coverable_id)->toBe($album->id);
+});
+
+it('can create a cover for file without album', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a file without any album
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Create a fake uploaded file
+    $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
+
+    // Make request to create cover
+    $response = $this->post(route('covers.create', [
+        'fileId' => $file->id
+    ]), [
+        'file' => $uploadedFile
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success', 'Cover created successfully');
+
+    // Verify the cover was created and attached to the file
+    $file->refresh();
+    expect($file->covers)->toHaveCount(1);
+    expect($file->covers->first()->coverable_type)->toBe(File::class);
+    expect($file->covers->first()->coverable_id)->toBe($file->id);
+});
+
+it('returns error when creating cover for non-existent file', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a fake uploaded file
+    $uploadedFile = \Illuminate\Http\UploadedFile::fake()->image('new-cover.jpg');
+
+    // Make request to create cover for non-existent file
+    $response = $this->post(route('covers.create', [
+        'fileId' => 999
+    ]), [
+        'file' => $uploadedFile
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHasErrors(['file' => 'File not found']);
+});
