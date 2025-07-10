@@ -22,7 +22,8 @@
         "laravel/tinker": "^2.10.1",
         "php-ffmpeg/php-ffmpeg": "^1.3",
         "tightenco/ziggy": "^2.4",
-        "typesense/typesense-php": "^5.1"
+        "typesense/typesense-php": "^5.1",
+        "wyxos/harmonie": "^1.6"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
