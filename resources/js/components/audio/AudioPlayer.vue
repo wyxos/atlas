@@ -8,6 +8,7 @@ import {
     Heart,
     ThumbsUp,
     ThumbsDown,
+    Laugh,
     Shuffle,
     Repeat,
     Repeat1
@@ -52,6 +53,7 @@ const volume = ref(audioStore.volume);
 const isLiked = ref(false);
 const isLoved = ref(false);
 const isDisliked = ref(false);
+const isLaughedAt = ref(false);
 
 // Function to load interaction states from file data
 function loadInteractionStates(file: any) {
@@ -60,11 +62,13 @@ function loadInteractionStates(file: any) {
         isLiked.value = !!file.liked;
         isLoved.value = !!file.loved;
         isDisliked.value = !!file.disliked;
+        isLaughedAt.value = !!file.laughed_at;
     } else {
         // Reset when no file
         isLiked.value = false;
         isLoved.value = false;
         isDisliked.value = false;
+        isLaughedAt.value = false;
     }
 }
 
@@ -163,6 +167,7 @@ function handleLove(): void {
     if (isLoved.value) {
         isLiked.value = false;
         isDisliked.value = false;
+        isLaughedAt.value = false;
     }
 
     // Update the current file in the store
@@ -170,6 +175,7 @@ function handleLove(): void {
         audioStore.currentFile.loved = isLoved.value;
         audioStore.currentFile.liked = isLiked.value;
         audioStore.currentFile.disliked = isDisliked.value;
+        audioStore.currentFile.laughed_at = isLaughedAt.value;
     }
 
     // Send request to backend
@@ -196,6 +202,7 @@ function handleLike(): void {
     if (isLiked.value) {
         isLoved.value = false;
         isDisliked.value = false;
+        isLaughedAt.value = false;
     }
 
     // Update the current file in the store
@@ -203,6 +210,7 @@ function handleLike(): void {
         audioStore.currentFile.loved = isLoved.value;
         audioStore.currentFile.liked = isLiked.value;
         audioStore.currentFile.disliked = isDisliked.value;
+        audioStore.currentFile.laughed_at = isLaughedAt.value;
     }
 
     // Send request to backend
@@ -230,6 +238,7 @@ function handleDislike(): void {
     if (isDisliked.value) {
         isLoved.value = false;
         isLiked.value = false;
+        isLaughedAt.value = false;
     }
 
     // Update the current file in the store
@@ -237,6 +246,7 @@ function handleDislike(): void {
         audioStore.currentFile.loved = isLoved.value;
         audioStore.currentFile.liked = isLiked.value;
         audioStore.currentFile.disliked = isDisliked.value;
+        audioStore.currentFile.laughed_at = isLaughedAt.value;
     }
 
     // Automatically go to next track when disliking
@@ -256,6 +266,41 @@ function handleDislike(): void {
                 audioStore.currentFile.disliked = wasDisliked;
             }
             console.error('Failed to toggle dislike status:', errors);
+        }
+    });
+}
+
+function handleLaughedAt(): void {
+    if (!audioStore.currentFile) return;
+
+    // Optimistically update the UI first
+    isLaughedAt.value = !isLaughedAt.value;
+    if (isLaughedAt.value) {
+        isLoved.value = false;
+        isLiked.value = false;
+        isDisliked.value = false;
+    }
+
+    // Update the current file in the store
+    if (audioStore.currentFile) {
+        audioStore.currentFile.loved = isLoved.value;
+        audioStore.currentFile.liked = isLiked.value;
+        audioStore.currentFile.disliked = isDisliked.value;
+        audioStore.currentFile.laughed_at = isLaughedAt.value;
+    }
+
+    // Send request to backend
+    router.post(route('audio.laughed-at', { file: audioStore.currentFile.id }), {}, {
+        preserveState: true,
+        preserveScroll: true,
+        only: [],
+        onError: (errors) => {
+            // Revert on error
+            isLaughedAt.value = !isLaughedAt.value;
+            if (audioStore.currentFile) {
+                audioStore.currentFile.laughed_at = isLaughedAt.value;
+            }
+            console.error('Failed to toggle laughed at status:', errors);
         }
     });
 }
@@ -601,6 +646,15 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                             title="Dislike"
                         >
                             <ThumbsDown :size="16" />
+                        </button>
+
+                        <button
+                            class="button circular small empty"
+                            :class="{ 'text-yellow-500 bg-yellow-500/20': isLaughedAt }"
+                            @click="handleLaughedAt"
+                            title="Laughed At"
+                        >
+                            <Laugh :size="16" />
                         </button>
                     </div>
                 </div>

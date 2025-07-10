@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Play, Pause, Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
+import { Play, Pause, Heart, ThumbsUp, ThumbsDown, Laugh } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
 
@@ -21,6 +21,7 @@ const emit = defineEmits<{
   (e: 'favorite', item: any, event: Event): void;
   (e: 'like', item: any, event: Event): void;
   (e: 'dislike', item: any, event: Event): void;
+  (e: 'laughedAt', item: any, event: Event): void;
 }>();
 
 // Computed property to get the cover image with priority: album covers first, then file covers
@@ -66,6 +67,12 @@ function handleLike(event: Event): void {
 function handleDislike(event: Event): void {
   event.stopPropagation();
   emit('dislike', props.item, event);
+}
+
+// Handle laughed at button click
+function handleLaughedAt(event: Event): void {
+  event.stopPropagation();
+  emit('laughedAt', props.item, event);
 }
 
 // Handle track title click to navigate to FileShow
@@ -294,6 +301,13 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
         @click.stop="handleDislike($event)"
       >
         <ThumbsDown :size="20" :fill="loadedFile?.disliked ? 'currentColor' : 'none'" />
+      </button>
+      <button
+        class="text-foreground hover:text-yellow-500 transition-colors p-1 rounded"
+        :class="{ 'text-yellow-500 bg-yellow-500/20': loadedFile?.laughed_at }"
+        @click.stop="handleLaughedAt($event)"
+      >
+        <Laugh :size="20" :fill="loadedFile?.laughed_at ? 'currentColor' : 'none'" />
       </button>
     </div>
   </div>

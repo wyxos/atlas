@@ -206,18 +206,25 @@ test('unrated page shows only unrated audio files', function () {
         'not_found' => false,
     ]);
 
+    $laughedAtFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'laughed_at' => true,
+        'not_found' => false,
+    ]);
+
     $response = $this->actingAs($this->user)->get('/audio/unrated');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Audio')
-        ->where('files', function ($files) use ($unratedFile1, $unratedFile2, $lovedFile, $likedFile, $dislikedFile) {
+        ->where('files', function ($files) use ($unratedFile1, $unratedFile2, $lovedFile, $likedFile, $dislikedFile, $laughedAtFile) {
             $fileIds = collect($files)->pluck('id');
             return $fileIds->contains($unratedFile1->id) &&
                    $fileIds->contains($unratedFile2->id) &&
                    !$fileIds->contains($lovedFile->id) &&
                    !$fileIds->contains($likedFile->id) &&
-                   !$fileIds->contains($dislikedFile->id);
+                   !$fileIds->contains($dislikedFile->id) &&
+                   !$fileIds->contains($laughedAtFile->id);
         })
         ->where('title', 'Unrated')
     );

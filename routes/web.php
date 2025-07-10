@@ -66,6 +66,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::post('audio/{file}/love', [AudioController::class, 'toggleLove'])->name('audio.love');
     Route::post('audio/{file}/like', [AudioController::class, 'toggleLike'])->name('audio.like');
     Route::post('audio/{file}/dislike', [AudioController::class, 'toggleDislike'])->name('audio.dislike');
+    Route::post('audio/{file}/laughed-at', [AudioController::class, 'toggleLaughedAt'])->name('audio.laughed-at');
 
     // Users routes
     Route::get('users', [UserController::class, 'index'])->name('users.index');

@@ -117,6 +117,7 @@ function toggleFavorite(item: any, event: Event): void {
         if (loadedFiles[item.id].loved) {
             loadedFiles[item.id].liked = false;
             loadedFiles[item.id].disliked = false;
+            loadedFiles[item.id].laughed_at = false;
         }
     }
 
@@ -125,6 +126,7 @@ function toggleFavorite(item: any, event: Event): void {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
+        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
     }
 
     // Send request to backend
@@ -154,6 +156,7 @@ function likeItem(item: any, event: Event): void {
         if (loadedFiles[item.id].liked) {
             loadedFiles[item.id].loved = false;
             loadedFiles[item.id].disliked = false;
+            loadedFiles[item.id].laughed_at = false;
         }
     }
 
@@ -162,6 +165,7 @@ function likeItem(item: any, event: Event): void {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
+        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
     }
 
     // Send request to backend
@@ -191,6 +195,7 @@ function dislikeItem(item: any, event: Event): void {
         if (loadedFiles[item.id].disliked) {
             loadedFiles[item.id].loved = false;
             loadedFiles[item.id].liked = false;
+            loadedFiles[item.id].laughed_at = false;
         }
     }
 
@@ -199,6 +204,7 @@ function dislikeItem(item: any, event: Event): void {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
+        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
     }
 
     // Send request to backend
@@ -212,6 +218,45 @@ function dislikeItem(item: any, event: Event): void {
                 loadedFiles[item.id].disliked = !loadedFiles[item.id].disliked;
             }
             console.error('Failed to toggle dislike status:', errors);
+        }
+    });
+
+    // Close the swipe actions after action
+    swipedItemId.value = null;
+}
+
+function laughedAtItem(item: any, event: Event): void {
+    event.stopPropagation(); // Prevent triggering parent click events
+
+    // Optimistically update the UI first
+    if (loadedFiles[item.id]) {
+        loadedFiles[item.id].laughed_at = !loadedFiles[item.id].laughed_at;
+        if (loadedFiles[item.id].laughed_at) {
+            loadedFiles[item.id].loved = false;
+            loadedFiles[item.id].liked = false;
+            loadedFiles[item.id].disliked = false;
+        }
+    }
+
+    // Also update the current file in the audio store if it matches
+    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
+        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
+        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
+        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
+        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
+    }
+
+    // Send request to backend
+    router.post(route('audio.laughed-at', { file: item.id }), {}, {
+        preserveState: true,
+        preserveScroll: true,
+        only: [],
+        onError: (errors) => {
+            // Revert on error
+            if (loadedFiles[item.id]) {
+                loadedFiles[item.id].laughed_at = !loadedFiles[item.id].laughed_at;
+            }
+            console.error('Failed to toggle laughed at status:', errors);
         }
     });
 
@@ -297,6 +342,7 @@ function onScroll(startIndex: number, endIndex: number, visibleStartIndex: numbe
                                     @favorite="toggleFavorite"
                                     @like="likeItem"
                                     @dislike="dislikeItem"
+                                    @laughed-at="laughedAtItem"
                                 />
                             </div>
                         </RecycleScroller>

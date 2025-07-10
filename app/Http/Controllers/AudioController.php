@@ -64,6 +64,8 @@ class AudioController extends Controller
             $file->liked_at = null;
             $file->disliked = false;
             $file->disliked_at = null;
+            $file->laughed_at = false;
+            $file->laughed_at_at = null;
         }
 
         $file->save();
@@ -73,6 +75,7 @@ class AudioController extends Controller
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
+                'laughed_at' => $file->laughed_at,
             ]);
         }
 
@@ -90,6 +93,8 @@ class AudioController extends Controller
             $file->loved_at = null;
             $file->disliked = false;
             $file->disliked_at = null;
+            $file->laughed_at = false;
+            $file->laughed_at_at = null;
         }
 
         $file->save();
@@ -99,6 +104,7 @@ class AudioController extends Controller
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
+                'laughed_at' => $file->laughed_at,
             ]);
         }
 
@@ -116,6 +122,8 @@ class AudioController extends Controller
             $file->loved_at = null;
             $file->liked = false;
             $file->liked_at = null;
+            $file->laughed_at = false;
+            $file->laughed_at_at = null;
         }
 
         $file->save();
@@ -125,6 +133,36 @@ class AudioController extends Controller
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
+                'laughed_at' => $file->laughed_at,
+            ]);
+        }
+
+        return back(303);
+    }
+
+    public function toggleLaughedAt(File $file)
+    {
+        $file->laughed_at = !$file->laughed_at;
+        $file->laughed_at_at = $file->laughed_at ? now() : null;
+
+        // Reset other statuses when laughing at
+        if ($file->laughed_at) {
+            $file->loved = false;
+            $file->loved_at = null;
+            $file->liked = false;
+            $file->liked_at = null;
+            $file->disliked = false;
+            $file->disliked_at = null;
+        }
+
+        $file->save();
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+                'laughed_at' => $file->laughed_at,
             ]);
         }
 
@@ -266,6 +304,7 @@ class AudioController extends Controller
                 ->where('loved', false)
                 ->where('liked', false)
                 ->where('disliked', false)
+                ->where('laughed_at', false)
                 ->select(['id'])
                 ->get(),
             'search' => [],

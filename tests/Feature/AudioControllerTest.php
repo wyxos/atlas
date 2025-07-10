@@ -375,3 +375,107 @@ it('returns error when creating cover for non-existent file', function () {
     $response->assertRedirect();
     $response->assertSessionHasErrors(['file' => 'File not found']);
 });
+
+it('can toggle laughed at status on a file', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+        'laughed_at' => false,
+    ]);
+
+    // Toggle laughed at to true
+    $response = $this->postJson(route('audio.laughed-at', ['file' => $file->id]));
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'loved' => false,
+        'liked' => false,
+        'disliked' => false,
+        'laughed_at' => true,
+    ]);
+
+    // Verify the file was updated in database
+    $file->refresh();
+    expect($file->laughed_at)->toBe(true);
+    expect($file->laughed_at_at)->not->toBeNull();
+
+    // Toggle laughed at to false
+    $response = $this->postJson(route('audio.laughed-at', ['file' => $file->id]));
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'loved' => false,
+        'liked' => false,
+        'disliked' => false,
+        'laughed_at' => false,
+    ]);
+
+    // Verify the file was updated in database
+    $file->refresh();
+    expect($file->laughed_at)->toBe(false);
+    expect($file->laughed_at_at)->toBeNull();
+});
+
+it('resets other reactions when laughed at is toggled on', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a file with other reactions set
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+        'loved' => true,
+        'loved_at' => now(),
+        'liked' => true,
+        'liked_at' => now(),
+        'disliked' => true,
+        'disliked_at' => now(),
+        'laughed_at' => false,
+    ]);
+
+    // Toggle laughed at to true
+    $response = $this->postJson(route('audio.laughed-at', ['file' => $file->id]));
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'loved' => false,
+        'liked' => false,
+        'disliked' => false,
+        'laughed_at' => true,
+    ]);
+
+    // Verify all other reactions were reset
+    $file->refresh();
+    expect($file->loved)->toBe(false);
+    expect($file->loved_at)->toBeNull();
+    expect($file->liked)->toBe(false);
+    expect($file->liked_at)->toBeNull();
+    expect($file->disliked)->toBe(false);
+    expect($file->disliked_at)->toBeNull();
+    expect($file->laughed_at)->toBe(true);
+    expect($file->laughed_at_at)->not->toBeNull();
+});
+
+it('returns 404 for non-existent file when toggling laughed at', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $response = $this->postJson(route('audio.laughed-at', ['file' => 999]));
+
+    $response->assertStatus(404);
+});

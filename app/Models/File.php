@@ -46,6 +46,8 @@ class File extends Model
         'disliked_at',
         'loved',
         'loved_at',
+        'laughed_at',
+        'laughed_at_at',
         'downloaded',
         'download_progress',
         'downloaded_at',
@@ -65,6 +67,7 @@ class File extends Model
         'liked' => 'boolean',
         'disliked' => 'boolean',
         'loved' => 'boolean',
+        'laughed_at' => 'boolean',
         'downloaded' => 'boolean',
         'download_progress' => 'integer',
         'not_found' => 'boolean',
@@ -73,6 +76,7 @@ class File extends Model
         'liked_at' => 'datetime',
         'disliked_at' => 'datetime',
         'loved_at' => 'datetime',
+        'laughed_at_at' => 'datetime',
         'downloaded_at' => 'datetime',
     ];
 
