@@ -40,18 +40,22 @@ test('dashboard displays file statistics', function () {
                     ->has('audioLoved')
                     ->has('audioLiked')
                     ->has('audioDisliked')
+                    ->has('audioLaughedAt')
                     ->has('audioNoRating')
                     ->has('globalLoved')
                     ->has('globalLiked')
                     ->has('globalDisliked')
+                    ->has('globalLaughedAt')
                     ->has('globalNoRating')
                     ->has('videoLoved')
                     ->has('videoLiked')
                     ->has('videoDisliked')
+                    ->has('videoLaughedAt')
                     ->has('videoNoRating')
                     ->has('imageLoved')
                     ->has('imageLiked')
                     ->has('imageDisliked')
+                    ->has('imageLaughedAt')
                     ->has('imageNoRating')
                     ->has('audioFiles')
                     ->has('videoFiles')
@@ -92,18 +96,22 @@ test('file statistics endpoint returns correct data', function () {
         'audioLoved',
         'audioLiked',
         'audioDisliked',
+        'audioLaughedAt',
         'audioNoRating',
         'globalLoved',
         'globalLiked',
         'globalDisliked',
+        'globalLaughedAt',
         'globalNoRating',
         'videoLoved',
         'videoLiked',
         'videoDisliked',
+        'videoLaughedAt',
         'videoNoRating',
         'imageLoved',
         'imageLiked',
         'imageDisliked',
+        'imageLaughedAt',
         'imageNoRating',
         'audioFiles',
         'videoFiles',

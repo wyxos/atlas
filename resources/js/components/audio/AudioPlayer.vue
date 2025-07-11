@@ -62,7 +62,7 @@ function loadInteractionStates(file: any) {
         isLiked.value = !!file.liked;
         isLoved.value = !!file.loved;
         isDisliked.value = !!file.disliked;
-        isLaughedAt.value = !!file.laughed_at;
+        isLaughedAt.value = !!file.funny;
     } else {
         // Reset when no file
         isLiked.value = false;
@@ -175,7 +175,7 @@ function handleLove(): void {
         audioStore.currentFile.loved = isLoved.value;
         audioStore.currentFile.liked = isLiked.value;
         audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.laughed_at = isLaughedAt.value;
+        audioStore.currentFile.funny = isLaughedAt.value;
     }
 
     // Send request to backend
@@ -210,7 +210,7 @@ function handleLike(): void {
         audioStore.currentFile.loved = isLoved.value;
         audioStore.currentFile.liked = isLiked.value;
         audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.laughed_at = isLaughedAt.value;
+        audioStore.currentFile.funny = isLaughedAt.value;
     }
 
     // Send request to backend
@@ -246,7 +246,7 @@ function handleDislike(): void {
         audioStore.currentFile.loved = isLoved.value;
         audioStore.currentFile.liked = isLiked.value;
         audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.laughed_at = isLaughedAt.value;
+        audioStore.currentFile.funny = isLaughedAt.value;
     }
 
     // Automatically go to next track when disliking
@@ -286,7 +286,7 @@ function handleLaughedAt(): void {
         audioStore.currentFile.loved = isLoved.value;
         audioStore.currentFile.liked = isLiked.value;
         audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.laughed_at = isLaughedAt.value;
+        audioStore.currentFile.funny = isLaughedAt.value;
     }
 
     // Send request to backend
@@ -298,7 +298,7 @@ function handleLaughedAt(): void {
             // Revert on error
             isLaughedAt.value = !isLaughedAt.value;
             if (audioStore.currentFile) {
-                audioStore.currentFile.laughed_at = isLaughedAt.value;
+                audioStore.currentFile.funny = isLaughedAt.value;
             }
             console.error('Failed to toggle laughed at status:', errors);
         }
@@ -652,7 +652,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                             class="button circular small empty"
                             :class="{ 'text-yellow-500 bg-yellow-500/20': isLaughedAt }"
                             @click="handleLaughedAt"
-                            title="Laughed At"
+                            title="Funny"
                         >
                             <Laugh :size="16" />
                         </button>

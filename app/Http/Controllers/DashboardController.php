@@ -35,7 +35,8 @@ class DashboardController extends Controller
                 COUNT(CASE WHEN liked = 1 THEN 1 END) as audio_liked,
                 COUNT(CASE WHEN loved = 1 THEN 1 END) as audio_loved,
                 COUNT(CASE WHEN disliked = 1 THEN 1 END) as audio_disliked,
-                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 THEN 1 END) as audio_no_rating
+                COUNT(CASE WHEN funny = 1 THEN 1 END) as audio_laughed_at,
+                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as audio_no_rating
             ')
             ->where('mime_type', 'like', 'audio/%')
             ->first();
@@ -57,7 +58,8 @@ class DashboardController extends Controller
                 COUNT(CASE WHEN liked = 1 THEN 1 END) as global_liked,
                 COUNT(CASE WHEN loved = 1 THEN 1 END) as global_loved,
                 COUNT(CASE WHEN disliked = 1 THEN 1 END) as global_disliked,
-                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 THEN 1 END) as global_no_rating
+                COUNT(CASE WHEN funny = 1 THEN 1 END) as global_laughed_at,
+                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as global_no_rating
             ')
             ->first();
 
@@ -66,7 +68,8 @@ class DashboardController extends Controller
                 COUNT(CASE WHEN liked = 1 THEN 1 END) as video_liked,
                 COUNT(CASE WHEN loved = 1 THEN 1 END) as video_loved,
                 COUNT(CASE WHEN disliked = 1 THEN 1 END) as video_disliked,
-                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 THEN 1 END) as video_no_rating
+                COUNT(CASE WHEN funny = 1 THEN 1 END) as video_laughed_at,
+                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as video_no_rating
             ')
             ->where('mime_type', 'like', 'video/%')
             ->first();
@@ -76,7 +79,8 @@ class DashboardController extends Controller
                 COUNT(CASE WHEN liked = 1 THEN 1 END) as image_liked,
                 COUNT(CASE WHEN loved = 1 THEN 1 END) as image_loved,
                 COUNT(CASE WHEN disliked = 1 THEN 1 END) as image_disliked,
-                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 THEN 1 END) as image_no_rating
+                COUNT(CASE WHEN funny = 1 THEN 1 END) as image_laughed_at,
+                COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as image_no_rating
             ')
             ->where('mime_type', 'like', 'image/%')
             ->first();
@@ -111,43 +115,47 @@ class DashboardController extends Controller
                 'audioFilesCount' => (int) $audioStats->audio_files_count,
                 'audioSpaceUsed' => (int) $audioStats->audio_size,
                 'audioNotFound' => (int) $audioStats->audio_not_found,
-                
+
                 // Audio Metadata Stats
                 'audioWithMetadata' => (int) $audioMetadataStats->audio_with_metadata,
                 'audioWithoutMetadata' => (int) $audioMetadataStats->audio_without_metadata,
                 'audioMetadataReviewRequired' => (int) $audioMetadataStats->audio_metadata_review_required,
                 'audioMetadataReviewNotRequired' => (int) $audioMetadataStats->audio_metadata_review_not_required,
-                
+
                 // Global Metadata Stats
                 'globalWithMetadata' => (int) $globalMetadataStats->global_with_metadata,
                 'globalWithoutMetadata' => (int) $globalMetadataStats->global_without_metadata,
                 'globalMetadataReviewRequired' => (int) $globalMetadataStats->global_metadata_review_required,
                 'globalMetadataReviewNotRequired' => (int) $globalMetadataStats->global_metadata_review_not_required,
-                
+
                 // Audio Rating Stats
                 'audioLoved' => (int) $audioStats->audio_loved,
                 'audioLiked' => (int) $audioStats->audio_liked,
                 'audioDisliked' => (int) $audioStats->audio_disliked,
+                'audioLaughedAt' => (int) $audioStats->audio_laughed_at,
                 'audioNoRating' => (int) $audioStats->audio_no_rating,
-                
+
                 // Global Rating Stats
                 'globalLoved' => (int) $globalRatings->global_loved,
                 'globalLiked' => (int) $globalRatings->global_liked,
                 'globalDisliked' => (int) $globalRatings->global_disliked,
+                'globalLaughedAt' => (int) $globalRatings->global_laughed_at,
                 'globalNoRating' => (int) $globalRatings->global_no_rating,
-                
+
                 // Video Rating Stats
                 'videoLoved' => (int) $videoRatings->video_loved,
                 'videoLiked' => (int) $videoRatings->video_liked,
                 'videoDisliked' => (int) $videoRatings->video_disliked,
+                'videoLaughedAt' => (int) $videoRatings->video_laughed_at,
                 'videoNoRating' => (int) $videoRatings->video_no_rating,
-                
+
                 // Image Rating Stats
                 'imageLoved' => (int) $imageRatings->image_loved,
                 'imageLiked' => (int) $imageRatings->image_liked,
                 'imageDisliked' => (int) $imageRatings->image_disliked,
+                'imageLaughedAt' => (int) $imageRatings->image_laughed_at,
                 'imageNoRating' => (int) $imageRatings->image_no_rating,
-                
+
                 // File Type Distribution (for pie chart)
                 'audioFiles' => (int) $fileTypeStats->audio_files,
                 'videoFiles' => (int) $fileTypeStats->video_files,

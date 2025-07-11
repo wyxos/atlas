@@ -304,10 +304,10 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
       </button>
       <button
         class="text-foreground hover:text-yellow-500 transition-colors p-1 rounded"
-        :class="{ 'text-yellow-500 bg-yellow-500/20': loadedFile?.laughed_at }"
+        :class="{ 'text-yellow-500 bg-yellow-500/20': loadedFile?.funny }"
         @click.stop="handleLaughedAt($event)"
       >
-        <Laugh :size="20" :fill="loadedFile?.laughed_at ? 'currentColor' : 'none'" />
+        <Laugh :size="20" :fill="loadedFile?.funny ? 'currentColor' : 'none'" />
       </button>
     </div>
   </div>

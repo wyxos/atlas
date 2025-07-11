@@ -12,43 +12,47 @@ interface FileStats {
     audioFilesCount: number;
     audioSpaceUsed: number;
     audioNotFound: number;
-    
+
     // Audio Metadata Stats
     audioWithMetadata: number;
     audioWithoutMetadata: number;
     audioMetadataReviewRequired: number;
     audioMetadataReviewNotRequired: number;
-    
+
     // Global Metadata Stats
     globalWithMetadata: number;
     globalWithoutMetadata: number;
     globalMetadataReviewRequired: number;
     globalMetadataReviewNotRequired: number;
-    
+
     // Audio Rating Stats
     audioLoved: number;
     audioLiked: number;
     audioDisliked: number;
+    audioLaughedAt: number;
     audioNoRating: number;
-    
+
     // Global Rating Stats
     globalLoved: number;
     globalLiked: number;
     globalDisliked: number;
+    globalLaughedAt: number;
     globalNoRating: number;
-    
+
     // Video Rating Stats
     videoLoved: number;
     videoLiked: number;
     videoDisliked: number;
+    videoLaughedAt: number;
     videoNoRating: number;
-    
+
     // Image Rating Stats
     imageLoved: number;
     imageLiked: number;
     imageDisliked: number;
+    imageLaughedAt: number;
     imageNoRating: number;
-    
+
     // File Type Distribution (for pie chart)
     audioFiles: number;
     videoFiles: number;
@@ -96,6 +100,7 @@ const globalRatingData = [
     { name: 'Loved', value: props.fileStats.globalLoved },
     { name: 'Liked', value: props.fileStats.globalLiked },
     { name: 'Disliked', value: props.fileStats.globalDisliked },
+    { name: 'Funny', value: props.fileStats.globalLaughedAt },
     { name: 'No Rating', value: props.fileStats.globalNoRating },
 ];
 
@@ -104,6 +109,7 @@ const audioRatingData = [
     { name: 'Loved', value: props.fileStats.audioLoved },
     { name: 'Liked', value: props.fileStats.audioLiked },
     { name: 'Disliked', value: props.fileStats.audioDisliked },
+    { name: 'Funny', value: props.fileStats.audioLaughedAt },
     { name: 'No Rating', value: props.fileStats.audioNoRating },
 ];
 
@@ -112,6 +118,7 @@ const videoRatingData = [
     { name: 'Loved', value: props.fileStats.videoLoved },
     { name: 'Liked', value: props.fileStats.videoLiked },
     { name: 'Disliked', value: props.fileStats.videoDisliked },
+    { name: 'Funny', value: props.fileStats.videoLaughedAt },
     { name: 'No Rating', value: props.fileStats.videoNoRating },
 ];
 
@@ -120,6 +127,7 @@ const imageRatingData = [
     { name: 'Loved', value: props.fileStats.imageLoved },
     { name: 'Liked', value: props.fileStats.imageLiked },
     { name: 'Disliked', value: props.fileStats.imageDisliked },
+    { name: 'Funny', value: props.fileStats.imageLaughedAt },
     { name: 'No Rating', value: props.fileStats.imageNoRating },
 ];
 
@@ -177,7 +185,7 @@ const getSpacePercentage = (bytes: number): number => {
                     </h2>
                     <PieChart :data="fileTypeData" />
                 </div>
-                
+
                 <!-- Metadata With/Without Block -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -215,10 +223,11 @@ const getSpacePercentage = (bytes: number): number => {
                         Global Ratings
                     </h2>
                     <PieChart :data="globalRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
                         <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Most loved files</div>
                         <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked files</div>
                         <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked files</div>
+                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Files that made you laugh</div>
                         <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated files</div>
                     </div>
                 </div>
@@ -230,10 +239,11 @@ const getSpacePercentage = (bytes: number): number => {
                         Audio Ratings
                     </h2>
                     <PieChart :data="audioRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
                         <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Favorite audio tracks</div>
                         <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked audio tracks</div>
                         <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked audio tracks</div>
+                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Audio that made you laugh</div>
                         <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated audio tracks</div>
                     </div>
                 </div>
@@ -245,10 +255,11 @@ const getSpacePercentage = (bytes: number): number => {
                         Video Ratings
                     </h2>
                     <PieChart :data="videoRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
                         <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Most watched videos</div>
                         <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked videos</div>
                         <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked videos</div>
+                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Videos that made you laugh</div>
                         <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated videos</div>
                     </div>
                 </div>
@@ -260,10 +271,11 @@ const getSpacePercentage = (bytes: number): number => {
                         Image Ratings
                     </h2>
                     <PieChart :data="imageRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-2 gap-1">
+                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
                         <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Most loved images</div>
                         <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked images</div>
                         <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked images</div>
+                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Images that made you laugh</div>
                         <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated images</div>
                     </div>
                 </div>

@@ -9,7 +9,7 @@
 - Discography view
 - Browse mode
   - [ ] Spotify integration
-  - [ ] ]
+  - [ ] KH Insider
 
 ## Video
 - List/Playlists
@@ -29,7 +29,10 @@
 ## General
 - [ ] Stream
 - [ ] Marathon
-- [ ] 
-
+- [ ] Docker
+- [ ] Desktop app for global controls
+- [ ] Database online backup
+- [ ] Dynamic IP handling
+- [ ] Phone app
 
 # Issues

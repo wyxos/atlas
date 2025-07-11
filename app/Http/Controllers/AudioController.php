@@ -64,8 +64,8 @@ class AudioController extends Controller
             $file->liked_at = null;
             $file->disliked = false;
             $file->disliked_at = null;
-            $file->laughed_at = false;
-            $file->laughed_at_at = null;
+            $file->funny = false;
+            $file->laughed_at = null;
         }
 
         $file->save();
@@ -75,7 +75,7 @@ class AudioController extends Controller
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
-                'laughed_at' => $file->laughed_at,
+                'funny' => $file->funny,
             ]);
         }
 
@@ -93,8 +93,8 @@ class AudioController extends Controller
             $file->loved_at = null;
             $file->disliked = false;
             $file->disliked_at = null;
-            $file->laughed_at = false;
-            $file->laughed_at_at = null;
+            $file->funny = false;
+            $file->laughed_at = null;
         }
 
         $file->save();
@@ -104,7 +104,7 @@ class AudioController extends Controller
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
-                'laughed_at' => $file->laughed_at,
+                'funny' => $file->funny,
             ]);
         }
 
@@ -122,8 +122,8 @@ class AudioController extends Controller
             $file->loved_at = null;
             $file->liked = false;
             $file->liked_at = null;
-            $file->laughed_at = false;
-            $file->laughed_at_at = null;
+            $file->funny = false;
+            $file->laughed_at = null;
         }
 
         $file->save();
@@ -133,7 +133,7 @@ class AudioController extends Controller
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
-                'laughed_at' => $file->laughed_at,
+                'funny' => $file->funny,
             ]);
         }
 
@@ -142,11 +142,11 @@ class AudioController extends Controller
 
     public function toggleLaughedAt(File $file)
     {
-        $file->laughed_at = !$file->laughed_at;
-        $file->laughed_at_at = $file->laughed_at ? now() : null;
+        $file->funny = !$file->funny;
+        $file->laughed_at = $file->funny ? now() : null;
 
         // Reset other statuses when laughing at
-        if ($file->laughed_at) {
+        if ($file->funny) {
             $file->loved = false;
             $file->loved_at = null;
             $file->liked = false;
@@ -162,7 +162,7 @@ class AudioController extends Controller
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
-                'laughed_at' => $file->laughed_at,
+                'funny' => $file->funny,
             ]);
         }
 
@@ -304,7 +304,7 @@ class AudioController extends Controller
                 ->where('loved', false)
                 ->where('liked', false)
                 ->where('disliked', false)
-                ->where('laughed_at', false)
+                ->where('funny', false)
                 ->select(['id'])
                 ->get(),
             'search' => [],

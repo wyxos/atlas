@@ -11,7 +11,7 @@ The system supports four types of reactions:
 1. **Love** (Heart icon) - Mark as favorite/loved
 2. **Like** (Thumbs Up icon) - Mark as liked  
 3. **Dislike** (Thumbs Down icon) - Mark as disliked
-4. **Laughed At** (Laugh icon) - Mark as funny/amusing
+4. **Funny** (Laugh icon) - Mark as funny/amusing
 
 ### Database Schema
 Each reaction is stored in the `files` table with the following columns:
@@ -85,7 +85,7 @@ The `File` model includes:
 - **Love**: Red heart icon with red background when active
 - **Like**: Blue thumbs up icon with blue background when active  
 - **Dislike**: Gray thumbs down icon with gray background when active
-- **Laughed At**: Yellow laugh icon with yellow background when active
+- **Funny**: Yellow laugh icon with yellow background when active
 
 #### State Management
 - Local state in `loadedFiles` object for immediate UI feedback
@@ -101,6 +101,15 @@ The reaction system integrates with the global audio player:
 - Player controls can trigger reaction updates
 - All four reaction buttons (love, like, dislike, laughed_at) are available in the desktop player
 - Mobile player focuses on playback controls and doesn't include reaction buttons
+
+#### Dashboard Analytics
+The reaction system is fully integrated into the dashboard statistics:
+- All four reactions (love, like, dislike, laughed_at) are tracked in dashboard queries
+- Statistics are broken down by file type (audio, video, image, global)
+- Pie charts display reaction distribution with appropriate icons and colors
+- Dashboard UI displays "Liked" and "Funny" as separate, distinct categories
+- "No Rating" calculation properly excludes files with any active reaction
+- Dashboard caching ensures optimal performance for reaction statistics
 
 #### Search and Filtering
 - Reaction status is included in file details API responses
