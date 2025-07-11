@@ -117,7 +117,7 @@ function toggleFavorite(item: any, event: Event): void {
         if (loadedFiles[item.id].loved) {
             loadedFiles[item.id].liked = false;
             loadedFiles[item.id].disliked = false;
-            loadedFiles[item.id].laughed_at = false;
+            loadedFiles[item.id].funny = false;
         }
     }
 
@@ -126,7 +126,7 @@ function toggleFavorite(item: any, event: Event): void {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
+        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
     }
 
     // Send request to backend
@@ -156,7 +156,7 @@ function likeItem(item: any, event: Event): void {
         if (loadedFiles[item.id].liked) {
             loadedFiles[item.id].loved = false;
             loadedFiles[item.id].disliked = false;
-            loadedFiles[item.id].laughed_at = false;
+            loadedFiles[item.id].funny = false;
         }
     }
 
@@ -165,7 +165,7 @@ function likeItem(item: any, event: Event): void {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
+        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
     }
 
     // Send request to backend
@@ -195,7 +195,7 @@ function dislikeItem(item: any, event: Event): void {
         if (loadedFiles[item.id].disliked) {
             loadedFiles[item.id].loved = false;
             loadedFiles[item.id].liked = false;
-            loadedFiles[item.id].laughed_at = false;
+            loadedFiles[item.id].funny = false;
         }
     }
 
@@ -204,7 +204,7 @@ function dislikeItem(item: any, event: Event): void {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
+        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
     }
 
     // Send request to backend
@@ -230,8 +230,8 @@ function laughedAtItem(item: any, event: Event): void {
 
     // Optimistically update the UI first
     if (loadedFiles[item.id]) {
-        loadedFiles[item.id].laughed_at = !loadedFiles[item.id].laughed_at;
-        if (loadedFiles[item.id].laughed_at) {
+        loadedFiles[item.id].funny = !loadedFiles[item.id].funny;
+        if (loadedFiles[item.id].funny) {
             loadedFiles[item.id].loved = false;
             loadedFiles[item.id].liked = false;
             loadedFiles[item.id].disliked = false;
@@ -243,7 +243,7 @@ function laughedAtItem(item: any, event: Event): void {
         audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
         audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
         audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.laughed_at = loadedFiles[item.id]?.laughed_at || false;
+        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
     }
 
     // Send request to backend
@@ -254,9 +254,9 @@ function laughedAtItem(item: any, event: Event): void {
         onError: (errors) => {
             // Revert on error
             if (loadedFiles[item.id]) {
-                loadedFiles[item.id].laughed_at = !loadedFiles[item.id].laughed_at;
+                loadedFiles[item.id].funny = !loadedFiles[item.id].funny;
             }
-            console.error('Failed to toggle laughed at status:', errors);
+            console.error('Failed to toggle funny status:', errors);
         }
     });
 

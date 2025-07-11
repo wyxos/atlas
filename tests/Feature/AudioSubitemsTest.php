@@ -7,6 +7,8 @@ use App\Models\Album;
 use App\Models\Playlist;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
+uses(RefreshDatabase::class);
+
 
 
 beforeEach(function () {
@@ -179,13 +181,17 @@ test('unrated page shows only unrated audio files', function () {
         'loved' => false,
         'liked' => false,
         'disliked' => false,
+        'funny' => false,
         'not_found' => false,
     ]);
 
     $unratedFile2 = File::factory()->create([
         'mime_type' => 'audio/mp3',
+        'loved' => false,
+        'liked' => false,
+        'disliked' => false,
+        'funny' => false,
         'not_found' => false,
-        // Default values will be false for rating fields
     ]);
 
     $lovedFile = File::factory()->create([
@@ -206,7 +212,7 @@ test('unrated page shows only unrated audio files', function () {
         'not_found' => false,
     ]);
 
-    $laughedAtFile = File::factory()->create([
+    $funnyFile = File::factory()->create([
         'mime_type' => 'audio/mp3',
         'funny' => true,
         'not_found' => false,
@@ -217,14 +223,14 @@ test('unrated page shows only unrated audio files', function () {
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Audio')
-        ->where('files', function ($files) use ($unratedFile1, $unratedFile2, $lovedFile, $likedFile, $dislikedFile, $laughedAtFile) {
+        ->where('files', function ($files) use ($unratedFile1, $unratedFile2, $lovedFile, $likedFile, $dislikedFile, $funnyFile) {
             $fileIds = collect($files)->pluck('id');
             return $fileIds->contains($unratedFile1->id) &&
                    $fileIds->contains($unratedFile2->id) &&
                    !$fileIds->contains($lovedFile->id) &&
                    !$fileIds->contains($likedFile->id) &&
                    !$fileIds->contains($dislikedFile->id) &&
-                   !$fileIds->contains($laughedAtFile->id);
+                   !$fileIds->contains($funnyFile->id);
         })
         ->where('title', 'Unrated')
     );

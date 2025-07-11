@@ -77,6 +77,10 @@ class FileFactory extends Factory
             'loved_at' => function (array $attributes) {
                 return $attributes['loved'] ? $this->faker->dateTimeBetween('-1 month') : null;
             },
+            'funny' => $this->faker->boolean(10), // 10% chance of being funny
+            'laughed_at' => function (array $attributes) {
+                return $attributes['funny'] ? $this->faker->dateTimeBetween('-1 month') : null;
+            },
             'downloaded' => $this->faker->boolean(40), // 40% chance of being downloaded
             'download_progress' => function (array $attributes) {
                 return $attributes['downloaded'] ? 100 : $this->faker->numberBetween(0, 99);

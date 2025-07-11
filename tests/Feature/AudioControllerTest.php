@@ -8,8 +8,6 @@ use App\Models\FileMetadata;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-
-
 it('can get file details with all relationships loaded', function () {
     // Create and authenticate a user
     $user = User::factory()->create();
