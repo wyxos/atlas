@@ -208,7 +208,7 @@ test('unrated page shows only unrated audio files', function () {
 
     $laughedAtFile = File::factory()->create([
         'mime_type' => 'audio/mp3',
-        'laughed_at' => true,
+        'funny' => true,
         'not_found' => false,
     ]);
 

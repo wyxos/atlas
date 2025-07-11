@@ -389,7 +389,7 @@ it('can toggle laughed at status on a file', function () {
         'size' => 1024,
         'mime_type' => 'audio/mpeg',
         'hash' => 'file123',
-        'laughed_at' => false,
+        'funny' => false,
     ]);
 
     // Toggle laughed at to true
@@ -400,13 +400,13 @@ it('can toggle laughed at status on a file', function () {
         'loved' => false,
         'liked' => false,
         'disliked' => false,
-        'laughed_at' => true,
+        'funny' => true,
     ]);
 
     // Verify the file was updated in database
     $file->refresh();
-    expect($file->laughed_at)->toBe(true);
-    expect($file->laughed_at_at)->not->toBeNull();
+    expect($file->funny)->toBe(true);
+    expect($file->laughed_at)->not->toBeNull();
 
     // Toggle laughed at to false
     $response = $this->postJson(route('audio.laughed-at', ['file' => $file->id]));
@@ -416,13 +416,13 @@ it('can toggle laughed at status on a file', function () {
         'loved' => false,
         'liked' => false,
         'disliked' => false,
-        'laughed_at' => false,
+        'funny' => false,
     ]);
 
     // Verify the file was updated in database
     $file->refresh();
-    expect($file->laughed_at)->toBe(false);
-    expect($file->laughed_at_at)->toBeNull();
+    expect($file->funny)->toBe(false);
+    expect($file->laughed_at)->toBeNull();
 });
 
 it('resets other reactions when laughed at is toggled on', function () {
@@ -444,7 +444,7 @@ it('resets other reactions when laughed at is toggled on', function () {
         'liked_at' => now(),
         'disliked' => true,
         'disliked_at' => now(),
-        'laughed_at' => false,
+        'funny' => false,
     ]);
 
     // Toggle laughed at to true
@@ -455,7 +455,7 @@ it('resets other reactions when laughed at is toggled on', function () {
         'loved' => false,
         'liked' => false,
         'disliked' => false,
-        'laughed_at' => true,
+        'funny' => true,
     ]);
 
     // Verify all other reactions were reset
@@ -466,8 +466,8 @@ it('resets other reactions when laughed at is toggled on', function () {
     expect($file->liked_at)->toBeNull();
     expect($file->disliked)->toBe(false);
     expect($file->disliked_at)->toBeNull();
-    expect($file->laughed_at)->toBe(true);
-    expect($file->laughed_at_at)->not->toBeNull();
+    expect($file->funny)->toBe(true);
+    expect($file->laughed_at)->not->toBeNull();
 });
 
 it('returns 404 for non-existent file when toggling laughed at', function () {

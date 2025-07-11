@@ -20,13 +20,13 @@ Each reaction is stored in the `files` table with the following columns:
 - `loved` (boolean, default: false)
 - `liked` (boolean, default: false) 
 - `disliked` (boolean, default: false)
-- `laughed_at` (boolean, default: false)
+- `funny` (boolean, default: false)
 
 #### Timestamp Columns
 - `loved_at` (timestamp, nullable)
 - `liked_at` (timestamp, nullable)
 - `disliked_at` (timestamp, nullable)
-- `laughed_at_at` (timestamp, nullable)
+- `laughed_at` (timestamp, nullable)
 
 ### Business Logic
 The reaction system implements **mutually exclusive reactions** - only one reaction can be active at a time per file:
@@ -128,6 +128,9 @@ Comprehensive test coverage includes:
 ### Migration History
 - Initial reactions (love, like, dislike) were part of the original files table creation
 - `laughed_at` reaction added via migration `2025_07_10_204429_add_laughed_at_to_files_table.php`
+- Column renaming via migration `2025_07_11_021711_rename_laughed_at_columns_in_files_table.php`:
+  - `laughed_at` (boolean) renamed to `funny`
+  - `laughed_at_at` (timestamp) renamed to `laughed_at`
 
 ### Future Considerations
 - Additional reaction types can be added following the same pattern
