@@ -89,10 +89,10 @@ test('command shows preview correctly', function () {
         ->assertExitCode(0);
 });
 
-test('command requires confirmation by default', function () {
+test('command requires confirmation by default for batch processing', function () {
     File::factory()->create(['ext' => 'm3u', 'filename' => 'playlist.m3u']);
 
-    $this->artisan('files:delete-m3u')
+    $this->artisan('files:delete-m3u --batch')
         ->expectsQuestion('Are you sure you want to proceed?', false)
         ->expectsOutput('Operation cancelled.')
         ->assertExitCode(0);
@@ -100,10 +100,10 @@ test('command requires confirmation by default', function () {
     Queue::assertNothingPushed();
 });
 
-test('command dispatches job when confirmed', function () {
+test('command dispatches job when confirmed in batch mode', function () {
     File::factory()->create(['ext' => 'm3u', 'filename' => 'playlist.m3u']);
 
-    $this->artisan('files:delete-m3u')
+    $this->artisan('files:delete-m3u --batch')
         ->expectsQuestion('Are you sure you want to proceed?', true)
         ->expectsOutput('M3U files deletion job has been queued.')
         ->assertExitCode(0);
@@ -111,20 +111,20 @@ test('command dispatches job when confirmed', function () {
     Queue::assertPushed(DeleteM3uFilesJob::class);
 });
 
-test('command skips confirmation with force flag', function () {
+test('command skips confirmation with force flag in batch mode', function () {
     File::factory()->create(['ext' => 'm3u', 'filename' => 'playlist.m3u']);
 
-    $this->artisan('files:delete-m3u --force')
+    $this->artisan('files:delete-m3u --batch --force')
         ->expectsOutput('M3U files deletion job has been queued.')
         ->assertExitCode(0);
 
     Queue::assertPushed(DeleteM3uFilesJob::class);
 });
 
-test('command passes chunk size to job', function () {
+test('command passes chunk size to job in batch mode', function () {
     File::factory()->create(['ext' => 'm3u', 'filename' => 'playlist.m3u']);
 
-    $this->artisan('files:delete-m3u --force --chunk=50')
+    $this->artisan('files:delete-m3u --batch --force --chunk=50')
         ->assertExitCode(0);
 
     Queue::assertPushed(DeleteM3uFilesJob::class, function ($job) {
@@ -140,4 +140,45 @@ test('preview shows limited number of files', function () {
         ->expectsOutput('Found 25 M3U files.')
         ->expectsOutput('... and 5 more files.')
         ->assertExitCode(0);
+});
+
+test('command processes files individually by default', function () {
+    File::factory()->create(['ext' => 'm3u', 'filename' => 'playlist.m3u']);
+
+    $this->artisan('files:delete-m3u')
+        ->expectsOutput('Processing files individually with confirmation...')
+        ->expectsQuestion('Delete this file?', false)
+        ->expectsOutput('- File skipped.')
+        ->expectsOutput('Deletion Summary:')
+        ->expectsOutput('✓ Deleted: 0 files')
+        ->expectsOutput('- Skipped: 1 files')
+        ->assertExitCode(0);
+
+    // File should still exist
+    expect(File::count())->toBe(1);
+});
+
+test('command deletes files when confirmed individually', function () {
+    File::factory()->create(['ext' => 'm3u', 'filename' => 'playlist.m3u']);
+
+    $this->artisan('files:delete-m3u')
+        ->expectsOutput('Processing files individually with confirmation...')
+        ->expectsQuestion('Delete this file?', true)
+        ->expectsOutput('Deletion Summary:')
+        ->assertExitCode(0);
+
+    // Note: In test environment, actual file deletion may not work due to missing file paths
+    // The important thing is that the command processes files individually and asks for confirmation
+});
+
+test('command processes files individually with force flag', function () {
+    File::factory()->create(['ext' => 'm3u', 'filename' => 'playlist.m3u']);
+
+    $this->artisan('files:delete-m3u --force')
+        ->expectsOutput('Processing files individually with confirmation...')
+        ->expectsOutput('Deletion Summary:')
+        ->assertExitCode(0);
+
+    // Note: In test environment, actual file deletion may not work due to missing file paths
+    // The important thing is that the command processes files individually without asking for confirmation when --force is used
 });

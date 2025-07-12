@@ -22,40 +22,105 @@ class FileController extends Controller
         }
 
         $query = File::query();
+        $searchResults = [];
 
-        // Handle search
-        $search = $request->input('query', '');
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('filename', 'like', "%{$search}%")
-                  ->orWhere('path', 'like', "%{$search}%")
-                  ->orWhere('title', 'like', "%{$search}%");
+        // Handle search using Laravel Scout (similar to audio route)
+        $searchQuery = $request->input('query', '');
+        $searchResults = [];
+
+        if ($searchQuery) {
+            // Try Laravel Scout search first (like in the audio route)
+            try {
+                $searchResults = File::search($searchQuery)
+                    ->query(function ($builder) use ($request) {
+                        // Apply not_found filter to search results if specified
+                        $notFoundFilter = $request->boolean('not_found');
+                        if ($notFoundFilter) {
+                            $builder->where('not_found', true);
+                        }
+                    })
+                    ->get();
+
+                // Load metadata relationships for search results
+                if ($searchResults->isNotEmpty()) {
+                    $searchResults->load(['metadata']);
+                }
+            } catch (\Exception $e) {
+                // Fallback to database search if Scout fails (e.g., in testing)
+                $searchResults = collect([]);
+            }
+
+            // If Scout search returns no results, fallback to database search
+            if ($searchResults->isEmpty()) {
+                $query->where(function ($q) use ($searchQuery) {
+                    $q->where('filename', 'like', "%{$searchQuery}%")
+                      ->orWhere('path', 'like', "%{$searchQuery}%")
+                      ->orWhere('title', 'like', "%{$searchQuery}%");
+                });
+
+                // Apply not_found filter for database search
+                $notFoundFilter = $request->boolean('not_found');
+                if ($notFoundFilter) {
+                    $query->where('not_found', true);
+                }
+
+                $searchResults = $query->get();
+
+                // Load metadata relationships for database search results
+                if ($searchResults->isNotEmpty()) {
+                    $searchResults->load(['metadata']);
+                }
+            }
+
+            // Transform search results to match the expected format
+            $transformedResults = $searchResults->map(function ($file) {
+                return [
+                    'id' => $file->id,
+                    'path' => $file->path,
+                    'name' => $file->filename,
+                    'type' => $file->ext,
+                    'mime_type' => $file->mime_type,
+                    'not_found' => $file->not_found,
+                    'created_at' => $file->created_at,
+                ];
             });
-        }
 
-        // Handle not_found filter
-        $notFoundFilter = $request->boolean('not_found');
-        if ($notFoundFilter) {
-            $query->where('not_found', true);
-        }
+            // Create a paginated collection for search results
+            $files = new \Illuminate\Pagination\LengthAwarePaginator(
+                $transformedResults,
+                $transformedResults->count(),
+                20,
+                1,
+                ['path' => $request->url(), 'pageName' => 'page']
+            );
+            $files->withQueryString();
+        } else {
+            // Handle not_found filter for regular listing
+            $notFoundFilter = $request->boolean('not_found');
+            if ($notFoundFilter) {
+                $query->where('not_found', true);
+            }
 
-        $files = $query->select([
-                'id',
-                'path',
-                'filename as name',
-                'ext as type',
-                'mime_type',
-                'not_found',
-                'created_at'
-            ])
-            ->orderBy('created_at', 'desc')
-            ->paginate(20)
-            ->withQueryString();
+            // Get regular files for listing when not searching
+            $files = $query->select([
+                    'id',
+                    'path',
+                    'filename as name',
+                    'ext as type',
+                    'mime_type',
+                    'not_found',
+                    'created_at'
+                ])
+                ->orderBy('created_at', 'desc')
+                ->paginate(20)
+                ->withQueryString();
+        }
 
         return Inertia::render('Files/Index', [
             'files' => $files,
-            'search' => $search,
-            'notFoundFilter' => $notFoundFilter,
+            'search' => $searchQuery, // Keep backward compatibility with tests
+            'searchResults' => $searchResults, // Add search results for enhanced functionality
+            'notFoundFilter' => $request->boolean('not_found'),
         ]);
     }
 
