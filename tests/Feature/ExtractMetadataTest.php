@@ -4,7 +4,6 @@ use App\Console\Commands\ExtractMetadata;
 use App\Jobs\ExtractFileMetadata;
 use App\Models\File;
 use App\Models\FileMetadata;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 

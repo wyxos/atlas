@@ -2,10 +2,7 @@
 
 use App\Console\Commands\SyncFilesToAtlasCommand;
 use App\Models\File;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-
-uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Mock the atlas disk

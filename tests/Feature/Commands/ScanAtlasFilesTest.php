@@ -2,14 +2,15 @@
 
 use App\Jobs\ProcessFileHash;
 use App\Models\File;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
-    // Create a fake atlas disk for testing
+    // Ensure clean database state for parallel execution
+    File::query()->delete();
+
+    // Create a fake atlas disk for testing with unique prefix for parallel execution
+    $testId = uniqid('test_', true);
     Storage::fake('atlas');
 
     // Create test files in the atlas disk
@@ -82,6 +83,9 @@ test('command processes files correctly when jobs are executed', function () {
 test('command does not dispatch jobs for existing files', function () {
     Queue::fake();
 
+    // Ensure clean database state for this test
+    File::query()->delete();
+
     // Create an existing file record
     File::create([
         'source' => 'local',
@@ -106,6 +110,9 @@ test('command does not dispatch jobs for existing files', function () {
 });
 
 test('command handles existing files correctly when jobs are executed', function () {
+    // Ensure clean database state for this test
+    File::query()->delete();
+
     // Create an existing file record
     File::create([
         'source' => 'local',
@@ -156,7 +163,10 @@ test('command dry-run mode shows what would be done without dispatching jobs', f
 test('command handles empty atlas directory gracefully', function () {
     Queue::fake();
 
-    // Create a fresh fake atlas disk without any files
+    // Clear database to ensure clean state
+    File::query()->delete();
+
+    // Create a fresh fake atlas disk without any files for this specific test
     Storage::fake('atlas');
 
     // Run the command
@@ -169,6 +179,13 @@ test('command handles empty atlas directory gracefully', function () {
 
     // Verify no files were created
     expect(File::count())->toBe(0);
+
+    // Restore the original test files for other tests that might run in parallel
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 });
 
 test('command processes files in chunks and dispatches jobs', function () {

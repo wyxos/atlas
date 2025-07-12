@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 test('users index page can be rendered for admin', function () {
     $user = User::factory()->create(['is_admin' => true]);

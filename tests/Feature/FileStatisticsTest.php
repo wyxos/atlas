@@ -2,9 +2,6 @@
 
 use App\Models\File;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 beforeEach(function () {
     // Create test files with different mime types

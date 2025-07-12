@@ -3,9 +3,6 @@
 use App\Models\Cover;
 use App\Models\File;
 use App\Models\Playlist;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 it('can create a playlist', function () {
     $playlist = Playlist::create([

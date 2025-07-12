@@ -5,9 +5,6 @@ use App\Models\File;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
-    // Run migrations to ensure the files table exists
-    $this->artisan('migrate');
-
     // Create a fake atlas disk for testing
     Storage::fake('atlas');
 });

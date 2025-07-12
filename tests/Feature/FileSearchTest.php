@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\File;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 it('creates searchable array with correct data types for typesense', function () {
     $file = File::factory()->create([

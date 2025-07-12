@@ -4,9 +4,7 @@ use App\Jobs\ExtractFileMetadata;
 use App\Jobs\TranslateFileMetadata;
 use App\Models\File;
 use App\Models\FileMetadata;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-
 
 
 /**

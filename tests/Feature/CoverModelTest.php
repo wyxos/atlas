@@ -4,9 +4,6 @@ use App\Models\Album;
 use App\Models\Artist;
 use App\Models\Cover;
 use App\Models\File;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 it('can create a cover', function () {
     $cover = Cover::create([

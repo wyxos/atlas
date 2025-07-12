@@ -3,11 +3,6 @@
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
-beforeEach(function () {
-    // Run migrations to ensure the users table exists
-    $this->artisan('migrate');
-});
-
 test('command creates an admin with provided email and password', function () {
     $email = 'admin@example.com';
     $password = 'secure_password123';

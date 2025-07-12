@@ -5,19 +5,19 @@ namespace Tests\Feature;
 use App\Jobs\TranslateFileMetadata;
 use App\Models\Cover;
 use App\Models\File;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-
-
 
 beforeEach(function () {
     // Create a fake storage disk for testing
     Storage::fake('public');
     Storage::fake('atlas');
 
+    // Create unique test identifiers for parallel testing
+    $this->testId = uniqid('test_', true);
+
     // Create a simple test cover image
     $this->testCoverData = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
-    $this->testCoverHash = md5($this->testCoverData);
+    $this->testCoverHash = md5($this->testCoverData . $this->testId); // Make hash unique per test
 });
 
 test('it creates cover record when processing metadata with cover art', function () {
@@ -32,11 +32,11 @@ test('it creates cover record when processing metadata with cover art', function
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title',
+                    'value' => 'Test Title ' . $this->testId,
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist',
+                    'value' => 'Test Artist ' . $this->testId,
                 ],
                 [
                     'id' => 'APIC',
@@ -74,7 +74,7 @@ test('it creates cover record when processing metadata with cover art', function
 
 test('it reuses existing cover when duplicate is found', function () {
     // Create a test artist first to associate with the cover
-    $artist = \App\Models\Artist::create(['name' => 'Test Artist']);
+    $artist = \App\Models\Artist::create(['name' => 'Test Artist ' . $this->testId]);
 
     // Create a test cover using our test cover data
     $existingCover = Cover::create([
@@ -101,11 +101,11 @@ test('it reuses existing cover when duplicate is found', function () {
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title',
+                    'value' => 'Test Title ' . $this->testId,
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist',
+                    'value' => 'Test Artist ' . $this->testId,
                 ],
             ],
         ],
@@ -171,11 +171,11 @@ test('it processes PIC tag for cover art', function () {
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title',
+                    'value' => 'Test Title ' . $this->testId,
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist',
+                    'value' => 'Test Artist ' . $this->testId,
                 ],
                 [
                     'id' => 'PIC', // Using PIC instead of APIC
@@ -227,15 +227,15 @@ test('it prioritizes album over artist when associating covers', function () {
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title',
+                    'value' => 'Test Title ' . $this->testId,
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist',
+                    'value' => 'Test Artist ' . $this->testId,
                 ],
                 [
                     'id' => 'TALB',
-                    'value' => 'Test Album',
+                    'value' => 'Test Album ' . $this->testId,
                 ],
                 [
                     'id' => 'APIC',
@@ -292,11 +292,11 @@ test('it associates cover with artist when no album is present', function () {
             'ID3v2.3' => [
                 [
                     'id' => 'TIT2',
-                    'value' => 'Test Title',
+                    'value' => 'Test Title ' . $this->testId,
                 ],
                 [
                     'id' => 'TPE1',
-                    'value' => 'Test Artist',
+                    'value' => 'Test Artist ' . $this->testId,
                 ],
                 [
                     'id' => 'APIC',

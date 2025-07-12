@@ -3,9 +3,7 @@
 use App\Models\LoginHistory;
 use App\Models\User;
 use App\Notifications\NewUserRegistered;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-
 
 
 test('login history is recorded when a user logs in', function () {

@@ -3,9 +3,6 @@
 use App\Models\File;
 use App\Models\FileMetadata;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 it('can create a file', function () {
     $file = File::create([
