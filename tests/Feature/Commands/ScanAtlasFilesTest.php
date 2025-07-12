@@ -2,13 +2,13 @@
 
 use App\Jobs\ProcessFileHash;
 use App\Models\File;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
-beforeEach(function () {
-    // Run migrations to ensure the files table exists
-    $this->artisan('migrate');
+uses(RefreshDatabase::class);
 
+beforeEach(function () {
     // Create a fake atlas disk for testing
     Storage::fake('atlas');
 
