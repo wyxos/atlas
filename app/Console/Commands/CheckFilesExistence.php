@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\File;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class CheckFilesExistence extends Command
@@ -130,6 +131,11 @@ class CheckFilesExistence extends Command
             } else {
                 // For local files, check if they exist in the filesystem
                 $exists = Storage::disk('atlas')->exists($path) || file_exists($path);
+
+                // If file doesn't exist, check for double-dot version
+                if (!$exists) {
+                    $exists = $this->checkAndFixDoubleDotsFile($path);
+                }
             }
         }
 
@@ -141,5 +147,43 @@ class CheckFilesExistence extends Command
             'exists' => $exists,
             'path' => $path,
         ];
+    }
+
+    /**
+     * Check for double-dot version of file and rename it if found.
+     */
+    private function checkAndFixDoubleDotsFile(string $path): bool
+    {
+        // Get file extension and base path
+        $pathInfo = pathinfo($path);
+        $directory = $pathInfo['dirname'] ?? '';
+        $filename = $pathInfo['filename'] ?? '';
+        $extension = $pathInfo['extension'] ?? '';
+
+        // Create double-dot version path
+        $doubleDotsPath = $directory . DIRECTORY_SEPARATOR . $filename . '..' . $extension;
+
+        // Check if double-dot version exists
+        $doubleDotsExists = Storage::disk('atlas')->exists($doubleDotsPath) || file_exists($doubleDotsPath);
+
+        if ($doubleDotsExists) {
+            try {
+                // Try to rename using Storage disk first
+                if (Storage::disk('atlas')->exists($doubleDotsPath)) {
+                    Storage::disk('atlas')->move($doubleDotsPath, $path);
+                } else {
+                    // Fallback to direct file system rename
+                    rename($doubleDotsPath, $path);
+                }
+
+                return true;
+            } catch (\Exception $e) {
+                // Log the error but don't throw - just return false
+                Log::error("Failed to rename double-dot file: {$doubleDotsPath} to {$path}. Error: " . $e->getMessage());
+                return false;
+            }
+        }
+
+        return false;
     }
 }

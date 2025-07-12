@@ -83,3 +83,40 @@ test('command processes only the specified file when using --file option', funct
     expect($existingFile->not_found)->toBeFalse();
     expect($urlFile->not_found)->toBeFalse();
 });
+
+test('command finds and renames double-dot files', function () {
+    // Create a file with double dots that should be renamed
+    Storage::disk('test_disk')->put('test_file..jpg', 'Test image content');
+
+    // Get the path to the double-dot file
+    $doubleDotsFilePath = Storage::disk('test_disk')->path('test_file..jpg');
+    $originalFilePath = Storage::disk('test_disk')->path('test_file.jpg');
+
+    // Create a file record in the database for the original filename (without double dots)
+    $fileRecord = File::factory()->create([
+        'path' => $originalFilePath,
+        'filename' => 'test_file.jpg',
+        'not_found' => false, // Initially set to false
+    ]);
+
+    // Verify the original file doesn't exist but the double-dot version does
+    expect(file_exists($originalFilePath))->toBeFalse();
+    expect(file_exists($doubleDotsFilePath))->toBeTrue();
+
+    // Run the command for this specific file
+    $this->artisan('files:check-existence --file=' . $fileRecord->id)
+        ->expectsOutput('Checking file existence...')
+        ->assertSuccessful();
+
+    // Refresh the file record
+    $fileRecord->refresh();
+
+    // The file should now be marked as found (not_found = false)
+    expect($fileRecord->not_found)->toBeFalse();
+
+    // The original file should now exist (renamed from double-dot version)
+    expect(file_exists($originalFilePath))->toBeTrue();
+
+    // The double-dot file should no longer exist
+    expect(file_exists($doubleDotsFilePath))->toBeFalse();
+});
