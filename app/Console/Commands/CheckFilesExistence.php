@@ -129,7 +129,7 @@ class CheckFilesExistence extends Command
                 $exists = true;
             } else {
                 // For local files, check if they exist in the filesystem
-                $exists = file_exists(Storage::disk('atlas')->path($path)) || file_exists($path);
+                $exists = Storage::disk('atlas')->exists($path) || file_exists($path);
             }
         }
 
