@@ -22,8 +22,3 @@ Performance:
 UI/Integration:
 * Check if UI alignments need backend alignments and vice versa.
 * Use Inertia router if applicable; otherwise, Axios; never Fetch.
-
-Task Management:
-* Strike out completed tasks in `todo.md`.
-* Read `.junie/feature-documentation.md` before tasks to understand flows and context.
-* Update `.junie/feature-documentation.md` after tasks with feature purpose, flow overview, setup/config/business logic, and notes for future agents.

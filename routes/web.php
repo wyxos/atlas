@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AudioController;
+use App\Http\Controllers\FileController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -73,6 +74,10 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+
+    // Files routes
+    Route::get('files', [FileController::class, 'index'])->name('files.index');
+    Route::delete('files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
 });
 
 require __DIR__.'/settings.php';

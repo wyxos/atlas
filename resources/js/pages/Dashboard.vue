@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import PlaceholderPattern from '../components/PlaceholderPattern.vue';
 import { BarChart } from '@/components/ui/bar-chart';
 import { PieChart } from '@/components/ui/pie-chart';
@@ -168,10 +168,10 @@ const getSpacePercentage = (bytes: number): number => {
                         <div class="text-2xl font-bold text-green-600">{{ formatFileSize(fileStats.audioSpaceUsed) }}</div>
                         <div class="text-sm text-muted-foreground">Space Used</div>
                     </div>
-                    <div class="space-y-1">
+                    <Link :href="route('files.index', { not_found: 'true' })" class="space-y-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2 transition-colors">
                         <div class="text-2xl font-bold text-red-600">{{ fileStats.audioNotFound.toLocaleString() }}</div>
                         <div class="text-sm text-muted-foreground">Not Found</div>
-                    </div>
+                    </Link>
                 </div>
             </div>
 
