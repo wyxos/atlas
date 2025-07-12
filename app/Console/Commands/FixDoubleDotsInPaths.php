@@ -204,6 +204,7 @@ class FixDoubleDotsInPaths extends Command
 
                 // Update the database record
                 $file->path = $correctedPath;
+                $file->ext = pathinfo($correctedPath, PATHINFO_EXTENSION);
                 $file->save();
             }
 
