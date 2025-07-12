@@ -15,9 +15,10 @@ beforeEach(function () {
     // Create unique test identifiers for parallel testing
     $this->testId = uniqid('test_', true);
 
-    // Create a simple test cover image
-    $this->testCoverData = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
-    $this->testCoverHash = md5($this->testCoverData . $this->testId); // Make hash unique per test
+    // Create a simple test cover image with unique data per test for parallel execution
+    $baseCoverData = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    $this->testCoverData = $baseCoverData . $this->testId; // Make cover data unique per test
+    $this->testCoverHash = md5($this->testCoverData); // Hash will be unique because data is unique
 });
 
 test('it creates cover record when processing metadata with cover art', function () {
