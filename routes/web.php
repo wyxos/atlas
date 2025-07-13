@@ -54,6 +54,8 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     // Playlists routes (moved to parent level)
     Route::get('playlists', [AudioController::class, 'playlists'])->name('playlists.index');
     Route::post('playlists', [AudioController::class, 'storePlaylist'])->name('playlists.store');
+    Route::get('playlists/{playlist}', [AudioController::class, 'showPlaylist'])->name('playlists.show');
+    Route::post('playlists/{playlist}/files', [AudioController::class, 'addFileToPlaylist'])->name('playlists.files.store');
 
     Route::get('audio/{file}', [AudioController::class, 'show'])->name('audio.show');
 

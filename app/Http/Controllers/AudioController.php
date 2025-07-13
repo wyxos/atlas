@@ -400,4 +400,54 @@ class AudioController extends Controller
 
         return back()->with('success', 'Playlist created successfully');
     }
+
+    public function showPlaylist(Playlist $playlist)
+    {
+        $search = [];
+
+        if ($query = request()->input('query')) {
+            // Filter search results to only include audio files in this playlist
+            $search = $playlist->files()
+                ->search($query)
+                ->query(function ($builder) {
+                    $builder->where('mime_type', 'like', 'audio/%')
+                            ->where('not_found', false);
+                })
+                ->get();
+
+            // Load metadata, covers, artists, and albums relationships for search results
+            if ($search->isNotEmpty()) {
+                $search->load(['metadata', 'covers', 'artists', 'albums']);
+            }
+        }
+
+        return Inertia::render('PlaylistShow', [
+            'playlist' => $playlist->load(['user', 'covers']),
+            'files' => fn () => $playlist->files()
+                ->where('mime_type', 'like', 'audio/%')
+                ->where('not_found', false)
+                ->select(['files.id'])
+                ->get(),
+            'search' => $search,
+        ]);
+    }
+
+    public function addFileToPlaylist(Request $request, Playlist $playlist)
+    {
+        $request->validate([
+            'file_id' => 'required|exists:files,id',
+        ]);
+
+        $file = File::findOrFail($request->file_id);
+
+        // Check if file is already in playlist
+        if ($playlist->files()->where('files.id', $file->id)->exists()) {
+            return back()->with('error', 'Track is already in this playlist');
+        }
+
+        // Add file to playlist
+        $playlist->files()->attach($file->id);
+
+        return back()->with('success', 'Track added to playlist successfully');
+    }
 }

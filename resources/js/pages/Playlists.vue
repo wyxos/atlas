@@ -92,6 +92,7 @@ function formatDate(dateString: string): string {
                     v-for="playlist in playlists.data"
                     :key="playlist.id"
                     class="hover:shadow-lg transition-shadow cursor-pointer"
+                    @click="() => router.visit(route('playlists.show', { playlist: playlist.id }))"
                 >
                     <CardContent class="p-4">
                         <div class="flex items-center space-x-4">

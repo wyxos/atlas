@@ -5,6 +5,7 @@ use App\Models\Artist;
 use App\Models\Cover;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Models\Playlist;
 use App\Models\User;
 
 it('can get file details with all relationships loaded', function () {
@@ -477,3 +478,33 @@ it('returns 404 for non-existent file when toggling laughed at', function () {
     $response->assertStatus(404);
 });
 
+it('playlists endpoint returns paginated data structure', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create some test playlists
+    $playlist1 = Playlist::create([
+        'name' => 'Test Playlist 1',
+        'user_id' => $user->id,
+    ]);
+
+    $playlist2 = Playlist::create([
+        'name' => 'Test Playlist 2',
+        'user_id' => $user->id,
+    ]);
+
+    // Test that the playlists route returns paginated data
+    $response = $this->get('/playlists');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Playlists')
+        ->has('playlists')
+        ->has('playlists.data')
+        ->has('playlists.links')
+        ->has('playlists.data', 2) // Should have 2 playlists
+        ->where('playlists.data.0.id', fn ($id) => in_array($id, [$playlist1->id, $playlist2->id]))
+        ->where('playlists.data.1.id', fn ($id) => in_array($id, [$playlist1->id, $playlist2->id]))
+    );
+});

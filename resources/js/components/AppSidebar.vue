@@ -15,11 +15,14 @@ interface Playlist {
 }
 
 const page = usePage<{
-    playlists: Playlist[];
+    playlists: {
+        data: Playlist[];
+        links: any[];
+    };
 }>();
 
 const mainNavItems = computed((): NavItem[] => {
-    const playlistItems: NavItem[] = page.props.playlists.map((playlist) => ({
+    const playlistItems: NavItem[] = (page.props.playlists?.data || []).map((playlist) => ({
         title: playlist.name,
         href: `/playlists/${playlist.id}`,
         icon: ListMusic,
