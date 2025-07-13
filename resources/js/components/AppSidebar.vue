@@ -4,82 +4,100 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { Headset, LayoutGrid, Video, Image, Users, Heart, ThumbsUp, ThumbsDown, Mic, Disc, ListMusic, HelpCircle, FileText } from 'lucide-vue-next';
+import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Audio',
-        href: '/audio',
-        icon: Headset,
-        isCollapsible: true,
-        items: [
-            {
-                title: 'Favorites',
-                href: '/audio/favorites',
-                icon: Heart,
-            },
-            {
-                title: 'Liked',
-                href: '/audio/liked',
-                icon: ThumbsUp,
-            },
-            {
-                title: 'Disliked',
-                href: '/audio/disliked',
-                icon: ThumbsDown,
-            },
-            {
-                title: 'Unrated',
-                href: '/audio/unrated',
-                icon: HelpCircle,
-            },
-            {
-                title: 'Artists',
-                href: '/artists',
-                icon: Mic,
-            },
-            {
-                title: 'Albums',
-                href: '/albums',
-                icon: Disc,
-            },
-        ],
-    },
-    {
-        title: 'Video',
-        href: '/video',
-        icon: Video
-    },
-    {
-        title: 'Images',
-        href: '/images',
-        icon: Image
-    },
-    {
-        title: 'Playlists',
-        href: '/playlists',
+interface Playlist {
+    id: number;
+    name: string;
+}
+
+const page = usePage<{
+    playlists: Playlist[];
+}>();
+
+const mainNavItems = computed((): NavItem[] => {
+    const playlistItems: NavItem[] = page.props.playlists.map((playlist) => ({
+        title: playlist.name,
+        href: `/playlists/${playlist.id}`,
         icon: ListMusic,
-        isCollapsible: true,
-        items: [],
-    },
-    {
-        title: 'Users',
-        href: '/users',
-        icon: Users
-    },
-    {
-        title: 'Files',
-        href: '/files',
-        icon: FileText
-    }
-];
+    }));
+
+    return [
+        {
+            title: 'Dashboard',
+            href: '/dashboard',
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Audio',
+            href: '/audio',
+            icon: Headset,
+            isCollapsible: true,
+            items: [
+                {
+                    title: 'Favorites',
+                    href: '/audio/favorites',
+                    icon: Heart,
+                },
+                {
+                    title: 'Liked',
+                    href: '/audio/liked',
+                    icon: ThumbsUp,
+                },
+                {
+                    title: 'Disliked',
+                    href: '/audio/disliked',
+                    icon: ThumbsDown,
+                },
+                {
+                    title: 'Unrated',
+                    href: '/audio/unrated',
+                    icon: HelpCircle,
+                },
+                {
+                    title: 'Artists',
+                    href: '/artists',
+                    icon: Mic,
+                },
+                {
+                    title: 'Albums',
+                    href: '/albums',
+                    icon: Disc,
+                },
+            ],
+        },
+        {
+            title: 'Video',
+            href: '/video',
+            icon: Video
+        },
+        {
+            title: 'Images',
+            href: '/images',
+            icon: Image
+        },
+        {
+            title: 'Playlists',
+            href: '/playlists',
+            icon: ListMusic,
+            isCollapsible: true,
+            items: playlistItems,
+        },
+        {
+            title: 'Users',
+            href: '/users',
+            icon: Users
+        },
+        {
+            title: 'Files',
+            href: '/files',
+            icon: FileText
+        }
+    ];
+});
 
 const footerNavItems: NavItem[] = [
 ];

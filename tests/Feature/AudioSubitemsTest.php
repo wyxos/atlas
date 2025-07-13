@@ -227,3 +227,34 @@ test('unrated page shows only unrated audio files', function () {
         ->where('title', 'Unrated')
     );
 });
+
+test('playlists are shared globally for sidebar', function () {
+    // Create some playlists for the user
+    $playlist1 = Playlist::factory()->create([
+        'name' => 'My Rock Playlist',
+        'user_id' => $this->user->id,
+    ]);
+
+    $playlist2 = Playlist::factory()->create([
+        'name' => 'Jazz Collection',
+        'user_id' => $this->user->id,
+    ]);
+
+    // Create a playlist for another user (should not be included)
+    $otherUser = User::factory()->create();
+    $otherPlaylist = Playlist::factory()->create([
+        'name' => 'Other User Playlist',
+        'user_id' => $otherUser->id,
+    ]);
+
+    $response = $this->actingAs($this->user)->get('/dashboard');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->has('playlists', 2)
+        ->where('playlists.0.name', 'Jazz Collection') // Ordered by name
+        ->where('playlists.0.id', $playlist2->id)
+        ->where('playlists.1.name', 'My Rock Playlist')
+        ->where('playlists.1.id', $playlist1->id)
+    );
+});

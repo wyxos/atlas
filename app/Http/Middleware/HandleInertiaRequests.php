@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Playlist;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -46,6 +47,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'playlists' => $request->user() ? Playlist::where('user_id', $request->user()->id)
+                ->select(['id', 'name'])
+                ->orderBy('name')
+                ->get() : [],
             'ziggy' => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
