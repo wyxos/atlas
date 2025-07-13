@@ -91,7 +91,7 @@ test('file can be deleted by admin', function () {
 
     $response = $this->actingAs($admin)->delete("/files/{$fileToDelete->id}");
 
-    $response->assertRedirect('/files');
+    $response->assertRedirectBack();
     $response->assertSessionHas('success');
 
     $this->assertDatabaseMissing('files', [
