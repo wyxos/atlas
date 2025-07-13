@@ -3,12 +3,16 @@
 use App\Models\Cover;
 use App\Models\File;
 use App\Models\Playlist;
+use App\Models\User;
 
 it('can create a playlist', function () {
+    $user = User::factory()->create();
+
     $playlist = Playlist::create([
         'name' => 'My Awesome Playlist',
         'is_smart' => false,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     expect($playlist)->toBeInstanceOf(Playlist::class);
@@ -18,6 +22,7 @@ it('can create a playlist', function () {
 });
 
 it('can create a smart playlist', function () {
+    $user = User::factory()->create();
     $smartParameters = [
         'genre' => 'rock',
         'year' => ['min' => 2000, 'max' => 2020],
@@ -28,6 +33,7 @@ it('can create a smart playlist', function () {
         'name' => 'Smart Rock Playlist',
         'is_smart' => true,
         'smart_parameters' => $smartParameters,
+        'user_id' => $user->id,
     ]);
 
     expect($playlist)->toBeInstanceOf(Playlist::class);
@@ -37,10 +43,13 @@ it('can create a smart playlist', function () {
 });
 
 it('casts is_smart to boolean', function () {
+    $user = User::factory()->create();
+
     $playlist = Playlist::create([
         'name' => 'Test Playlist',
         'is_smart' => 1,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     expect($playlist->is_smart)->toBeTrue();
@@ -48,12 +57,14 @@ it('casts is_smart to boolean', function () {
 });
 
 it('casts smart_parameters to array', function () {
+    $user = User::factory()->create();
     $smartParameters = ['genre' => 'jazz', 'limit' => 50];
 
     $playlist = Playlist::create([
         'name' => 'Jazz Playlist',
         'is_smart' => true,
         'smart_parameters' => $smartParameters,
+        'user_id' => $user->id,
     ]);
 
     expect($playlist->smart_parameters)->toBeArray();
@@ -61,10 +72,13 @@ it('casts smart_parameters to array', function () {
 });
 
 it('can have many covers', function () {
+    $user = User::factory()->create();
+
     $playlist = Playlist::create([
         'name' => 'Test Playlist',
         'is_smart' => false,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     $cover1 = Cover::create([
@@ -87,10 +101,13 @@ it('can have many covers', function () {
 });
 
 it('cover can belong to a playlist', function () {
+    $user = User::factory()->create();
+
     $playlist = Playlist::create([
         'name' => 'Test Playlist',
         'is_smart' => false,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     $cover = Cover::create([
@@ -105,18 +122,24 @@ it('cover can belong to a playlist', function () {
 });
 
 it('has default value for is_smart', function () {
+    $user = User::factory()->create();
+
     $playlist = Playlist::create([
         'name' => 'Default Playlist',
+        'user_id' => $user->id,
     ]);
 
     expect($playlist->is_smart)->toBeFalse();
 });
 
 it('can have many files', function () {
+    $user = User::factory()->create();
+
     $playlist = Playlist::create([
         'name' => 'Test Playlist',
         'is_smart' => false,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     $file1 = File::create([
@@ -145,16 +168,20 @@ it('can have many files', function () {
 });
 
 it('file can belong to many playlists', function () {
+    $user = User::factory()->create();
+
     $playlist1 = Playlist::create([
         'name' => 'Rock Playlist',
         'is_smart' => false,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     $playlist2 = Playlist::create([
         'name' => 'Favorites Playlist',
         'is_smart' => false,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     $file = File::create([
@@ -174,10 +201,13 @@ it('file can belong to many playlists', function () {
 });
 
 it('can detach files from playlist', function () {
+    $user = User::factory()->create();
+
     $playlist = Playlist::create([
         'name' => 'Test Playlist',
         'is_smart' => false,
         'smart_parameters' => null,
+        'user_id' => $user->id,
     ]);
 
     $file = File::create([
