@@ -75,6 +75,31 @@ function loadInteractionStates(file: any) {
 // Load interaction states when the current file changes
 watch(() => audioStore.currentFile, loadInteractionStates, { immediate: true });
 
+// Watch for reaction changes in the current file to sync local state
+watch(() => audioStore.currentFile?.liked, (newValue) => {
+    if (audioStore.currentFile && isLiked.value !== !!newValue) {
+        isLiked.value = !!newValue;
+    }
+});
+
+watch(() => audioStore.currentFile?.loved, (newValue) => {
+    if (audioStore.currentFile && isLoved.value !== !!newValue) {
+        isLoved.value = !!newValue;
+    }
+});
+
+watch(() => audioStore.currentFile?.disliked, (newValue) => {
+    if (audioStore.currentFile && isDisliked.value !== !!newValue) {
+        isDisliked.value = !!newValue;
+    }
+});
+
+watch(() => audioStore.currentFile?.funny, (newValue) => {
+    if (audioStore.currentFile && isLaughedAt.value !== !!newValue) {
+        isLaughedAt.value = !!newValue;
+    }
+});
+
 // Get the current file title for display
 const currentTitle = computed(() => {
     if (!audioStore.currentFile) return 'No file selected';

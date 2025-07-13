@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
-import { onMounted, provide } from 'vue';
+import { onMounted, provide, watch } from 'vue';
 import { audioStore, audioActions } from '@/stores/audioStore';
 
 // Import our new components and composables
@@ -264,6 +264,31 @@ function laughedAtItem(item: any, event: Event): void {
     swipedItemId.value = null;
 }
 
+
+// Watch for reaction changes in the current file to sync loadedFiles
+watch(() => audioStore.currentFile?.liked, (newValue) => {
+    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
+        loadedFiles[audioStore.currentFile.id].liked = !!newValue;
+    }
+});
+
+watch(() => audioStore.currentFile?.loved, (newValue) => {
+    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
+        loadedFiles[audioStore.currentFile.id].loved = !!newValue;
+    }
+});
+
+watch(() => audioStore.currentFile?.disliked, (newValue) => {
+    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
+        loadedFiles[audioStore.currentFile.id].disliked = !!newValue;
+    }
+});
+
+watch(() => audioStore.currentFile?.funny, (newValue) => {
+    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
+        loadedFiles[audioStore.currentFile.id].funny = !!newValue;
+    }
+});
 
 onMounted(() => {
     // Provide the loadFileDetails function for the AudioPlayer
