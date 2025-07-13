@@ -94,6 +94,9 @@ function convertToDuration(seconds: number): string {
 // Drag and drop state
 const isDragging = ref(false);
 
+// Hover state for play/pause button
+const isHovered = ref(false);
+
 // Drag and drop functions
 const handleDragEnter = (event: DragEvent): void => {
     event.preventDefault();
@@ -203,20 +206,31 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
     @mousedown="emit('touchStart', $event)"
     @mousemove="emit('touchMove', $event)"
     @mouseup="emit('touchEnd', item)"
-    @mouseleave="$event.buttons && emit('touchEnd', item)"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false; $event.buttons && emit('touchEnd', item)"
   >
     <div class="flex gap-2 items-center group">
         <button
-            class="cursor-pointer  text-white w-10 mr-6 flex items-center justify-center"
+            class="cursor-pointer text-white w-10 mr-6 flex items-center justify-center"
             @click.stop="handlePlay($event)"
         >
-
-            <span v-if="currentFileId !== item.id"
-                  @click.stop="handlePlay($event)">{{ index}}</span>
-
-            <template>
-                <Play v-if="!isPlaying || currentFileId !== item.id" :size="20" />
-                <Pause v-else :size="20" />
+            <!-- Show play/pause button on hover -->
+            <template v-if="isHovered">
+                <Pause v-if="isPlaying && currentFileId === item.id" :size="20" />
+                <Play v-else :size="20" />
+            </template>
+            <!-- Show index or animated wave when not hovering -->
+            <template v-else>
+                <!-- Show animated wave if this file is currently playing -->
+                <div class="boxContainer" v-if="isPlaying && currentFileId === item.id">
+                    <div class="box box1"></div>
+                    <div class="box box2"></div>
+                    <div class="box box3"></div>
+                    <div class="box box4"></div>
+                    <div class="box box5"></div>
+                </div>
+                <!-- Show index number when not playing -->
+                <span v-else class="text-sm font-medium">{{ index }}</span>
             </template>
         </button>
       <div
@@ -312,3 +326,80 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
     </div>
   </div>
 </template>
+
+<style>
+@keyframes quiet {
+    25%{
+        transform: scaleY(.6);
+    }
+    50%{
+        transform: scaleY(.4);
+    }
+    75%{
+        transform: scaleY(.8);
+    }
+}
+
+@keyframes normal {
+    25%{
+        transform: scaleY(1);
+    }
+    50%{
+        transform: scaleY(.4);
+    }
+    75%{
+        transform: scaleY(.6);
+    }
+}
+@keyframes loud {
+    25%{
+        transform: scaleY(1);
+    }
+    50%{
+        transform: scaleY(.4);
+    }
+    75%{
+        transform: scaleY(1.7);
+    }
+}
+
+.boxContainer{
+    display: flex;
+    justify-content: space-between;
+    height: 30px;
+    --boxSize: 6px;
+    --gutter: 4px;
+    width: calc((var(--boxSize) + var(--gutter)) * 5);
+}
+
+.box{
+    transform: scaleY(.4);
+    height: 100%;
+    width: var(--boxSize);
+    background: #12E2DC;
+    animation-duration: 1s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    border-radius: 4px;
+}
+
+.box1{
+    animation-name: quiet;
+}
+
+.box2{
+    animation-name: normal;
+}
+
+.box3{
+    animation-name: quiet;
+}
+
+.box4{
+    animation-name: loud;
+}
+
+.box5{
+    animation-name: quiet;
+}
+</style>
