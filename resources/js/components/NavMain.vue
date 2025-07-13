@@ -25,9 +25,10 @@ function isExpanded(itemTitle: string): boolean {
 }
 
 function isItemActive(item: NavItem): boolean {
-    if (item.href === page.url) return true;
+    const currentBaseUrl = page.url.split('?')[0];
+    if (item.href === currentBaseUrl) return true;
     if (item.items) {
-        return item.items.some(subItem => subItem.href === page.url);
+        return item.items.some(subItem => subItem.href === currentBaseUrl);
     }
     return false;
 }
@@ -37,8 +38,9 @@ function initializeExpandedState(): void {
     expandedItems.value.clear();
 
     // Auto-expand parent items that have active sub-items
+    const currentBaseUrl = page.url.split('?')[0];
     props.items.forEach(item => {
-        if (item.items && item.items.some(subItem => subItem.href === page.url)) {
+        if (item.items && item.items.some(subItem => subItem.href === currentBaseUrl)) {
             expandedItems.value.add(item.title);
         }
     });
@@ -79,7 +81,7 @@ watch(() => page.url, () => {
                     </SidebarMenuButton>
                     <SidebarMenuSub v-if="isExpanded(item.title)">
                         <SidebarMenuSubItem v-for="subItem in item.items" :key="subItem.title">
-                            <SidebarMenuSubButton as-child :is-active="subItem.href === page.url">
+                            <SidebarMenuSubButton as-child :is-active="subItem.href === page.url.split('?')[0]">
                                 <Link :href="subItem.href">
                                     <component v-if="subItem.icon" :is="subItem.icon" />
                                     <span>{{ subItem.title }}</span>
@@ -91,7 +93,7 @@ watch(() => page.url, () => {
 
                 <!-- Regular item without sub-items -->
                 <template v-else>
-                    <SidebarMenuButton as-child :is-active="item.href === page.url" :tooltip="item.title">
+                    <SidebarMenuButton as-child :is-active="item.href === page.url.split('?')[0]" :tooltip="item.title">
                         <Link :href="item.href">
                             <component :is="item.icon" />
                             <span>{{ item.title }}</span>
