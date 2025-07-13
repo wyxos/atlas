@@ -6,7 +6,7 @@
   - [ ] Ability to edit metadata
 - Artist view
 - Album view
-- Discography view
+- Discography view 
 - Browse mode
   - [ ] Spotify integration
   - [ ] KH Insider

@@ -5,10 +5,6 @@ import {
     Pause,
     SkipBack,
     SkipForward,
-    Heart,
-    ThumbsUp,
-    ThumbsDown,
-    Laugh,
     Shuffle,
     Repeat,
     Repeat1
@@ -16,6 +12,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
 import { audioStore, audioActions } from '@/stores/audioStore';
+import AudioReactions from '@/components/audio/AudioReactions.vue';
 
 
 // Create a single, persistent audio element that will be shared across all instances
@@ -401,8 +398,6 @@ function updateCurrentFile(newFile: any): void {
     audioActions.setCurrentFile(newFile);
 }
 
-// Import additional icons for like/love/dislike
-import { Heart, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
 
 // Watch for changes to isPlaying and currentFile
 watch(() => audioStore.isPlaying, updatePlayState);
@@ -645,42 +640,17 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                     </div>
 
                     <!-- Love/Like controls (right) -->
-                    <div class="flex items-center gap-2 flex-1">
-                        <button
-                            class="button circular small empty"
-                            :class="{ 'destructive': isLoved }"
-                            @click="handleLove"
-                            title="Love"
-                        >
-                            <Heart :size="16" />
-                        </button>
-
-                        <button
-                            class="button circular small empty"
-                            :class="{ 'active': isLiked }"
-                            @click="handleLike"
-                            title="Like"
-                        >
-                            <ThumbsUp :size="16" />
-                        </button>
-
-                        <button
-                            class="button circular small empty"
-                            :class="{ 'disabled': isDisliked }"
-                            @click="handleDislike"
-                            title="Dislike"
-                        >
-                            <ThumbsDown :size="16" />
-                        </button>
-
-                        <button
-                            class="button circular small empty"
-                            :class="{ 'text-yellow-500 bg-yellow-500/20': isLaughedAt }"
-                            @click="handleLaughedAt"
-                            title="Funny"
-                        >
-                            <Laugh :size="16" />
-                        </button>
+                    <div class="flex items-center flex-1">
+                        <AudioReactions
+                            :file="audioStore.currentFile"
+                            :icon-size="16"
+                            variant="player"
+                            :show-labels="true"
+                            @favorite="handleLove"
+                            @like="handleLike"
+                            @dislike="handleDislike"
+                            @laughed-at="handleLaughedAt"
+                        />
                     </div>
                 </div>
             </div>

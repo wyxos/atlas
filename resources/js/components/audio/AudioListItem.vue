@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Play, Pause, Heart, ThumbsUp, ThumbsDown, Laugh } from 'lucide-vue-next';
+import { Play, Pause } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
+import AudioReactions from '@/components/audio/AudioReactions.vue';
 
 const props = defineProps<{
   item: any;
@@ -51,29 +52,6 @@ function handlePlay(event: Event): void {
   emit('play', props.item);
 }
 
-// Handle favorite button click
-function handleFavorite(event: Event): void {
-  event.stopPropagation();
-  emit('favorite', props.item, event);
-}
-
-// Handle like button click
-function handleLike(event: Event): void {
-  event.stopPropagation();
-  emit('like', props.item, event);
-}
-
-// Handle dislike button click
-function handleDislike(event: Event): void {
-  event.stopPropagation();
-  emit('dislike', props.item, event);
-}
-
-// Handle laughed at button click
-function handleLaughedAt(event: Event): void {
-  event.stopPropagation();
-  emit('laughedAt', props.item, event);
-}
 
 // Handle track title click to navigate to FileShow
 function handleTitleClick(event: Event): void {
@@ -294,35 +272,16 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
     </div>
 
     <!-- Action buttons container -->
-    <div class="absolute top-0 left-full md:static h-full items-center flex gap-4 p-4">
-      <button
-        class="text-foreground hover:text-destructive transition-colors p-1 rounded"
-        :class="{ 'text-red-500 bg-red-500/20': loadedFile?.loved }"
-        @click.stop="handleFavorite($event)"
-      >
-        <Heart :size="20" :fill="loadedFile?.loved ? 'currentColor' : 'none'" />
-      </button>
-      <button
-        class="text-foreground hover:text-secondary transition-colors p-1 rounded"
-        :class="{ 'text-blue-500 bg-blue-500/20': loadedFile?.liked }"
-        @click.stop="handleLike($event)"
-      >
-        <ThumbsUp :size="20" :fill="loadedFile?.liked ? 'currentColor' : 'none'" />
-      </button>
-      <button
-        class="text-foreground hover:text-destructive transition-colors p-1 rounded"
-        :class="{ 'text-gray-500 bg-gray-500/20': loadedFile?.disliked }"
-        @click.stop="handleDislike($event)"
-      >
-        <ThumbsDown :size="20" :fill="loadedFile?.disliked ? 'currentColor' : 'none'" />
-      </button>
-      <button
-        class="text-foreground hover:text-yellow-500 transition-colors p-1 rounded"
-        :class="{ 'text-yellow-500 bg-yellow-500/20': loadedFile?.funny }"
-        @click.stop="handleLaughedAt($event)"
-      >
-        <Laugh :size="20" :fill="loadedFile?.funny ? 'currentColor' : 'none'" />
-      </button>
+    <div class="absolute top-0 left-full md:static h-full items-center flex p-4">
+      <AudioReactions
+        :file="loadedFile"
+        :icon-size="20"
+        variant="list"
+        @favorite="(file, event) => emit('favorite', file, event)"
+        @like="(file, event) => emit('like', file, event)"
+        @dislike="(file, event) => emit('dislike', file, event)"
+        @laughed-at="(file, event) => emit('laughedAt', file, event)"
+      />
     </div>
   </div>
 </template>
