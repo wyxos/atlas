@@ -9,6 +9,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { debounce } from 'lodash';
 import { ref, watch } from 'vue';
+import { Trash } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -134,7 +135,9 @@ const getFileTypeColor = (mimeType: string): string => {
                             <TableCell>{{ formatDate(file.created_at) }}</TableCell>
                             <TableCell>
                                 <div class="flex space-x-2">
-                                    <button @click="openDeleteDialog(file)" class="text-red-600 hover:text-red-800">Delete</button>
+                                    <Button @click="openDeleteDialog(file)" variant="destructive">
+                                        <Trash></Trash>
+                                    </Button>
                                 </div>
                             </TableCell>
                         </TableRow>

@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ref } from 'vue';
+import { Trash, Pencil } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -93,15 +94,15 @@ const openDeleteDialog = (user: User) => {
               <TableCell>{{ user.last_login_at ? formatDate(user.last_login_at) : 'Never' }}</TableCell>
               <TableCell>
                 <div class="flex space-x-2">
-                  <Link :href="`/users/${user.id}/edit`" class="text-blue-600 hover:text-blue-800">
-                    Edit
-                  </Link>
-                  <button
+                  <Button @click="router.get(`/users/${user.id}/edit`)">
+                      <Pencil></Pencil>
+                  </Button>
+                  <Button
                     @click="openDeleteDialog(user)"
-                    class="text-red-600 hover:text-red-800"
+                    variant="destructive"
                   >
-                    Delete
-                  </button>
+                      <Trash></Trash>
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
