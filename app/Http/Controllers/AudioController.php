@@ -316,7 +316,9 @@ class AudioController extends Controller
     {
         $artists = Artist::whereHas('files', function ($query) {
             $query->audio()->where('not_found', false);
-        })->with('covers')->get();
+        })->with('covers')
+        ->orderBy('name')
+        ->paginate(12);
 
         return Inertia::render('Artists', [
             'artists' => $artists,

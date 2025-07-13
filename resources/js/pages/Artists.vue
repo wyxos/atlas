@@ -2,10 +2,9 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Mic } from 'lucide-vue-next';
+import { Pagination } from '@/components/ui/pagination';
+import { Mic } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -27,40 +26,13 @@ interface Artist {
     }>;
 }
 
-const props = defineProps<{
-    artists: Artist[];
+defineProps<{
+    artists: {
+        data: Artist[];
+        links: any[];
+        meta: any;
+    };
 }>();
-
-// Pagination state
-const currentPage = ref(1);
-const itemsPerPage = 12;
-
-// Computed properties for pagination
-const totalPages = computed(() => Math.ceil(props.artists.length / itemsPerPage));
-const paginatedArtists = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return props.artists.slice(start, end);
-});
-
-// Pagination methods
-function goToPage(page: number): void {
-    if (page >= 1 && page <= totalPages.value) {
-        currentPage.value = page;
-    }
-}
-
-function nextPage(): void {
-    if (currentPage.value < totalPages.value) {
-        currentPage.value++;
-    }
-}
-
-function prevPage(): void {
-    if (currentPage.value > 1) {
-        currentPage.value--;
-    }
-}
 
 // Get artist cover image
 function getArtistCover(artist: Artist): string {
@@ -84,7 +56,7 @@ function getArtistCover(artist: Artist): string {
             <!-- Artists Grid -->
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
                 <Card
-                    v-for="artist in paginatedArtists"
+                    v-for="artist in artists.data"
                     :key="artist.id"
                     class="hover:shadow-lg transition-shadow cursor-pointer"
                 >
@@ -106,43 +78,10 @@ function getArtistCover(artist: Artist): string {
             </div>
 
             <!-- Pagination -->
-            <div v-if="totalPages > 1" class="flex items-center justify-center space-x-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="currentPage === 1"
-                    @click="prevPage"
-                >
-                    <ChevronLeft class="w-4 h-4" />
-                    Previous
-                </Button>
-
-                <div class="flex space-x-1">
-                    <Button
-                        v-for="page in totalPages"
-                        :key="page"
-                        :variant="page === currentPage ? 'default' : 'outline'"
-                        size="sm"
-                        @click="goToPage(page)"
-                        class="min-w-[40px]"
-                    >
-                        {{ page }}
-                    </Button>
-                </div>
-
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="currentPage === totalPages"
-                    @click="nextPage"
-                >
-                    Next
-                    <ChevronRight class="w-4 h-4" />
-                </Button>
-            </div>
+            <Pagination :data="artists" />
 
             <!-- Empty state -->
-            <div v-if="artists.length === 0" class="text-center py-12">
+            <div v-if="artists.data.length === 0" class="text-center py-12">
                 <Mic class="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 class="text-lg font-semibold text-gray-600 mb-2">No Artists Found</h3>
                 <p class="text-gray-500">No artists are available in your music collection.</p>

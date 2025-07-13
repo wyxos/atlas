@@ -3,7 +3,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, Disc } from 'lucide-vue-next';
+import { Pagination } from '@/components/ui/pagination';
+import { Disc } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -36,7 +37,7 @@ const { albums } = defineProps<{
 // Get album cover image
 function getAlbumCover(album: Album): string {
     if (album.covers && album.covers.length > 0) {
-        return `/storage/${album.covers[0].path}`;
+        return `/atlas/${album.covers[0].path}`;
     }
     return '';
 }
@@ -77,30 +78,7 @@ function getAlbumCover(album: Album): string {
             </div>
 
             <!-- Pagination -->
-            <div v-if="albums.links && albums.links.length > 3" class="mt-4 flex justify-center">
-                <nav class="flex space-x-2">
-                    <template v-for="link in albums.links" :key="link.label">
-                        <Link
-                            v-if="link.url"
-                            :href="link.url"
-                            class="rounded-md px-3 py-2 text-sm"
-                            :class="{
-                                'bg-blue-500 text-white': link.active,
-                                'bg-gray-200 text-gray-700 hover:bg-gray-300': !link.active,
-                            }"
-                        >
-                            <ChevronLeft v-if="link.label.includes('Previous')" class="h-4 w-4" />
-                            <ChevronRight v-else-if="link.label.includes('Next')" class="h-4 w-4" />
-                            <span v-else>{{ link.label }}</span>
-                        </Link>
-                        <span v-else class="px-3 py-2 text-sm text-gray-400">
-                            <ChevronLeft v-if="link.label.includes('Previous')" class="h-4 w-4" />
-                            <ChevronRight v-else-if="link.label.includes('Next')" class="h-4 w-4" />
-                            <span v-else>{{ link.label }}</span>
-                        </span>
-                    </template>
-                </nav>
-            </div>
+            <Pagination :data="albums" />
 
             <!-- Empty state -->
             <div v-if="albums.data.length === 0" class="text-center py-12">

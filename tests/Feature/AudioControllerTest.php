@@ -476,3 +476,4 @@ it('returns 404 for non-existent file when toggling laughed at', function () {
 
     $response->assertStatus(404);
 });
+
