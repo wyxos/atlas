@@ -5,6 +5,7 @@ import { Head } from '@inertiajs/vue3';
 import { Card, CardContent } from '@/components/ui/card';
 import { Pagination } from '@/components/ui/pagination';
 import { Mic } from 'lucide-vue-next';
+import GenericSearch from '@/components/ui/search/GenericSearch.vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -26,12 +27,13 @@ interface Artist {
     }>;
 }
 
-defineProps<{
+const props = defineProps<{
     artists: {
         data: Artist[];
         links: any[];
         meta: any;
     };
+    search: Artist[];
 }>();
 
 // Get artist cover image
@@ -53,39 +55,54 @@ function getArtistCover(artist: Artist): string {
                 <p class="text-gray-600 mt-2">Browse your music collection by artist</p>
             </div>
 
-            <!-- Artists Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
-                <Card
-                    v-for="artist in artists.data"
-                    :key="artist.id"
-                    class="hover:shadow-lg transition-shadow cursor-pointer"
-                >
-                    <CardContent class="p-4">
-                        <div class="aspect-square mb-3 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
-                            <img
-                                v-if="getArtistCover(artist)"
-                                :src="getArtistCover(artist)"
-                                :alt="artist.name"
-                                class="w-full h-full object-cover"
-                            />
-                            <Mic v-else class="w-12 h-12 text-gray-400" />
-                        </div>
-                        <h3 class="font-semibold text-sm truncate" :title="artist.name">
-                            {{ artist.name }}
-                        </h3>
-                    </CardContent>
-                </Card>
-            </div>
+            <!-- Search Component -->
+            <GenericSearch
+                route-name="artists.index"
+                placeholder="Search artists..."
+                :initial-query="$page.url.includes('query=') ? new URLSearchParams($page.url.split('?')[1]).get('query') : ''"
+            >
+                <template #noResults="{ query }">
+                    <div class="text-center">
+                        <Mic class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                        <h3 class="text-lg font-semibold text-gray-600 mb-2">No Artists Found</h3>
+                        <p class="text-gray-500">No artists match "{{ query }}"</p>
+                    </div>
+                </template>
 
-            <!-- Pagination -->
-            <Pagination :data="artists" />
+                <!-- Artists Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
+                    <Card
+                        v-for="artist in (props.search.length > 0 ? props.search : artists.data)"
+                        :key="artist.id"
+                        class="hover:shadow-lg transition-shadow cursor-pointer"
+                    >
+                        <CardContent class="p-4">
+                            <div class="aspect-square mb-3 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                                <img
+                                    v-if="getArtistCover(artist)"
+                                    :src="getArtistCover(artist)"
+                                    :alt="artist.name"
+                                    class="w-full h-full object-cover"
+                                />
+                                <Mic v-else class="w-12 h-12 text-gray-400" />
+                            </div>
+                            <h3 class="font-semibold text-sm truncate" :title="artist.name">
+                                {{ artist.name }}
+                            </h3>
+                        </CardContent>
+                    </Card>
+                </div>
 
-            <!-- Empty state -->
-            <div v-if="artists.data.length === 0" class="text-center py-12">
-                <Mic class="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 class="text-lg font-semibold text-gray-600 mb-2">No Artists Found</h3>
-                <p class="text-gray-500">No artists are available in your music collection.</p>
-            </div>
+                <!-- Pagination (only show when not searching) -->
+                <Pagination v-if="props.search.length === 0" :data="artists" />
+
+                <!-- Empty state (only show when not searching) -->
+                <div v-if="props.search.length === 0 && artists.data.length === 0" class="text-center py-12">
+                    <Mic class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 class="text-lg font-semibold text-gray-600 mb-2">No Artists Found</h3>
+                    <p class="text-gray-500">No artists are available in your music collection.</p>
+                </div>
+            </GenericSearch>
         </div>
     </AppLayout>
 </template>

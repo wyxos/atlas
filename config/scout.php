@@ -227,6 +227,38 @@ return [
                     'query_by' => 'filename,title,description,tags,path,artist_name,artist_names,album_name,album_names',
                 ],
             ],
+            App\Models\Album::class => [
+                'collection-schema' => [
+                    'fields' => [
+                        ['name' => 'id', 'type' => 'string'],
+                        ['name' => 'name', 'type' => 'string'],
+                        ['name' => 'files_count', 'type' => 'int32', 'optional' => true],
+                        ['name' => 'audio_files_count', 'type' => 'int32', 'optional' => true],
+                        ['name' => 'created_at', 'type' => 'int64'],
+                        ['name' => 'updated_at', 'type' => 'int64'],
+                    ],
+                    'default_sorting_field' => 'created_at',
+                ],
+                'search-parameters' => [
+                    'query_by' => 'name',
+                ],
+            ],
+            App\Models\Artist::class => [
+                'collection-schema' => [
+                    'fields' => [
+                        ['name' => 'id', 'type' => 'string'],
+                        ['name' => 'name', 'type' => 'string'],
+                        ['name' => 'files_count', 'type' => 'int32', 'optional' => true],
+                        ['name' => 'audio_files_count', 'type' => 'int32', 'optional' => true],
+                        ['name' => 'created_at', 'type' => 'int64'],
+                        ['name' => 'updated_at', 'type' => 'int64'],
+                    ],
+                    'default_sorting_field' => 'created_at',
+                ],
+                'search-parameters' => [
+                    'query_by' => 'name',
+                ],
+            ],
         ],
 
     ],

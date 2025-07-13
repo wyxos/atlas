@@ -314,6 +314,24 @@ class AudioController extends Controller
 
     public function artists()
     {
+        $search = [];
+
+        if ($query = request()->input('query')) {
+            // Filter search results to only include artists with audio files
+            $search = Artist::search($query)
+                ->query(function ($builder) {
+                    $builder->whereHas('files', function ($query) {
+                        $query->audio()->where('not_found', false);
+                    });
+                })
+                ->get();
+
+            // Load covers relationship for search results
+            if ($search->isNotEmpty()) {
+                $search->load(['covers']);
+            }
+        }
+
         $artists = Artist::whereHas('files', function ($query) {
             $query->audio()->where('not_found', false);
         })->with('covers')
@@ -322,11 +340,30 @@ class AudioController extends Controller
 
         return Inertia::render('Artists', [
             'artists' => $artists,
+            'search' => $search,
         ]);
     }
 
     public function albums()
     {
+        $search = [];
+
+        if ($query = request()->input('query')) {
+            // Filter search results to only include albums with audio files
+            $search = Album::search($query)
+                ->query(function ($builder) {
+                    $builder->whereHas('files', function ($query) {
+                        $query->audio()->where('not_found', false);
+                    });
+                })
+                ->get();
+
+            // Load covers relationship for search results
+            if ($search->isNotEmpty()) {
+                $search->load(['covers']);
+            }
+        }
+
         $albums = Album::whereHas('files', function ($query) {
             $query->audio()->where('not_found', false);
         })->with('covers')
@@ -335,6 +372,7 @@ class AudioController extends Controller
 
         return Inertia::render('Albums', [
             'albums' => $albums,
+            'search' => $search,
         ]);
     }
 

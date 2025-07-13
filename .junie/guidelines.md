@@ -22,16 +22,14 @@ Testing:
 
 - All new logic must be covered by a proper test class created with `php artisan make:test`.
 - Respect and follow the testing framework already in place (e.g., PHPUnit or PEST).
-- After PHP logic tasks: create or update a test case if missing, evaluate individually, align existing tests, run `php artisan test` to ensure all pass.
+- After PHP logic tasks: create or update a test case if missing, evaluate individually, align existing tests, run `php artisan test --compact --parallel` to ensure all pass.
 - Tests must be written in a way that allows them to run in parallel. Ensure they do not share state or rely on global/shared data.
 - Always verify test success using `php artisan test --compact --parallel`.
 - Do not create JS tests.
 - Match the style of the existing test suite (e.g., `test` for PEST, method-based structure for PHPUnit).
 - Do not create standalone test files.
 - Instead, extend or improve the appropriate existing test class that covers the feature or logic under review.
-
     - Only create a new test case if:
-
         - No relevant test class exists.
         - The logic is isolated and cannot logically belong to any current test suites.
     - Always attempt to reproduce and debug issues through the most relevant existing test class.
