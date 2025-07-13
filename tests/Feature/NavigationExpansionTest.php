@@ -24,9 +24,9 @@ test('audio navigation sub-routes are accessible', function () {
         '/audio/liked',
         '/audio/disliked',
         '/audio/unrated',
-        '/audio/artists',
-        '/audio/albums',
-        '/audio/playlists'
+        '/artists',
+        '/albums',
+        '/playlists'
     ];
 
     foreach ($subRoutes as $route) {

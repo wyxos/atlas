@@ -9,7 +9,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { debounce } from 'lodash';
 import { ref, watch } from 'vue';
-import { Trash } from 'lucide-vue-next';
+import { Trash, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -157,10 +157,14 @@ const getFileTypeColor = (mimeType: string): string => {
                                     'bg-gray-200 text-gray-700 hover:bg-gray-300': !link.active,
                                 }"
                             >
-                                {{ link.label }}
+                                <ChevronLeft v-if="link.label.includes('Previous')" class="h-4 w-4" />
+                                <ChevronRight v-else-if="link.label.includes('Next')" class="h-4 w-4" />
+                                <span v-else>{{ link.label }}</span>
                             </Link>
                             <span v-else class="px-3 py-2 text-sm text-gray-400">
-                                {{ link.label }}
+                                <ChevronLeft v-if="link.label.includes('Previous')" class="h-4 w-4" />
+                                <ChevronRight v-else-if="link.label.includes('Next')" class="h-4 w-4" />
+                                <span v-else>{{ link.label }}</span>
                             </span>
                         </template>
                     </nav>

@@ -318,10 +318,7 @@ class AudioController extends Controller
             $query->audio()->where('not_found', false);
         })->with('covers')->get();
 
-        return Inertia::render('Audio', [
-            'files' => collect([]), // Empty collection for now
-            'search' => [],
-            'title' => 'Artists',
+        return Inertia::render('Artists', [
             'artists' => $artists,
         ]);
     }
@@ -330,27 +327,37 @@ class AudioController extends Controller
     {
         $albums = Album::whereHas('files', function ($query) {
             $query->audio()->where('not_found', false);
-        })->with('covers')->get();
+        })->with('covers')
+        ->orderBy('name')
+        ->paginate(12);
 
-        return Inertia::render('Audio', [
-            'files' => collect([]), // Empty collection for now
-            'search' => [],
-            'title' => 'Albums',
+        return Inertia::render('Albums', [
             'albums' => $albums,
         ]);
     }
 
     public function playlists()
     {
-        $playlists = Playlist::whereHas('files', function ($query) {
-            $query->audio()->where('not_found', false);
-        })->get();
+        $playlists = Playlist::withCount('files')
+        ->orderBy('created_at', 'desc')
+        ->paginate(10);
 
-        return Inertia::render('Audio', [
-            'files' => collect([]), // Empty collection for now
-            'search' => [],
-            'title' => 'Playlists',
+        return Inertia::render('Playlists', [
             'playlists' => $playlists,
         ]);
+    }
+
+    public function storePlaylist(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        Playlist::create([
+            'name' => $request->name,
+            'user_id' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'Playlist created successfully');
     }
 }

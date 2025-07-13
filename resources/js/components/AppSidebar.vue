@@ -42,18 +42,13 @@ const mainNavItems: NavItem[] = [
             },
             {
                 title: 'Artists',
-                href: '/audio/artists',
+                href: '/artists',
                 icon: Mic,
             },
             {
                 title: 'Albums',
-                href: '/audio/albums',
+                href: '/albums',
                 icon: Disc,
-            },
-            {
-                title: 'Playlists',
-                href: '/audio/playlists',
-                icon: ListMusic,
             },
         ],
     },
@@ -66,6 +61,13 @@ const mainNavItems: NavItem[] = [
         title: 'Images',
         href: '/images',
         icon: Image
+    },
+    {
+        title: 'Playlists',
+        href: '/playlists',
+        icon: ListMusic,
+        isCollapsible: true,
+        items: [],
     },
     {
         title: 'Users',

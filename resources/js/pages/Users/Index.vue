@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ref } from 'vue';
-import { Trash, Pencil } from 'lucide-vue-next';
+import { Trash, Pencil, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -108,6 +108,32 @@ const openDeleteDialog = (user: User) => {
             </TableRow>
           </TableBody>
         </Table>
+
+        <!-- Pagination -->
+        <div v-if="users.links && users.links.length > 3" class="mt-4 flex justify-center">
+          <nav class="flex space-x-2">
+            <template v-for="link in users.links" :key="link.label">
+              <Link
+                v-if="link.url"
+                :href="link.url"
+                class="rounded-md px-3 py-2 text-sm"
+                :class="{
+                  'bg-blue-500 text-white': link.active,
+                  'bg-gray-200 text-gray-700 hover:bg-gray-300': !link.active,
+                }"
+              >
+                <ChevronLeft v-if="link.label.includes('Previous')" class="h-4 w-4" />
+                <ChevronRight v-else-if="link.label.includes('Next')" class="h-4 w-4" />
+                <span v-else>{{ link.label }}</span>
+              </Link>
+              <span v-else class="px-3 py-2 text-sm text-gray-400">
+                <ChevronLeft v-if="link.label.includes('Previous')" class="h-4 w-4" />
+                <ChevronRight v-else-if="link.label.includes('Next')" class="h-4 w-4" />
+                <span v-else>{{ link.label }}</span>
+              </span>
+            </template>
+          </nav>
+        </div>
       </div>
     </div>
 

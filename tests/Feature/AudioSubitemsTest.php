@@ -43,36 +43,33 @@ test('audio disliked page can be accessed', function () {
     );
 });
 
-test('audio artists page can be accessed', function () {
-    $response = $this->actingAs($this->user)->get('/audio/artists');
+test('artists page can be accessed', function () {
+    $response = $this->actingAs($this->user)->get('/artists');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Audio')
+        ->component('Artists')
         ->has('artists')
-        ->where('title', 'Artists')
     );
 });
 
-test('audio albums page can be accessed', function () {
-    $response = $this->actingAs($this->user)->get('/audio/albums');
+test('albums page can be accessed', function () {
+    $response = $this->actingAs($this->user)->get('/albums');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Audio')
+        ->component('Albums')
         ->has('albums')
-        ->where('title', 'Albums')
     );
 });
 
-test('audio playlists page can be accessed', function () {
-    $response = $this->actingAs($this->user)->get('/audio/playlists');
+test('playlists page can be accessed', function () {
+    $response = $this->actingAs($this->user)->get('/playlists');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
-        ->component('Audio')
+        ->component('Playlists')
         ->has('playlists')
-        ->where('title', 'Playlists')
     );
 });
 

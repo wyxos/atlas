@@ -46,9 +46,14 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('audio/liked', [AudioController::class, 'liked'])->name('audio.liked');
     Route::get('audio/disliked', [AudioController::class, 'disliked'])->name('audio.disliked');
     Route::get('audio/unrated', [AudioController::class, 'unrated'])->name('audio.unrated');
-    Route::get('audio/artists', [AudioController::class, 'artists'])->name('audio.artists');
-    Route::get('audio/albums', [AudioController::class, 'albums'])->name('audio.albums');
-    Route::get('audio/playlists', [AudioController::class, 'playlists'])->name('audio.playlists');
+
+    // Artists and Albums routes (moved to parent level)
+    Route::get('artists', [AudioController::class, 'artists'])->name('artists.index');
+    Route::get('albums', [AudioController::class, 'albums'])->name('albums.index');
+
+    // Playlists routes (moved to parent level)
+    Route::get('playlists', [AudioController::class, 'playlists'])->name('playlists.index');
+    Route::post('playlists', [AudioController::class, 'storePlaylist'])->name('playlists.store');
 
     Route::get('audio/{file}', [AudioController::class, 'show'])->name('audio.show');
 
