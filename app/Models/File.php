@@ -114,6 +114,14 @@ class File extends Model
     }
 
     /**
+     * Get the queues associated with the file.
+     */
+    public function queues(): BelongsToMany
+    {
+        return $this->belongsToMany(Queue::class)->withPivot('position')->orderBy('position');
+    }
+
+    /**
      * Get all of the file's covers.
      * Ordered to prioritize album covers over artist covers.
      */
