@@ -13,6 +13,7 @@ Route::get('/', function () {
 Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/file-stats', [App\Http\Controllers\DashboardController::class, 'getFileStatsJson'])->name('dashboard.file-stats');
+    Route::post('dashboard/clear-cache', [App\Http\Controllers\DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
 
     Route::get('audio', function () {
         $search = [];

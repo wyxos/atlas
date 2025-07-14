@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import PlaceholderPattern from '../components/PlaceholderPattern.vue';
-import { BarChart } from '@/components/ui/bar-chart';
 import { PieChart } from '@/components/ui/pie-chart';
 import Icon from '@/components/Icon.vue';
+import { ref } from 'vue';
 
 interface FileStats {
     // Audio Count & Space Usage
@@ -140,11 +140,21 @@ const formatFileSize = (bytes: number): string => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Helper function to calculate space usage percentages
-const getSpacePercentage = (bytes: number): number => {
-    const totalSpace = props.fileStats.audioSize + props.fileStats.videoSize + props.fileStats.imageSize + props.fileStats.otherSize;
-    if (totalSpace === 0) return 0;
-    return (bytes / totalSpace) * 100;
+// Cache busting functionality
+const isRefreshing = ref(false);
+
+const refreshStats = (): void => {
+    if (isRefreshing.value) return;
+
+    isRefreshing.value = true;
+
+    router.post(route('dashboard.clear-cache'), {}, {
+        preserveState: false,
+        preserveScroll: true,
+        onFinish: () => {
+            isRefreshing.value = false;
+        }
+    });
 };
 </script>
 
@@ -153,6 +163,21 @@ const getSpacePercentage = (bytes: number): number => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
+            <!-- Refresh Stats Button -->
+            <div class="flex justify-end">
+                <button
+                    @click="refreshStats"
+                    :disabled="isRefreshing"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors duration-200"
+                    :class="{ 'cursor-not-allowed': isRefreshing }"
+                >
+                    <Icon
+                        :name="isRefreshing ? 'loader' : 'refresh'"
+                        :class="['h-4 w-4', { 'animate-spin': isRefreshing }]"
+                    />
+                    {{ isRefreshing ? 'Refreshing...' : 'Refresh Stats' }}
+                </button>
+            </div>
             <!-- Audio Count & Space Usage Block -->
             <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                 <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
