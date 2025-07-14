@@ -4,6 +4,9 @@ import { audioStore } from '@/stores/audioStore';
 import AudioListItem from '@/components/audio/AudioListItem.vue';
 import AudioSearch from '@/components/audio/AudioSearch.vue';
 import { useAudioList } from '@/composables/useAudioList';
+import useContextMenu from '@/composables/useContextMenu';
+
+const {handleContextMenu} = useContextMenu();
 
 interface Props {
     files: any[];
@@ -77,6 +80,7 @@ defineExpose({
                             @like="likeItem"
                             @dislike="dislikeItem"
                             @laughed-at="laughedAtItem"
+                            @contextmenu.prevent="handleContextMenu($event, {handler: 'audio-list', item})"
                         />
                     </div>
                 </RecycleScroller>

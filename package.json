@@ -25,6 +25,7 @@
         "vue-tsc": "^2.2.4"
     },
     "dependencies": {
+        "@imengyu/vue3-context-menu": "^1.5.1",
         "@inertiajs/vue3": "^2.0.0",
         "@tailwindcss/vite": "^4.1.1",
         "@tanstack/vue-table": "^8.21.3",
