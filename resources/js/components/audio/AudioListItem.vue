@@ -4,7 +4,6 @@ import { Play, Pause } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
 import AudioReactions from '@/components/audio/AudioReactions.vue';
-import PlaylistContextMenu from '@/components/audio/PlaylistContextMenu.vue';
 
 const props = defineProps<{
   item: any;
@@ -76,11 +75,6 @@ const isDragging = ref(false);
 // Hover state for play/pause button
 const isHovered = ref(false);
 
-// Context menu state
-const contextMenuVisible = ref(false);
-const contextMenuX = ref(0);
-const contextMenuY = ref(0);
-let longPressTimer: number | null = null;
 
 // Drag and drop functions
 const handleDragEnter = (event: DragEvent): void => {
@@ -176,39 +170,6 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
     }
 };
 
-// Context menu handlers
-function handleContextMenu(event: MouseEvent): void {
-    event.preventDefault();
-    if (!props.loadedFile?.id) return;
-
-    contextMenuX.value = event.clientX;
-    contextMenuY.value = event.clientY;
-    contextMenuVisible.value = true;
-}
-
-function handleLongPressStart(event: TouchEvent | MouseEvent): void {
-    if (!props.loadedFile?.id) return;
-
-    longPressTimer = window.setTimeout(() => {
-        const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX;
-        const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY;
-
-        contextMenuX.value = clientX;
-        contextMenuY.value = clientY;
-        contextMenuVisible.value = true;
-    }, 500); // 500ms for long press
-}
-
-function handleLongPressEnd(): void {
-    if (longPressTimer) {
-        clearTimeout(longPressTimer);
-        longPressTimer = null;
-    }
-}
-
-function closeContextMenu(): void {
-    contextMenuVisible.value = false;
-}
 
 </script>
 
@@ -219,15 +180,14 @@ function closeContextMenu(): void {
       'bg-primary text-primary-foreground': currentFileId === item.id,
       'transform -translate-x-32': isSwipedOpen
     }"
-    @touchstart="(event) => { emit('touchStart', event); handleLongPressStart(event); }"
+    @touchstart="emit('touchStart', $event)"
     @touchmove="emit('touchMove', $event)"
-    @touchend="(event) => { emit('touchEnd', item); handleLongPressEnd(); }"
-    @mousedown="(event) => { emit('touchStart', event); handleLongPressStart(event); }"
+    @touchend="emit('touchEnd', item)"
+    @mousedown="emit('touchStart', $event)"
     @mousemove="emit('touchMove', $event)"
-    @mouseup="(event) => { emit('touchEnd', item); handleLongPressEnd(); }"
+    @mouseup="emit('touchEnd', item)"
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false; $event.buttons && emit('touchEnd', item)"
-    @contextmenu="handleContextMenu"
   >
     <div class="flex gap-2 items-center group">
         <button
@@ -327,15 +287,6 @@ function closeContextMenu(): void {
     </div>
   </div>
 
-  <!-- Context Menu -->
-  <PlaylistContextMenu
-    v-if="loadedFile?.id"
-    :file-id="loadedFile.id"
-    :visible="contextMenuVisible"
-    :x="contextMenuX"
-    :y="contextMenuY"
-    @close="closeContextMenu"
-  />
 </template>
 
 <style>
