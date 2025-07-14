@@ -259,45 +259,120 @@ class AudioController extends Controller
 
     public function favorites()
     {
+        $search = [];
+
+        if ($query = request()->input('query')) {
+            // Filter search results to only include audio files that exist and are loved
+            $search = File::search($query)
+                ->query(function ($builder) {
+                    $builder->where('mime_type', 'like', 'audio/%')
+                            ->where('not_found', false)
+                            ->where('loved', true);
+                })
+                ->get();
+
+            // Load metadata, covers, artists, and albums relationships for search results
+            if ($search->isNotEmpty()) {
+                $search->load(['metadata', 'covers', 'artists', 'albums']);
+            }
+        }
+
         return Inertia::render('Audio', [
             'files' => fn () => File::audio()
                 ->where('not_found', false)
                 ->where('loved', true)
                 ->select(['id'])
                 ->get(),
-            'search' => [],
+            'search' => $search,
             'title' => 'Favorites',
         ]);
     }
 
     public function liked()
     {
+        $search = [];
+
+        if ($query = request()->input('query')) {
+            // Filter search results to only include audio files that exist and are liked
+            $search = File::search($query)
+                ->query(function ($builder) {
+                    $builder->where('mime_type', 'like', 'audio/%')
+                            ->where('not_found', false)
+                            ->where('liked', true);
+                })
+                ->get();
+
+            // Load metadata, covers, artists, and albums relationships for search results
+            if ($search->isNotEmpty()) {
+                $search->load(['metadata', 'covers', 'artists', 'albums']);
+            }
+        }
+
         return Inertia::render('Audio', [
             'files' => fn () => File::audio()
                 ->where('not_found', false)
                 ->where('liked', true)
                 ->select(['id'])
                 ->get(),
-            'search' => [],
+            'search' => $search,
             'title' => 'Liked',
         ]);
     }
 
     public function disliked()
     {
+        $search = [];
+
+        if ($query = request()->input('query')) {
+            // Filter search results to only include audio files that exist and are disliked
+            $search = File::search($query)
+                ->query(function ($builder) {
+                    $builder->where('mime_type', 'like', 'audio/%')
+                            ->where('not_found', false)
+                            ->where('disliked', true);
+                })
+                ->get();
+
+            // Load metadata, covers, artists, and albums relationships for search results
+            if ($search->isNotEmpty()) {
+                $search->load(['metadata', 'covers', 'artists', 'albums']);
+            }
+        }
+
         return Inertia::render('Audio', [
             'files' => fn () => File::audio()
                 ->where('not_found', false)
                 ->where('disliked', true)
                 ->select(['id'])
                 ->get(),
-            'search' => [],
+            'search' => $search,
             'title' => 'Disliked',
         ]);
     }
 
     public function unrated()
     {
+        $search = [];
+
+        if ($query = request()->input('query')) {
+            // Filter search results to only include audio files that exist and are unrated
+            $search = File::search($query)
+                ->query(function ($builder) {
+                    $builder->where('mime_type', 'like', 'audio/%')
+                            ->where('not_found', false)
+                            ->where('loved', false)
+                            ->where('liked', false)
+                            ->where('disliked', false)
+                            ->where('funny', false);
+                })
+                ->get();
+
+            // Load metadata, covers, artists, and albums relationships for search results
+            if ($search->isNotEmpty()) {
+                $search->load(['metadata', 'covers', 'artists', 'albums']);
+            }
+        }
+
         return Inertia::render('Audio', [
             'files' => fn () => File::audio()
                 ->where('not_found', false)
@@ -307,7 +382,7 @@ class AudioController extends Controller
                 ->where('funny', false)
                 ->select(['id'])
                 ->get(),
-            'search' => [],
+            'search' => $search,
             'title' => 'Unrated',
         ]);
     }

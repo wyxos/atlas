@@ -7,11 +7,15 @@ import { router } from '@inertiajs/vue3';
 
 const props = defineProps<{
   initialQuery?: string;
+  searchRoute?: string;
 }>();
 
 const query = ref(props.initialQuery || '');
 const isLoading = ref(false);
 const showNoResults = ref(false);
+
+// Get the current route for search context, default to audio route for backward compatibility
+const currentSearchRoute = props.searchRoute || route('audio');
 
 // Debounced search function
 const debouncedSearch = debounce((newQuery: string|null, oldQuery: string|null) => {
@@ -20,7 +24,7 @@ const debouncedSearch = debounce((newQuery: string|null, oldQuery: string|null) 
 
   if (newQuery && newQuery.trim()) {
     isLoading.value = true;
-    router.get(route('audio'), { query: newQuery }, {
+    router.get(currentSearchRoute, { query: newQuery }, {
       preserveState: true,
       only: ['search'],
       replace: true,
@@ -48,7 +52,7 @@ const debouncedSearch = debounce((newQuery: string|null, oldQuery: string|null) 
     // If query is cleared, reset search results
     isLoading.value = true;
     showNoResults.value = false;
-    router.get(route('audio'), {}, {
+    router.get(currentSearchRoute, {}, {
       preserveState: true,
       only: ['search'],
       replace: true,

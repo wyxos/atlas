@@ -92,6 +92,7 @@ function formatDate(dateString: string): string {
                 ref="audioListRef"
                 :files="props.files"
                 :search="props.search"
+                :search-route="route('playlists.show', { playlist: props.playlist.id })"
                 no-results-message='No match was found for "{query}" in this playlist'
             />
 

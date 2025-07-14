@@ -12,6 +12,7 @@ interface Props {
     files: any[];
     search: any[];
     noResultsMessage?: string;
+    searchRoute?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -45,7 +46,7 @@ defineExpose({
 
 <template>
     <!-- Search component -->
-    <AudioSearch :initial-query="initialQuery">
+    <AudioSearch :initial-query="initialQuery" :search-route="props.searchRoute">
         <template #noResults="{ query }">
             <p class="text-gray-500">{{ noResultsMessage.replace('{query}', query) }}</p>
         </template>

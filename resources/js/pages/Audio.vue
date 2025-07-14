@@ -1,11 +1,35 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, usePage } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 
 // Import our components
 import AudioList from '@/components/audio/AudioList.vue';
+
+const props = defineProps<{
+    files: any[];
+    search: any[];
+    title?: string;
+}>();
+
+const page = usePage();
+
+// Determine the current route name for search context
+const currentSearchRoute = computed(() => {
+    const currentUrl = page.url;
+    if (currentUrl.includes('/audio/favorites')) {
+        return route('audio.favorites');
+    } else if (currentUrl.includes('/audio/liked')) {
+        return route('audio.liked');
+    } else if (currentUrl.includes('/audio/disliked')) {
+        return route('audio.disliked');
+    } else if (currentUrl.includes('/audio/unrated')) {
+        return route('audio.unrated');
+    } else {
+        return route('audio');
+    }
+});
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -13,15 +37,10 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: route('dashboard'),
     },
     {
-        title: 'Audio',
-        href: route('audio'),
+        title: props.title || 'Audio',
+        href: currentSearchRoute.value,
     },
 ];
-
-const props = defineProps<{
-    files: any[];
-    search: any[];
-}>();
 
 // Reference to the AudioList component
 const audioListRef = ref<InstanceType<typeof AudioList> | null>(null);
@@ -43,6 +62,7 @@ function handleGlobalClick(event: Event): void {
                 ref="audioListRef"
                 :files="props.files"
                 :search="props.search"
+                :search-route="currentSearchRoute"
             />
         </div>
     </AppLayout>
