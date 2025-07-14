@@ -207,5 +207,19 @@ export const audioActions = {
     audioStore.currentTime = 0;
     audioStore.duration = 0;
     audioStore.isPlayerVisible = false;
+  },
+
+  // Scroll to current track functionality
+  scrollToCurrentTrack() {
+    // Emit a custom event that pages with RecycleScroller can listen to
+    if (typeof window !== 'undefined' && audioStore.currentFile) {
+      const event = new CustomEvent('scrollToCurrentTrack', {
+        detail: {
+          currentFileId: audioStore.currentFile.id,
+          currentIndex: audioStore.currentIndex
+        }
+      });
+      window.dispatchEvent(event);
+    }
   }
 };

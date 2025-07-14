@@ -344,6 +344,11 @@ function handleTitleClick(): void {
     }
 }
 
+// Handle album cover click to scroll to current track
+function handleAlbumCoverClick(): void {
+    audioActions.scrollToCurrentTrack();
+}
+
 // Function to handle play/pause based on isPlaying prop
 function updatePlayState(newIsPlaying: boolean): void {
     if (typeof window === 'undefined' || !window.globalAudioElement) {
@@ -599,8 +604,9 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                 </div>
                 <!-- Actual player cover when loaded -->
                 <div v-else-if="audioStore.currentFile"
-                     class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32 shrink-0 transition-all duration-300"
+                     class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32 shrink-0 transition-all duration-300 cursor-pointer"
                      :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
+                     @click="handleAlbumCoverClick"
                      @dragenter="handleDragEnter"
                      @dragover="handleDragOver"
                      @dragleave="handleDragLeave"

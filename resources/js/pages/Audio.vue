@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
-import { onMounted, provide, watch } from 'vue';
+import { onMounted, provide, watch, ref, onBeforeUnmount } from 'vue';
 import { audioStore, audioActions } from '@/stores/audioStore';
 
 // Import our new components and composables
@@ -45,6 +45,8 @@ const {
   handleGlobalClick
 } = useAudioSwipeHandler();
 
+// RecycleScroller ref for scrollToItem functionality
+const recycleScrollerRef = ref<InstanceType<typeof RecycleScroller> | null>(null);
 
 // Play audio with smart queue management
 async function playAudio(file: any): Promise<void> {
@@ -290,9 +292,35 @@ watch(() => audioStore.currentFile?.funny, (newValue) => {
     }
 });
 
+// Handle scroll to current track functionality
+function handleScrollToCurrentTrack(event: CustomEvent) {
+    const { currentFileId } = event.detail;
+
+    if (!recycleScrollerRef.value || !currentFileId) return;
+
+    // Get the current items list (search results or all files)
+    const currentItems = props.search.length ? props.search : props.files;
+
+    // Find the index of the current playing file in the displayed list
+    const index = currentItems.findIndex(item => item.id === currentFileId);
+
+    if (index !== -1) {
+        // Scroll to the item using RecycleScroller's scrollToItem method
+        recycleScrollerRef.value.scrollToItem(index);
+    }
+}
+
 onMounted(() => {
     // Provide the loadFileDetails function for the AudioPlayer
     provide('loadFileDetails', loadFileDetails);
+
+    // Listen for scroll to current track events
+    window.addEventListener('scrollToCurrentTrack', handleScrollToCurrentTrack as EventListener);
+});
+
+onBeforeUnmount(() => {
+    // Clean up event listener
+    window.removeEventListener('scrollToCurrentTrack', handleScrollToCurrentTrack as EventListener);
 });
 
 
@@ -343,6 +371,7 @@ function onScroll(startIndex: number, endIndex: number, visibleStartIndex: numbe
                     <!-- Results list -->
                     <div class="flex-1 md:p-4">
                         <RecycleScroller
+                            ref="recycleScrollerRef"
                             class="h-[600px] RecycleScroller"
                             :items="query ? props.search : props.files"
                             :item-size="74"
