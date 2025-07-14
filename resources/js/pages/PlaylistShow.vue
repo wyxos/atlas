@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import { RecycleScroller } from 'vue-virtual-scroller';
-import { onMounted, provide, watch, ref, onBeforeUnmount } from 'vue';
-import { audioStore, audioActions } from '@/stores/audioStore';
+import { audioStore } from '@/stores/audioStore';
 
-// Import our audio components and composables
+// Import our components and composables
 import AudioListItem from '@/components/audio/AudioListItem.vue';
 import AudioSearch from '@/components/audio/AudioSearch.vue';
-import { useAudioFileLoader } from '@/components/audio/useAudioFileLoader';
-import { useAudioSwipeHandler } from '@/components/audio/useAudioSwipeHandler';
+import { useAudioList } from '@/composables/useAudioList';
 
 interface Playlist {
     id: number;
@@ -45,328 +43,26 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Use our composables
+// Use the audio list composable for all common functionality
 const {
-  loadedFiles,
-  loadFileDetails,
-  getFileData
-} = useAudioFileLoader();
+    loadedFiles,
+    swipedItemId,
+    recycleScrollerRef,
+    initialQuery,
+    playAudio,
+    getFileData,
+    toggleFavorite,
+    likeItem,
+    dislikeItem,
+    laughedAtItem,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    handleGlobalClick,
+    onScroll
+} = useAudioList(props);
 
-const {
-  swipedItemId,
-  handleTouchStart,
-  handleTouchMove,
-  handleTouchEnd,
-  handleGlobalClick
-} = useAudioSwipeHandler();
-
-// RecycleScroller ref for scrollToItem functionality
-const recycleScrollerRef = ref<InstanceType<typeof RecycleScroller> | null>(null);
-
-// Play audio with smart queue management
-async function playAudio(file: any): Promise<void> {
-    const fileId = file.id;
-    let fileData = loadedFiles[fileId];
-
-    if (!fileData) {
-        audioActions.setLoading(true);
-        fileData = await loadFileDetails(fileId, true);
-        if (!fileData) {
-            console.error('Failed to load file data for playback');
-            audioActions.setLoading(false);
-            return;
-        }
-    }
-
-    if (audioStore.currentFile && audioStore.currentFile.id === fileId) {
-        // Same file - just toggle play/pause
-        if (audioStore.isPlaying) {
-            audioActions.setPlaying(false);
-        } else {
-            audioActions.setPlaying(true);
-        }
-    } else {
-        // Different file - check if we're searching and have an existing queue
-        const isSearching = props.search.length > 0;
-        const hasExistingQueue = audioStore.playlist.length > 0;
-
-        if (isSearching && hasExistingQueue) {
-            // Try to find the track in the existing queue first
-            const foundInQueue = audioActions.findAndPlayInQueue(fileId, loadFileDetails);
-            if (foundInQueue) {
-                audioActions.setPlaying(true);
-                return;
-            }
-        }
-
-        // If not found in queue or no existing queue, set up new playlist
-        audioActions.setLoading(true);
-        const filesToQueue = props.search.length ? props.search : props.files;
-
-        // Queue the entire visible list when playing a new track
-        const playlistData = [];
-        for (const item of filesToQueue) {
-            let itemData = loadedFiles[item.id];
-            if (!itemData) {
-                // Load essential data for playlist - we'll load full data when needed
-                itemData = item;
-            }
-            playlistData.push(itemData);
-        }
-
-        // Set up the complete playlist
-        audioActions.setPlaylist(playlistData, fileData);
-        // Set current file which will also make player visible
-        await audioActions.setCurrentFile(fileData, loadFileDetails);
-        audioActions.setPlaying(true);
-        audioActions.setLoading(false);
-    }
-}
-
-// Action handlers
-function toggleFavorite(item: any, event: Event): void {
-    event.stopPropagation(); // Prevent triggering parent click events
-
-    // Optimistically update the UI first
-    if (loadedFiles[item.id]) {
-        loadedFiles[item.id].loved = !loadedFiles[item.id].loved;
-        if (loadedFiles[item.id].loved) {
-            loadedFiles[item.id].liked = false;
-            loadedFiles[item.id].disliked = false;
-            loadedFiles[item.id].funny = false;
-        }
-    }
-
-    // Also update the current file in the audio store if it matches
-    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
-        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
-        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
-        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
-    }
-
-    // Send request to backend
-    router.post(route('audio.love', { file: item.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            if (loadedFiles[item.id]) {
-                loadedFiles[item.id].loved = !loadedFiles[item.id].loved;
-            }
-            console.error('Failed to toggle love status:', errors);
-        }
-    });
-
-    // Close the swipe actions after action
-    swipedItemId.value = null;
-}
-
-function likeItem(item: any, event: Event): void {
-    event.stopPropagation(); // Prevent triggering parent click events
-
-    // Optimistically update the UI first
-    if (loadedFiles[item.id]) {
-        loadedFiles[item.id].liked = !loadedFiles[item.id].liked;
-        if (loadedFiles[item.id].liked) {
-            loadedFiles[item.id].loved = false;
-            loadedFiles[item.id].disliked = false;
-            loadedFiles[item.id].funny = false;
-        }
-    }
-
-    // Also update the current file in the audio store if it matches
-    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
-        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
-        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
-        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
-    }
-
-    // Send request to backend
-    router.post(route('audio.like', { file: item.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            if (loadedFiles[item.id]) {
-                loadedFiles[item.id].liked = !loadedFiles[item.id].liked;
-            }
-            console.error('Failed to toggle like status:', errors);
-        }
-    });
-
-    // Close the swipe actions after action
-    swipedItemId.value = null;
-}
-
-function dislikeItem(item: any, event: Event): void {
-    event.stopPropagation(); // Prevent triggering parent click events
-
-    // Optimistically update the UI first
-    if (loadedFiles[item.id]) {
-        loadedFiles[item.id].disliked = !loadedFiles[item.id].disliked;
-        if (loadedFiles[item.id].disliked) {
-            loadedFiles[item.id].loved = false;
-            loadedFiles[item.id].liked = false;
-            loadedFiles[item.id].funny = false;
-        }
-    }
-
-    // Also update the current file in the audio store if it matches
-    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
-        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
-        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
-        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
-    }
-
-    // Send request to backend
-    router.post(route('audio.dislike', { file: item.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            if (loadedFiles[item.id]) {
-                loadedFiles[item.id].disliked = !loadedFiles[item.id].disliked;
-            }
-            console.error('Failed to toggle dislike status:', errors);
-        }
-    });
-
-    // Close the swipe actions after action
-    swipedItemId.value = null;
-}
-
-function laughedAtItem(item: any, event: Event): void {
-    event.stopPropagation(); // Prevent triggering parent click events
-
-    // Optimistically update the UI first
-    if (loadedFiles[item.id]) {
-        loadedFiles[item.id].funny = !loadedFiles[item.id].funny;
-        if (loadedFiles[item.id].funny) {
-            loadedFiles[item.id].loved = false;
-            loadedFiles[item.id].liked = false;
-            loadedFiles[item.id].disliked = false;
-        }
-    }
-
-    // Also update the current file in the audio store if it matches
-    if (audioStore.currentFile && audioStore.currentFile.id === item.id) {
-        audioStore.currentFile.loved = loadedFiles[item.id]?.loved || false;
-        audioStore.currentFile.liked = loadedFiles[item.id]?.liked || false;
-        audioStore.currentFile.disliked = loadedFiles[item.id]?.disliked || false;
-        audioStore.currentFile.funny = loadedFiles[item.id]?.funny || false;
-    }
-
-    // Send request to backend
-    router.post(route('audio.laughed-at', { file: item.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            if (loadedFiles[item.id]) {
-                loadedFiles[item.id].funny = !loadedFiles[item.id].funny;
-            }
-            console.error('Failed to toggle funny status:', errors);
-        }
-    });
-
-    // Close the swipe actions after action
-    swipedItemId.value = null;
-}
-
-// Watch for reaction changes in the current file to sync loadedFiles
-watch(() => audioStore.currentFile?.liked, (newValue) => {
-    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
-        loadedFiles[audioStore.currentFile.id].liked = !!newValue;
-    }
-});
-
-watch(() => audioStore.currentFile?.loved, (newValue) => {
-    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
-        loadedFiles[audioStore.currentFile.id].loved = !!newValue;
-    }
-});
-
-watch(() => audioStore.currentFile?.disliked, (newValue) => {
-    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
-        loadedFiles[audioStore.currentFile.id].disliked = !!newValue;
-    }
-});
-
-watch(() => audioStore.currentFile?.funny, (newValue) => {
-    if (audioStore.currentFile && loadedFiles[audioStore.currentFile.id]) {
-        loadedFiles[audioStore.currentFile.id].funny = !!newValue;
-    }
-});
-
-// Handle scroll to current track functionality
-function handleScrollToCurrentTrack(event: CustomEvent) {
-    const { currentFileId } = event.detail;
-
-    if (!recycleScrollerRef.value || !currentFileId) return;
-
-    // Get the current items list (search results or all files)
-    const currentItems = props.search.length ? props.search : props.files;
-
-    // Find the index of the current playing file in the displayed list
-    const index = currentItems.findIndex(item => item.id === currentFileId);
-
-    if (index !== -1) {
-        // Scroll to the item using RecycleScroller's scrollToItem method
-        recycleScrollerRef.value.scrollToItem(index);
-    }
-}
-
-onMounted(() => {
-    // Provide the loadFileDetails function for the AudioPlayer
-    provide('loadFileDetails', loadFileDetails);
-
-    // Listen for scroll to current track events
-    window.addEventListener('scrollToCurrentTrack', handleScrollToCurrentTrack as EventListener);
-});
-
-onBeforeUnmount(() => {
-    // Clean up event listener
-    window.removeEventListener('scrollToCurrentTrack', handleScrollToCurrentTrack as EventListener);
-});
-
-const initialQuery = window.location.search
-    ? new URLSearchParams(window.location.search).get('query') || ''
-    : '';
-
-// Scroll timeout for debouncing
-let scrollTimeout: number | null = null;
-
-function onScroll(startIndex: number, endIndex: number, visibleStartIndex: number, visibleEndIndex: number): void {
-    // Clear previous timeout
-    if (scrollTimeout !== null) {
-        window.clearTimeout(scrollTimeout);
-    }
-
-    // Set a timeout to detect when scrolling stops (debounce)
-    scrollTimeout = window.setTimeout(() => {
-        // Get the current items list (search results or all files)
-        const currentItems = props.search.length ? props.search : props.files;
-
-        // Pre-load item details for visible items
-        for (let i = visibleStartIndex; i <= visibleEndIndex; i++) {
-            if (i >= 0 && i < currentItems.length) {
-                const item = currentItems[i];
-                if (item && !loadedFiles[item.id]) {
-                    loadFileDetails(item.id, true); // Load with priority
-                }
-            }
-        }
-    }, 500); // 500ms debounce to detect scroll stop
-}
-
-// Format date
+// Format date - playlist-specific functionality
 function formatDate(dateString: string): string {
     return new Date(dateString).toLocaleDateString();
 }
