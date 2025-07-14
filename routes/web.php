@@ -3,6 +3,8 @@
 use App\Http\Controllers\AudioController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VideoController;
+use App\Http\Controllers\ImageController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -47,6 +49,8 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('audio/liked', [AudioController::class, 'liked'])->name('audio.liked');
     Route::get('audio/disliked', [AudioController::class, 'disliked'])->name('audio.disliked');
     Route::get('audio/unrated', [AudioController::class, 'unrated'])->name('audio.unrated');
+    Route::get('audio/funny', [AudioController::class, 'funny'])->name('audio.funny');
+    Route::get('audio/podcasts', [AudioController::class, 'podcasts'])->name('audio.podcasts');
 
     // Artists and Albums routes (moved to parent level)
     Route::get('artists', [AudioController::class, 'artists'])->name('artists.index');
@@ -62,6 +66,20 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     // Audio details route for AJAX loading
     Route::get('audio/{file}/details', [AudioController::class, 'getDetails'])->name('audio.details');
+
+    // Video routes
+    Route::get('video', [VideoController::class, 'index'])->name('video.index');
+    Route::get('video/movies', [VideoController::class, 'movies'])->name('video.movies');
+    Route::get('video/series', [VideoController::class, 'series'])->name('video.series');
+    Route::get('video/various', [VideoController::class, 'various'])->name('video.various');
+    Route::get('video/{file}', [VideoController::class, 'show'])->name('video.show');
+
+    // Images routes
+    Route::get('images', [ImageController::class, 'index'])->name('images.index');
+    Route::get('images/books', [ImageController::class, 'books'])->name('images.books');
+    Route::get('images/sets', [ImageController::class, 'sets'])->name('images.sets');
+    Route::get('images/various', [ImageController::class, 'various'])->name('images.various');
+    Route::get('images/{file}', [ImageController::class, 'show'])->name('images.show');
 
     // Get playlist membership for a file
     Route::get('files/{file}/playlists', [AudioController::class, 'getFilePlaylistMembership'])->name('files.playlists');

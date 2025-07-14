@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { Headset, LayoutGrid, Video, Image, Users, Heart, ThumbsUp, ThumbsDown, Mic, Disc, ListMusic, HelpCircle, FileText } from 'lucide-vue-next';
+import { Headset, LayoutGrid, Video, Image, Users, Heart, ThumbsUp, ThumbsDown, Mic, Disc, ListMusic, HelpCircle, FileText, Smile, Podcast } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -51,6 +51,11 @@ const mainNavItems = computed((): NavItem[] => {
                     icon: ThumbsUp,
                 },
                 {
+                    title: 'Funny',
+                    href: '/audio/funny',
+                    icon: Smile,
+                },
+                {
                     title: 'Disliked',
                     href: '/audio/disliked',
                     icon: ThumbsDown,
@@ -70,17 +75,58 @@ const mainNavItems = computed((): NavItem[] => {
                     href: '/albums',
                     icon: Disc,
                 },
+                {
+                    title: 'Podcasts',
+                    href: '/audio/podcasts',
+                    icon: Podcast,
+                },
             ],
         },
         {
             title: 'Video',
             href: '/video',
-            icon: Video
+            icon: Video,
+            isCollapsible: true,
+            items: [
+                {
+                    title: 'Movies',
+                    href: '/video/movies',
+                    icon: Video,
+                },
+                {
+                    title: 'Series',
+                    href: '/video/series',
+                    icon: Video,
+                },
+                {
+                    title: 'Various',
+                    href: '/video/various',
+                    icon: Video,
+                },
+            ],
         },
         {
             title: 'Images',
             href: '/images',
-            icon: Image
+            icon: Image,
+            isCollapsible: true,
+            items: [
+                {
+                    title: 'Books',
+                    href: '/images/books',
+                    icon: Image,
+                },
+                {
+                    title: 'Sets',
+                    href: '/images/sets',
+                    icon: Image,
+                },
+                {
+                    title: 'Various',
+                    href: '/images/various',
+                    icon: Image,
+                },
+            ],
         },
         {
             title: 'Playlists',

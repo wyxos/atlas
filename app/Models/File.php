@@ -139,6 +139,22 @@ class File extends Model
         return $query->where('mime_type', 'like', 'audio/%');
     }
 
+    /**
+     * Scope a query to only include video files.
+     */
+    public function scopeVideo(Builder $query): Builder
+    {
+        return $query->where('mime_type', 'like', 'video/%');
+    }
+
+    /**
+     * Scope a query to only include image files.
+     */
+    public function scopeImage(Builder $query): Builder
+    {
+        return $query->where('mime_type', 'like', 'image/%');
+    }
+
     // Customize the data sent to Typesense
     public function toSearchableArray()
     {
