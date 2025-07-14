@@ -2,13 +2,10 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
-import { RecycleScroller } from 'vue-virtual-scroller';
-import { audioStore } from '@/stores/audioStore';
+import { ref } from 'vue';
 
-// Import our components and composables
-import AudioListItem from '@/components/audio/AudioListItem.vue';
-import AudioSearch from '@/components/audio/AudioSearch.vue';
-import { useAudioList } from '@/composables/useAudioList';
+// Import our components
+import AudioList from '@/components/audio/AudioList.vue';
 
 interface Playlist {
     id: number;
@@ -43,24 +40,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Use the audio list composable for all common functionality
-const {
-    loadedFiles,
-    swipedItemId,
-    recycleScrollerRef,
-    initialQuery,
-    playAudio,
-    getFileData,
-    toggleFavorite,
-    likeItem,
-    dislikeItem,
-    laughedAtItem,
-    handleTouchStart,
-    handleTouchMove,
-    handleTouchEnd,
-    handleGlobalClick,
-    onScroll
-} = useAudioList(props);
+// Reference to the AudioList component
+const audioListRef = ref<InstanceType<typeof AudioList> | null>(null);
+
+// Handle global click by delegating to AudioList component
+function handleGlobalClick(event: Event): void {
+    if (audioListRef.value) {
+        audioListRef.value.handleGlobalClick(event);
+    }
+}
 
 // Format date - playlist-specific functionality
 function formatDate(dateString: string): string {
@@ -99,48 +87,13 @@ function formatDate(dateString: string): string {
                 </div>
             </div>
 
-            <!-- Search component -->
-            <AudioSearch :initial-query="initialQuery">
-                <template #noResults="{ query }">
-                    <p class="text-gray-500">No match was found for "{{ query }}" in this playlist</p>
-                </template>
-
-                <template #default="{ query }">
-                    <!-- Results list -->
-                    <div class="flex-1 md:p-4">
-                        <RecycleScroller
-                            ref="recycleScrollerRef"
-                            class="h-[600px] RecycleScroller"
-                            :items="query ? props.search : props.files"
-                            :item-size="74"
-                            key-field="id"
-                            :emit-update="true"
-                            @update="onScroll"
-                            v-slot="{ item, index }"
-                        >
-                            <div class="relative overflow-hidden">
-                                <!-- List item component -->
-                                <AudioListItem
-                                    :item="item"
-                                    :index="index + 1"
-                                    :loaded-file="loadedFiles[item.id]"
-                                    :is-playing="audioStore.isPlaying"
-                                    :current-file-id="audioStore.currentFile ? audioStore.currentFile.id : null"
-                                    :is-swiped-open="swipedItemId === item.id"
-                                    @play="playAudio(getFileData(item))"
-                                    @touch-start="handleTouchStart"
-                                    @touch-move="handleTouchMove"
-                                    @touch-end="handleTouchEnd"
-                                    @favorite="toggleFavorite"
-                                    @like="likeItem"
-                                    @dislike="dislikeItem"
-                                    @laughed-at="laughedAtItem"
-                                />
-                            </div>
-                        </RecycleScroller>
-                    </div>
-                </template>
-            </AudioSearch>
+            <!-- Audio List -->
+            <AudioList
+                ref="audioListRef"
+                :files="props.files"
+                :search="props.search"
+                no-results-message='No match was found for "{query}" in this playlist'
+            />
 
             <!-- Empty state -->
             <div v-if="files.length === 0" class="flex-1 flex items-center justify-center">
