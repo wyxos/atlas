@@ -442,12 +442,29 @@ class AudioController extends Controller
 
         // Check if file is already in playlist
         if ($playlist->files()->where('files.id', $file->id)->exists()) {
-            return back()->with('error', 'Track is already in this playlist');
+            // Remove file from playlist (toggle off)
+            $playlist->files()->detach($file->id);
+            return back()->with('success', 'Track removed from playlist successfully');
         }
 
-        // Add file to playlist
+        // Add file to playlist (toggle on)
         $playlist->files()->attach($file->id);
 
         return back()->with('success', 'Track added to playlist successfully');
+    }
+
+    public function getFilePlaylistMembership(File $file)
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json([]);
+        }
+
+        $playlistIds = $file->playlists()
+            ->where('user_id', $user->id)
+            ->pluck('playlists.id')
+            ->toArray();
+
+        return response()->json($playlistIds);
     }
 }

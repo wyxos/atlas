@@ -542,7 +542,7 @@ it('can add file to playlist via context menu route', function () {
     expect($playlist->files()->where('files.id', $file->id)->exists())->toBe(true);
 });
 
-it('prevents duplicate files in playlist via context menu route', function () {
+it('toggles file in playlist via context menu route (removes if already present)', function () {
     // Create and authenticate a user
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -566,16 +566,19 @@ it('prevents duplicate files in playlist via context menu route', function () {
     // Add file to playlist first time
     $playlist->files()->attach($file->id);
 
-    // Try to add the same file again via context menu route
+    // Verify file is in playlist
+    expect($playlist->files()->where('files.id', $file->id)->exists())->toBe(true);
+
+    // Toggle the same file again via context menu route (should remove it)
     $response = $this->post(route('playlists.files.store', ['playlist' => $playlist->id]), [
         'file_id' => $file->id,
     ]);
 
     $response->assertStatus(302); // Redirect back
-    $response->assertSessionHas('error', 'Track is already in this playlist');
+    $response->assertSessionHas('success', 'Track removed from playlist successfully');
 
-    // Verify there's still only one instance of the file in the playlist
-    expect($playlist->files()->where('files.id', $file->id)->count())->toBe(1);
+    // Verify the file was removed from the playlist
+    expect($playlist->files()->where('files.id', $file->id)->exists())->toBe(false);
 });
 
 it('validates file_id when adding to playlist via context menu route', function () {
@@ -596,4 +599,113 @@ it('validates file_id when adding to playlist via context menu route', function 
 
     $response->assertStatus(302); // Redirect back with validation errors
     $response->assertSessionHasErrors(['file_id']);
+});
+
+it('can get playlist membership for a file', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create playlists
+    $playlist1 = Playlist::create([
+        'name' => 'Test Playlist 1',
+        'user_id' => $user->id,
+    ]);
+
+    $playlist2 = Playlist::create([
+        'name' => 'Test Playlist 2',
+        'user_id' => $user->id,
+    ]);
+
+    $playlist3 = Playlist::create([
+        'name' => 'Test Playlist 3',
+        'user_id' => $user->id,
+    ]);
+
+    // Create an audio file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Add file to playlist1 and playlist3
+    $playlist1->files()->attach($file->id);
+    $playlist3->files()->attach($file->id);
+
+    // Get playlist membership for the file
+    $response = $this->get(route('files.playlists', ['file' => $file->id]));
+
+    $response->assertStatus(200);
+    $response->assertJson([$playlist1->id, $playlist3->id]);
+});
+
+it('returns empty array for file not in any playlists', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a playlist (but don't add file to it)
+    Playlist::create([
+        'name' => 'Test Playlist',
+        'user_id' => $user->id,
+    ]);
+
+    // Create an audio file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Get playlist membership for the file
+    $response = $this->get(route('files.playlists', ['file' => $file->id]));
+
+    $response->assertStatus(200);
+    $response->assertJson([]);
+});
+
+it('only returns playlists owned by authenticated user', function () {
+    // Create two users
+    $user1 = User::factory()->create();
+    $user2 = User::factory()->create();
+
+    // Create playlists for both users
+    $user1Playlist = Playlist::create([
+        'name' => 'User 1 Playlist',
+        'user_id' => $user1->id,
+    ]);
+
+    $user2Playlist = Playlist::create([
+        'name' => 'User 2 Playlist',
+        'user_id' => $user2->id,
+    ]);
+
+    // Create an audio file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Add file to both playlists
+    $user1Playlist->files()->attach($file->id);
+    $user2Playlist->files()->attach($file->id);
+
+    // Authenticate as user1 and get playlist membership
+    $this->actingAs($user1);
+    $response = $this->get(route('files.playlists', ['file' => $file->id]));
+
+    $response->assertStatus(200);
+    $response->assertJson([$user1Playlist->id]);
+    $response->assertJsonMissing([$user2Playlist->id]);
 });
