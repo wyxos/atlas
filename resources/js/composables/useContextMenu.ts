@@ -7,9 +7,7 @@ const options = reactive<MenuOptions>({
     y: 0,
     zIndex: 9999,
     minWidth: 230,
-    // x: 500,
-    // y: 200,
-    theme: 'default'
+    theme: 'win10 dark'
 });
 
 type Content = {
@@ -18,8 +16,12 @@ type Content = {
     item: null | { id: number; name: string };
 }
 
+// Store the current context menu content
+const currentContent = ref<Content | null>(null);
+
 function handleContextMenu(event: MouseEvent, content: Content) {
-    console.log('Context menu event:', event, content);
+    // Store the current content for use in menu actions
+    currentContent.value = content;
 
     // Update menu position
     options.x = event.clientX;
@@ -30,5 +32,5 @@ function handleContextMenu(event: MouseEvent, content: Content) {
 }
 
 export default function useContextMenu() {
-    return { show, options, handleContextMenu };
+    return { show, options, currentContent, handleContextMenu };
 }

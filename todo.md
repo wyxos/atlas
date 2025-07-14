@@ -2,6 +2,8 @@
 ## Audio
 - List/Playlists
 - Player
+  - [ ] disable next/previous if no tracks
+  - [ ] keep track when list got shuffled and render visual
 - Single view
   - [ ] Ability to edit metadata
 - Artist view

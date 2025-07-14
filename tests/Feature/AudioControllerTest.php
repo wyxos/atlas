@@ -508,3 +508,92 @@ it('playlists endpoint returns paginated data structure', function () {
         ->where('playlists.data.1.id', fn ($id) => in_array($id, [$playlist1->id, $playlist2->id]))
     );
 });
+
+it('can add file to playlist via context menu route', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a playlist
+    $playlist = Playlist::create([
+        'name' => 'Test Playlist',
+        'user_id' => $user->id,
+    ]);
+
+    // Create an audio file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Add file to playlist via the context menu route
+    $response = $this->post(route('playlists.files.store', ['playlist' => $playlist->id]), [
+        'file_id' => $file->id,
+    ]);
+
+    $response->assertStatus(302); // Redirect back
+    $response->assertSessionHas('success', 'Track added to playlist successfully');
+
+    // Verify the file was added to the playlist
+    expect($playlist->files()->where('files.id', $file->id)->exists())->toBe(true);
+});
+
+it('prevents duplicate files in playlist via context menu route', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a playlist
+    $playlist = Playlist::create([
+        'name' => 'Test Playlist',
+        'user_id' => $user->id,
+    ]);
+
+    // Create an audio file
+    $file = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+    ]);
+
+    // Add file to playlist first time
+    $playlist->files()->attach($file->id);
+
+    // Try to add the same file again via context menu route
+    $response = $this->post(route('playlists.files.store', ['playlist' => $playlist->id]), [
+        'file_id' => $file->id,
+    ]);
+
+    $response->assertStatus(302); // Redirect back
+    $response->assertSessionHas('error', 'Track is already in this playlist');
+
+    // Verify there's still only one instance of the file in the playlist
+    expect($playlist->files()->where('files.id', $file->id)->count())->toBe(1);
+});
+
+it('validates file_id when adding to playlist via context menu route', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a playlist
+    $playlist = Playlist::create([
+        'name' => 'Test Playlist',
+        'user_id' => $user->id,
+    ]);
+
+    // Try to add non-existent file to playlist
+    $response = $this->post(route('playlists.files.store', ['playlist' => $playlist->id]), [
+        'file_id' => 999,
+    ]);
+
+    $response->assertStatus(302); // Redirect back with validation errors
+    $response->assertSessionHasErrors(['file_id']);
+});
