@@ -709,3 +709,188 @@ it('only returns playlists owned by authenticated user', function () {
     $response->assertJson([$user1Playlist->id]);
     $response->assertJsonMissing([$user2Playlist->id]);
 });
+
+it('can show playlist without search query', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a playlist
+    $playlist = Playlist::create([
+        'name' => 'Test Playlist',
+        'user_id' => $user->id,
+    ]);
+
+    // Create audio files
+    $file1 = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio-1.mp3',
+        'path' => '/path/to/test-audio-1.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+        'not_found' => false,
+    ]);
+
+    $file2 = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio-2.mp3',
+        'path' => '/path/to/test-audio-2.mp3',
+        'size' => 2048,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file456',
+        'not_found' => false,
+    ]);
+
+    // Add files to playlist
+    $playlist->files()->attach([$file1->id, $file2->id]);
+
+    // Make request to showPlaylist endpoint
+    $response = $this->get(route('playlists.show', ['playlist' => $playlist->id]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('PlaylistShow')
+        ->has('playlist')
+        ->has('files')
+        ->has('search')
+        ->where('playlist.id', $playlist->id)
+        ->where('playlist.name', 'Test Playlist')
+        ->where('search', []) // No search results when no query
+    );
+});
+
+it('can search files within a playlist without crashing', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a playlist
+    $playlist = Playlist::create([
+        'name' => 'Test Playlist',
+        'user_id' => $user->id,
+    ]);
+
+    // Create audio files with different titles
+    $file1 = File::create([
+        'source' => 'test',
+        'filename' => 'song-one.mp3',
+        'path' => '/path/to/song-one.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file123',
+        'title' => 'Amazing Song',
+        'not_found' => false,
+    ]);
+
+    $file2 = File::create([
+        'source' => 'test',
+        'filename' => 'song-two.mp3',
+        'path' => '/path/to/song-two.mp3',
+        'size' => 2048,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file456',
+        'title' => 'Another Track',
+        'not_found' => false,
+    ]);
+
+    $file3 = File::create([
+        'source' => 'test',
+        'filename' => 'song-three.mp3',
+        'path' => '/path/to/song-three.mp3',
+        'size' => 3072,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'file789',
+        'title' => 'Amazing Beat',
+        'not_found' => false,
+    ]);
+
+    // Index files for search (required for database driver)
+    $file1->searchable();
+    $file2->searchable();
+    $file3->searchable();
+
+    // Add files to playlist
+    $playlist->files()->attach([$file1->id, $file2->id, $file3->id]);
+
+    // Make request to showPlaylist endpoint with search query
+    // The main goal is to ensure this doesn't crash with BadMethodCallException
+    $response = $this->get(route('playlists.show', ['playlist' => $playlist->id, 'query' => 'Amazing']));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('PlaylistShow')
+        ->has('playlist')
+        ->has('files')
+        ->has('search') // Search should be present (even if empty)
+        ->where('playlist.id', $playlist->id)
+        ->where('playlist.name', 'Test Playlist')
+    );
+});
+
+it('search in playlist handles different file types without crashing', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create a playlist
+    $playlist = Playlist::create([
+        'name' => 'Test Playlist',
+        'user_id' => $user->id,
+    ]);
+
+    // Create files with same title but different types/statuses
+    $audioFile = File::create([
+        'source' => 'test',
+        'filename' => 'test-audio.mp3',
+        'path' => '/path/to/test-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'audio123',
+        'title' => 'Test Song',
+        'not_found' => false,
+    ]);
+
+    $videoFile = File::create([
+        'source' => 'test',
+        'filename' => 'test-video.mp4',
+        'path' => '/path/to/test-video.mp4',
+        'size' => 2048,
+        'mime_type' => 'video/mp4',
+        'hash' => 'video123',
+        'title' => 'Test Song',
+        'not_found' => false,
+    ]);
+
+    $notFoundFile = File::create([
+        'source' => 'test',
+        'filename' => 'missing-audio.mp3',
+        'path' => '/path/to/missing-audio.mp3',
+        'size' => 1024,
+        'mime_type' => 'audio/mpeg',
+        'hash' => 'missing123',
+        'title' => 'Test Song',
+        'not_found' => true,
+    ]);
+
+    // Index files for search (required for database driver)
+    $audioFile->searchable();
+    $videoFile->searchable();
+    $notFoundFile->searchable();
+
+    // Add all files to playlist
+    $playlist->files()->attach([$audioFile->id, $videoFile->id, $notFoundFile->id]);
+
+    // Make request to showPlaylist endpoint with search query
+    // The main goal is to ensure this doesn't crash with BadMethodCallException
+    $response = $this->get(route('playlists.show', ['playlist' => $playlist->id, 'query' => 'Test Song']));
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('PlaylistShow')
+        ->has('playlist')
+        ->has('files')
+        ->has('search') // Search should be present (even if empty)
+        ->where('playlist.id', $playlist->id)
+    );
+});

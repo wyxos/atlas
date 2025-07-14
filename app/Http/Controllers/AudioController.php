@@ -481,11 +481,18 @@ class AudioController extends Controller
         $search = [];
 
         if ($query = request()->input('query')) {
-            // Filter search results to only include audio files in this playlist
-            $search = $playlist->files()
-                ->search($query)
-                ->query(function ($builder) {
-                    $builder->where('mime_type', 'like', 'audio/%')
+            // Get playlist file IDs for filtering
+            $playlistFileIds = $playlist->files()
+                ->where('mime_type', 'like', 'audio/%')
+                ->where('not_found', false)
+                ->pluck('files.id')
+                ->toArray();
+
+            // Search files and filter to only include files in this playlist
+            $search = File::search($query)
+                ->query(function ($builder) use ($playlistFileIds) {
+                    $builder->whereIn('id', $playlistFileIds)
+                            ->where('mime_type', 'like', 'audio/%')
                             ->where('not_found', false);
                 })
                 ->get();
