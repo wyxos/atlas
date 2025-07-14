@@ -4,7 +4,7 @@ import type { BreadcrumbItemType } from '@/types';
 import { ContextMenu, ContextMenuItem } from '@imengyu/vue3-context-menu';
 import useContextMenu from '@/composables/useContextMenu';
 
-const { show } = useContextMenu();
+const { show, options } = useContextMenu();
 
 interface Props {
     breadcrumbs?: BreadcrumbItemType[];
@@ -20,7 +20,9 @@ withDefaults(defineProps<Props>(), {
         <slot />
         <context-menu
             v-model:show="show"
+            :options="options"
         >
+            <context-menu-item label="Simple item" />
             <context-menu-item label="Simple item" />
 <!--            <context-menu-item label="Simple item" @click="onMenuClick(1)" />-->
 <!--            <context-menu-separator />&lt;!&ndash;use this to add separator&ndash;&gt;-->
