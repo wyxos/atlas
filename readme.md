@@ -174,6 +174,8 @@ Atlas is a self-hosted audio library management and streaming platform. It provi
 
 ![Dashboard](docs/images/dashboard.png)
 *Atlas Dashboard showing file statistics and distribution*
+![Audio Player](docs/images/audio-player.png)
+*Audio player interface with playback controls and metadata*
 
 ## Contributing
 
