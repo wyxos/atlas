@@ -7,12 +7,14 @@ import {
     SkipForward,
     Shuffle,
     Repeat,
-    Repeat1
+    Repeat1,
+    Menu
 } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
 import { audioStore, audioActions } from '@/stores/audioStore';
 import AudioReactions from '@/components/audio/AudioReactions.vue';
+import AudioQueuePanel from '@/components/audio/AudioQueuePanel.vue';
 
 
 // Create a single, persistent audio element that will be shared across all instances
@@ -45,6 +47,9 @@ const audioPlayer = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(audioStore.currentTime);
 const duration = ref(audioStore.duration);
 const volume = ref(audioStore.volume);
+
+// Queue panel state
+const isQueuePanelOpen = ref(false);
 
 // Track user interactions with tracks
 const isLiked = ref(false);
@@ -347,6 +352,16 @@ function handleTitleClick(): void {
 // Handle album cover click to scroll to current track
 function handleAlbumCoverClick(): void {
     audioActions.scrollToCurrentTrack();
+}
+
+// Handle queue panel toggle
+function toggleQueuePanel(): void {
+    isQueuePanelOpen.value = !isQueuePanelOpen.value;
+}
+
+// Handle queue panel close
+function closeQueuePanel(): void {
+    isQueuePanelOpen.value = false;
 }
 
 // Function to handle play/pause based on isPlaying prop
@@ -745,11 +760,25 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                 </div>
             </div>
 
-            <div class="w-100">
-                <!-- display incoming track -->
+            <div class="w-100 flex justify-end">
+                <!-- Queue panel toggle button -->
+                <button
+                    class="button circular small empty"
+                    @click="toggleQueuePanel"
+                    title="Show Queue"
+                    :class="{ 'bg-primary text-primary-foreground': isQueuePanelOpen }"
+                >
+                    <Menu :size="16" />
+                </button>
             </div>
         </div>
         <!-- End of player desktop -->
+
+        <!-- Queue Panel -->
+        <AudioQueuePanel
+            :is-open="isQueuePanelOpen"
+            @close="closeQueuePanel"
+        />
 
         <!-- Start of mobile player -->
         <div class="md:hidden">
