@@ -1,7 +1,15 @@
 # Atlas - Audio Library Management System
 
 ## Overview
-Atlas is a self-hosted audio library management and streaming platform. It provides automated metadata extraction, intelligent file organization, and a modern web interface for browsing and playing your audio collection.
+Atlas is a self-hosted audio library management and streaming platform. Run it on anything from a Raspberry Pi to a full server and keep your music collection private but accessible from any device. Automated metadata extraction, intelligent organization and a modern web interface make managing large libraries painless. Built as an alternative to services like Plex and Spotify, Atlas puts you in complete control of your media.
+
+### Why Choose Atlas?
+- **Self‑hosted & Private**: Keep your music on your own hardware with no vendor lock‑in or recurring storage fees.
+- **Runs Anywhere**: Lightweight enough for a Raspberry Pi yet scalable for a dedicated server or cloud VM.
+- **Advanced Playlists & Organization**: Smart rules and metadata tools help tame even huge collections.
+- **Real Shuffle & Offline Support**: Stream or sync your files without the limitations of commercial services.
+- **Custom Integrations**: Bring in additional metadata or content from other services with your own extensions.
+- **Extensible**: Open source so you can build exactly the features you need.
 
 ## Core Features
 
@@ -20,6 +28,7 @@ Atlas is a self-hosted audio library management and streaming platform. It provi
 - **Direct Audio Streaming**: Stream audio files directly from your library
 - **Love/Like/Dislike System**: Rate and organize your favorite tracks
 - **Seen Status Tracking**: Keep track of what you've listened to
+- **Cross-Device Access**: Responsive web interface works great on desktop and mobile with true shuffle playback
 
 ### 📊 **Dashboard & Analytics**
 - **File Statistics**: Visual breakdown of library composition and storage usage
