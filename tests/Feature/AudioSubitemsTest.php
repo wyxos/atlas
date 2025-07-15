@@ -228,6 +228,103 @@ test('unrated page shows only unrated audio files', function () {
     );
 });
 
+test('audio funny page can be accessed', function () {
+    $response = $this->actingAs($this->user)->get('/audio/funny');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->has('files')
+        ->where('title', 'Funny')
+    );
+});
+
+test('audio podcasts page can be accessed', function () {
+    $response = $this->actingAs($this->user)->get('/audio/podcasts');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->has('files')
+        ->where('title', 'Podcasts')
+    );
+});
+
+test('funny page shows only funny audio files', function () {
+    // Create audio files with different statuses
+    $funnyFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'funny' => true,
+        'not_found' => false,
+    ]);
+
+    $normalFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'not_found' => false,
+    ]);
+
+    $response = $this->actingAs($this->user)->get('/audio/funny');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->where('files', function ($files) use ($funnyFile) {
+            return collect($files)->contains('id', $funnyFile->id);
+        })
+        ->where('title', 'Funny')
+    );
+});
+
+test('funny page search functionality works correctly', function () {
+    // Create a funny audio file with searchable metadata
+    $funnyFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'funny' => true,
+        'not_found' => false,
+        'title' => 'Funny Comedy Show',
+    ]);
+
+    $normalFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'not_found' => false,
+        'title' => 'Regular Music Track',
+    ]);
+
+    $response = $this->actingAs($this->user)->get('/audio/funny?query=Comedy');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->has('search')
+        ->where('title', 'Funny')
+    );
+});
+
+test('podcasts page search functionality works correctly', function () {
+    // Create a podcast file with metadata
+    $podcastFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'not_found' => false,
+        'path' => '/storage/podcasts/tech-talk.mp3',
+        'title' => 'Tech Talk Episode 1',
+    ]);
+
+    $normalFile = File::factory()->create([
+        'mime_type' => 'audio/mp3',
+        'not_found' => false,
+        'title' => 'Regular Music Track',
+    ]);
+
+    $response = $this->actingAs($this->user)->get('/audio/podcasts?query=Tech');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Audio')
+        ->has('search')
+        ->where('title', 'Podcasts')
+    );
+});
+
 test('playlists are shared globally for sidebar', function () {
     // Create some playlists for the user
     $playlist1 = Playlist::factory()->create([

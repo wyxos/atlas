@@ -26,6 +26,10 @@ const currentSearchRoute = computed(() => {
         return route('audio.disliked');
     } else if (currentUrl.includes('/audio/unrated')) {
         return route('audio.unrated');
+    } else if (currentUrl.includes('/audio/funny')) {
+        return route('audio.funny');
+    } else if (currentUrl.includes('/audio/podcasts')) {
+        return route('audio.podcasts');
     } else {
         return route('audio');
     }
