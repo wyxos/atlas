@@ -117,7 +117,7 @@ const getButtonClass = (reactionType: string, isActive: boolean) => {
       @click="handleLaughedAt"
       :title="showLabels ? 'Funny' : undefined"
     >
-      <Laugh :size="iconSize" :fill="isLaughedAt ? 'currentColor' : 'none'" />
+      <Laugh :size="iconSize" />
     </button>
   </div>
 </template>

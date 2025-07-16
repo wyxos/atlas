@@ -52,8 +52,12 @@ defineExpose({
         </template>
 
         <template #default="{ query }">
+
             <!-- Results list -->
             <div class="flex-1 md:p-4">
+                <p class="mb-4 text-sm">
+                    <strong>{{ props.files.length }}</strong> <span class="">tracks</span>
+                </p>
                 <RecycleScroller
                     ref="recycleScrollerRef"
                     class="h-[600px] RecycleScroller"
