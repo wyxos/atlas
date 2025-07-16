@@ -1,7 +1,7 @@
-# Atlas - Audio Library Management System
+# Atlas - Media Management and Streaming Platform
 
 ## Overview
-Atlas is a self-hosted audio library management and streaming platform. It provides automated metadata extraction, intelligent file organization, and a modern web interface for browsing and playing your audio collection.
+Atlas is a self-hosted media management and streaming platform with AI-powered features, multi-source content browsing, and advanced file organization capabilities. It provides automated metadata extraction, intelligent file organization, and a modern web interface for browsing and playing your media collection.
 
 ## Core Features
 
@@ -34,22 +34,24 @@ Atlas is a self-hosted audio library management and streaming platform. It provi
 ## Technology Stack
 - **Backend**: Laravel 12 (PHP 8.2+)
 - **Frontend**: Vue.js 3 with TypeScript and Inertia.js
-- **UI Framework**: Tailwind CSS with Shadcn Vue components
-- **Search Engine**: Typesense with Laravel Scout
+- **UI Framework**: Tailwind CSS 4 with Reka UI components
+- **Search Engine**: Typesense with Laravel Scout (optional)
 - **Queue System**: Laravel Queues for background processing
 - **Metadata Processing**: PHP-FFMpeg for audio file analysis
 - **Authentication**: Laravel Breeze with Inertia.js
+- **Testing Framework**: PEST for PHP testing
+- **Additional Libraries**: wyxos/harmonie for enhanced functionality
 
 ## Installation
 
 ### Prerequisites
 - **PHP 8.2+** with extensions: `mbstring`, `xml`, `json`, `gd`
 - **Composer** for PHP dependency management
-- **Node.js 18+** and npm for frontend assets
-- **Database**: MySQL 8.0+ or PostgreSQL 13+ or SQLite 3.35+
-- **Queue Worker**: Redis (recommended) or database for job queuing
-- **Search Engine**: Typesense server for full-text search
-- **Storage**: Local file system or cloud storage for audio files
+- **Node.js** and npm for frontend assets
+- **Database**: SQLite (default), MySQL 8.0+, or PostgreSQL 13+
+- **Queue Worker**: Database queues (default) or Redis for job queuing
+- **Search Engine**: Typesense server for full-text search (optional)
+- **Storage**: Local file system or cloud storage for media files
 
 ### Setup Steps
 
@@ -77,21 +79,26 @@ Atlas is a self-hosted audio library management and streaming platform. It provi
 
 5. **Configure services in `.env`**
    ```env
-   # Database
-   DB_CONNECTION=mysql
-   DB_HOST=127.0.0.1
-   DB_DATABASE=atlas
-   DB_USERNAME=your_username
-   DB_PASSWORD=your_password
+   # Database (SQLite is default, or configure MySQL/PostgreSQL)
+   DB_CONNECTION=sqlite
+   # For MySQL/PostgreSQL, uncomment and configure:
+   # DB_CONNECTION=mysql
+   # DB_HOST=127.0.0.1
+   # DB_DATABASE=atlas
+   # DB_USERNAME=your_username
+   # DB_PASSWORD=your_password
    
-   # Typesense Search
-   SCOUT_DRIVER=typesense
-   TYPESENSE_API_KEY=your_typesense_key
-   TYPESENSE_HOST=localhost
-   TYPESENSE_PORT=8108
+   # Queue (database is default)
+   QUEUE_CONNECTION=database
    
-   # Queue (for metadata processing)
-   QUEUE_CONNECTION=redis  # or database
+   # Optional: User registration
+   REGISTRATION_ENABLED=true
+   
+   # Optional: Typesense Search (if using full-text search)
+   # SCOUT_DRIVER=typesense
+   # TYPESENSE_API_KEY=your_typesense_key
+   # TYPESENSE_HOST=localhost
+   # TYPESENSE_PORT=8108
    ```
 
 6. **Run database migrations**
@@ -140,14 +147,55 @@ Atlas is a self-hosted audio library management and streaming platform. It provi
    php artisan files:translate-metadata --file=123
    ```
 
+### Administrative Commands
+
+1. **Create admin user**:
+   ```bash
+   # Create admin with email (password will be generated)
+   php artisan make:admin admin@example.com
+   
+   # Create admin with specific password
+   php artisan make:admin admin@example.com --password=yourpassword
+   ```
+
+2. **Database management**:
+   ```bash
+   # Create database backup
+   php artisan db:backup
+   
+   # Push database to remote server
+   php artisan db:push-to-remote hostname /local/path /remote/path
+   
+   # Pull database from remote server
+   php artisan db:pull-from-remote hostname /remote/path /local/path
+   
+   # Dry run (see what would happen without executing)
+   php artisan db:push-to-remote hostname /local/path /remote/path --dry-run
+   ```
+
+3. **File management**:
+   ```bash
+   # Check file existence and integrity
+   php artisan files:check-existence
+   
+   # Scan and sync files to Atlas
+   php artisan files:sync-to-atlas
+   
+   # Scan Atlas files
+   php artisan files:scan-atlas
+   ```
+
 ### Development Commands
 
-- **Start development environment**: `composer run dev`
-- **Run with SSR**: `composer run dev:ssr`
+- **Start development environment**: `composer run dev` (runs server, queue worker, and vite concurrently)
+- **Run with SSR**: `composer run dev:ssr` (includes SSR server and log monitoring)
 - **Run tests**: `composer run test` or `php artisan test`
 - **Watch frontend changes**: `npm run dev`
 - **Build for production**: `npm run build`
-- **Queue worker**: `php artisan queue:work`
+- **Build with SSR**: `npm run build:ssr`
+- **Code formatting**: `npm run format` (Prettier)
+- **Code linting**: `npm run lint` (ESLint)
+- **Queue worker**: `php artisan queue:work` (if running manually)
 
 ## Roadmap
 
