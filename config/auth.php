@@ -112,4 +112,17 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Registration Control
+    |--------------------------------------------------------------------------
+    |
+    | This option controls whether user registration is enabled or disabled.
+    | When set to false, registration routes will return 404 responses while
+    | login functionality remains completely unaffected.
+    |
+    */
+
+    'registration_enabled' => env('REGISTRATION_ENABLED', true),
+
 ];

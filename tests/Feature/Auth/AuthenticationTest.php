@@ -39,3 +39,23 @@ test('users can logout', function () {
     $this->assertGuest();
     $response->assertRedirect('/');
 });
+
+test('users can still login when registration is disabled', function () {
+    // Disable registration
+    config(['auth.registration_enabled' => false]);
+
+    $user = User::factory()->create();
+
+    // Login screen should still be accessible
+    $response = $this->get('/login');
+    $response->assertStatus(200);
+
+    // Login should still work
+    $response = $this->post('/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect(route('dashboard', absolute: false));
+});
