@@ -53,6 +53,24 @@ class AudioController extends Controller
         return response()->json($file);
     }
 
+    public function getBatchDetails(Request $request)
+    {
+        $request->validate([
+            'file_ids' => 'required|array',
+            'file_ids.*' => 'required|integer|exists:files,id'
+        ]);
+
+        $fileIds = $request->input('file_ids');
+
+        // Load all files with their relationships in a single query
+        $files = File::whereIn('id', $fileIds)
+            ->with(['metadata', 'covers', 'artists.covers', 'albums.covers'])
+            ->get()
+            ->keyBy('id'); // Key by ID for easy frontend access
+
+        return response()->json($files);
+    }
+
     public function toggleLove(File $file)
     {
         $file->loved = !$file->loved;

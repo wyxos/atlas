@@ -15,6 +15,7 @@ export function useAudioList(props: AudioListProps) {
     const {
         loadedFiles,
         loadFileDetails,
+        loadBatchFileDetails,
         getFileData
     } = useAudioFileLoader();
 
@@ -205,14 +206,20 @@ export function useAudioList(props: AudioListProps) {
             // Get the current items list (search results or all files)
             const currentItems = props.search.length ? props.search : props.files;
 
-            // Pre-load item details for visible items
+            // Collect file IDs that need to be loaded
+            const fileIdsToLoad: number[] = [];
             for (let i = visibleStartIndex; i <= visibleEndIndex; i++) {
                 if (i >= 0 && i < currentItems.length) {
                     const item = currentItems[i];
                     if (item && !loadedFiles[item.id]) {
-                        loadFileDetails(item.id, true); // Load with priority
+                        fileIdsToLoad.push(item.id);
                     }
                 }
+            }
+
+            // Load all needed files in a single batch request
+            if (fileIdsToLoad.length > 0) {
+                loadBatchFileDetails(fileIdsToLoad);
             }
         }, 500); // 500ms debounce to detect scroll stop
     }

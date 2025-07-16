@@ -50,6 +50,56 @@ export function useAudioFileLoader() {
     }
   }
 
+  // Function to load multiple file details in a single batch request
+  async function loadBatchFileDetails(fileIds: (string | number)[]) {
+    if (fileIds.length === 0) {
+      return;
+    }
+
+    // Filter out files that are already loaded or have pending requests
+    const idsToLoad = fileIds.filter(id => !loadedFiles[id] && !pendingRequests[id]);
+
+    if (idsToLoad.length === 0) {
+      return;
+    }
+
+    // Create abort controller for batch request cancellation
+    const controller = new AbortController();
+
+    // Mark all files as having pending requests
+    idsToLoad.forEach(id => {
+      pendingRequests[id] = controller;
+    });
+
+    try {
+      const response = await axios.post(route('audio.batch-details'), {
+        file_ids: idsToLoad
+      }, {
+        signal: controller.signal
+      });
+
+      // Update loadedFiles with the batch response
+      const batchData = response.data;
+      Object.keys(batchData).forEach(fileId => {
+        loadedFiles[fileId] = batchData[fileId];
+        delete pendingRequests[fileId];
+      });
+
+      console.log(`Batch loaded ${Object.keys(batchData).length} files`);
+    } catch (error) {
+      if (axios.isCancel(error)) {
+        console.log('Batch request canceled for files:', idsToLoad);
+      } else {
+        console.error('Error loading batch file details:', error);
+      }
+
+      // Clean up pending requests on error
+      idsToLoad.forEach(id => {
+        delete pendingRequests[id];
+      });
+    }
+  }
+
   // Function to get file data (either from cache or props)
   function getFileData(item: any) {
     return loadedFiles[item.id] || item;
@@ -106,12 +156,18 @@ export function useAudioFileLoader() {
 
     console.log(`Loading ${currentlyVisible.size} visible items out of ${observedItems.value.size} observed`);
 
-    // Only load details for items that are currently visible in the viewport
+    // Collect file IDs that need to be loaded
+    const fileIdsToLoad: (string | number)[] = [];
     currentlyVisible.forEach(itemId => {
       if (!loadedFiles[itemId]) {
-        loadFileDetails(itemId, true); // Load with priority
+        fileIdsToLoad.push(itemId);
       }
     });
+
+    // Load all needed files in a single batch request
+    if (fileIdsToLoad.length > 0) {
+      loadBatchFileDetails(fileIdsToLoad);
+    }
 
     // Cancel any pending requests for items that are no longer visible
     Object.keys(pendingRequests).forEach(itemId => {
@@ -189,6 +245,7 @@ export function useAudioFileLoader() {
   return {
     loadedFiles,
     loadFileDetails,
+    loadBatchFileDetails,
     getFileData,
     handleScroll,
     observeItem,

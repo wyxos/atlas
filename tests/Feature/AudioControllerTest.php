@@ -161,6 +161,148 @@ it('returns 404 for non-existent file', function () {
     $response->assertStatus(404);
 });
 
+it('can get batch file details for multiple files', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Create multiple files with metadata and relationships
+    $files = [];
+    $expectedIds = [];
+
+    for ($i = 1; $i <= 3; $i++) {
+        // Create artist and album for each file
+        $artist = Artist::create(['name' => "Test Artist $i"]);
+        $album = Album::create(['name' => "Test Album $i"]);
+
+        // Create file
+        $file = File::create([
+            'source' => 'test',
+            'filename' => "test-audio-batch-$i.mp3",
+            'path' => "/path/to/test-audio-batch-$i.mp3",
+            'size' => 1024 * $i,
+            'mime_type' => 'audio/mpeg',
+            'hash' => "batch-file-hash-$i",
+        ]);
+
+        // Create metadata
+        FileMetadata::create([
+            'file_id' => $file->id,
+            'payload' => ['title' => "Batch Test Song $i"],
+        ]);
+
+        // Associate with artist and album
+        $file->artists()->attach($artist->id);
+        $file->albums()->attach($album->id);
+
+        // Create covers
+        Cover::create([
+            'path' => "covers/batch-file-$i-cover.jpg",
+            'hash' => "batch-file-$i-cover-hash",
+            'coverable_id' => $file->id,
+            'coverable_type' => File::class,
+        ]);
+
+        Cover::create([
+            'path' => "covers/batch-artist-$i-cover.jpg",
+            'hash' => "batch-artist-$i-cover-hash",
+            'coverable_id' => $artist->id,
+            'coverable_type' => Artist::class,
+        ]);
+
+        Cover::create([
+            'path' => "covers/batch-album-$i-cover.jpg",
+            'hash' => "batch-album-$i-cover-hash",
+            'coverable_id' => $album->id,
+            'coverable_type' => Album::class,
+        ]);
+
+        $files[] = $file;
+        $expectedIds[] = $file->id;
+    }
+
+    // Make batch request
+    $response = $this->postJson(route('audio.batch-details'), [
+        'file_ids' => $expectedIds
+    ]);
+
+    $response->assertStatus(200);
+    $data = $response->json();
+
+    // Assert we got all requested files
+    expect($data)->toHaveCount(3);
+
+    // Assert each file has the correct structure and data
+    foreach ($files as $index => $file) {
+        $fileData = $data[$file->id];
+
+        expect($fileData)->toHaveKey('id');
+        expect($fileData['id'])->toBe($file->id);
+
+        // Assert relationships are loaded
+        expect($fileData)->toHaveKey('metadata');
+        expect($fileData)->toHaveKey('covers');
+        expect($fileData)->toHaveKey('artists');
+        expect($fileData)->toHaveKey('albums');
+
+        // Assert metadata
+        expect($fileData['metadata'])->not->toBeNull();
+        expect($fileData['metadata']['payload']['title'])->toBe("Batch Test Song " . ($index + 1));
+
+        // Assert covers
+        expect($fileData['covers'])->toHaveCount(1);
+        expect($fileData['covers'][0]['path'])->toBe("covers/batch-file-" . ($index + 1) . "-cover.jpg");
+
+        // Assert artists with covers
+        expect($fileData['artists'])->toHaveCount(1);
+        expect($fileData['artists'][0]['name'])->toBe("Test Artist " . ($index + 1));
+        expect($fileData['artists'][0]['covers'])->toHaveCount(1);
+
+        // Assert albums with covers
+        expect($fileData['albums'])->toHaveCount(1);
+        expect($fileData['albums'][0]['name'])->toBe("Test Album " . ($index + 1));
+        expect($fileData['albums'][0]['covers'])->toHaveCount(1);
+    }
+});
+
+it('validates batch details request requires file_ids array', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Test missing file_ids
+    $response = $this->postJson(route('audio.batch-details'), []);
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors(['file_ids']);
+
+    // Test invalid file_ids format
+    $response = $this->postJson(route('audio.batch-details'), [
+        'file_ids' => 'not-an-array'
+    ]);
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors(['file_ids']);
+
+    // Test non-existent file IDs
+    $response = $this->postJson(route('audio.batch-details'), [
+        'file_ids' => [999, 1000]
+    ]);
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors(['file_ids.0', 'file_ids.1']);
+});
+
+it('returns empty object for empty file_ids array in batch request', function () {
+    // Create and authenticate a user
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Test empty array - should pass validation but return empty result
+    $response = $this->postJson(route('audio.batch-details'), [
+        'file_ids' => []
+    ]);
+    $response->assertStatus(422); // Should fail validation as array is required to be non-empty
+    $response->assertJsonValidationErrors(['file_ids']);
+});
+
 it('can update a cover associated with file album', function () {
     // Create and authenticate a user
     $user = User::factory()->create();

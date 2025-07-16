@@ -67,6 +67,9 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     // Audio details route for AJAX loading
     Route::get('audio/{file}/details', [AudioController::class, 'getDetails'])->name('audio.details');
 
+    // Batch audio details route for optimized loading
+    Route::post('audio/batch-details', [AudioController::class, 'getBatchDetails'])->name('audio.batch-details');
+
     // Video routes
     Route::get('video', [VideoController::class, 'index'])->name('video.index');
     Route::get('video/movies', [VideoController::class, 'movies'])->name('video.movies');
