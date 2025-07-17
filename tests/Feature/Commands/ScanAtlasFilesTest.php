@@ -238,12 +238,14 @@ test('command handles files without extensions when jobs are executed', function
     expect($file->mime_type)->toBe('application/octet-stream');
 });
 
-test('command excludes files in covers and metadata folders when jobs are executed', function () {
+test('command excludes files in covers, metadata, and thumbnails folders when jobs are executed', function () {
     // Create files in excluded folders
     Storage::disk('atlas')->put('covers/album_cover.jpg', 'album cover content');
     Storage::disk('atlas')->put('covers/subfolder/another_cover.png', 'nested cover content');
     Storage::disk('atlas')->put('metadata/track_info.json', 'metadata content');
     Storage::disk('atlas')->put('metadata/nested/deep_metadata.xml', 'nested metadata content');
+    Storage::disk('atlas')->put('thumbnails/thumb1.jpg', 'thumbnail content');
+    Storage::disk('atlas')->put('thumbnails/nested/thumb2.png', 'nested thumbnail content');
 
     // Create a regular file that should be included
     Storage::disk('atlas')->put('music/regular_song.mp3', 'regular music content');
@@ -261,6 +263,8 @@ test('command excludes files in covers and metadata folders when jobs are execut
     expect(File::where('path', 'covers/subfolder/another_cover.png')->exists())->toBeFalse();
     expect(File::where('path', 'metadata/track_info.json')->exists())->toBeFalse();
     expect(File::where('path', 'metadata/nested/deep_metadata.xml')->exists())->toBeFalse();
+    expect(File::where('path', 'thumbnails/thumb1.jpg')->exists())->toBeFalse();
+    expect(File::where('path', 'thumbnails/nested/thumb2.png')->exists())->toBeFalse();
 
     // Verify that the regular file was created
     expect(File::where('path', 'music/regular_song.mp3')->exists())->toBeTrue();

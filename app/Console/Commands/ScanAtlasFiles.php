@@ -28,6 +28,17 @@ class ScanAtlasFiles extends Command
     protected $description = 'Scan the atlas disk for all files and create them in the database if they don\'t exist';
 
     /**
+     * Directories to exclude from scanning.
+     *
+     * @var array<string>
+     */
+    protected array $excludedDirectories = [
+        'covers',
+        'metadata',
+        'thumbnails',
+    ];
+
+    /**
      * Execute the console command.
      */
     public function handle(): int
@@ -119,8 +130,10 @@ class ScanAtlasFiles extends Command
             }
 
             // Get paths to exclude
-            $coversPath = Storage::disk('atlas')->path('covers');
-            $metadataPath = Storage::disk('atlas')->path('metadata');
+            $excludedPaths = [];
+            foreach ($this->excludedDirectories as $directory) {
+                $excludedPaths[] = Storage::disk('atlas')->path($directory);
+            }
 
             $iterator = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS),
@@ -131,8 +144,16 @@ class ScanAtlasFiles extends Command
                 if ($file->isFile()) {
                     $filePath = $file->getPathname();
 
-                    // Skip files in covers and metadata folders
-                    if (str_starts_with($filePath, $coversPath) || str_starts_with($filePath, $metadataPath)) {
+                    // Skip files in excluded directories
+                    $shouldSkip = false;
+                    foreach ($excludedPaths as $excludedPath) {
+                        if (str_starts_with($filePath, $excludedPath)) {
+                            $shouldSkip = true;
+                            break;
+                        }
+                    }
+
+                    if ($shouldSkip) {
                         continue;
                     }
 
