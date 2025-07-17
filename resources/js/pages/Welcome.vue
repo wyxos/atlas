@@ -3,6 +3,55 @@ import { Head } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { useGoogleAnalytics } from '@/composables/useGoogleAnalytics';
+import { onMounted } from 'vue';
+
+const { trackButtonClick, trackScrollDepth, isEnabled } = useGoogleAnalytics();
+
+// Track button clicks
+const handleGetStartedClick = () => {
+    trackButtonClick('Get Started', 'cta');
+};
+
+const handleSignInClick = () => {
+    trackButtonClick('Sign In', 'navigation');
+};
+
+const handleGetStartedFooterClick = () => {
+    trackButtonClick('Get Started Footer', 'cta');
+};
+
+// Track scroll depth
+let scrollDepthTracked = { 25: false, 50: false, 75: false, 100: false };
+
+const handleScroll = () => {
+    if (!isEnabled()) return;
+    
+    const scrollTop = window.pageYOffset;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const scrollPercent = Math.round((scrollTop / docHeight) * 100);
+    
+    // Track scroll milestones
+    if (scrollPercent >= 25 && !scrollDepthTracked[25]) {
+        scrollDepthTracked[25] = true;
+        trackScrollDepth(25);
+    } else if (scrollPercent >= 50 && !scrollDepthTracked[50]) {
+        scrollDepthTracked[50] = true;
+        trackScrollDepth(50);
+    } else if (scrollPercent >= 75 && !scrollDepthTracked[75]) {
+        scrollDepthTracked[75] = true;
+        trackScrollDepth(75);
+    } else if (scrollPercent >= 100 && !scrollDepthTracked[100]) {
+        scrollDepthTracked[100] = true;
+        trackScrollDepth(100);
+    }
+};
+
+onMounted(() => {
+    if (isEnabled()) {
+        window.addEventListener('scroll', handleScroll);
+    }
+});
 </script>
 
 <template>
@@ -28,10 +77,10 @@ import { Separator } from '@/components/ui/separator';
                 </div>
                 
                 <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
-                    <Button as="a" href="https://github.com/username/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg">
+                    <Button as="a" href="https://github.com/username/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg" @click="handleGetStartedClick">
                         Get Started
                     </Button>
-                    <Button as="a" :href="route('login')" variant="outline" size="lg" class="px-8 py-3 text-lg border-border hover:bg-accent">
+                    <Button as="a" :href="route('login')" variant="outline" size="lg" class="px-8 py-3 text-lg border-border hover:bg-accent" @click="handleSignInClick">
                         Sign In
                     </Button>
                 </div>
@@ -186,7 +235,7 @@ import { Separator } from '@/components/ui/separator';
                     and enjoy unlimited access to your personal media server.
                 </p>
                 <div class="flex justify-center pt-4">
-                    <Button as="a" href="https://github.com/username/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg">
+                    <Button as="a" href="https://github.com/username/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg" @click="handleGetStartedFooterClick">
                         Get Started
                     </Button>
                 </div>

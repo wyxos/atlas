@@ -1,6 +1,6 @@
 # Features
 ## Audio
-- List/Playlists
+- List/Playlists - completed
 - Player
   - [ ] disable next/previous if no tracks
   - [ ] keep track when list got shuffled and render visual
@@ -37,6 +37,7 @@
 
 ## General
 - [ ] Stream
+- [ ] Radio station
 - [ ] Marathon
 - [ ] Docker
 - [ ] Desktop app for global controls
