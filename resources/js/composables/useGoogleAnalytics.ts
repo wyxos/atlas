@@ -21,9 +21,11 @@ declare global {
 export function useGoogleAnalytics() {
     const page = usePage()
     
-    // Check if Google Analytics is configured
+    // Check if Google Analytics is configured AND we're on the Welcome page
     const isEnabled = (): boolean => {
-        return !!(page.props.google_analytics as GoogleAnalyticsConfig)?.id
+        const hasGAId = !!(page.props.google_analytics as GoogleAnalyticsConfig)?.id
+        const isWelcomePage = page.component === 'Welcome'
+        return hasGAId && isWelcomePage
     }
     
     // Get the GA tracking ID

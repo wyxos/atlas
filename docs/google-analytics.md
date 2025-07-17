@@ -61,11 +61,13 @@ The Google Analytics integration tracks the following events on the Welcome page
 
 ### Key Features
 
-- **Conditional Loading**: GA script only loads on the Welcome page when `GOOGLE_ANALYTICS_ID` is set
+- **Conditional Loading**: GA script loads when `GOOGLE_ANALYTICS_ID` is set, but tracking only happens on Welcome page
 - **Privacy First**: No tracking for authenticated users or other pages
 - **Self-Hosted Friendly**: Easy to disable by not setting the environment variable
 - **TypeScript Support**: Fully typed Google Analytics integration
 - **Event Tracking**: Custom events for button clicks and scroll depth
+- **Google-Compliant**: Script placed immediately after `<head>` tag as per Google's requirements
+- **Inertia.js Compatible**: Works correctly with Inertia's SPA navigation
 
 ## Privacy Considerations
 
