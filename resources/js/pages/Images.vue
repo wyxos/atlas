@@ -21,6 +21,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 interface ImageFile {
     id: number;
     filename: string;
+    path?: string;
     title?: string;
     size: number;
     width?: number;
@@ -44,11 +45,8 @@ const { images } = props;
 
 // Get image path
 function getImagePath(image: ImageFile): string {
-    if (image.covers && image.covers.length > 0) {
-        return `/atlas/${image.covers[0].path}`;
-    }
     // Fallback to the original file path if no cover exists
-    return `/atlas/${image.filename}`;
+    return `/atlas/${image.path}`;
 }
 
 // Format file size

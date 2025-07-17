@@ -33,7 +33,13 @@ class ExtractMetadata extends Command
         // If a specific file ID is provided, only process that file
         if ($fileId) {
             $this->info("Processing only file with ID: {$fileId}");
-            $file = File::audio()->where('id', $fileId)->first();
+            $file = File::query()
+                ->where(function ($query) {
+                    $query->audio()
+                        ->orWhere(fn ($q) => $q->video())
+                        ->orWhere(fn ($q) => $q->image());
+                })
+                ->where('id', $fileId)->first();
 
             if ($file) {
                 $this->info("Queuing metadata extraction for file: {$file->path}");
@@ -46,7 +52,12 @@ class ExtractMetadata extends Command
             }
         } else {
             // Process all audio files in chunks if no specific file ID is provided
-            File::audio()
+            File::query()
+                ->where(function ($query) {
+                    $query->audio()
+                        ->orWhere(fn ($q) => $q->video())
+                        ->orWhere(fn ($q) => $q->image());
+                })
                 ->chunk(100, function ($files) use (&$count) {
                     foreach ($files as $file) {
                         $this->info("Queuing metadata extraction for file: {$file->path}");
