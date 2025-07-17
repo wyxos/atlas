@@ -26,11 +26,11 @@ let scrollDepthTracked = { 25: false, 50: false, 75: false, 100: false };
 
 const handleScroll = () => {
     if (!isEnabled()) return;
-    
+
     const scrollTop = window.pageYOffset;
     const docHeight = document.documentElement.scrollHeight - window.innerHeight;
     const scrollPercent = Math.round((scrollTop / docHeight) * 100);
-    
+
     // Track scroll milestones
     if (scrollPercent >= 25 && !scrollDepthTracked[25]) {
         scrollDepthTracked[25] = true;
@@ -60,7 +60,7 @@ onMounted(() => {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     </Head>
-    
+
     <div class="min-h-screen bg-gradient-to-br from-background via-background to-accent/20">
         <!-- Hero Section -->
         <div class="container mx-auto px-4 py-16">
@@ -75,9 +75,9 @@ onMounted(() => {
                         Open-source, self-hosted media server for organizing and streaming your personal collection
                     </p>
                 </div>
-                
+
                 <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mt-8">
-                    <Button as="a" href="https://github.com/username/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg" @click="handleGetStartedClick">
+                    <Button as="a" href="https://github.com/wyxos/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg" @click="handleGetStartedClick">
                         Get Started
                     </Button>
                     <Button as="a" :href="route('login')" variant="outline" size="lg" class="px-8 py-3 text-lg border-border hover:bg-accent" @click="handleSignInClick">
@@ -231,15 +231,15 @@ onMounted(() => {
                     Ready to take control of your media?
                 </h2>
                 <p class="text-lg text-muted-foreground max-w-2xl mx-auto">
-                    Atlas is completely free and open-source. Clone the repository, deploy on your own infrastructure, 
+                    Atlas is completely free and open-source. Clone the repository, deploy on your own infrastructure,
                     and enjoy unlimited access to your personal media server.
                 </p>
                 <div class="flex justify-center pt-4">
-                    <Button as="a" href="https://github.com/username/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg" @click="handleGetStartedFooterClick">
+                    <Button as="a" href="https://github.com/wyxos/atlas" target="_blank" size="lg" class="btn-atlas-primary px-8 py-3 text-lg" @click="handleGetStartedFooterClick">
                         Get Started
                     </Button>
                 </div>
-                
+
                 <div class="mt-8 p-6 bg-accent/30 rounded-lg border border-border max-w-3xl mx-auto">
                     <div class="flex items-center justify-center space-x-2 mb-3">
                         <svg class="w-5 h-5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
