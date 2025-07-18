@@ -55,7 +55,20 @@ onMounted(() => {
 </script>
 
 <template>
-    <Head title="Welcome to Atlas">
+<Head title="Atlas - Self-Hosted Media Server & Streaming Platform">
+        <meta name="description" content="Atlas is an open-source, self-hosted media management and streaming platform. Stream your music, videos, and photos privately with AI-powered organization, metadata extraction, and modern web interface.">
+        <meta name="keywords" content="self-hosted media server, streaming platform, music server, video streaming, open source, Laravel, Vue.js, media management, metadata extraction, privacy-focused, Netflix alternative, Spotify alternative">
+        <meta name="author" content="Wyxos">
+        <meta property="og:title" content="Atlas - Self-Hosted Media Server & Streaming Platform">
+        <meta property="og:description" content="Open-source media server for organizing and streaming your personal music, videos, and photos. Complete privacy with AI-powered metadata extraction.">
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://github.com/wyxos/atlas">
+        <meta property="og:image" content="/og-image.png">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Atlas - Self-Hosted Media Server & Streaming Platform">
+        <meta name="twitter:description" content="Open-source media server for organizing and streaming your personal music, videos, and photos. Complete privacy with AI-powered metadata extraction.">
+        <meta name="twitter:image" content="/og-image.png">
+        <link rel="canonical" href="https://github.com/wyxos/atlas">
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />

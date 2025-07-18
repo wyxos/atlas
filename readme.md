@@ -1,7 +1,25 @@
-# Atlas - Media Management and Streaming Platform
+# Atlas - Self-Hosted Media Server & Streaming Platform
 
-## Overview
-Atlas is a self-hosted media management and streaming platform with AI-powered features, multi-source content browsing, and advanced file organization capabilities. It provides automated metadata extraction, intelligent file organization, and a modern web interface for browsing and playing your media collection.
+[![GitHub stars](https://img.shields.io/github/stars/wyxos/atlas?style=social)](https://github.com/wyxos/atlas/stargazers)
+[![GitHub license](https://img.shields.io/github/license/wyxos/atlas)](https://github.com/wyxos/atlas/blob/main/LICENSE)
+[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.2-blue)](https://www.php.net/)
+[![Laravel](https://img.shields.io/badge/laravel-12-red)](https://laravel.com/)
+[![Vue.js](https://img.shields.io/badge/vue.js-3-green)](https://vuejs.org/)
+
+**Atlas** is a powerful, open-source **self-hosted media server** and **streaming platform** that gives you complete control over your digital media collection. Built with **Laravel** and **Vue.js**, Atlas offers **AI-powered media management**, **automatic metadata extraction**, and a modern web interface for organizing and streaming your personal music, videos, and images.
+
+🎵 **Perfect for music enthusiasts, media collectors, and privacy-conscious users** who want to host their own **Netflix/Spotify alternative** without relying on cloud services.
+
+## ✨ Key Features at a Glance
+
+- 🎧 **Audio-First Design**: Optimized for music libraries with full metadata support
+- 🤖 **AI-Powered Organization**: Intelligent file categorization and tagging
+- 🔍 **Lightning-Fast Search**: Powered by Typesense for instant results
+- 📱 **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- 🏠 **Self-Hosted**: Complete privacy - your data never leaves your server
+- 🚀 **Modern Tech Stack**: Laravel 12, Vue.js 3, TypeScript, Tailwind CSS
+- 🔐 **Multi-User Support**: User management with admin controls
+- 📊 **Analytics Dashboard**: Track your library statistics and health
 
 ## Core Features
 

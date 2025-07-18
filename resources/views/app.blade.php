@@ -13,8 +13,11 @@
         </script>
         @endif
         
-        <meta charset="utf-8">
+<meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="Atlas is an open-source, self-hosted media management and streaming platform. It offers AI-powered metadata extraction, intelligent file organization, and a modern web interface for your media collection.">
+        <meta name="keywords" content="self-hosted media server, streaming platform, user management, media organization, Laravel, Vue.js">
+        <meta name="author" content="Wyxos">
 
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>

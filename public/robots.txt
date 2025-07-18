@@ -1,2 +1,21 @@
 User-agent: *
-Disallow:
+Allow: /
+
+# Block admin and private areas
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /files/
+Disallow: /users/
+
+# Allow public assets
+Allow: /css/
+Allow: /js/
+Allow: /images/
+Allow: /favicon.ico
+Allow: /sitemap.xml
+
+# Sitemap location
+Sitemap: https://github.com/wyxos/atlas/sitemap.xml

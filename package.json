@@ -1,4 +1,31 @@
 {
+    "name": "atlas-media-server",
+    "version": "1.0.0",
+    "description": "Atlas - Open-source self-hosted media server and streaming platform with AI-powered metadata extraction and modern web interface",
+    "keywords": [
+        "media-server",
+        "streaming-platform",
+        "self-hosted",
+        "vue",
+        "typescript",
+        "laravel",
+        "inertia",
+        "tailwind",
+        "music-server",
+        "video-streaming",
+        "media-management",
+        "open-source"
+    ],
+    "homepage": "https://github.com/wyxos/atlas",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/wyxos/atlas.git"
+    },
+    "bugs": {
+        "url": "https://github.com/wyxos/atlas/issues"
+    },
+    "author": "Wyxos <contact@wyxos.com>",
+    "license": "MIT",
     "private": true,
     "type": "module",
     "scripts": {
