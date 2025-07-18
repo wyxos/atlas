@@ -22,6 +22,7 @@ interface ImageFile {
     id: number;
     filename: string;
     path?: string;
+    image_url?: string;
     title?: string;
     size: number;
     width?: number;
@@ -45,8 +46,8 @@ const { images } = props;
 
 // Get image path
 function getImagePath(image: ImageFile): string {
-    // Fallback to the original file path if no cover exists
-    return `/atlas/${image.path}`;
+    // Use the normalized URL from the controller if available, otherwise fallback to manual construction
+    return image.image_url || `/atlas/${image.path}`;
 }
 
 // Format file size
@@ -117,9 +118,9 @@ function getDisplayTitle(image: ImageFile): string {
                                 </div>
 
                                 <!-- View overlay -->
-                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
-                                    <Eye class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                                </div>
+<!--                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">-->
+<!--                                    <Eye class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />-->
+<!--                                </div>-->
 
                                 <!-- Dimensions badge -->
                                 <div v-if="formatDimensions(image)" class="absolute top-2 right-2 bg-black bg-opacity-80 text-white text-xs px-2 py-1 rounded">

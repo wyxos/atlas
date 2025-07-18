@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Scout\Searchable;
 
 class File extends Model
@@ -153,6 +154,18 @@ class File extends Model
     public function scopeImage(Builder $query): Builder
     {
         return $query->where('mime_type', 'like', 'image/%');
+    }
+
+    /**
+     * Get the normalized URL for the file.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->path) {
+            return null;
+        }
+
+        return Storage::disk('atlas')->url($this->path);
     }
 
     // Customize the data sent to Typesense

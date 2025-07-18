@@ -33,6 +33,20 @@ class ImageController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(48);
 
+        // Append image_url attribute to paginated results
+        $images->getCollection()->transform(function ($file) {
+            $file->append('image_url');
+            return $file;
+        });
+
+        // Append image_url attribute to search results
+        if (!empty($search)) {
+            $search = collect($search)->map(function ($file) {
+                $file->append('image_url');
+                return $file;
+            })->toArray();
+        }
+
         return Inertia::render('Images', [
             'images' => $images,
             'search' => $search,
@@ -79,6 +93,20 @@ class ImageController extends Controller
             ->with('covers')
             ->orderBy('created_at', 'desc')
             ->paginate(48);
+
+        // Append image_url attribute to paginated results
+        $images->getCollection()->transform(function ($file) {
+            $file->append('image_url');
+            return $file;
+        });
+
+        // Append image_url attribute to search results
+        if (!empty($search)) {
+            $search = collect($search)->map(function ($file) {
+                $file->append('image_url');
+                return $file;
+            })->toArray();
+        }
 
         return Inertia::render('Images', [
             'images' => $images,
@@ -129,6 +157,20 @@ class ImageController extends Controller
             ->with('covers')
             ->orderBy('created_at', 'desc')
             ->paginate(48);
+
+        // Append image_url attribute to paginated results
+        $images->getCollection()->transform(function ($file) {
+            $file->append('image_url');
+            return $file;
+        });
+
+        // Append image_url attribute to search results
+        if (!empty($search)) {
+            $search = collect($search)->map(function ($file) {
+                $file->append('image_url');
+                return $file;
+            })->toArray();
+        }
 
         return Inertia::render('Images', [
             'images' => $images,
@@ -191,6 +233,20 @@ class ImageController extends Controller
             ->with('covers')
             ->orderBy('created_at', 'desc')
             ->paginate(48);
+
+        // Append image_url attribute to paginated results
+        $images->getCollection()->transform(function ($file) {
+            $file->append('image_url');
+            return $file;
+        });
+
+        // Append image_url attribute to search results
+        if (!empty($search)) {
+            $search = collect($search)->map(function ($file) {
+                $file->append('image_url');
+                return $file;
+            })->toArray();
+        }
 
         return Inertia::render('Images', [
             'images' => $images,
