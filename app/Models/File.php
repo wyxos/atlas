@@ -165,7 +165,14 @@ class File extends Model
             return null;
         }
 
-        return Storage::disk('atlas')->url($this->path);
+//        return Storage::disk('atlas')->url($this->path);
+//
+        // Encode the path components to handle special characters
+        $pathParts = explode('/', $this->path);
+        $encodedParts = array_map('rawurlencode', $pathParts);
+        $encodedPath = implode('/', $encodedParts);
+
+        return "/atlas/{$encodedPath}";
     }
 
     // Customize the data sent to Typesense

@@ -89,20 +89,27 @@ it('handles special characters in image paths correctly', function () {
 
     expect($foundImages)->toHaveCount(3);
 
-    // Check that each image has a properly formatted URL from Storage disk
+    // Check that each image has a properly formatted URL with encoded special characters
     foreach ($foundImages as $image) {
         // Verify the raw path still exists
         expect($image['path'])->toBeString();
         expect($image['path'])->not->toBeEmpty();
 
-        // Verify the new image_url field exists and is a valid URL from Storage disk
+        // Verify the new image_url field exists and is properly encoded
         expect($image)->toHaveKey('image_url');
         expect($image['image_url'])->toBeString();
-        expect($image['image_url'])->not->toBeEmpty();
+        expect($image['image_url'])->toStartWith('/atlas/');
 
-        // Storage disk URLs should be properly formatted URLs from the atlas disk
-        // They should contain the /atlas/ path and be non-empty strings
-        expect($image['image_url'])->toContain('/atlas/');
+        // Verify that special characters are properly encoded in the URL
+        if (str_contains($image['path'], ' ')) {
+            expect($image['image_url'])->toContain('%20'); // Space should be encoded
+        }
+        if (str_contains($image['path'], '[')) {
+            expect($image['image_url'])->toContain('%5B'); // [ should be encoded
+        }
+        if (str_contains($image['path'], ']')) {
+            expect($image['image_url'])->toContain('%5D'); // ] should be encoded
+        }
     }
 });
 

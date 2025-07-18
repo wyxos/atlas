@@ -27,6 +27,11 @@
 
 ## Image
 - List/Playlists
+- Context menu
+  - Convert to album/artist/track cover
+    - [ ] Context menu item
+    - [ ] Delete file instance after conversion
+    - [ ] Ability to set type/tag
 - Viewer/Reader
 - Manga/Chapter/Artist view
 - Browse mode
