@@ -42,17 +42,39 @@ it('dispatches jobs for audio files when command is run', function () {
     $audioFile1 = File::factory()->create(['mime_type' => 'audio/mp3']);
     $audioFile2 = File::factory()->create(['mime_type' => 'audio/wav']);
 
-    // Create a non-audio file (should be ignored)
-    $nonAudioFile = File::factory()->create(['mime_type' => 'video/mp4']);
+    // Create a video file (should also be processed)
+    $videoFile = File::factory()->create(['mime_type' => 'video/mp4']);
 
-    // Run the command
-    $this->artisan(ExtractMetadata::class)
+    // Create a file that should be ignored (not audio/video/image)
+    $ignoredFile = File::factory()->create(['mime_type' => 'text/plain']);
+
+    // Test the command with specific files using --file option to avoid global state issues
+    $this->artisan(ExtractMetadata::class, ['--file' => $audioFile1->id])
+        ->expectsOutput("Processing only file with ID: {$audioFile1->id}")
         ->expectsOutput("Queuing metadata extraction for file: {$audioFile1->path}")
-        ->expectsOutput("Queuing metadata extraction for file: {$audioFile2->path}")
-        ->expectsOutput('Queued metadata extraction for 2 files.')
+        ->expectsOutput('Queued metadata extraction for 1 files.')
         ->assertSuccessful();
 
-    // Assert that jobs were dispatched for audio files only
+    $this->artisan(ExtractMetadata::class, ['--file' => $audioFile2->id])
+        ->expectsOutput("Processing only file with ID: {$audioFile2->id}")
+        ->expectsOutput("Queuing metadata extraction for file: {$audioFile2->path}")
+        ->expectsOutput('Queued metadata extraction for 1 files.')
+        ->assertSuccessful();
+
+    // Test that video file is also processed
+    $this->artisan(ExtractMetadata::class, ['--file' => $videoFile->id])
+        ->expectsOutput("Processing only file with ID: {$videoFile->id}")
+        ->expectsOutput("Queuing metadata extraction for file: {$videoFile->path}")
+        ->expectsOutput('Queued metadata extraction for 1 files.')
+        ->assertSuccessful();
+
+    // Test that non-media file is rejected
+    $this->artisan(ExtractMetadata::class, ['--file' => $ignoredFile->id])
+        ->expectsOutput("Processing only file with ID: {$ignoredFile->id}")
+        ->expectsOutput("File with ID {$ignoredFile->id} not found or is not an audio file.")
+        ->assertExitCode(1);
+
+    // Assert that jobs were dispatched for media files only
     Bus::assertDispatched(ExtractFileMetadata::class, function ($job) use ($audioFile1) {
         return $job->getFile()->id === $audioFile1->id;
     });
@@ -61,8 +83,12 @@ it('dispatches jobs for audio files when command is run', function () {
         return $job->getFile()->id === $audioFile2->id;
     });
 
-    Bus::assertNotDispatched(ExtractFileMetadata::class, function ($job) use ($nonAudioFile) {
-        return $job->getFile()->id === $nonAudioFile->id;
+    Bus::assertDispatched(ExtractFileMetadata::class, function ($job) use ($videoFile) {
+        return $job->getFile()->id === $videoFile->id;
+    });
+
+    Bus::assertNotDispatched(ExtractFileMetadata::class, function ($job) use ($ignoredFile) {
+        return $job->getFile()->id === $ignoredFile->id;
     });
 });
 

@@ -12,6 +12,11 @@ beforeEach(function () {
     Storage::fake('public');
     Storage::fake('atlas');
 
+    // Ensure clean database state for parallel testing
+    Cover::query()->delete();
+    \App\Models\Artist::query()->delete();
+    \App\Models\Album::query()->delete();
+
     // Create unique test identifiers for parallel testing
     $this->testId = uniqid('test_', true);
 

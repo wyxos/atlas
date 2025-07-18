@@ -110,7 +110,7 @@ test('command does not dispatch jobs for existing files', function () {
 });
 
 test('command handles existing files correctly when jobs are executed', function () {
-    // Ensure clean database state for this test
+    // Ensure clean state for parallel testing
     File::query()->delete();
 
     // Create an existing file record
@@ -142,6 +142,17 @@ test('command handles existing files correctly when jobs are executed', function
 
 test('command dry-run mode shows what would be done without dispatching jobs', function () {
     Queue::fake();
+
+    // Ensure clean state for parallel testing
+    File::query()->delete();
+    Storage::fake('atlas');
+
+    // Create test files in the atlas disk
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 
     // Ensure no files exist initially
     expect(File::count())->toBe(0);
@@ -191,6 +202,9 @@ test('command handles empty atlas directory gracefully', function () {
 test('command processes files in chunks and dispatches jobs', function () {
     Queue::fake();
 
+    // Ensure clean state for parallel testing
+    File::query()->delete();
+
     // Run the command with a small chunk size
     $this->artisan('atlas:scan-files --chunk=2')
         ->expectsOutput('Found 5 files to process.')
@@ -201,6 +215,9 @@ test('command processes files in chunks and dispatches jobs', function () {
 });
 
 test('command processes files in chunks correctly when jobs are executed', function () {
+    // Ensure clean state for parallel testing
+    File::query()->delete();
+
     // Run the command with a small chunk size
     $this->artisan('atlas:scan-files --chunk=2')
         ->expectsOutput('Found 5 files to process.')
@@ -239,6 +256,9 @@ test('command handles files without extensions when jobs are executed', function
 });
 
 test('command excludes files in covers, metadata, and thumbnails folders when jobs are executed', function () {
+    // Ensure clean state for parallel testing
+    File::query()->delete();
+
     // Create files in excluded folders
     Storage::disk('atlas')->put('covers/album_cover.jpg', 'album cover content');
     Storage::disk('atlas')->put('covers/subfolder/another_cover.png', 'nested cover content');
