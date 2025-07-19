@@ -1,10 +1,10 @@
 # Atlas
 
-[![GitHub stars](https://img.shields.io/github/stars/wyxos/atlas?style=social)](https://github.com/wyxos/atlas/stargazers)
-[![GitHub license](https://img.shields.io/github/license/wyxos/atlas)](https://github.com/wyxos/atlas/blob/main/LICENSE)
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.2-blue)](https://www.php.net/)
-[![Laravel](https://img.shields.io/badge/laravel-12-red)](https://laravel.com/)
-[![Vue.js](https://img.shields.io/badge/vue.js-3-green)](https://vuejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel)](https://laravel.com)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vue.js)](https://vuejs.org)
+[![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php)](https://php.net)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://typescriptlang.org)
 
 Atlas is an open-source self-hosted media server and streaming platform for managing your digital media collection. Built with Laravel and Vue.js, Atlas provides automated metadata extraction, file organization, and a web interface for streaming personal music, videos, and images.
 
@@ -233,18 +233,34 @@ Designed for users who want to host their own media server without relying on cl
 
 ## Contributing
 
-Contributions welcome - submit a PR.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Support
 
-If you encounter any issues or have questions, please [open an issue](https://github.com/wyxos/atlas/issues) on GitHub.
+- **[Report Issues](https://github.com/wyxos/atlas/issues)** - Bug reports and feature requests
+- **[Website](https://wyxos.com)** - More information about Wyxos
+
+---
+
+## License
+
+Atlas is open-source software licensed under the [MIT License](LICENSE). You're free to use, modify, and distribute this software according to the license terms.
+
+---
 
 ## Acknowledgments
 
+- Created by [Wyxos](https://wyxos.com)
 - Built with [Laravel](https://laravel.com/) and [Vue.js](https://vuejs.org/)
 - UI components from [Shadcn Vue](https://www.shadcn-vue.com/)
 - Search powered by [Typesense](https://typesense.org/)
+
+---
+
+<div align="center">
+
+**[Back to Top](#atlas)**
+
+**Open Source Media Server for Laravel**
+
+</div>
