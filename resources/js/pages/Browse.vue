@@ -1,19 +1,9 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import { ref, onMounted } from 'vue';
 import { Masonry } from '@wyxos/vibe';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Browse',
-        href: '/browse',
-    },
-];
-
-const items = ref([]);
-const masonry = ref(null);
 
 interface DemoItem {
     id: string;
@@ -22,45 +12,94 @@ interface DemoItem {
     height: number;
     page: number;
     index: number;
+    meta?: {
+        model_name?: string;
+        model_id?: number;
+        version_name?: string;
+        blurhash?: string;
+    };
 }
 
-// Sample data generator - simulates API calls
-const generateSampleData = (page: number, itemsPerPage: number = 24): DemoItem[] => {
-    const items: DemoItem[] = [];
-    const startIndex = (page - 1) * itemsPerPage;
-    
-    for (let i = 0; i < itemsPerPage; i++) {
-        const index = startIndex + i;
-        const id = `item-${page}-${i}`;
-        const picId = (index % 1000) + 1; // Use picsum photo IDs 1-1000
-        const width = 250 + Math.floor(Math.random() * 300); // Random width between 250-550
-        const height = 200 + Math.floor(Math.random() * 400); // Random height between 200-600
-        
-        items.push({
-            id,
-            src: `https://picsum.photos/id/${picId}/${width}/${height}`,
-            width,
-            height,
-            page,
-            index
-        });
-    }
-    
-    return items;
-};
+interface Props {
+    initialImages: DemoItem[];
+    currentPage: number | string;
+    hasNextPage: boolean;
+    nextCursor?: string | null;
+}
 
-// Simulate API call with delay
+const props = defineProps<Props>();
+
+const breadcrumbs: BreadcrumbItem[] = [
+    {
+        title: 'Browse',
+        href: '/browse',
+    },
+];
+
+const items = ref<DemoItem[]>([]);
+const masonry = ref(null);
+let nextCursorToFetch: string | null = null; // Track next cursor to fetch
+
+// Initialize with server-side data
+onMounted(() => {
+    if (props.initialImages && props.initialImages.length > 0) {
+        items.value = [...props.initialImages];
+        // Set next cursor based on whether we have more pages
+        nextCursorToFetch = props.hasNextPage ? props.nextCursor : null;
+    }
+});
+
+// Fetch more images for infinite scroll
 const getPage = async (page: number) => {
-    return new Promise<{ items: DemoItem[], nextPage: number }>((resolve) => {
-        setTimeout(() => {
-            const newItems = generateSampleData(page);
-            const output = {
-                items: newItems,
-                nextPage: page + 1
-            };
-            resolve(output);
-        }, 800); // Simulate network delay
-    });
+    try {
+        console.log('Masonry requesting page:', page, 'using cursor:', nextCursorToFetch); // Debug log
+        
+        // If there's no next cursor to fetch, return empty
+        if (!nextCursorToFetch) {
+            console.log('No more pages to fetch');
+            return { items: [], nextPage: null };
+        }
+        
+        // Use Inertia to navigate with cursor and get data
+        return new Promise((resolve) => {
+            router.get(
+                route('browse', { cursor: nextCursorToFetch }),
+                {},
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    only: ['initialImages', 'hasNextPage', 'nextCursor'],
+                    onSuccess: (response) => {
+                        const newImages = response.props.initialImages as DemoItem[];
+                        const hasNext = response.props.hasNextPage;
+                        const nextCursor = response.props.nextCursor;
+                        
+                        console.log('Fetched images:', newImages?.length, 'hasNext:', hasNext, 'nextCursor:', nextCursor); // Debug log
+                        
+                        if (newImages && newImages.length > 0) {
+                            // Update next cursor to fetch
+                            nextCursorToFetch = hasNext ? nextCursor : null;
+                            
+                            resolve({
+                                items: newImages,
+                                nextPage: hasNext ? nextCursor : null
+                            });
+                        } else {
+                            nextCursorToFetch = null;
+                            resolve({ items: [], nextPage: null });
+                        }
+                    },
+                    onError: () => {
+                        console.error('Failed to fetch more images');
+                        resolve({ items: [], nextPage: null });
+                    }
+                }
+            );
+        });
+    } catch (error) {
+        console.error('Failed to fetch more images:', error);
+        return { items: [], nextPage: null };
+    }
 };
 </script>
 

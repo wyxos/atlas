@@ -20,6 +20,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     
     // Browse route
     Route::get('browse', [BrowseController::class, 'index'])->name('browse');
+    Route::get('browse/debug', [BrowseController::class, 'debug'])->name('browse.debug');
 
     Route::get('audio', function () {
         $search = [];
