@@ -52,7 +52,7 @@ onMounted(() => {
 // Fetch more images for infinite scroll
 const getPage = async (page: number) => {
     try {
-        console.log('Masonry requesting page:', page, 'using cursor:', nextCursorToFetch); // Debug log
+        console.log('Masonry requesting page:', page, 'using cursor:', nextCursorToFetch);
         
         // If there's no next cursor to fetch, return empty
         if (!nextCursorToFetch) {
@@ -61,7 +61,7 @@ const getPage = async (page: number) => {
         }
         
         // Use Inertia to navigate with cursor and get data
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             router.get(
                 route('browse', { cursor: nextCursorToFetch }),
                 {},
@@ -70,27 +70,32 @@ const getPage = async (page: number) => {
                     preserveScroll: true,
                     only: ['initialImages', 'hasNextPage', 'nextCursor'],
                     onSuccess: (response) => {
-                        const newImages = response.props.initialImages as DemoItem[];
-                        const hasNext = response.props.hasNextPage;
-                        const nextCursor = response.props.nextCursor;
-                        
-                        console.log('Fetched images:', newImages?.length, 'hasNext:', hasNext, 'nextCursor:', nextCursor); // Debug log
-                        
-                        if (newImages && newImages.length > 0) {
-                            // Update next cursor to fetch
-                            nextCursorToFetch = hasNext ? nextCursor : null;
+                        try {
+                            const newImages = response.props.initialImages as DemoItem[];
+                            const hasNext = response.props.hasNextPage;
+                            const nextCursor = response.props.nextCursor;
                             
-                            resolve({
-                                items: newImages,
-                                nextPage: hasNext ? nextCursor : null
-                            });
-                        } else {
-                            nextCursorToFetch = null;
+                            console.log('Fetched images:', newImages?.length, 'hasNext:', hasNext, 'nextCursor:', nextCursor);
+                            
+                            if (newImages && newImages.length > 0) {
+                                // Update next cursor to fetch
+                                nextCursorToFetch = hasNext ? nextCursor : null;
+                                
+                                resolve({
+                                    items: newImages,
+                                    nextPage: hasNext ? nextCursor : null
+                                });
+                            } else {
+                                nextCursorToFetch = null;
+                                resolve({ items: [], nextPage: null });
+                            }
+                        } catch (error) {
+                            console.error('Error processing response:', error);
                             resolve({ items: [], nextPage: null });
                         }
                     },
-                    onError: () => {
-                        console.error('Failed to fetch more images');
+                    onError: (errors) => {
+                        console.error('Failed to fetch more images:', errors);
                         resolve({ items: [], nextPage: null });
                     }
                 }
@@ -153,6 +158,8 @@ const getPage = async (page: number) => {
                             :alt="`Image ${item.id}`"
                             class="w-full h-auto"
                             loading="lazy"
+                            @error="(e) => console.warn('Failed to load image:', item.id, e)"
+                            @load="(e) => console.debug('Loaded image:', item.id)"
                         />
                         <button 
                             class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100" 
