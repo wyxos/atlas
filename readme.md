@@ -261,6 +261,6 @@ ATLAS is open-source software licensed under the [MIT License](LICENSE). You're 
 
 **[Back to Top](#atlas)**
 
-**Open Source Media Server for Laravel**
+**Open Source Self-Hosted Media Server**
 
 </div>
