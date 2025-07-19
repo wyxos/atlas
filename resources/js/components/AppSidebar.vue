@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { Headset, LayoutGrid, Video, Image, Users, Heart, ThumbsUp, ThumbsDown, Mic, Disc, ListMusic, HelpCircle, FileText, Smile, Podcast } from 'lucide-vue-next';
+import { Headset, LayoutGrid, Video, Image, Users, Heart, ThumbsUp, ThumbsDown, Mic, Disc, ListMusic, HelpCircle, FileText, Smile, Podcast, Search } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -33,6 +33,11 @@ const mainNavItems = computed((): NavItem[] => {
             title: 'Dashboard',
             href: '/dashboard',
             icon: LayoutGrid,
+        },
+        {
+            title: 'Browse',
+            href: '/browse',
+            icon: Search,
         },
         {
             title: 'Audio',
