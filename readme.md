@@ -1,4 +1,4 @@
-# Atlas - Self-Hosted Media Server & Streaming Platform
+# Atlas
 
 [![GitHub stars](https://img.shields.io/github/stars/wyxos/atlas?style=social)](https://github.com/wyxos/atlas/stargazers)
 [![GitHub license](https://img.shields.io/github/license/wyxos/atlas)](https://github.com/wyxos/atlas/blob/main/LICENSE)
@@ -6,45 +6,45 @@
 [![Laravel](https://img.shields.io/badge/laravel-12-red)](https://laravel.com/)
 [![Vue.js](https://img.shields.io/badge/vue.js-3-green)](https://vuejs.org/)
 
-**Atlas** is a powerful, open-source **self-hosted media server** and **streaming platform** that gives you complete control over your digital media collection. Built with **Laravel** and **Vue.js**, Atlas offers **AI-powered media management**, **automatic metadata extraction**, and a modern web interface for organizing and streaming your personal music, videos, and images.
+Atlas is an open-source self-hosted media server and streaming platform for managing your digital media collection. Built with Laravel and Vue.js, Atlas provides automated metadata extraction, file organization, and a web interface for streaming personal music, videos, and images.
 
-🎵 **Perfect for music enthusiasts, media collectors, and privacy-conscious users** who want to host their own **Netflix/Spotify alternative** without relying on cloud services.
+Designed for users who want to host their own media server without relying on cloud services.
 
-## ✨ Key Features at a Glance
+## Key Features
 
-- 🎧 **Audio-First Design**: Optimized for music libraries with full metadata support
-- 🤖 **AI-Powered Organization**: Intelligent file categorization and tagging
-- 🔍 **Lightning-Fast Search**: Powered by Typesense for instant results
-- 📱 **Responsive Design**: Works perfectly on desktop, tablet, and mobile
-- 🏠 **Self-Hosted**: Complete privacy - your data never leaves your server
-- 🚀 **Modern Tech Stack**: Laravel 12, Vue.js 3, TypeScript, Tailwind CSS
-- 🔐 **Multi-User Support**: User management with admin controls
-- 📊 **Analytics Dashboard**: Track your library statistics and health
+- **Audio-First Design**: Optimized for music libraries with full metadata support
+- **AI-Powered Organization**: Automated file categorization and tagging
+- **Search**: Powered by Typesense for full-text search across metadata
+- **Responsive Design**: Works on desktop, tablet, and mobile devices
+- **Self-Hosted**: Your data remains on your server
+- **Modern Tech Stack**: Laravel 12, Vue.js 3, TypeScript, Tailwind CSS
+- **Multi-User Support**: User management with admin controls
+- **Analytics Dashboard**: Library statistics and health monitoring
 
 ## Core Features
 
-### 🎵 **Audio-Focused Library Management**
+### Audio Library Management
 - **Automated Metadata Extraction**: Processes audio files to extract ID3v1/ID3v2 tags, cover art, and technical information
-- **Smart Organization**: Automatically organizes files by artists, albums, and metadata
+- **File Organization**: Automatically organizes files by artists, albums, and metadata
 - **Cover Art Management**: Extracts and manages album artwork with deduplication
 - **File Status Tracking**: Monitors missing files, metadata extraction status, and files requiring review
 
-### 🔍 **Advanced Search & Discovery**
-- **Full-Text Search**: Powered by Typesense for fast, typo-tolerant search across metadata
+### Search and Discovery
+- **Full-Text Search**: Powered by Typesense for search across metadata
 - **Faceted Browsing**: Filter by artists, albums, years, genres, and file properties
 - **Audio-Only Results**: Filters ensure only playable audio content is displayed
 
-### 🎧 **Streaming & Playback**
+### Streaming and Playback
 - **Direct Audio Streaming**: Stream audio files directly from your library
-- **Love/Like/Dislike System**: Rate and organize your favorite tracks
-- **Seen Status Tracking**: Keep track of what you've listened to
+- **Rating System**: Rate and organize tracks with love/like/dislike options
+- **Listen Tracking**: Keep track of what you've listened to
 
-### 📊 **Dashboard & Analytics**
+### Dashboard and Analytics
 - **File Statistics**: Visual breakdown of library composition and storage usage
 - **Health Monitoring**: Track files needing attention (missing, no metadata, review required)
-- **Space Usage Analysis**: Understand storage consumption by file type
+- **Storage Analysis**: View storage consumption by file type
 
-### 👥 **User Management**
+### User Management
 - **Multi-User Support**: User registration and authentication
 - **Admin Controls**: Super admin role for user and system management
 - **Individual Preferences**: Personal ratings and listening history
@@ -217,24 +217,12 @@
 
 ## Roadmap
 
-### Near Term
 - [ ] **Playlist Management**: Create and manage custom playlists
 - [ ] **Enhanced Audio Player**: Improved playback controls and queue management
 - [ ] **Batch Operations**: Bulk metadata editing and file operations
-- [ ] **Mobile Responsive Design**: Better mobile/tablet experience
-
-### Medium Term
-- [ ] **Advanced Search**: More sophisticated filtering and faceted search
-- [ ] **Metadata Editing**: In-app metadata correction and enhancement
-- [ ] **File Import Wizards**: Guided setup for new libraries
 - [ ] **Docker Support**: Containerized deployment options
-
-### Long Term
+- [ ] **Metadata Editing**: In-app metadata correction and enhancement
 - [ ] **Plugin System**: Extensible architecture for custom features
-- [ ] **Multiple Libraries**: Support for separate music collections
-- [ ] **Last.fm Integration**: Scrobbling and external metadata sources
-- [ ] **API Documentation**: RESTful API for external integrations
-- [ ] **Collaborative Features**: Shared libraries and social features
 
 ## Screenshots
 
@@ -245,19 +233,7 @@
 
 ## Contributing
 
-We welcome contributions! Here's how you can help:
-
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit your changes** (`git commit -m 'Add some amazing feature'`)
-4. **Push to the branch** (`git push origin feature/amazing-feature`)
-5. **Open a Pull Request**
-
-Please make sure to:
-- Follow the existing code style
-- Write tests for new features
-- Update documentation as needed
-- Test your changes thoroughly
+Contributions welcome - submit a PR.
 
 ## License
 
