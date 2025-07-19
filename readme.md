@@ -1,4 +1,4 @@
-# Atlas
+# ATLAS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel)](https://laravel.com)
@@ -6,7 +6,7 @@
 [![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php)](https://php.net)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://typescriptlang.org)
 
-Atlas is an open-source self-hosted media server and streaming platform for managing your digital media collection. Built with Laravel and Vue.js, Atlas provides automated metadata extraction, file organization, and a web interface for streaming personal music, videos, and images.
+ATLAS is an open-source self-hosted media server and streaming platform for managing your digital media collection. Built with Laravel and Vue.js, ATLAS provides automated metadata extraction, file organization, and a web interface for streaming personal music, videos, and images.
 
 Designed for users who want to host their own media server without relying on cloud services.
 
@@ -196,10 +196,10 @@ Designed for users who want to host their own media server without relying on cl
    # Check file existence and integrity
    php artisan files:check-existence
    
-   # Scan and sync files to Atlas
+   # Scan and sync files to ATLAS
    php artisan files:sync-to-atlas
    
-   # Scan Atlas files
+   # Scan ATLAS files
    php artisan files:scan-atlas
    ```
 
@@ -227,7 +227,7 @@ Designed for users who want to host their own media server without relying on cl
 ## Screenshots
 
 ![Dashboard](docs/images/dashboard.png)
-*Atlas Dashboard showing file statistics and distribution*
+*ATLAS Dashboard showing file statistics and distribution*
 ![Audio Player](docs/images/audio-player.png)
 *Audio player interface with playback controls and metadata*
 
@@ -244,7 +244,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-Atlas is open-source software licensed under the [MIT License](LICENSE). You're free to use, modify, and distribute this software according to the license terms.
+ATLAS is open-source software licensed under the [MIT License](LICENSE). You're free to use, modify, and distribute this software according to the license terms.
 
 ---
 
