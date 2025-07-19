@@ -4,6 +4,9 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/vue3';
 import PlaceholderPattern from '../components/PlaceholderPattern.vue';
 import { PieChart } from '@/components/ui/pie-chart';
+import { BarChart } from '@/components/ui/bar-chart';
+import { HorizontalBarChart } from '@/components/ui/horizontal-bar-chart';
+import { ProgressCard } from '@/components/ui/progress-card';
 import Icon from '@/components/Icon.vue';
 import { ref } from 'vue';
 
@@ -12,6 +15,19 @@ interface FileStats {
     audioFilesCount: number;
     audioSpaceUsed: number;
     audioNotFound: number;
+
+    // Video Count & Space Usage
+    videoFilesCount: number;
+    videoSpaceUsed: number;
+    videoNotFound: number;
+
+    // Image Count & Space Usage
+    imageFilesCount: number;
+    imageSpaceUsed: number;
+    imageNotFound: number;
+
+    // Total Files Not Found
+    totalFilesNotFound: number;
 
     // Audio Metadata Stats
     audioWithMetadata: number;
@@ -62,6 +78,12 @@ interface FileStats {
     videoSize: number;
     imageSize: number;
     otherSize: number;
+
+    // Disk Space Information
+    diskSpaceTotal: number;
+    diskSpaceUsed: number;
+    diskSpaceFree: number;
+    diskSpaceUsedPercent: number;
 }
 
 const props = defineProps<{
@@ -75,27 +97,30 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-// Prepare data for the pie chart (file types with space information)
+// File Type Distribution - Keep as Pie Chart (good for proportions)
 const fileTypeData = [
-    { name: 'Audio Files', value: props.fileStats.audioFiles, size: props.fileStats.audioSize },
-    { name: 'Video Files', value: props.fileStats.videoFiles, size: props.fileStats.videoSize },
-    { name: 'Image Files', value: props.fileStats.imageFiles, size: props.fileStats.imageSize },
-    { name: 'Other Files', value: props.fileStats.otherFiles, size: props.fileStats.otherSize },
+    { name: 'Audio Files', value: props.fileStats.audioFiles },
+    { name: 'Video Files', value: props.fileStats.videoFiles },
+    { name: 'Image Files', value: props.fileStats.imageFiles },
+    { name: 'Other Files', value: props.fileStats.otherFiles },
 ];
 
-// Prepare data for the metadata with/without pie chart
-const metadataWithWithoutData = [
-    { name: 'With Metadata', value: props.fileStats.globalWithMetadata },
-    { name: 'Without Metadata', value: props.fileStats.globalWithoutMetadata },
+// Storage Usage - Better as Bar Chart for size comparison
+const storageUsageData = [
+    { name: 'Audio', value: props.fileStats.audioSize },
+    { name: 'Video', value: props.fileStats.videoSize },
+    { name: 'Image', value: props.fileStats.imageSize },
+    { name: 'Other', value: props.fileStats.otherSize },
 ];
 
-// Prepare data for the metadata review status pie chart
-const metadataReviewData = [
-    { name: 'Review Required', value: props.fileStats.globalMetadataReviewRequired },
-    { name: 'Review Not Required', value: props.fileStats.globalMetadataReviewNotRequired },
+// File Type Comparison - Vertical Bar Chart
+const fileTypeComparisonData = [
+    { name: 'Audio Files', value: props.fileStats.audioFiles },
+    { name: 'Video Files', value: props.fileStats.videoFiles },
+    { name: 'Image Files', value: props.fileStats.imageFiles },
 ];
 
-// Prepare data for global rating bar chart
+// Rating Data - Better as Horizontal Bar Charts
 const globalRatingData = [
     { name: 'Loved', value: props.fileStats.globalLoved },
     { name: 'Liked', value: props.fileStats.globalLiked },
@@ -104,7 +129,6 @@ const globalRatingData = [
     { name: 'No Rating', value: props.fileStats.globalNoRating },
 ];
 
-// Prepare data for audio rating bar chart
 const audioRatingData = [
     { name: 'Loved', value: props.fileStats.audioLoved },
     { name: 'Liked', value: props.fileStats.audioLiked },
@@ -113,7 +137,6 @@ const audioRatingData = [
     { name: 'No Rating', value: props.fileStats.audioNoRating },
 ];
 
-// Prepare data for video rating bar chart
 const videoRatingData = [
     { name: 'Loved', value: props.fileStats.videoLoved },
     { name: 'Liked', value: props.fileStats.videoLiked },
@@ -122,13 +145,32 @@ const videoRatingData = [
     { name: 'No Rating', value: props.fileStats.videoNoRating },
 ];
 
-// Prepare data for image rating bar chart
 const imageRatingData = [
     { name: 'Loved', value: props.fileStats.imageLoved },
     { name: 'Liked', value: props.fileStats.imageLiked },
     { name: 'Disliked', value: props.fileStats.imageDisliked },
     { name: 'Funny', value: props.fileStats.imageLaughedAt },
     { name: 'No Rating', value: props.fileStats.imageNoRating },
+];
+
+// Metadata totals for progress cards
+const metadataTotal = props.fileStats.globalWithMetadata + props.fileStats.globalWithoutMetadata;
+const reviewTotal = props.fileStats.globalMetadataReviewRequired + props.fileStats.globalMetadataReviewNotRequired;
+
+// Disk Space with File Types Chart Data
+const diskSpaceWithFileTypesData = [
+    { name: 'Audio Files', value: Math.round(props.fileStats.audioSize / (1024 * 1024)) },
+    { name: 'Video Files', value: Math.round(props.fileStats.videoSize / (1024 * 1024)) },
+    { name: 'Image Files', value: Math.round(props.fileStats.imageSize / (1024 * 1024)) },
+    { name: 'Other Files', value: Math.round(props.fileStats.otherSize / (1024 * 1024)) },
+    { name: 'Free Space', value: Math.round(props.fileStats.diskSpaceFree / (1024 * 1024)) },
+];
+
+// Not Found Files Chart Data
+const notFoundData = [
+    { name: 'Audio Not Found', value: props.fileStats.audioNotFound },
+    { name: 'Video Not Found', value: props.fileStats.videoNotFound },
+    { name: 'Image Not Found', value: props.fileStats.imageNotFound },
 ];
 
 // Helper function to format file sizes
@@ -178,31 +220,42 @@ const refreshStats = (): void => {
                     {{ isRefreshing ? 'Refreshing...' : 'Refresh Stats' }}
                 </button>
             </div>
-            <!-- Audio Count & Space Usage Block -->
-            <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
-                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Icon name="music" class="h-5 w-5 text-foreground" />
-                    Audio Count & Space Usage
-                </h2>
-                <div class="grid grid-cols-3 gap-4 text-center">
-                    <div class="space-y-1">
-                        <div class="text-2xl font-bold text-blue-600">{{ fileStats.audioFilesCount.toLocaleString() }}</div>
-                        <div class="text-sm text-muted-foreground">Audio Files</div>
+
+            <!-- Disk Space & Not Found Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Disk Space with File Types Chart -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Icon name="hardDrive" class="h-5 w-5 text-foreground" />
+                        Disk Space Overview
+                    </h2>
+                    <PieChart :data="diskSpaceWithFileTypesData" />
+                    <div class="mt-4 text-center">
+                        <div class="text-sm text-muted-foreground">
+                            {{ formatFileSize(fileStats.diskSpaceUsed) }} used of {{ formatFileSize(fileStats.diskSpaceTotal) }} 
+                            ({{ fileStats.diskSpaceUsedPercent }}%)
+                        </div>
                     </div>
-                    <div class="space-y-1">
-                        <div class="text-2xl font-bold text-green-600">{{ formatFileSize(fileStats.audioSpaceUsed) }}</div>
-                        <div class="text-sm text-muted-foreground">Space Used</div>
+                </div>
+
+                <!-- Not Found Files Chart -->
+                <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Icon name="alertTriangle" class="h-5 w-5 text-foreground" />
+                        Files Not Found
+                    </h2>
+                    <BarChart :data="notFoundData" colorScheme="status" />
+                    <div class="mt-4 text-center">
+                        <div class="text-sm text-muted-foreground">
+                            Total: {{ fileStats.totalFilesNotFound.toLocaleString() }} files not found
+                        </div>
                     </div>
-                    <Link :href="route('files.index', { not_found: 'true' })" class="space-y-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2 transition-colors">
-                        <div class="text-2xl font-bold text-red-600">{{ fileStats.audioNotFound.toLocaleString() }}</div>
-                        <div class="text-sm text-muted-foreground">Not Found</div>
-                    </Link>
                 </div>
             </div>
 
-            <!-- Charts Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <!-- File Types Pie Chart -->
+            <!-- Overview Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <!-- File Types Pie Chart - Keep as pie (good for proportions) -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Icon name="pieChart" class="h-5 w-5 text-foreground" />
@@ -211,98 +264,78 @@ const refreshStats = (): void => {
                     <PieChart :data="fileTypeData" />
                 </div>
 
-                <!-- Metadata With/Without Block -->
+                <!-- File Type Comparison Bar Chart -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Icon name="fileText" class="h-5 w-5 text-foreground" />
-                        Metadata Availability
+                        <Icon name="barChart" class="h-5 w-5 text-foreground" />
+                        File Type Count
                     </h2>
-                    <PieChart :data="metadataWithWithoutData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
-                        <div><strong>With Metadata:</strong> Files with extracted metadata</div>
-                        <div><strong>Without Metadata:</strong> Files missing metadata</div>
-                    </div>
+                    <BarChart :data="fileTypeComparisonData" colorScheme="default" />
                 </div>
 
-                <!-- Metadata Review Status Block -->
+                <!-- Storage Usage Bar Chart -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Icon name="search" class="h-5 w-5 text-foreground" />
-                        Metadata Review Status
+                        <Icon name="hardDrive" class="h-5 w-5 text-foreground" />
+                        Storage Usage
                     </h2>
-                    <PieChart :data="metadataReviewData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
-                        <div><strong>Review Required:</strong> Metadata flagged for review</div>
-                        <div><strong>Review Not Required:</strong> Clean metadata</div>
-                    </div>
+                    <BarChart :data="storageUsageData.map(item => ({ name: item.name, value: Math.round(item.value / (1024 * 1024)) }))" colorScheme="default" />
+                    <div class="mt-2 text-xs text-muted-foreground text-center">Values in MB</div>
                 </div>
 
-            </div>
-
-            <!-- Rating Blocks Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
-                <!-- Global Ratings Block -->
+                <!-- Global Ratings Horizontal Bar Chart -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
-                    <h2 class="text-lg font-semibold mb-4 text-blue-700 flex items-center gap-2">
-                        <Icon name="star" class="h-5 w-5 text-blue-700" />
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Icon name="star" class="h-5 w-5 text-foreground" />
                         Global Ratings
                     </h2>
-                    <PieChart :data="globalRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
-                        <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Most loved files</div>
-                        <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked files</div>
-                        <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked files</div>
-                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Files that made you laugh</div>
-                        <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated files</div>
-                    </div>
+                    <HorizontalBarChart :data="globalRatingData" colorScheme="rating" />
                 </div>
+            </div>
 
-                <!-- Audio Ratings Block -->
+            <!-- Metadata Status Progress Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ProgressCard 
+                    title="Files with Metadata"
+                    :value="fileStats.globalWithMetadata"
+                    :total="metadataTotal"
+                    variant="success"
+                />
+                <ProgressCard 
+                    title="Metadata Requiring Review"
+                    :value="fileStats.globalMetadataReviewRequired"
+                    :total="reviewTotal"
+                    variant="warning"
+                />
+            </div>
+
+            <!-- Ratings by Media Type -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- Audio Ratings -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Icon name="music" class="h-5 w-5 text-foreground" />
                         Audio Ratings
                     </h2>
-                    <PieChart :data="audioRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
-                        <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Favorite audio tracks</div>
-                        <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked audio tracks</div>
-                        <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked audio tracks</div>
-                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Audio that made you laugh</div>
-                        <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated audio tracks</div>
-                    </div>
+                    <HorizontalBarChart :data="audioRatingData" colorScheme="rating" />
                 </div>
 
-                <!-- Video Ratings Block -->
+                <!-- Video Ratings -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Icon name="video" class="h-5 w-5 text-foreground" />
                         Video Ratings
                     </h2>
-                    <PieChart :data="videoRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
-                        <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Most watched videos</div>
-                        <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked videos</div>
-                        <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked videos</div>
-                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Videos that made you laugh</div>
-                        <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated videos</div>
-                    </div>
+                    <HorizontalBarChart :data="videoRatingData" colorScheme="rating" />
                 </div>
 
-                <!-- Image Ratings Block -->
+                <!-- Image Ratings -->
                 <div class="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border p-6">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
                         <Icon name="image" class="h-5 w-5 text-foreground" />
                         Image Ratings
                     </h2>
-                    <PieChart :data="imageRatingData" />
-                    <div class="mt-4 text-xs text-muted-foreground grid grid-cols-1 gap-1">
-                        <div class="flex items-center gap-1"><strong>Loved:</strong> <Icon name="heart" class="h-3 w-3 text-red-500" /> Most loved images</div>
-                        <div class="flex items-center gap-1"><strong>Liked:</strong> <Icon name="thumbsUp" class="h-3 w-3 text-green-500" /> Liked images</div>
-                        <div class="flex items-center gap-1"><strong>Disliked:</strong> <Icon name="thumbsDown" class="h-3 w-3 text-red-500" /> Disliked images</div>
-                        <div class="flex items-center gap-1"><strong>Funny:</strong> <Icon name="laugh" class="h-3 w-3 text-yellow-500" /> Images that made you laugh</div>
-                        <div class="flex items-center gap-1"><strong>No Rating:</strong> <Icon name="minus" class="h-3 w-3 text-gray-500" /> Unrated images</div>
-                    </div>
+                    <HorizontalBarChart :data="imageRatingData" colorScheme="rating" />
                 </div>
             </div>
 

@@ -90,8 +90,11 @@ class DashboardController extends Controller
         ')
         ->first();
 
-        // Video ratings statistics
-        $videoRatings = File::selectRaw('
+        // Video statistics with count, size, and not found
+        $videoStats = File::selectRaw('
+            COUNT(*) as video_files_count,
+            COUNT(CASE WHEN not_found = 1 THEN 1 END) as video_not_found,
+            COALESCE(SUM(size), 0) as video_size,
             COUNT(CASE WHEN liked = 1 THEN 1 END) as video_liked,
             COUNT(CASE WHEN loved = 1 THEN 1 END) as video_loved,
             COUNT(CASE WHEN disliked = 1 THEN 1 END) as video_disliked,
@@ -101,8 +104,11 @@ class DashboardController extends Controller
         ->where('mime_type', 'like', 'video/%')
         ->first();
 
-        // Image ratings statistics
-        $imageRatings = File::selectRaw('
+        // Image statistics with count, size, and not found
+        $imageStats = File::selectRaw('
+            COUNT(*) as image_files_count,
+            COUNT(CASE WHEN not_found = 1 THEN 1 END) as image_not_found,
+            COALESCE(SUM(size), 0) as image_size,
             COUNT(CASE WHEN liked = 1 THEN 1 END) as image_liked,
             COUNT(CASE WHEN loved = 1 THEN 1 END) as image_loved,
             COUNT(CASE WHEN disliked = 1 THEN 1 END) as image_disliked,
@@ -111,6 +117,9 @@ class DashboardController extends Controller
         ')
         ->where('mime_type', 'like', 'image/%')
         ->first();
+
+        // Total files not found across all types
+        $totalNotFound = File::where('not_found', 1)->count();
 
         // Global metadata statistics (all files)
         $globalMetadataStats = File::selectRaw('
@@ -137,11 +146,27 @@ class DashboardController extends Controller
         $totalFiles = $fileTypeStats->audio_files + $fileTypeStats->video_files + $fileTypeStats->image_files;
         $otherFiles = File::count() - $totalFiles;
 
+        // Get disk space information
+        $diskSpaceInfo = $this->getDiskSpaceInfo();
+
         return [
             // Audio Count & Space Usage
             'audioFilesCount' => (int) $audioStats->audio_files_count,
             'audioSpaceUsed' => (int) $audioStats->audio_size,
             'audioNotFound' => (int) $audioStats->audio_not_found,
+
+            // Video Count & Space Usage
+            'videoFilesCount' => (int) $videoStats->video_files_count,
+            'videoSpaceUsed' => (int) $videoStats->video_size,
+            'videoNotFound' => (int) $videoStats->video_not_found,
+
+            // Image Count & Space Usage
+            'imageFilesCount' => (int) $imageStats->image_files_count,
+            'imageSpaceUsed' => (int) $imageStats->image_size,
+            'imageNotFound' => (int) $imageStats->image_not_found,
+
+            // Total Files Not Found
+            'totalFilesNotFound' => (int) $totalNotFound,
 
             // Audio Metadata Stats
             'audioWithMetadata' => (int) $audioMetadataStats->audio_with_metadata,
@@ -170,18 +195,18 @@ class DashboardController extends Controller
             'globalNoRating' => (int) $globalRatings->global_no_rating,
 
             // Video Rating Stats
-            'videoLoved' => (int) $videoRatings->video_loved,
-            'videoLiked' => (int) $videoRatings->video_liked,
-            'videoDisliked' => (int) $videoRatings->video_disliked,
-            'videoLaughedAt' => (int) $videoRatings->video_laughed_at,
-            'videoNoRating' => (int) $videoRatings->video_no_rating,
+            'videoLoved' => (int) $videoStats->video_loved,
+            'videoLiked' => (int) $videoStats->video_liked,
+            'videoDisliked' => (int) $videoStats->video_disliked,
+            'videoLaughedAt' => (int) $videoStats->video_laughed_at,
+            'videoNoRating' => (int) $videoStats->video_no_rating,
 
             // Image Rating Stats
-            'imageLoved' => (int) $imageRatings->image_loved,
-            'imageLiked' => (int) $imageRatings->image_liked,
-            'imageDisliked' => (int) $imageRatings->image_disliked,
-            'imageLaughedAt' => (int) $imageRatings->image_laughed_at,
-            'imageNoRating' => (int) $imageRatings->image_no_rating,
+            'imageLoved' => (int) $imageStats->image_loved,
+            'imageLiked' => (int) $imageStats->image_liked,
+            'imageDisliked' => (int) $imageStats->image_disliked,
+            'imageLaughedAt' => (int) $imageStats->image_laughed_at,
+            'imageNoRating' => (int) $imageStats->image_no_rating,
 
             // File Type Distribution (for pie chart)
             'audioFiles' => (int) $fileTypeStats->audio_files,
@@ -192,6 +217,57 @@ class DashboardController extends Controller
             'videoSize' => (int) $fileTypeStats->video_size,
             'imageSize' => (int) $fileTypeStats->image_size,
             'otherSize' => (int) $fileTypeStats->other_size,
+
+            // Disk Space Information
+            'diskSpaceTotal' => $diskSpaceInfo['total'],
+            'diskSpaceUsed' => $diskSpaceInfo['used'],
+            'diskSpaceFree' => $diskSpaceInfo['free'],
+            'diskSpaceUsedPercent' => $diskSpaceInfo['used_percent'],
         ];
+    }
+
+    /**
+     * Get disk space information for the application directory.
+     */
+    private function getDiskSpaceInfo(): array
+    {
+        try {
+            // Get the application's storage path
+            $path = storage_path();
+
+            // Get disk space information
+            $totalSpace = disk_total_space($path);
+            $freeSpace = disk_free_space($path);
+
+            if ($totalSpace === false || $freeSpace === false) {
+                // Fallback values if disk_*_space functions fail
+                return [
+                    'total' => 0,
+                    'used' => 0,
+                    'free' => 0,
+                    'used_percent' => 0,
+                ];
+            }
+
+            $usedSpace = $totalSpace - $freeSpace;
+            $usedPercent = $totalSpace > 0 ? round(($usedSpace / $totalSpace) * 100, 1) : 0;
+
+            return [
+                'total' => (int) $totalSpace,
+                'used' => (int) $usedSpace,
+                'free' => (int) $freeSpace,
+                'used_percent' => (float) $usedPercent,
+            ];
+        } catch (Exception $e) {
+            // Log the error and return fallback values
+            \Log::warning('Failed to get disk space information: ' . $e->getMessage());
+
+            return [
+                'total' => 0,
+                'used' => 0,
+                'free' => 0,
+                'used_percent' => 0,
+            ];
+        }
     }
 }
