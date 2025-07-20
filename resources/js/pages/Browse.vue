@@ -12,12 +12,6 @@ interface DemoItem {
     height: number;
     page: string | number;
     index: number;
-    meta?: {
-        model_name?: string;
-        model_id?: number;
-        version_name?: string;
-        blurhash?: string;
-    };
 }
 
 interface Props {
