@@ -71,26 +71,29 @@ const downloadImage = (item: Item) => {
     alert(`Downloading image: ${item.id}`);
 };
 
-// Blacklist function - removes the item and calls backend
+// Blacklist function - removes the item immediately for better UX
 const blacklistImage = (item: Item, onRemove: any) => {
     console.log('Blacklisting image:', item.id);
-
-    // Call backend to blacklist the item
+    
+    // Remove from UI immediately for better user experience
+    onRemove(item);
+    
+    // Call backend to blacklist the item in the background
+    // Use cancelToken: false to prevent Inertia from cancelling concurrent requests
     router.post(
         route('browse.blacklist', { file: item.id }),
         { reason: 'Blacklisted via browse interface' },
         {
             preserveState: true,
             preserveScroll: true,
+            cancelToken: false,
             onSuccess: () => {
                 console.log('Item blacklisted successfully:', item.id);
-                // Remove from UI after successful backend update
-                onRemove(item);
             },
             onError: (errors) => {
                 console.error('Failed to blacklist item:', errors);
-                // Still remove from UI even if backend call fails
-                onRemove(item);
+                // Could optionally show a toast notification here
+                // but we don't re-add the item since the user intent was to remove it
             }
         }
     );
