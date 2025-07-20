@@ -8,10 +8,13 @@ use Illuminate\Support\Facades\Storage;
 beforeEach(function () {
     // Ensure clean database state for parallel execution
     File::query()->delete();
-
-    // Create a fake atlas disk for testing with unique prefix for parallel execution
-    $testId = uniqid('test_', true);
+    
+    // Always create a fresh fake atlas disk to avoid cross-test interference
     Storage::fake('atlas');
+});
+
+test('command scans atlas disk and dispatches file processing jobs', function () {
+    Queue::fake();
 
     // Create test files in the atlas disk
     Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
@@ -19,10 +22,6 @@ beforeEach(function () {
     Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
     Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
     Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
-});
-
-test('command scans atlas disk and dispatches file processing jobs', function () {
-    Queue::fake();
 
     // Ensure no files exist initially
     expect(File::count())->toBe(0);
@@ -42,6 +41,13 @@ test('command scans atlas disk and dispatches file processing jobs', function ()
 
 test('command processes files correctly when jobs are executed', function () {
     // Don't fake the queue so jobs run synchronously
+
+    // Create test files in the atlas disk
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 
     // Ensure no files exist initially
     expect(File::count())->toBe(0);
@@ -83,8 +89,12 @@ test('command processes files correctly when jobs are executed', function () {
 test('command does not dispatch jobs for existing files', function () {
     Queue::fake();
 
-    // Ensure clean database state for this test
-    File::query()->delete();
+    // Create test files in the atlas disk
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 
     // Create an existing file record
     File::create([
@@ -110,8 +120,12 @@ test('command does not dispatch jobs for existing files', function () {
 });
 
 test('command handles existing files correctly when jobs are executed', function () {
-    // Ensure clean state for parallel testing
-    File::query()->delete();
+    // Create test files in the atlas disk
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 
     // Create an existing file record
     File::create([
@@ -190,20 +204,17 @@ test('command handles empty atlas directory gracefully', function () {
 
     // Verify no files were created
     expect(File::count())->toBe(0);
-
-    // Restore the original test files for other tests that might run in parallel
-    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
-    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
-    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
-    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
-    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 });
 
 test('command processes files in chunks and dispatches jobs', function () {
     Queue::fake();
 
-    // Ensure clean state for parallel testing
-    File::query()->delete();
+    // Create test files in the atlas disk
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 
     // Run the command with a small chunk size
     $this->artisan('atlas:scan-files --chunk=2')
@@ -215,8 +226,12 @@ test('command processes files in chunks and dispatches jobs', function () {
 });
 
 test('command processes files in chunks correctly when jobs are executed', function () {
-    // Ensure clean state for parallel testing
-    File::query()->delete();
+    // Create test files in the atlas disk
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 
     // Run the command with a small chunk size
     $this->artisan('atlas:scan-files --chunk=2')
@@ -256,8 +271,12 @@ test('command handles files without extensions when jobs are executed', function
 });
 
 test('command excludes files in covers, metadata, and thumbnails folders when jobs are executed', function () {
-    // Ensure clean state for parallel testing
-    File::query()->delete();
+    // Create test files in the atlas disk first
+    Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
+    Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
+    Storage::disk('atlas')->put('images/test_image.jpg', 'fake jpg content');
+    Storage::disk('atlas')->put('documents/test_doc.pdf', 'fake pdf content');
+    Storage::disk('atlas')->put('subfolder/nested/deep_file.txt', 'nested file content');
 
     // Create files in excluded folders
     Storage::disk('atlas')->put('covers/album_cover.jpg', 'album cover content');
