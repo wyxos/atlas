@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -26,9 +27,15 @@ class CivitAIService
         $limit = (int) $this->request->get('limit', 20);
 
         $result = $this->fetchItems($page, $limit);
-        $transformedItems = $this->transformItems($result['items'], $page);
+        $transformedItems = $this->transformItems($result['items']);
 
-        return $this->transformResponse($result, $transformedItems, $page);
+        // Upsert items as File instances
+        $files = $this->upsertFiles($transformedItems);
+
+        // Format for UI display
+        $uiItems = $this->formatForUI($files, $page);
+
+        return $this->transformResponse($result, $uiItems, $page);
     }
 
     /**
@@ -84,24 +91,110 @@ class CivitAIService
     }
 
     /**
-     * Transform CivitAI items data into the format expected by the frontend.
+     * Transform CivitAI items data to align with files table schema.
      */
-    private function transformItems(array $items, $currentPage): array
+    private function transformItems(array $items): array
     {
         $transformedItems = [];
+
+        foreach ($items as $itemData) {
+            // Extract metadata if available
+            $meta = $itemData['meta'] ?? [];
+
+            $transformedItems[] = [
+                // Core identification
+                'source' => 'CivitAI',
+                'source_id' => (string) $itemData['id'],
+                'url' => $itemData['url'],
+                'referrer_url' => "https://civitai.com/images/{$itemData['id']}",
+
+                // File properties
+                'filename' => basename(parse_url($itemData['url'], PHP_URL_PATH)) ?: 'civitai_' . $itemData['id'],
+                'ext' => pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg',
+                'mime_type' => 'image/' . (pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpeg'),
+                'hash' => $itemData['hash'] ?? null,
+
+                // Content metadata
+                'title' => $meta['prompt'] ?? null,
+                'description' => null,
+                'thumbnail_url' => $itemData['url'],
+
+                // Status fields (non-reaction)
+                'is_blacklisted' => false,
+                'downloaded' => false,
+                'download_progress' => 0,
+                'not_found' => false,
+
+                // Metadata for FileMetadata relationship
+                '_metadata' => array_merge($meta, [
+                    'width' => $itemData['width'] ?? null,
+                    'height' => $itemData['height'] ?? null,
+                    'civitai_id' => $itemData['id'],
+                    'civitai_stats' => $itemData['stats'] ?? null,
+                    'data' => $itemData
+                ]),
+            ];
+        }
+
+        return $transformedItems;
+    }
+
+    /**
+     * Upsert transformed items as File instances based on referrer_url.
+     */
+    private function upsertFiles(array $transformedItems): array
+    {
+        $files = [];
+
+        foreach ($transformedItems as $item) {
+            // Extract metadata for separate storage
+            $metadata = $item['_metadata'] ?? [];
+            unset($item['_metadata']);
+
+            // Upsert based on referrer_url (unique constraint)
+            $file = File::updateOrCreate(
+                ['referrer_url' => $item['referrer_url']],
+                $item
+            );
+
+            // Store or update metadata
+            if (!empty($metadata)) {
+                $file->metadata()->updateOrCreate(
+                    ['file_id' => $file->id],
+                    ['payload' => $metadata]
+                );
+            }
+
+            // Load metadata relationship for UI formatting
+            $file->load('metadata');
+
+            $files[] = $file;
+        }
+
+        return $files;
+    }
+
+    /**
+     * Format File instances for UI display.
+     */
+    private function formatForUI(array $files, $currentPage): array
+    {
+        $uiItems = [];
         $pageIdentifier = $currentPage ?: null;
 
-        foreach ($items as $index => $itemData) {
-            $transformedItems[] = [
-                'id' => $itemData['id'], // Use actual CivitAI ID
-                'src' => $itemData['url'],
-                'width' => $itemData['width'],
-                'height' => $itemData['height'],
+        foreach ($files as $index => $file) {
+            $metadata = $file->metadata?->payload ?? [];
+
+            $uiItems[] = [
+                'id' => $file->id,
+                'src' => $file->url,
+                'width' => $metadata['width'] ?? null,
+                'height' => $metadata['height'] ?? null,
                 'page' => $pageIdentifier,
                 'index' => $index,
             ];
         }
 
-        return $transformedItems;
+        return $uiItems;
     }
 }
