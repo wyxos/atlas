@@ -50,6 +50,35 @@ onMounted(() => {
     }
 });
 
+// Mock download function
+const downloadImage = (item: DemoItem) => {
+    console.log('Downloading image:', item.id, item.src);
+    // TODO: Implement actual download functionality
+    alert(`Downloading image: ${item.id}`);
+};
+
+// Blacklist function - removes the item
+const blacklistImage = (item: DemoItem, onRemove: Function) => {
+    console.log('Blacklisting image:', item.id);
+    onRemove(item);
+};
+
+// Handle image click events
+const handleImageClick = (event: MouseEvent, item: DemoItem, onRemove: Function) => {
+    if (event.altKey && event.button === 0) { // Alt + Left click
+        event.preventDefault();
+        downloadImage(item);
+    }
+};
+
+// Handle image context menu (right click)
+const handleImageContextMenu = (event: MouseEvent, item: DemoItem, onRemove: Function) => {
+    if (event.altKey) { // Alt + Right click
+        event.preventDefault();
+        blacklistImage(item, onRemove);
+    }
+};
+
 // Fetch more images for infinite scroll
 const getPage = async (page: number) => {
     try {
@@ -125,7 +154,6 @@ const getPage = async (page: number) => {
             <!-- Header -->
             <div class="flex-shrink-0 p-4 border-b">
                 <div class="flex flex-col items-center gap-4">
-
                 </div>
             </div>
 
@@ -146,10 +174,12 @@ const getPage = async (page: number) => {
                         <img
                             :src="item.src"
                             :alt="`Image ${item.id}`"
-                            class="w-full h-auto"
+                            class="w-full h-auto cursor-pointer"
                             loading="lazy"
                             @error="(e) => console.warn('Failed to load image:', item.id, e)"
                             @load="(e) => console.debug('Loaded image:', item.id)"
+                            @mousedown="(e) => handleImageClick(e, item, onRemove)"
+                            @contextmenu="(e) => handleImageContextMenu(e, item, onRemove)"
                         />
                         <button
                             class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100"
@@ -166,11 +196,11 @@ const getPage = async (page: number) => {
                 <!-- Loading Overlay -->
                 <div
                     v-if="isLoading"
-                    class="absolute inset-0  flex items-center justify-center z-50 backdrop-blur-[1px]"
+                    class="absolute inset-0 bg-opacity-30 flex items-center justify-center z-50 backdrop-blur-[2px]"
                 >
                     <div class="bg-primary rounded-lg p-6 shadow-lg flex items-center gap-3">
                         <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                        <span class="font-medium text-primary-foreground">Loading more images...</span>
+                        <span class="font-medium text-white">Loading more images...</span>
                     </div>
                 </div>
             </div>
