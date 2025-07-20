@@ -169,7 +169,6 @@ const getPage = async (pageParam: number | string) => {
                 <Masonry
                     v-model:items="items"
                     :get-next-page="getPage"
-                    :load-at-page="null"
                     ref="masonry"
                     :layout="{
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
