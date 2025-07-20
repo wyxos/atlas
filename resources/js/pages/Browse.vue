@@ -16,9 +16,9 @@ interface Item {
 
 interface Props {
     items: Item[];
-    currentPage: number | string;
+    page: number | string;
+    nextPage: number | string | null;
     hasNextPage: boolean;
-    nextCursor: string | null;
 }
 
 const props = defineProps<Props>();
@@ -36,13 +36,13 @@ const isLoading = ref(false);
 
 // Unified pagination state - works with both cursor and page-based pagination
 const paginationState = ref<{
-    currentPage: number | string;
+    page: number | string;
     nextPage: number | string | null;
-    hasNext: boolean;
+    hasNextPage: boolean;
 }>({
-    currentPage: props.currentPage || 1,
-    nextPage: props.hasNextPage ? (props.nextCursor || (Number(props.currentPage) + 1)) : null,
-    hasNext: props.hasNextPage
+    page: props.page,
+    nextPage: props.nextPage,
+    hasNextPage: props.hasNextPage
 });
 
 // Initialize with server-side data
@@ -81,7 +81,7 @@ const getPage = async (pageParam: number | string) => {
         console.log('Masonry requesting:', pageParam, 'current state:', paginationState.value);
 
         // If there's no next page to fetch, return empty
-        if (!paginationState.value.hasNext || !paginationState.value.nextPage) {
+        if (!paginationState.value.hasNextPage || !paginationState.value.nextPage) {
             console.log('No more pages to fetch');
             return { items: [], nextPage: null };
         }
@@ -89,15 +89,10 @@ const getPage = async (pageParam: number | string) => {
         // Set loading state
         isLoading.value = true;
 
-        // Build query parameters - support both cursor and page-based pagination
-        const queryParams: Record<string, any> = {};
-        
-        // If nextPage is a string, treat it as a cursor; if number, treat as page
-        if (typeof paginationState.value.nextPage === 'string' && isNaN(Number(paginationState.value.nextPage))) {
-            queryParams.cursor = paginationState.value.nextPage;
-        } else {
-            queryParams.page = paginationState.value.nextPage;
-        }
+        // Use the nextPage value directly - backend determines if it's cursor or page number
+        const queryParams = {
+            page: paginationState.value.nextPage
+        };
 
         // Use Inertia to fetch data
         return new Promise((resolve, reject) => {
@@ -107,22 +102,22 @@ const getPage = async (pageParam: number | string) => {
                 {
                     preserveState: true,
                     preserveScroll: true,
-                    only: ['items', 'hasNextPage', 'nextCursor', 'currentPage'],
+                    only: ['items', 'hasNextPage', 'nextPage', 'page'],
                     onSuccess: (response) => {
                         try {
                             const newItems = response.props.items as Item[];
                             const hasNext = response.props.hasNextPage;
-                            const nextCursor = response.props.nextCursor;
-                            const currentPage = response.props.currentPage;
+                            const nextPage = response.props.nextPage;
+                            const currentPage = response.props.page;
 
-                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextCursor/page:', nextCursor || currentPage);
+                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextPage:', nextPage, 'currentPage:', currentPage);
 
                             if (newItems && newItems.length > 0) {
-                                // Update pagination state - handle both cursor and page-based responses
+                                // Update pagination state - backend provides both current page and nextPage values
                                 paginationState.value = {
-                                    currentPage: nextCursor || currentPage,
-                                    nextPage: hasNext ? (nextCursor || (Number(currentPage) + 1)) : null,
-                                    hasNext: hasNext
+                                    page: currentPage,
+                                    nextPage: hasNext ? nextPage : null,
+                                    hasNextPage: hasNext
                                 };
 
                                 resolve({
@@ -130,7 +125,7 @@ const getPage = async (pageParam: number | string) => {
                                     nextPage: paginationState.value.nextPage
                                 });
                             } else {
-                                paginationState.value.hasNext = false;
+                                paginationState.value.hasNextPage = false;
                                 paginationState.value.nextPage = null;
                                 resolve({ items: [], nextPage: null });
                             }
@@ -174,7 +169,7 @@ const getPage = async (pageParam: number | string) => {
                 <Masonry
                     v-model:items="items"
                     :get-next-page="getPage"
-                    :load-at-page="paginationState.currentPage"
+                    :load-at-page="paginationState.page"
                     ref="masonry"
                     :layout="{
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
