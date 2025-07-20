@@ -189,7 +189,6 @@ const getPage = async (pageParam: number | string) => {
                             @click.alt.exact.prevent="handleAltClick(item)"
                             @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
                         />
-                        {{ item.page }}
                         <button
                             class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100"
                             @click="onRemove(item)"

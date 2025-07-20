@@ -34,3 +34,4 @@ yarn-error.log
 # Database files - large SQLite files
 /database/*.sqlite*
 *.sqlite*
+/resources/js/components/ui
