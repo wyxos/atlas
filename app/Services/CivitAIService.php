@@ -25,7 +25,7 @@ class CivitAIService
         $cursor = $this->request->get('cursor');
         $limit = 20;
 
-        $result = $this->fetchCivitAIImages($page, $limit, $cursor);
+        $result = $this->fetchItems($page, $limit, $cursor);
 
         return [
             'initialImages' => $result['images'],
@@ -38,7 +38,7 @@ class CivitAIService
     /**
      * Fetch images from CivitAI API with support for both cursor and page-based pagination.
      */
-    private function fetchCivitAIImages(int $page, int $limit, ?string $cursor = null): array
+    private function fetchItems(int $page, int $limit, ?string $cursor = null): array
     {
         $params = [
             'limit' => $limit,
@@ -68,7 +68,7 @@ class CivitAIService
         $batchId = $cursor ? "cursor_{$cursor}" : "page_{$page}";
 
         return [
-            'images' => $this->transformImagesToImages($data['items'] ?? [], $batchId),
+            'images' => $this->transform($data['items'] ?? [], $batchId),
             'hasNextPage' => !empty($metadata['nextCursor']) || !empty($metadata['nextPage']),
             'nextCursor' => $metadata['nextCursor'] ?? null,
             'nextPage' => $metadata['nextPage'] ?? null
@@ -78,7 +78,7 @@ class CivitAIService
     /**
      * Transform CivitAI images data into the format expected by the frontend.
      */
-    private function transformImagesToImages(array $images, string $batchId): array
+    private function transform(array $images, string $batchId): array
     {
         $transformedImages = [];
 
