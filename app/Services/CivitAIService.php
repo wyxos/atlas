@@ -89,7 +89,7 @@ class CivitAIService
     private function transformItems(array $items, $currentPage): array
     {
         $transformedItems = [];
-        $pageIdentifier = $currentPage ?: 'initial';
+        $pageIdentifier = $currentPage ?: null;
 
         foreach ($items as $index => $itemData) {
             $transformedItems[] = [
@@ -97,7 +97,7 @@ class CivitAIService
                 'src' => $itemData['url'],
                 'width' => $itemData['width'],
                 'height' => $itemData['height'],
-                'page' => "page_{$pageIdentifier}_{$index}",
+                'page' => $pageIdentifier,
                 'index' => $index,
             ];
         }
