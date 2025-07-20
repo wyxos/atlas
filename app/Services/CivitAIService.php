@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\File;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 class CivitAIService
@@ -140,38 +141,121 @@ class CivitAIService
     }
 
     /**
-     * Upsert transformed items as File instances based on referrer_url.
+     * Upsert transformed items as File instances based on referrer_url using bulk operations.
      */
     private function upsertFiles(array $transformedItems): array
     {
-        $files = [];
-
-        foreach ($transformedItems as $item) {
-            // Extract metadata for separate storage
-            $metadata = $item['_metadata'] ?? [];
-            unset($item['_metadata']);
-
-            // Upsert based on referrer_url (unique constraint)
-            $file = File::updateOrCreate(
-                ['referrer_url' => $item['referrer_url']],
-                $item
-            );
-
-            // Store or update metadata
-            if (!empty($metadata)) {
-                $file->metadata()->updateOrCreate(
-                    ['file_id' => $file->id],
-                    ['payload' => $metadata]
-                );
-            }
-
-            // Load metadata relationship for UI formatting
-            $file->load('metadata');
-
-            $files[] = $file;
+        if (empty($transformedItems)) {
+            return [];
         }
-
-        return $files;
+        
+        // Extract referrer URLs and metadata
+        $referrerUrls = [];
+        $metadataByReferrer = [];
+        
+        foreach ($transformedItems as $item) {
+            $referrerUrls[] = $item['referrer_url'];
+            $metadataByReferrer[$item['referrer_url']] = $item['_metadata'] ?? [];
+        }
+        
+        // Get existing files by referrer_url
+        $existingFiles = File::whereIn('referrer_url', $referrerUrls)
+            ->get()
+            ->keyBy('referrer_url');
+        
+        $filesToCreate = [];
+        $filesToUpdate = [];
+        $fileIds = [];
+        
+        foreach ($transformedItems as $item) {
+            $referrerUrl = $item['referrer_url'];
+            unset($item['_metadata']); // Remove metadata before file operations
+            
+            if ($existingFiles->has($referrerUrl)) {
+                // Update existing file
+                $existingFile = $existingFiles->get($referrerUrl);
+                $existingFile->update($item);
+                $fileIds[] = $existingFile->id;
+            } else {
+                // Prepare for bulk insert
+                $item['created_at'] = now();
+                $item['updated_at'] = now();
+                $filesToCreate[] = $item;
+            }
+        }
+        
+        // Bulk insert new files
+        if (!empty($filesToCreate)) {
+            File::insert($filesToCreate);
+            
+            // Get the newly created files
+            $newReferrerUrls = array_column($filesToCreate, 'referrer_url');
+            $newFiles = File::whereIn('referrer_url', $newReferrerUrls)
+                ->get()
+                ->keyBy('referrer_url');
+            
+            foreach ($newFiles as $file) {
+                $fileIds[] = $file->id;
+            }
+        }
+        
+        // Handle metadata in bulk
+        $this->upsertMetadata($fileIds, $metadataByReferrer, $referrerUrls);
+        
+        // Return all files with metadata loaded
+        return File::whereIn('id', $fileIds)->with('metadata')->get()->all();
+    }
+    
+    /**
+     * Upsert metadata for files in bulk.
+     */
+    private function upsertMetadata(array $fileIds, array $metadataByReferrer, array $referrerUrls): void
+    {
+        if (empty($fileIds) || empty($metadataByReferrer)) {
+            return;
+        }
+        
+        // Get file ID to referrer URL mapping
+        $fileMapping = File::whereIn('id', $fileIds)
+            ->select('id', 'referrer_url')
+            ->get()
+            ->keyBy('referrer_url');
+        
+        // Get existing metadata
+        $existingMetadata = File::whereIn('id', $fileIds)
+            ->with('metadata')
+            ->get()
+            ->pluck('metadata', 'id')
+            ->filter();
+        
+        $metadataToCreate = [];
+        $metadataToUpdate = [];
+        
+        foreach ($metadataByReferrer as $referrerUrl => $metadata) {
+            if (empty($metadata) || !$fileMapping->has($referrerUrl)) {
+                continue;
+            }
+            
+            $fileId = $fileMapping->get($referrerUrl)->id;
+            
+            if ($existingMetadata->has($fileId)) {
+                // Update existing metadata
+                $existingMetadata->get($fileId)->update(['payload' => $metadata]);
+            } else {
+                // Prepare for bulk insert
+                $metadataToCreate[] = [
+                    'file_id' => $fileId,
+                    'payload' => json_encode($metadata),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+        
+        // Bulk insert new metadata
+        if (!empty($metadataToCreate)) {
+            DB::table('file_metadata')->insert($metadataToCreate);
+        }
     }
 
     /**
