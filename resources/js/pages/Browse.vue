@@ -62,20 +62,14 @@ const blacklistImage = (item: DemoItem, onRemove: Function) => {
     onRemove(item);
 };
 
-// Handle image click events
-const handleImageClick = (event: MouseEvent, item: DemoItem, onRemove: Function) => {
-    if (event.altKey && event.button === 0) { // Alt + Left click
-        event.preventDefault();
-        downloadImage(item);
-    }
+// Handle Alt+click for download
+const handleAltClick = (item: DemoItem) => {
+    downloadImage(item);
 };
 
-// Handle image context menu (right click)
-const handleImageContextMenu = (event: MouseEvent, item: DemoItem, onRemove: Function) => {
-    if (event.altKey) { // Alt + Right click
-        event.preventDefault();
-        blacklistImage(item, onRemove);
-    }
+// Handle Alt+right-click for blacklist
+const handleAltRightClick = (item: DemoItem, onRemove: Function) => {
+    blacklistImage(item, onRemove);
 };
 
 // Fetch more images for infinite scroll
@@ -177,8 +171,8 @@ const getPage = async (page: number) => {
                             loading="lazy"
                             @error="(e) => console.warn('Failed to load image:', item.id, e)"
                             @load="(e) => console.debug('Loaded image:', item.id)"
-                            @mousedown="(e) => handleImageClick(e, item, onRemove)"
-                            @contextmenu="(e) => handleImageContextMenu(e, item, onRemove)"
+                            @click.alt.exact.prevent="handleAltClick(item)"
+                            @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
                         />
                         <button
                             class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100"
