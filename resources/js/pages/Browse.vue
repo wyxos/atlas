@@ -5,7 +5,7 @@ import { Head, router } from '@inertiajs/vue3';
 import { ref, onMounted } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 
-interface DemoItem {
+interface Item {
     id: number; // Use actual CivitAI numeric ID
     src: string;
     width: number;
@@ -15,7 +15,7 @@ interface DemoItem {
 }
 
 interface Props {
-    items: DemoItem[];
+    items: Item[];
     currentPage: number | string;
     hasNextPage: boolean;
     nextCursor: string | null;
@@ -30,50 +30,58 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const items = ref<DemoItem[]>([]);
+const items = ref<Item[]>([]);
 const masonry = ref(null);
 const isLoading = ref(false);
-let nextCursorToFetch: string | null = null; // Track next cursor to fetch
+
+// Unified pagination state - works with both cursor and page-based pagination
+const paginationState = ref<{
+    currentPage: number | string;
+    nextPage: number | string | null;
+    hasNext: boolean;
+}>({
+    currentPage: props.currentPage || 1,
+    nextPage: props.hasNextPage ? (props.nextCursor || (Number(props.currentPage) + 1)) : null,
+    hasNext: props.hasNextPage
+});
 
 // Initialize with server-side data
 onMounted(() => {
     if (props.items && props.items.length > 0) {
         items.value = [...props.items];
-        // Set next cursor based on whether we have more pages
-        nextCursorToFetch = props.hasNextPage ? props.nextCursor : null;
     }
 });
 
 // Mock download function
-const downloadImage = (item: DemoItem) => {
+const downloadImage = (item: Item) => {
     console.log('Downloading image:', item.id, item.src);
     // TODO: Implement actual download functionality
     alert(`Downloading image: ${item.id}`);
 };
 
 // Blacklist function - removes the item
-const blacklistImage = (item: DemoItem, onRemove: Function) => {
+const blacklistImage = (item: Item, onRemove: Function) => {
     console.log('Blacklisting image:', item.id);
     onRemove(item);
 };
 
 // Handle Alt+click for download
-const handleAltClick = (item: DemoItem) => {
+const handleAltClick = (item: Item) => {
     downloadImage(item);
 };
 
 // Handle Alt+right-click for blacklist
-const handleAltRightClick = (item: DemoItem, onRemove: Function) => {
+const handleAltRightClick = (item: Item, onRemove: Function) => {
     blacklistImage(item, onRemove);
 };
 
-// Fetch more images for infinite scroll
-const getPage = async (page: number) => {
+// Unified pagination handler - works with both cursor and page-based pagination
+const getPage = async (pageParam: number | string) => {
     try {
-        console.log('Masonry requesting page:', page, 'using cursor:', nextCursorToFetch);
+        console.log('Masonry requesting:', pageParam, 'current state:', paginationState.value);
 
-        // If there's no next cursor to fetch, return empty
-        if (!nextCursorToFetch) {
+        // If there's no next page to fetch, return empty
+        if (!paginationState.value.hasNext || !paginationState.value.nextPage) {
             console.log('No more pages to fetch');
             return { items: [], nextPage: null };
         }
@@ -81,33 +89,49 @@ const getPage = async (page: number) => {
         // Set loading state
         isLoading.value = true;
 
-        // Use Inertia to navigate with cursor and get data
+        // Build query parameters - support both cursor and page-based pagination
+        const queryParams: Record<string, any> = {};
+        
+        // If nextPage is a string, treat it as a cursor; if number, treat as page
+        if (typeof paginationState.value.nextPage === 'string' && isNaN(Number(paginationState.value.nextPage))) {
+            queryParams.cursor = paginationState.value.nextPage;
+        } else {
+            queryParams.page = paginationState.value.nextPage;
+        }
+
+        // Use Inertia to fetch data
         return new Promise((resolve, reject) => {
             router.get(
-                route('browse', { cursor: nextCursorToFetch }),
+                route('browse', queryParams),
                 {},
                 {
                     preserveState: true,
                     preserveScroll: true,
-                    only: ['items', 'hasNextPage', 'nextCursor'],
+                    only: ['items', 'hasNextPage', 'nextCursor', 'currentPage'],
                     onSuccess: (response) => {
                         try {
-                            const newItems = response.props.items as DemoItem[];
+                            const newItems = response.props.items as Item[];
                             const hasNext = response.props.hasNextPage;
                             const nextCursor = response.props.nextCursor;
+                            const currentPage = response.props.currentPage;
 
-                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextCursor:', nextCursor);
+                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextCursor/page:', nextCursor || currentPage);
 
                             if (newItems && newItems.length > 0) {
-                                // Update next cursor to fetch
-                                nextCursorToFetch = hasNext ? nextCursor : null;
+                                // Update pagination state - handle both cursor and page-based responses
+                                paginationState.value = {
+                                    currentPage: nextCursor || currentPage,
+                                    nextPage: hasNext ? (nextCursor || (Number(currentPage) + 1)) : null,
+                                    hasNext: hasNext
+                                };
 
                                 resolve({
                                     items: newItems,
-                                    nextPage: hasNext ? nextCursor : null
+                                    nextPage: paginationState.value.nextPage
                                 });
                             } else {
-                                nextCursorToFetch = null;
+                                paginationState.value.hasNext = false;
+                                paginationState.value.nextPage = null;
                                 resolve({ items: [], nextPage: null });
                             }
                         } catch (error) {
@@ -150,6 +174,7 @@ const getPage = async (page: number) => {
                 <Masonry
                     v-model:items="items"
                     :get-next-page="getPage"
+                    :load-at-page="paginationState.currentPage"
                     ref="masonry"
                     :layout="{
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
