@@ -115,14 +115,6 @@ it('transforms CivitAI images correctly', function () {
         'height' => 1536,
         'page' => 'page_1',
         'index' => 0,
-        'meta' => [
-            'model_name' => 'Realistic Vision V5.1',
-            'model_id' => null,
-            'version_name' => null,
-            'blurhash' => 'detailed_hash_456',
-            'prompt' => 'detailed prompt with many words',
-            'seed' => 12345,
-        ]
     ]);
 
     // Test second image transformation (with missing seed)
@@ -134,14 +126,6 @@ it('transforms CivitAI images correctly', function () {
         'height' => 768,
         'page' => 'page_1',
         'index' => 1,
-        'meta' => [
-            'model_name' => 'DreamShaper',
-            'model_id' => null,
-            'version_name' => null,
-            'blurhash' => 'second_hash_789',
-            'prompt' => 'another test prompt',
-            'seed' => null, // Should handle missing seed gracefully
-        ]
     ]);
 });
 

@@ -86,14 +86,6 @@ class BrowseController extends Controller
                 'height' => $imageData['height'],
                 'page' => $batchId,
                 'index' => $index,
-                'meta' => [
-                    'model_name' => $imageData['meta']['Model'] ?? null,
-                    'model_id' => null,
-                    'version_name' => null,
-                    'blurhash' => $imageData['hash'] ?? null,
-                    'prompt' => $imageData['meta']['prompt'] ?? null,
-                    'seed' => $imageData['meta']['seed'] ?? null,
-                ]
             ];
         }
 
