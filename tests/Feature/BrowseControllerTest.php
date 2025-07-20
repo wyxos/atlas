@@ -95,9 +95,10 @@ it('handles cursor-based pagination correctly', function () {
 
     $data = $response->getOriginalContent()->getData();
     $items = $data['page']['props']['items'];
+    $previousCursor = $data['page']['props']['previousCursor'];
 
-    // Verify batch ID is cursor-based
-    expect($items[0]['page'])->toBe('cursor_existing_cursor_token');
+    // Verify previous cursor tracking
+    expect($previousCursor)->toBe('existing_cursor_token');
 });
 
 it('handles CivitAI API errors gracefully', function () {

@@ -36,8 +36,10 @@ it('fetches and transforms images correctly from CivitAI API', function () {
     expect($item['src'])->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-image.jpeg');
     expect($item['width'])->toBe(512);
     expect($item['height'])->toBe(768);
-    expect($item['page'])->toBe('page_1');
     expect($item['index'])->toBe(0);
+    
+    // Check previous cursor tracking
+    expect($result['previousCursor'])->toBeNull(); // No previous cursor for first page
 
     // Verify that the CivitAI API was called correctly
     Http::assertSent(function ($request) {
@@ -72,7 +74,7 @@ it('handles cursor-based pagination correctly', function () {
     $result = $service->fetch();
 
     expect($result['nextCursor'])->toBe('new_cursor_token');
-    expect($result['items'][0]['page'])->toBe('cursor_existing_cursor_token');
+    expect($result['previousCursor'])->toBe('existing_cursor_token'); // Previous cursor should be tracked
 
     // Verify that the CivitAI API was called with cursor instead of page
     Http::assertSent(function ($request) {
@@ -117,7 +119,6 @@ it('transforms multiple images correctly', function () {
         'src' => 'https://image.civitai.com/first-image.jpeg',
         'width' => 1024,
         'height' => 1536,
-        'page' => 'page_1',
         'index' => 0,
     ]);
 
@@ -127,7 +128,6 @@ it('transforms multiple images correctly', function () {
         'src' => 'https://image.civitai.com/second-image.png',
         'width' => 768,
         'height' => 768,
-        'page' => 'page_1',
         'index' => 1,
     ]);
 });
@@ -200,6 +200,24 @@ it('uses correct API parameters', function () {
                $data['sort'] === 'Newest' &&
                $data['period'] === 'AllTime' &&
                $data['nsfw'] === 'false';
+    });
+});
+
+it('uses limit parameter from request', function () {
+    Http::fake([
+        'civitai.com/api/v1/images*' => Http::response([
+            'items' => [],
+            'metadata' => []
+        ], 200)
+    ]);
+
+    $request = new Request(['page' => 1, 'limit' => 50]);
+    $service = new CivitAIService($request);
+    $service->fetch();
+
+    // Verify limit parameter from request is used
+    Http::assertSent(function ($request) {
+        return $request->data()['limit'] === 50;
     });
 });
 
