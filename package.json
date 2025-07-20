@@ -50,6 +50,7 @@
         "eslint-plugin-vue": "^9.32.0",
         "jsdom": "^26.1.0",
         "lodash": "^4.17.21",
+        "lodash-es": "^4.17.21",
         "prettier": "^3.4.2",
         "prettier-plugin-organize-imports": "^4.1.0",
         "prettier-plugin-tailwindcss": "^0.6.11",

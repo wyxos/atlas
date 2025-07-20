@@ -10,7 +10,7 @@ interface DemoItem {
     src: string;
     width: number;
     height: number;
-    page: number;
+    page: string | number;
     index: number;
     meta?: {
         model_name?: string;
@@ -24,7 +24,7 @@ interface Props {
     initialImages: DemoItem[];
     currentPage: number | string;
     hasNextPage: boolean;
-    nextCursor?: string | null;
+    nextCursor: string | null;
 }
 
 const props = defineProps<Props>();
@@ -53,13 +53,13 @@ onMounted(() => {
 const getPage = async (page: number) => {
     try {
         console.log('Masonry requesting page:', page, 'using cursor:', nextCursorToFetch);
-        
+
         // If there's no next cursor to fetch, return empty
         if (!nextCursorToFetch) {
             console.log('No more pages to fetch');
             return { items: [], nextPage: null };
         }
-        
+
         // Use Inertia to navigate with cursor and get data
         return new Promise((resolve, reject) => {
             router.get(
@@ -74,13 +74,13 @@ const getPage = async (page: number) => {
                             const newImages = response.props.initialImages as DemoItem[];
                             const hasNext = response.props.hasNextPage;
                             const nextCursor = response.props.nextCursor;
-                            
+
                             console.log('Fetched images:', newImages?.length, 'hasNext:', hasNext, 'nextCursor:', nextCursor);
-                            
+
                             if (newImages && newImages.length > 0) {
                                 // Update next cursor to fetch
                                 nextCursorToFetch = hasNext ? nextCursor : null;
-                                
+
                                 resolve({
                                     items: newImages,
                                     nextPage: hasNext ? nextCursor : null
@@ -118,11 +118,11 @@ const getPage = async (page: number) => {
                 <div class="flex flex-col items-center gap-4">
                     <h1 class="text-3xl font-bold">Browse</h1>
                     <p class="text-muted-foreground">Vue Infinite Block Engine (VIBE) Example</p>
-                    
+
                     <div v-if="masonry" class="flex items-center gap-4">
                         <div class="flex items-center gap-2">
                             <span class="text-sm text-muted-foreground">Loading:</span>
-                            <span 
+                            <span
                                 class="px-3 py-1 rounded-full text-sm font-medium"
                                 :class="masonry.isLoading ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'"
                             >
@@ -141,28 +141,28 @@ const getPage = async (page: number) => {
 
             <!-- Masonry Container -->
             <div class="flex-1 min-h-0">
-                <Masonry 
-                    v-model:items="items" 
-                    :get-next-page="getPage" 
+                <Masonry
+                    v-model:items="items"
+                    :get-next-page="getPage"
                     ref="masonry"
-                    :layout="{ 
+                    :layout="{
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
                         gutterX: 16,
-                        gutterY: 16 
+                        gutterY: 16
                     }"
                     class="h-full"
                 >
                     <template #item="{ item, onRemove }">
-                        <img 
-                            :src="item.src" 
+                        <img
+                            :src="item.src"
                             :alt="`Image ${item.id}`"
                             class="w-full h-auto"
                             loading="lazy"
                             @error="(e) => console.warn('Failed to load image:', item.id, e)"
                             @load="(e) => console.debug('Loaded image:', item.id)"
                         />
-                        <button 
-                            class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100" 
+                        <button
+                            class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100"
                             @click="onRemove(item)"
                             title="Remove item"
                         >

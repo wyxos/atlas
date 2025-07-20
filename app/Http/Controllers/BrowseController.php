@@ -36,7 +36,7 @@ class BrowseController extends Controller
             }
 
             $data = $response->json();
-            $images = $this->transformImagesToImages($data['items'] ?? [], 1);
+            $images = $this->transformImagesToImages($data['items'] ?? [], 'debug_page_1');
             
             return response()->json([
                 'success' => true,
@@ -102,8 +102,11 @@ class BrowseController extends Controller
         $data = $response->json();
         $metadata = $data['metadata'] ?? [];
         
+        // Create a batch identifier for cursor-based pagination
+        $batchId = $cursor ? "cursor_{$cursor}" : "page_{$page}";
+        
         return [
-            'images' => $this->transformImagesToImages($data['items'] ?? [], $page),
+            'images' => $this->transformImagesToImages($data['items'] ?? [], $batchId),
             'hasNextPage' => !empty($metadata['nextCursor']) || !empty($metadata['nextPage']),
             'nextCursor' => $metadata['nextCursor'] ?? null,
             'nextPage' => $metadata['nextPage'] ?? null
@@ -113,7 +116,7 @@ class BrowseController extends Controller
     /**
      * Transform CivitAI images data into the format expected by the frontend.
      */
-    private function transformImagesToImages(array $images, int $page): array
+    private function transformImagesToImages(array $images, string $batchId): array
     {
         $transformedImages = [];
         
@@ -123,7 +126,7 @@ class BrowseController extends Controller
                 'src' => $imageData['url'],
                 'width' => $imageData['width'],
                 'height' => $imageData['height'],
-                'page' => $page,
+                'page' => $batchId,
                 'index' => $index,
                 'meta' => [
                     'model_name' => $imageData['meta']['Model'] ?? null,
