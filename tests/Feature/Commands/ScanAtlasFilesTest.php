@@ -9,8 +9,20 @@ beforeEach(function () {
     // Ensure clean database state for parallel execution
     File::query()->delete();
     
-    // Always create a fresh fake atlas disk to avoid cross-test interference
-    Storage::fake('atlas');
+    // Create a unique test disk for this test to avoid parallel test interference
+    $this->testDiskName = 'test_atlas_' . uniqid();
+    
+    // Create the fake disk with unique name
+    Storage::fake($this->testDiskName);
+    
+    // Override the atlas disk configuration to point to our unique test disk
+    config([
+        'filesystems.disks.atlas.driver' => 'local',
+        'filesystems.disks.atlas.root' => storage_path('framework/testing/disks/' . $this->testDiskName),
+    ]);
+    
+    // Clear any cached disk instances to ensure the new configuration is used
+    app('filesystem')->forgetDisk('atlas');
 });
 
 test('command scans atlas disk and dispatches file processing jobs', function () {
@@ -157,10 +169,6 @@ test('command handles existing files correctly when jobs are executed', function
 test('command dry-run mode shows what would be done without dispatching jobs', function () {
     Queue::fake();
 
-    // Ensure clean state for parallel testing
-    File::query()->delete();
-    Storage::fake('atlas');
-
     // Create test files in the atlas disk
     Storage::disk('atlas')->put('audio/test_song.mp3', 'fake mp3 content');
     Storage::disk('atlas')->put('video/test_video.mp4', 'fake mp4 content');
@@ -187,12 +195,6 @@ test('command dry-run mode shows what would be done without dispatching jobs', f
 
 test('command handles empty atlas directory gracefully', function () {
     Queue::fake();
-
-    // Clear database to ensure clean state
-    File::query()->delete();
-
-    // Create a fresh fake atlas disk without any files for this specific test
-    Storage::fake('atlas');
 
     // Run the command
     $this->artisan('atlas:scan-files')
