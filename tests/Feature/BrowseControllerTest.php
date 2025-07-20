@@ -93,11 +93,20 @@ it('handles cursor-based pagination correctly', function () {
                !isset($request->data()['page']); // Page should not be set when cursor is used
     });
 
+    // Verify response structure for cursor-based pagination
+    $response->assertInertia(fn ($page) => $page
+        ->component('Browse')
+        ->has('items')
+        ->has('nextCursor')
+        ->has('previousCursor')
+        ->where('nextCursor', 'new_cursor_token')
+        ->where('previousCursor', 'existing_cursor_token')
+    );
+
+    // Verify the page attribute is correctly set for cursor-based pagination
     $data = $response->getOriginalContent()->getData();
     $items = $data['page']['props']['items'];
-
-    // Verify batch ID is cursor-based
-    expect($items[0]['page'])->toBe('cursor_existing_cursor_token');
+    expect($items[0]['page'])->toBe('cursor_existing_cursor_token-0');
 });
 
 it('handles CivitAI API errors gracefully', function () {
