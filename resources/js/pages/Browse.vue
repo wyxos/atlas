@@ -210,6 +210,9 @@ const getPage = async (pageParam: number | string) => {
             <!-- Header -->
             <div class="flex-shrink-0 p-4 border-b">
                 <div class="flex flex-col items-center gap-4">
+                    <button class="button" @click="masonry.loadNext" :disabled="isLoading">
+                        Load more
+                    </button>
                 </div>
             </div>
 

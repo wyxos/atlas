@@ -50,7 +50,7 @@ class CivitAIService
             'limit' => $limit,
             'sort' => 'Newest',
             'period' => 'AllTime',
-            'nsfw' => 'false',
+//            'nsfw' => 'false',
         ];
 
         // For CivitAI, if page is null (first request), don't send cursor
