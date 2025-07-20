@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\File;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -41,6 +42,7 @@ class CivitAIService
 
     /**
      * Fetch images from CivitAI API using unified page parameter.
+     * @throws ConnectionException
      */
     private function fetchItems($page, int $limit): array
     {
@@ -58,8 +60,7 @@ class CivitAIService
         }
         // Note: CivitAI doesn't use traditional page numbers, only cursors
 
-        $response = Http::timeout(30)
-            ->get(self::CIVITAI_API_BASE.'/images', $params);
+        $response = Http::get(self::CIVITAI_API_BASE.'/images', $params);
 
         if (! $response->successful()) {
             throw new \Exception('CivitAI API request failed: '.$response->status());
