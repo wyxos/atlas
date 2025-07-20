@@ -48,7 +48,7 @@ class CivitAIService
             'limit' => $limit,
             'sort' => 'Newest',
             'period' => 'AllTime',
-            'nsfw' => 'false'
+            'nsfw' => 'false',
         ];
 
         // For CivitAI, if page is null (first request), don't send cursor
@@ -59,10 +59,10 @@ class CivitAIService
         // Note: CivitAI doesn't use traditional page numbers, only cursors
 
         $response = Http::timeout(30)
-            ->get(self::CIVITAI_API_BASE . '/images', $params);
+            ->get(self::CIVITAI_API_BASE.'/images', $params);
 
-        if (!$response->successful()) {
-            throw new \Exception('CivitAI API request failed: ' . $response->status());
+        if (! $response->successful()) {
+            throw new \Exception('CivitAI API request failed: '.$response->status());
         }
 
         $data = $response->json();
@@ -80,14 +80,18 @@ class CivitAIService
      */
     private function transformResponse(array $result, array $transformedItems, $currentPage): array
     {
-        $hasNextPage = !empty($result['metadata']['nextCursor']);
+        $hasNextPage = ! empty($result['metadata']['nextCursor']);
         $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
+
+        // Check if all items were blacklisted and we have a next page available
+        $allItemsBlacklisted = empty($transformedItems) && ! empty($result['items']) && $hasNextPage;
 
         return [
             'items' => $transformedItems,
             'page' => $currentPage, // Current page value (cursor or null for first page)
             'nextPage' => $nextPage, // Next page value (cursor or null if no more)
             'hasNextPage' => $hasNextPage,
+            'allItemsBlacklisted' => $allItemsBlacklisted, // Flag to trigger next page fetch
         ];
     }
 
@@ -110,9 +114,9 @@ class CivitAIService
                 'referrer_url' => "https://civitai.com/images/{$itemData['id']}",
 
                 // File properties
-                'filename' => basename(parse_url($itemData['url'], PHP_URL_PATH)) ?: 'civitai_' . $itemData['id'],
+                'filename' => basename(parse_url($itemData['url'], PHP_URL_PATH)) ?: 'civitai_'.$itemData['id'],
                 'ext' => pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg',
-                'mime_type' => 'image/' . (pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpeg'),
+                'mime_type' => 'image/'.(pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpeg'),
                 'hash' => $itemData['hash'] ?? null,
 
                 // Content metadata
@@ -120,19 +124,13 @@ class CivitAIService
                 'description' => null,
                 'thumbnail_url' => $itemData['url'],
 
-                // Status fields (non-reaction)
-                'is_blacklisted' => false,
-                'downloaded' => false,
-                'download_progress' => 0,
-                'not_found' => false,
-
                 // Metadata for FileMetadata relationship
                 '_metadata' => array_merge($meta, [
                     'width' => $itemData['width'] ?? null,
                     'height' => $itemData['height'] ?? null,
                     'civitai_id' => $itemData['id'],
                     'civitai_stats' => $itemData['stats'] ?? null,
-                    'data' => $itemData
+                    'data' => $itemData,
                 ]),
             ];
         }
@@ -148,29 +146,29 @@ class CivitAIService
         if (empty($transformedItems)) {
             return [];
         }
-        
+
         // Extract referrer URLs and metadata
         $referrerUrls = [];
         $metadataByReferrer = [];
-        
+
         foreach ($transformedItems as $item) {
             $referrerUrls[] = $item['referrer_url'];
             $metadataByReferrer[$item['referrer_url']] = $item['_metadata'] ?? [];
         }
-        
+
         // Get existing files by referrer_url
         $existingFiles = File::whereIn('referrer_url', $referrerUrls)
             ->get()
             ->keyBy('referrer_url');
-        
+
         $filesToCreate = [];
         $filesToUpdate = [];
         $fileIds = [];
-        
+
         foreach ($transformedItems as $item) {
             $referrerUrl = $item['referrer_url'];
             unset($item['_metadata']); // Remove metadata before file operations
-            
+
             if ($existingFiles->has($referrerUrl)) {
                 // Update existing file
                 $existingFile = $existingFiles->get($referrerUrl);
@@ -183,29 +181,33 @@ class CivitAIService
                 $filesToCreate[] = $item;
             }
         }
-        
+
         // Bulk insert new files
-        if (!empty($filesToCreate)) {
+        if (! empty($filesToCreate)) {
             File::insert($filesToCreate);
-            
+
             // Get the newly created files
             $newReferrerUrls = array_column($filesToCreate, 'referrer_url');
             $newFiles = File::whereIn('referrer_url', $newReferrerUrls)
                 ->get()
                 ->keyBy('referrer_url');
-            
+
             foreach ($newFiles as $file) {
                 $fileIds[] = $file->id;
             }
         }
-        
+
         // Handle metadata in bulk
         $this->upsertMetadata($fileIds, $metadataByReferrer, $referrerUrls);
-        
-        // Return all files with metadata loaded
-        return File::whereIn('id', $fileIds)->with('metadata')->get()->all();
+
+        // Return all files with metadata loaded, excluding blacklisted ones
+        return File::whereIn('id', $fileIds)
+            ->where('is_blacklisted', false)
+            ->with('metadata')
+            ->get()
+            ->all();
     }
-    
+
     /**
      * Upsert metadata for files in bulk.
      */
@@ -214,30 +216,30 @@ class CivitAIService
         if (empty($fileIds) || empty($metadataByReferrer)) {
             return;
         }
-        
+
         // Get file ID to referrer URL mapping
         $fileMapping = File::whereIn('id', $fileIds)
             ->select('id', 'referrer_url')
             ->get()
             ->keyBy('referrer_url');
-        
+
         // Get existing metadata
         $existingMetadata = File::whereIn('id', $fileIds)
             ->with('metadata')
             ->get()
             ->pluck('metadata', 'id')
             ->filter();
-        
+
         $metadataToCreate = [];
         $metadataToUpdate = [];
-        
+
         foreach ($metadataByReferrer as $referrerUrl => $metadata) {
-            if (empty($metadata) || !$fileMapping->has($referrerUrl)) {
+            if (empty($metadata) || ! $fileMapping->has($referrerUrl)) {
                 continue;
             }
-            
+
             $fileId = $fileMapping->get($referrerUrl)->id;
-            
+
             if ($existingMetadata->has($fileId)) {
                 // Update existing metadata
                 $existingMetadata->get($fileId)->update(['payload' => $metadata]);
@@ -251,9 +253,9 @@ class CivitAIService
                 ];
             }
         }
-        
+
         // Bulk insert new metadata
-        if (!empty($metadataToCreate)) {
+        if (! empty($metadataToCreate)) {
             DB::table('file_metadata')->insert($metadataToCreate);
         }
     }

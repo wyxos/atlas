@@ -19,6 +19,7 @@ interface Props {
     page: number | string | null;
     nextPage: number | string | null;
     hasNextPage: boolean;
+    allItemsBlacklisted?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -50,6 +51,17 @@ onMounted(() => {
     if (props.items && props.items.length > 0) {
         items.value = [...props.items];
     }
+
+    // If all items are blacklisted, trigger next page fetch
+    if (props.allItemsBlacklisted && masonry.value) {
+        console.log('All items blacklisted, triggering next page fetch');
+        // Use setTimeout to ensure masonry is fully initialized
+        setTimeout(() => {
+            if (masonry.value && typeof masonry.value.loadNextPage === 'function') {
+                masonry.value.loadNextPage();
+            }
+        }, 100);
+    }
 });
 
 // Mock download function
@@ -59,10 +71,29 @@ const downloadImage = (item: Item) => {
     alert(`Downloading image: ${item.id}`);
 };
 
-// Blacklist function - removes the item
+// Blacklist function - removes the item and calls backend
 const blacklistImage = (item: Item, onRemove: any) => {
     console.log('Blacklisting image:', item.id);
-    onRemove(item);
+
+    // Call backend to blacklist the item
+    router.post(
+        route('browse.blacklist', { file: item.id }),
+        { reason: 'Blacklisted via browse interface' },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                console.log('Item blacklisted successfully:', item.id);
+                // Remove from UI after successful backend update
+                onRemove(item);
+            },
+            onError: (errors) => {
+                console.error('Failed to blacklist item:', errors);
+                // Still remove from UI even if backend call fails
+                onRemove(item);
+            }
+        }
+    );
 };
 
 // Handle Alt+click for download
@@ -102,15 +133,16 @@ const getPage = async (pageParam: number | string) => {
                 {
                     preserveState: true,
                     preserveScroll: true,
-                    only: ['items', 'hasNextPage', 'nextPage', 'page'],
+                    only: ['items', 'hasNextPage', 'nextPage', 'page', 'allItemsBlacklisted'],
                     onSuccess: (response) => {
                         try {
                             const newItems = response.props.items as Item[];
                             const hasNext = response.props.hasNextPage;
                             const nextPage = response.props.nextPage;
                             const currentPage = response.props.page;
+                            const allBlacklisted = response.props.allItemsBlacklisted;
 
-                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextPage:', nextPage, 'currentPage:', currentPage);
+                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextPage:', nextPage, 'currentPage:', currentPage, 'allBlacklisted:', allBlacklisted);
 
                             if (newItems && newItems.length > 0) {
                                 // Update pagination state - backend provides both current page and nextPage values
@@ -124,6 +156,20 @@ const getPage = async (pageParam: number | string) => {
                                     items: newItems,
                                     nextPage: paginationState.value.nextPage
                                 });
+                            } else if (allBlacklisted && hasNext) {
+                                // All items were blacklisted, but we have more pages - continue fetching
+                                console.log('All items blacklisted, continuing to next page automatically');
+                                paginationState.value = {
+                                    page: currentPage,
+                                    nextPage: hasNext ? nextPage : null,
+                                    hasNextPage: hasNext
+                                };
+
+                                // Recursively fetch the next page
+                                setTimeout(async () => {
+                                    const nextResult = await getPage(nextPage);
+                                    resolve(nextResult);
+                                }, 100);
                             } else {
                                 paginationState.value.hasNextPage = false;
                                 paginationState.value.nextPage = null;
@@ -191,8 +237,8 @@ const getPage = async (pageParam: number | string) => {
                         />
                         <button
                             class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100"
-                            @click="onRemove(item)"
-                            title="Remove item"
+                            @click="blacklistImage(item, onRemove)"
+                            title="Blacklist item"
                         >
                             <svg class="w-4 h-4" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>

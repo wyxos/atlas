@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\File;
 use App\Services\CivitAIService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,5 +19,23 @@ class BrowseController extends Controller
         $result = $civitAIService->fetch();
 
         return Inertia::render('Browse', $result);
+    }
+
+    /**
+     * Blacklist a file.
+     */
+    public function blacklist(Request $request, File $file): \Illuminate\Http\RedirectResponse
+    {
+        $request->validate([
+            'reason' => 'nullable|string|max:255'
+        ]);
+
+        $file->update([
+            'is_blacklisted' => true,
+            'blacklist_reason' => $request->input('reason')
+        ]);
+
+        return back()
+            ->with('message', 'Item has been blacklisted');
     }
 }
