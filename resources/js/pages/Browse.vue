@@ -10,6 +10,7 @@ interface DemoItem {
     src: string;
     width: number;
     height: number;
+    page: string | number;
     index: number;
     meta?: {
         model_name?: string;

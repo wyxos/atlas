@@ -23,7 +23,7 @@ class CivitAIService
     {
         $page = (int) $this->request->get('page', 1);
         $cursor = $this->request->get('cursor');
-        $limit = (int) $this->request->get('limit', 20);
+        $limit = 20;
 
         $result = $this->fetchItems($page, $limit, $cursor);
 
@@ -59,10 +59,13 @@ class CivitAIService
         $data = $response->json();
         $metadata = $data['metadata'] ?? [];
 
+        // Create a batch identifier for cursor-based pagination
+        $batchId = $cursor ? "cursor_{$cursor}" : "page_{$page}";
+
         return [
             'items' => $data['items'] ?? [],
             'metadata' => $metadata,
-            'currentCursor' => $cursor,
+            'batchId' => $batchId,
         ];
     }
 
@@ -72,18 +75,17 @@ class CivitAIService
     private function transformResponse(array $result, int $page): array
     {
         return [
-            'items' => $this->transformItems($result['items']),
+            'items' => $this->transformItems($result['items'], $result['batchId']),
             'currentPage' => $page,
             'hasNextPage' => !empty($result['metadata']['nextCursor']) || !empty($result['metadata']['nextPage']),
             'nextCursor' => $result['metadata']['nextCursor'] ?? null,
-            'previousCursor' => $result['currentCursor'], // Track the previous cursor for backward navigation
         ];
     }
 
     /**
      * Transform CivitAI items data into the format expected by the frontend.
      */
-    private function transformItems(array $items): array
+    private function transformItems(array $items, string $batchId): array
     {
         $transformedItems = [];
 
@@ -93,6 +95,7 @@ class CivitAIService
                 'src' => $itemData['url'],
                 'width' => $itemData['width'],
                 'height' => $itemData['height'],
+                'page' => $batchId,
                 'index' => $index,
             ];
         }
