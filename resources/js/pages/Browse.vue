@@ -6,7 +6,7 @@ import { ref, onMounted } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 
 interface DemoItem {
-    id: string;
+    id: number; // Use actual CivitAI numeric ID
     src: string;
     width: number;
     height: number;
@@ -21,7 +21,7 @@ interface DemoItem {
 }
 
 interface Props {
-    initialImages: DemoItem[];
+    items: DemoItem[];
     currentPage: number | string;
     hasNextPage: boolean;
     nextCursor: string | null;
@@ -43,8 +43,8 @@ let nextCursorToFetch: string | null = null; // Track next cursor to fetch
 
 // Initialize with server-side data
 onMounted(() => {
-    if (props.initialImages && props.initialImages.length > 0) {
-        items.value = [...props.initialImages];
+    if (props.items && props.items.length > 0) {
+        items.value = [...props.items];
         // Set next cursor based on whether we have more pages
         nextCursorToFetch = props.hasNextPage ? props.nextCursor : null;
     }
@@ -101,21 +101,21 @@ const getPage = async (page: number) => {
                 {
                     preserveState: true,
                     preserveScroll: true,
-                    only: ['initialImages', 'hasNextPage', 'nextCursor'],
+                    only: ['items', 'hasNextPage', 'nextCursor'],
                     onSuccess: (response) => {
                         try {
-                            const newImages = response.props.initialImages as DemoItem[];
+                            const newItems = response.props.items as DemoItem[];
                             const hasNext = response.props.hasNextPage;
                             const nextCursor = response.props.nextCursor;
 
-                            console.log('Fetched images:', newImages?.length, 'hasNext:', hasNext, 'nextCursor:', nextCursor);
+                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextCursor:', nextCursor);
 
-                            if (newImages && newImages.length > 0) {
+                            if (newItems && newItems.length > 0) {
                                 // Update next cursor to fetch
                                 nextCursorToFetch = hasNext ? nextCursor : null;
 
                                 resolve({
-                                    items: newImages,
+                                    items: newItems,
                                     nextPage: hasNext ? nextCursor : null
                                 });
                             } else {

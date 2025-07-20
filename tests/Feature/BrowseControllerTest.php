@@ -39,7 +39,7 @@ it('can access browse page', function () {
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
-        ->has('initialImages')
+        ->has('items')
         ->has('currentPage')
         ->has('hasNextPage')
         ->has('nextCursor')
@@ -94,10 +94,10 @@ it('handles cursor-based pagination correctly', function () {
     });
 
     $data = $response->getOriginalContent()->getData();
-    $images = $data['page']['props']['initialImages'];
+    $items = $data['page']['props']['items'];
 
     // Verify batch ID is cursor-based
-    expect($images[0]['page'])->toBe('cursor_existing_cursor_token');
+    expect($items[0]['page'])->toBe('cursor_existing_cursor_token');
 });
 
 it('handles CivitAI API errors gracefully', function () {
@@ -126,7 +126,7 @@ it('handles empty CivitAI response', function () {
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
-        ->where('initialImages', [])
+        ->where('items', [])
         ->where('hasNextPage', false)
         ->where('nextCursor', null)
     );

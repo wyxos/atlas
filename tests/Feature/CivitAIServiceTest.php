@@ -29,15 +29,15 @@ it('fetches and transforms images correctly from CivitAI API', function () {
     expect($result['currentPage'])->toBe(1);
     expect($result['hasNextPage'])->toBeTrue();
     expect($result['nextCursor'])->toBe('next_cursor_token');
-    expect($result['initialImages'])->toHaveCount(1);
+    expect($result['items'])->toHaveCount(1);
 
-    $image = $result['initialImages'][0];
-    expect($image['id'])->toBe('civitai-image-12345');
-    expect($image['src'])->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-image.jpeg');
-    expect($image['width'])->toBe(512);
-    expect($image['height'])->toBe(768);
-    expect($image['page'])->toBe('page_1');
-    expect($image['index'])->toBe(0);
+    $item = $result['items'][0];
+    expect($item['id'])->toBe(12345); // Use actual CivitAI ID
+    expect($item['src'])->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-image.jpeg');
+    expect($item['width'])->toBe(512);
+    expect($item['height'])->toBe(768);
+    expect($item['page'])->toBe('page_1');
+    expect($item['index'])->toBe(0);
 
     // Verify that the CivitAI API was called correctly
     Http::assertSent(function ($request) {
@@ -72,7 +72,7 @@ it('handles cursor-based pagination correctly', function () {
     $result = $service->fetch();
 
     expect($result['nextCursor'])->toBe('new_cursor_token');
-    expect($result['initialImages'][0]['page'])->toBe('cursor_existing_cursor_token');
+    expect($result['items'][0]['page'])->toBe('cursor_existing_cursor_token');
 
     // Verify that the CivitAI API was called with cursor instead of page
     Http::assertSent(function ($request) {
@@ -109,11 +109,11 @@ it('transforms multiple images correctly', function () {
     $service = new CivitAIService($request);
     $result = $service->fetch();
 
-    expect($result['initialImages'])->toHaveCount(2);
+    expect($result['items'])->toHaveCount(2);
 
-    $firstImage = $result['initialImages'][0];
-    expect($firstImage)->toMatchArray([
-        'id' => 'civitai-image-123456',
+    $firstItem = $result['items'][0];
+    expect($firstItem)->toMatchArray([
+        'id' => 123456, // Use actual CivitAI ID
         'src' => 'https://image.civitai.com/first-image.jpeg',
         'width' => 1024,
         'height' => 1536,
@@ -121,9 +121,9 @@ it('transforms multiple images correctly', function () {
         'index' => 0,
     ]);
 
-    $secondImage = $result['initialImages'][1];
-    expect($secondImage)->toMatchArray([
-        'id' => 'civitai-image-654321',
+    $secondItem = $result['items'][1];
+    expect($secondItem)->toMatchArray([
+        'id' => 654321, // Use actual CivitAI ID
         'src' => 'https://image.civitai.com/second-image.png',
         'width' => 768,
         'height' => 768,
@@ -155,7 +155,7 @@ it('handles empty API response', function () {
     $service = new CivitAIService($request);
     $result = $service->fetch();
 
-    expect($result['initialImages'])->toBeEmpty();
+    expect($result['items'])->toBeEmpty();
     expect($result['hasNextPage'])->toBeFalse();
     expect($result['nextCursor'])->toBeNull();
 });

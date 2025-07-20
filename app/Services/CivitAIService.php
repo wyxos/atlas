@@ -17,7 +17,7 @@ class CivitAIService
     }
 
     /**
-     * Fetch and transform CivitAI images for the browse page.
+     * Fetch and transform CivitAI items for the browse page.
      */
     public function fetch(): array
     {
@@ -27,12 +27,7 @@ class CivitAIService
 
         $result = $this->fetchItems($page, $limit, $cursor);
 
-        return [
-            'initialImages' => $result['images'],
-            'currentPage' => $page,
-            'hasNextPage' => $result['hasNextPage'],
-            'nextCursor' => $result['nextCursor'] ?? null,
-        ];
+        return $this->transformResponse($result, $page);
     }
 
     /**
@@ -68,31 +63,43 @@ class CivitAIService
         $batchId = $cursor ? "cursor_{$cursor}" : "page_{$page}";
 
         return [
-            'images' => $this->transform($data['items'] ?? [], $batchId),
-            'hasNextPage' => !empty($metadata['nextCursor']) || !empty($metadata['nextPage']),
-            'nextCursor' => $metadata['nextCursor'] ?? null,
-            'nextPage' => $metadata['nextPage'] ?? null
+            'items' => $data['items'] ?? [],
+            'metadata' => $metadata,
+            'batchId' => $batchId,
         ];
     }
 
     /**
-     * Transform CivitAI images data into the format expected by the frontend.
+     * Transform the response from fetchItems into the final format for the frontend.
      */
-    private function transform(array $images, string $batchId): array
+    private function transformResponse(array $result, int $page): array
     {
-        $transformedImages = [];
+        return [
+            'items' => $this->transformItems($result['items'], $result['batchId']),
+            'currentPage' => $page,
+            'hasNextPage' => !empty($result['metadata']['nextCursor']) || !empty($result['metadata']['nextPage']),
+            'nextCursor' => $result['metadata']['nextCursor'] ?? null,
+        ];
+    }
 
-        foreach ($images as $index => $imageData) {
-            $transformedImages[] = [
-                'id' => "civitai-image-{$imageData['id']}",
-                'src' => $imageData['url'],
-                'width' => $imageData['width'],
-                'height' => $imageData['height'],
+    /**
+     * Transform CivitAI items data into the format expected by the frontend.
+     */
+    private function transformItems(array $items, string $batchId): array
+    {
+        $transformedItems = [];
+
+        foreach ($items as $index => $itemData) {
+            $transformedItems[] = [
+                'id' => $itemData['id'], // Use actual CivitAI ID
+                'src' => $itemData['url'],
+                'width' => $itemData['width'],
+                'height' => $itemData['height'],
                 'page' => $batchId,
                 'index' => $index,
             ];
         }
 
-        return $transformedImages;
+        return $transformedItems;
     }
 }
