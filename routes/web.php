@@ -17,10 +17,9 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/file-stats', [App\Http\Controllers\DashboardController::class, 'getFileStatsJson'])->name('dashboard.file-stats');
     Route::post('dashboard/clear-cache', [App\Http\Controllers\DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
-    
+
     // Browse route
     Route::get('browse', [BrowseController::class, 'index'])->name('browse');
-    Route::get('browse/debug', [BrowseController::class, 'debug'])->name('browse.debug');
 
     Route::get('audio', function () {
         $search = [];

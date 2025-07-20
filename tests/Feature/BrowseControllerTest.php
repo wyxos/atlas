@@ -181,7 +181,7 @@ it('handles cursor-based pagination correctly', function () {
 
     $data = $response->getOriginalContent()->getData();
     $images = $data['page']['props']['initialImages'];
-    
+
     // Verify batch ID is cursor-based
     expect($images[0]['page'])->toBe('cursor_existing_cursor_token');
 });
@@ -218,66 +218,6 @@ it('handles empty CivitAI response', function () {
     );
 });
 
-it('debug endpoint returns correct structure', function () {
-    // Mock the CivitAI API response for debug endpoint
-    Http::fake([
-        'civitai.com/api/v1/images*' => Http::response([
-            'items' => [
-                [
-                    'id' => 11111,
-                    'url' => 'https://image.civitai.com/debug/test-image.jpeg',
-                    'width' => 256,
-                    'height' => 256,
-                    'hash' => 'debug_hash',
-                    'meta' => [
-                        'Model' => 'Debug Model',
-                        'prompt' => 'debug test'
-                    ]
-                ]
-            ],
-            'metadata' => []
-        ], 200)
-    ]);
-
-    $response = $this->get('/browse/debug');
-
-    $response->assertStatus(200);
-    $response->assertJsonStructure([
-        'success',
-        'raw_data_count',
-        'transformed_images_count',
-        'sample_image',
-        'first_model'
-    ]);
-
-    $json = $response->json();
-    expect($json['success'])->toBeTrue();
-    expect($json['raw_data_count'])->toBe(1);
-    expect($json['transformed_images_count'])->toBe(1);
-    expect($json['sample_image'])->toHaveKey('id');
-    expect($json['sample_image']['id'])->toBe('civitai-image-11111');
-});
-
-it('debug endpoint handles API errors', function () {
-    // Mock a failed API response for debug
-    Http::fake([
-        'civitai.com/api/v1/images*' => Http::response(['error' => 'API Error'], 404)
-    ]);
-
-    $response = $this->get('/browse/debug');
-
-    $response->assertStatus(200); // Debug endpoint returns 200 even on API errors
-    $response->assertJsonStructure([
-        'error',
-        'status',
-        'body'
-    ]);
-
-    $json = $response->json();
-    expect($json['error'])->toBe('CivitAI API request failed');
-    expect($json['status'])->toBe(404);
-});
-
 it('validates pagination parameters correctly', function () {
     Http::fake([
         'civitai.com/api/v1/images*' => Http::response([
@@ -288,7 +228,7 @@ it('validates pagination parameters correctly', function () {
 
     // Test with string page parameter (should be cast to int)
     $response = $this->get('/browse?page=5');
-    
+
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->where('currentPage', 5)

@@ -13,48 +13,6 @@ class BrowseController extends Controller
     private const CIVITAI_API_BASE = 'https://civitai.com/api/v1';
 
     /**
-     * Debug endpoint to test CivitAI API directly.
-     */
-    public function debug(Request $request)
-    {
-        try {
-            $response = Http::timeout(30)
-                ->get(self::CIVITAI_API_BASE . '/images', [
-                    'page' => 1,
-                    'limit' => 5,
-                    'sort' => 'Most Reactions',
-                    'period' => 'AllTime',
-                    'nsfw' => 'false'
-                ]);
-
-            if (!$response->successful()) {
-                return response()->json([
-                    'error' => 'CivitAI API request failed',
-                    'status' => $response->status(),
-                    'body' => $response->body()
-                ]);
-            }
-
-            $data = $response->json();
-            $images = $this->transformImagesToImages($data['items'] ?? [], 'debug_page_1');
-
-            return response()->json([
-                'success' => true,
-                'raw_data_count' => count($data['items'] ?? []),
-                'transformed_images_count' => count($images),
-                'sample_image' => $images[0] ?? null,
-                'first_model' => $data['items'][0] ?? null
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Exception occurred',
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-        }
-    }
-
-    /**
      * Display the browse page with initial CivitAI data.
      */
     public function index(Request $request): Response
