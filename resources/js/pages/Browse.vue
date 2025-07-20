@@ -38,6 +38,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const items = ref<DemoItem[]>([]);
 const masonry = ref(null);
+const isLoading = ref(false);
 let nextCursorToFetch: string | null = null; // Track next cursor to fetch
 
 // Initialize with server-side data
@@ -59,6 +60,9 @@ const getPage = async (page: number) => {
             console.log('No more pages to fetch');
             return { items: [], nextPage: null };
         }
+
+        // Set loading state
+        isLoading.value = true;
 
         // Use Inertia to navigate with cursor and get data
         return new Promise((resolve, reject) => {
@@ -92,10 +96,14 @@ const getPage = async (page: number) => {
                         } catch (error) {
                             console.error('Error processing response:', error);
                             resolve({ items: [], nextPage: null });
+                        } finally {
+                            // Clear loading state
+                            isLoading.value = false;
                         }
                     },
                     onError: (errors) => {
                         console.error('Failed to fetch more images:', errors);
+                        isLoading.value = false;
                         resolve({ items: [], nextPage: null });
                     }
                 }
@@ -103,6 +111,7 @@ const getPage = async (page: number) => {
         });
     } catch (error) {
         console.error('Failed to fetch more images:', error);
+        isLoading.value = false;
         return { items: [], nextPage: null };
     }
 };
@@ -114,33 +123,14 @@ const getPage = async (page: number) => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="h-screen flex flex-col overflow-hidden">
             <!-- Header -->
-            <div class="flex-shrink-0 p-4 bg-white border-b">
+            <div class="flex-shrink-0 p-4 border-b">
                 <div class="flex flex-col items-center gap-4">
-                    <h1 class="text-3xl font-bold">Browse</h1>
-                    <p class="text-muted-foreground">Vue Infinite Block Engine (VIBE) Example</p>
 
-                    <div v-if="masonry" class="flex items-center gap-4">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm text-muted-foreground">Loading:</span>
-                            <span
-                                class="px-3 py-1 rounded-full text-sm font-medium"
-                                :class="masonry.isLoading ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'"
-                            >
-                                {{ masonry.isLoading ? 'Loading...' : 'Ready' }}
-                            </span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm text-muted-foreground">Items:</span>
-                            <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-800 text-sm font-medium">
-                                {{ items.length }}
-                            </span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
             <!-- Masonry Container -->
-            <div class="flex-1 min-h-0">
+            <div class="flex-1 min-h-0 relative">
                 <Masonry
                     v-model:items="items"
                     :get-next-page="getPage"
@@ -172,6 +162,17 @@ const getPage = async (page: number) => {
                         </button>
                     </template>
                 </Masonry>
+
+                <!-- Loading Overlay -->
+                <div
+                    v-if="isLoading"
+                    class="absolute inset-0 bg-black/10 flex items-center justify-center z-50 backdrop-blur-sm"
+                >
+                    <div class="bg-white rounded-lg p-6 shadow-lg flex items-center gap-3">
+                        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                        <span class="text-gray-700 font-medium">Loading more images...</span>
+                    </div>
+                </div>
             </div>
         </div>
     </AppLayout>

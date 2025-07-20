@@ -11,7 +11,7 @@ use Inertia\Response;
 class BrowseController extends Controller
 {
     private const CIVITAI_API_BASE = 'https://civitai.com/api/v1';
-    
+
     /**
      * Debug endpoint to test CivitAI API directly.
      */
@@ -37,7 +37,7 @@ class BrowseController extends Controller
 
             $data = $response->json();
             $images = $this->transformImagesToImages($data['items'] ?? [], 'debug_page_1');
-            
+
             return response()->json([
                 'success' => true,
                 'raw_data_count' => count($data['items'] ?? []),
@@ -53,7 +53,7 @@ class BrowseController extends Controller
             ]);
         }
     }
-    
+
     /**
      * Display the browse page with initial CivitAI data.
      */
@@ -62,9 +62,9 @@ class BrowseController extends Controller
         $page = (int) $request->get('page', 1);
         $cursor = $request->get('cursor');
         $limit = 20;
-        
+
         $result = $this->fetchCivitAIImages($page, $limit, $cursor);
-        
+
         return Inertia::render('Browse', [
             'initialImages' => $result['images'],
             'currentPage' => $page,
@@ -72,7 +72,7 @@ class BrowseController extends Controller
             'nextCursor' => $result['nextCursor'] ?? null,
         ]);
     }
-    
+
     /**
      * Fetch images from CivitAI API with support for both cursor and page-based pagination.
      */
@@ -80,18 +80,18 @@ class BrowseController extends Controller
     {
         $params = [
             'limit' => $limit,
-            'sort' => 'Most Reactions', 
+            'sort' => 'Newest',
             'period' => 'AllTime',
             'nsfw' => 'false'
         ];
-        
+
         // Use cursor if provided, otherwise fall back to page
         if ($cursor) {
             $params['cursor'] = $cursor;
         } else {
             $params['page'] = $page;
         }
-        
+
         $response = Http::timeout(30)
             ->get(self::CIVITAI_API_BASE . '/images', $params);
 
@@ -101,10 +101,10 @@ class BrowseController extends Controller
 
         $data = $response->json();
         $metadata = $data['metadata'] ?? [];
-        
+
         // Create a batch identifier for cursor-based pagination
         $batchId = $cursor ? "cursor_{$cursor}" : "page_{$page}";
-        
+
         return [
             'images' => $this->transformImagesToImages($data['items'] ?? [], $batchId),
             'hasNextPage' => !empty($metadata['nextCursor']) || !empty($metadata['nextPage']),
@@ -119,7 +119,7 @@ class BrowseController extends Controller
     private function transformImagesToImages(array $images, string $batchId): array
     {
         $transformedImages = [];
-        
+
         foreach ($images as $index => $imageData) {
             $transformedImages[] = [
                 'id' => "civitai-image-{$imageData['id']}",
