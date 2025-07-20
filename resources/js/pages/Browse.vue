@@ -33,7 +33,6 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const items = ref<Item[]>([]);
 const masonry = ref(null);
-const isLoading = ref(false);
 
 // Unified pagination state - works with both cursor and page-based pagination
 const paginationState = ref<{
@@ -120,9 +119,6 @@ const getPage = async (pageParam: number | string) => {
             return { items: [], nextPage: null };
         }
 
-        // Set loading state
-        isLoading.value = true;
-
         // Use the nextPage value directly - backend determines if it's cursor or page number
         const queryParams = {
             page: paginationState.value.nextPage
@@ -181,14 +177,10 @@ const getPage = async (pageParam: number | string) => {
                         } catch (error) {
                             console.error('Error processing response:', error);
                             resolve({ items: [], nextPage: null });
-                        } finally {
-                            // Clear loading state
-                            isLoading.value = false;
                         }
                     },
                     onError: (errors) => {
                         console.error('Failed to fetch more images:', errors);
-                        isLoading.value = false;
                         resolve({ items: [], nextPage: null });
                     }
                 }
@@ -196,7 +188,6 @@ const getPage = async (pageParam: number | string) => {
         });
     } catch (error) {
         console.error('Failed to fetch more images:', error);
-        isLoading.value = false;
         return { items: [], nextPage: null };
     }
 };
@@ -210,9 +201,6 @@ const getPage = async (pageParam: number | string) => {
             <!-- Header -->
             <div class="flex-shrink-0 p-4 border-b">
                 <div class="flex flex-col items-center gap-4">
-                    <button class="button" @click="masonry.loadNext" :disabled="isLoading">
-                        Load more
-                    </button>
                 </div>
             </div>
 
@@ -255,7 +243,7 @@ const getPage = async (pageParam: number | string) => {
 
                 <!-- Loading Overlay -->
                 <div
-                    v-if="isLoading"
+                    v-if="masonry?.isLoading"
                     class="absolute inset-0 bg-opacity-30 flex items-center justify-center z-50 backdrop-blur-[2px]"
                 >
                     <div class="bg-primary rounded-lg p-6 shadow-lg flex items-center gap-3">
