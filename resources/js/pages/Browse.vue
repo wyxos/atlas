@@ -16,7 +16,7 @@ interface Item {
 
 interface Props {
     items: Item[];
-    page: number | string;
+    page: number | string | null;
     nextPage: number | string | null;
     hasNextPage: boolean;
 }
@@ -36,7 +36,7 @@ const isLoading = ref(false);
 
 // Unified pagination state - works with both cursor and page-based pagination
 const paginationState = ref<{
-    page: number | string;
+    page: number | string | null;
     nextPage: number | string | null;
     hasNextPage: boolean;
 }>({
@@ -60,7 +60,7 @@ const downloadImage = (item: Item) => {
 };
 
 // Blacklist function - removes the item
-const blacklistImage = (item: Item, onRemove: Function) => {
+const blacklistImage = (item: Item, onRemove: any) => {
     console.log('Blacklisting image:', item.id);
     onRemove(item);
 };
@@ -71,7 +71,7 @@ const handleAltClick = (item: Item) => {
 };
 
 // Handle Alt+right-click for blacklist
-const handleAltRightClick = (item: Item, onRemove: Function) => {
+const handleAltRightClick = (item: Item, onRemove: any) => {
     blacklistImage(item, onRemove);
 };
 
@@ -95,7 +95,7 @@ const getPage = async (pageParam: number | string) => {
         };
 
         // Use Inertia to fetch data
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             router.get(
                 route('browse', queryParams),
                 {},
@@ -169,7 +169,7 @@ const getPage = async (pageParam: number | string) => {
                 <Masonry
                     v-model:items="items"
                     :get-next-page="getPage"
-                    :load-at-page="paginationState.page"
+                    :load-at-page="null"
                     ref="masonry"
                     :layout="{
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
@@ -185,7 +185,7 @@ const getPage = async (pageParam: number | string) => {
                             class="w-full h-auto cursor-pointer"
                             loading="lazy"
                             @error="(e) => console.warn('Failed to load image:', item.id, e)"
-                            @load="(e) => console.debug('Loaded image:', item.id)"
+                            @load="() => console.debug('Loaded image:', item.id)"
                             @click.alt.exact.prevent="handleAltClick(item)"
                             @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
                         />
@@ -194,7 +194,7 @@ const getPage = async (pageParam: number | string) => {
                             @click="onRemove(item)"
                             title="Remove item"
                         >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                             </svg>
                         </button>

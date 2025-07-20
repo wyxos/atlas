@@ -21,20 +21,20 @@ class CivitAIService
      */
     public function fetch(): array
     {
-        $page = (int) $this->request->get('page', 1);
-        $cursor = $this->request->get('cursor');
+        // Get the unified 'page' parameter - could be cursor or page number
+        $page = $this->request->get('page');
         $limit = (int) $this->request->get('limit', 20);
 
-        $result = $this->fetchItems($page, $limit, $cursor);
-        $transformedItems = $this->transformItems($result['items']);
+        $result = $this->fetchItems($page, $limit);
+        $transformedItems = $this->transformItems($result['items'], $page);
 
         return $this->transformResponse($result, $transformedItems, $page);
     }
 
     /**
-     * Fetch images from CivitAI API with support for both cursor and page-based pagination.
+     * Fetch images from CivitAI API using unified page parameter.
      */
-    private function fetchItems(int $page, int $limit, ?string $cursor = null): array
+    private function fetchItems($page, int $limit): array
     {
         $params = [
             'limit' => $limit,
@@ -43,12 +43,12 @@ class CivitAIService
             'nsfw' => 'false'
         ];
 
-        // Use cursor if provided, otherwise fall back to page
-        if ($cursor) {
-            $params['cursor'] = $cursor;
-        } else {
-            $params['page'] = $page;
+        // For CivitAI, if page is null (first request), don't send cursor
+        // If page has a value, it's a cursor string
+        if ($page !== null) {
+            $params['cursor'] = $page;
         }
+        // Note: CivitAI doesn't use traditional page numbers, only cursors
 
         $response = Http::timeout(30)
             ->get(self::CIVITAI_API_BASE . '/images', $params);
@@ -63,32 +63,33 @@ class CivitAIService
         return [
             'items' => $data['items'] ?? [],
             'metadata' => $metadata,
-            'currentCursor' => $cursor,
+            'currentPage' => $page,
         ];
     }
 
     /**
      * Transform the response from fetchItems into the final format for the frontend.
      */
-    private function transformResponse(array $result, array $transformedItems, int $page): array
+    private function transformResponse(array $result, array $transformedItems, $currentPage): array
     {
+        $hasNextPage = !empty($result['metadata']['nextCursor']);
+        $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
+
         return [
             'items' => $transformedItems,
-            'currentPage' => $page,
-            'hasNextPage' => !empty($result['metadata']['nextCursor']) || !empty($result['metadata']['nextPage']),
-            'nextCursor' => $result['metadata']['nextCursor'] ?? null,
-            'previousCursor' => $result['currentCursor'], // Track the previous cursor for backward navigation
+            'page' => $currentPage, // Current page value (cursor or null for first page)
+            'nextPage' => $nextPage, // Next page value (cursor or null if no more)
+            'hasNextPage' => $hasNextPage,
         ];
     }
 
     /**
      * Transform CivitAI items data into the format expected by the frontend.
      */
-    private function transformItems(array $items): array
+    private function transformItems(array $items, $currentPage): array
     {
         $transformedItems = [];
-        $cursor = $this->request->get('cursor');
-        $page = (int) $this->request->get('page', 1);
+        $pageIdentifier = $currentPage ?: 'initial';
 
         foreach ($items as $index => $itemData) {
             $transformedItems[] = [
@@ -96,7 +97,7 @@ class CivitAIService
                 'src' => $itemData['url'],
                 'width' => $itemData['width'],
                 'height' => $itemData['height'],
-                'page' => ($cursor ? "cursor_{$cursor}-" : "page_{$page}-") . $index,
+                'page' => "page_{$pageIdentifier}_{$index}",
                 'index' => $index,
             ];
         }
