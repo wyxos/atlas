@@ -166,11 +166,11 @@ const getPage = async (page: number) => {
                 <!-- Loading Overlay -->
                 <div
                     v-if="isLoading"
-                    class="absolute inset-0 bg-black/10 flex items-center justify-center z-50 backdrop-blur-sm"
+                    class="absolute inset-0  flex items-center justify-center z-50 backdrop-blur-[1px]"
                 >
-                    <div class="bg-white rounded-lg p-6 shadow-lg flex items-center gap-3">
+                    <div class="bg-primary rounded-lg p-6 shadow-lg flex items-center gap-3">
                         <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                        <span class="text-gray-700 font-medium">Loading more images...</span>
+                        <span class="font-medium text-primary-foreground">Loading more images...</span>
                     </div>
                 </div>
             </div>
