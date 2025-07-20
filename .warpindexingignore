@@ -30,3 +30,7 @@ yarn-error.log
 /tests/Feature/Personal
 /tests/Unit/Personal
 /public/atlas
+
+# Database files - large SQLite files
+/database/*.sqlite*
+*.sqlite*
