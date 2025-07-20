@@ -57,8 +57,8 @@ onMounted(() => {
         console.log('All items blacklisted, triggering next page fetch');
         // Use setTimeout to ensure masonry is fully initialized
         setTimeout(() => {
-            if (masonry.value && typeof masonry.value.loadNextPage === 'function') {
-                masonry.value.loadNextPage();
+            if (masonry.value && typeof masonry.value.loadNext === 'function') {
+                masonry.value.loadNext();
             }
         }, 100);
     }
@@ -74,10 +74,10 @@ const downloadImage = (item: Item) => {
 // Blacklist function - removes the item immediately for better UX
 const blacklistImage = (item: Item, onRemove: any) => {
     console.log('Blacklisting image:', item.id);
-    
+
     // Remove from UI immediately for better user experience
     onRemove(item);
-    
+
     // Call backend to blacklist the item in the background
     // Use cancelToken: false to prevent Inertia from cancelling concurrent requests
     router.post(
