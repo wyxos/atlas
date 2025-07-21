@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     // Create and authenticate a user for each test
@@ -203,5 +205,34 @@ it('validates blacklist reason length', function () {
     // Verify the file was NOT blacklisted
     $file->refresh();
     expect($file->is_blacklisted)->toBeFalse();
+});
+
+it('can queue a file for download via POST request', function () {
+    Queue::fake();
+    
+    // Create a file to download
+    $file = File::factory()->create([
+        'downloaded' => false,
+        'download_progress' => 0,
+    ]);
+
+    $response = $this->postJson(route('browse.download', $file));
+
+    $response->assertStatus(200)
+        ->assertJson([
+            'success' => true,
+            'message' => 'File download started'
+        ]);
+
+    // Assert that the DownloadFile job was dispatched
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
+        return $job->file->id === $file->id;
+    });
+});
+
+it('returns 404 when trying to download non-existent file', function () {
+    $response = $this->postJson(route('browse.download', ['file' => 99999]));
+
+    $response->assertStatus(404);
 });
 

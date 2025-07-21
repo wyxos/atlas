@@ -5,6 +5,9 @@ import { Head, router } from '@inertiajs/vue3';
 import { ref, onMounted } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
+import AudioReactions from '@/components/audio/AudioReactions.vue';
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
 
 interface Item {
     id: number; // Use actual CivitAI numeric ID
@@ -35,6 +38,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 const items = ref<Item[]>([]);
 const masonry = ref(null);
 
+// Download progress tracking
+const downloadProgress = ref<Record<number, number>>({});
+const downloadedItems = ref<Set<number>>(new Set());
+
+// Echo instance for real-time updates
+let echoInstance: Echo | null = null;
+
 // Unified pagination state - works with both cursor and page-based pagination
 const paginationState = ref<{
     page: number | string | null;
@@ -52,6 +62,9 @@ onMounted(() => {
         items.value = [...props.items];
     }
 
+    // Initialize Echo for real-time updates
+    initializeEcho();
+
     // If all items are blacklisted, trigger next page fetch
     if (props.allItemsBlacklisted && masonry.value) {
         console.log('All items blacklisted, triggering next page fetch');
@@ -63,6 +76,75 @@ onMounted(() => {
         }, 100);
     }
 });
+
+// Initialize Echo for real-time download progress
+const initializeEcho = () => {
+    try {
+        window.Pusher = Pusher;
+        echoInstance = new Echo({
+            broadcaster: 'reverb',
+            key: import.meta.env.VITE_REVERB_APP_KEY,
+            wsHost: import.meta.env.VITE_REVERB_HOST ?? '127.0.0.1',
+            wsPort: import.meta.env.VITE_REVERB_PORT ?? 8080,
+            wssPort: import.meta.env.VITE_REVERB_PORT ?? 8080,
+            forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'http') === 'https',
+            enabledTransports: ['ws', 'wss'],
+        });
+
+        // Listen for download progress events
+        echoInstance.channel('file-download-progress')
+            .listen('file-download-progress', (e: any) => {
+                console.log('Download progress:', e);
+                downloadProgress.value[e.fileId] = e.progress;
+                
+                if (e.progress === 100) {
+                    downloadedItems.value.add(e.fileId);
+                    // Remove progress after a delay
+                    setTimeout(() => {
+                        delete downloadProgress.value[e.fileId];
+                    }, 2000);
+                }
+            });
+    } catch (error) {
+        console.error('Failed to initialize Echo:', error);
+    }
+};
+
+// Download function that starts the download process
+const startDownload = async (item: Item) => {
+    try {
+        await axios.post(
+            route('browse.download', { file: item.id }),
+        );
+        console.log('Download started for item:', item.id);
+        downloadProgress.value[item.id] = 0;
+    } catch (error) {
+        console.error('Failed to start download:', error);
+    }
+};
+
+// Reaction handlers
+const handleFavorite = (file: any, event: Event) => {
+    console.log('Love reaction - starting download:', file.id);
+    startDownload(file);
+};
+
+const handleLike = (file: any, event: Event) => {
+    console.log('Like reaction - starting download:', file.id);
+    startDownload(file);
+};
+
+const handleDislike = (file: any, event: Event, onRemove?: any) => {
+    console.log('Dislike reaction - blacklisting:', file.id);
+    if (onRemove) {
+        blacklistImage(file, onRemove);
+    }
+};
+
+const handleLaughedAt = (file: any, event: Event) => {
+    console.log('Funny reaction - starting download:', file.id);
+    startDownload(file);
+};
 
 // Mock download function
 const downloadImage = (item: Item) => {
@@ -213,25 +295,44 @@ const getPage = async (pageParam: number | string) => {
                     class="h-full"
                 >
                     <template #item="{ item, onRemove }">
-                        <img
-                            :src="item.src"
-                            :alt="`Image ${item.id}`"
-                            class="w-full h-auto cursor-pointer"
-                            loading="lazy"
-                            @error="(e) => console.warn('Failed to load image:', item.id, e)"
-                            @load="() => console.debug('Loaded image:', item.id)"
-                            @click.alt.exact.prevent="handleAltClick(item)"
-                            @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
-                        />
-                        <button
-                            class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-colors opacity-80 hover:opacity-100"
-                            @click="blacklistImage(item, onRemove)"
-                            title="Blacklist item"
-                        >
-                            <svg class="w-4 h-4" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                        </button>
+                        <div class="relative">
+                            <img
+                                :src="item.src"
+                                :alt="`Image ${item.id}`"
+                                class="w-full h-auto cursor-pointer"
+                                loading="lazy"
+                                @error="(e) => console.warn('Failed to load image:', item.id, e)"
+                                @load="() => console.debug('Loaded image:', item.id)"
+                                @click.alt.exact.prevent="handleAltClick(item)"
+                                @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
+                            />
+                            
+                            <!-- AudioReactions component -->
+                            <div class="absolute bottom-2 right-2">
+                                <AudioReactions
+                                    :file="item"
+                                    :icon-size="16"
+                                    variant="list"
+                                    @favorite="handleFavorite"
+                                    @like="handleLike"
+                                    @dislike="(file, event) => handleDislike(file, event, onRemove)"
+                                    @laughedAt="handleLaughedAt"
+                                />
+                            </div>
+                            
+                            <!-- Download progress bar -->
+                            <div v-if="downloadProgress[item.id] !== undefined" class="absolute bottom-0 left-0 right-0 bg-black/50">
+                                <div class="bg-blue-500 h-1 transition-all duration-300" :style="{ width: downloadProgress[item.id] + '%' }"></div>
+                                <div class="text-white text-xs p-1 text-center">
+                                    Downloading... {{ downloadProgress[item.id] }}%
+                                </div>
+                            </div>
+                            
+                            <!-- Downloaded indicator -->
+                            <div v-if="downloadedItems.has(item.id)" class="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs">
+                                ✓ Downloaded
+                            </div>
+                        </div>
                     </template>
                 </Masonry>
 

@@ -36,6 +36,7 @@ class ScanAtlasFiles extends Command
         'covers',
         'metadata',
         'thumbnails',
+        'downloads',
     ];
 
     /**

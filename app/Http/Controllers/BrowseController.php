@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Services\CivitAIService;
 use Illuminate\Http\Request;
@@ -38,6 +39,20 @@ class BrowseController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Item has been blacklisted'
+        ], 200);
+    }
+
+    /**
+     * Queue a file for download.
+     */
+    public function download(File $file): \Illuminate\Http\JsonResponse
+    {
+        // Queue the download job
+        DownloadFile::dispatch($file);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'File download started'
         ], 200);
     }
 }

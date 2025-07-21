@@ -21,6 +21,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     // Browse routes
     Route::get('browse', [BrowseController::class, 'index'])->name('browse');
     Route::post('browse/blacklist/{file}', [BrowseController::class, 'blacklist'])->name('browse.blacklist');
+    Route::post('browse/download/{file}', [BrowseController::class, 'download'])->name('browse.download');
 
     Route::get('audio', function () {
         $search = [];
