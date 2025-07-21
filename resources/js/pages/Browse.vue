@@ -4,7 +4,6 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
 import { ref, onMounted } from 'vue';
 import { Masonry } from '@wyxos/vibe';
-import axios from 'axios';
 
 interface Item {
     id: number; // Use actual CivitAI numeric ID
@@ -72,23 +71,31 @@ const downloadImage = (item: Item) => {
 };
 
 // Blacklist function - removes the item immediately for better UX
-const blacklistImage = async (item: Item, onRemove: any) => {
+const blacklistImage = (item: Item, onRemove: any) => {
     console.log('Blacklisting image:', item.id);
 
     // Remove from UI immediately for better user experience
     onRemove(item);
 
-    // Call backend to blacklist the item in the background using axios
-    try {
-        await axios.post(route('browse.blacklist', { file: item.id }), {
-            reason: 'Blacklisted via browse interface'
-        });
-        console.log('Item blacklisted successfully:', item.id);
-    } catch (error) {
-        console.error('Failed to blacklist item:', error);
-        // Could optionally show a toast notification here
-        // but we don't re-add the item since the user intent was to remove it
-    }
+    // Call backend to blacklist the item in the background
+    // Use cancelToken: false to prevent Inertia from cancelling concurrent requests
+    router.post(
+        route('browse.blacklist', { file: item.id }),
+        { reason: 'Blacklisted via browse interface' },
+        {
+            preserveState: true,
+            preserveScroll: true,
+            cancelToken: false,
+            onSuccess: () => {
+                console.log('Item blacklisted successfully:', item.id);
+            },
+            onError: (errors) => {
+                console.error('Failed to blacklist item:', errors);
+                // Could optionally show a toast notification here
+                // but we don't re-add the item since the user intent was to remove it
+            }
+        }
+    );
 };
 
 // Handle Alt+click for download
