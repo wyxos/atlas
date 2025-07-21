@@ -51,73 +51,76 @@ function handleLaughedAt(event: Event): void {
   emit('laughedAt', props.file, event);
 }
 
-// Dynamic classes based on variant
-const getButtonClass = (reactionType: string, isActive: boolean) => {
-  if (props.variant === 'player') {
-    const baseClass = 'button circular small empty';
-    switch (reactionType) {
-      case 'favorite':
-        return `${baseClass} ${isActive ? 'destructive' : ''}`;
-      case 'like':
-        return `${baseClass} ${isActive ? 'active' : ''}`;
-      case 'dislike':
-        return `${baseClass} ${isActive ? 'disabled' : ''}`;
-      case 'laugh':
-        return `${baseClass} ${isActive ? 'text-yellow-500 bg-yellow-500/20' : ''}`;
-      default:
-        return baseClass;
-    }
-  } else {
-    // List variant (original AudioListItem styling)
-    const baseClass = 'text-foreground transition-colors p-1 rounded';
-    switch (reactionType) {
-      case 'favorite':
-        return `${baseClass} hover:text-destructive ${isActive ? 'text-red-500 bg-red-500/20' : ''}`;
-      case 'like':
-        return `${baseClass} hover:text-secondary ${isActive ? 'text-blue-500 bg-blue-500/20' : ''}`;
-      case 'dislike':
-        return `${baseClass} hover:text-destructive ${isActive ? 'text-gray-500 bg-gray-500/20' : ''}`;
-      case 'laugh':
-        return `${baseClass} hover:text-yellow-500 ${isActive ? 'text-yellow-500 bg-yellow-500/20' : ''}`;
-      default:
-        return baseClass;
-    }
-  }
-};
 </script>
 
 <template>
   <div class="flex gap-4 items-center">
+    <!-- Love Button -->
     <button
-      :class="getButtonClass('favorite', isLoved)"
+      :class="[
+        'transition-all p-2 rounded-md',
+        isLoved
+          ? 'bg-red-500/30 hover:bg-red-500/40'
+          : 'hover:bg-red-500'
+      ]"
       @click="handleFavorite"
       :title="showLabels ? 'Love' : undefined"
     >
-      <Heart :size="iconSize" :fill="isLoved ? 'currentColor' : 'none'" />
+      <Heart
+        :size="iconSize"
+        :class="isLoved ? 'text-red-500' : 'text-white'"
+      />
     </button>
 
+    <!-- Like Button -->
     <button
-      :class="getButtonClass('like', isLiked)"
+      :class="[
+        'transition-all p-2 rounded-md',
+        isLiked
+          ? 'bg-blue-500/30 hover:bg-blue-500/40'
+          : 'hover:bg-blue-500'
+      ]"
       @click="handleLike"
       :title="showLabels ? 'Like' : undefined"
     >
-      <ThumbsUp :size="iconSize" :fill="isLiked ? 'currentColor' : 'none'" />
+      <ThumbsUp
+        :size="iconSize"
+        :class="isLiked ? 'text-blue-500' : 'text-white'"
+      />
     </button>
 
+    <!-- Dislike Button -->
     <button
-      :class="getButtonClass('dislike', isDisliked)"
+      :class="[
+        'transition-all p-2 rounded-md',
+        isDisliked
+          ? 'bg-gray-500/30 hover:bg-gray-500/40'
+          : 'hover:bg-gray-500'
+      ]"
       @click="handleDislike"
       :title="showLabels ? 'Dislike' : undefined"
     >
-      <ThumbsDown :size="iconSize" :fill="isDisliked ? 'currentColor' : 'none'" />
+      <ThumbsDown
+        :size="iconSize"
+        :class="isDisliked ? 'text-gray-500' : 'text-white'"
+      />
     </button>
 
+    <!-- Funny Button -->
     <button
-      :class="getButtonClass('laugh', isLaughedAt)"
+      :class="[
+        'transition-all p-2 rounded-md',
+        isLaughedAt
+          ? 'bg-yellow-500/30 hover:bg-yellow-500/40'
+          : 'hover:bg-yellow-500'
+      ]"
       @click="handleLaughedAt"
       :title="showLabels ? 'Funny' : undefined"
     >
-      <Laugh :size="iconSize" />
+      <Laugh
+        :size="iconSize"
+        :class="isLaughedAt ? 'text-yellow-500' : 'text-white'"
+      />
     </button>
   </div>
 </template>

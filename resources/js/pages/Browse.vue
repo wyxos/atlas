@@ -153,9 +153,12 @@ const blacklistImage = async (item: Item) => {
     }
 };
 
-// Handle Alt+click for download
+// Handle Alt+click for download and like
 const handleAltClick = (item: Item) => {
-    downloadImage(item);
+    // Start download
+    startDownload(item);
+    // Also trigger like reaction
+    handleLike(item, new Event('click'));
 };
 
 // Handle Alt+right-click for blacklist
