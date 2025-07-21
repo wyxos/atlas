@@ -24,7 +24,7 @@ class BrowseController extends Controller
     /**
      * Blacklist a file.
      */
-    public function blacklist(Request $request, File $file): \Illuminate\Http\RedirectResponse
+    public function blacklist(Request $request, File $file): \Illuminate\Http\JsonResponse
     {
         $request->validate([
             'reason' => 'nullable|string|max:255'
@@ -35,7 +35,9 @@ class BrowseController extends Controller
             'blacklist_reason' => $request->input('reason')
         ]);
 
-        return back()
-            ->with('message', 'Item has been blacklisted');
+        return response()->json([
+            'success' => true,
+            'message' => 'Item has been blacklisted'
+        ], 200);
     }
 }

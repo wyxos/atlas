@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\File;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
@@ -40,21 +41,22 @@ it('can access browse page', function () {
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
         ->has('items')
-        ->has('currentPage')
+        ->has('page')
         ->has('hasNextPage')
-        ->has('nextCursor')
-        ->where('currentPage', 1)
+        ->has('nextPage')
+        ->where('page', null) // First page is null
         ->where('hasNextPage', true)
-        ->where('nextCursor', 'next_cursor_token')
+        ->where('nextPage', 'next_cursor_token')
     );
 
     // Verify that the CivitAI API was called correctly
     Http::assertSent(function ($request) {
+        $data = $request->data();
         return str_contains($request->url(), 'civitai.com/api/v1/images') &&
-               $request->data()['page'] === 1 &&
-               $request->data()['limit'] === 20 &&
-               $request->data()['sort'] === 'Newest' &&
-               $request->data()['nsfw'] === 'false';
+               $data['limit'] === 40 && // Default limit from service
+               $data['sort'] === 'Newest' &&
+               $data['period'] === 'AllTime' &&
+               !isset($data['cursor']); // First request should not have cursor
     });
 });
 
@@ -82,31 +84,30 @@ it('handles cursor-based pagination correctly', function () {
         ], 200)
     ]);
 
-    $response = $this->get('/browse?cursor=existing_cursor_token');
+    $response = $this->get('/browse?page=existing_cursor_token');
 
     $response->assertStatus(200);
 
-    // Verify that the CivitAI API was called with cursor instead of page
+    // Verify that the CivitAI API was called with cursor parameter
     Http::assertSent(function ($request) {
         return str_contains($request->url(), 'civitai.com/api/v1/images') &&
-               $request->data()['cursor'] === 'existing_cursor_token' &&
-               !isset($request->data()['page']); // Page should not be set when cursor is used
+               $request->data()['cursor'] === 'existing_cursor_token';
     });
 
     // Verify response structure for cursor-based pagination
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
         ->has('items')
-        ->has('nextCursor')
-        ->has('previousCursor')
-        ->where('nextCursor', 'new_cursor_token')
-        ->where('previousCursor', 'existing_cursor_token')
+        ->has('nextPage')
+        ->has('page')
+        ->where('nextPage', 'new_cursor_token')
+        ->where('page', 'existing_cursor_token')
     );
 
     // Verify the page attribute is correctly set for cursor-based pagination
     $data = $response->getOriginalContent()->getData();
     $items = $data['page']['props']['items'];
-    expect($items[0]['page'])->toBe('cursor_existing_cursor_token-0');
+    expect($items[0]['page'])->toBe('existing_cursor_token');
 });
 
 it('handles CivitAI API errors gracefully', function () {
@@ -137,7 +138,70 @@ it('handles empty CivitAI response', function () {
         ->component('Browse')
         ->where('items', [])
         ->where('hasNextPage', false)
-        ->where('nextCursor', null)
+        ->where('nextPage', null)
     );
+});
+
+it('can blacklist a file via POST request', function () {
+    // Create a file to blacklist
+    $file = File::factory()->create([
+        'is_blacklisted' => false,
+        'blacklist_reason' => null,
+    ]);
+
+    $response = $this->postJson(route('browse.blacklist', $file), [
+        'reason' => 'Test blacklisting reason'
+    ]);
+
+    $response->assertStatus(200)
+        ->assertJson([
+            'success' => true,
+            'message' => 'Item has been blacklisted'
+        ]);
+
+    // Verify the file was blacklisted in the database
+    $file->refresh();
+    expect($file->is_blacklisted)->toBeTrue();
+    expect($file->blacklist_reason)->toBe('Test blacklisting reason');
+});
+
+it('can blacklist a file without a reason', function () {
+    // Create a file to blacklist
+    $file = File::factory()->create([
+        'is_blacklisted' => false,
+        'blacklist_reason' => null,
+    ]);
+
+    $response = $this->postJson(route('browse.blacklist', $file));
+
+    $response->assertStatus(200)
+        ->assertJson([
+            'success' => true,
+            'message' => 'Item has been blacklisted'
+        ]);
+
+    // Verify the file was blacklisted in the database
+    $file->refresh();
+    expect($file->is_blacklisted)->toBeTrue();
+    expect($file->blacklist_reason)->toBeNull();
+});
+
+it('validates blacklist reason length', function () {
+    $file = File::factory()->create([
+        'is_blacklisted' => false,
+    ]);
+
+    $longReason = str_repeat('a', 256); // Exceeds 255 char limit
+
+    $response = $this->postJson(route('browse.blacklist', $file), [
+        'reason' => $longReason
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors('reason');
+
+    // Verify the file was NOT blacklisted
+    $file->refresh();
+    expect($file->is_blacklisted)->toBeFalse();
 });
 
