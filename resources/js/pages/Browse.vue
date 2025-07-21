@@ -33,8 +33,8 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/browse',
     },
 ];
+const masonryItems = ref<Item[]>([]);
 
-const items = ref<Item[]>([]);
 const masonry = ref(null);
 
 // Download progress tracking
@@ -73,7 +73,7 @@ const paginationState = ref<{
 // Initialize with server-side data
 onMounted(() => {
     if (props.items && props.items.length > 0) {
-        items.value = [...props.items];
+        masonryItems.value = [...props.items];
     }
 
     // // If all items are blacklisted, trigger next page fetch
@@ -262,7 +262,7 @@ const getPage = async (pageParam: number | string) => {
             <!-- Masonry Container -->
             <div class="flex-1 min-h-0 relative">
                 <Masonry
-                    v-model:items="items"
+                    v-model:items="masonryItems"
                     :get-next-page="getPage"
                     :skip-initial-load="true"
                     ref="masonry"
