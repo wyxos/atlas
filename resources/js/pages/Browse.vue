@@ -102,25 +102,116 @@ const startDownload = async (item: Item) => {
 };
 
 // Reaction handlers
-const handleFavorite = (file: any, event: Event) => {
+const handleFavorite = async (file: any, event: Event) => {
     console.log('Love reaction - starting download:', file.id);
-    startDownload(file);
+    
+    // Update local state optimistically
+    const originalLoved = file.loved;
+    file.loved = !file.loved;
+    if (file.loved) {
+        file.liked = false;
+        file.disliked = false;
+        file.funny = false;
+    }
+    
+    try {
+        // Persist to backend
+        const response = await axios.post(route('audio.love', { file: file.id }));
+        
+        // Update with server response
+        Object.assign(file, response.data);
+        
+        // Start download
+        startDownload(file);
+    } catch (error) {
+        // Revert on error
+        file.loved = originalLoved;
+        console.error('Failed to toggle love status:', error);
+    }
 };
 
-const handleLike = (file: any, event: Event) => {
+const handleLike = async (file: any, event: Event) => {
     console.log('Like reaction - starting download:', file.id);
-    startDownload(file);
+    
+    // Update local state optimistically
+    const originalLiked = file.liked;
+    file.liked = !file.liked;
+    if (file.liked) {
+        file.loved = false;
+        file.disliked = false;
+        file.funny = false;
+    }
+    
+    try {
+        // Persist to backend
+        const response = await axios.post(route('audio.like', { file: file.id }));
+        
+        // Update with server response
+        Object.assign(file, response.data);
+        
+        // Start download
+        startDownload(file);
+    } catch (error) {
+        // Revert on error
+        file.liked = originalLiked;
+        console.error('Failed to toggle like status:', error);
+    }
 };
 
-const handleDislike = (file: any, event: Event) => {
+const handleDislike = async (file: any, event: Event) => {
     console.log('Dislike reaction - blacklisting:', file.id);
-
+    
+    // Update local state optimistically
+    const originalDisliked = file.disliked;
+    file.disliked = !file.disliked;
+    if (file.disliked) {
+        file.loved = false;
+        file.liked = false;
+        file.funny = false;
+    }
+    
+    try {
+        // Persist to backend
+        const response = await axios.post(route('audio.dislike', { file: file.id }));
+        
+        // Update with server response
+        Object.assign(file, response.data);
+    } catch (error) {
+        // Revert on error
+        file.disliked = originalDisliked;
+        console.error('Failed to toggle dislike status:', error);
+    }
+    
+    // Blacklist the image
     blacklistImage(file);
 };
 
-const handleLaughedAt = (file: any, event: Event) => {
+const handleLaughedAt = async (file: any, event: Event) => {
     console.log('Funny reaction - starting download:', file.id);
-    startDownload(file);
+    
+    // Update local state optimistically
+    const originalFunny = file.funny;
+    file.funny = !file.funny;
+    if (file.funny) {
+        file.loved = false;
+        file.liked = false;
+        file.disliked = false;
+    }
+    
+    try {
+        // Persist to backend
+        const response = await axios.post(route('audio.laughed-at', { file: file.id }));
+        
+        // Update with server response
+        Object.assign(file, response.data);
+        
+        // Start download
+        startDownload(file);
+    } catch (error) {
+        // Revert on error
+        file.funny = originalFunny;
+        console.error('Failed to toggle funny status:', error);
+    }
 };
 
 // Mock download function
