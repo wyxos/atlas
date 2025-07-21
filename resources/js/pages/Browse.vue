@@ -76,16 +76,16 @@ onMounted(() => {
         items.value = [...props.items];
     }
 
-    // If all items are blacklisted, trigger next page fetch
-    if (props.allItemsBlacklisted && masonry.value) {
-        console.log('All items blacklisted, triggering next page fetch');
-        // Use setTimeout to ensure masonry is fully initialized
-        setTimeout(() => {
-            if (masonry.value && typeof masonry.value.loadNext === 'function') {
-                masonry.value.loadNext();
-            }
-        }, 100);
-    }
+    // // If all items are blacklisted, trigger next page fetch
+    // if (props.allItemsBlacklisted && masonry.value) {
+    //     console.log('All items blacklisted, triggering next page fetch');
+    //     // Use setTimeout to ensure masonry is fully initialized
+    //     setTimeout(() => {
+    //         if (masonry.value && typeof masonry.value.loadNext === 'function') {
+    //             masonry.value.loadNext();
+    //         }
+    //     }, 100);
+    // }
 });
 
 // Download function that starts the download process
@@ -112,11 +112,10 @@ const handleLike = (file: any, event: Event) => {
     startDownload(file);
 };
 
-const handleDislike = (file: any, event: Event, onRemove?: any) => {
+const handleDislike = (file: any, event: Event) => {
     console.log('Dislike reaction - blacklisting:', file.id);
-    if (onRemove) {
-        blacklistImage(file, onRemove);
-    }
+
+    blacklistImage(file);
 };
 
 const handleLaughedAt = (file: any, event: Event) => {
@@ -132,11 +131,13 @@ const downloadImage = (item: Item) => {
 };
 
 // Blacklist function - removes the item immediately for better UX
-const blacklistImage = async (item: Item, onRemove: any) => {
+const blacklistImage = async (item: Item) => {
     console.log('Blacklisting image:', item.id);
 
     // Remove from UI immediately for better user experience
-    onRemove(item);
+    if(masonry.value){
+        masonry.value.onRemove(item);
+    }
 
     try {
         // Call backend to blacklist the item using axios
@@ -272,7 +273,7 @@ const getPage = async (pageParam: number | string) => {
                     }"
                     class="h-full"
                 >
-                    <template #item="{ item, onRemove }">
+                    <template #item="{ item }">
                         <div class="relative">
                             <img
                                 :src="item.src"
@@ -282,7 +283,7 @@ const getPage = async (pageParam: number | string) => {
                                 @error="(e) => console.warn('Failed to load image:', item.id, e)"
                                 @load="() => console.debug('Loaded image:', item.id)"
                                 @click.alt.exact.prevent="handleAltClick(item)"
-                                @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
+                                @contextmenu.alt.exact.prevent="handleAltRightClick(item)"
                             />
 
                             <!-- AudioReactions component -->
@@ -293,7 +294,7 @@ const getPage = async (pageParam: number | string) => {
                                     variant="list"
                                     @favorite="handleFavorite"
                                     @like="handleLike"
-                                    @dislike="(file, event) => handleDislike(file, event, onRemove)"
+                                    @dislike="(file, event) => handleDislike(file, event)"
                                     @laughedAt="handleLaughedAt"
                                 />
                             </div>
