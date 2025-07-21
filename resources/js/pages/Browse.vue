@@ -278,12 +278,12 @@ const getPage = async (pageParam: number | string) => {
                             <img
                                 :src="item.src"
                                 :alt="`Image ${item.id}`"
-                                class="w-full h-auto cursor-pointer"
+                                class="w-full h-auto cursor-pointer transition-all duration-500 ease-in-out"
                                 loading="lazy"
                                 @error="(e) => console.warn('Failed to load image:', item.id, e)"
                                 @load="() => console.debug('Loaded image:', item.id)"
                                 @click.alt.exact.prevent="handleAltClick(item)"
-                                @contextmenu.alt.exact.prevent="handleAltRightClick(item)"
+                                @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
                             />
 
                             <!-- AudioReactions component -->
