@@ -39,14 +39,6 @@ class FileDownloadProgress implements ShouldBroadcast
     }
 
     /**
-     * The event's broadcast name.
-     */
-    public function broadcastAs(): string
-    {
-        return 'file-download-progress';
-    }
-
-    /**
      * Get the data to broadcast.
      */
     public function broadcastWith(): array

@@ -6,8 +6,7 @@ import { ref, onMounted } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
 import AudioReactions from '@/components/audio/AudioReactions.vue';
-import Echo from 'laravel-echo';
-import Pusher from 'pusher-js';
+import { useEchoPublic } from '@laravel/echo-vue';
 
 interface Item {
     id: number; // Use actual CivitAI numeric ID
@@ -42,8 +41,23 @@ const masonry = ref(null);
 const downloadProgress = ref<Record<number, number>>({});
 const downloadedItems = ref<Set<number>>(new Set());
 
-// Echo instance for real-time updates
-let echoInstance: Echo | null = null;
+// Setup Echo listener for download progress using useEchoPublic composable for public channel
+useEchoPublic(
+    'file-download-progress',
+    'FileDownloadProgress',
+    (e: any) => {
+        console.log('Received download progress event:', e);
+        downloadProgress.value[e.fileId] = e.progress;
+
+        if (e.progress === 100) {
+            downloadedItems.value.add(e.fileId);
+            // Remove progress after a delay
+            setTimeout(() => {
+                delete downloadProgress.value[e.fileId];
+            }, 2000);
+        }
+    }
+);
 
 // Unified pagination state - works with both cursor and page-based pagination
 const paginationState = ref<{
@@ -62,9 +76,6 @@ onMounted(() => {
         items.value = [...props.items];
     }
 
-    // Initialize Echo for real-time updates
-    initializeEcho();
-
     // If all items are blacklisted, trigger next page fetch
     if (props.allItemsBlacklisted && masonry.value) {
         console.log('All items blacklisted, triggering next page fetch');
@@ -76,39 +87,6 @@ onMounted(() => {
         }, 100);
     }
 });
-
-// Initialize Echo for real-time download progress
-const initializeEcho = () => {
-    try {
-        window.Pusher = Pusher;
-        echoInstance = new Echo({
-            broadcaster: 'reverb',
-            key: import.meta.env.VITE_REVERB_APP_KEY,
-            wsHost: import.meta.env.VITE_REVERB_HOST ?? '127.0.0.1',
-            wsPort: import.meta.env.VITE_REVERB_PORT ?? 8080,
-            wssPort: import.meta.env.VITE_REVERB_PORT ?? 8080,
-            forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'http') === 'https',
-            enabledTransports: ['ws', 'wss'],
-        });
-
-        // Listen for download progress events
-        echoInstance.channel('file-download-progress')
-            .listen('file-download-progress', (e: any) => {
-                console.log('Download progress:', e);
-                downloadProgress.value[e.fileId] = e.progress;
-                
-                if (e.progress === 100) {
-                    downloadedItems.value.add(e.fileId);
-                    // Remove progress after a delay
-                    setTimeout(() => {
-                        delete downloadProgress.value[e.fileId];
-                    }, 2000);
-                }
-            });
-    } catch (error) {
-        console.error('Failed to initialize Echo:', error);
-    }
-};
 
 // Download function that starts the download process
 const startDownload = async (item: Item) => {
@@ -306,7 +284,7 @@ const getPage = async (pageParam: number | string) => {
                                 @click.alt.exact.prevent="handleAltClick(item)"
                                 @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
                             />
-                            
+
                             <!-- AudioReactions component -->
                             <div class="absolute bottom-2 right-2">
                                 <AudioReactions
@@ -319,7 +297,7 @@ const getPage = async (pageParam: number | string) => {
                                     @laughedAt="handleLaughedAt"
                                 />
                             </div>
-                            
+
                             <!-- Download progress bar -->
                             <div v-if="downloadProgress[item.id] !== undefined" class="absolute bottom-0 left-0 right-0 bg-black/50">
                                 <div class="bg-blue-500 h-1 transition-all duration-300" :style="{ width: downloadProgress[item.id] + '%' }"></div>
@@ -327,7 +305,7 @@ const getPage = async (pageParam: number | string) => {
                                     Downloading... {{ downloadProgress[item.id] }}%
                                 </div>
                             </div>
-                            
+
                             <!-- Downloaded indicator -->
                             <div v-if="downloadedItems.has(item.id)" class="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs">
                                 ✓ Downloaded
