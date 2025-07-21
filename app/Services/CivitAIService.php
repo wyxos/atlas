@@ -279,6 +279,10 @@ class CivitAIService
                 'height' => $metadata['height'] ?? null,
                 'page' => $pageIdentifier,
                 'index' => $index,
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+                'funny' => $file->funny,
             ];
         }
 

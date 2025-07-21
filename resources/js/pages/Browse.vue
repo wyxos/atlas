@@ -7,6 +7,7 @@ import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
 import AudioReactions from '@/components/audio/AudioReactions.vue';
 import { useEchoPublic } from '@laravel/echo-vue';
+import { Button } from '@/components/ui/button';
 
 interface Item {
     id: number; // Use actual CivitAI numeric ID
@@ -104,7 +105,7 @@ const startDownload = async (item: Item) => {
 // Reaction handlers
 const handleFavorite = async (file: any, event: Event) => {
     console.log('Love reaction - starting download:', file.id);
-    
+
     // Update local state optimistically
     const originalLoved = file.loved;
     file.loved = !file.loved;
@@ -113,14 +114,14 @@ const handleFavorite = async (file: any, event: Event) => {
         file.disliked = false;
         file.funny = false;
     }
-    
+
     try {
         // Persist to backend
         const response = await axios.post(route('audio.love', { file: file.id }));
-        
+
         // Update with server response
         Object.assign(file, response.data);
-        
+
         // Start download
         startDownload(file);
     } catch (error) {
@@ -132,7 +133,7 @@ const handleFavorite = async (file: any, event: Event) => {
 
 const handleLike = async (file: any, event: Event) => {
     console.log('Like reaction - starting download:', file.id);
-    
+
     // Update local state optimistically
     const originalLiked = file.liked;
     file.liked = !file.liked;
@@ -141,14 +142,14 @@ const handleLike = async (file: any, event: Event) => {
         file.disliked = false;
         file.funny = false;
     }
-    
+
     try {
         // Persist to backend
         const response = await axios.post(route('audio.like', { file: file.id }));
-        
+
         // Update with server response
         Object.assign(file, response.data);
-        
+
         // Start download
         startDownload(file);
     } catch (error) {
@@ -160,7 +161,7 @@ const handleLike = async (file: any, event: Event) => {
 
 const handleDislike = async (file: any, event: Event) => {
     console.log('Dislike reaction - blacklisting:', file.id);
-    
+
     // Update local state optimistically
     const originalDisliked = file.disliked;
     file.disliked = !file.disliked;
@@ -169,11 +170,11 @@ const handleDislike = async (file: any, event: Event) => {
         file.liked = false;
         file.funny = false;
     }
-    
+
     try {
         // Persist to backend
         const response = await axios.post(route('audio.dislike', { file: file.id }));
-        
+
         // Update with server response
         Object.assign(file, response.data);
     } catch (error) {
@@ -181,14 +182,14 @@ const handleDislike = async (file: any, event: Event) => {
         file.disliked = originalDisliked;
         console.error('Failed to toggle dislike status:', error);
     }
-    
+
     // Blacklist the image
     blacklistImage(file);
 };
 
 const handleLaughedAt = async (file: any, event: Event) => {
     console.log('Funny reaction - starting download:', file.id);
-    
+
     // Update local state optimistically
     const originalFunny = file.funny;
     file.funny = !file.funny;
@@ -197,14 +198,14 @@ const handleLaughedAt = async (file: any, event: Event) => {
         file.liked = false;
         file.disliked = false;
     }
-    
+
     try {
         // Persist to backend
         const response = await axios.post(route('audio.laughed-at', { file: file.id }));
-        
+
         // Update with server response
         Object.assign(file, response.data);
-        
+
         // Start download
         startDownload(file);
     } catch (error) {
@@ -340,6 +341,16 @@ const getPage = async (pageParam: number | string) => {
         return { items: [], nextPage: null };
     }
 };
+
+// Load next page of images
+const loadNext = async () => {
+    if (masonry.value && typeof masonry.value.loadNext === 'function') {
+        console.log('Loading next page of images');
+        await masonry.value.loadNext();
+    } else {
+        console.warn('Masonry component not ready or loadNext function not available');
+    }
+};
 </script>
 
 <template>
@@ -350,6 +361,7 @@ const getPage = async (pageParam: number | string) => {
             <!-- Header -->
             <div class="flex-shrink-0 p-4 border-b">
                 <div class="flex flex-col items-center gap-4">
+                    <Button  @click="loadNext()">Next+</Button>
                 </div>
             </div>
 
