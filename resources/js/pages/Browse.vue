@@ -254,8 +254,8 @@ const handleAltClick = (item: Item) => {
 };
 
 // Handle Alt+right-click for blacklist
-const handleAltRightClick = (item: Item, onRemove: any) => {
-    blacklistImage(item, onRemove);
+const handleAltRightClick = (item: Item) => {
+    blacklistImage(item);
 };
 
 // Unified pagination handler - works with both cursor and page-based pagination
@@ -293,7 +293,7 @@ const getPage = async (pageParam: number | string) => {
 
                             console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextPage:', nextPage, 'currentPage:', currentPage, 'allBlacklisted:', allBlacklisted);
 
-                            if (newItems && newItems.length > 0) {
+                            // if (newItems && newItems.length > 0) {
                                 // Update pagination state - backend provides both current page and nextPage values
                                 paginationState.value = {
                                     page: currentPage,
@@ -305,25 +305,25 @@ const getPage = async (pageParam: number | string) => {
                                     items: newItems,
                                     nextPage: paginationState.value.nextPage
                                 });
-                            } else if (allBlacklisted && hasNext) {
+                            // } else if (allBlacklisted && hasNext) {
                                 // All items were blacklisted, but we have more pages - continue fetching
-                                console.log('All items blacklisted, continuing to next page automatically');
-                                paginationState.value = {
-                                    page: currentPage,
-                                    nextPage: hasNext ? nextPage : null,
-                                    hasNextPage: hasNext
-                                };
+                                // console.log('All items blacklisted, continuing to next page automatically');
+                                // paginationState.value = {
+                                //     page: currentPage,
+                                //     nextPage: hasNext ? nextPage : null,
+                                //     hasNextPage: hasNext
+                                // };
 
-                                // Recursively fetch the next page
-                                setTimeout(async () => {
-                                    const nextResult = await getPage(nextPage);
-                                    resolve(nextResult);
-                                }, 100);
-                            } else {
-                                paginationState.value.hasNextPage = false;
-                                paginationState.value.nextPage = null;
-                                resolve({ items: [], nextPage: null });
-                            }
+                                // // Recursively fetch the next page
+                                // setTimeout(async () => {
+                                //     const nextResult = await getPage(nextPage);
+                                //     resolve(nextResult);
+                                // }, 100);
+                            // } else {
+                            //     paginationState.value.hasNextPage = false;
+                            //     paginationState.value.nextPage = null;
+                            //     resolve({ items: [], nextPage: null });
+                            // }
                         } catch (error) {
                             console.error('Error processing response:', error);
                             resolve({ items: [], nextPage: null });
@@ -389,7 +389,7 @@ const loadNext = async () => {
                                 @error="(e) => console.warn('Failed to load image:', item.id, e)"
                                 @load="() => console.debug('Loaded image:', item.id)"
                                 @click.alt.exact.prevent="handleAltClick(item)"
-                                @contextmenu.alt.exact.prevent="handleAltRightClick(item, onRemove)"
+                                @contextmenu.alt.exact.prevent="handleAltRightClick(item)"
                             />
 
                             <!-- AudioReactions component -->

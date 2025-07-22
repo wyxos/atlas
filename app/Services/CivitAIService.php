@@ -26,7 +26,7 @@ class CivitAIService
     {
         // Get the unified 'page' parameter - could be cursor or page number
         $page = $this->request->get('page');
-        $limit = (int) $this->request->get('limit', 40);
+        $limit = (int) $this->request->get('limit', 20);
 
         $result = $this->fetchItems($page, $limit);
         $transformedItems = $this->transformItems($result['items']);
@@ -48,7 +48,8 @@ class CivitAIService
     {
         $params = [
             'limit' => $limit,
-            'sort' => 'Newest',
+//            'sort' => 'Newest',
+            'sort' => 'Most Reactions',
             'period' => 'AllTime',
 //            'nsfw' => 'false',
         ];
