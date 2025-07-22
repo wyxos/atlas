@@ -8,6 +8,7 @@ Code Quality:
 - All new logic must have test coverage within the appropriate test class unless explicitly stated otherwise.
 - Avoid redundant test scaffolding.
 - When adding a new test, ensure the test name and structure aligns with the surrounding style and naming.
+- For Vue files, always have the script tag at the top, followed by the template tag.
 
 Debugging:
 
@@ -33,6 +34,7 @@ Testing:
         - No relevant test class exists.
         - The logic is isolated and cannot logically belong to any current test suites.
     - Always attempt to reproduce and debug issues through the most relevant existing test class.
+- Never run ```php artisan migrate``` unless nothing breaks when running `php artisan test --compact --parallel`.
 
 Performance:
 
