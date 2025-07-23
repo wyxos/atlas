@@ -204,6 +204,7 @@ class CivitAIService
 
         return File::query()
             ->whereIn('referrer_url', $reffererUrls)
+            ->where('is_blacklisted', false)
             ->get()
             ->all();
     }

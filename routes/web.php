@@ -107,6 +107,12 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::post('audio/{file}/like', [AudioController::class, 'toggleLike'])->name('audio.like');
     Route::post('audio/{file}/dislike', [AudioController::class, 'toggleDislike'])->name('audio.dislike');
     Route::post('audio/{file}/laughed-at', [AudioController::class, 'toggleLaughedAt'])->name('audio.laughed-at');
+    
+    // Generic file interaction routes (for all file types)
+    Route::post('files/{file}/love', [AudioController::class, 'toggleLove'])->name('files.love');
+    Route::post('files/{file}/like', [AudioController::class, 'toggleLike'])->name('files.like');
+    Route::post('files/{file}/dislike', [AudioController::class, 'toggleDislike'])->name('files.dislike');
+    Route::post('files/{file}/laughed-at', [AudioController::class, 'toggleLaughedAt'])->name('files.laughed-at');
 
     // Users routes
     Route::get('users', [UserController::class, 'index'])->name('users.index');

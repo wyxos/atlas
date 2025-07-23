@@ -448,10 +448,10 @@ class AudioController extends Controller
                             ->where('not_found', false)
                             ->where(function ($query) {
                                 $query->whereHas('metadata', function ($metaQuery) {
-                                    $metaQuery->where('genre', 'like', '%podcast%')
-                                             ->orWhere('genre', 'like', '%Podcast%')
-                                             ->orWhere('album', 'like', '%podcast%')
-                                             ->orWhere('album', 'like', '%Podcast%');
+                                    $metaQuery->where('payload->genre', 'like', '%podcast%')
+                                             ->orWhere('payload->genre', 'like', '%Podcast%')
+                                             ->orWhere('payload->album', 'like', '%podcast%')
+                                             ->orWhere('payload->album', 'like', '%Podcast%');
                                 })
                                 ->orWhere('path', 'like', '%podcast%')
                                 ->orWhere('path', 'like', '%Podcast%');
@@ -470,10 +470,10 @@ class AudioController extends Controller
                 ->where('not_found', false)
                 ->where(function ($query) {
                     $query->whereHas('metadata', function ($metaQuery) {
-                        $metaQuery->where('genre', 'like', '%podcast%')
-                                 ->orWhere('genre', 'like', '%Podcast%')
-                                 ->orWhere('album', 'like', '%podcast%')
-                                 ->orWhere('album', 'like', '%Podcast%');
+                        $metaQuery->where('payload->genre', 'like', '%podcast%')
+                                 ->orWhere('payload->genre', 'like', '%Podcast%')
+                                 ->orWhere('payload->album', 'like', '%podcast%')
+                                 ->orWhere('payload->album', 'like', '%Podcast%');
                     })
                     ->orWhere('path', 'like', '%podcast%')
                     ->orWhere('path', 'like', '%Podcast%');

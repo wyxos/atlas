@@ -117,7 +117,7 @@ const handleFavorite = async (file: any, event: Event) => {
 
     try {
         // Persist to backend
-        const response = await axios.post(route('audio.love', { file: file.id }));
+        const response = await axios.post(route('files.love', { file: file.id }));
 
         // Update with server response
         Object.assign(file, response.data);
@@ -145,7 +145,7 @@ const handleLike = async (file: any, event: Event) => {
 
     try {
         // Persist to backend
-        const response = await axios.post(route('audio.like', { file: file.id }));
+        const response = await axios.post(route('files.like', { file: file.id }));
 
         // Update with server response
         Object.assign(file, response.data);
@@ -173,7 +173,7 @@ const handleDislike = async (file: any, event: Event) => {
 
     try {
         // Persist to backend
-        const response = await axios.post(route('audio.dislike', { file: file.id }));
+        const response = await axios.post(route('files.dislike', { file: file.id }));
 
         // Update with server response
         Object.assign(file, response.data);
@@ -201,7 +201,7 @@ const handleLaughedAt = async (file: any, event: Event) => {
 
     try {
         // Persist to backend
-        const response = await axios.post(route('audio.laughed-at', { file: file.id }));
+        const response = await axios.post(route('files.laughed-at', { file: file.id }));
 
         // Update with server response
         Object.assign(file, response.data);

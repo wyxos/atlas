@@ -57,13 +57,13 @@ class DashboardController extends Controller
         // Audio-specific statistics with a single optimized query
         $audioStats = File::selectRaw('
             COUNT(*) as audio_files_count,
-            COUNT(CASE WHEN not_found = 1 THEN 1 END) as audio_not_found,
+            COUNT(CASE WHEN not_found = true THEN 1 END) as audio_not_found,
             COALESCE(SUM(size), 0) as audio_size,
-            COUNT(CASE WHEN liked = 1 THEN 1 END) as audio_liked,
-            COUNT(CASE WHEN loved = 1 THEN 1 END) as audio_loved,
-            COUNT(CASE WHEN disliked = 1 THEN 1 END) as audio_disliked,
-            COUNT(CASE WHEN funny = 1 THEN 1 END) as audio_laughed_at,
-            COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as audio_no_rating
+            COUNT(CASE WHEN liked = true THEN 1 END) as audio_liked,
+            COUNT(CASE WHEN loved = true THEN 1 END) as audio_loved,
+            COUNT(CASE WHEN disliked = true THEN 1 END) as audio_disliked,
+            COUNT(CASE WHEN funny = true THEN 1 END) as audio_laughed_at,
+            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as audio_no_rating
         ')
         ->where('mime_type', 'like', 'audio/%')
         ->first();
@@ -73,8 +73,8 @@ class DashboardController extends Controller
             COUNT(*) as total_audio,
             COUNT(CASE WHEN file_metadata.id IS NOT NULL THEN 1 END) as audio_with_metadata,
             COUNT(CASE WHEN file_metadata.id IS NULL THEN 1 END) as audio_without_metadata,
-            COUNT(CASE WHEN file_metadata.is_review_required = 1 THEN 1 END) as audio_metadata_review_required,
-            COUNT(CASE WHEN file_metadata.is_review_required = 0 AND file_metadata.id IS NOT NULL THEN 1 END) as audio_metadata_review_not_required
+            COUNT(CASE WHEN file_metadata.is_review_required = true THEN 1 END) as audio_metadata_review_required,
+            COUNT(CASE WHEN file_metadata.is_review_required = false AND file_metadata.id IS NOT NULL THEN 1 END) as audio_metadata_review_not_required
         ')
         ->where('mime_type', 'like', 'audio/%')
         ->leftJoin('file_metadata', 'files.id', '=', 'file_metadata.file_id')
@@ -82,24 +82,24 @@ class DashboardController extends Controller
 
         // Global ratings statistics (all files)
         $globalRatings = File::selectRaw('
-            COUNT(CASE WHEN liked = 1 THEN 1 END) as global_liked,
-            COUNT(CASE WHEN loved = 1 THEN 1 END) as global_loved,
-            COUNT(CASE WHEN disliked = 1 THEN 1 END) as global_disliked,
-            COUNT(CASE WHEN funny = 1 THEN 1 END) as global_laughed_at,
-            COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as global_no_rating
+            COUNT(CASE WHEN liked = true THEN 1 END) as global_liked,
+            COUNT(CASE WHEN loved = true THEN 1 END) as global_loved,
+            COUNT(CASE WHEN disliked = true THEN 1 END) as global_disliked,
+            COUNT(CASE WHEN funny = true THEN 1 END) as global_laughed_at,
+            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as global_no_rating
         ')
         ->first();
 
         // Video statistics with count, size, and not found
         $videoStats = File::selectRaw('
             COUNT(*) as video_files_count,
-            COUNT(CASE WHEN not_found = 1 THEN 1 END) as video_not_found,
+            COUNT(CASE WHEN not_found = true THEN 1 END) as video_not_found,
             COALESCE(SUM(size), 0) as video_size,
-            COUNT(CASE WHEN liked = 1 THEN 1 END) as video_liked,
-            COUNT(CASE WHEN loved = 1 THEN 1 END) as video_loved,
-            COUNT(CASE WHEN disliked = 1 THEN 1 END) as video_disliked,
-            COUNT(CASE WHEN funny = 1 THEN 1 END) as video_laughed_at,
-            COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as video_no_rating
+            COUNT(CASE WHEN liked = true THEN 1 END) as video_liked,
+            COUNT(CASE WHEN loved = true THEN 1 END) as video_loved,
+            COUNT(CASE WHEN disliked = true THEN 1 END) as video_disliked,
+            COUNT(CASE WHEN funny = true THEN 1 END) as video_laughed_at,
+            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as video_no_rating
         ')
         ->where('mime_type', 'like', 'video/%')
         ->first();
@@ -107,41 +107,41 @@ class DashboardController extends Controller
         // Image statistics with count, size, and not found
         $imageStats = File::selectRaw('
             COUNT(*) as image_files_count,
-            COUNT(CASE WHEN not_found = 1 THEN 1 END) as image_not_found,
+            COUNT(CASE WHEN not_found = true THEN 1 END) as image_not_found,
             COALESCE(SUM(size), 0) as image_size,
-            COUNT(CASE WHEN liked = 1 THEN 1 END) as image_liked,
-            COUNT(CASE WHEN loved = 1 THEN 1 END) as image_loved,
-            COUNT(CASE WHEN disliked = 1 THEN 1 END) as image_disliked,
-            COUNT(CASE WHEN funny = 1 THEN 1 END) as image_laughed_at,
-            COUNT(CASE WHEN liked = 0 AND loved = 0 AND disliked = 0 AND funny = 0 THEN 1 END) as image_no_rating
+            COUNT(CASE WHEN liked = true THEN 1 END) as image_liked,
+            COUNT(CASE WHEN loved = true THEN 1 END) as image_loved,
+            COUNT(CASE WHEN disliked = true THEN 1 END) as image_disliked,
+            COUNT(CASE WHEN funny = true THEN 1 END) as image_laughed_at,
+            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as image_no_rating
         ')
         ->where('mime_type', 'like', 'image/%')
         ->first();
 
         // Total files not found across all types
-        $totalNotFound = File::where('not_found', 1)->count();
+        $totalNotFound = File::where('not_found', true)->count();
 
         // Global metadata statistics (all files)
         $globalMetadataStats = File::selectRaw('
             COUNT(*) as total_files,
             COUNT(CASE WHEN file_metadata.id IS NOT NULL THEN 1 END) as global_with_metadata,
             COUNT(CASE WHEN file_metadata.id IS NULL THEN 1 END) as global_without_metadata,
-            COUNT(CASE WHEN file_metadata.is_review_required = 1 THEN 1 END) as global_metadata_review_required,
-            COUNT(CASE WHEN file_metadata.is_review_required = 0 AND file_metadata.id IS NOT NULL THEN 1 END) as global_metadata_review_not_required
+            COUNT(CASE WHEN file_metadata.is_review_required = true THEN 1 END) as global_metadata_review_required,
+            COUNT(CASE WHEN file_metadata.is_review_required = false AND file_metadata.id IS NOT NULL THEN 1 END) as global_metadata_review_not_required
         ')
         ->leftJoin('file_metadata', 'files.id', '=', 'file_metadata.file_id')
         ->first();
 
         // Get overall file type distribution for the pie chart
-        $fileTypeStats = File::selectRaw('
-            COUNT(CASE WHEN mime_type LIKE "audio/%" THEN 1 END) as audio_files,
-            COUNT(CASE WHEN mime_type LIKE "video/%" THEN 1 END) as video_files,
-            COUNT(CASE WHEN mime_type LIKE "image/%" THEN 1 END) as image_files,
-            COALESCE(SUM(CASE WHEN mime_type LIKE "audio/%" THEN size END), 0) as audio_size,
-            COALESCE(SUM(CASE WHEN mime_type LIKE "video/%" THEN size END), 0) as video_size,
-            COALESCE(SUM(CASE WHEN mime_type LIKE "image/%" THEN size END), 0) as image_size,
-            COALESCE(SUM(CASE WHEN mime_type NOT LIKE "audio/%" AND mime_type NOT LIKE "video/%" AND mime_type NOT LIKE "image/%" THEN size END), 0) as other_size
-        ')->first();
+        $fileTypeStats = File::selectRaw("
+            COUNT(CASE WHEN mime_type LIKE 'audio/%' THEN 1 END) as audio_files,
+            COUNT(CASE WHEN mime_type LIKE 'video/%' THEN 1 END) as video_files,
+            COUNT(CASE WHEN mime_type LIKE 'image/%' THEN 1 END) as image_files,
+            COALESCE(SUM(CASE WHEN mime_type LIKE 'audio/%' THEN size END), 0) as audio_size,
+            COALESCE(SUM(CASE WHEN mime_type LIKE 'video/%' THEN size END), 0) as video_size,
+            COALESCE(SUM(CASE WHEN mime_type LIKE 'image/%' THEN size END), 0) as image_size,
+            COALESCE(SUM(CASE WHEN mime_type NOT LIKE 'audio/%' AND mime_type NOT LIKE 'video/%' AND mime_type NOT LIKE 'image/%' THEN size END), 0) as other_size
+        ")->first();
 
         $totalFiles = $fileTypeStats->audio_files + $fileTypeStats->video_files + $fileTypeStats->image_files;
         $otherFiles = File::count() - $totalFiles;

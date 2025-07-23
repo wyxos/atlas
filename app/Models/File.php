@@ -175,21 +175,32 @@ class File extends Model
         return "/atlas/{$encodedPath}";
     }
 
+    /**
+     * Make all instances of the model searchable with proper eager loading.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function makeAllSearchableUsing($query)
+    {
+        // Only eager load relationships for audio files to avoid unnecessary queries
+        return $query->with([
+            'metadata' => function($q) {
+                // Load metadata for all files
+            },
+            'artists' => function($q) {
+                // Only load for audio files - will be empty for non-audio
+            },
+            'albums' => function($q) {
+                // Only load for audio files - will be empty for non-audio  
+            }
+        ]);
+    }
+
     // Customize the data sent to Typesense
     public function toSearchableArray()
     {
-        // Load metadata relationship if not already loaded
-        if (! $this->relationLoaded('metadata')) {
-            $this->load('metadata');
-        }
-
-        // Load artists and albums relationships if not already loaded
-        if (! $this->relationLoaded('artists')) {
-            $this->load('artists');
-        }
-        if (! $this->relationLoaded('albums')) {
-            $this->load('albums');
-        }
+        // Relationships should already be loaded via makeAllSearchableUsing
 
         $array = [
             'id' => (string) $this->id,
