@@ -53,7 +53,7 @@ class CivitAIService
             'sort' => 'Newest',
 //            'sort' => 'Most Reactions',
             'period' => 'AllTime',
-//            'nsfw' => 'false',
+            'nsfw' => false,
         ];
 
         // For CivitAI, if page is null (first request), don't send cursor
@@ -169,8 +169,6 @@ class CivitAIService
                     'filename' => $item['filename'],
                     'ext' => $item['ext'],
                     'mime_type' => $item['mime_type'],
-                    'hash' => $item['hash'],
-                    'title' => $item['title'],
                     'description' => $item['description'],
                     'thumbnail_url' => $item['thumbnail_url'],
                     'created_at' => Carbon::now(),
