@@ -3,17 +3,18 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
 
-class PushDatabaseToRemote extends Command
+class PushDatabaseToRemoteServer extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'db:push-to-remote 
+    protected $signature = 'db:push-to-remote-server 
                             {host : SSH host to connect to}
-                            {--connection= : The database connection to backup and push (defaults to default connection)}
+                            {--connection= : The database connection to backup and sync (defaults to default connection)}
                             {--remote-connection= : The remote database connection to import into (defaults to default connection)}
                             {--dry-run : Show what would be done without actually doing it}';
 
@@ -22,7 +23,7 @@ class PushDatabaseToRemote extends Command
      *
      * @var string
      */
-    protected $description = 'Push local database to remote server via SSH (generic command)';
+    protected $description = 'Push local database to remote server via SSH';
 
     /**
      * Execute the console command.
@@ -34,14 +35,19 @@ class PushDatabaseToRemote extends Command
         $remoteConnection = $this->option('remote-connection') ?: config('database.default');
         $host = $this->argument('host');
 
+        // Step 1: Create local backup
         $backupCommand = 'php artisan db:backup --connection=' . escapeshellarg($connection);
-        $pushBackupCommand = 'scp storage/backups/*.sql ' . $host . ':~/';
-        $importCommand = 'ssh ' . $host . ' "php artisan db:import ~/`ls -t ~/ | head -1` --connection=' . escapeshellarg($remoteConnection) . '"';
+
+        // Step 2: Copy latest SQL to server
+        $copyCommand = 'scp storage/backups/*.sql ' . escapeshellarg($host) . ':~/';
+
+        // Step 3: Run import on server
+        $importCommand = 'ssh ' . escapeshellarg($host) . ' "php artisan db:import --connection=' . escapeshellarg($remoteConnection) . '"';
 
         if ($isDryRun) {
             $this->warn('DRY RUN MODE: No actual sync will be performed');
             $this->info('Would execute: ' . $backupCommand);
-            $this->info('Would execute: ' . $pushBackupCommand);
+            $this->info('Would execute: ' . $copyCommand);
             $this->info('Would execute: ' . $importCommand);
             $this->info('Dry run completed successfully');
             return Command::SUCCESS;
@@ -53,7 +59,7 @@ class PushDatabaseToRemote extends Command
             return Command::SUCCESS;
         }
 
-        // Run backup command
+        // Step 1: Create backup
         $this->info('Creating local backup...');
         $backupResult = $this->executeCommand($backupCommand);
 
@@ -62,21 +68,21 @@ class PushDatabaseToRemote extends Command
             return Command::FAILURE;
         }
 
-        $this->info('Pushing backup to remote server...');
+        // Step 2: Copy to server
+        $this->info('Copying backup to remote server...');
+        $copyResult = $this->executeCommand($copyCommand);
 
-        // Push backup to remote server
-        $pushResult = $this->executeCommand($pushBackupCommand);
-
-        if ($pushResult !== 0) {
-            $this->error('Failed to push backup to remote server');
+        if ($copyResult !== 0) {
+            $this->error('Failed to copy backup to remote server');
             return Command::FAILURE;
         }
 
-        $this->info('Running import command on remote server...');
+        // Step 3: Import on server
+        $this->info('Running import on remote server...');
         $importResult = $this->executeCommand($importCommand);
 
         if ($importResult === 0) {
-            $this->info('✓ Database successfully imported on remote server');
+            $this->info('✓ Database successfully synced to remote server');
             return Command::SUCCESS;
         } else {
             $this->error('✗ Failed to import database on remote server');
@@ -90,7 +96,7 @@ class PushDatabaseToRemote extends Command
     private function executeCommand(string $command): int
     {
         $this->line("Executing: {$command}");
-        
+
         $process = proc_open(
             $command,
             [
@@ -112,7 +118,7 @@ class PushDatabaseToRemote extends Command
         // Read stdout and stderr
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);
-        
+
         fclose($pipes[1]);
         fclose($pipes[2]);
 
@@ -127,20 +133,5 @@ class PushDatabaseToRemote extends Command
         }
 
         return $exitCode;
-    }
-
-    /**
-     * Format bytes into human readable format.
-     */
-    private function formatBytes(int $bytes): string
-    {
-        $units = ['B', 'KB', 'MB', 'GB'];
-        $bytes = max($bytes, 0);
-        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-        $pow = min($pow, count($units) - 1);
-        
-        $bytes /= (1 << (10 * $pow));
-        
-        return round($bytes, 2) . ' ' . $units[$pow];
     }
 }
