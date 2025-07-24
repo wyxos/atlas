@@ -13,10 +13,9 @@ class PushDatabaseToRemote extends Command
      */
     protected $signature = 'db:push-to-remote 
                             {host : SSH host to connect to}
-                            {local-path : Local database file path}
-                            {remote-path : Remote database file path}
-                            {--dry-run : Show what would be done without actually doing it}
-                            {--no-backup : Skip creating backup on remote server}';
+                            {--connection= : The database connection to backup and push (defaults to default connection)}
+                            {--remote-connection= : The remote database connection to import into (defaults to default connection)}
+                            {--dry-run : Show what would be done without actually doing it}';
 
     /**
      * The console command description.
@@ -31,36 +30,19 @@ class PushDatabaseToRemote extends Command
     public function handle(): int
     {
         $isDryRun = $this->option('dry-run');
-        $noBackup = $this->option('no-backup');
+        $connection = $this->option('connection') ?: config('database.default');
+        $remoteConnection = $this->option('remote-connection') ?: config('database.default');
         $host = $this->argument('host');
-        $localDbPath = $this->argument('local-path');
-        $remoteDbPath = $this->argument('remote-path');
+
+        $backupCommand = 'php artisan db:backup --connection=' . escapeshellarg($connection);
+        $pushBackupCommand = 'scp storage/backups/*.sql ' . $host . ':~/';
+        $importCommand = 'ssh ' . $host . ' "php artisan db:import ~/`ls -t ~/ | head -1` --connection=' . escapeshellarg($remoteConnection) . '"';
 
         if ($isDryRun) {
             $this->warn('DRY RUN MODE: No actual sync will be performed');
-        }
-
-        $this->info('Starting database push to remote server...');
-
-        // Check if local database exists
-        if (!file_exists($localDbPath)) {
-            $this->error("Local database file not found at: {$localDbPath}");
-            return Command::FAILURE;
-        }
-
-        $this->info("Local database found: {$localDbPath}");
-        $this->info("Target remote host: {$host}");
-        $this->info("Target remote path: {$remoteDbPath}");
-
-        // Get file size for progress indication
-        $fileSize = filesize($localDbPath);
-        $this->info("Database size: " . $this->formatBytes($fileSize));
-
-        if ($isDryRun) {
-            $this->info('Would execute: scp "' . $localDbPath . '" ' . $host . ':' . $remoteDbPath);
-            if (!$noBackup) {
-                $this->info('Would create backup: ssh ' . $host . ' "cp ' . $remoteDbPath . ' ' . $remoteDbPath . '.backup.' . date('Y-m-d_H-i-s') . '"');
-            }
+            $this->info('Would execute: ' . $backupCommand);
+            $this->info('Would execute: ' . $pushBackupCommand);
+            $this->info('Would execute: ' . $importCommand);
             $this->info('Dry run completed successfully');
             return Command::SUCCESS;
         }
@@ -71,42 +53,33 @@ class PushDatabaseToRemote extends Command
             return Command::SUCCESS;
         }
 
-        // Create backup on remote server first (unless disabled)
-        if (!$noBackup) {
-            $this->info('Creating backup on remote server...');
-            $backupCommand = 'ssh ' . $host . ' "cp ' . $remoteDbPath . ' ' . $remoteDbPath . '.backup.' . date('Y-m-d_H-i-s') . '"';
-            
-            $backupResult = $this->executeCommand($backupCommand);
-            if ($backupResult !== 0) {
-                $this->warn('Failed to create backup on remote server (file might not exist yet)');
-            } else {
-                $this->info('Backup created successfully');
-            }
+        // Run backup command
+        $this->info('Creating local backup...');
+        $backupResult = $this->executeCommand($backupCommand);
+
+        if ($backupResult !== 0) {
+            $this->error('Failed to create local backup');
+            return Command::FAILURE;
         }
 
-        // Push database to remote server
-        $this->info('Pushing database to remote server...');
-        $syncCommand = 'scp "' . $localDbPath . '" ' . $host . ':' . $remoteDbPath;
-        
-        $syncResult = $this->executeCommand($syncCommand);
-        
-        if ($syncResult === 0) {
-            $this->info('✓ Database successfully pushed to remote server');
-            
-            // Verify the sync
-            $this->info('Verifying push...');
-            $verifyCommand = 'ssh ' . $host . ' "ls -la ' . $remoteDbPath . '"';
-            $verifyResult = $this->executeCommand($verifyCommand);
-            
-            if ($verifyResult === 0) {
-                $this->info('✓ Push verified successfully');
-            } else {
-                $this->warn('Could not verify push');
-            }
-            
+        $this->info('Pushing backup to remote server...');
+
+        // Push backup to remote server
+        $pushResult = $this->executeCommand($pushBackupCommand);
+
+        if ($pushResult !== 0) {
+            $this->error('Failed to push backup to remote server');
+            return Command::FAILURE;
+        }
+
+        $this->info('Running import command on remote server...');
+        $importResult = $this->executeCommand($importCommand);
+
+        if ($importResult === 0) {
+            $this->info('✓ Database successfully imported on remote server');
             return Command::SUCCESS;
         } else {
-            $this->error('✗ Failed to push database to remote server');
+            $this->error('✗ Failed to import database on remote server');
             return Command::FAILURE;
         }
     }

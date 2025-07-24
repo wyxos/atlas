@@ -374,26 +374,28 @@ const loadNext = async () => {
                     ref="masonry"
                     :layout="{
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
-                        gutterX: 16,
-                        gutterY: 16
+                        footer: 32
                     }"
                     class="h-full"
                 >
                     <template #item="{ item }">
-                        <div class="relative">
-                            <img
-                                :src="item.src"
-                                :alt="`Image ${item.id}`"
-                                class="w-full h-auto cursor-pointer transition-all duration-500 ease-in-out"
-                                loading="lazy"
-                                @error="(e) => console.warn('Failed to load image:', item.id, e)"
-                                @load="() => console.debug('Loaded image:', item.id)"
-                                @click.alt.exact.prevent="handleAltClick(item)"
-                                @contextmenu.alt.exact.prevent="handleAltRightClick(item)"
-                            />
+                        <div class="relative h-full">
+                            <!-- Image container with fixed imageHeight -->
+                            <div class="relative" :style="{ height: item.imageHeight + 'px' }">
+                                <img
+                                    :src="item.src"
+                                    :alt="`Image ${item.id}`"
+                                    class="w-full h-full object-cover cursor-pointer transition-all duration-500 ease-in-out"
+                                    loading="lazy"
+                                    @error="(e) => console.warn('Failed to load image:', item.id, e)"
+                                    @load="() => console.debug('Loaded image:', item.id)"
+                                    @click.alt.exact.prevent="handleAltClick(item)"
+                                    @contextmenu.alt.exact.prevent="handleAltRightClick(item)"
+                                />
+                            </div>
 
-                            <!-- AudioReactions component -->
-                            <div class="absolute bottom-2 right-2">
+                            <!-- Footer area for reactions -->
+                            <div class="absolute bottom-0 left-0 right-0 flex items-center justify-end p-2" style="height: 32px;">
                                 <AudioReactions
                                     :file="item"
                                     :icon-size="16"
@@ -405,8 +407,8 @@ const loadNext = async () => {
                                 />
                             </div>
 
-                            <!-- Download progress bar -->
-                            <div v-if="downloadProgress[item.id] !== undefined" class="absolute bottom-0 left-0 right-0 bg-black/50">
+                            <!-- Download progress bar - positioned at bottom of image area -->
+                            <div v-if="downloadProgress[item.id] !== undefined" class="absolute left-0 right-0 bg-black/50" :style="{ bottom: '32px' }">
                                 <div class="bg-blue-500 h-1 transition-all duration-300" :style="{ width: downloadProgress[item.id] + '%' }"></div>
                                 <div class="text-white text-xs p-1 text-center">
                                     Downloading... {{ downloadProgress[item.id] }}%

@@ -12,9 +12,13 @@
 - Artist view
 - Album view
 - Discography view 
+
 - Browse mode
   - [ ] Spotify integration
   - [ ] KH Insider
+  - [ ] CivitAI/Seaart/Tensorart/Shakker integration
+  - [ ] Wallhaven integration
+  - [ ] YouTube integration
 
 ## Video
 - List/Playlists
@@ -22,8 +26,6 @@
 - Single view
 - Series/Show/Anime view
 - Browse mode
-  - [ ] YouTube integration
-
 
 ## Image
 - List/Playlists
@@ -34,9 +36,6 @@
     - [ ] Ability to set type/tag
 - Viewer/Reader
 - Manga/Chapter/Artist view
-- Browse mode
-  - [ ] CivitAI/Seaart/Tensorart/Shakker integration
-  - [ ] Wallhaven integration
 
 ## Dashboard
 

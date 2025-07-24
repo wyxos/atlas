@@ -50,8 +50,8 @@ class CivitAIService
     {
         $params = [
             'limit' => $limit,
-            'sort' => 'Newest',
-//            'sort' => 'Most Reactions',
+//            'sort' => 'Newest',
+            'sort' => 'Most Reactions',
             'period' => 'AllTime',
             'nsfw' => false,
         ];

@@ -13,10 +13,9 @@ class PullDatabaseFromRemote extends Command
      */
     protected $signature = 'db:pull-from-remote 
                             {host : SSH host to connect to}
-                            {local-path : Local database file path}
-                            {remote-path : Remote database file path}
-                            {--dry-run : Show what would be done without actually doing it}
-                            {--no-backup : Skip creating backup of local database}';
+                            {--connection= : The local database connection to import into (defaults to default connection)}
+                            {--remote-connection= : The remote database connection to backup (defaults to default connection)}
+                            {--dry-run : Show what would be done without actually doing it}';
 
     /**
      * The console command description.
@@ -31,37 +30,21 @@ class PullDatabaseFromRemote extends Command
     public function handle(): int
     {
         $isDryRun = $this->option('dry-run');
-        $noBackup = $this->option('no-backup');
+        $connection = $this->option('connection') ?: config('database.default');
+        $remoteConnection = $this->option('remote-connection') ?: config('database.default');
         $host = $this->argument('host');
-        $localDbPath = $this->argument('local-path');
-        $remoteDbPath = $this->argument('remote-path');
+
+        $remoteBackupCommand = 'ssh ' . $host . ' "php artisan db:backup --connection=' . escapeshellarg($remoteConnection) . '"';
+        $pullBackupCommand = 'scp ' . $host . ':storage/backups/*.sql storage/backups/';
+        $importCommand = 'php artisan db:import storage/backups/`ls -t storage/backups/ | head -1` --connection=' . escapeshellarg($connection);
 
         if ($isDryRun) {
             $this->warn('DRY RUN MODE: No actual sync will be performed');
-        }
-
-        $this->info('Starting database pull from remote server...');
-        $this->info("Source remote host: {$host}");
-        $this->info("Source remote path: {$remoteDbPath}");
-        $this->info("Target local path: {$localDbPath}");
-
-        if ($isDryRun) {
-            $this->info('Would execute: scp ' . $host . ':' . $remoteDbPath . ' "' . $localDbPath . '"');
-            if (!$noBackup && file_exists($localDbPath)) {
-                $this->info('Would create backup: cp "' . $localDbPath . '" "' . $localDbPath . '.backup.' . date('Y-m-d_H-i-s') . '"');
-            }
+            $this->info('Would execute: ' . $remoteBackupCommand);
+            $this->info('Would execute: ' . $pullBackupCommand);
+            $this->info('Would execute: ' . $importCommand);
             $this->info('Dry run completed successfully');
             return Command::SUCCESS;
-        }
-
-        // Check if remote database exists
-        $this->info('Checking if remote database exists...');
-        $checkCommand = 'ssh ' . $host . ' "test -f ' . $remoteDbPath . ' && echo exists || echo not_found"';
-        $checkResult = $this->executeCommand($checkCommand, true);
-        
-        if ($checkResult !== 0) {
-            $this->error('Failed to check remote database existence');
-            return Command::FAILURE;
         }
 
         // Confirm before proceeding
@@ -70,61 +53,33 @@ class PullDatabaseFromRemote extends Command
             return Command::SUCCESS;
         }
 
-        // Create backup of local database if it exists and backup is not disabled
-        if (!$noBackup && file_exists($localDbPath)) {
-            $this->info('Creating backup of local database...');
-            $backupPath = $localDbPath . '.backup.' . date('Y-m-d_H-i-s');
-            
-            if (copy($localDbPath, $backupPath)) {
-                $this->info("✓ Local database backed up to: {$backupPath}");
-            } else {
-                $this->error('Failed to create backup of local database');
-                return Command::FAILURE;
-            }
+        // Run backup command on remote server
+        $this->info('Creating backup on remote server...');
+        $backupResult = $this->executeCommand($remoteBackupCommand);
+
+        if ($backupResult !== 0) {
+            $this->error('Failed to create backup on remote server');
+            return Command::FAILURE;
         }
 
-        // Get remote database size for progress indication
-        $this->info('Getting remote database information...');
-        $sizeCommand = 'ssh ' . $host . ' "ls -la ' . $remoteDbPath . ' | awk \'{print $5}\'"';
-        $sizeResult = $this->executeCommand($sizeCommand, true);
+        $this->info('Pulling backup from remote server...');
         
-        if ($sizeResult === 0) {
-            $this->info('Remote database found');
+        // Pull backup from remote server
+        $pullResult = $this->executeCommand($pullBackupCommand);
+
+        if ($pullResult !== 0) {
+            $this->error('Failed to pull backup from remote server');
+            return Command::FAILURE;
         }
 
-        // Pull database from remote server
-        $this->info('Pulling database from remote server...');
-        $syncCommand = 'scp ' . $host . ':' . $remoteDbPath . ' "' . $localDbPath . '"';
-        
-        $syncResult = $this->executeCommand($syncCommand);
-        
-        if ($syncResult === 0) {
-            $this->info('✓ Database successfully pulled from remote server');
-            
-            // Verify the sync
-            $this->info('Verifying pull...');
-            if (file_exists($localDbPath)) {
-                $fileSize = filesize($localDbPath);
-                $this->info("✓ Local database verified - Size: " . $this->formatBytes($fileSize));
-                
-                // Test database integrity
-                $this->info('Testing database integrity...');
-                $integrityCommand = 'sqlite3 "' . $localDbPath . '" "PRAGMA integrity_check;"';
-                $integrityResult = $this->executeCommand($integrityCommand, true);
-                
-                if ($integrityResult === 0) {
-                    $this->info('✓ Database integrity check passed');
-                } else {
-                    $this->warn('Database integrity check failed or could not be performed');
-                }
-            } else {
-                $this->error('Local database file not found after pull');
-                return Command::FAILURE;
-            }
-            
+        $this->info('Importing database locally...');
+        $importResult = $this->executeCommand($importCommand);
+
+        if ($importResult === 0) {
+            $this->info('✓ Database successfully imported locally');
             return Command::SUCCESS;
         } else {
-            $this->error('✗ Failed to pull database from remote server');
+            $this->error('✗ Failed to import database locally');
             return Command::FAILURE;
         }
     }
