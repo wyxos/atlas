@@ -1,21 +1,16 @@
-<script setup lang="ts">
+<script lang="ts" setup>
+import AudioReactions from '@/components/audio/AudioReactions.vue';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
-import { ref, onMounted } from 'vue';
+import { useEchoPublic } from '@laravel/echo-vue';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
-import AudioReactions from '@/components/audio/AudioReactions.vue';
-import { useEchoPublic } from '@laravel/echo-vue';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ChevronDown } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
 
 interface Item {
     id: number; // Use actual CivitAI numeric ID
@@ -37,7 +32,6 @@ interface Props {
     page: number | string | null;
     nextPage: number | string | null;
     hasNextPage: boolean;
-    allItemsBlacklisted?: boolean;
     filters: Filters;
 }
 
@@ -87,22 +81,18 @@ const downloadProgress = ref<Record<number, number>>({});
 const downloadedItems = ref<Set<number>>(new Set());
 
 // Setup Echo listener for download progress using useEchoPublic composable for public channel
-useEchoPublic(
-    'file-download-progress',
-    'FileDownloadProgress',
-    (e: any) => {
-        console.log('Received download progress event:', e);
-        downloadProgress.value[e.fileId] = e.progress;
+useEchoPublic('file-download-progress', 'FileDownloadProgress', (e: any) => {
+    console.log('Received download progress event:', e);
+    downloadProgress.value[e.fileId] = e.progress;
 
-        if (e.progress === 100) {
-            downloadedItems.value.add(e.fileId);
-            // Remove progress after a delay
-            setTimeout(() => {
-                delete downloadProgress.value[e.fileId];
-            }, 2000);
-        }
+    if (e.progress === 100) {
+        downloadedItems.value.add(e.fileId);
+        // Remove progress after a delay
+        setTimeout(() => {
+            delete downloadProgress.value[e.fileId];
+        }, 2000);
     }
-);
+});
 
 // Unified pagination state - works with both cursor and page-based pagination
 const paginationState = ref<{
@@ -112,7 +102,7 @@ const paginationState = ref<{
 }>({
     page: props.page,
     nextPage: props.nextPage,
-    hasNextPage: props.hasNextPage
+    hasNextPage: props.hasNextPage,
 });
 
 // Initialize with server-side data
@@ -120,25 +110,12 @@ onMounted(() => {
     if (props.items && props.items.length > 0) {
         masonryItems.value = [...props.items];
     }
-
-    // // If all items are blacklisted, trigger next page fetch
-    // if (props.allItemsBlacklisted && masonry.value) {
-    //     console.log('All items blacklisted, triggering next page fetch');
-    //     // Use setTimeout to ensure masonry is fully initialized
-    //     setTimeout(() => {
-    //         if (masonry.value && typeof masonry.value.loadNext === 'function') {
-    //             masonry.value.loadNext();
-    //         }
-    //     }, 100);
-    // }
 });
 
 // Download function that starts the download process
 const startDownload = async (item: Item) => {
     try {
-        await axios.post(
-            route('browse.download', { file: item.id }),
-        );
+        await axios.post(route('browse.download', { file: item.id }));
         console.log('Download started for item:', item.id);
         downloadProgress.value[item.id] = 0;
     } catch (error) {
@@ -271,16 +248,13 @@ const blacklistImage = async (item: Item) => {
     console.log('Blacklisting image:', item.id);
 
     // Remove from UI immediately for better user experience
-    if(masonry.value){
+    if (masonry.value) {
         masonry.value.onRemove(item);
     }
 
     try {
         // Call backend to blacklist the item using axios
-        await axios.post(
-            route('browse.blacklist', { file: item.id }),
-            { reason: 'Blacklisted via browse interface' }
-        );
+        await axios.post(route('browse.blacklist', { file: item.id }), { reason: 'Blacklisted via browse interface' });
         console.log('Item blacklisted successfully:', item.id);
     } catch (error) {
         console.error('Failed to blacklist item:', error);
@@ -330,48 +304,35 @@ const getPage = async (pageParam: number | string) => {
                 {
                     preserveState: true,
                     preserveScroll: true,
-                    only: ['items', 'hasNextPage', 'nextPage', 'page', 'allItemsBlacklisted'],
+                    only: ['items', 'hasNextPage', 'nextPage', 'page'],
                     onSuccess: (response) => {
                         try {
                             const newItems = response.props.items as Item[];
                             const hasNext = response.props.hasNextPage;
                             const nextPage = response.props.nextPage;
                             const currentPage = response.props.page;
-                            const allBlacklisted = response.props.allItemsBlacklisted;
 
-                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextPage:', nextPage, 'currentPage:', currentPage, 'allBlacklisted:', allBlacklisted);
+                            console.log(
+                                'Fetched items:',
+                                newItems?.length,
+                                'hasNext:',
+                                hasNext,
+                                'nextPage:',
+                                nextPage,
+                                'currentPage:',
+                                currentPage,
+                            );
 
-                            // if (newItems && newItems.length > 0) {
-                                // Update pagination state - backend provides both current page and nextPage values
-                                paginationState.value = {
-                                    page: currentPage,
-                                    nextPage: hasNext ? nextPage : null,
-                                    hasNextPage: hasNext
-                                };
+                            paginationState.value = {
+                                page: currentPage,
+                                nextPage: hasNext ? nextPage : null,
+                                hasNextPage: hasNext,
+                            };
 
-                                resolve({
-                                    items: newItems,
-                                    nextPage: paginationState.value.nextPage
-                                });
-                            // } else if (allBlacklisted && hasNext) {
-                                // All items were blacklisted, but we have more pages - continue fetching
-                                // console.log('All items blacklisted, continuing to next page automatically');
-                                // paginationState.value = {
-                                //     page: currentPage,
-                                //     nextPage: hasNext ? nextPage : null,
-                                //     hasNextPage: hasNext
-                                // };
-
-                                // // Recursively fetch the next page
-                                // setTimeout(async () => {
-                                //     const nextResult = await getPage(nextPage);
-                                //     resolve(nextResult);
-                                // }, 100);
-                            // } else {
-                            //     paginationState.value.hasNextPage = false;
-                            //     paginationState.value.nextPage = null;
-                            //     resolve({ items: [], nextPage: null });
-                            // }
+                            resolve({
+                                items: newItems,
+                                nextPage: paginationState.value.nextPage,
+                            });
                         } catch (error) {
                             console.error('Error processing response:', error);
                             resolve({ items: [], nextPage: null });
@@ -380,8 +341,8 @@ const getPage = async (pageParam: number | string) => {
                     onError: (errors) => {
                         console.error('Failed to fetch more images:', errors);
                         resolve({ items: [], nextPage: null });
-                    }
-                }
+                    },
+                },
             );
         });
     } catch (error) {
@@ -414,10 +375,14 @@ const applyFilters = () => {
         nsfw: currentFilters.value.nsfw.toString(),
     };
 
-    router.get(route('browse', queryParams), {}, {
-        preserveState: false, // Don't preserve state to get fresh data
-        preserveScroll: false, // Don't preserve scroll to go back to top
-    });
+    router.get(
+        route('browse', queryParams),
+        {},
+        {
+            preserveState: false, // Don't preserve state to get fresh data
+            preserveScroll: false, // Don't preserve scroll to go back to top
+        },
+    );
 };
 
 // Load next page of images
@@ -435,19 +400,19 @@ const loadNext = async () => {
     <Head title="Browse" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="h-screen flex flex-col overflow-hidden">
+        <div class="flex h-screen flex-col overflow-hidden">
             <!-- Header -->
-            <div class="flex-shrink-0 p-4 border-b">
+            <div class="flex-shrink-0 border-b p-4">
                 <div class="flex flex-col items-center gap-4">
                     <!-- Filter Controls -->
-                    <div class="flex items-center gap-4 flex-wrap">
+                    <div class="flex flex-wrap items-center gap-4">
                         <!-- Sort Dropdown -->
                         <div class="flex items-center gap-2">
                             <label class="text-sm font-medium">Sort:</label>
                             <DropdownMenu>
                                 <DropdownMenuTrigger as-child>
-                                    <Button variant="outline" class="min-w-[140px] justify-between">
-                                        {{ sortOptions.find(option => option.value === currentFilters.sort)?.label || currentFilters.sort }}
+                                    <Button class="min-w-[140px] justify-between" variant="outline">
+                                        {{ sortOptions.find((option) => option.value === currentFilters.sort)?.label || currentFilters.sort }}
                                         <ChevronDown class="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -455,9 +420,9 @@ const loadNext = async () => {
                                     <DropdownMenuItem
                                         v-for="option in sortOptions"
                                         :key="option.value"
-                                        @click="handleSortChange(option.value)"
-                                        class="cursor-pointer"
                                         :class="{ 'bg-accent': currentFilters.sort === option.value }"
+                                        class="cursor-pointer"
+                                        @click="handleSortChange(option.value)"
                                     >
                                         {{ option.label }}
                                     </DropdownMenuItem>
@@ -470,8 +435,8 @@ const loadNext = async () => {
                             <label class="text-sm font-medium">Period:</label>
                             <DropdownMenu>
                                 <DropdownMenuTrigger as-child>
-                                    <Button variant="outline" class="min-w-[100px] justify-between">
-                                        {{ periodOptions.find(option => option.value === currentFilters.period)?.label || currentFilters.period }}
+                                    <Button class="min-w-[100px] justify-between" variant="outline">
+                                        {{ periodOptions.find((option) => option.value === currentFilters.period)?.label || currentFilters.period }}
                                         <ChevronDown class="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -479,9 +444,9 @@ const loadNext = async () => {
                                     <DropdownMenuItem
                                         v-for="option in periodOptions"
                                         :key="option.value"
-                                        @click="handlePeriodChange(option.value)"
-                                        class="cursor-pointer"
                                         :class="{ 'bg-accent': currentFilters.period === option.value }"
+                                        class="cursor-pointer"
+                                        @click="handlePeriodChange(option.value)"
                                     >
                                         {{ option.label }}
                                     </DropdownMenuItem>
@@ -491,14 +456,8 @@ const loadNext = async () => {
 
                         <!-- NSFW Checkbox -->
                         <div class="flex items-center gap-2">
-                            <Checkbox
-                                :id="'nsfw-checkbox'"
-                                :checked="currentFilters.nsfw"
-                                @update:checked="handleNsfwChange"
-                            />
-                            <label for="nsfw-checkbox" class="text-sm font-medium cursor-pointer">
-                                Show NSFW
-                            </label>
+                            <Checkbox :id="'nsfw-checkbox'" :checked="currentFilters.nsfw" @update:checked="handleNsfwChange" />
+                            <label class="cursor-pointer text-sm font-medium" for="nsfw-checkbox"> Show NSFW </label>
                         </div>
                     </div>
 
@@ -507,26 +466,26 @@ const loadNext = async () => {
             </div>
 
             <!-- Masonry Container -->
-            <div class="flex-1 min-h-0 relative">
+            <div class="relative min-h-0 flex-1">
                 <Masonry
+                    ref="masonry"
                     v-model:items="masonryItems"
                     :get-next-page="getPage"
-                    :skip-initial-load="true"
-                    ref="masonry"
                     :layout="{
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
-                        footer: 32
+                        footer: 32,
                     }"
+                    :skip-initial-load="true"
                     class="h-full"
                 >
                     <template #item="{ item }">
                         <div class="relative h-full">
                             <!-- Image container with fixed imageHeight -->
-                            <div class="relative" :style="{ height: item.imageHeight + 'px' }">
+                            <div :style="{ height: item.imageHeight + 'px' }" class="relative">
                                 <img
-                                    :src="item.src"
                                     :alt="`Image ${item.id}`"
-                                    class="w-full h-full object-cover cursor-pointer transition-all duration-500 ease-in-out"
+                                    :src="item.src"
+                                    class="h-full w-full cursor-pointer object-cover transition-all duration-500 ease-in-out"
                                     loading="lazy"
                                     @error="(e) => console.warn('Failed to load image:', item.id, e)"
                                     @load="() => console.debug('Loaded image:', item.id)"
@@ -536,28 +495,30 @@ const loadNext = async () => {
                             </div>
 
                             <!-- Footer area for reactions -->
-                            <div class="absolute bottom-0 left-0 right-0 flex items-center justify-end p-2" style="height: 32px;">
+                            <div class="absolute right-0 bottom-0 left-0 flex items-center justify-end p-2" style="height: 32px">
                                 <AudioReactions
                                     :file="item"
                                     :icon-size="16"
                                     variant="list"
-                                    @favorite="handleFavorite"
-                                    @like="handleLike"
                                     @dislike="(file, event) => handleDislike(file, event)"
+                                    @favorite="handleFavorite"
                                     @laughedAt="handleLaughedAt"
+                                    @like="handleLike"
                                 />
                             </div>
 
                             <!-- Download progress bar - positioned at bottom of image area -->
-                            <div v-if="downloadProgress[item.id] !== undefined" class="absolute left-0 right-0 bg-black/50" :style="{ bottom: '32px' }">
-                                <div class="bg-blue-500 h-1 transition-all duration-300" :style="{ width: downloadProgress[item.id] + '%' }"></div>
-                                <div class="text-white text-xs p-1 text-center">
-                                    Downloading... {{ downloadProgress[item.id] }}%
-                                </div>
+                            <div
+                                v-if="downloadProgress[item.id] !== undefined"
+                                :style="{ bottom: '32px' }"
+                                class="absolute right-0 left-0 bg-black/50"
+                            >
+                                <div :style="{ width: downloadProgress[item.id] + '%' }" class="h-1 bg-blue-500 transition-all duration-300"></div>
+                                <div class="p-1 text-center text-xs text-white">Downloading... {{ downloadProgress[item.id] }}%</div>
                             </div>
 
                             <!-- Downloaded indicator -->
-                            <div v-if="downloadedItems.has(item.id)" class="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs">
+                            <div v-if="downloadedItems.has(item.id)" class="absolute top-2 left-2 rounded bg-green-500 px-2 py-1 text-xs text-white">
                                 ✓ Downloaded
                             </div>
                         </div>
@@ -565,12 +526,9 @@ const loadNext = async () => {
                 </Masonry>
 
                 <!-- Loading Overlay -->
-                <div
-                    v-if="masonry?.isLoading"
-                    class="absolute inset-0 bg-opacity-30 flex items-center justify-center z-50 backdrop-blur-[2px]"
-                >
-                    <div class="bg-primary rounded-lg p-6 shadow-lg flex items-center gap-3">
-                        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <div v-if="masonry?.isLoading" class="bg-opacity-30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-[2px]">
+                    <div class="flex items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
+                        <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-500"></div>
                         <span class="font-medium text-white">Loading more images...</span>
                     </div>
                 </div>

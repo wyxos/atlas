@@ -86,15 +86,11 @@ class CivitAIService
         $hasNextPage = ! empty($result['metadata']['nextCursor']);
         $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
 
-        // Check if all items were blacklisted and we have a next page available
-        $allItemsBlacklisted = empty($transformedItems) && ! empty($result['items']) && $hasNextPage;
-
         return [
             'items' => $transformedItems,
             'page' => $currentPage, // Current page value (cursor or null for first page)
             'nextPage' => $nextPage, // Next page value (cursor or null if no more)
             'hasNextPage' => $hasNextPage,
-            'allItemsBlacklisted' => $allItemsBlacklisted, // Flag to trigger next page fetch
         ];
     }
 
