@@ -50,10 +50,9 @@ class CivitAIService
     {
         $params = [
             'limit' => $limit,
-//            'sort' => 'Newest',
-            'sort' => 'Most Reactions',
-            'period' => 'AllTime',
-            'nsfw' => false,
+            'sort' => $this->request->get('sort', 'Most Reactions'),
+            'period' => $this->request->get('period', 'AllTime'),
+            'nsfw' => $this->request->boolean('nsfw', false),
         ];
 
         // For CivitAI, if page is null (first request), don't send cursor

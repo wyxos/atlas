@@ -8,6 +8,14 @@ import axios from 'axios';
 import AudioReactions from '@/components/audio/AudioReactions.vue';
 import { useEchoPublic } from '@laravel/echo-vue';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-vue-next';
 
 interface Item {
     id: number; // Use actual CivitAI numeric ID
@@ -18,12 +26,19 @@ interface Item {
     index: number;
 }
 
+interface Filters {
+    sort: string;
+    period: string;
+    nsfw: boolean;
+}
+
 interface Props {
     items: Item[];
     page: number | string | null;
     nextPage: number | string | null;
     hasNextPage: boolean;
     allItemsBlacklisted?: boolean;
+    filters: Filters;
 }
 
 const props = defineProps<Props>();
@@ -37,6 +52,35 @@ const breadcrumbs: BreadcrumbItem[] = [
 const masonryItems = ref<Item[]>([]);
 
 const masonry = ref(null);
+
+// Filter state management
+const currentFilters = ref<Filters>({
+    sort: props.filters.sort,
+    period: props.filters.period,
+    nsfw: props.filters.nsfw,
+});
+
+// Sort options based on CivitAI API
+const sortOptions = [
+    { value: 'Most Reactions', label: 'Most Reactions' },
+    { value: 'Most Comments', label: 'Most Comments' },
+    { value: 'Newest', label: 'Newest' },
+    { value: 'Oldest', label: 'Oldest' },
+    { value: 'Most Liked', label: 'Most Liked' },
+    { value: 'Most Downloaded', label: 'Most Downloaded' },
+    { value: 'Most Followed', label: 'Most Followed' },
+    { value: 'Most Collected', label: 'Most Collected' },
+    { value: 'Random', label: 'Random' },
+];
+
+// Period options based on CivitAI API
+const periodOptions = [
+    { value: 'AllTime', label: 'All Time' },
+    { value: 'Year', label: 'Year' },
+    { value: 'Month', label: 'Month' },
+    { value: 'Week', label: 'Week' },
+    { value: 'Day', label: 'Day' },
+];
 
 // Download progress tracking
 const downloadProgress = ref<Record<number, number>>({});
@@ -270,8 +314,12 @@ const getPage = async (pageParam: number | string) => {
         }
 
         // Use the nextPage value directly - backend determines if it's cursor or page number
+        // Include current filters to maintain consistency
         const queryParams = {
-            page: paginationState.value.nextPage
+            page: paginationState.value.nextPage,
+            sort: currentFilters.value.sort,
+            period: currentFilters.value.period,
+            nsfw: currentFilters.value.nsfw.toString(),
         };
 
         // Use Inertia to fetch data
@@ -342,6 +390,36 @@ const getPage = async (pageParam: number | string) => {
     }
 };
 
+// Filter change handlers - navigate back to page 1 when filters change
+const handleSortChange = (newSort: string) => {
+    currentFilters.value.sort = newSort;
+    applyFilters();
+};
+
+const handlePeriodChange = (newPeriod: string) => {
+    currentFilters.value.period = newPeriod;
+    applyFilters();
+};
+
+const handleNsfwChange = (checked: boolean) => {
+    currentFilters.value.nsfw = checked;
+    applyFilters();
+};
+
+// Apply filters by navigating to the browse page with new parameters (no page parameter to go to page 1)
+const applyFilters = () => {
+    const queryParams = {
+        sort: currentFilters.value.sort,
+        period: currentFilters.value.period,
+        nsfw: currentFilters.value.nsfw.toString(),
+    };
+
+    router.get(route('browse', queryParams), {}, {
+        preserveState: false, // Don't preserve state to get fresh data
+        preserveScroll: false, // Don't preserve scroll to go back to top
+    });
+};
+
 // Load next page of images
 const loadNext = async () => {
     if (masonry.value && typeof masonry.value.loadNext === 'function') {
@@ -361,7 +439,70 @@ const loadNext = async () => {
             <!-- Header -->
             <div class="flex-shrink-0 p-4 border-b">
                 <div class="flex flex-col items-center gap-4">
-                    <Button  @click="loadNext()">Next+</Button>
+                    <!-- Filter Controls -->
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <!-- Sort Dropdown -->
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium">Sort:</label>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger as-child>
+                                    <Button variant="outline" class="min-w-[140px] justify-between">
+                                        {{ sortOptions.find(option => option.value === currentFilters.sort)?.label || currentFilters.sort }}
+                                        <ChevronDown class="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuItem
+                                        v-for="option in sortOptions"
+                                        :key="option.value"
+                                        @click="handleSortChange(option.value)"
+                                        class="cursor-pointer"
+                                        :class="{ 'bg-accent': currentFilters.sort === option.value }"
+                                    >
+                                        {{ option.label }}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
+                        <!-- Period Dropdown -->
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm font-medium">Period:</label>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger as-child>
+                                    <Button variant="outline" class="min-w-[100px] justify-between">
+                                        {{ periodOptions.find(option => option.value === currentFilters.period)?.label || currentFilters.period }}
+                                        <ChevronDown class="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuItem
+                                        v-for="option in periodOptions"
+                                        :key="option.value"
+                                        @click="handlePeriodChange(option.value)"
+                                        class="cursor-pointer"
+                                        :class="{ 'bg-accent': currentFilters.period === option.value }"
+                                    >
+                                        {{ option.label }}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
+                        <!-- NSFW Checkbox -->
+                        <div class="flex items-center gap-2">
+                            <Checkbox
+                                :id="'nsfw-checkbox'"
+                                :checked="currentFilters.nsfw"
+                                @update:checked="handleNsfwChange"
+                            />
+                            <label for="nsfw-checkbox" class="text-sm font-medium cursor-pointer">
+                                Show NSFW
+                            </label>
+                        </div>
+                    </div>
+
+                    <Button @click="loadNext()">Next+</Button>
                 </div>
             </div>
 

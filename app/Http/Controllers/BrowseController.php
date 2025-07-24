@@ -19,6 +19,13 @@ class BrowseController extends Controller
         $civitAIService = new CivitAIService($request);
         $result = $civitAIService->fetch();
 
+        // Add current filter values to the response
+        $result['filters'] = [
+            'sort' => $request->get('sort', 'Most Reactions'),
+            'period' => $request->get('period', 'AllTime'),
+            'nsfw' => $request->boolean('nsfw', false),
+        ];
+
         return Inertia::render('Browse', $result);
     }
 
