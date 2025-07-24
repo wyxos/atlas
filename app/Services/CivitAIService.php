@@ -143,7 +143,7 @@ class CivitAIService
     }
 
     /**
-     * Upsert transformed items as File instances based on referrer_url using bulk operations.
+     * Upsert transformed items as File instances based on referrer_url using Laravel's upsert().
      */
     private function upsertFiles(array $transformedItems): array
     {
@@ -151,57 +151,73 @@ class CivitAIService
             return [];
         }
 
-        $reffererUrls = collect($transformedItems)->pluck('referrer_url')->toArray();
+        // Prepare data for upsert operation
+        $fileData = collect($transformedItems)->map(function ($item) {
+            return [
+                'source' => $item['source'],
+                'source_id' => $item['source_id'],
+                'url' => $item['url'],
+                'referrer_url' => $item['referrer_url'],
+                'filename' => $item['filename'],
+                'ext' => $item['ext'],
+                'mime_type' => $item['mime_type'],
+                'description' => $item['description'],
+                'thumbnail_url' => $item['thumbnail_url'],
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ];
+        })->toArray();
 
-        $existingFiles = File::query()
-            ->whereIn('referrer_url', $reffererUrls)
-            ->get();
+        // Single atomic upsert operation
+        File::upsert(
+            $fileData,
+            ['referrer_url'], // Unique identifier column(s)
+            ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'updated_at'] // Columns to update on conflict
+        );
 
-        $newFiles = collect($transformedItems)->filter(function ($item) use ($existingFiles) {
-            return !$existingFiles->contains('referrer_url', $item['referrer_url']);
-        })
-            ->map(function ($item) {
-                return [
-                    'source' => $item['source'],
-                    'source_id' => $item['source_id'],
-                    'url' => $item['url'],
-                    'referrer_url' => $item['referrer_url'],
-                    'filename' => $item['filename'],
-                    'ext' => $item['ext'],
-                    'mime_type' => $item['mime_type'],
-                    'description' => $item['description'],
-                    'thumbnail_url' => $item['thumbnail_url'],
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                ];
+        $referrerUrls = collect($transformedItems)->pluck('referrer_url')->toArray();
+
+        // Get all files that were upserted
+        $upsertedFiles = File::query()
+            ->whereIn('referrer_url', $referrerUrls)
+            ->get()
+            ->keyBy('referrer_url');
+
+        // Prepare metadata for upsert
+        $metadataToUpsert = collect($transformedItems)
+            ->filter(function ($item) {
+                return isset($item['_metadata']);
             })
+            ->map(function ($item) use ($upsertedFiles) {
+                $file = $upsertedFiles->get($item['referrer_url']);
+                if ($file) {
+                    return [
+                        'file_id' => $file->id,
+                        'payload' => json_encode($item['_metadata']),
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now(),
+                    ];
+                }
+                return null;
+            })
+            ->filter()
             ->toArray();
 
-        File::insert($newFiles);
-
-        // Target files without metadata
-        $filesWithoutMetadata = File::query()
-            ->whereIn('referrer_url', $reffererUrls)
-            ->whereDoesntHave('metadata')
-            ->get();
-
-        $matchMetadata = $filesWithoutMetadata->map(function ($file) use ($transformedItems) {
-            $item = collect($transformedItems)->firstWhere('referrer_url', $file->referrer_url);
-            if ($item && isset($item['_metadata'])) {
-                return [
-                    'file_id' => $file->id,
-                    'payload' => json_encode($item['_metadata']),
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                ];
-            }
-            return null;
-        })->filter();
-
-        FileMetadata::insert($matchMetadata->toArray());
+        // Upsert metadata (insert new, update existing)
+        if (!empty($metadataToUpsert)) {
+            FileMetadata::upsert(
+                $metadataToUpsert,
+                ['file_id'], // Unique identifier
+                ['payload', 'updated_at'] // Columns to update on conflict
+            );
+        }
 
         return File::query()
-            ->whereIn('referrer_url', $reffererUrls)
+            ->whereIn('referrer_url', $referrerUrls)
+            ->where('liked', false)
+            ->where('disliked', false)
+            ->where('funny', false)
+            ->where('downloaded', false)
             ->where('is_blacklisted', false)
             ->get()
             ->all();
