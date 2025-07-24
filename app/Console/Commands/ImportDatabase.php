@@ -58,14 +58,115 @@ class ImportDatabase extends Command
         }
 
         try {
-            // Execute import
-            DB::unprepared(file_get_contents($filePath));
-            $this->info("✓ Database imported successfully from {$filePath}");
-            return Command::SUCCESS;
+            // Get database configuration
+            $config = config("database.connections.{$connection}");
+            
+            if (!$config) {
+                $this->error("Database connection '{$connection}' not found");
+                return Command::FAILURE;
+            }
+
+            if ($config['driver'] !== 'mysql') {
+                $this->error("This command only supports MySQL/MariaDB connections");
+                return Command::FAILURE;
+            }
+
+            // Build mysql import command
+            $command = $this->buildMysqlImportCommand($config, $filePath);
+            
+            $this->info('Importing SQL dump...');
+            $this->line("Executing: mysql [credentials hidden]");
+            
+            $result = $this->executeCommand($command);
+            
+            if ($result === 0) {
+                $fileSize = $this->formatBytes($latestFile->getSize());
+                $this->info("✓ Database imported successfully from {$filePath} ({$fileSize})");
+                return Command::SUCCESS;
+            } else {
+                $this->error('✗ Failed to import database');
+                return Command::FAILURE;
+            }
+
         } catch (\Exception $e) {
             $this->error('Import failed: ' . $e->getMessage());
             return Command::FAILURE;
         }
+    }
+
+    /**
+     * Build the mysql import command.
+     */
+    private function buildMysqlImportCommand(array $config, string $filePath): string
+    {
+        $command = 'mysql';
+        
+        if (!empty($config['host'])) {
+            $command .= ' -h ' . escapeshellarg($config['host']);
+        }
+        
+        if (!empty($config['port'])) {
+            $command .= ' -P ' . escapeshellarg($config['port']);
+        }
+        
+        if (!empty($config['username'])) {
+            $command .= ' -u ' . escapeshellarg($config['username']);
+        }
+        
+        if (!empty($config['password'])) {
+            $command .= ' -p' . escapeshellarg($config['password']);
+        }
+        
+        if (!empty($config['database'])) {
+            $command .= ' ' . escapeshellarg($config['database']);
+        }
+        
+        $command .= ' < ' . escapeshellarg($filePath);
+        
+        return $command;
+    }
+
+    /**
+     * Execute a shell command and return the exit code.
+     */
+    private function executeCommand(string $command): int
+    {
+        $process = proc_open(
+            $command,
+            [
+                0 => ['pipe', 'r'],  // stdin
+                1 => ['pipe', 'w'],  // stdout
+                2 => ['pipe', 'w'],  // stderr
+            ],
+            $pipes
+        );
+
+        if (!is_resource($process)) {
+            $this->error('Failed to start process');
+            return 1;
+        }
+
+        // Close stdin
+        fclose($pipes[0]);
+
+        // Read stdout and stderr
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $exitCode = proc_close($process);
+
+        if (!empty($stdout)) {
+            $this->line($stdout);
+        }
+
+        if (!empty($stderr)) {
+            $this->error($stderr);
+        }
+
+        return $exitCode;
     }
 
     /**
