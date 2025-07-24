@@ -15,7 +15,8 @@ class ImportDatabase extends Command
      */
     protected $signature = 'db:import 
                             {--connection= : The database connection to import into (defaults to default connection)}
-                            {--dry-run : Show what would be done without actually doing it}';
+                            {--dry-run : Show what would be done without actually doing it}
+                            {--force : Skip confirmation prompt}';
 
     /**
      * The console command description.
@@ -51,8 +52,8 @@ class ImportDatabase extends Command
             return Command::SUCCESS;
         }
 
-        // Confirm before proceeding
-        if (!$this->confirm('This will overwrite the current database. Are you sure you want to continue?')) {
+        // Confirm before proceeding (unless --force is used)
+        if (!$this->option('force') && !$this->confirm('This will overwrite the current database. Are you sure you want to continue?')) {
             $this->info('Operation cancelled by user');
             return Command::SUCCESS;
         }
