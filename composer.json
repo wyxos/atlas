@@ -34,6 +34,7 @@
         "php": "^8.2",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/framework": "^12.0",
+        "laravel/horizon": "^5.33",
         "laravel/reverb": "^1.0",
         "laravel/scout": "^10.15",
         "laravel/tinker": "^2.10.1",
