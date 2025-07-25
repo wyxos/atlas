@@ -10,50 +10,31 @@ class ImageController extends Controller
 {
     public function index()
     {
-        $search = [];
-
-        if ($query = request()->input('query')) {
-            // Filter search results to only include image files that exist
-            $search = File::search($query)
-                ->query(function ($builder) {
-                    $builder->where('mime_type', 'like', 'image/%')
-                        ->whereNotNUll('path')
-                            ->where('not_found', false);
-                })
-                ->get();
-
-            // Load covers relationship for search results
-            if ($search->isNotEmpty()) {
-                $search->load(['covers']);
-            }
-        }
-
-        $images = File::search('')
+        $query = request()->input('query', '');
+        
+        // Use Scout search for all cases - use wildcard '*' for empty queries
+        $searchQuery = empty($query) ? '*' : $query;
+        
+        $images = File::search($searchQuery)
             ->query(function ($builder) {
                 $builder->where('mime_type', 'like', 'image/%')
-                    ->whereNotNUll('path')
+                    ->whereNotNull('path')
                     ->where('not_found', false);
             })
             ->orderBy('created_at', 'desc')
             ->paginate(48);
 
-        // Append image_url attribute to paginated results
+        // Load covers relationship
+        $images->getCollection()->load(['covers']);
+
+        // Append image_url attribute to results
         $images->getCollection()->transform(function ($file) {
             $file->append('image_url');
             return $file;
         });
 
-        // Append image_url attribute to search results
-        if (!empty($search)) {
-            $search = collect($search)->map(function ($file) {
-                $file->append('image_url');
-                return $file;
-            })->toArray();
-        }
-
         return Inertia::render('Images', [
             'images' => $images,
-            'search' => $search,
         ]);
     }
 

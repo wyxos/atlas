@@ -39,10 +39,18 @@ const props = defineProps<{
         links: any[];
         meta: any;
     };
-    search: ImageFile[];
 }>();
 
 const { images } = props;
+
+// Get initial query from URL
+function getInitialQuery(): string {
+    if (typeof window !== 'undefined' && window.location.search) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('query') || '';
+    }
+    return '';
+}
 
 // Get image path
 function getImagePath(image: ImageFile): string {
@@ -86,7 +94,7 @@ function getDisplayTitle(image: ImageFile): string {
             <GenericSearch
                 route-name="images.index"
                 placeholder="Search images..."
-                :initial-query="$page.url.includes('query=') ? new URLSearchParams($page.url.split('?')[1]).get('query') : ''"
+                :initial-query="getInitialQuery()"
             >
                 <template #noResults="{ query }">
                     <div class="text-center">
@@ -99,7 +107,7 @@ function getDisplayTitle(image: ImageFile): string {
                 <!-- Images Grid - Pinterest-like layout -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 mb-8">
                     <Card
-                        v-for="image in (props.search.length > 0 ? props.search : images.data)"
+                        v-for="image in images.data"
                         :key="image.id"
                         class="hover:shadow-lg transition-shadow cursor-pointer group overflow-hidden"
                     >
@@ -141,11 +149,11 @@ function getDisplayTitle(image: ImageFile): string {
                     </Card>
                 </div>
 
-                <!-- Pagination (only show when not searching) -->
-                <Pagination v-if="props.search.length === 0" :data="images" />
+                <!-- Pagination -->
+                <Pagination :data="images" />
 
-                <!-- Empty state (only show when not searching) -->
-                <div v-if="props.search.length === 0 && images.data.length === 0" class="text-center py-12">
+                <!-- Empty state -->
+                <div v-if="images.data.length === 0" class="text-center py-12">
                     <Image class="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 class="text-lg font-semibold text-gray-600 mb-2">No Images Found</h3>
                     <p class="text-gray-500">No images are available in your collection.</p>
