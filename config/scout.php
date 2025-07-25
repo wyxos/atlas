@@ -214,6 +214,7 @@ return [
                         ['name' => 'downloaded', 'type' => 'bool', 'optional' => true],
                         ['name' => 'download_progress', 'type' => 'int32', 'optional' => true],
                         ['name' => 'downloaded_at', 'type' => 'int64', 'optional' => true],
+                        ['name' => 'not_found', 'type' => 'bool', 'optional' => true],
                         ['name' => 'artist_name', 'type' => 'string', 'optional' => true],
                         ['name' => 'artist_names', 'type' => 'string[]', 'optional' => true],
                         ['name' => 'album_name', 'type' => 'string', 'optional' => true],

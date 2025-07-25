@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\File;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -11,21 +12,28 @@ class ImageController extends Controller
     public function index()
     {
         $query = request()->input('query', '');
-        
-        // Use Scout search for all cases - use wildcard '*' for empty queries
-        $searchQuery = empty($query) ? '*' : $query;
-        
-        $images = File::search($searchQuery)
-            ->query(function ($builder) {
-                $builder->where('mime_type', 'like', 'image/%')
-                    ->whereNotNull('path')
-                    ->where('not_found', false);
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate(48);
 
-        // Load covers relationship
-        $images->getCollection()->load(['covers']);
+        // Handle empty query case properly for Typesense
+        if (empty($query)) {
+            // For empty queries, use regular Eloquent with Scout-like ordering
+            $images = File::where('mime_type', 'like', 'image/%')
+                ->where('not_found', false)
+                ->whereNotNull('path')
+                ->where('path', '!=', '')
+                ->orderBy('created_at', 'desc')
+                ->paginate(48);
+        } else {
+            // For actual search queries, use Scout
+            $images = File::search($query)
+                ->query(function (Builder $builder) {
+                    $builder->where('mime_type', 'like', 'image/%')
+                        ->where('not_found', false)
+                        ->whereNotNull('path')
+                        ->where('path', '!=', '');
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate(48);
+        }
 
         // Append image_url attribute to results
         $images->getCollection()->transform(function ($file) {
@@ -47,15 +55,15 @@ class ImageController extends Controller
             $search = File::search($query)
                 ->query(function ($builder) {
                     $builder->where('mime_type', 'like', 'image/%')
-                            ->where('not_found', false)
-                            ->where(function ($q) {
-                                $q->whereJsonContains('tags', 'book')
-                                  ->orWhere('title', 'like', '%book%')
-                                  ->orWhere('title', 'like', '%page%')
-                                  ->orWhere('filename', 'like', '%book%')
-                                  ->orWhere('filename', 'like', '%page%')
-                                  ->orWhere('filename', 'like', '%chapter%');
-                            });
+                        ->where('not_found', false)
+                        ->where(function ($q) {
+                            $q->whereJsonContains('tags', 'book')
+                                ->orWhere('title', 'like', '%book%')
+                                ->orWhere('title', 'like', '%page%')
+                                ->orWhere('filename', 'like', '%book%')
+                                ->orWhere('filename', 'like', '%page%')
+                                ->orWhere('filename', 'like', '%chapter%');
+                        });
                 })
                 ->get();
 
@@ -69,11 +77,11 @@ class ImageController extends Controller
             ->where('not_found', false)
             ->where(function ($query) {
                 $query->whereJsonContains('tags', 'book')
-                      ->orWhere('title', 'like', '%book%')
-                      ->orWhere('title', 'like', '%page%')
-                      ->orWhere('filename', 'like', '%book%')
-                      ->orWhere('filename', 'like', '%page%')
-                      ->orWhere('filename', 'like', '%chapter%');
+                    ->orWhere('title', 'like', '%book%')
+                    ->orWhere('title', 'like', '%page%')
+                    ->orWhere('filename', 'like', '%book%')
+                    ->orWhere('filename', 'like', '%page%')
+                    ->orWhere('filename', 'like', '%chapter%');
             })
             ->with('covers')
             ->orderBy('created_at', 'desc')
@@ -109,16 +117,16 @@ class ImageController extends Controller
             $search = File::search($query)
                 ->query(function ($builder) {
                     $builder->where('mime_type', 'like', 'image/%')
-                            ->where('not_found', false)
-                            ->where(function ($q) {
-                                $q->whereJsonContains('tags', 'set')
-                                  ->orWhere('title', 'like', '%set%')
-                                  ->orWhere('title', 'like', '%collection%')
-                                  ->orWhere('title', 'like', '%gallery%')
-                                  ->orWhere('filename', 'like', '%set%')
-                                  ->orWhere('filename', 'like', '%collection%')
-                                  ->orWhere('filename', 'like', '%gallery%');
-                            });
+                        ->where('not_found', false)
+                        ->where(function ($q) {
+                            $q->whereJsonContains('tags', 'set')
+                                ->orWhere('title', 'like', '%set%')
+                                ->orWhere('title', 'like', '%collection%')
+                                ->orWhere('title', 'like', '%gallery%')
+                                ->orWhere('filename', 'like', '%set%')
+                                ->orWhere('filename', 'like', '%collection%')
+                                ->orWhere('filename', 'like', '%gallery%');
+                        });
                 })
                 ->get();
 
@@ -132,12 +140,12 @@ class ImageController extends Controller
             ->where('not_found', false)
             ->where(function ($query) {
                 $query->whereJsonContains('tags', 'set')
-                      ->orWhere('title', 'like', '%set%')
-                      ->orWhere('title', 'like', '%collection%')
-                      ->orWhere('title', 'like', '%gallery%')
-                      ->orWhere('filename', 'like', '%set%')
-                      ->orWhere('filename', 'like', '%collection%')
-                      ->orWhere('filename', 'like', '%gallery%');
+                    ->orWhere('title', 'like', '%set%')
+                    ->orWhere('title', 'like', '%collection%')
+                    ->orWhere('title', 'like', '%gallery%')
+                    ->orWhere('filename', 'like', '%set%')
+                    ->orWhere('filename', 'like', '%collection%')
+                    ->orWhere('filename', 'like', '%gallery%');
             })
             ->with('covers')
             ->orderBy('created_at', 'desc')
@@ -173,22 +181,22 @@ class ImageController extends Controller
             $search = File::search($query)
                 ->query(function ($builder) {
                     $builder->where('mime_type', 'like', 'image/%')
-                            ->where('not_found', false)
-                            ->where(function ($q) {
-                                $q->whereJsonDoesntContain('tags', 'book')
-                                  ->whereJsonDoesntContain('tags', 'set');
-                            })
-                            ->where('title', 'not like', '%book%')
-                            ->where('title', 'not like', '%page%')
-                            ->where('title', 'not like', '%set%')
-                            ->where('title', 'not like', '%collection%')
-                            ->where('title', 'not like', '%gallery%')
-                            ->where('filename', 'not like', '%book%')
-                            ->where('filename', 'not like', '%page%')
-                            ->where('filename', 'not like', '%chapter%')
-                            ->where('filename', 'not like', '%set%')
-                            ->where('filename', 'not like', '%collection%')
-                            ->where('filename', 'not like', '%gallery%');
+                        ->where('not_found', false)
+                        ->where(function ($q) {
+                            $q->whereJsonDoesntContain('tags', 'book')
+                                ->whereJsonDoesntContain('tags', 'set');
+                        })
+                        ->where('title', 'not like', '%book%')
+                        ->where('title', 'not like', '%page%')
+                        ->where('title', 'not like', '%set%')
+                        ->where('title', 'not like', '%collection%')
+                        ->where('title', 'not like', '%gallery%')
+                        ->where('filename', 'not like', '%book%')
+                        ->where('filename', 'not like', '%page%')
+                        ->where('filename', 'not like', '%chapter%')
+                        ->where('filename', 'not like', '%set%')
+                        ->where('filename', 'not like', '%collection%')
+                        ->where('filename', 'not like', '%gallery%');
                 })
                 ->get();
 
@@ -202,7 +210,7 @@ class ImageController extends Controller
             ->where('not_found', false)
             ->where(function ($query) {
                 $query->whereJsonDoesntContain('tags', 'book')
-                      ->whereJsonDoesntContain('tags', 'set');
+                    ->whereJsonDoesntContain('tags', 'set');
             })
             ->where('title', 'not like', '%book%')
             ->where('title', 'not like', '%page%')
