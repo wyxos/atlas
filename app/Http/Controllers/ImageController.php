@@ -17,6 +17,7 @@ class ImageController extends Controller
             $search = File::search($query)
                 ->query(function ($builder) {
                     $builder->where('mime_type', 'like', 'image/%')
+                        ->whereNotNUll('path')
                             ->where('not_found', false);
                 })
                 ->get();
@@ -27,9 +28,12 @@ class ImageController extends Controller
             }
         }
 
-        $images = File::image()
-            ->where('not_found', false)
-            ->with('covers')
+        $images = File::search('')
+            ->query(function ($builder) {
+                $builder->where('mime_type', 'like', 'image/%')
+                    ->whereNotNUll('path')
+                    ->where('not_found', false);
+            })
             ->orderBy('created_at', 'desc')
             ->paginate(48);
 

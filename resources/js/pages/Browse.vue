@@ -363,7 +363,9 @@ const handlePeriodChange = (newPeriod: string) => {
 };
 
 const handleNsfwChange = (checked: boolean) => {
+    console.log('NSFW checkbox changed to:', checked);
     currentFilters.value.nsfw = checked;
+    console.log('Current filters after change:', currentFilters.value);
     applyFilters();
 };
 
@@ -374,6 +376,9 @@ const applyFilters = () => {
         period: currentFilters.value.period,
         nsfw: currentFilters.value.nsfw.toString(),
     };
+    
+    console.log('Applying filters with query params:', queryParams);
+    console.log('Route URL will be:', route('browse', queryParams));
 
     router.get(
         route('browse', queryParams),
@@ -456,7 +461,7 @@ const loadNext = async () => {
 
                         <!-- NSFW Checkbox -->
                         <div class="flex items-center gap-2">
-                            <Checkbox :id="'nsfw-checkbox'" :checked="currentFilters.nsfw" @update:checked="handleNsfwChange" />
+                            <Checkbox :id="'nsfw-checkbox'" v-model="currentFilters.nsfw" @update:model-value="handleNsfwChange" />
                             <label class="cursor-pointer text-sm font-medium" for="nsfw-checkbox"> Show NSFW </label>
                         </div>
                     </div>
