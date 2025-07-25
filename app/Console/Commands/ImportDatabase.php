@@ -100,7 +100,7 @@ class ImportDatabase extends Command
      */
     private function buildMysqlImportCommand(array $config, string $filePath): string
     {
-        $command = 'mysql';
+        $command = $this->getMysqlPath();
         
         if (!empty($config['host'])) {
             $command .= ' -h ' . escapeshellarg($config['host']);
@@ -125,6 +125,39 @@ class ImportDatabase extends Command
         $command .= ' < ' . escapeshellarg($filePath);
         
         return $command;
+    }
+
+    /**
+     * Get the appropriate mysql path based on the operating system.
+     */
+    private function getMysqlPath(): string
+    {
+        // Check if we're on Windows and if Herd is available
+        if (PHP_OS_FAMILY === 'Windows') {
+            $herdPath = getenv('USERPROFILE') . '\\.config\\herd\\bin\\services\\mariadb\\10.11\\bin\\mysql.exe';
+            
+            if (file_exists($herdPath)) {
+                return '"' . $herdPath . '"';
+            }
+            
+            // Fallback to system PATH on Windows
+            return 'mysql';
+        }
+        
+        // Check if we're on macOS and if Herd is available
+        if (PHP_OS_FAMILY === 'Darwin') {
+            $herdPath = getenv('HOME') . '/Library/Application Support/Herd/bin/mysql';
+            
+            if (file_exists($herdPath)) {
+                return '"' . $herdPath . '"';
+            }
+            
+            // Fallback to system PATH on macOS
+            return 'mysql';
+        }
+        
+        // On Linux/Unix systems, use the system PATH
+        return 'mysql';
     }
 
     /**

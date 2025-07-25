@@ -72,8 +72,9 @@ class BackupDatabase extends Command
             return 1;
         }
 
-        // Generate backup filename
-        $filename = Str::of(basename($databasePath))->beforeLast('.')."_{$timestamp}.sqlite";
+        // Generate backup filename with environment
+        $environment = app()->environment();
+        $filename = Str::of(basename($databasePath))->beforeLast('.')."_{$environment}_{$timestamp}.sqlite";
         $backupPath = $customOutput ?: "{$backupDir}/{$filename}";
 
         // Copy the database file
@@ -90,8 +91,9 @@ class BackupDatabase extends Command
         $username = $config['username'];
         $password = $config['password'] ?? '';
 
-        // Generate backup filename
-        $filename = "{$database}_{$timestamp}.sql";
+        // Generate backup filename with environment
+        $environment = app()->environment();
+        $filename = "{$database}_{$environment}_{$timestamp}.sql";
         $backupPath = $customOutput ?: "{$backupDir}/{$filename}";
 
         // Build mysqldump command with OS-appropriate path
