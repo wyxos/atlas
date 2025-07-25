@@ -43,6 +43,13 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                'verify' => false, // Disable SSL certificate verification
+                'curl' => [
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_SSL_VERIFYPEER => 0,
+                    CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                    CURLOPT_SSL_CIPHER_LIST => 'ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!SHA1:!AESCCM',
+                ],
             ],
         ],
 
@@ -61,6 +68,12 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                'verify' => false, // Disable SSL certificate verification
+                'curl' => [
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_SSL_VERIFYPEER => 0,
+                    CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
+                ],
             ],
         ],
 
