@@ -23,13 +23,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 const masonryItems = ref<IBrowseItem[]>([]);
 const masonry = ref(null);
 const isAutocycling = ref(false);
-const autoNext = ref(false);
 
 // Filter state management
 const currentFilters = ref<IBrowseFilters>({
     sort: props.filters.sort,
     period: props.filters.period,
     nsfw: props.filters.nsfw,
+    autoNext: props.filters.autoNext,
 });
 
 // Unified pagination state - works with both cursor and page-based pagination
@@ -47,7 +47,7 @@ const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedA
 onMounted(() => {
     if (props.items && props.items.length > 0) {
         masonryItems.value = [...props.items];
-    } else if (autoNext.value && paginationState.value.hasNextPage && paginationState.value.nextPage && !isAutocycling.value) {
+    } else if (currentFilters.value.autoNext && paginationState.value.hasNextPage && paginationState.value.nextPage && !isAutocycling.value) {
         // Automatically trigger next page if auto next is enabled
         autocycleUntilItems();
     }
@@ -66,7 +66,7 @@ const removeItemFromView = async (item: IBrowseItem) => {
                 console.log('No items left in view after removal, loading next page...');
 
                 // If auto next is enabled, trigger autocycle, otherwise just load next page
-                if (autoNext.value) {
+                if (currentFilters.value.autoNext) {
                     await autocycleUntilItems();
                 } else {
                     await loadNext();
@@ -149,7 +149,8 @@ const getPage = async (pageParam: number | string) => {
             page: paginationState.value.nextPage,
             sort: currentFilters.value.sort,
             period: currentFilters.value.period,
-            nsfw: currentFilters.value.nsfw.toString(),
+            nsfw: currentFilters.value.nsfw,
+            autoNext: currentFilters.value.autoNext,
         };
 
         // Use Inertia to fetch data
@@ -177,7 +178,7 @@ const getPage = async (pageParam: number | string) => {
                             };
 
                             // Check if we should auto cycle after getting empty results
-                            if (!isAutocycling.value && newItems.length === 0 && hasNext && nextPage && autoNext.value) {
+                            if (!isAutocycling.value && newItems.length === 0 && hasNext && nextPage && currentFilters.value.autoNext) {
                                 // Automatically trigger next page if auto next is enabled
                                 setTimeout(() => autocycleUntilItems(), 100);
                             }
@@ -222,12 +223,25 @@ const handleNsfwChange = (checked: boolean) => {
     applyFilters();
 };
 
+const handleAutoNextChange = (checked: boolean) => {
+    console.log('Auto Next checkbox changed to:', checked);
+    currentFilters.value.autoNext = checked;
+    console.log('Current filters after change:', currentFilters.value);
+    applyFilters();
+};
+
+const handleBackToFirst = () => {
+    console.log('Going back to first page with current filters');
+    applyFilters();
+};
+
 // Apply filters by navigating to the browse page with new parameters (no page parameter to go to page 1)
 const applyFilters = () => {
     const queryParams = {
         sort: currentFilters.value.sort,
         period: currentFilters.value.period,
-        nsfw: currentFilters.value.nsfw.toString(),
+        nsfw: currentFilters.value.nsfw,
+        autoNext: currentFilters.value.autoNext,
     };
 
     console.log('Applying filters with query params:', queryParams);
@@ -263,12 +277,12 @@ const loadNext = async () => {
             <div class="flex-shrink-0 border-b p-4">
                 <div class="flex flex-col items-center gap-4">
                     <BrowseFilters
-                        :auto-next="autoNext"
                         :filters="currentFilters"
                         @sort-change="handleSortChange"
                         @period-change="handlePeriodChange"
                         @nsfw-change="handleNsfwChange"
-                        @auto-next-change="(value) => (autoNext = value)"
+                        @auto-next-change="handleAutoNextChange"
+                        @back-to-first="handleBackToFirst"
                         @load-next="loadNext"
                     />
                 </div>

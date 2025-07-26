@@ -16,6 +16,7 @@ export interface BrowseFilters {
     sort: string;
     period: string;
     nsfw: boolean;
+    autoNext: boolean;
 }
 
 export interface BrowseProps {

@@ -24,6 +24,7 @@ class BrowseController extends Controller
             'sort' => $request->get('sort', 'Most Reactions'),
             'period' => $request->get('period', 'AllTime'),
             'nsfw' => $request->boolean('nsfw', false),
+            'autoNext' => $request->boolean('autoNext', false),
         ];
 
         return Inertia::render('Browse', $result);

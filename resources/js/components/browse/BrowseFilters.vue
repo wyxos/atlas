@@ -56,27 +56,33 @@
 
         <!-- Auto Next Checkbox -->
         <div class="flex items-center gap-2">
-            <Checkbox :id="'auto-next-checkbox'" :model-value="autoNext" @update:model-value="$emit('autoNextChange', $event)" />
+            <Checkbox 
+                :id="'auto-next-checkbox'" 
+                :model-value="filters.autoNext" 
+                @update:model-value="$emit('autoNextChange', $event)" 
+            />
             <label class="cursor-pointer text-sm font-medium" for="auto-next-checkbox">Auto Next</label>
         </div>
+
+        <!-- Back to First Page Button -->
+        <Button variant="outline" @click="$emit('backToFirst')">Back to First</Button>
 
         <!-- Next Button -->
         <Button @click="$emit('loadNext')">Next+</Button>
     </div>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
+import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { PERIOD_OPTIONS, SORT_OPTIONS } from '@/constants/browse';
-import type { BrowseFilters } from '@/types/browse';
 import { ChevronDown } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { SORT_OPTIONS, PERIOD_OPTIONS } from '@/constants/browse';
+import type { BrowseFilters } from '@/types/browse';
 
 interface Props {
     filters: BrowseFilters;
-    autoNext: boolean;
 }
 
 const props = defineProps<Props>();
@@ -87,6 +93,7 @@ const emit = defineEmits<{
     nsfwChange: [value: boolean];
     autoNextChange: [value: boolean];
     loadNext: [];
+    backToFirst: [];
 }>();
 
 const sortOptions = SORT_OPTIONS;
