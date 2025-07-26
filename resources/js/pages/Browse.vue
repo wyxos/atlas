@@ -1,15 +1,15 @@
 <script lang="ts" setup>
-import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
-import { Masonry } from '@wyxos/vibe';
-import { onMounted, ref } from 'vue';
 import BrowseFilters from '@/components/browse/BrowseFilters.vue';
 import BrowseItem from '@/components/browse/BrowseItem.vue';
 import { useDownloadProgress } from '@/composables/useDownloadProgress';
 import { useItemReactions } from '@/composables/useItemReactions';
-import { MAX_AUTOCYCLE_ATTEMPTS, AUTOCYCLE_DELAY } from '@/constants/browse';
-import type { BrowseProps, BrowseItem as IBrowseItem, BrowseFilters as IBrowseFilters, PaginationState } from '@/types/browse';
+import { AUTOCYCLE_DELAY, MAX_AUTOCYCLE_ATTEMPTS } from '@/constants/browse';
+import AppLayout from '@/layouts/AppLayout.vue';
+import { type BreadcrumbItem } from '@/types';
+import type { BrowseProps, BrowseFilters as IBrowseFilters, BrowseItem as IBrowseItem, PaginationState } from '@/types/browse';
+import { Head, router } from '@inertiajs/vue3';
+import { Masonry } from '@wyxos/vibe';
+import { onMounted, ref } from 'vue';
 
 const props = defineProps<BrowseProps>();
 
@@ -41,14 +41,7 @@ const paginationState = ref<PaginationState>({
 
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
-const { 
-    startDownload,
-    handleFavorite, 
-    handleLike, 
-    handleDislike, 
-    handleLaughedAt, 
-    blacklistImage 
-} = useItemReactions();
+const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage } = useItemReactions();
 
 // Initialize with server-side data
 onMounted(() => {
@@ -61,9 +54,25 @@ onMounted(() => {
 });
 
 // Remove item from masonry view
-const removeItemFromView = (item: IBrowseItem) => {
+const removeItemFromView = async (item: IBrowseItem) => {
     if (masonry.value && typeof masonry.value.onRemove === 'function') {
         masonry.value.onRemove(item);
+
+        // Check if we need to load more items after removal
+        // Use a small delay to allow the masonry to update its internal state
+        setTimeout(async () => {
+            // Check if there are no visible items left and more pages are available
+            if (masonryItems.value.length === 0 && paginationState.value.hasNextPage && paginationState.value.nextPage) {
+                console.log('No items left in view after removal, loading next page...');
+
+                // If auto next is enabled, trigger autocycle, otherwise just load next page
+                if (autoNext.value) {
+                    await autocycleUntilItems();
+                } else {
+                    await loadNext();
+                }
+            }
+        }, 500); // Small delay to allow masonry state to update
     }
 };
 
@@ -77,7 +86,7 @@ const handleAltClick = (item: IBrowseItem) => {
 
 // Handle Alt+right-click for blacklist
 const handleAltRightClick = (item: IBrowseItem) => {
-    blacklistImage(item, masonry.value);
+    blacklistImage(item, removeItemFromView);
 };
 
 // Autocycle function - uses masonry's loadNext method repeatedly until items are found
@@ -129,10 +138,10 @@ const getPage = async (pageParam: number | string) => {
         console.log('Masonry requesting:', pageParam, 'current state:', paginationState.value);
 
         // If there's no next page to fetch, return empty
-        if (!paginationState.value.hasNextPage || !paginationState.value.nextPage) {
-            console.log('No more pages to fetch');
-            return { items: [], nextPage: null };
-        }
+        // if (!paginationState.value.hasNextPage || !paginationState.value.nextPage) {
+        //     console.log('No more pages to fetch');
+        //     return { items: [], nextPage: null };
+        // }
 
         // Use the nextPage value directly - backend determines if it's cursor or page number
         // Include current filters to maintain consistency
@@ -254,12 +263,12 @@ const loadNext = async () => {
             <div class="flex-shrink-0 border-b p-4">
                 <div class="flex flex-col items-center gap-4">
                     <BrowseFilters
-                        :filters="currentFilters"
                         :auto-next="autoNext"
+                        :filters="currentFilters"
                         @sort-change="handleSortChange"
                         @period-change="handlePeriodChange"
                         @nsfw-change="handleNsfwChange"
-                        @auto-next-change="(value) => autoNext = value"
+                        @auto-next-change="(value) => (autoNext = value)"
                         @load-next="loadNext"
                     />
                 </div>
@@ -280,12 +289,12 @@ const loadNext = async () => {
                 >
                     <template #item="{ item }">
                         <BrowseItem
-                            :item="item"
                             :download-progress="downloadProgress[item.id]"
                             :is-downloaded="downloadedItems.has(item.id)"
+                            :item="item"
+                            @dislike="(file, event) => handleDislike(file, event, (item) => blacklistImage(item, removeItemFromView))"
                             @favorite="(file, event) => handleFavorite(file, event, removeItemFromView)"
                             @like="(file, event) => handleLike(file, event, removeItemFromView)"
-                            @dislike="(file, event) => handleDislike(file, event, (item) => blacklistImage(item, masonry))"
                             @laughed-at="(file, event) => handleLaughedAt(file, event, removeItemFromView)"
                             @alt-click="handleAltClick"
                             @alt-right-click="handleAltRightClick"

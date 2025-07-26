@@ -50,21 +50,13 @@
 
         <!-- NSFW Checkbox -->
         <div class="flex items-center gap-2">
-            <Checkbox 
-                :id="'nsfw-checkbox'" 
-                :model-value="filters.nsfw" 
-                @update:model-value="$emit('nsfwChange', $event)" 
-            />
+            <Checkbox :id="'nsfw-checkbox'" :model-value="filters.nsfw" @update:model-value="$emit('nsfwChange', $event)" />
             <label class="cursor-pointer text-sm font-medium" for="nsfw-checkbox">Show NSFW</label>
         </div>
 
         <!-- Auto Next Checkbox -->
         <div class="flex items-center gap-2">
-            <Checkbox 
-                :id="'auto-next-checkbox'" 
-                :model-value="autoNext" 
-                @update:model-value="$emit('autoNextChange', $event)" 
-            />
+            <Checkbox :id="'auto-next-checkbox'" :model-value="autoNext" @update:model-value="$emit('autoNextChange', $event)" />
             <label class="cursor-pointer text-sm font-medium" for="auto-next-checkbox">Auto Next</label>
         </div>
 
@@ -73,14 +65,14 @@
     </div>
 </template>
 
-<script setup lang="ts">
-import { computed } from 'vue';
+<script lang="ts" setup>
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-vue-next';
-import { SORT_OPTIONS, PERIOD_OPTIONS } from '@/constants/browse';
+import { PERIOD_OPTIONS, SORT_OPTIONS } from '@/constants/browse';
 import type { BrowseFilters } from '@/types/browse';
+import { ChevronDown } from 'lucide-vue-next';
+import { computed } from 'vue';
 
 interface Props {
     filters: BrowseFilters;
@@ -101,10 +93,10 @@ const sortOptions = SORT_OPTIONS;
 const periodOptions = PERIOD_OPTIONS;
 
 const currentSortLabel = computed(() => {
-    return sortOptions.find(option => option.value === props.filters.sort)?.label || props.filters.sort;
+    return sortOptions.find((option) => option.value === props.filters.sort)?.label || props.filters.sort;
 });
 
 const currentPeriodLabel = computed(() => {
-    return periodOptions.find(option => option.value === props.filters.period)?.label || props.filters.period;
+    return periodOptions.find((option) => option.value === props.filters.period)?.label || props.filters.period;
 });
 </script>

@@ -138,20 +138,20 @@ export function useItemReactions() {
         }
     };
 
-    const blacklistImage = async (item: BrowseItem, masonry: any) => {
+    const blacklistImage = async (item: BrowseItem, onRemove?: (item: BrowseItem) => void) => {
         console.log('Blacklisting image:', item.id);
 
         try {
             // Call backend to blacklist the item using axios
-            await axios.post(route('browse.blacklist', { file: item.id }), {
-                reason: 'Blacklisted via browse interface',
+            await axios.post(route('browse.blacklist', { file: item.id }), { 
+                reason: 'Blacklisted via browse interface' 
             });
-
-            // Remove from UI immediately for better user experience
-            if (masonry && typeof masonry.onRemove === 'function') {
-                masonry.onRemove(item);
-            }
             console.log('Item blacklisted successfully:', item.id);
+            
+            // Remove from view after successful blacklist
+            if (onRemove) {
+                onRemove(item);
+            }
         } catch (error) {
             console.error('Failed to blacklist item:', error);
             // Could optionally show a toast notification here
