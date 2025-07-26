@@ -1,41 +1,17 @@
 <script lang="ts" setup>
-import AudioReactions from '@/components/audio/AudioReactions.vue';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
-import { useEchoPublic } from '@laravel/echo-vue';
 import { Masonry } from '@wyxos/vibe';
-import axios from 'axios';
-import { ChevronDown } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
+import BrowseFilters from '@/components/browse/BrowseFilters.vue';
+import BrowseItem from '@/components/browse/BrowseItem.vue';
+import { useDownloadProgress } from '@/composables/useDownloadProgress';
+import { useItemReactions } from '@/composables/useItemReactions';
+import { MAX_AUTOCYCLE_ATTEMPTS, AUTOCYCLE_DELAY } from '@/constants/browse';
+import type { BrowseProps, BrowseItem as IBrowseItem, BrowseFilters as IBrowseFilters, PaginationState } from '@/types/browse';
 
-interface Item {
-    id: number; // Use actual CivitAI numeric ID
-    src: string;
-    width: number;
-    height: number;
-    page: string | number;
-    index: number;
-}
-
-interface Filters {
-    sort: string;
-    period: string;
-    nsfw: boolean;
-}
-
-interface Props {
-    items: Item[];
-    page: number | string | null;
-    nextPage: number | string | null;
-    hasNextPage: boolean;
-    filters: Filters;
-}
-
-const props = defineProps<Props>();
+const props = defineProps<BrowseProps>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -43,71 +19,36 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/browse',
     },
 ];
-const masonryItems = ref<Item[]>([]);
 
+const masonryItems = ref<IBrowseItem[]>([]);
 const masonry = ref(null);
+const isAutocycling = ref(false);
+const autoNext = ref(false);
 
 // Filter state management
-const currentFilters = ref<Filters>({
+const currentFilters = ref<IBrowseFilters>({
     sort: props.filters.sort,
     period: props.filters.period,
     nsfw: props.filters.nsfw,
 });
 
-// Sort options based on CivitAI API
-const sortOptions = [
-    { value: 'Most Reactions', label: 'Most Reactions' },
-    { value: 'Most Comments', label: 'Most Comments' },
-    { value: 'Newest', label: 'Newest' },
-    { value: 'Oldest', label: 'Oldest' },
-    { value: 'Most Liked', label: 'Most Liked' },
-    { value: 'Most Downloaded', label: 'Most Downloaded' },
-    { value: 'Most Followed', label: 'Most Followed' },
-    { value: 'Most Collected', label: 'Most Collected' },
-    { value: 'Random', label: 'Random' },
-];
-
-// Period options based on CivitAI API
-const periodOptions = [
-    { value: 'AllTime', label: 'All Time' },
-    { value: 'Year', label: 'Year' },
-    { value: 'Month', label: 'Month' },
-    { value: 'Week', label: 'Week' },
-    { value: 'Day', label: 'Day' },
-];
-
-// Download progress tracking
-const downloadProgress = ref<Record<number, number>>({});
-const downloadedItems = ref<Set<number>>(new Set());
-
-// Autocycle state
-const isAutocycling = ref(false);
-const autoNext = ref(false);
-
-// Setup Echo listener for download progress using useEchoPublic composable for public channel
-useEchoPublic('file-download-progress', 'FileDownloadProgress', (e: any) => {
-    console.log('Received download progress event:', e);
-    downloadProgress.value[e.fileId] = e.progress;
-
-    if (e.progress === 100) {
-        downloadedItems.value.add(e.fileId);
-        // Remove progress after a delay
-        setTimeout(() => {
-            delete downloadProgress.value[e.fileId];
-        }, 2000);
-    }
-});
-
 // Unified pagination state - works with both cursor and page-based pagination
-const paginationState = ref<{
-    page: number | string | null;
-    nextPage: number | string | null;
-    hasNextPage: boolean;
-}>({
+const paginationState = ref<PaginationState>({
     page: props.page,
     nextPage: props.nextPage,
     hasNextPage: props.hasNextPage,
 });
+
+// Use composables
+const { downloadProgress, downloadedItems } = useDownloadProgress();
+const { 
+    startDownload,
+    handleFavorite, 
+    handleLike, 
+    handleDislike, 
+    handleLaughedAt, 
+    blacklistImage 
+} = useItemReactions();
 
 // Initialize with server-side data
 onMounted(() => {
@@ -119,159 +60,8 @@ onMounted(() => {
     }
 });
 
-// Download function that starts the download process
-const startDownload = async (item: Item) => {
-    try {
-        await axios.post(route('browse.download', { file: item.id }));
-        console.log('Download started for item:', item.id);
-        downloadProgress.value[item.id] = 0;
-    } catch (error) {
-        console.error('Failed to start download:', error);
-    }
-};
-
-// Reaction handlers
-const handleFavorite = async (file: any, event: Event) => {
-    console.log('Love reaction - starting download:', file.id);
-
-    // Update local state optimistically
-    const originalLoved = file.loved;
-    file.loved = !file.loved;
-    if (file.loved) {
-        file.liked = false;
-        file.disliked = false;
-        file.funny = false;
-    }
-
-    try {
-        // Persist to backend
-        const response = await axios.post(route('files.love', { file: file.id }));
-
-        // Update with server response
-        Object.assign(file, response.data);
-
-        // Start download
-        startDownload(file);
-    } catch (error) {
-        // Revert on error
-        file.loved = originalLoved;
-        console.error('Failed to toggle love status:', error);
-    }
-};
-
-const handleLike = async (file: any, event: Event) => {
-    console.log('Like reaction - starting download:', file.id);
-
-    // Update local state optimistically
-    const originalLiked = file.liked;
-    file.liked = !file.liked;
-    if (file.liked) {
-        file.loved = false;
-        file.disliked = false;
-        file.funny = false;
-    }
-
-    try {
-        // Persist to backend
-        const response = await axios.post(route('files.like', { file: file.id }));
-
-        // Update with server response
-        Object.assign(file, response.data);
-
-        // Start download
-        startDownload(file);
-    } catch (error) {
-        // Revert on error
-        file.liked = originalLiked;
-        console.error('Failed to toggle like status:', error);
-    }
-};
-
-const handleDislike = async (file: any, event: Event) => {
-    console.log('Dislike reaction - blacklisting:', file.id);
-
-    // Update local state optimistically
-    const originalDisliked = file.disliked;
-    file.disliked = !file.disliked;
-    if (file.disliked) {
-        file.loved = false;
-        file.liked = false;
-        file.funny = false;
-    }
-
-    try {
-        // Persist to backend
-        const response = await axios.post(route('files.dislike', { file: file.id }));
-
-        // Update with server response
-        Object.assign(file, response.data);
-    } catch (error) {
-        // Revert on error
-        file.disliked = originalDisliked;
-        console.error('Failed to toggle dislike status:', error);
-    }
-
-    // Blacklist the image
-    blacklistImage(file);
-};
-
-const handleLaughedAt = async (file: any, event: Event) => {
-    console.log('Funny reaction - starting download:', file.id);
-
-    // Update local state optimistically
-    const originalFunny = file.funny;
-    file.funny = !file.funny;
-    if (file.funny) {
-        file.loved = false;
-        file.liked = false;
-        file.disliked = false;
-    }
-
-    try {
-        // Persist to backend
-        const response = await axios.post(route('files.laughed-at', { file: file.id }));
-
-        // Update with server response
-        Object.assign(file, response.data);
-
-        // Start download
-        startDownload(file);
-    } catch (error) {
-        // Revert on error
-        file.funny = originalFunny;
-        console.error('Failed to toggle funny status:', error);
-    }
-};
-
-// Mock download function
-const downloadImage = (item: Item) => {
-    console.log('Downloading image:', item.id, item.src);
-    // TODO: Implement actual download functionality
-    alert(`Downloading image: ${item.id}`);
-};
-
-// Blacklist function - removes the item immediately for better UX
-const blacklistImage = async (item: Item) => {
-    console.log('Blacklisting image:', item.id);
-
-    // Remove from UI immediately for better user experience
-    if (masonry.value) {
-        masonry.value.onRemove(item);
-    }
-
-    try {
-        // Call backend to blacklist the item using axios
-        await axios.post(route('browse.blacklist', { file: item.id }), { reason: 'Blacklisted via browse interface' });
-        console.log('Item blacklisted successfully:', item.id);
-    } catch (error) {
-        console.error('Failed to blacklist item:', error);
-        // Could optionally show a toast notification here
-        // but we don't re-add the item since the user intent was to remove it
-    }
-};
-
 // Handle Alt+click for download and like
-const handleAltClick = (item: Item) => {
+const handleAltClick = (item: IBrowseItem) => {
     // Start download
     startDownload(item);
     // Also trigger like reaction
@@ -279,8 +69,13 @@ const handleAltClick = (item: Item) => {
 };
 
 // Handle Alt+right-click for blacklist
-const handleAltRightClick = (item: Item) => {
-    blacklistImage(item);
+const handleAltRightClick = (item: IBrowseItem) => {
+    blacklistImage(item, masonry.value);
+};
+
+// Wrapper for dislike that includes blacklist callback
+const handleDislikeWithBlacklist = (file: any, event: Event) => {
+    handleDislike(file, event, (item: IBrowseItem) => blacklistImage(item, masonry.value));
 };
 
 // Autocycle function - uses masonry's loadNext method repeatedly until items are found
@@ -288,13 +83,12 @@ const autocycleUntilItems = async (): Promise<void> => {
     isAutocycling.value = true;
 
     let attempts = 0;
-    const maxAttempts = 10; // Prevent infinite loops
     const initialItemCount = masonryItems.value.length;
 
     try {
-        while (attempts < maxAttempts && paginationState.value.hasNextPage && paginationState.value.nextPage) {
+        while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.hasNextPage && paginationState.value.nextPage) {
             attempts++;
-            console.log(`Autocycle attempt ${attempts}/${maxAttempts}`);
+            console.log(`Autocycle attempt ${attempts}/${MAX_AUTOCYCLE_ATTEMPTS}`);
 
             if (masonry.value && typeof masonry.value.loadNext === 'function') {
                 await masonry.value.loadNext();
@@ -306,14 +100,14 @@ const autocycleUntilItems = async (): Promise<void> => {
                 }
 
                 // Small delay to prevent overwhelming the API
-                await new Promise((resolve) => setTimeout(resolve, 100));
+                await new Promise((resolve) => setTimeout(resolve, AUTOCYCLE_DELAY));
             } else {
                 console.warn('Masonry component not ready or loadNext function not available');
                 break;
             }
         }
 
-        if (attempts >= maxAttempts) {
+        if (attempts >= MAX_AUTOCYCLE_ATTEMPTS) {
             console.warn('Autocycle stopped after maximum attempts');
         }
 
@@ -358,7 +152,7 @@ const getPage = async (pageParam: number | string) => {
                     only: ['items', 'hasNextPage', 'nextPage', 'page'],
                     onSuccess: (response) => {
                         try {
-                            const newItems = response.props.items as Item[];
+                            const newItems = response.props.items as IBrowseItem[];
                             const hasNext = response.props.hasNextPage;
                             const nextPage = response.props.nextPage;
                             const currentPage = response.props.page;
@@ -457,70 +251,15 @@ const loadNext = async () => {
             <!-- Header -->
             <div class="flex-shrink-0 border-b p-4">
                 <div class="flex flex-col items-center gap-4">
-                    <!-- Filter Controls -->
-                    <div class="flex flex-wrap items-center gap-4">
-                        <!-- Sort Dropdown -->
-                        <div class="flex items-center gap-2">
-                            <label class="text-sm font-medium">Sort:</label>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger as-child>
-                                    <Button class="min-w-[140px] justify-between" variant="outline">
-                                        {{ sortOptions.find((option) => option.value === currentFilters.sort)?.label || currentFilters.sort }}
-                                        <ChevronDown class="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <DropdownMenuItem
-                                        v-for="option in sortOptions"
-                                        :key="option.value"
-                                        :class="{ 'bg-accent': currentFilters.sort === option.value }"
-                                        class="cursor-pointer"
-                                        @click="handleSortChange(option.value)"
-                                    >
-                                        {{ option.label }}
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        <!-- Period Dropdown -->
-                        <div class="flex items-center gap-2">
-                            <label class="text-sm font-medium">Period:</label>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger as-child>
-                                    <Button class="min-w-[100px] justify-between" variant="outline">
-                                        {{ periodOptions.find((option) => option.value === currentFilters.period)?.label || currentFilters.period }}
-                                        <ChevronDown class="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <DropdownMenuItem
-                                        v-for="option in periodOptions"
-                                        :key="option.value"
-                                        :class="{ 'bg-accent': currentFilters.period === option.value }"
-                                        class="cursor-pointer"
-                                        @click="handlePeriodChange(option.value)"
-                                    >
-                                        {{ option.label }}
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        <!-- NSFW Checkbox -->
-                        <div class="flex items-center gap-2">
-                            <Checkbox :id="'nsfw-checkbox'" v-model="currentFilters.nsfw" @update:model-value="handleNsfwChange" />
-                            <label class="cursor-pointer text-sm font-medium" for="nsfw-checkbox"> Show NSFW </label>
-                        </div>
-
-                        <!-- Auto Next Checkbox -->
-                        <div class="flex items-center gap-2">
-                            <Checkbox :id="'auto-next-checkbox'" v-model="autoNext" />
-                            <label class="cursor-pointer text-sm font-medium" for="auto-next-checkbox"> Auto Next </label>
-                        </div>
-
-                        <Button @click="loadNext()">Next+</Button>
-                    </div>
+                    <BrowseFilters
+                        :filters="currentFilters"
+                        :auto-next="autoNext"
+                        @sort-change="handleSortChange"
+                        @period-change="handlePeriodChange"
+                        @nsfw-change="handleNsfwChange"
+                        @auto-next-change="(value) => autoNext = value"
+                        @load-next="loadNext"
+                    />
                 </div>
             </div>
 
@@ -538,49 +277,17 @@ const loadNext = async () => {
                     class="h-full"
                 >
                     <template #item="{ item }">
-                        <div class="relative h-full">
-                            <!-- Image container with fixed imageHeight -->
-                            <div :style="{ height: item.imageHeight + 'px' }" class="relative">
-                                <img
-                                    :alt="`Image ${item.id}`"
-                                    :src="item.src"
-                                    class="h-full w-full cursor-pointer object-cover transition-all duration-500 ease-in-out"
-                                    loading="lazy"
-                                    @error="(e) => console.warn('Failed to load image:', item.id, e)"
-                                    @load="() => console.debug('Loaded image:', item.id)"
-                                    @click.alt.exact.prevent="handleAltClick(item)"
-                                    @contextmenu.alt.exact.prevent="handleAltRightClick(item)"
-                                />
-                            </div>
-
-                            <!-- Footer area for reactions -->
-                            <div class="absolute right-0 bottom-0 left-0 flex items-center justify-end p-2" style="height: 32px">
-                                <AudioReactions
-                                    :file="item"
-                                    :icon-size="16"
-                                    variant="list"
-                                    @dislike="(file, event) => handleDislike(file, event)"
-                                    @favorite="handleFavorite"
-                                    @laughedAt="handleLaughedAt"
-                                    @like="handleLike"
-                                />
-                            </div>
-
-                            <!-- Download progress bar - positioned at bottom of image area -->
-                            <div
-                                v-if="downloadProgress[item.id] !== undefined"
-                                :style="{ bottom: '32px' }"
-                                class="absolute right-0 left-0 bg-black/50"
-                            >
-                                <div :style="{ width: downloadProgress[item.id] + '%' }" class="h-1 bg-blue-500 transition-all duration-300"></div>
-                                <div class="p-1 text-center text-xs text-white">Downloading... {{ downloadProgress[item.id] }}%</div>
-                            </div>
-
-                            <!-- Downloaded indicator -->
-                            <div v-if="downloadedItems.has(item.id)" class="absolute top-2 left-2 rounded bg-green-500 px-2 py-1 text-xs text-white">
-                                ✓ Downloaded
-                            </div>
-                        </div>
+                        <BrowseItem
+                            :item="item"
+                            :download-progress="downloadProgress[item.id]"
+                            :is-downloaded="downloadedItems.has(item.id)"
+                            @favorite="handleFavorite"
+                            @like="handleLike"
+                            @dislike="handleDislikeWithBlacklist"
+                            @laughed-at="handleLaughedAt"
+                            @alt-click="handleAltClick"
+                            @alt-right-click="handleAltRightClick"
+                        />
                     </template>
                 </Masonry>
 
