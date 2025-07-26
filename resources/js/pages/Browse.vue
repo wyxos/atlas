@@ -60,22 +60,24 @@ onMounted(() => {
     }
 });
 
+// Remove item from masonry view
+const removeItemFromView = (item: IBrowseItem) => {
+    if (masonry.value && typeof masonry.value.onRemove === 'function') {
+        masonry.value.onRemove(item);
+    }
+};
+
 // Handle Alt+click for download and like
 const handleAltClick = (item: IBrowseItem) => {
     // Start download
     startDownload(item);
-    // Also trigger like reaction
-    handleLike(item, new Event('click'));
+    // Also trigger like reaction with removal callback
+    handleLike(item, new Event('click'), removeItemFromView);
 };
 
 // Handle Alt+right-click for blacklist
 const handleAltRightClick = (item: IBrowseItem) => {
     blacklistImage(item, masonry.value);
-};
-
-// Wrapper for dislike that includes blacklist callback
-const handleDislikeWithBlacklist = (file: any, event: Event) => {
-    handleDislike(file, event, (item: IBrowseItem) => blacklistImage(item, masonry.value));
 };
 
 // Autocycle function - uses masonry's loadNext method repeatedly until items are found
@@ -281,10 +283,10 @@ const loadNext = async () => {
                             :item="item"
                             :download-progress="downloadProgress[item.id]"
                             :is-downloaded="downloadedItems.has(item.id)"
-                            @favorite="handleFavorite"
-                            @like="handleLike"
-                            @dislike="handleDislikeWithBlacklist"
-                            @laughed-at="handleLaughedAt"
+                            @favorite="(file, event) => handleFavorite(file, event, removeItemFromView)"
+                            @like="(file, event) => handleLike(file, event, removeItemFromView)"
+                            @dislike="(file, event) => handleDislike(file, event, (item) => blacklistImage(item, masonry))"
+                            @laughed-at="(file, event) => handleLaughedAt(file, event, removeItemFromView)"
                             @alt-click="handleAltClick"
                             @alt-right-click="handleAltRightClick"
                         />

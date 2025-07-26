@@ -1,5 +1,5 @@
-import axios from 'axios';
 import type { BrowseItem } from '@/types/browse';
+import axios from 'axios';
 
 export function useItemReactions() {
     const startDownload = async (item: BrowseItem) => {
@@ -11,7 +11,7 @@ export function useItemReactions() {
         }
     };
 
-    const handleFavorite = async (file: any, event: Event) => {
+    const handleFavorite = async (file: any, event: Event, onRemove?: (item: BrowseItem) => void) => {
         console.log('Love reaction - starting download:', file.id);
 
         // Update local state optimistically
@@ -32,6 +32,11 @@ export function useItemReactions() {
 
             // Start download
             startDownload(file);
+
+            // Remove from view if favorited
+            if (file.loved && onRemove) {
+                onRemove(file);
+            }
         } catch (error) {
             // Revert on error
             file.loved = originalLoved;
@@ -39,7 +44,7 @@ export function useItemReactions() {
         }
     };
 
-    const handleLike = async (file: any, event: Event) => {
+    const handleLike = async (file: any, event: Event, onRemove?: (item: BrowseItem) => void) => {
         console.log('Like reaction - starting download:', file.id);
 
         // Update local state optimistically
@@ -60,6 +65,11 @@ export function useItemReactions() {
 
             // Start download
             startDownload(file);
+
+            // Remove from view if liked
+            if (file.liked && onRemove) {
+                onRemove(file);
+            }
         } catch (error) {
             // Revert on error
             file.liked = originalLiked;
@@ -95,7 +105,7 @@ export function useItemReactions() {
         onBlacklist(file);
     };
 
-    const handleLaughedAt = async (file: any, event: Event) => {
+    const handleLaughedAt = async (file: any, event: Event, onRemove?: (item: BrowseItem) => void) => {
         console.log('Funny reaction - starting download:', file.id);
 
         // Update local state optimistically
@@ -116,6 +126,11 @@ export function useItemReactions() {
 
             // Start download
             startDownload(file);
+
+            // Remove from view if laughed at
+            if (file.funny && onRemove) {
+                onRemove(file);
+            }
         } catch (error) {
             // Revert on error
             file.funny = originalFunny;
@@ -126,16 +141,16 @@ export function useItemReactions() {
     const blacklistImage = async (item: BrowseItem, masonry: any) => {
         console.log('Blacklisting image:', item.id);
 
-        // Remove from UI immediately for better user experience
-        if (masonry && typeof masonry.onRemove === 'function') {
-            masonry.onRemove(item);
-        }
-
         try {
             // Call backend to blacklist the item using axios
-            await axios.post(route('browse.blacklist', { file: item.id }), { 
-                reason: 'Blacklisted via browse interface' 
+            await axios.post(route('browse.blacklist', { file: item.id }), {
+                reason: 'Blacklisted via browse interface',
             });
+
+            // Remove from UI immediately for better user experience
+            if (masonry && typeof masonry.onRemove === 'function') {
+                masonry.onRemove(item);
+            }
             console.log('Item blacklisted successfully:', item.id);
         } catch (error) {
             console.error('Failed to blacklist item:', error);
