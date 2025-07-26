@@ -178,8 +178,8 @@ class File extends Model
     /**
      * Make all instances of the model searchable with proper eager loading.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param Builder $query
+     * @return Builder
      */
     public function makeAllSearchableUsing($query)
     {
@@ -192,7 +192,7 @@ class File extends Model
                 // Only load for audio files - will be empty for non-audio
             },
             'albums' => function($q) {
-                // Only load for audio files - will be empty for non-audio  
+                // Only load for audio files - will be empty for non-audio
             }
         ]);
     }
@@ -208,7 +208,7 @@ class File extends Model
             'source_id' => $this->source_id,
             'url' => $this->url,
             'referrer_url' => $this->referrer_url,
-            'path' => $this->path,
+            'path' => $this->path ?? '__missing__',
             'filename' => $this->filename,
             'ext' => $this->ext,
             'size' => $this->size,
@@ -302,7 +302,7 @@ class File extends Model
         // Remove null values for optional fields to keep the index clean
         return array_filter($array, function ($value, $key) {
             // Always keep required fields and boolean false values
-            if (in_array($key, ['id', 'source', 'filename', 'created_at', 'updated_at'])) {
+            if (in_array($key, ['id', 'source', 'filename', 'path', 'created_at', 'updated_at'])) {
                 return true;
             }
             // Keep boolean false values

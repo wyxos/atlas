@@ -13,27 +13,18 @@ class ImageController extends Controller
     {
         $query = request()->input('query', '');
 
-        // Handle empty query case properly for Typesense
-        if (empty($query)) {
-            // For empty queries, use regular Eloquent with Scout-like ordering
-            $images = File::where('mime_type', 'like', 'image/%')
-                ->where('not_found', false)
-                ->whereNotNull('path')
-                ->where('path', '!=', '')
-                ->orderBy('created_at', 'desc')
-                ->paginate(48);
-        } else {
-            // For actual search queries, use Scout
-            $images = File::search($query)
-                ->query(function (Builder $builder) {
-                    $builder->where('mime_type', 'like', 'image/%')
-                        ->where('not_found', false)
-                        ->whereNotNull('path')
-                        ->where('path', '!=', '');
-                })
-                ->orderBy('created_at', 'desc')
-                ->paginate(48);
-        }
+        // Use Scout search for all cases - use wildcard '*' for empty queries
+        $searchQuery = empty($query) ? '*' : $query;
+
+        $images = File::search($searchQuery)
+            ->query(function (Builder $builder) {
+                $builder
+                    ->where('mime_type', 'like', 'image/%')
+                    ->where('not_found', 0);
+            })
+            ->whereNotIn('path', ['__missing__'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(48);
 
         // Append image_url attribute to results
         $images->getCollection()->transform(function ($file) {
