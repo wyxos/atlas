@@ -49,6 +49,13 @@ it('can access browse page', function () {
         ->where('page', null) // First page is null
         ->where('hasNextPage', true)
         ->where('nextPage', 'next_cursor_token')
+        ->has('filters')
+        ->where('filters', [
+            'sort' => 'Most Reactions',
+            'period' => 'AllTime',
+            'nsfw' => false,
+            'autoNext' => false,
+        ])
     );
 
     // Verify that the CivitAI API was called correctly
@@ -266,5 +273,35 @@ it('handles empty results with next cursor scenario for autocycle', function () 
     expect($props['items'])->toBeEmpty();
     expect($props['hasNextPage'])->toBeTrue();
     expect($props['nextPage'])->toBe('cursor_with_potential_items');
+});
+
+it('handles autoNext parameter correctly', function () {
+    // Mock the CivitAI API response
+    Http::fake([
+        'civitai.com/api/v1/images*' => Http::response([
+            'items' => [],
+            'metadata' => []
+        ], 200)
+    ]);
+
+    // Test with autoNext=true
+    $response = $this->get('/browse?autoNext=true');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Browse')
+        ->has('filters')
+        ->where('filters.autoNext', true)
+    );
+
+    // Test with autoNext=false
+    $response = $this->get('/browse?autoNext=false');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Browse')
+        ->has('filters')
+        ->where('filters.autoNext', false)
+    );
 });
 
