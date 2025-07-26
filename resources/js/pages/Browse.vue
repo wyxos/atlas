@@ -312,16 +312,7 @@ const getPage = async (pageParam: number | string) => {
                             const nextPage = response.props.nextPage;
                             const currentPage = response.props.page;
 
-                            console.log(
-                                'Fetched items:',
-                                newItems?.length,
-                                'hasNext:',
-                                hasNext,
-                                'nextPage:',
-                                nextPage,
-                                'currentPage:',
-                                currentPage,
-                            );
+                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextPage:', nextPage, 'currentPage:', currentPage);
 
                             paginationState.value = {
                                 page: currentPage,
@@ -376,7 +367,7 @@ const applyFilters = () => {
         period: currentFilters.value.period,
         nsfw: currentFilters.value.nsfw.toString(),
     };
-    
+
     console.log('Applying filters with query params:', queryParams);
     console.log('Route URL will be:', route('browse', queryParams));
 
@@ -464,9 +455,9 @@ const loadNext = async () => {
                             <Checkbox :id="'nsfw-checkbox'" v-model="currentFilters.nsfw" @update:model-value="handleNsfwChange" />
                             <label class="cursor-pointer text-sm font-medium" for="nsfw-checkbox"> Show NSFW </label>
                         </div>
-                    </div>
 
-                    <Button @click="loadNext()">Next+</Button>
+                        <Button @click="loadNext()">Next+</Button>
+                    </div>
                 </div>
             </div>
 
