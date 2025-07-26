@@ -16,15 +16,6 @@ class BrowseController extends Controller
      */
     public function index(Request $request): Response
     {
-        // Debug logging
-        \Log::info('Browse request received', [
-            'all_params' => $request->all(),
-            'sort' => $request->get('sort', 'Most Reactions'),
-            'period' => $request->get('period', 'AllTime'),
-            'nsfw' => $request->boolean('nsfw', false),
-            'nsfw_raw' => $request->get('nsfw'),
-        ]);
-        
         $civitAIService = new CivitAIService($request);
         $result = $civitAIService->fetch();
 

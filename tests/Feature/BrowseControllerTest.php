@@ -55,8 +55,8 @@ it('can access browse page', function () {
     Http::assertSent(function ($request) {
         $data = $request->data();
         return str_contains($request->url(), 'civitai.com/api/v1/images') &&
-               $data['limit'] === 40 && // Default limit from service
-               $data['sort'] === 'Newest' &&
+               $data['limit'] === 20 && // Default limit from service
+               $data['sort'] === 'Most Reactions' &&
                $data['period'] === 'AllTime' &&
                !isset($data['cursor']); // First request should not have cursor
     });
@@ -234,5 +234,37 @@ it('returns 404 when trying to download non-existent file', function () {
     $response = $this->postJson(route('browse.download', ['file' => 99999]));
 
     $response->assertStatus(404);
+});
+
+it('handles empty results with next cursor scenario for autocycle', function () {
+    // Mock the CivitAI API response with empty items but next cursor
+    Http::fake([
+        'civitai.com/api/v1/images*' => Http::response([
+            'items' => [],
+            'metadata' => [
+                'nextCursor' => 'cursor_with_potential_items',
+                'totalItems' => 1000
+            ]
+        ], 200)
+    ]);
+
+    $response = $this->get('/browse');
+
+    $response->assertStatus(200);
+    $response->assertInertia(fn ($page) => $page
+        ->component('Browse')
+        ->where('items', [])
+        ->where('hasNextPage', true)
+        ->where('nextPage', 'cursor_with_potential_items')
+    );
+
+    // This scenario should trigger the autocycle prompt in the frontend
+    // The response contains empty items but has nextPage available
+    $data = $response->getOriginalContent()->getData();
+    $props = $data['page']['props'];
+    
+    expect($props['items'])->toBeEmpty();
+    expect($props['hasNextPage'])->toBeTrue();
+    expect($props['nextPage'])->toBe('cursor_with_potential_items');
 });
 

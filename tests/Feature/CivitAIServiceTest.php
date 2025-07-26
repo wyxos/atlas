@@ -43,8 +43,8 @@ it('fetches and transforms images correctly from CivitAI API', function () {
         $data = $request->data();
         return str_contains($request->url(), 'civitai.com/api/v1/images') &&
                $data['cursor'] === 1 && // Page parameter becomes cursor
-               $data['limit'] === 40 && // Default limit from service
-               $data['sort'] === 'Newest' &&
+               $data['limit'] === 20 && // Default limit from service
+               $data['sort'] === 'Most Reactions' &&
                $data['period'] === 'AllTime';
     });
 });
@@ -193,8 +193,8 @@ it('uses correct API parameters', function () {
     // Verify all required parameters are sent to CivitAI API
     Http::assertSent(function ($request) {
         $data = $request->data();
-        return $data['limit'] === 40 && // Default limit from service
-               $data['sort'] === 'Newest' &&
+        return $data['limit'] === 20 && // Default limit from service
+               $data['sort'] === 'Most Reactions' &&
                $data['period'] === 'AllTime' &&
                $data['cursor'] === 1; // Page parameter becomes cursor
     });

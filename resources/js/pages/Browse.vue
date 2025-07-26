@@ -10,7 +10,7 @@ import { useEchoPublic } from '@laravel/echo-vue';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
 import { ChevronDown } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 
 interface Item {
     id: number; // Use actual CivitAI numeric ID
@@ -80,6 +80,11 @@ const periodOptions = [
 const downloadProgress = ref<Record<number, number>>({});
 const downloadedItems = ref<Set<number>>(new Set());
 
+// Autocycle state
+const isAutocycling = ref(false);
+const showAutocyclePrompt = ref(false);
+const autocyclePromptVisible = ref(false);
+
 // Setup Echo listener for download progress using useEchoPublic composable for public channel
 useEchoPublic('file-download-progress', 'FileDownloadProgress', (e: any) => {
     console.log('Received download progress event:', e);
@@ -105,10 +110,22 @@ const paginationState = ref<{
     hasNextPage: props.hasNextPage,
 });
 
+// Check if we should show autocycle prompt
+const shouldShowAutocyclePrompt = computed(() => {
+    return masonryItems.value.length === 0 && 
+           paginationState.value.hasNextPage && 
+           paginationState.value.nextPage && 
+           !isAutocycling.value;
+});
+
 // Initialize with server-side data
 onMounted(() => {
     if (props.items && props.items.length > 0) {
         masonryItems.value = [...props.items];
+    } else if (shouldShowAutocyclePrompt.value) {
+        // Show autocycle prompt if no items but there's a next page
+        showAutocyclePrompt.value = true;
+        autocyclePromptVisible.value = true;
     }
 });
 
@@ -276,6 +293,62 @@ const handleAltRightClick = (item: Item) => {
     blacklistImage(item);
 };
 
+// Autocycle function - uses masonry's loadNext method repeatedly until items are found
+const autocycleUntilItems = async (): Promise<void> => {
+    isAutocycling.value = true;
+    showAutocyclePrompt.value = false;
+    autocyclePromptVisible.value = false;
+    
+    let attempts = 0;
+    const maxAttempts = 10; // Prevent infinite loops
+    const initialItemCount = masonryItems.value.length;
+    
+    try {
+        while (attempts < maxAttempts && paginationState.value.hasNextPage && paginationState.value.nextPage) {
+            attempts++;
+            console.log(`Autocycle attempt ${attempts}/${maxAttempts}`);
+            
+            if (masonry.value && typeof masonry.value.loadNext === 'function') {
+                await masonry.value.loadNext();
+                
+                // Check if new items were added after loadNext
+                if (masonryItems.value.length > initialItemCount) {
+                    console.log(`Autocycle successful after ${attempts} attempts - found ${masonryItems.value.length - initialItemCount} new items`);
+                    break;
+                }
+                
+                // Small delay to prevent overwhelming the API
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } else {
+                console.warn('Masonry component not ready or loadNext function not available');
+                break;
+            }
+        }
+        
+        if (attempts >= maxAttempts) {
+            console.warn('Autocycle stopped after maximum attempts');
+        }
+        
+        if (masonryItems.value.length === initialItemCount) {
+            console.log('Autocycle complete - no more pages available or no new items found');
+        }
+    } catch (error) {
+        console.error('Error during autocycle:', error);
+    } finally {
+        isAutocycling.value = false;
+    }
+};
+
+// Handle autocycle prompt response
+const handleAutocycleResponse = (accepted: boolean) => {
+    if (accepted) {
+        autocycleUntilItems();
+    } else {
+        showAutocyclePrompt.value = false;
+        autocyclePromptVisible.value = false;
+    }
+};
+
 // Unified pagination handler - works with both cursor and page-based pagination
 const getPage = async (pageParam: number | string) => {
     try {
@@ -319,6 +392,12 @@ const getPage = async (pageParam: number | string) => {
                                 nextPage: hasNext ? nextPage : null,
                                 hasNextPage: hasNext,
                             };
+
+                            // Check if we should show autocycle prompt after getting empty results
+                            if (!isAutocycling.value && newItems.length === 0 && hasNext && nextPage) {
+                                showAutocyclePrompt.value = true;
+                                autocyclePromptVisible.value = true;
+                            }
 
                             resolve({
                                 items: newItems,
@@ -457,6 +536,16 @@ const loadNext = async () => {
                         </div>
 
                         <Button @click="loadNext()">Next+</Button>
+                        
+                        <!-- Autocycle Button (for manual triggering) -->
+                        <Button 
+                            v-if="shouldShowAutocyclePrompt && !showAutocyclePrompt" 
+                            variant="secondary" 
+                            @click="handleAutocycleResponse(true)"
+                            :disabled="isAutocycling"
+                        >
+                            {{ isAutocycling ? 'Autocycling...' : 'Find Items' }}
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -522,10 +611,41 @@ const loadNext = async () => {
                 </Masonry>
 
                 <!-- Loading Overlay -->
-                <div v-if="masonry?.isLoading" class="bg-opacity-30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-[2px]">
+                <div v-if="masonry?.isLoading || isAutocycling" class="bg-opacity-30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-[2px]">
                     <div class="flex items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
                         <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-500"></div>
-                        <span class="font-medium text-white">Loading more images...</span>
+                        <span class="font-medium text-white">
+                            {{ isAutocycling ? 'Finding available items...' : 'Loading more images...' }}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Autocycle Prompt Modal -->
+                <div 
+                    v-if="autocyclePromptVisible" 
+                    class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                >
+                    <div class="mx-4 max-w-md rounded-lg bg-white p-6 shadow-xl">
+                        <h3 class="mb-4 text-lg font-semibold text-gray-900">
+                            No Items to Display
+                        </h3>
+                        <p class="mb-6 text-gray-600">
+                            All items on this page appear to be blacklisted, liked, or downloaded. 
+                            Would you like to automatically cycle through pages until available items are found?
+                        </p>
+                        <div class="flex gap-3 justify-end">
+                            <Button 
+                                variant="outline" 
+                                @click="handleAutocycleResponse(false)"
+                            >
+                                No, Keep Current View
+                            </Button>
+                            <Button 
+                                @click="handleAutocycleResponse(true)"
+                            >
+                                Yes, Find Items
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
