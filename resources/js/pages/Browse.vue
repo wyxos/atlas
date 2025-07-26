@@ -284,6 +284,7 @@ const loadNext = async () => {
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
                         footer: 32,
                     }"
+                    :max-items="300"
                     :skip-initial-load="true"
                     class="h-full"
                 >
