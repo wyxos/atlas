@@ -23,6 +23,7 @@ export const audioStore = reactive({
 
   // UI state
   isPlayerVisible: false,
+  isPlayerMinimized: false,
 });
 
 // Audio player actions
@@ -196,6 +197,10 @@ export const audioActions = {
     }
   },
 
+  toggleMinimized() {
+    audioStore.isPlayerMinimized = !audioStore.isPlayerMinimized;
+  },
+
   reset() {
     audioStore.currentFile = null;
     audioStore.isPlaying = false;
@@ -207,6 +212,7 @@ export const audioActions = {
     audioStore.currentTime = 0;
     audioStore.duration = 0;
     audioStore.isPlayerVisible = false;
+    audioStore.isPlayerMinimized = false;
   },
 
   // Scroll to current track functionality

@@ -8,7 +8,9 @@ import {
     Shuffle,
     Repeat,
     Repeat1,
-    Menu
+    Menu,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
@@ -364,6 +366,11 @@ function closeQueuePanel(): void {
     isQueuePanelOpen.value = false;
 }
 
+// Handle minimize/restore toggle
+function toggleMinimized(): void {
+    audioActions.toggleMinimized();
+}
+
 // Function to handle play/pause based on isPlaying prop
 function updatePlayState(newIsPlaying: boolean): void {
     if (typeof window === 'undefined' || !window.globalAudioElement) {
@@ -606,122 +613,52 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
     <div class="sticky bottom-0 left-0 bg-card border-t border-border px-4 w-full py-2 md:p-4"
          v-if="audioStore.isPlayerLoading || audioStore.currentFile">
         <!-- We're using a global audio element attached to window.globalAudioElement -->
-        <!-- This is a hidden placeholder for backward compatibility -->
-        <audio ref="audioPlayer" class="hidden"></audio>
-
         <!-- Start of player desktop -->
         <div class="hidden md:flex gap-4 items-center">
-            <div class="flex gap-4 items-center w-100">
-                <!-- Loading skeleton for player cover -->
-                <div v-if="audioStore.isPlayerLoading"
-                     class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
-                    <Skeleton class="w-full h-full" />
-                </div>
-                <!-- Actual player cover when loaded -->
-                <div v-else-if="audioStore.currentFile"
-                     class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32 shrink-0 transition-all duration-300 cursor-pointer"
-                     :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
-                     @click="handleAlbumCoverClick"
-                     @dragenter="handleDragEnter"
-                     @dragover="handleDragOver"
-                     @dragleave="handleDragLeave"
-                     @drop="handleDrop">
-                    <img
-                        v-if="coverImage"
-                        :src="`/atlas/${coverImage}`"
-                        alt="Cover"
-                        class="w-full h-full object-cover"
-                        :class="isDragging ? 'opacity-50' : ''"
-                    />
-                    <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
-                        <span class="text-xs">No Cover</span>
+            <!-- Minimized View -->
+            <template v-if="audioStore.isPlayerMinimized">
+                <div class="flex items-center gap-4 flex-1">
+                    <!-- Small cover -->
+                    <div v-if="audioStore.isPlayerLoading"
+                         class="flex items-center justify-center relative w-12 h-12">
+                        <Skeleton class="w-full h-full" />
                     </div>
-
-                    <!-- Drag Overlay -->
-                    <div v-if="isDragging" class="absolute inset-0 flex items-center justify-center bg-blue-50/80">
-                        <div class="text-center">
-                            <span class="text-xs font-medium text-blue-700">Drop to replace</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-2 truncate">
-                    <!-- Loading skeleton for player artist and title -->
-                    <div v-if="audioStore.isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
-                        <Skeleton class="h-4 w-24" />
-                        <Skeleton class="h-5 w-32" />
-                    </div>
-                    <!-- Actual player artist and title when loaded -->
                     <div v-else-if="audioStore.currentFile"
-                         class="font-medium text-foreground mb-2 flex flex-col gap-1">
-                        <span class="text-xs font-semibold text-muted-foreground truncate">{{
-                                currentArtist || 'Unknown Artist'
-                            }}</span>
-                        <span class="text-foreground font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
-                    </div>
-
-                    <!-- Love/Like controls (right) -->
-                    <div class="flex items-center flex-1">
-                        <AudioReactions
-                            :file="audioStore.currentFile"
-                            :icon-size="16"
-                            variant="player"
-                            :show-labels="true"
-                            @favorite="handleLove"
-                            @like="handleLike"
-                            @dislike="handleDislike"
-                            @laughed-at="handleLaughedAt"
+                         class="flex items-center justify-center relative w-12 h-12 shrink-0 cursor-pointer"
+                         @click="handleAlbumCoverClick">
+                        <img
+                            v-if="coverImage"
+                            :src="`/atlas/${coverImage}`"
+                            alt="Cover"
+                            class="w-full h-full object-cover rounded"
                         />
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex-1">
-                <!-- Progress bar skeleton -->
-                <div v-if="audioStore.isPlayerLoading" class="mb-2">
-                    <div class="flex gap-4 justify-between items-center text-xs text-white mb-2">
-                        <Skeleton class="h-3 w-10" />
-                        <Skeleton class="h-2 w-full" />
-                        <Skeleton class="h-3 w-10" />
-                    </div>
-                </div>
-                <!-- Actual progress bar -->
-                <div v-else-if="audioStore.currentFile" class="mb-2">
-
-                    <div class="flex gap-4 items-center text-xs text-muted-foreground mb-2">
-                        <span>{{ formatTime(currentTime) }}</span>
-                        <div
-                            class="h-2 bg-muted rounded-full cursor-pointer transition-colors hover:bg-muted/80 flex-1"
-                            @click="seekTo($event)"
-                        >
-                            <div
-                                class="h-full bg-primary rounded-full transition-all"
-                                :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
-                            ></div>
+                        <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground rounded">
+                            <span class="text-xs">♪</span>
                         </div>
-                        <span>{{ formatTime(duration) }}</span>
                     </div>
-
-                    <!-- Player controls -->
-                    <div class="flex items-center justify-center gap-4 mt-2">
-                        <!-- Media controls (center) -->
-                        <div class="flex items-center gap-4">
-                            <button
-                                class="button circular small empty"
-                                @click="handleShuffle"
-                                title="Shuffle"
-                            >
-                                <Shuffle :size="16" />
-                            </button>
-
+                    
+                    <!-- Title and basic controls -->
+                    <div class="flex items-center gap-4 flex-1">
+                        <div class="flex flex-col min-w-0">
+                            <div v-if="audioStore.isPlayerLoading" class="font-medium text-white flex gap-2">
+                                <Skeleton class="h-4 w-32" />
+                            </div>
+                            <div v-else-if="audioStore.currentFile" class="font-medium text-foreground">
+                                <span class="text-sm font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
+                                <span class="text-xs text-muted-foreground truncate block">{{ currentArtist || 'Unknown Artist' }}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Basic playback controls -->
+                        <div class="flex items-center gap-2">
                             <button
                                 class="button circular small empty"
                                 @click="handlePrevious"
                                 title="Previous"
                             >
-                                <SkipBack :size="20" />
+                                <SkipBack :size="16" />
                             </button>
-
+                            
                             <button
                                 class="button circular empty"
                                 :class="{
@@ -731,36 +668,198 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                                 @click="togglePlayPause"
                                 title="Play/Pause"
                             >
-                                <Play v-if="!audioStore.isPlaying" :size="24" />
-                                <Pause v-else :size="24" />
+                                <Play v-if="!audioStore.isPlaying" :size="20" />
+                                <Pause v-else :size="20" />
                             </button>
-
+                            
                             <button
                                 class="button circular small empty"
                                 @click="handleNext"
                                 title="Next"
                             >
-                                <SkipForward :size="20" />
+                                <SkipForward :size="16" />
                             </button>
-
-                            <button
-                                class="button circular small empty"
-                                :class="{
-                  'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
-                  'bg-blue-500 text-white': audioStore.repeatMode === 'one'
-                }"
-                                @click="handleRepeat"
-                                :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+                        </div>
+                        
+                        <!-- Compact progress bar -->
+                        <div v-if="audioStore.currentFile" class="flex-1 min-w-0 mx-4">
+                            <div
+                                class="h-1 bg-muted rounded-full cursor-pointer transition-colors hover:bg-muted/80"
+                                @click="seekTo($event)"
                             >
-                                <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
-                                <Repeat v-else :size="16" />
-                            </button>
+                                <div
+                                    class="h-full bg-primary rounded-full transition-all"
+                                    :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                                ></div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </template>
+            
+            <!-- Full View -->
+            <template v-else>
+                <div class="flex gap-4 items-center w-100">
+                    <!-- Loading skeleton for player cover -->
+                    <div v-if="audioStore.isPlayerLoading"
+                         class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
+                        <Skeleton class="w-full h-full" />
+                    </div>
+                    <!-- Actual player cover when loaded -->
+                    <div v-else-if="audioStore.currentFile"
+                         class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32 shrink-0 transition-all duration-300 cursor-pointer"
+                         :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
+                         @click="handleAlbumCoverClick"
+                         @dragenter="handleDragEnter"
+                         @dragover="handleDragOver"
+                         @dragleave="handleDragLeave"
+                         @drop="handleDrop">
+                        <img
+                            v-if="coverImage"
+                            :src="`/atlas/${coverImage}`"
+                            alt="Cover"
+                            class="w-full h-full object-cover"
+                            :class="isDragging ? 'opacity-50' : ''"
+                        />
+                        <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
+                            <span class="text-xs">No Cover</span>
+                        </div>
 
-            <div class="w-100 flex justify-end">
+                        <!-- Drag Overlay -->
+                        <div v-if="isDragging" class="absolute inset-0 flex items-center justify-center bg-blue-50/80">
+                            <div class="text-center">
+                                <span class="text-xs font-medium text-blue-700">Drop to replace</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2 truncate">
+                        <!-- Loading skeleton for player artist and title -->
+                        <div v-if="audioStore.isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
+                            <Skeleton class="h-4 w-24" />
+                            <Skeleton class="h-5 w-32" />
+                        </div>
+                        <!-- Actual player artist and title when loaded -->
+                        <div v-else-if="audioStore.currentFile"
+                             class="font-medium text-foreground mb-2 flex flex-col gap-1">
+                            <span class="text-xs font-semibold text-muted-foreground truncate">{
+                                    currentArtist || 'Unknown Artist'
+                                }</span>
+                            <span class="text-foreground font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
+                        </div>
+
+                        <!-- Love/Like controls (right) -->
+                        <div class="flex items-center flex-1">
+                            <AudioReactions
+                                :file="audioStore.currentFile"
+                                :icon-size="16"
+                                variant="player"
+                                :show-labels="true"
+                                @favorite="handleLove"
+                                @like="handleLike"
+                                @dislike="handleDislike"
+                                @laughed-at="handleLaughedAt"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1">
+                    <!-- Progress bar skeleton -->
+                    <div v-if="audioStore.isPlayerLoading" class="mb-2">
+                        <div class="flex gap-4 justify-between items-center text-xs text-white mb-2">
+                            <Skeleton class="h-3 w-10" />
+                            <Skeleton class="h-2 w-full" />
+                            <Skeleton class="h-3 w-10" />
+                        </div>
+                    </div>
+                    <!-- Actual progress bar -->
+                    <div v-else-if="audioStore.currentFile" class="mb-2">
+
+                        <div class="flex gap-4 items-center text-xs text-muted-foreground mb-2">
+                            <span>{{ formatTime(currentTime) }}</span>
+                            <div
+                                class="h-2 bg-muted rounded-full cursor-pointer transition-colors hover:bg-muted/80 flex-1"
+                                @click="seekTo($event)"
+                            >
+                                <div
+                                    class="h-full bg-primary rounded-full transition-all"
+                                    :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                                ></div>
+                            </div>
+                            <span>{{ formatTime(duration) }}</span>
+                        </div>
+
+                        <!-- Player controls -->
+                        <div class="flex items-center justify-center gap-4 mt-2">
+                            <!-- Media controls (center) -->
+                            <div class="flex items-center gap-4">
+                                <button
+                                    class="button circular small empty"
+                                    @click="handleShuffle"
+                                    title="Shuffle"
+                                >
+                                    <Shuffle :size="16" />
+                                </button>
+
+                                <button
+                                    class="button circular small empty"
+                                    @click="handlePrevious"
+                                    title="Previous"
+                                >
+                                    <SkipBack :size="20" />
+                                </button>
+
+                                <button
+                                    class="button circular empty"
+                                    :class="{
+                      'active': audioStore.isPlaying,
+                      'secondary': !audioStore.isPlaying
+                    }"
+                                    @click="togglePlayPause"
+                                    title="Play/Pause"
+                                >
+                                    <Play v-if="!audioStore.isPlaying" :size="24" />
+                                    <Pause v-else :size="24" />
+                                </button>
+
+                                <button
+                                    class="button circular small empty"
+                                    @click="handleNext"
+                                    title="Next"
+                                >
+                                    <SkipForward :size="20" />
+                                </button>
+
+                                <button
+                                    class="button circular small empty"
+                                    :class="{
+                      'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
+                      'bg-blue-500 text-white': audioStore.repeatMode === 'one'
+                    }"
+                                    @click="handleRepeat"
+                                    :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+                                >
+                                    <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
+                                    <Repeat v-else :size="16" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <div class="w-100 flex justify-end gap-2">
+                <!-- Minimize/Restore button -->
+                <button
+                    class="button circular small empty"
+                    @click="toggleMinimized"
+                    :title="audioStore.isPlayerMinimized ? 'Restore Player' : 'Minimize Player'"
+                >
+                    <ChevronUp v-if="audioStore.isPlayerMinimized" :size="16" />
+                    <ChevronDown v-else :size="16" />
+                </button>
+                
                 <!-- Queue panel toggle button -->
                 <button
                     class="button circular small empty"
@@ -782,7 +881,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
 
         <!-- Start of mobile player -->
         <div class="md:hidden">
-            <div class="flex gap-2 items-center  mb-4">
+            <div class="flex gap-2 items-center mb-4">
                 <!-- Loading skeleton for player cover -->
                 <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-16 h-16">
                     <Skeleton class="w-full h-full" />
@@ -827,85 +926,98 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                         }}</span>
                     <span class="text-foreground font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
                 </div>
+                
+                <!-- Minimize/Restore button for mobile -->
+                <button
+                    class="button circular small empty"
+                    @click="toggleMinimized"
+                    :title="audioStore.isPlayerMinimized ? 'Restore Player' : 'Minimize Player'"
+                >
+                    <ChevronUp v-if="audioStore.isPlayerMinimized" :size="16" />
+                    <ChevronDown v-else :size="16" />
+                </button>
             </div>
 
-            <!-- Progress bar skeleton -->
-            <div v-if="audioStore.isPlayerLoading" class="mb-2">
-                <Skeleton class="h-2 w-full mb-2" />
-                              <div class="flex justify-between text-xs text-white mb-2">
-                                  <Skeleton class="h-3 w-10" />
-                                  <Skeleton class="h-3 w-10" />
-                              </div>
-            </div>
-            <!-- Actual progress bar -->
-            <div v-else-if="audioStore.currentFile" class="mb-2">
-                <div
-                    class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
-                    @click="seekTo($event)"
-                >
-                    <div
-                        class="h-full bg-primary rounded-full transition-all"
-                        :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
-                    ></div>
+            <!-- Progress bar and controls - only show when not minimized -->
+            <template v-if="!audioStore.isPlayerMinimized">
+                <!-- Progress bar skeleton -->
+                <div v-if="audioStore.isPlayerLoading" class="mb-2">
+                    <Skeleton class="h-2 w-full mb-2" />
+                                  <div class="flex justify-between text-xs text-white mb-2">
+                                      <Skeleton class="h-3 w-10" />
+                                      <Skeleton class="h-3 w-10" />
+                                  </div>
                 </div>
-                              <div class="flex justify-between text-xs text-muted-foreground mb-2">
-                                  <span>{{ formatTime(currentTime) }}</span>
-                                  <span>{{ formatTime(duration) }}</span>
-                              </div>
-            </div>
+                <!-- Actual progress bar -->
+                <div v-else-if="audioStore.currentFile" class="mb-2">
+                    <div
+                        class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
+                        @click="seekTo($event)"
+                    >
+                        <div
+                            class="h-full bg-primary rounded-full transition-all"
+                            :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                        ></div>
+                    </div>
+                                  <div class="flex justify-between text-xs text-muted-foreground mb-2">
+                                      <span>{{ formatTime(currentTime) }}</span>
+                                      <span>{{ formatTime(duration) }}</span>
+                                  </div>
+                </div>
 
-            <!-- Mobile navigation controls -->
-            <div class="flex items-center justify-center gap-4">
-                <button
-                    class="button circular small empty"
-                    @click="handleShuffle"
-                    title="Shuffle"
-                >
-                    <Shuffle :size="12" />
-                </button>
+                <!-- Mobile navigation controls -->
+                <div class="flex items-center justify-center gap-4">
+                    <button
+                        class="button circular small empty"
+                        @click="handleShuffle"
+                        title="Shuffle"
+                    >
+                        <Shuffle :size="12" />
+                    </button>
 
-                <button
-                    class="button circular small empty"
-                    @click="handlePrevious"
-                    title="Previous"
-                >
-                    <SkipBack :size="16" />
-                </button>
+                    <button
+                        class="button circular small empty"
+                        @click="handlePrevious"
+                        title="Previous"
+                    >
+                        <SkipBack :size="16" />
+                    </button>
 
-                <button
-                    class="button circular empty"
-                    :class="{
-                  'active': audioStore.isPlaying,
-                  'secondary': !audioStore.isPlaying
-                }"
-                    @click="togglePlayPause"
-                    title="Play/Pause"
-                >
-                    <Play v-if="!audioStore.isPlaying" :size="24" />
-                    <Pause v-else :size="18" />
-                </button>
+                    <button
+                        class="button circular empty"
+                        :class="{
+                      'active': audioStore.isPlaying,
+                      'secondary': !audioStore.isPlaying
+                    }"
+                        @click="togglePlayPause"
+                        title="Play/Pause"
+                    >
+                        <Play v-if="!audioStore.isPlaying" :size="24" />
+                        <Pause v-else :size="18" />
+                    </button>
 
-                <button
-                    class="button circular small empty"
-                    @click="handleNext"
-                    title="Next"
-                >
-                    <SkipForward :size="16" />
-                </button>
+                    <button
+                        class="button circular small empty"
+                        @click="handleNext"
+                        title="Next"
+                    >
+                        <SkipForward :size="16" />
+                    </button>
 
-                <button
-                    class="button circular small empty"
-                    :class="{
-                  'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
-                  'bg-blue-500 text-white': audioStore.repeatMode === 'one'
-                }"
-                    @click="handleRepeat"
-                    :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
-                >
-                    <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
-                    <Repeat v-else :size="12" />
-                </button>
-            </div>
+                    <button
+                        class="button circular small empty"
+                        :class="{
+                      'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
+                      'bg-blue-500 text-white': audioStore.repeatMode === 'one'
+                    }"
+                        @click="handleRepeat"
+                        :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+                    >
+                        <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
+                        <Repeat v-else :size="12" />
+                    </button>
+                </div>
+            </template>
         </div>
         <!-- End of mobile player -->
     </div>
