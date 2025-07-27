@@ -25,8 +25,7 @@ declare module '@vue/runtime-core' {
     }
 }
 
-// Extend Window interface for our global audio player
+// Window interface extensions (if needed in the future)
 interface Window {
-    globalAudioElement?: HTMLAudioElement;
-    loadFileDetails?: (id: number, priority?: boolean) => Promise<any>;
+    // Add any future window extensions here
 }

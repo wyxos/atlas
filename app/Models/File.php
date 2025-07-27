@@ -235,17 +235,8 @@ class File extends Model
         if ($this->metadata && $this->metadata->payload) {
             $metadata = $this->metadata->payload;
 
-            // Add common audio metadata fields
-            if (isset($metadata['artist'])) {
-                $array['metadata_artist'] = $metadata['artist'];
-            }
-
             if (isset($metadata['title'])) {
                 $array['metadata_title'] = $metadata['title'];
-            }
-
-            if (isset($metadata['album'])) {
-                $array['metadata_album'] = $metadata['album'];
             }
 
             if (isset($metadata['genre'])) {
@@ -267,18 +258,14 @@ class File extends Model
 
         // Include artist names from related artists
         if ($this->artists && $this->artists->isNotEmpty()) {
-            $artistNames = $this->artists->pluck('name')->filter()->toArray();
+            $artistNames = $this->artists->pluck('name')->filter()->join(', ');
             $array['artist_names'] = $artistNames;
-            // Also include the first artist name for backward compatibility
-            $array['artist_name'] = $artistNames[0] ?? null;
         }
 
         // Include album names from related albums
         if ($this->albums && $this->albums->isNotEmpty()) {
-            $albumNames = $this->albums->pluck('name')->filter()->toArray();
+            $albumNames = $this->albums->pluck('name')->filter()->join(', ');
             $array['album_names'] = $albumNames;
-            // Also include the first album name for backward compatibility
-            $array['album_name'] = $albumNames[0] ?? null;
         }
 
         // Handle tags - ensure it's an array or null

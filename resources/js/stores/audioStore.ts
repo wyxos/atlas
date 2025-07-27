@@ -3,6 +3,19 @@ import { reactive } from 'vue';
 // Repeat modes
 export type RepeatMode = 'off' | 'all' | 'one';
 
+// Create a single persistent audio element
+const createAudioElement = (): HTMLAudioElement => {
+  const audio = new Audio();
+  
+  // Set up basic audio element properties
+  audio.preload = 'metadata';
+  
+  return audio;
+};
+
+// Create the audio element instance
+let audioElement: HTMLAudioElement | null = null;
+
 // Global audio player state
 export const audioStore = reactive({
   // Player state
@@ -25,6 +38,49 @@ export const audioStore = reactive({
   isPlayerVisible: false,
   isPlayerMinimized: false,
 });
+
+// Audio element management
+let loadFileDetailsFunction: ((id: number, priority?: boolean) => Promise<any>) | null = null;
+
+// Initialize audio element and set up global event listeners
+const initializeAudioElement = (): HTMLAudioElement => {
+  if (audioElement) {
+    return audioElement;
+  }
+
+  audioElement = createAudioElement();
+
+  // Set up persistent event listeners
+  audioElement.addEventListener('ended', () => {
+    // When track ends, update the store state
+    audioActions.setPlaying(false);
+    // Try to play the next track (moveToNext already handles repeat modes)
+    audioActions.moveToNext(loadFileDetailsFunction).then((nextTrack) => {
+      if (nextTrack) {
+        audioActions.setPlaying(true);
+      }
+    });
+  });
+
+  audioElement.addEventListener('timeupdate', () => {
+    audioActions.updateTime(audioElement!.currentTime);
+  });
+
+  audioElement.addEventListener('loadedmetadata', () => {
+    audioActions.updateDuration(audioElement!.duration);
+  });
+
+  audioElement.addEventListener('volumechange', () => {
+    audioActions.updateVolume(audioElement!.volume);
+  });
+
+  return audioElement;
+};
+
+// Get the audio element (initialize if needed)
+export const getAudioElement = (): HTMLAudioElement => {
+  return initializeAudioElement();
+};
 
 // Audio player actions
 export const audioActions = {
@@ -199,6 +255,48 @@ export const audioActions = {
 
   toggleMinimized() {
     audioStore.isPlayerMinimized = !audioStore.isPlayerMinimized;
+  },
+
+  // Audio element control methods
+  setLoadFileDetailsFunction(loadFileDetails: (id: number, priority?: boolean) => Promise<any>) {
+    loadFileDetailsFunction = loadFileDetails;
+  },
+
+  play(): Promise<void> | undefined {
+    const audio = getAudioElement();
+    const playPromise = audio.play();
+    
+    if (playPromise !== undefined) {
+      return playPromise.catch((error) => {
+        console.error('Error playing audio:', error);
+        audioActions.setPlaying(false);
+        throw error;
+      });
+    }
+  },
+
+  pause() {
+    const audio = getAudioElement();
+    audio.pause();
+  },
+
+  setVolume(volume: number) {
+    const audio = getAudioElement();
+    audio.volume = Math.max(0, Math.min(1, volume));
+  },
+
+  setCurrentTime(time: number) {
+    const audio = getAudioElement();
+    audio.currentTime = time;
+  },
+
+  loadFile(fileId: number) {
+    const audio = getAudioElement();
+    // Always reset currentTime to 0 when changing tracks
+    audio.currentTime = 0;
+    audio.src = `/audio/stream/${fileId}`;
+    // Explicitly load the audio before attempting to play
+    audio.load();
   },
 
   reset() {

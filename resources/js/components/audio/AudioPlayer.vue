@@ -2,35 +2,14 @@
 import AudioQueuePanel from '@/components/audio/AudioQueuePanel.vue';
 import AudioReactions from '@/components/audio/AudioReactions.vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { audioActions, audioStore } from '@/stores/audioStore';
+import { audioActions, audioStore, getAudioElement } from '@/stores/audioStore';
 import { router } from '@inertiajs/vue3';
 import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-vue-next';
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-// Create a single, persistent audio element that will be shared across all instances
-// This ensures the audio continues playing during navigation
-if (typeof window !== 'undefined' && !window.globalAudioElement) {
-    window.globalAudioElement = new Audio();
+// Inject the loadFileDetails function from the parent component
+const loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>('loadFileDetails', () => Promise.resolve(null));
 
-    // Add global event listeners that persist across component instances
-    window.globalAudioElement.addEventListener('ended', () => {
-        // When track ends, update the store state
-        audioActions.setPlaying(false);
-        // Try to play the next track (moveToNext already handles repeat modes)
-        audioActions.moveToNext(window.loadFileDetails).then((nextTrack) => {
-            if (nextTrack) {
-                audioActions.setPlaying(true);
-            }
-        });
-    });
-}
-
-// Store the loadFileDetails function globally so it can be used by the audio element's event listeners
-if (typeof window !== 'undefined') {
-    window.loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>('loadFileDetails', () => Promise.resolve(null));
-}
-
-const audioPlayer = ref<HTMLAudioElement | null>(null);
 const currentTime = ref(audioStore.currentTime);
 const duration = ref(audioStore.duration);
 const volume = ref(audioStore.volume);
@@ -144,7 +123,8 @@ function formatTime(seconds: number): string {
 
 // Seek to a specific position in the audio
 function seekTo(event: MouseEvent): void {
-    if (typeof window === 'undefined' || !window.globalAudioElement || !duration.value) return;
+    const audioElement = getAudioElement();
+    if (!audioElement || !duration.value) return;
 
     const progressBar = event.currentTarget as HTMLElement;
     const rect = progressBar.getBoundingClientRect();
@@ -152,7 +132,7 @@ function seekTo(event: MouseEvent): void {
     const percentage = offsetX / rect.width;
 
     const newTime = percentage * duration.value;
-    window.globalAudioElement.currentTime = newTime;
+    audioElement.currentTime = newTime;
     audioActions.updateTime(newTime);
 }
 
@@ -168,7 +148,7 @@ function togglePlayPause(): void {
 
 // Handle previous track
 async function handlePrevious(): Promise<void> {
-    const previousTrack = await audioActions.moveToPrevious(window.loadFileDetails);
+    const previousTrack = await audioActions.moveToPrevious(loadFileDetails);
     if (previousTrack) {
         audioActions.setPlaying(true);
     }
@@ -176,7 +156,7 @@ async function handlePrevious(): Promise<void> {
 
 // Handle next track
 async function handleNext(): Promise<void> {
-    const nextTrack = await audioActions.moveToNext(window.loadFileDetails || loadFileDetails);
+    const nextTrack = await audioActions.moveToNext(loadFileDetails);
     if (nextTrack) {
         audioActions.setPlaying(true);
     }
@@ -384,13 +364,14 @@ function toggleMinimized(): void {
 
 // Function to handle play/pause based on isPlaying prop
 function updatePlayState(newIsPlaying: boolean): void {
-    if (typeof window === 'undefined' || !window.globalAudioElement) {
+    const audioElement = getAudioElement();
+    if (!audioElement) {
         return;
     }
 
     if (newIsPlaying) {
         // Use a promise to ensure play() is handled properly
-        const playPromise = window.globalAudioElement.play();
+        const playPromise = audioElement.play();
 
         // Handle play promise to catch any errors
         if (playPromise !== undefined) {
@@ -401,28 +382,29 @@ function updatePlayState(newIsPlaying: boolean): void {
             });
         }
     } else {
-        window.globalAudioElement.pause();
+        audioElement.pause();
     }
     audioActions.setPlaying(newIsPlaying);
 }
 
 // Function to update the current file
 function updateCurrentFile(newFile: any): void {
-    if (typeof window === 'undefined' || !window.globalAudioElement) {
+    const audioElement = getAudioElement();
+    if (!audioElement) {
         return;
     }
 
     if (newFile) {
         // Always reset currentTime to 0 when changing tracks
-        window.globalAudioElement.currentTime = 0;
+        audioElement.currentTime = 0;
 
-        window.globalAudioElement.src = `/audio/stream/${newFile.id}`;
+        audioElement.src = `/audio/stream/${newFile.id}`;
         // Explicitly load the audio before attempting to play
-        window.globalAudioElement.load();
+        audioElement.load();
 
         if (audioStore.isPlaying) {
             // Use a promise to ensure play() is called after the audio is loaded
-            const playPromise = window.globalAudioElement.play();
+            const playPromise = audioElement.play();
 
             // Handle play promise to catch any errors
             if (playPromise !== undefined) {
@@ -442,12 +424,10 @@ watch(() => audioStore.currentFile, updateCurrentFile);
 
 // Initialize the audio player when the component is mounted
 onMounted(() => {
-    if (typeof window === 'undefined' || !window.globalAudioElement) {
+    const audioEl = getAudioElement();
+    if (!audioEl) {
         return;
     }
-
-    // Set up event listeners for the global audio element
-    const audioEl = window.globalAudioElement;
 
     // Update time display
     const timeUpdateHandler = () => {
@@ -632,7 +612,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
         v-if="audioStore.isPlayerLoading || audioStore.currentFile"
         class="sticky bottom-0 left-0 w-full border-t border-border bg-card px-4 py-2 md:p-4"
     >
-        <!-- We're using a global audio element attached to window.globalAudioElement -->
+        <!-- We're using a Vue-managed persistent audio element from the store -->
         <!-- Start of player desktop -->
         <div class="hidden items-center gap-4 md:flex">
             <!-- Minimized View -->
