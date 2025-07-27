@@ -42,7 +42,7 @@ const paginationState = ref<PaginationState>({
 
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
-const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage } = useItemReactions();
+const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
 
 // Initialize with server-side data
 onMounted(() => {
@@ -277,6 +277,26 @@ const loadNext = async () => {
         console.warn('Masonry component not ready or loadNext function not available');
     }
 };
+
+// Handle undo blacklist
+const handleUndoBlacklist = async () => {
+    try {
+        const result = await undoLastBlacklist();
+        if (result.success) {
+            console.log('Successfully undid blacklist:', result.message);
+            // You could show a toast notification here if you have a toast system
+            alert(result.message); // Temporary alert - you might want to replace with a proper toast
+        }
+    } catch (error) {
+        console.error('Failed to undo blacklist:', error);
+        // Handle error case
+        if (error.response?.status === 404) {
+            alert('No blacklisted items found to undo.');
+        } else {
+            alert('Failed to undo blacklist. Please try again.');
+        }
+    }
+};
 </script>
 
 <template>
@@ -295,6 +315,7 @@ const loadNext = async () => {
                         @auto-next-change="handleAutoNextChange"
                         @back-to-first="handleBackToFirst"
                         @load-next="loadNext"
+                        @undo-blacklist="handleUndoBlacklist"
                     />
                 </div>
             </div>

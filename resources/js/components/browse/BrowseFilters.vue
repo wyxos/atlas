@@ -67,6 +67,12 @@
         <!-- Back to First Page Button -->
         <Button variant="outline" @click="$emit('backToFirst')">Back to First</Button>
 
+        <!-- Undo Blacklist Button -->
+        <Button variant="outline" @click="$emit('undoBlacklist')">
+            <Undo class="h-4 w-4 mr-2" />
+            Undo Blacklist
+        </Button>
+
         <!-- Next Button -->
         <Button @click="$emit('loadNext')">Next+</Button>
     </div>
@@ -77,7 +83,7 @@ import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown, Undo } from 'lucide-vue-next';
 import { SORT_OPTIONS, PERIOD_OPTIONS } from '@/constants/browse';
 import type { BrowseFilters } from '@/types/browse';
 
@@ -94,6 +100,7 @@ const emit = defineEmits<{
     autoNextChange: [value: boolean];
     loadNext: [];
     backToFirst: [];
+    undoBlacklist: [];
 }>();
 
 const sortOptions = SORT_OPTIONS;

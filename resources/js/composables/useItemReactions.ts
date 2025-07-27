@@ -159,6 +159,19 @@ export function useItemReactions() {
         }
     };
 
+    const undoLastBlacklist = async () => {
+        console.log('Undoing last blacklisted item...');
+
+        try {
+            const response = await axios.post(route('browse.undo-blacklist'));
+            console.log('Successfully undid blacklist:', response.data);
+            return response.data;
+        } catch (error) {
+            console.error('Failed to undo blacklist:', error);
+            throw error;
+        }
+    };
+
     return {
         startDownload,
         handleFavorite,
@@ -166,5 +179,6 @@ export function useItemReactions() {
         handleDislike,
         handleLaughedAt,
         blacklistImage,
+        undoLastBlacklist,
     };
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Services\CivitAIService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,7 +34,7 @@ class BrowseController extends Controller
     /**
      * Blacklist a file.
      */
-    public function blacklist(Request $request, File $file): \Illuminate\Http\JsonResponse
+    public function blacklist(Request $request, File $file): JsonResponse
     {
         $request->validate([
             'reason' => 'nullable|string|max:255'
@@ -53,7 +54,7 @@ class BrowseController extends Controller
     /**
      * Queue a file for download.
      */
-    public function download(File $file): \Illuminate\Http\JsonResponse
+    public function download(File $file): JsonResponse
     {
         // Queue the download job
         DownloadFile::dispatch($file);
@@ -61,6 +62,45 @@ class BrowseController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'File download started'
+        ], 200);
+    }
+
+    /**
+     * Undo the last blacklisted item - unblacklist it, download it, and like it.
+     */
+    public function undoLastBlacklist(Request $request): JsonResponse
+    {
+        // Find the most recently blacklisted item
+        $lastBlacklistedFile = File::where('is_blacklisted', true)
+            ->orderBy('updated_at', 'desc')
+            ->first();
+
+        if (!$lastBlacklistedFile) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No blacklisted items found'
+            ], 404);
+        }
+
+        // Undo the blacklist
+        $lastBlacklistedFile->update([
+            'is_blacklisted' => false,
+            'blacklist_reason' => null,
+            'liked' => true, // Like the item
+            'liked_at' => now()
+        ]);
+
+        // Queue the download
+        DownloadFile::dispatch($lastBlacklistedFile);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Undid blacklist for '{$lastBlacklistedFile->url}', liked it, and started download",
+            'file' => [
+                'id' => $lastBlacklistedFile->id,
+                'filename' => $lastBlacklistedFile->filename,
+                'title' => $lastBlacklistedFile->title
+            ]
         ], 200);
     }
 }
