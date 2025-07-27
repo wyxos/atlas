@@ -7,6 +7,7 @@ import { router } from '@inertiajs/vue3';
 import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-vue-next';
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useCoverDragDrop } from '@/composables/useCoverDragDrop.js';
+import { useAudioReactions } from '@/composables/useAudioReactions.js';
 
 // Inject the loadFileDetails function from the parent component
 const loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>('loadFileDetails', () => Promise.resolve(null));
@@ -18,68 +19,8 @@ const volume = ref(audioStore.volume);
 // Queue panel state
 const isQueuePanelOpen = ref(false);
 
-// Track user interactions with tracks
-const isLiked = ref(false);
-const isLoved = ref(false);
-const isDisliked = ref(false);
-const isLaughedAt = ref(false);
-
-// Function to load interaction states from file data
-function loadInteractionStates(file: any) {
-    if (file) {
-        // Load the love status from the file data
-        isLiked.value = !!file.liked;
-        isLoved.value = !!file.loved;
-        isDisliked.value = !!file.disliked;
-        isLaughedAt.value = !!file.funny;
-    } else {
-        // Reset when no file
-        isLiked.value = false;
-        isLoved.value = false;
-        isDisliked.value = false;
-        isLaughedAt.value = false;
-    }
-}
-
-// Load interaction states when the current file changes
-watch(() => audioStore.currentFile, loadInteractionStates, { immediate: true });
-
-// Watch for reaction changes in the current file to sync local state
-watch(
-    () => audioStore.currentFile?.liked,
-    (newValue) => {
-        if (audioStore.currentFile && isLiked.value !== !!newValue) {
-            isLiked.value = !!newValue;
-        }
-    },
-);
-
-watch(
-    () => audioStore.currentFile?.loved,
-    (newValue) => {
-        if (audioStore.currentFile && isLoved.value !== !!newValue) {
-            isLoved.value = !!newValue;
-        }
-    },
-);
-
-watch(
-    () => audioStore.currentFile?.disliked,
-    (newValue) => {
-        if (audioStore.currentFile && isDisliked.value !== !!newValue) {
-            isDisliked.value = !!newValue;
-        }
-    },
-);
-
-watch(
-    () => audioStore.currentFile?.funny,
-    (newValue) => {
-        if (audioStore.currentFile && isLaughedAt.value !== !!newValue) {
-            isLaughedAt.value = !!newValue;
-        }
-    },
-);
+// Audio reactions functionality
+const { handleLove, handleLike, handleDislike, handleLaughedAt } = useAudioReactions();
 
 // Get the current file title for display
 const currentTitle = computed(() => {
@@ -163,168 +104,8 @@ async function handleNext(): Promise<void> {
     }
 }
 
-// Handle love/like/dislike actions
-function handleLove(): void {
-    if (!audioStore.currentFile) return;
-
-    // Optimistically update the UI first
-    isLoved.value = !isLoved.value;
-    if (isLoved.value) {
-        isLiked.value = false;
-        isDisliked.value = false;
-        isLaughedAt.value = false;
-    }
-
-    // Update the current file in the store
-    if (audioStore.currentFile) {
-        audioStore.currentFile.loved = isLoved.value;
-        audioStore.currentFile.liked = isLiked.value;
-        audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.funny = isLaughedAt.value;
-    }
-
-    // Send request to backend
-    router.post(
-        route('audio.love', { file: audioStore.currentFile.id }),
-        {},
-        {
-            preserveState: true,
-            preserveScroll: true,
-            only: [],
-            onError: (errors) => {
-                // Revert on error
-                isLoved.value = !isLoved.value;
-                if (audioStore.currentFile) {
-                    audioStore.currentFile.loved = isLoved.value;
-                }
-                console.error('Failed to toggle love status:', errors);
-            },
-        },
-    );
-}
-
-function handleLike(): void {
-    if (!audioStore.currentFile) return;
-
-    // Optimistically update the UI first
-    isLiked.value = !isLiked.value;
-    if (isLiked.value) {
-        isLoved.value = false;
-        isDisliked.value = false;
-        isLaughedAt.value = false;
-    }
-
-    // Update the current file in the store
-    if (audioStore.currentFile) {
-        audioStore.currentFile.loved = isLoved.value;
-        audioStore.currentFile.liked = isLiked.value;
-        audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.funny = isLaughedAt.value;
-    }
-
-    // Send request to backend
-    router.post(
-        route('audio.like', { file: audioStore.currentFile.id }),
-        {},
-        {
-            preserveState: true,
-            preserveScroll: true,
-            only: [],
-            onError: (errors) => {
-                // Revert on error
-                isLiked.value = !isLiked.value;
-                if (audioStore.currentFile) {
-                    audioStore.currentFile.liked = isLiked.value;
-                }
-                console.error('Failed to toggle like status:', errors);
-            },
-        },
-    );
-}
-
-function handleDislike(): void {
-    if (!audioStore.currentFile) return;
-
-    // Optimistically update the UI first
-    const wasDisliked = isDisliked.value;
-    isDisliked.value = !isDisliked.value;
-    if (isDisliked.value) {
-        isLoved.value = false;
-        isLiked.value = false;
-        isLaughedAt.value = false;
-    }
-
-    // Update the current file in the store
-    if (audioStore.currentFile) {
-        audioStore.currentFile.loved = isLoved.value;
-        audioStore.currentFile.liked = isLiked.value;
-        audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.funny = isLaughedAt.value;
-    }
-
-    // Automatically go to next track when disliking
-    if (isDisliked.value) {
-        handleNext();
-    }
-
-    // Send request to backend
-    router.post(
-        route('audio.dislike', { file: audioStore.currentFile.id }),
-        {},
-        {
-            preserveState: true,
-            preserveScroll: true,
-            only: [],
-            onError: (errors) => {
-                // Revert on error
-                isDisliked.value = wasDisliked;
-                if (audioStore.currentFile) {
-                    audioStore.currentFile.disliked = wasDisliked;
-                }
-                console.error('Failed to toggle dislike status:', errors);
-            },
-        },
-    );
-}
-
-function handleLaughedAt(): void {
-    if (!audioStore.currentFile) return;
-
-    // Optimistically update the UI first
-    isLaughedAt.value = !isLaughedAt.value;
-    if (isLaughedAt.value) {
-        isLoved.value = false;
-        isLiked.value = false;
-        isDisliked.value = false;
-    }
-
-    // Update the current file in the store
-    if (audioStore.currentFile) {
-        audioStore.currentFile.loved = isLoved.value;
-        audioStore.currentFile.liked = isLiked.value;
-        audioStore.currentFile.disliked = isDisliked.value;
-        audioStore.currentFile.funny = isLaughedAt.value;
-    }
-
-    // Send request to backend
-    router.post(
-        route('audio.laughed-at', { file: audioStore.currentFile.id }),
-        {},
-        {
-            preserveState: true,
-            preserveScroll: true,
-            only: [],
-            onError: (errors) => {
-                // Revert on error
-                isLaughedAt.value = !isLaughedAt.value;
-                if (audioStore.currentFile) {
-                    audioStore.currentFile.funny = isLaughedAt.value;
-                }
-                console.error('Failed to toggle laughed at status:', errors);
-            },
-        },
-    );
-}
+// Wrap reaction handlers to provide handleNext callback for dislike
+const wrappedHandleDislike = () => handleDislike(handleNext);
 
 // Handle shuffle
 function handleShuffle(): void {
@@ -645,7 +426,7 @@ const { isDragging, handleDragEnter, handleDragOver, handleDragLeave, handleDrop
                                 :icon-size="16"
                                 :show-labels="true"
                                 variant="player"
-                                @dislike="handleDislike"
+                                @dislike="wrappedHandleDislike"
                                 @favorite="handleLove"
                                 @like="handleLike"
                                 @laughed-at="handleLaughedAt"
