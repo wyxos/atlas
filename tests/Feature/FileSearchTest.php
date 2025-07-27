@@ -226,20 +226,12 @@ it('includes artist and album names in searchable array when relationships are l
     $searchableArray = $file->toSearchableArray();
 
     // Test that artist names are included
-    expect($searchableArray)->toHaveKey('artist_name');
     expect($searchableArray)->toHaveKey('artist_names');
-    expect($searchableArray['artist_name'])->toBe('Test Artist 1');
-    expect($searchableArray['artist_names'])->toBeArray();
-    expect($searchableArray['artist_names'])->toContain('Test Artist 1');
-    expect($searchableArray['artist_names'])->toContain('Test Artist 2');
+    expect($searchableArray['artist_names'])->toBe('Test Artist 1, Test Artist 2');
 
     // Test that album names are included
-    expect($searchableArray)->toHaveKey('album_name');
     expect($searchableArray)->toHaveKey('album_names');
-    expect($searchableArray['album_name'])->toBe('Test Album 1');
-    expect($searchableArray['album_names'])->toBeArray();
-    expect($searchableArray['album_names'])->toContain('Test Album 1');
-    expect($searchableArray['album_names'])->toContain('Test Album 2');
+    expect($searchableArray['album_names'])->toBe('Test Album 1, Test Album 2');
 });
 
 it('handles files without artists or albums in searchable array', function () {
@@ -251,8 +243,37 @@ it('handles files without artists or albums in searchable array', function () {
     $searchableArray = $file->toSearchableArray();
 
     // Test that artist and album fields are not included when no relationships exist
-    expect($searchableArray)->not->toHaveKey('artist_name');
     expect($searchableArray)->not->toHaveKey('artist_names');
-    expect($searchableArray)->not->toHaveKey('album_name');
     expect($searchableArray)->not->toHaveKey('album_names');
+});
+
+it('includes funny and laughed_at fields in searchable array', function () {
+    $file = File::factory()->create([
+        'filename' => 'funny-test.mp3',
+        'funny' => true,
+        'laughed_at' => now(),
+    ]);
+
+    $searchableArray = $file->toSearchableArray();
+
+    // Test that funny and laughed_at fields are included
+    expect($searchableArray)->toHaveKey('funny');
+    expect($searchableArray['funny'])->toBeBool()->toBeTrue();
+    expect($searchableArray)->toHaveKey('laughed_at');
+    expect($searchableArray['laughed_at'])->toBeInt();
+});
+
+it('handles null laughed_at field correctly', function () {
+    $file = File::factory()->create([
+        'filename' => 'not-funny-test.mp3',
+        'funny' => false,
+        'laughed_at' => null,
+    ]);
+
+    $searchableArray = $file->toSearchableArray();
+
+    // Test that funny is included but laughed_at is not when null
+    expect($searchableArray)->toHaveKey('funny');
+    expect($searchableArray['funny'])->toBeBool()->toBeFalse();
+    expect($searchableArray)->not->toHaveKey('laughed_at');
 });

@@ -224,6 +224,7 @@ class File extends Model
             'liked' => $this->liked,
             'disliked' => $this->disliked,
             'loved' => $this->loved,
+            'funny' => $this->funny,
             'downloaded' => $this->downloaded,
             'download_progress' => $this->download_progress,
             'not_found' => $this->not_found,
@@ -279,7 +280,7 @@ class File extends Model
         // Handle timestamp fields - convert to Unix timestamps
         $timestampFields = [
             'seen_preview_at', 'seen_file_at', 'liked_at', 'disliked_at',
-            'loved_at', 'downloaded_at',
+            'loved_at', 'laughed_at', 'downloaded_at',
         ];
 
         foreach ($timestampFields as $field) {

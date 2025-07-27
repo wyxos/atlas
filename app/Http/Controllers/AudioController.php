@@ -291,7 +291,7 @@ class AudioController extends Controller
 
             // Load metadata, covers, artists, and albums relationships for search results
             if ($search->isNotEmpty()) {
-                $search->load(['metadata', 'covers', 'artists', 'albums']);
+//                $search->load(['metadata', 'covers', 'artists', 'albums']);
             }
         }
 
@@ -322,7 +322,7 @@ class AudioController extends Controller
 
             // Load metadata, covers, artists, and albums relationships for search results
             if ($search->isNotEmpty()) {
-                $search->load(['metadata', 'covers', 'artists', 'albums']);
+//                $search->load(['metadata', 'covers', 'artists', 'albums']);
             }
         }
 
@@ -353,7 +353,7 @@ class AudioController extends Controller
 
             // Load metadata, covers, artists, and albums relationships for search results
             if ($search->isNotEmpty()) {
-                $search->load(['metadata', 'covers', 'artists', 'albums']);
+//                $search->load(['metadata', 'covers', 'artists', 'albums']);
             }
         }
 
@@ -387,7 +387,7 @@ class AudioController extends Controller
 
             // Load metadata, covers, artists, and albums relationships for search results
             if ($search->isNotEmpty()) {
-                $search->load(['metadata', 'covers', 'artists', 'albums']);
+//                $search->load(['metadata', 'covers', 'artists', 'albums']);
             }
         }
 
@@ -421,7 +421,7 @@ class AudioController extends Controller
 
             // Load metadata, covers, artists, and albums relationships for search results
             if ($search->isNotEmpty()) {
-                $search->load(['metadata', 'covers', 'artists', 'albums']);
+//                $search->load(['metadata', 'covers', 'artists', 'albums']);
             }
         }
 
@@ -461,7 +461,7 @@ class AudioController extends Controller
 
             // Load metadata, covers, artists, and albums relationships for search results
             if ($search->isNotEmpty()) {
-                $search->load(['metadata', 'covers', 'artists', 'albums']);
+//                $search->load(['metadata', 'covers', 'artists', 'albums']);
             }
         }
 
@@ -546,17 +546,6 @@ class AudioController extends Controller
         return Inertia::render('Albums', [
             'albums' => $albums,
             'search' => $search,
-        ]);
-    }
-
-    public function playlists()
-    {
-        $playlists = Playlist::withCount('files')
-        ->orderBy('created_at', 'desc')
-        ->paginate(10);
-
-        return Inertia::render('Playlists', [
-            'playlists' => $playlists,
         ]);
     }
 
@@ -646,5 +635,16 @@ class AudioController extends Controller
             ->toArray();
 
         return response()->json($playlistIds);
+    }
+
+    public function playlists()
+    {
+        $playlists = Playlist::withCount('files')
+        ->orderBy('created_at', 'desc')
+        ->paginate(10);
+
+        return Inertia::render('Playlists', [
+            'playlists' => $playlists,
+        ]);
     }
 }
