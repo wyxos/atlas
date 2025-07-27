@@ -1,12 +1,14 @@
 import '../css/app.css';
 
-import { createInertiaApp } from '@inertiajs/vue3';
+import ContextMenu from '@imengyu/vue3-context-menu';
+import '@imengyu/vue3-context-menu/lib/vue3-context-menu.css';
+import { createInertiaApp, router } from '@inertiajs/vue3';
+import { configureEcho } from '@laravel/echo-vue';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from 'ziggy-js';
 import { initializeTheme } from './composables/useAppearance';
-import { configureEcho } from '@laravel/echo-vue';
 
 configureEcho({
     broadcaster: 'reverb',
@@ -17,13 +19,19 @@ configureEcho({
     forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
     enabledTransports: ['ws', 'wss'],
 });
-import ContextMenu from '@imengyu/vue3-context-menu'
-import '@imengyu/vue3-context-menu/lib/vue3-context-menu.css'
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
-import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
-import VueVirtualScroller from 'vue-virtual-scroller'
+import VueVirtualScroller from 'vue-virtual-scroller';
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+
+window.addEventListener('popstate', (event) => {
+    event.stopImmediatePropagation();
+
+    router.reload({
+        except: ['flash'],
+    });
+});
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

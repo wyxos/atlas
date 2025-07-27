@@ -1,23 +1,11 @@
-<script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue';
-import {
-    Play,
-    Pause,
-    SkipBack,
-    SkipForward,
-    Shuffle,
-    Repeat,
-    Repeat1,
-    Menu,
-    ChevronDown,
-    ChevronUp
-} from 'lucide-vue-next';
-import { Skeleton } from '@/components/ui/skeleton';
-import { router } from '@inertiajs/vue3';
-import { audioStore, audioActions } from '@/stores/audioStore';
-import AudioReactions from '@/components/audio/AudioReactions.vue';
+<script lang="ts" setup>
 import AudioQueuePanel from '@/components/audio/AudioQueuePanel.vue';
-
+import AudioReactions from '@/components/audio/AudioReactions.vue';
+import { Skeleton } from '@/components/ui/skeleton';
+import { audioActions, audioStore } from '@/stores/audioStore';
+import { router } from '@inertiajs/vue3';
+import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from 'lucide-vue-next';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 // Create a single, persistent audio element that will be shared across all instances
 // This ensures the audio continues playing during navigation
@@ -29,7 +17,7 @@ if (typeof window !== 'undefined' && !window.globalAudioElement) {
         // When track ends, update the store state
         audioActions.setPlaying(false);
         // Try to play the next track (moveToNext already handles repeat modes)
-        audioActions.moveToNext(window.loadFileDetails).then(nextTrack => {
+        audioActions.moveToNext(window.loadFileDetails).then((nextTrack) => {
             if (nextTrack) {
                 audioActions.setPlaying(true);
             }
@@ -39,10 +27,7 @@ if (typeof window !== 'undefined' && !window.globalAudioElement) {
 
 // Store the loadFileDetails function globally so it can be used by the audio element's event listeners
 if (typeof window !== 'undefined') {
-    window.loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>(
-        'loadFileDetails',
-        () => Promise.resolve(null)
-    );
+    window.loadFileDetails = inject<(id: number, priority?: boolean) => Promise<any>>('loadFileDetails', () => Promise.resolve(null));
 }
 
 const audioPlayer = ref<HTMLAudioElement | null>(null);
@@ -80,29 +65,41 @@ function loadInteractionStates(file: any) {
 watch(() => audioStore.currentFile, loadInteractionStates, { immediate: true });
 
 // Watch for reaction changes in the current file to sync local state
-watch(() => audioStore.currentFile?.liked, (newValue) => {
-    if (audioStore.currentFile && isLiked.value !== !!newValue) {
-        isLiked.value = !!newValue;
-    }
-});
+watch(
+    () => audioStore.currentFile?.liked,
+    (newValue) => {
+        if (audioStore.currentFile && isLiked.value !== !!newValue) {
+            isLiked.value = !!newValue;
+        }
+    },
+);
 
-watch(() => audioStore.currentFile?.loved, (newValue) => {
-    if (audioStore.currentFile && isLoved.value !== !!newValue) {
-        isLoved.value = !!newValue;
-    }
-});
+watch(
+    () => audioStore.currentFile?.loved,
+    (newValue) => {
+        if (audioStore.currentFile && isLoved.value !== !!newValue) {
+            isLoved.value = !!newValue;
+        }
+    },
+);
 
-watch(() => audioStore.currentFile?.disliked, (newValue) => {
-    if (audioStore.currentFile && isDisliked.value !== !!newValue) {
-        isDisliked.value = !!newValue;
-    }
-});
+watch(
+    () => audioStore.currentFile?.disliked,
+    (newValue) => {
+        if (audioStore.currentFile && isDisliked.value !== !!newValue) {
+            isDisliked.value = !!newValue;
+        }
+    },
+);
 
-watch(() => audioStore.currentFile?.funny, (newValue) => {
-    if (audioStore.currentFile && isLaughedAt.value !== !!newValue) {
-        isLaughedAt.value = !!newValue;
-    }
-});
+watch(
+    () => audioStore.currentFile?.funny,
+    (newValue) => {
+        if (audioStore.currentFile && isLaughedAt.value !== !!newValue) {
+            isLaughedAt.value = !!newValue;
+        }
+    },
+);
 
 // Get the current file title for display
 const currentTitle = computed(() => {
@@ -113,9 +110,7 @@ const currentTitle = computed(() => {
 // Get the current file artist for display
 const currentArtist = computed(() => {
     if (!audioStore.currentFile) return 'Unknown Artist';
-    return audioStore.currentFile.artists && audioStore.currentFile.artists.length > 0
-        ? audioStore.currentFile.artists[0].name
-        : 'Unknown Artist';
+    return audioStore.currentFile.artists && audioStore.currentFile.artists.length > 0 ? audioStore.currentFile.artists[0].name : 'Unknown Artist';
 });
 
 // Computed property to get the cover image with priority: album covers first, then file covers
@@ -208,19 +203,23 @@ function handleLove(): void {
     }
 
     // Send request to backend
-    router.post(route('audio.love', { file: audioStore.currentFile.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            isLoved.value = !isLoved.value;
-            if (audioStore.currentFile) {
-                audioStore.currentFile.loved = isLoved.value;
-            }
-            console.error('Failed to toggle love status:', errors);
-        }
-    });
+    router.post(
+        route('audio.love', { file: audioStore.currentFile.id }),
+        {},
+        {
+            preserveState: true,
+            preserveScroll: true,
+            only: [],
+            onError: (errors) => {
+                // Revert on error
+                isLoved.value = !isLoved.value;
+                if (audioStore.currentFile) {
+                    audioStore.currentFile.loved = isLoved.value;
+                }
+                console.error('Failed to toggle love status:', errors);
+            },
+        },
+    );
 }
 
 function handleLike(): void {
@@ -243,19 +242,23 @@ function handleLike(): void {
     }
 
     // Send request to backend
-    router.post(route('audio.like', { file: audioStore.currentFile.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            isLiked.value = !isLiked.value;
-            if (audioStore.currentFile) {
-                audioStore.currentFile.liked = isLiked.value;
-            }
-            console.error('Failed to toggle like status:', errors);
-        }
-    });
+    router.post(
+        route('audio.like', { file: audioStore.currentFile.id }),
+        {},
+        {
+            preserveState: true,
+            preserveScroll: true,
+            only: [],
+            onError: (errors) => {
+                // Revert on error
+                isLiked.value = !isLiked.value;
+                if (audioStore.currentFile) {
+                    audioStore.currentFile.liked = isLiked.value;
+                }
+                console.error('Failed to toggle like status:', errors);
+            },
+        },
+    );
 }
 
 function handleDislike(): void {
@@ -284,19 +287,23 @@ function handleDislike(): void {
     }
 
     // Send request to backend
-    router.post(route('audio.dislike', { file: audioStore.currentFile.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            isDisliked.value = wasDisliked;
-            if (audioStore.currentFile) {
-                audioStore.currentFile.disliked = wasDisliked;
-            }
-            console.error('Failed to toggle dislike status:', errors);
-        }
-    });
+    router.post(
+        route('audio.dislike', { file: audioStore.currentFile.id }),
+        {},
+        {
+            preserveState: true,
+            preserveScroll: true,
+            only: [],
+            onError: (errors) => {
+                // Revert on error
+                isDisliked.value = wasDisliked;
+                if (audioStore.currentFile) {
+                    audioStore.currentFile.disliked = wasDisliked;
+                }
+                console.error('Failed to toggle dislike status:', errors);
+            },
+        },
+    );
 }
 
 function handleLaughedAt(): void {
@@ -319,19 +326,23 @@ function handleLaughedAt(): void {
     }
 
     // Send request to backend
-    router.post(route('audio.laughed-at', { file: audioStore.currentFile.id }), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        only: [],
-        onError: (errors) => {
-            // Revert on error
-            isLaughedAt.value = !isLaughedAt.value;
-            if (audioStore.currentFile) {
-                audioStore.currentFile.funny = isLaughedAt.value;
-            }
-            console.error('Failed to toggle laughed at status:', errors);
-        }
-    });
+    router.post(
+        route('audio.laughed-at', { file: audioStore.currentFile.id }),
+        {},
+        {
+            preserveState: true,
+            preserveScroll: true,
+            only: [],
+            onError: (errors) => {
+                // Revert on error
+                isLaughedAt.value = !isLaughedAt.value;
+                if (audioStore.currentFile) {
+                    audioStore.currentFile.funny = isLaughedAt.value;
+                }
+                console.error('Failed to toggle laughed at status:', errors);
+            },
+        },
+    );
 }
 
 // Handle shuffle
@@ -424,7 +435,6 @@ function updateCurrentFile(newFile: any): void {
     }
     audioActions.setCurrentFile(newFile);
 }
-
 
 // Watch for changes to isPlaying and currentFile
 watch(() => audioStore.isPlaying, updatePlayState);
@@ -573,34 +583,42 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
     try {
         if (coverId) {
             // Update existing cover
-            router.post(route('covers.update', { coverId: coverId }), {
-                file: file,
-            }, {
-                forceFormData: true,
-                preserveScroll: true,
-                onSuccess: () => {
-                    // The page will be refreshed with updated covers
+            router.post(
+                route('covers.update', { coverId: coverId }),
+                {
+                    file: file,
                 },
-                onError: (errors) => {
-                    console.error('Error uploading cover:', errors);
-                    alert('Failed to upload cover image');
-                }
-            });
+                {
+                    forceFormData: true,
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        // The page will be refreshed with updated covers
+                    },
+                    onError: (errors) => {
+                        console.error('Error uploading cover:', errors);
+                        alert('Failed to upload cover image');
+                    },
+                },
+            );
         } else {
             // Create new cover for the file
-            router.post(route('covers.create', { fileId: audioStore.currentFile.id }), {
-                file: file,
-            }, {
-                forceFormData: true,
-                preserveScroll: true,
-                onSuccess: () => {
-                    // The page will be refreshed with new cover
+            router.post(
+                route('covers.create', { fileId: audioStore.currentFile.id }),
+                {
+                    file: file,
                 },
-                onError: (errors) => {
-                    console.error('Error creating cover:', errors);
-                    alert('Failed to create cover image');
-                }
-            });
+                {
+                    forceFormData: true,
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        // The page will be refreshed with new cover
+                    },
+                    onError: (errors) => {
+                        console.error('Error creating cover:', errors);
+                        alert('Failed to create cover image');
+                    },
+                },
+            );
         }
     } catch (error) {
         console.error('Error handling cover:', error);
@@ -610,118 +628,110 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
 </script>
 
 <template>
-    <div class="sticky bottom-0 left-0 bg-card border-t border-border px-4 w-full py-2 md:p-4"
-         v-if="audioStore.isPlayerLoading || audioStore.currentFile">
+    <div
+        v-if="audioStore.isPlayerLoading || audioStore.currentFile"
+        class="sticky bottom-0 left-0 w-full border-t border-border bg-card px-4 py-2 md:p-4"
+    >
         <!-- We're using a global audio element attached to window.globalAudioElement -->
         <!-- Start of player desktop -->
-        <div class="hidden md:flex gap-4 items-center">
+        <div class="hidden items-center gap-4 md:flex">
             <!-- Minimized View -->
             <template v-if="audioStore.isPlayerMinimized">
-                <div class="flex items-center gap-4 flex-1">
+                <div class="flex flex-1 items-center gap-4">
                     <!-- Small cover -->
-                    <div v-if="audioStore.isPlayerLoading"
-                         class="flex items-center justify-center relative w-12 h-12">
-                        <Skeleton class="w-full h-full" />
+                    <div v-if="audioStore.isPlayerLoading" class="relative flex h-12 w-12 items-center justify-center">
+                        <Skeleton class="h-full w-full" />
                     </div>
-                    <div v-else-if="audioStore.currentFile"
-                         class="flex items-center justify-center relative w-12 h-12 shrink-0 cursor-pointer"
-                         @click="handleAlbumCoverClick">
-                        <img
-                            v-if="coverImage"
-                            :src="`/atlas/${coverImage}`"
-                            alt="Cover"
-                            class="w-full h-full object-cover rounded"
-                        />
-                        <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground rounded">
+                    <div
+                        v-else-if="audioStore.currentFile"
+                        class="relative flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center"
+                        @click="handleAlbumCoverClick"
+                    >
+                        <img v-if="coverImage" :src="`/atlas/${coverImage}`" alt="Cover" class="h-full w-full rounded object-cover" />
+                        <div v-else class="flex h-full w-full items-center justify-center rounded bg-muted text-muted-foreground">
                             <span class="text-xs">♪</span>
                         </div>
                     </div>
-                    
+
                     <!-- Title and basic controls -->
-                    <div class="flex items-center gap-4 flex-1">
-                        <div class="flex flex-col min-w-0">
-                            <div v-if="audioStore.isPlayerLoading" class="font-medium text-white flex gap-2">
+                    <div class="flex flex-1 items-center gap-4">
+                        <div class="flex min-w-0 flex-col">
+                            <div v-if="audioStore.isPlayerLoading" class="flex gap-2 font-medium text-white">
                                 <Skeleton class="h-4 w-32" />
                             </div>
                             <div v-else-if="audioStore.currentFile" class="font-medium text-foreground">
-                                <span class="text-sm font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
-                                <span class="text-xs text-muted-foreground truncate block">{{ currentArtist || 'Unknown Artist' }}</span>
+                                <span
+                                    class="cursor-pointer truncate text-sm font-semibold transition-colors hover:text-primary"
+                                    @click="handleTitleClick"
+                                    >{{ currentTitle }}</span
+                                >
+                                <span class="block truncate text-xs text-muted-foreground">{{ currentArtist || 'Unknown Artist' }}</span>
                             </div>
                         </div>
-                        
+
                         <!-- Basic playback controls -->
                         <div class="flex items-center gap-2">
-                            <button
-                                class="button circular small empty"
-                                @click="handlePrevious"
-                                title="Previous"
-                            >
+                            <button class="button circular small empty" title="Previous" @click="handlePrevious">
                                 <SkipBack :size="16" />
                             </button>
-                            
+
                             <button
-                                class="button circular empty"
                                 :class="{
-                  'active': audioStore.isPlaying,
-                  'secondary': !audioStore.isPlaying
-                }"
-                                @click="togglePlayPause"
+                                    active: audioStore.isPlaying,
+                                    secondary: !audioStore.isPlaying,
+                                }"
+                                class="button circular empty"
                                 title="Play/Pause"
+                                @click="togglePlayPause"
                             >
                                 <Play v-if="!audioStore.isPlaying" :size="20" />
                                 <Pause v-else :size="20" />
                             </button>
-                            
-                            <button
-                                class="button circular small empty"
-                                @click="handleNext"
-                                title="Next"
-                            >
+
+                            <button class="button circular small empty" title="Next" @click="handleNext">
                                 <SkipForward :size="16" />
                             </button>
                         </div>
-                        
+
                         <!-- Compact progress bar -->
-                        <div v-if="audioStore.currentFile" class="flex-1 min-w-0 mx-4">
-                            <div
-                                class="h-1 bg-muted rounded-full cursor-pointer transition-colors hover:bg-muted/80"
-                                @click="seekTo($event)"
-                            >
+                        <div v-if="audioStore.currentFile" class="mx-4 min-w-0 flex-1">
+                            <div class="h-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="seekTo($event)">
                                 <div
-                                    class="h-full bg-primary rounded-full transition-all"
                                     :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                                    class="h-full rounded-full bg-primary transition-all"
                                 ></div>
                             </div>
                         </div>
                     </div>
                 </div>
             </template>
-            
+
             <!-- Full View -->
             <template v-else>
-                <div class="flex gap-4 items-center w-100">
+                <div class="flex w-100 items-center gap-4">
                     <!-- Loading skeleton for player cover -->
-                    <div v-if="audioStore.isPlayerLoading"
-                         class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32">
-                        <Skeleton class="w-full h-full" />
+                    <div v-if="audioStore.isPlayerLoading" class="relative flex h-18 w-18 items-center justify-center md:h-32 md:w-32">
+                        <Skeleton class="h-full w-full" />
                     </div>
                     <!-- Actual player cover when loaded -->
-                    <div v-else-if="audioStore.currentFile"
-                         class="flex items-center justify-center relative w-18 h-18 md:w-32 md:h-32 shrink-0 transition-all duration-300 cursor-pointer"
-                         :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
-                         @click="handleAlbumCoverClick"
-                         @dragenter="handleDragEnter"
-                         @dragover="handleDragOver"
-                         @dragleave="handleDragLeave"
-                         @drop="handleDrop">
+                    <div
+                        v-else-if="audioStore.currentFile"
+                        :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
+                        class="relative flex h-18 w-18 shrink-0 cursor-pointer items-center justify-center transition-all duration-300 md:h-32 md:w-32"
+                        @click="handleAlbumCoverClick"
+                        @dragenter="handleDragEnter"
+                        @dragleave="handleDragLeave"
+                        @dragover="handleDragOver"
+                        @drop="handleDrop"
+                    >
                         <img
                             v-if="coverImage"
+                            :class="isDragging ? 'opacity-50' : ''"
                             :src="`/atlas/${coverImage}`"
                             alt="Cover"
-                            class="w-full h-full object-cover"
-                            :class="isDragging ? 'opacity-50' : ''"
+                            class="h-full w-full object-cover"
                         />
-                        <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
+                        <div v-else class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
                             <span class="text-xs">No Cover</span>
                         </div>
 
@@ -735,29 +745,30 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
 
                     <div class="flex flex-col gap-2 truncate">
                         <!-- Loading skeleton for player artist and title -->
-                        <div v-if="audioStore.isPlayerLoading" class="font-medium text-white mb-2 flex flex-col gap-2">
+                        <div v-if="audioStore.isPlayerLoading" class="mb-2 flex flex-col gap-2 font-medium text-white">
                             <Skeleton class="h-4 w-24" />
                             <Skeleton class="h-5 w-32" />
                         </div>
                         <!-- Actual player artist and title when loaded -->
-                        <div v-else-if="audioStore.currentFile"
-                             class="font-medium text-foreground mb-2 flex flex-col gap-1">
-                            <span class="text-xs font-semibold text-muted-foreground truncate">{
-                                    currentArtist || 'Unknown Artist'
-                                }</span>
-                            <span class="text-foreground font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
+                        <div v-else-if="audioStore.currentFile" class="mb-2 flex flex-col gap-1 font-medium text-foreground">
+                            <span class="truncate text-xs font-semibold text-muted-foreground">{{ currentArtist || 'Unknown Artist' }}</span>
+                            <span
+                                class="cursor-pointer truncate font-semibold text-foreground transition-colors hover:text-primary"
+                                @click="handleTitleClick"
+                                >{{ currentTitle }}</span
+                            >
                         </div>
 
                         <!-- Love/Like controls (right) -->
-                        <div class="flex items-center flex-1">
+                        <div class="flex flex-1 items-center">
                             <AudioReactions
                                 :file="audioStore.currentFile"
                                 :icon-size="16"
-                                variant="player"
                                 :show-labels="true"
+                                variant="player"
+                                @dislike="handleDislike"
                                 @favorite="handleLove"
                                 @like="handleLike"
-                                @dislike="handleDislike"
                                 @laughed-at="handleLaughedAt"
                             />
                         </div>
@@ -767,7 +778,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                 <div class="flex-1">
                     <!-- Progress bar skeleton -->
                     <div v-if="audioStore.isPlayerLoading" class="mb-2">
-                        <div class="flex gap-4 justify-between items-center text-xs text-white mb-2">
+                        <div class="mb-2 flex items-center justify-between gap-4 text-xs text-white">
                             <Skeleton class="h-3 w-10" />
                             <Skeleton class="h-2 w-full" />
                             <Skeleton class="h-3 w-10" />
@@ -775,70 +786,56 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                     </div>
                     <!-- Actual progress bar -->
                     <div v-else-if="audioStore.currentFile" class="mb-2">
-
-                        <div class="flex gap-4 items-center text-xs text-muted-foreground mb-2">
+                        <div class="mb-2 flex items-center gap-4 text-xs text-muted-foreground">
                             <span>{{ formatTime(currentTime) }}</span>
-                            <div
-                                class="h-2 bg-muted rounded-full cursor-pointer transition-colors hover:bg-muted/80 flex-1"
-                                @click="seekTo($event)"
-                            >
+                            <div class="h-2 flex-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="seekTo($event)">
                                 <div
-                                    class="h-full bg-primary rounded-full transition-all"
                                     :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                                    class="h-full rounded-full bg-primary transition-all"
                                 ></div>
                             </div>
                             <span>{{ formatTime(duration) }}</span>
                         </div>
 
                         <!-- Player controls -->
-                        <div class="flex items-center justify-center gap-4 mt-2">
+                        <div class="mt-2 flex items-center justify-center gap-4">
                             <!-- Media controls (center) -->
                             <div class="flex items-center gap-4">
-                                <button
-                                    class="button circular small empty"
-                                    @click="handleShuffle"
-                                    title="Shuffle"
-                                >
+                                <button class="button circular small empty" title="Shuffle" @click="handleShuffle">
                                     <Shuffle :size="16" />
                                 </button>
 
-                                <button
-                                    class="button circular small empty"
-                                    @click="handlePrevious"
-                                    title="Previous"
-                                >
+                                <button class="button circular small empty" title="Previous" @click="handlePrevious">
                                     <SkipBack :size="20" />
                                 </button>
 
                                 <button
-                                    class="button circular empty"
                                     :class="{
-                      'active': audioStore.isPlaying,
-                      'secondary': !audioStore.isPlaying
-                    }"
-                                    @click="togglePlayPause"
+                                        active: audioStore.isPlaying,
+                                        secondary: !audioStore.isPlaying,
+                                    }"
+                                    class="button circular empty"
                                     title="Play/Pause"
+                                    @click="togglePlayPause"
                                 >
                                     <Play v-if="!audioStore.isPlaying" :size="24" />
                                     <Pause v-else :size="24" />
                                 </button>
 
-                                <button
-                                    class="button circular small empty"
-                                    @click="handleNext"
-                                    title="Next"
-                                >
+                                <button class="button circular small empty" title="Next" @click="handleNext">
                                     <SkipForward :size="20" />
                                 </button>
 
                                 <button
-                                    class="button circular small empty"
                                     :class="{
-                      'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
-                      'bg-blue-500 text-white': audioStore.repeatMode === 'one'
-                    }"
+                                        'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
+                                        'bg-blue-500 text-white': audioStore.repeatMode === 'one',
+                                    }"
+                                    :title="
+                                        audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'
+                                    "
+                                    class="button circular small empty"
                                     @click="handleRepeat"
-                                    :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
                                 >
                                     <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
                                     <Repeat v-else :size="16" />
@@ -849,23 +846,23 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                 </div>
             </template>
 
-            <div class="w-100 flex justify-end gap-2">
+            <div class="flex w-100 justify-end gap-2">
                 <!-- Minimize/Restore button -->
                 <button
+                    :title="audioStore.isPlayerMinimized ? 'Restore Player' : 'Minimize Player'"
                     class="button circular small empty"
                     @click="toggleMinimized"
-                    :title="audioStore.isPlayerMinimized ? 'Restore Player' : 'Minimize Player'"
                 >
                     <ChevronUp v-if="audioStore.isPlayerMinimized" :size="16" />
                     <ChevronDown v-else :size="16" />
                 </button>
-                
+
                 <!-- Queue panel toggle button -->
                 <button
-                    class="button circular small empty"
-                    @click="toggleQueuePanel"
-                    title="Show Queue"
                     :class="{ 'bg-primary text-primary-foreground': isQueuePanelOpen }"
+                    class="button circular small empty"
+                    title="Show Queue"
+                    @click="toggleQueuePanel"
                 >
                     <Menu :size="16" />
                 </button>
@@ -874,34 +871,33 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
         <!-- End of player desktop -->
 
         <!-- Queue Panel -->
-        <AudioQueuePanel
-            :is-open="isQueuePanelOpen"
-            @close="closeQueuePanel"
-        />
+        <AudioQueuePanel :is-open="isQueuePanelOpen" @close="closeQueuePanel" />
 
         <!-- Start of mobile player -->
         <div class="md:hidden">
-            <div class="flex gap-2 items-center mb-4">
+            <div class="mb-4 flex items-center gap-2">
                 <!-- Loading skeleton for player cover -->
-                <div v-if="audioStore.isPlayerLoading" class="flex items-center justify-center relative w-16 h-16">
-                    <Skeleton class="w-full h-full" />
+                <div v-if="audioStore.isPlayerLoading" class="relative flex h-16 w-16 items-center justify-center">
+                    <Skeleton class="h-full w-full" />
                 </div>
                 <!-- Actual player cover when loaded -->
-                <div v-else-if="audioStore.currentFile"
-                     class="flex items-center justify-center relative w-16 h-16 transition-all duration-300"
-                     :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
-                     @dragenter="handleDragEnter"
-                     @dragover="handleDragOver"
-                     @dragleave="handleDragLeave"
-                     @drop="handleDrop">
+                <div
+                    v-else-if="audioStore.currentFile"
+                    :class="isDragging ? 'border-2 border-dashed border-blue-300 bg-blue-50' : ''"
+                    class="relative flex h-16 w-16 items-center justify-center transition-all duration-300"
+                    @dragenter="handleDragEnter"
+                    @dragleave="handleDragLeave"
+                    @dragover="handleDragOver"
+                    @drop="handleDrop"
+                >
                     <img
                         v-if="coverImage"
+                        :class="isDragging ? 'opacity-50' : ''"
                         :src="`/atlas/${coverImage}`"
                         alt="Cover"
-                        class="w-full h-full object-cover"
-                        :class="isDragging ? 'opacity-50' : ''"
+                        class="h-full w-full object-cover"
                     />
-                    <div v-else class="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
+                    <div v-else class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
                         <span class="text-xs">No Cover</span>
                     </div>
 
@@ -914,24 +910,25 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
                 </div>
 
                 <!-- Loading skeleton for player artist and title -->
-                <div v-if="audioStore.isPlayerLoading" class="font-medium text-white flex flex-col gap-2 flex-1">
+                <div v-if="audioStore.isPlayerLoading" class="flex flex-1 flex-col gap-2 font-medium text-white">
                     <Skeleton class="h-4 w-24" />
                     <Skeleton class="h-5 w-32" />
                 </div>
                 <!-- Actual player artist and title when loaded -->
-                <div v-else-if="audioStore.currentFile"
-                     class="font-medium text-foreground flex flex-col gap-1 flex-1 truncate">
-                    <span class="text-xs font-semibold text-muted-foreground truncate">{{
-                            currentArtist || 'Unknown Artist'
-                        }}</span>
-                    <span class="text-foreground font-semibold truncate cursor-pointer hover:text-primary transition-colors" @click="handleTitleClick">{{ currentTitle }}</span>
+                <div v-else-if="audioStore.currentFile" class="flex flex-1 flex-col gap-1 truncate font-medium text-foreground">
+                    <span class="truncate text-xs font-semibold text-muted-foreground">{{ currentArtist || 'Unknown Artist' }}</span>
+                    <span
+                        class="cursor-pointer truncate font-semibold text-foreground transition-colors hover:text-primary"
+                        @click="handleTitleClick"
+                        >{{ currentTitle }}</span
+                    >
                 </div>
-                
+
                 <!-- Minimize/Restore button for mobile -->
                 <button
+                    :title="audioStore.isPlayerMinimized ? 'Restore Player' : 'Minimize Player'"
                     class="button circular small empty"
                     @click="toggleMinimized"
-                    :title="audioStore.isPlayerMinimized ? 'Restore Player' : 'Minimize Player'"
                 >
                     <ChevronUp v-if="audioStore.isPlayerMinimized" :size="16" />
                     <ChevronDown v-else :size="16" />
@@ -942,76 +939,61 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
             <template v-if="!audioStore.isPlayerMinimized">
                 <!-- Progress bar skeleton -->
                 <div v-if="audioStore.isPlayerLoading" class="mb-2">
-                    <Skeleton class="h-2 w-full mb-2" />
-                                  <div class="flex justify-between text-xs text-white mb-2">
-                                      <Skeleton class="h-3 w-10" />
-                                      <Skeleton class="h-3 w-10" />
-                                  </div>
+                    <Skeleton class="mb-2 h-2 w-full" />
+                    <div class="mb-2 flex justify-between text-xs text-white">
+                        <Skeleton class="h-3 w-10" />
+                        <Skeleton class="h-3 w-10" />
+                    </div>
                 </div>
                 <!-- Actual progress bar -->
                 <div v-else-if="audioStore.currentFile" class="mb-2">
-                    <div
-                        class="h-2 bg-muted rounded-full cursor-pointer mb-2 transition-colors hover:bg-muted/80"
-                        @click="seekTo($event)"
-                    >
+                    <div class="mb-2 h-2 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="seekTo($event)">
                         <div
-                            class="h-full bg-primary rounded-full transition-all"
                             :style="{ width: `${(currentTime / duration) * 100 || 0}%` }"
+                            class="h-full rounded-full bg-primary transition-all"
                         ></div>
                     </div>
-                                  <div class="flex justify-between text-xs text-muted-foreground mb-2">
-                                      <span>{{ formatTime(currentTime) }}</span>
-                                      <span>{{ formatTime(duration) }}</span>
-                                  </div>
+                    <div class="mb-2 flex justify-between text-xs text-muted-foreground">
+                        <span>{{ formatTime(currentTime) }}</span>
+                        <span>{{ formatTime(duration) }}</span>
+                    </div>
                 </div>
 
                 <!-- Mobile navigation controls -->
                 <div class="flex items-center justify-center gap-4">
-                    <button
-                        class="button circular small empty"
-                        @click="handleShuffle"
-                        title="Shuffle"
-                    >
+                    <button class="button circular small empty" title="Shuffle" @click="handleShuffle">
                         <Shuffle :size="12" />
                     </button>
 
-                    <button
-                        class="button circular small empty"
-                        @click="handlePrevious"
-                        title="Previous"
-                    >
+                    <button class="button circular small empty" title="Previous" @click="handlePrevious">
                         <SkipBack :size="16" />
                     </button>
 
                     <button
-                        class="button circular empty"
                         :class="{
-                      'active': audioStore.isPlaying,
-                      'secondary': !audioStore.isPlaying
-                    }"
-                        @click="togglePlayPause"
+                            active: audioStore.isPlaying,
+                            secondary: !audioStore.isPlaying,
+                        }"
+                        class="button circular empty"
                         title="Play/Pause"
+                        @click="togglePlayPause"
                     >
                         <Play v-if="!audioStore.isPlaying" :size="24" />
                         <Pause v-else :size="18" />
                     </button>
 
-                    <button
-                        class="button circular small empty"
-                        @click="handleNext"
-                        title="Next"
-                    >
+                    <button class="button circular small empty" title="Next" @click="handleNext">
                         <SkipForward :size="16" />
                     </button>
 
                     <button
-                        class="button circular small empty"
                         :class="{
-                      'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
-                      'bg-blue-500 text-white': audioStore.repeatMode === 'one'
-                    }"
-                        @click="handleRepeat"
+                            'bg-primary text-primary-foreground': audioStore.repeatMode === 'all',
+                            'bg-blue-500 text-white': audioStore.repeatMode === 'one',
+                        }"
                         :title="audioStore.repeatMode === 'off' ? 'Repeat Off' : audioStore.repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+                        class="button circular small empty"
+                        @click="handleRepeat"
                     >
                         <Repeat1 v-if="audioStore.repeatMode === 'one'" :size="16" />
                         <Repeat v-else :size="12" />
