@@ -23,6 +23,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const masonryItems = ref<IBrowseItem[]>([]);
 const masonry = ref(null);
 const isAutocycling = ref(false);
+const autocycleAttempts = ref(0);
 
 // Filter state management
 const currentFilters = ref<IBrowseFilters>({
@@ -45,6 +46,8 @@ const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedA
 
 // Initialize with server-side data
 onMounted(() => {
+    console.log('Mounted Browse component with initial items:', props.items);
+
     if (props.items && props.items.length > 0) {
         masonryItems.value = [...props.items];
     } else if (currentFilters.value.autoNext && paginationState.value.hasNextPage && paginationState.value.nextPage && !isAutocycling.value) {
@@ -89,9 +92,16 @@ const handleAltRightClick = (item: IBrowseItem) => {
     blacklistImage(item, removeItemFromView);
 };
 
+// Handle left click for single image view
+const handleLeftClick = (item: IBrowseItem) => {
+    console.log('Left clicked item:', item.id);
+    // Navigation is already handled in BrowseItem component
+};
+
 // Autocycle function - uses masonry's loadNext method repeatedly until items are found
 const autocycleUntilItems = async (): Promise<void> => {
     isAutocycling.value = true;
+    autocycleAttempts.value = 0;
 
     let attempts = 0;
     const initialItemCount = masonryItems.value.length;
@@ -99,6 +109,7 @@ const autocycleUntilItems = async (): Promise<void> => {
     try {
         while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.hasNextPage && paginationState.value.nextPage) {
             attempts++;
+            autocycleAttempts.value = attempts;
             console.log(`Autocycle attempt ${attempts}/${MAX_AUTOCYCLE_ATTEMPTS}`);
 
             if (masonry.value && typeof masonry.value.loadNext === 'function') {
@@ -311,6 +322,7 @@ const loadNext = async () => {
                             @favorite="(file, event) => handleFavorite(file, event, removeItemFromView)"
                             @like="(file, event) => handleLike(file, event, removeItemFromView)"
                             @laughed-at="(file, event) => handleLaughedAt(file, event, removeItemFromView)"
+                            @left-click="handleLeftClick"
                             @alt-click="handleAltClick"
                             @alt-right-click="handleAltRightClick"
                         />
@@ -322,11 +334,14 @@ const loadNext = async () => {
                     v-if="masonry?.isLoading || isAutocycling"
                     class="bg-opacity-30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-[2px]"
                 >
-                    <div class="flex items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
-                        <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-500"></div>
-                        <span class="font-medium text-white">
-                            {{ isAutocycling ? 'Finding available items...' : 'Loading more images...' }}
-                        </span>
+                    <div class="flex flex-col items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
+                        <div class="flex items-center gap-3">
+                            <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-500"></div>
+                            <span class="font-medium text-white">
+                                {{ isAutocycling ? 'Finding available items...' : 'Loading more images...' }}
+                            </span>
+                        </div>
+                        <div v-if="isAutocycling" class="text-sm text-gray-200">Attempt {{ autocycleAttempts }} of {{ MAX_AUTOCYCLE_ATTEMPTS }}</div>
                     </div>
                 </div>
             </div>
