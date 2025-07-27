@@ -72,7 +72,7 @@ class BrowseController extends Controller
     {
         // Find the most recently blacklisted item
         $lastBlacklistedFile = File::where('is_blacklisted', true)
-            ->orderBy('updated_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->first();
 
         if (!$lastBlacklistedFile) {
