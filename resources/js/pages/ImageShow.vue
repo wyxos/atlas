@@ -14,6 +14,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { computed, ref } from 'vue';
 import { formatDate } from '@/lib/utils';
+import { useImageZoom } from '@/composables/useImageZoom';
 
 interface FileData {
     id: number;
@@ -82,60 +83,27 @@ const getFileTypeColor = (mimeType: string): string => {
     return 'text-gray-600';
 };
 
-// Image viewer state
-const isImageViewerOpen = ref(false);
-const imageViewerZoom = ref(1);
-const imageViewerPosition = ref({ x: 0, y: 0 });
+// Use image zoom composable
+const { 
+    isImageViewerOpen, 
+    imageViewerZoom, 
+    imageViewerPosition, 
+    currentImage, 
+    imageUrl: zoomImageUrl, 
+    openImageViewer, 
+    closeImageViewer, 
+    zoomIn, 
+    zoomOut, 
+    resetZoom, 
+    startDrag, 
+    onDrag, 
+    stopDrag,
+    isDragging 
+} = useImageZoom();
 
-// Image viewer functions
-const openImageViewer = () => {
-    isImageViewerOpen.value = true;
-    imageViewerZoom.value = 1;
-    imageViewerPosition.value = { x: 0, y: 0 };
-};
-
-const closeImageViewer = () => {
-    isImageViewerOpen.value = false;
-};
-
-const zoomIn = () => {
-    imageViewerZoom.value = Math.min(imageViewerZoom.value * 1.2, 5);
-};
-
-const zoomOut = () => {
-    imageViewerZoom.value = Math.max(imageViewerZoom.value / 1.2, 0.1);
-};
-
-const resetZoom = () => {
-    imageViewerZoom.value = 1;
-    imageViewerPosition.value = { x: 0, y: 0 };
-};
-
-// Handle image dragging in viewer
-const isDragging = ref(false);
-const dragStart = ref({ x: 0, y: 0 });
-
-const startDrag = (event: MouseEvent) => {
-    if (imageViewerZoom.value > 1) {
-        isDragging.value = true;
-        dragStart.value = {
-            x: event.clientX - imageViewerPosition.value.x,
-            y: event.clientY - imageViewerPosition.value.y
-        };
-    }
-};
-
-const onDrag = (event: MouseEvent) => {
-    if (isDragging.value && imageViewerZoom.value > 1) {
-        imageViewerPosition.value = {
-            x: event.clientX - dragStart.value.x,
-            y: event.clientY - dragStart.value.y
-        };
-    }
-};
-
-const stopDrag = () => {
-    isDragging.value = false;
+// Open image viewer with current file
+const openImageViewerWithFile = () => {
+    openImageViewer(props.file);
 };
 
 // Get the image URL for display
@@ -239,7 +207,7 @@ const organizedMetadata = computed(() => {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                @click="openImageViewer"
+                                @click="openImageViewerWithFile"
                             >
                                 <Icon name="maximize" class="h-4 w-4 mr-2" />
                                 View Full Size
@@ -275,7 +243,7 @@ const organizedMetadata = computed(() => {
                                         :src="imageUrl"
                                         :alt="file.name"
                                         class="h-full w-full cursor-pointer rounded-lg object-contain max-h-96"
-                                        @click="openImageViewer"
+                                        @click="openImageViewerWithFile"
                                     />
                                 </div>
                             </div>
@@ -401,8 +369,8 @@ const organizedMetadata = computed(() => {
                     @mouseleave="stopDrag"
                 >
                     <img
-                        :src="imageUrl"
-                        :alt="file.name"
+                        :src="zoomImageUrl"
+                        :alt="currentImage?.name || file.name"
                         :style="{
                             transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x / imageViewerZoom}px, ${imageViewerPosition.y / imageViewerZoom}px)`,
                             cursor: imageViewerZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'

@@ -3,6 +3,9 @@ import BrowseFilters from '@/components/browse/BrowseFilters.vue';
 import BrowseItem from '@/components/browse/BrowseItem.vue';
 import { useDownloadProgress } from '@/composables/useDownloadProgress';
 import { useItemReactions } from '@/composables/useItemReactions';
+import { useImageZoom } from '@/composables/useImageZoom';
+import Icon from '@/components/Icon.vue';
+import { Button } from '@/components/ui/button';
 import { AUTOCYCLE_DELAY, MAX_AUTOCYCLE_ATTEMPTS } from '@/constants/browse';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -44,6 +47,22 @@ const paginationState = ref<PaginationState>({
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
 const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
+const { 
+    isImageViewerOpen, 
+    imageViewerZoom, 
+    imageViewerPosition, 
+    currentImage, 
+    imageUrl, 
+    openImageViewer, 
+    closeImageViewer, 
+    zoomIn, 
+    zoomOut, 
+    resetZoom, 
+    startDrag, 
+    onDrag, 
+    stopDrag,
+    isDragging 
+} = useImageZoom();
 
 // Remove item from masonry view
 const removeItemFromView = async (item: IBrowseItem) => {
@@ -301,6 +320,7 @@ const handleUndoBlacklist = async () => {
                             @laughed-at="(file, event) => handleLaughedAt(file, event, removeItemFromView)"
                             @alt-click="handleAltClick"
                             @alt-right-click="handleAltRightClick"
+                            @left-click="openImageViewer"
                         />
                     </template>
                 </Masonry>
@@ -322,6 +342,80 @@ const handleUndoBlacklist = async () => {
                 </div>
                 <div v-if="!masonry?.isLoading && masonryItems.length === 0" class="absolute inset-0 flex items-center justify-center">
                     <div class="text-gray-500">No images found. Try changing filters or loading more.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Full Screen Image Viewer Modal -->
+        <div
+            v-if="isImageViewerOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+            @click="closeImageViewer"
+        >
+            <div class="relative h-full w-full">
+                <!-- Close Button -->
+                <Button
+                    variant="outline"
+                    size="sm"
+                    class="absolute top-4 right-4 z-10 bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                    @click="closeImageViewer"
+                >
+                    <Icon name="x" class="h-4 w-4" />
+                </Button>
+
+                <!-- Zoom Controls -->
+                <div class="absolute top-4 left-4 z-10 flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                        @click="zoomOut"
+                    >
+                        <Icon name="zoomOut" class="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                        @click="resetZoom"
+                    >
+                        <Icon name="maximize" class="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                        @click="zoomIn"
+                    >
+                        <Icon name="zoomIn" class="h-4 w-4" />
+                    </Button>
+                </div>
+
+                <!-- Zoom Level Indicator -->
+                <div class="absolute bottom-4 left-4 z-10 rounded bg-white/10 px-2 py-1 text-sm text-white backdrop-blur-sm">
+                    {{ Math.round(imageViewerZoom * 100) }}%
+                </div>
+
+                <!-- Image Container -->
+                <div
+                    class="flex h-full w-full items-center justify-center overflow-hidden"
+                    @mousedown="startDrag"
+                    @mousemove="onDrag"
+                    @mouseup="stopDrag"
+                    @mouseleave="stopDrag"
+                >
+                    <img
+                        v-if="currentImage"
+                        :src="imageUrl"
+                        :alt="currentImage.name || `Image ${currentImage.id}`"
+                        :style="{
+                            transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x / imageViewerZoom}px, ${imageViewerPosition.y / imageViewerZoom}px)`,
+                            cursor: imageViewerZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+                        }"
+                        class="max-h-full max-w-full object-contain transition-transform"
+                        @click.stop
+                        @dragstart.prevent
+                    />
                 </div>
             </div>
         </div>
