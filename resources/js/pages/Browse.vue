@@ -35,9 +35,8 @@ const currentFilters = ref<IBrowseFilters>({
 
 // Unified pagination state - works with both cursor and page-based pagination
 const paginationState = ref<PaginationState>({
-    page: props.page,
-    nextPage: props.nextPage,
-    hasNextPage: props.hasNextPage,
+    page: props.filters.page,
+    nextPage: props.filters.nextPage,
 });
 
 // Use composables
@@ -48,9 +47,7 @@ const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedA
 onMounted(() => {
     console.log('Mounted Browse component with initial items:', props.items);
 
-    if (props.items && props.items.length > 0) {
-        masonryItems.value = [...props.items];
-    } else if (currentFilters.value.autoNext && paginationState.value.hasNextPage && paginationState.value.nextPage && !isAutocycling.value) {
+    if (currentFilters.value.autoNext && paginationState.value.nextPage && !isAutocycling.value) {
         // Automatically trigger next page if auto next is enabled
         autocycleUntilItems();
     }
@@ -65,7 +62,7 @@ const removeItemFromView = async (item: IBrowseItem) => {
         // Use a small delay to allow the masonry to update its internal state
         setTimeout(async () => {
             // Check if there are no visible items left and more pages are available
-            if (masonryItems.value.length === 0 && paginationState.value.hasNextPage && paginationState.value.nextPage) {
+            if (masonryItems.value.length === 0 && paginationState.value.nextPage) {
                 console.log('No items left in view after removal, loading next page...');
 
                 // If auto next is enabled, trigger autocycle, otherwise just load next page
@@ -107,7 +104,7 @@ const autocycleUntilItems = async (): Promise<void> => {
     const initialItemCount = masonryItems.value.length;
 
     try {
-        while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.hasNextPage && paginationState.value.nextPage) {
+        while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.nextPage) {
             attempts++;
             autocycleAttempts.value = attempts;
             console.log(`Autocycle attempt ${attempts}/${MAX_AUTOCYCLE_ATTEMPTS}`);
@@ -148,20 +145,13 @@ const getPage = async (pageParam: number | string) => {
     try {
         console.log('Masonry requesting:', pageParam, 'current state:', paginationState.value);
 
-        // If there's no next page to fetch, return empty
-        // if (!paginationState.value.hasNextPage || !paginationState.value.nextPage) {
-        //     console.log('No more pages to fetch');
-        //     return { items: [], nextPage: null };
-        // }
-
-        // Use the nextPage value directly - backend determines if it's cursor or page number
-        // Include current filters to maintain consistency
         const queryParams = {
             page: paginationState.value.nextPage,
             sort: currentFilters.value.sort,
             period: currentFilters.value.period,
             nsfw: currentFilters.value.nsfw,
             autoNext: currentFilters.value.autoNext,
+            search: 1,
         };
 
         // Use Inertia to fetch data
@@ -172,24 +162,23 @@ const getPage = async (pageParam: number | string) => {
                 {
                     preserveState: true,
                     preserveScroll: true,
-                    only: ['items', 'hasNextPage', 'nextPage', 'page'],
+                    only: ['items', 'filters'],
                     onSuccess: (response) => {
                         try {
                             const newItems = response.props.items as IBrowseItem[];
-                            const hasNext = response.props.hasNextPage;
-                            const nextPage = response.props.nextPage;
-                            const currentPage = response.props.page;
+                            const filters = response.props.filters;
+                            const nextPage = filters.nextPage;
+                            const currentPage = filters.page;
 
-                            console.log('Fetched items:', newItems?.length, 'hasNext:', hasNext, 'nextPage:', nextPage, 'currentPage:', currentPage);
+                            console.log('Fetched items:', newItems?.length, 'nextPage:', nextPage, 'currentPage:', currentPage);
 
                             paginationState.value = {
                                 page: currentPage,
-                                nextPage: hasNext ? nextPage : null,
-                                hasNextPage: hasNext,
+                                nextPage: nextPage ? nextPage : null,
                             };
 
                             // Check if we should auto cycle after getting empty results
-                            if (!isAutocycling.value && newItems.length === 0 && hasNext && nextPage && currentFilters.value.autoNext) {
+                            if (!isAutocycling.value && newItems.length === 0 && nextPage && currentFilters.value.autoNext) {
                                 // Automatically trigger next page if auto next is enabled
                                 setTimeout(() => autocycleUntilItems(), 100);
                             }
@@ -248,24 +237,10 @@ const handleBackToFirst = () => {
 
 // Apply filters by navigating to the browse page with new parameters (no page parameter to go to page 1)
 const applyFilters = () => {
-    const queryParams = {
-        sort: currentFilters.value.sort,
-        period: currentFilters.value.period,
-        nsfw: currentFilters.value.nsfw,
-        autoNext: currentFilters.value.autoNext,
-    };
+    paginationState.value.page = null;
+    paginationState.value.nextPage = null;
 
-    console.log('Applying filters with query params:', queryParams);
-    console.log('Route URL will be:', route('browse', queryParams));
-
-    router.get(
-        route('browse', queryParams),
-        {},
-        {
-            preserveState: false, // Don't preserve state to get fresh data
-            preserveScroll: false, // Don't preserve scroll to go back to top
-        },
-    );
+    masonry.value?.loadPage(props.filters.page);
 };
 
 // Load next page of images
@@ -330,8 +305,8 @@ const handleUndoBlacklist = async () => {
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
                         footer: 32,
                     }"
+                    :load-at-page="filters.page"
                     :max-items="300"
-                    :skip-initial-load="true"
                     class="h-full"
                 >
                     <template #item="{ item }">
@@ -364,6 +339,9 @@ const handleUndoBlacklist = async () => {
                         </div>
                         <div v-if="isAutocycling" class="text-sm text-gray-200">Attempt {{ autocycleAttempts }} of {{ MAX_AUTOCYCLE_ATTEMPTS }}</div>
                     </div>
+                </div>
+                <div v-if="!masonry?.isLoading && masonryItems.length === 0" class="absolute inset-0 flex items-center justify-center">
+                    <div class="text-gray-500">No images found. Try changing filters or loading more.</div>
                 </div>
             </div>
         </div>

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\File;
 use App\Models\FileMetadata;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +66,7 @@ class CivitAIService
         $response = Http::get(self::CIVITAI_API_BASE.'/images', $params);
 
         if (! $response->successful()) {
-            throw new \Exception('CivitAI API request failed: '.$response->status());
+            throw new Exception('CivitAI API request failed: '.$response->status());
         }
 
         $data = $response->json();
@@ -75,22 +76,6 @@ class CivitAIService
             'items' => $data['items'] ?? [],
             'metadata' => $metadata,
             'currentPage' => $page,
-        ];
-    }
-
-    /**
-     * Transform the response from fetchItems into the final format for the frontend.
-     */
-    private function transformResponse(array $result, array $transformedItems, $currentPage): array
-    {
-        $hasNextPage = ! empty($result['metadata']['nextCursor']);
-        $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
-
-        return [
-            'items' => $transformedItems,
-            'page' => $currentPage, // Current page value (cursor or null for first page)
-            'nextPage' => $nextPage, // Next page value (cursor or null if no more)
-            'hasNextPage' => $hasNextPage,
         ];
     }
 
@@ -218,8 +203,6 @@ class CivitAIService
             ->all();
     }
 
-
-
     /**
      * Format File instances for UI display.
      */
@@ -246,5 +229,26 @@ class CivitAIService
         }
 
         return $uiItems;
+    }
+
+    /**
+     * Transform the response from fetchItems into the final format for the frontend.
+     */
+    private function transformResponse(array $result, array $transformedItems, $currentPage): array
+    {
+        $hasNextPage = ! empty($result['metadata']['nextCursor']);
+        $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
+
+        return [
+            'items' => $transformedItems,
+            'filters' => [
+                'page' => $currentPage, // Current page value (cursor or null for first page)
+                'nextPage' => $nextPage, // Next page value (cursor or null if no more)
+                'sort' => $this->request->get('sort', 'Most Reactions'),
+                'period' => $this->request->get('period', 'AllTime'),
+                'nsfw' => $this->request->boolean('nsfw', false),
+                'autoNext' => $this->request->boolean('autoNext', false),
+            ]
+        ];
     }
 }

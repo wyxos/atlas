@@ -17,20 +17,18 @@ export interface BrowseFilters {
     period: string;
     nsfw: boolean;
     autoNext: boolean;
+    page: number | string | null;
+    nextPage: number | string | null;
 }
 
 export interface BrowseProps {
     items: BrowseItem[];
-    page: number | string | null;
-    nextPage: number | string | null;
-    hasNextPage: boolean;
     filters: BrowseFilters;
 }
 
 export interface PaginationState {
     page: number | string | null;
     nextPage: number | string | null;
-    hasNextPage: boolean;
 }
 
 export interface SortOption {

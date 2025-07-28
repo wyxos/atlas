@@ -17,16 +17,22 @@ class BrowseController extends Controller
      */
     public function index(Request $request): Response
     {
-        $civitAIService = new CivitAIService($request);
-        $result = $civitAIService->fetch();
-
-        // Add current filter values to the response
-        $result['filters'] = [
-            'sort' => $request->get('sort', 'Most Reactions'),
-            'period' => $request->get('period', 'AllTime'),
-            'nsfw' => $request->boolean('nsfw', false),
-            'autoNext' => $request->boolean('autoNext', false),
+        $result = [
+            'items' => [],
+            'filters' => [
+                'page' => null, // Current page value (cursor or null for first page)
+                'nextPage' => null, // Next page value (cursor or null if no more)
+                'sort' => $request->get('sort', 'Most Reactions'),
+                'period' => $request->get('period', 'AllTime'),
+                'nsfw' => $request->boolean('nsfw', false),
+                'autoNext' => $request->boolean('autoNext', false),
+            ]
         ];
+
+        if($request->has('search')){
+            $civitAIService = new CivitAIService($request);
+            $result = $civitAIService->fetch();
+        }
 
         return Inertia::render('Browse', $result);
     }
@@ -72,7 +78,7 @@ class BrowseController extends Controller
     {
         // Find the most recently blacklisted item
         $lastBlacklistedFile = File::where('is_blacklisted', true)
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->first();
 
         if (!$lastBlacklistedFile) {
