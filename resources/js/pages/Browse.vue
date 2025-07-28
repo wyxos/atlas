@@ -1,12 +1,12 @@
 <script lang="ts" setup>
+import FileReactions from '@/components/audio/FileReactions.vue';
 import BrowseFilters from '@/components/browse/BrowseFilters.vue';
 import BrowseItem from '@/components/browse/BrowseItem.vue';
-import FileReactions from '@/components/audio/FileReactions.vue';
-import { useDownloadProgress } from '@/composables/useDownloadProgress';
-import { useItemReactions } from '@/composables/useItemReactions';
-import { useImageZoom } from '@/composables/useImageZoom';
 import Icon from '@/components/Icon.vue';
 import { Button } from '@/components/ui/button';
+import { useDownloadProgress } from '@/composables/useDownloadProgress';
+import { useImageZoom } from '@/composables/useImageZoom';
+import { useItemReactions } from '@/composables/useItemReactions';
 import { AUTOCYCLE_DELAY, MAX_AUTOCYCLE_ATTEMPTS } from '@/constants/browse';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
@@ -48,30 +48,30 @@ const paginationState = ref<PaginationState>({
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
 const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
-const { 
-    isImageViewerOpen, 
-    imageViewerZoom, 
-    imageViewerPosition, 
-    currentImage, 
+const {
+    isImageViewerOpen,
+    imageViewerZoom,
+    imageViewerPosition,
+    currentImage,
     allImages,
     currentIndex,
-    imageUrl, 
+    imageUrl,
     isCurrentVideo,
     isCurrentImage,
     canGoNext,
     canGoPrevious,
-    openImageViewer, 
-    closeImageViewer, 
-    zoomIn, 
-    zoomOut, 
-    resetZoom, 
-    startDrag, 
-    onDrag, 
+    openImageViewer,
+    closeImageViewer,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    startDrag,
+    onDrag,
     stopDrag,
     isDragging,
     goToNext,
     goToPrevious,
-    removeCurrentAndGoNext
+    removeCurrentAndGoNext,
 } = useImageZoom();
 
 // Remove item from masonry view
@@ -148,6 +148,28 @@ const handleFullScreenLaughedAt = (item: IBrowseItem, event: Event) => {
         removeItemFromView(item);
         removeCurrentAndGoNext();
     });
+};
+
+// Alt+Click shortcuts for full screen mode
+const handleFullScreenAltClick = () => {
+    if (currentImage.value) {
+        // Same behavior as browse grid: download + like + remove + next
+        startDownload(currentImage.value);
+        handleLike(currentImage.value, new Event('click'), () => {
+            removeItemFromView(currentImage.value!);
+            removeCurrentAndGoNext();
+        });
+    }
+};
+
+const handleFullScreenAltRightClick = () => {
+    if (currentImage.value) {
+        // Same behavior as browse grid: blacklist + remove + next
+        blacklistImage(currentImage.value, () => {
+            removeItemFromView(currentImage.value!);
+            removeCurrentAndGoNext();
+        });
+    }
 };
 
 // Autocycle function - uses masonry's loadNext method repeatedly until items are found
@@ -396,89 +418,74 @@ const handleUndoBlacklist = async () => {
         <div
             v-if="isImageViewerOpen"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+            tabindex="0"
             @click="closeImageViewer"
             @keydown.escape="closeImageViewer"
             @keydown.left="goToPrevious"
             @keydown.right="goToNext"
-            tabindex="0"
         >
             <div class="relative h-full w-full">
                 <!-- Close Button -->
                 <Button
-                    variant="outline"
-                    size="sm"
                     class="absolute top-4 right-4 z-10 bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                    size="sm"
+                    variant="outline"
                     @click.stop="closeImageViewer"
                 >
-                    <Icon name="x" class="h-4 w-4" />
+                    <Icon class="h-4 w-4" name="x" />
                 </Button>
 
                 <!-- Navigation Controls -->
-                <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 flex gap-2">
+                <div class="absolute top-4 left-1/2 z-10 flex -translate-x-1/2 transform gap-2">
                     <Button
                         v-if="canGoPrevious"
-                        variant="outline"
-                        size="sm"
                         class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                        size="sm"
+                        variant="outline"
                         @click.stop="goToPrevious"
                     >
-                        <Icon name="chevronLeft" class="h-4 w-4" />
+                        <Icon class="h-4 w-4" name="chevronLeft" />
                         Previous
                     </Button>
-                    <div class="bg-white/10 backdrop-blur-sm rounded px-3 py-2 text-sm text-white">
+                    <div class="rounded bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm">
                         {{ currentIndex + 1 }} / {{ allImages.length }}
                     </div>
                     <Button
                         v-if="canGoNext"
-                        variant="outline"
-                        size="sm"
                         class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                        size="sm"
+                        variant="outline"
                         @click.stop="goToNext"
                     >
                         Next
-                        <Icon name="chevronRight" class="h-4 w-4" />
+                        <Icon class="h-4 w-4" name="chevronRight" />
                     </Button>
                 </div>
 
                 <!-- Zoom Controls (only for images) -->
                 <div v-if="isCurrentImage" class="absolute top-4 left-4 z-10 flex gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                        @click.stop="zoomOut"
-                    >
-                        <Icon name="zoomOut" class="h-4 w-4" />
+                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomOut">
+                        <Icon class="h-4 w-4" name="zoomOut" />
                     </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                        @click.stop="resetZoom"
-                    >
-                        <Icon name="maximize" class="h-4 w-4" />
+                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="resetZoom">
+                        <Icon class="h-4 w-4" name="maximize" />
                     </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                        @click.stop="zoomIn"
-                    >
-                        <Icon name="zoomIn" class="h-4 w-4" />
+                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomIn">
+                        <Icon class="h-4 w-4" name="zoomIn" />
                     </Button>
                 </div>
 
                 <!-- Reactions Panel -->
-                <div class="absolute bottom-4 right-4 z-10" @click.stop>
-                    <div v-if="currentImage" class="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                <div class="absolute right-4 bottom-4 z-10" @click.stop>
+                    <div v-if="currentImage" class="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
                         <FileReactions
                             :file="currentImage"
                             :icon-size="20"
                             variant="player"
-                            @favorite="(file, event) => handleFullScreenFavorite(file, event)"
-                            @like="(file, event) => handleFullScreenLike(file, event)"
                             @dislike="(file, event) => handleFullScreenDislike(file, event)"
+                            @favorite="(file, event) => handleFullScreenFavorite(file, event)"
                             @laughedAt="(file, event) => handleFullScreenLaughedAt(file, event)"
+                            @like="(file, event) => handleFullScreenLike(file, event)"
                         />
                     </div>
                 </div>
@@ -490,35 +497,39 @@ const handleUndoBlacklist = async () => {
 
                 <!-- Media Container -->
                 <div
-                    class="flex h-full w-full items-center justify-center overflow-hidden"
                     :class="{ 'cursor-pointer': !isCurrentImage }"
+                    class="flex h-full w-full items-center justify-center overflow-hidden"
                     @mousedown="isCurrentImage ? startDrag : null"
+                    @mouseleave="isCurrentImage ? stopDrag : null"
                     @mousemove="isCurrentImage ? onDrag : null"
                     @mouseup="isCurrentImage ? stopDrag : null"
-                    @mouseleave="isCurrentImage ? stopDrag : null"
+                    @click.alt.exact.prevent="handleFullScreenAltClick"
+                    @contextmenu.alt.exact.prevent="handleFullScreenAltRightClick"
                 >
                     <!-- Image Display -->
                     <img
                         v-if="currentImage && isCurrentImage"
-                        :src="imageUrl"
                         :alt="currentImage.name || `Image ${currentImage.id}`"
+                        :src="imageUrl"
                         :style="{
                             transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x / imageViewerZoom}px, ${imageViewerPosition.y / imageViewerZoom}px)`,
-                            cursor: imageViewerZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+                            cursor: imageViewerZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
                         }"
                         class="max-h-full max-w-full object-contain transition-transform"
+                        @click.alt.exact.prevent="handleFullScreenAltClick"
+                        @contextmenu.alt.exact.prevent="handleFullScreenAltRightClick"
                         @click.stop
                         @dragstart.prevent
                     />
-                    
+
                     <!-- Video Display -->
                     <video
                         v-else-if="currentImage && isCurrentVideo"
-                        :src="imageUrl"
                         :alt="currentImage.name || `Video ${currentImage.id}`"
+                        :src="imageUrl"
+                        autoplay
                         class="max-h-full max-w-full object-contain"
                         controls
-                        autoplay
                         loop
                         @click.stop
                     >
@@ -530,22 +541,22 @@ const handleUndoBlacklist = async () => {
                 <!-- Left/Right Navigation Arrows -->
                 <Button
                     v-if="canGoPrevious"
-                    variant="outline"
+                    class="absolute top-1/2 left-4 z-10 h-12 w-12 -translate-y-1/2 transform bg-white/10 backdrop-blur-sm hover:bg-white/20"
                     size="lg"
-                    class="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-white/10 backdrop-blur-sm hover:bg-white/20 w-12 h-12"
+                    variant="outline"
                     @click.stop="goToPrevious"
                 >
-                    <Icon name="chevronLeft" class="h-6 w-6" />
+                    <Icon class="h-6 w-6" name="chevronLeft" />
                 </Button>
-                
+
                 <Button
                     v-if="canGoNext"
-                    variant="outline"
+                    class="absolute top-1/2 right-4 z-10 h-12 w-12 -translate-y-1/2 transform bg-white/10 backdrop-blur-sm hover:bg-white/20"
                     size="lg"
-                    class="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-white/10 backdrop-blur-sm hover:bg-white/20 w-12 h-12"
+                    variant="outline"
                     @click.stop="goToNext"
                 >
-                    <Icon name="chevronRight" class="h-6 w-6" />
+                    <Icon class="h-6 w-6" name="chevronRight" />
                 </Button>
             </div>
         </div>
