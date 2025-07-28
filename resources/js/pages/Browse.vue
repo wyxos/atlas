@@ -27,6 +27,8 @@ const autocycleAttempts = ref(0);
 
 // Filter state management
 const currentFilters = ref<IBrowseFilters>({
+    page: props.filters.page,
+    nextPage: props.filters.nextPage,
     sort: props.filters.sort,
     period: props.filters.period,
     nsfw: props.filters.nsfw,
@@ -219,7 +221,7 @@ const applyFilters = () => {
     paginationState.value.page = null;
     paginationState.value.nextPage = null;
 
-    masonry.value?.loadPage(props.filters.page);
+    masonry.value?.loadPage(null);
 };
 
 // Load next page of images
@@ -295,7 +297,6 @@ const handleUndoBlacklist = async () => {
                             @favorite="(file, event) => handleFavorite(file, event, removeItemFromView)"
                             @like="(file, event) => handleLike(file, event, removeItemFromView)"
                             @laughed-at="(file, event) => handleLaughedAt(file, event, removeItemFromView)"
-                            @left-click="handleLeftClick"
                             @alt-click="handleAltClick"
                             @alt-right-click="handleAltRightClick"
                         />
