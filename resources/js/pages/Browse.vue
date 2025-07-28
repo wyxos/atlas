@@ -132,7 +132,7 @@ const autocycleUntilItems = async (): Promise<void> => {
 const getPage = async (pageParam: number | string) => {
     try {
         const queryParams = {
-            page: paginationState.value.nextPage,
+            page: pageParam,
             sort: currentFilters.value.sort,
             period: currentFilters.value.period,
             nsfw: currentFilters.value.nsfw,
@@ -152,7 +152,7 @@ const getPage = async (pageParam: number | string) => {
                     onSuccess: (response) => {
                         try {
                             const newItems = response.props.items as IBrowseItem[];
-                            const filters = response.props.filters;
+                            const filters = response.props.filters as IBrowseFilters;
                             const nextPage = filters.nextPage;
                             const currentPage = filters.page;
 
