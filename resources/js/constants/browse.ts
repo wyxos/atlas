@@ -1,4 +1,4 @@
-import type { SortOption, PeriodOption } from '@/types/browse';
+import type { PeriodOption, SortOption } from '@/types/browse';
 
 // Sort options based on CivitAI API specification
 export const SORT_OPTIONS: SortOption[] = [
@@ -16,5 +16,5 @@ export const PERIOD_OPTIONS: PeriodOption[] = [
     { value: 'Day', label: 'Day' },
 ];
 
-export const MAX_AUTOCYCLE_ATTEMPTS = 10;
+export const MAX_AUTOCYCLE_ATTEMPTS = 100;
 export const AUTOCYCLE_DELAY = 100;

@@ -2,7 +2,7 @@ import '../css/app.css';
 
 import ContextMenu from '@imengyu/vue3-context-menu';
 import '@imengyu/vue3-context-menu/lib/vue3-context-menu.css';
-import { createInertiaApp, router } from '@inertiajs/vue3';
+import { createInertiaApp } from '@inertiajs/vue3';
 import { configureEcho } from '@laravel/echo-vue';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { DefineComponent } from 'vue';
@@ -25,13 +25,13 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 import VueVirtualScroller from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 
-window.addEventListener('popstate', (event) => {
-    event.stopImmediatePropagation();
-
-    router.reload({
-        except: ['flash'],
-    });
-});
+// window.addEventListener('popstate', (event) => {
+//     event.stopImmediatePropagation();
+//
+//     router.reload({
+//         except: ['flash'],
+//     });
+// });
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

@@ -1,5 +1,5 @@
-import { ref } from 'vue';
 import { useEchoPublic } from '@laravel/echo-vue';
+import { ref } from 'vue';
 
 export function useDownloadProgress() {
     const downloadProgress = ref<Record<number, number>>({});
@@ -7,7 +7,6 @@ export function useDownloadProgress() {
 
     // Setup Echo listener for download progress using useEchoPublic composable for public channel
     useEchoPublic('file-download-progress', 'FileDownloadProgress', (e: any) => {
-        console.log('Received download progress event:', e);
         downloadProgress.value[e.fileId] = e.progress;
 
         if (e.progress === 100) {

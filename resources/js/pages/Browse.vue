@@ -9,7 +9,7 @@ import { type BreadcrumbItem } from '@/types';
 import type { BrowseProps, BrowseFilters as IBrowseFilters, BrowseItem as IBrowseItem, PaginationState } from '@/types/browse';
 import { Head, router } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 
 const props = defineProps<BrowseProps>();
 
@@ -43,16 +43,6 @@ const paginationState = ref<PaginationState>({
 const { downloadProgress, downloadedItems } = useDownloadProgress();
 const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
 
-// Initialize with server-side data
-onMounted(() => {
-    console.log('Mounted Browse component with initial items:', props.items);
-
-    if (currentFilters.value.autoNext && paginationState.value.nextPage && !isAutocycling.value) {
-        // Automatically trigger next page if auto next is enabled
-        autocycleUntilItems();
-    }
-});
-
 // Remove item from masonry view
 const removeItemFromView = async (item: IBrowseItem) => {
     if (masonry.value && typeof masonry.value.onRemove === 'function') {
@@ -63,8 +53,6 @@ const removeItemFromView = async (item: IBrowseItem) => {
         setTimeout(async () => {
             // Check if there are no visible items left and more pages are available
             if (masonryItems.value.length === 0 && paginationState.value.nextPage) {
-                console.log('No items left in view after removal, loading next page...');
-
                 // If auto next is enabled, trigger autocycle, otherwise just load next page
                 if (currentFilters.value.autoNext) {
                     await autocycleUntilItems();
@@ -143,8 +131,6 @@ const autocycleUntilItems = async (): Promise<void> => {
 // Unified pagination handler - works with both cursor and page-based pagination
 const getPage = async (pageParam: number | string) => {
     try {
-        console.log('Masonry requesting:', pageParam, 'current state:', paginationState.value);
-
         const queryParams = {
             page: paginationState.value.nextPage,
             sort: currentFilters.value.sort,
@@ -157,7 +143,7 @@ const getPage = async (pageParam: number | string) => {
         // Use Inertia to fetch data
         return new Promise((resolve) => {
             router.get(
-                route('browse', queryParams),
+                route('browse.data', queryParams),
                 {},
                 {
                     preserveState: true,
@@ -169,8 +155,6 @@ const getPage = async (pageParam: number | string) => {
                             const filters = response.props.filters;
                             const nextPage = filters.nextPage;
                             const currentPage = filters.page;
-
-                            console.log('Fetched items:', newItems?.length, 'nextPage:', nextPage, 'currentPage:', currentPage);
 
                             paginationState.value = {
                                 page: currentPage,
@@ -217,21 +201,16 @@ const handlePeriodChange = (newPeriod: string) => {
 };
 
 const handleNsfwChange = (checked: boolean) => {
-    console.log('NSFW checkbox changed to:', checked);
     currentFilters.value.nsfw = checked;
-    console.log('Current filters after change:', currentFilters.value);
     applyFilters();
 };
 
 const handleAutoNextChange = (checked: boolean) => {
-    console.log('Auto Next checkbox changed to:', checked);
     currentFilters.value.autoNext = checked;
-    console.log('Current filters after change:', currentFilters.value);
     applyFilters();
 };
 
 const handleBackToFirst = () => {
-    console.log('Going back to first page with current filters');
     applyFilters();
 };
 
@@ -246,7 +225,6 @@ const applyFilters = () => {
 // Load next page of images
 const loadNext = async () => {
     if (masonry.value && typeof masonry.value.loadNext === 'function') {
-        console.log('Loading next page of images');
         await masonry.value.loadNext();
     } else {
         console.warn('Masonry component not ready or loadNext function not available');
@@ -258,7 +236,6 @@ const handleUndoBlacklist = async () => {
     try {
         const result = await undoLastBlacklist();
         if (result.success) {
-            console.log('Successfully undid blacklist:', result.message);
             // You could show a toast notification here if you have a toast system
             alert(result.message); // Temporary alert - you might want to replace with a proper toast
         }

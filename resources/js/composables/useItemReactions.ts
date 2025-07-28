@@ -5,15 +5,12 @@ export function useItemReactions() {
     const startDownload = async (item: BrowseItem) => {
         try {
             await axios.post(route('browse.download', { file: item.id }));
-            console.log('Download started for item:', item.id);
         } catch (error) {
             console.error('Failed to start download:', error);
         }
     };
 
     const handleFavorite = async (file: any, event: Event, onRemove?: (item: BrowseItem) => void) => {
-        console.log('Love reaction - starting download:', file.id);
-
         // Update local state optimistically
         const originalLoved = file.loved;
         file.loved = !file.loved;
@@ -45,8 +42,6 @@ export function useItemReactions() {
     };
 
     const handleLike = async (file: any, event: Event, onRemove?: (item: BrowseItem) => void) => {
-        console.log('Like reaction - starting download:', file.id);
-
         // Update local state optimistically
         const originalLiked = file.liked;
         file.liked = !file.liked;
@@ -78,8 +73,6 @@ export function useItemReactions() {
     };
 
     const handleDislike = async (file: any, event: Event, onBlacklist: (item: BrowseItem) => void) => {
-        console.log('Dislike reaction - blacklisting:', file.id);
-
         // Update local state optimistically
         const originalDisliked = file.disliked;
         file.disliked = !file.disliked;
@@ -106,8 +99,6 @@ export function useItemReactions() {
     };
 
     const handleLaughedAt = async (file: any, event: Event, onRemove?: (item: BrowseItem) => void) => {
-        console.log('Funny reaction - starting download:', file.id);
-
         // Update local state optimistically
         const originalFunny = file.funny;
         file.funny = !file.funny;
@@ -139,15 +130,12 @@ export function useItemReactions() {
     };
 
     const blacklistImage = async (item: BrowseItem, onRemove?: (item: BrowseItem) => void) => {
-        console.log('Blacklisting image:', item.id);
-
         try {
             // Call backend to blacklist the item using axios
-            await axios.post(route('browse.blacklist', { file: item.id }), { 
-                reason: 'Blacklisted via browse interface' 
+            await axios.post(route('browse.blacklist', { file: item.id }), {
+                reason: 'Blacklisted via browse interface',
             });
-            console.log('Item blacklisted successfully:', item.id);
-            
+
             // Remove from view after successful blacklist
             if (onRemove) {
                 onRemove(item);
@@ -160,11 +148,8 @@ export function useItemReactions() {
     };
 
     const undoLastBlacklist = async () => {
-        console.log('Undoing last blacklisted item...');
-
         try {
             const response = await axios.post(route('browse.undo-blacklist'));
-            console.log('Successfully undid blacklist:', response.data);
             return response.data;
         } catch (error) {
             console.error('Failed to undo blacklist:', error);

@@ -21,6 +21,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     // Browse routes
     Route::get('browse', [BrowseController::class, 'index'])->name('browse');
+    Route::get('browse/data', [BrowseController::class, 'data'])->name('browse.data');
     Route::post('browse/blacklist/{file}', [BrowseController::class, 'blacklist'])->name('browse.blacklist');
     Route::post('browse/undo-blacklist', [BrowseController::class, 'undoLastBlacklist'])->name('browse.undo-blacklist');
     Route::post('browse/download/{file}', [BrowseController::class, 'download'])->name('browse.download');
@@ -108,7 +109,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::post('audio/{file}/like', [AudioController::class, 'toggleLike'])->name('audio.like');
     Route::post('audio/{file}/dislike', [AudioController::class, 'toggleDislike'])->name('audio.dislike');
     Route::post('audio/{file}/laughed-at', [AudioController::class, 'toggleLaughedAt'])->name('audio.laughed-at');
-    
+
     // Generic file interaction routes (for all file types)
     Route::post('files/{file}/love', [AudioController::class, 'toggleLove'])->name('files.love');
     Route::post('files/{file}/like', [AudioController::class, 'toggleLike'])->name('files.like');
