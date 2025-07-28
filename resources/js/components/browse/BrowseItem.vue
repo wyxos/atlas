@@ -1,8 +1,10 @@
 <template>
     <div class="relative h-full">
-        <!-- Image container with fixed imageHeight -->
+        <!-- Media container with fixed imageHeight -->
         <div :style="{ height: item.imageHeight + 'px' }" class="relative">
+            <!-- Image element for image files -->
             <img
+                v-if="isImage"
                 :alt="`Image ${item.id}`"
                 :src="item.src"
                 class="h-full w-full cursor-pointer object-cover transition-all duration-500 ease-in-out"
@@ -13,6 +15,27 @@
                 @click.alt.exact.prevent="handleAltClick"
                 @contextmenu.alt.exact.prevent="handleAltRightClick"
             />
+            
+            <!-- Video element for video files -->
+            <video
+                v-else-if="isVideo"
+                :src="item.src"
+                class="h-full w-full cursor-pointer object-cover transition-all duration-500 ease-in-out"
+                muted
+                loop
+                playsinline
+                preload="metadata"
+                @error="(e) => console.warn('Failed to load video:', item.id, e)"
+                @loadeddata="() => console.debug('Loaded video:', item.id)"
+                @click.left.exact="handleLeftClick"
+                @click.alt.exact.prevent="handleAltClick"
+                @contextmenu.alt.exact.prevent="handleAltRightClick"
+                @mouseenter="(e) => e.target.play().catch(() => {})"
+                @mouseleave="(e) => e.target.pause()"
+            >
+                <source :src="item.src" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
         </div>
 
         <!-- Footer area for reactions -->
@@ -59,6 +82,7 @@
 import AudioReactions from '@/components/audio/AudioReactions.vue';
 import type { BrowseItem } from '@/types/browse';
 import { router } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 interface Props {
     item: BrowseItem;
@@ -90,6 +114,18 @@ const handleAltClick = () => {
 const handleAltRightClick = () => {
     emit('altRightClick', props.item);
 };
+
+// Utility function to detect if the file is a video based on its URL
+const isVideo = computed(() => {
+    const src = props.item.src.toLowerCase();
+    return src.includes('.mp4') || src.includes('.webm') || src.includes('.mov') || src.includes('.avi') || src.includes('.mkv') || src.includes('.wmv') || src.includes('.m4v');
+});
+
+// Utility function to detect if the file is an image
+const isImage = computed(() => {
+    const src = props.item.src.toLowerCase();
+    return src.includes('.jpg') || src.includes('.jpeg') || src.includes('.png') || src.includes('.gif') || src.includes('.webp') || src.includes('.svg') || src.includes('.bmp') || !isVideo.value;
+});
 
 // Utility function to format large numbers
 const formatCount = (count: number): string => {
