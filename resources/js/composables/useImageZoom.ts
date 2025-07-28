@@ -5,6 +5,7 @@ export interface ImageData {
     name?: string;
     url?: string;
     src?: string; // For BrowseItem compatibility
+    original?: string; // For BrowseItem original URL
     image_url?: string;
     downloaded?: boolean;
     not_found?: boolean;
@@ -75,7 +76,12 @@ export function useImageZoom() {
     const imageUrl = computed(() => {
         if (!currentImage.value) return '';
         
-        // For BrowseItem objects, use src directly
+        // For BrowseItem objects, use original field for full resolution
+        if (currentImage.value.original) {
+            return currentImage.value.original;
+        }
+        
+        // Fallback to src for compatibility
         if (currentImage.value.src) {
             return currentImage.value.src;
         }

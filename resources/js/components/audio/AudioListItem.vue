@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { Play, Pause } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { router } from '@inertiajs/vue3';
-import AudioReactions from '@/components/audio/AudioReactions.vue';
+import FileReactions from '@/components/audio/FileReactions.vue';
 
 const props = defineProps<{
   item: any;
@@ -275,7 +275,7 @@ const handleDrop = async (event: DragEvent): Promise<void> => {
 
     <!-- Action buttons container -->
     <div class="absolute top-0 left-full md:static h-full items-center flex p-4">
-      <AudioReactions
+      <FileReactions
         :file="loadedFile"
         :icon-size="20"
         variant="list"

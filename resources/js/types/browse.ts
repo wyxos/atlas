@@ -1,6 +1,7 @@
 export interface BrowseItem {
     id: number; // Use actual CivitAI numeric ID
     src: string;
+    original: string; // Full resolution image URL
     width: number;
     height: number;
     page: string | number;

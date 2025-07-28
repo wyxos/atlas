@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import AudioQueuePanel from '@/components/audio/AudioQueuePanel.vue';
-import AudioReactions from '@/components/audio/AudioReactions.vue';
+import FileReactions from '@/components/audio/FileReactions.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { audioActions, audioStore, getAudioElement } from '@/stores/audioStore';
 import { router } from '@inertiajs/vue3';
@@ -421,7 +421,7 @@ const { isDragging, handleDragEnter, handleDragOver, handleDragLeave, handleDrop
 
                         <!-- Love/Like controls (right) -->
                         <div class="flex flex-1 items-center">
-                            <AudioReactions
+                            <FileReactions
                                 :file="audioStore.currentFile"
                                 :icon-size="16"
                                 :show-labels="true"

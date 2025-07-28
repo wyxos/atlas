@@ -29,7 +29,7 @@ class CivitAIService
     {
         // Get the unified 'page' parameter - could be cursor or page number
         $page = $this->request->get('page');
-        $limit = (int) $this->request->get('limit', 20);
+        $limit = (int) $this->request->get('limit', 40);
 
         $result = $this->fetchItems($page, $limit);
         $transformedItems = $this->transformItems($result['items']);
@@ -61,7 +61,15 @@ class CivitAIService
         if ($page !== null) {
             $params['cursor'] = $page;
         }
+        else{
+            // If no page is specified, we assume it's the first page
+            $params['cursor'] = null; // CivitAI API does not require a cursor for the first page
+        }
+
         // Note: CivitAI doesn't use traditional page numbers, only cursors
+
+        // delete page and autoNext
+        unset($params['page'], $params['autoNext']);
 
         $response = Http::get(self::CIVITAI_API_BASE.'/images', $params);
 
@@ -90,6 +98,11 @@ class CivitAIService
             // Extract metadata if available
             $meta = $itemData['meta'] ?? [];
 
+            $thumbnail = $itemData['url'];
+
+            //  replace in string $thumbnail width=xxx with width=450
+            $thumbnail = preg_replace('/width=\d+/', 'width=450', $thumbnail);
+
             $transformedItems[] = [
                 // Core identification
                 'source' => 'CivitAI',
@@ -106,7 +119,7 @@ class CivitAIService
                 // Content metadata
                 'title' => $meta['prompt'] ?? null,
                 'description' => null,
-                'thumbnail_url' => $itemData['url'],
+                'thumbnail_url' => $thumbnail,
 
                 // Metadata for FileMetadata relationship
                 '_metadata' => array_merge($meta, [
@@ -216,7 +229,8 @@ class CivitAIService
 
             $uiItems[] = [
                 'id' => $file->id,
-                'src' => $file->url,
+                'src' => $file->thumbnail_url,
+                'original' => $file->url,
                 'width' => $metadata['width'] ?? null,
                 'height' => $metadata['height'] ?? null,
                 'page' => $pageIdentifier,
