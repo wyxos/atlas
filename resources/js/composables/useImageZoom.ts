@@ -10,6 +10,10 @@ export interface ImageData {
     downloaded?: boolean;
     not_found?: boolean;
     path?: string;
+    loved?: boolean;
+    liked?: boolean;
+    disliked?: boolean;
+    funny?: boolean;
 }
 
 export function useImageZoom() {
@@ -18,10 +22,14 @@ export function useImageZoom() {
     const imageViewerZoom = ref(1);
     const imageViewerPosition = ref({ x: 0, y: 0 });
     const currentImage = ref<ImageData | null>(null);
+    const allImages = ref<ImageData[]>([]);
+    const currentIndex = ref(0);
 
     // Image viewer functions
-    const openImageViewer = (image: ImageData) => {
+    const openImageViewer = (image: ImageData, imageList: ImageData[] = []) => {
         currentImage.value = image;
+        allImages.value = imageList;
+        currentIndex.value = imageList.findIndex(img => img.id === image.id) || 0;
         isImageViewerOpen.value = true;
         imageViewerZoom.value = 1;
         imageViewerPosition.value = { x: 0, y: 0 };
@@ -30,6 +38,8 @@ export function useImageZoom() {
     const closeImageViewer = () => {
         isImageViewerOpen.value = false;
         currentImage.value = null;
+        allImages.value = [];
+        currentIndex.value = 0;
     };
 
     const zoomIn = () => {
@@ -72,6 +82,52 @@ export function useImageZoom() {
         isDragging.value = false;
     };
 
+    // Navigation functions
+    const goToNext = () => {
+        if (allImages.value.length > 0 && currentIndex.value < allImages.value.length - 1) {
+            currentIndex.value++;
+            currentImage.value = allImages.value[currentIndex.value];
+            resetZoom();
+        }
+    };
+
+    const goToPrevious = () => {
+        if (allImages.value.length > 0 && currentIndex.value > 0) {
+            currentIndex.value--;
+            currentImage.value = allImages.value[currentIndex.value];
+            resetZoom();
+        }
+    };
+
+    const canGoNext = computed(() => {
+        return allImages.value.length > 0 && currentIndex.value < allImages.value.length - 1;
+    });
+
+    const canGoPrevious = computed(() => {
+        return allImages.value.length > 0 && currentIndex.value > 0;
+    });
+
+    // Remove current item and navigate to next
+    const removeCurrentAndGoNext = () => {
+        if (allImages.value.length > 0) {
+            // Remove current item from the array
+            allImages.value.splice(currentIndex.value, 1);
+            
+            // If we removed the last item, go to previous
+            if (currentIndex.value >= allImages.value.length && currentIndex.value > 0) {
+                currentIndex.value--;
+            }
+            
+            // Update current image or close if no items left
+            if (allImages.value.length > 0) {
+                currentImage.value = allImages.value[currentIndex.value];
+                resetZoom();
+            } else {
+                closeImageViewer();
+            }
+        }
+    };
+
     // Get the image URL for display
     const imageUrl = computed(() => {
         if (!currentImage.value) return '';
@@ -100,17 +156,54 @@ export function useImageZoom() {
         return currentImage.value.image_url || `/atlas/${currentImage.value.path}`;
     });
 
+    // Utility function to detect if the current file is a video
+    const isCurrentVideo = computed(() => {
+        if (!currentImage.value) return false;
+        const url = imageUrl.value.toLowerCase();
+        return (
+            url.includes('.mp4') ||
+            url.includes('.webm') ||
+            url.includes('.mov') ||
+            url.includes('.avi') ||
+            url.includes('.mkv') ||
+            url.includes('.wmv') ||
+            url.includes('.m4v')
+        );
+    });
+
+    // Utility function to detect if the current file is an image
+    const isCurrentImage = computed(() => {
+        if (!currentImage.value) return false;
+        const url = imageUrl.value.toLowerCase();
+        return (
+            url.includes('.jpg') ||
+            url.includes('.jpeg') ||
+            url.includes('.png') ||
+            url.includes('.gif') ||
+            url.includes('.webp') ||
+            url.includes('.svg') ||
+            url.includes('.bmp') ||
+            !isCurrentVideo.value
+        );
+    });
+
     return {
         // State
         isImageViewerOpen,
         imageViewerZoom,
         imageViewerPosition,
         currentImage,
+        allImages,
+        currentIndex,
         isDragging,
         dragStart,
         
         // Computed
         imageUrl,
+        isCurrentVideo,
+        isCurrentImage,
+        canGoNext,
+        canGoPrevious,
         
         // Methods
         openImageViewer,
@@ -120,6 +213,9 @@ export function useImageZoom() {
         resetZoom,
         startDrag,
         onDrag,
-        stopDrag
+        stopDrag,
+        goToNext,
+        goToPrevious,
+        removeCurrentAndGoNext
     };
 }
