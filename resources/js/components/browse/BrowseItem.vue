@@ -81,7 +81,7 @@ const emit = defineEmits<{
 const handleLeftClick = () => {
     // Navigate to single file view with preserved state
     router.get(
-        route('audio.show', { file: props.item.id }),
+        route('images.show', { file: props.item.id }),
         {},
         {
             preserveState: false,

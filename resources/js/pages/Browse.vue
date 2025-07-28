@@ -221,6 +221,8 @@ const applyFilters = () => {
     paginationState.value.page = null;
     paginationState.value.nextPage = null;
 
+    masonryItems.value = [];
+
     masonry.value?.loadPage(null);
 };
 

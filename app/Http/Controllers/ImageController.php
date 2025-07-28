@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\File;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ImageController extends Controller
@@ -241,9 +242,16 @@ class ImageController extends Controller
 
     public function show(File $file)
     {
-        // This method can be implemented later for individual image viewing
+        // Load the covers and metadata relationships
+        $file->load(['covers', 'metadata']);
+        
+        // Append the image_url attribute
+        $file->append('image_url');
+
         return Inertia::render('ImageShow', [
-            'file' => $file->load(['covers', 'metadata']),
+            'file' => $file,
+            'metadata' => $file->metadata,
+            'rawMetadata' => Storage::disk('atlas')->json('metadata/'.$file->id.'.json'),
         ]);
     }
 }
