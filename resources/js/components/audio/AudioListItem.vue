@@ -53,11 +53,11 @@ function handlePlay(event: Event): void {
 }
 
 
-// Handle track title click to navigate to FileShow
+// Handle track title click to navigate to AudioShow
 function handleTitleClick(event: Event): void {
   event.stopPropagation();
   if (props.loadedFile?.id) {
-    router.visit(route('files.show', { file: props.loadedFile.id }));
+    router.visit(route('audio.show', { file: props.loadedFile.id }));
   }
 }
 

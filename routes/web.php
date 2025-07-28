@@ -97,7 +97,6 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('files/{file}/playlists', [AudioController::class, 'getFilePlaylistMembership'])->name('files.playlists');
 
     // Files routes (using AudioController for consistency)
-    Route::get('files/{file}', [AudioController::class, 'show'])->name('files.show');
     Route::post('covers/{coverId}', [AudioController::class, 'updateCover'])->name('covers.update');
     Route::post('covers/create/{fileId}', [AudioController::class, 'createCover'])->name('covers.create');
 

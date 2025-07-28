@@ -117,10 +117,10 @@ function handleRepeat(): void {
     audioActions.toggleRepeat();
 }
 
-// Handle track title click to navigate to FileShow
+// Handle track title click to navigate to AudioShow
 function handleTitleClick(): void {
     if (audioStore.currentFile?.id) {
-        router.visit(route('files.show', { file: audioStore.currentFile.id }));
+        router.visit(route('audio.show', { file: audioStore.currentFile.id }));
     }
 }
 

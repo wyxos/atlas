@@ -67,7 +67,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
     {
         title: props.file.name,
-        href: route('files.show', { file: props.file.id }),
+        href: route('audio.show', { file: props.file.id }),
     },
 ];
 

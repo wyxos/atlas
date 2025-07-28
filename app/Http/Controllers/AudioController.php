@@ -38,7 +38,7 @@ class AudioController extends Controller
         // Load the covers, artists, and albums relationships
         $file->load(['covers', 'artists.covers', 'albums.covers']);
 
-        return Inertia::render('FileShow', [
+        return Inertia::render('AudioShow', [
             'file' => $file,
             'metadata' => $file->metadata,
             'rawMetadata' => Storage::disk('atlas')->json('metadata/'.$file->id.'.json'),
