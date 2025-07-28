@@ -21,6 +21,7 @@ class ImageController extends Controller
             ->query(function (Builder $builder) {
                 $builder
                     ->where('mime_type', 'like', 'image/%')
+                    ->where('is_blacklisted', 0)
                     ->where('not_found', 0);
             })
             ->whereNotIn('path', ['__missing__'])
@@ -244,7 +245,7 @@ class ImageController extends Controller
     {
         // Load the covers and metadata relationships
         $file->load(['covers', 'metadata']);
-        
+
         // Append the image_url attribute
         $file->append('image_url');
 
