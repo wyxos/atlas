@@ -22,7 +22,7 @@ class BrowseController extends Controller
             'filters' => [
                 'page' => $request->get('page', null), // Current page value (cursor or null for first page)
                 'nextPage' => null, // Next page value (cursor or null if no more)
-                'sort' => $request->get('sort', 'Most Reactions'),
+                'sort' => $request->get('sort', 'Newest'),
                 'period' => $request->get('period', 'AllTime'),
                 'nsfw' => $request->boolean('nsfw', false),
                 'autoNext' => $request->boolean('autoNext', false),

@@ -51,7 +51,8 @@ class CivitAIService
     {
         $params = [
             'limit' => $limit,
-            'sort' => $this->request->get('sort', 'Most Reactions'),
+            'sort' => $this->request->get('sort', 'Newest'),
+//            "baseModels" => ["SDXL 1.0"],
             'period' => $this->request->get('period', 'AllTime'),
             'nsfw' => $this->request->boolean('nsfw', false),
         ];
@@ -72,6 +73,17 @@ class CivitAIService
         unset($params['page'], $params['autoNext']);
 
         $response = Http::get(self::CIVITAI_API_BASE.'/images', $params);
+
+        if(app()->environment('local')){
+            // log to a file {time}_civitai.json, the params used and the response returned in storage/logs
+            $logData = [
+                'time' => Carbon::now()->toDateTimeString(),
+                'params' => $params,
+                'response' => $response->json(),
+            ];
+
+            file_put_contents(storage_path('logs/'.Carbon::now()->format('Y-m-d_H-i-s').'_civitai.json'), json_encode($logData, JSON_PRETTY_PRINT));
+        }
 
         if (! $response->successful()) {
             throw new Exception('CivitAI API request failed: '.$response->status());
@@ -133,6 +145,37 @@ class CivitAIService
         }
 
         return $transformedItems;
+    }
+
+    private function getFileExtension(array $itemData): string
+    {
+        return pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+    }
+
+    private function getMimeType(array $itemData): string
+    {
+        $extension = strtolower($this->getFileExtension($itemData));
+
+        switch ($extension) {
+            case 'jpeg':
+            case 'jpg':
+                return 'image/jpeg';
+            case 'png':
+                return 'image/png';
+            case 'gif':
+                return 'image/gif';
+            case 'webp':
+                return 'image/webp';
+            case 'mp4':
+                return 'video/mp4';
+            case 'avi':
+                return 'video/x-msvideo';
+            case 'mov':
+                return 'video/quicktime';
+            // Add more types as needed
+            default:
+                return 'application/octet-stream';
+        }
     }
 
     /**
@@ -264,36 +307,6 @@ class CivitAIService
                 'autoNext' => $this->request->boolean('autoNext', false),
             ]
         ];
-    }
-    private function getFileExtension(array $itemData): string
-    {
-        return pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
-    }
-
-    private function getMimeType(array $itemData): string
-    {
-        $extension = strtolower($this->getFileExtension($itemData));
-
-        switch ($extension) {
-            case 'jpeg':
-            case 'jpg':
-                return 'image/jpeg';
-            case 'png':
-                return 'image/png';
-            case 'gif':
-                return 'image/gif';
-            case 'webp':
-                return 'image/webp';
-            case 'mp4':
-                return 'video/mp4';
-            case 'avi':
-                return 'video/x-msvideo';
-            case 'mov':
-                return 'video/quicktime';
-            // Add more types as needed
-            default:
-                return 'application/octet-stream';
-        }
     }
 
 }
