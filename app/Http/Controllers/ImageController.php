@@ -28,9 +28,10 @@ class ImageController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(48);
 
-        // Append image_url attribute to results
+        // Append image_url attribute to results and include source
         $images->getCollection()->transform(function ($file) {
             $file->append('image_url');
+            $file->makeVisible(['source']); // Make source visible
             return $file;
         });
 
@@ -254,5 +255,52 @@ class ImageController extends Controller
             'metadata' => $file->metadata,
             'rawMetadata' => Storage::disk('atlas')->json('metadata/'.$file->id.'.json'),
         ]);
+    }
+
+    /**
+     * Delete a local file or blacklist a remote file
+     */
+    public function deleteOrBlacklist(File $file)
+    {
+        // If the file source is not 'local' (i.e., it's from CivitAI or other external sources), blacklist it
+        if ($file->source !== 'local') {
+            // Remove the physical file if it exists (for cached files)
+            if ($file->path && Storage::disk('atlas')->exists($file->path)) {
+                Storage::disk('atlas')->delete($file->path);
+            }
+
+            $file->update([
+                'is_blacklisted' => true,
+                'blacklist_reason' => 'Blacklisted from images page'
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Image has been blacklisted',
+                'action' => 'blacklisted'
+            ]);
+        }
+
+        // For local files, actually delete them
+        try {
+            // Delete the physical file if it exists
+            if ($file->path && Storage::disk('atlas')->exists($file->path)) {
+                Storage::disk('atlas')->delete($file->path);
+            }
+
+            // Delete the database record
+            $file->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Image has been deleted',
+                'action' => 'deleted'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete image: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('files', function (Blueprint $table) {
             $table->id();
-            $table->string('source'); // Origin of file ("NAS", "YouTube", "Booru", etc.)
+            $table->string('source'); // Origin of file ("local", "NAS", "YouTube", "Booru", etc.)
             $table->string('source_id')->nullable(); // Unique ID from source (if available)
             $table->string('url')->nullable();
             $table->string('referrer_url')->nullable(); // Page URL where the file was discovered

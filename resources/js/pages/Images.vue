@@ -4,8 +4,11 @@ import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { Card, CardContent } from '@/components/ui/card';
 import { Pagination } from '@/components/ui/pagination';
-import { Image, Eye } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
+import { Image, Eye, Trash2, X } from 'lucide-vue-next';
 import GenericSearch from '@/components/ui/search/GenericSearch.vue';
+import axios from 'axios';
+import { ref } from 'vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -27,6 +30,7 @@ interface ImageFile {
     size: number;
     width?: number;
     height?: number;
+    source?: string;
     covers?: Array<{
         id: number;
         path: string;
@@ -78,6 +82,59 @@ function formatDimensions(image: ImageFile): string {
 function getDisplayTitle(image: ImageFile): string {
     return image.title || image.filename.replace(/\.[^/.]+$/, '');
 }
+
+// Reactive state for handling deletions
+const deletingImages = ref<Set<number>>(new Set());
+const removedImages = ref<Set<number>>(new Set());
+
+// Delete or blacklist an image
+const handleDeleteImage = async (image: ImageFile, event: Event) => {
+    event.stopPropagation(); // Prevent card click
+    
+    const actionText = image.source === 'local' ? 'delete' : 'blacklist';
+    
+    if (!confirm(`Are you sure you want to ${actionText} this image?`)) {
+        return;
+    }
+
+    deletingImages.value.add(image.id);
+
+    try {
+        const response = await axios.delete(route('images.delete', { file: image.id }));
+        
+        if (response.data.success) {
+            removedImages.value.add(image.id);
+            
+            // Show success message
+            alert(response.data.message);
+        }
+    } catch (error) {
+        console.error('Failed to delete/blacklist image:', error);
+        alert('Failed to process the image. Please try again.');
+    } finally {
+        deletingImages.value.delete(image.id);
+    }
+};
+
+// Get button text based on source
+const getDeleteButtonText = (image: ImageFile): string => {
+    return image.source === 'local' ? 'Delete' : 'Blacklist';
+};
+
+// Get button variant based on source
+const getDeleteButtonVariant = (image: ImageFile): 'destructive' | 'secondary' => {
+    return image.source === 'local' ? 'destructive' : 'secondary';
+};
+
+// Check if image should be hidden (removed)
+const isImageRemoved = (image: ImageFile): boolean => {
+    return removedImages.value.has(image.id);
+};
+
+// Check if image is being deleted
+const isImageDeleting = (image: ImageFile): boolean => {
+    return deletingImages.value.has(image.id);
+};
 </script>
 
 <template>
@@ -144,6 +201,28 @@ function getDisplayTitle(image: ImageFile): string {
                                 <p class="text-xs text-gray-500">
                                     {{ formatFileSize(image.size) }}
                                 </p>
+                                
+                                <!-- Delete/Blacklist Button -->
+                                <div class="mt-3">
+                                    <Button
+                                        v-if="!isImageRemoved(image)"
+                                        :variant="getDeleteButtonVariant(image)"
+                                        size="sm"
+                                        :disabled="isImageDeleting(image)"
+                                        @click="(event) => handleDeleteImage(image, event)"
+                                    >
+                                        <template v-if="isImageDeleting(image)">
+                                            <div class="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"></div>
+                                        </template>
+                                        <template v-else>
+                                            <component :is="image.source === 'local' ? Trash2 : X" class="w-4 h-4 mr-2" />
+                                            {{ getDeleteButtonText(image) }}
+                                        </template>
+                                    </Button>
+                                    <div v-else class="text-sm text-green-600 font-medium">
+                                        ✓ {{ image.source === 'local' ? 'Deleted' : 'Blacklisted' }}
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

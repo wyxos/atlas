@@ -91,6 +91,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('images/books', [ImageController::class, 'books'])->name('images.books');
     Route::get('images/sets', [ImageController::class, 'sets'])->name('images.sets');
     Route::get('images/various', [ImageController::class, 'various'])->name('images.various');
+    Route::delete('images/{file}', [ImageController::class, 'deleteOrBlacklist'])->name('images.delete');
     Route::get('images/{file}', [ImageController::class, 'show'])->name('images.show');
 
     // Get playlist membership for a file
