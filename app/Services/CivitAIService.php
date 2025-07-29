@@ -112,8 +112,8 @@ class CivitAIService
 
                 // File properties
                 'filename' => basename(parse_url($itemData['url'], PHP_URL_PATH)) ?: 'civitai_'.$itemData['id'],
-                'ext' => pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg',
-                'mime_type' => 'image/'.(pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpeg'),
+                'ext' => $this->getFileExtension($itemData),
+                'mime_type' => $this->getMimeType($itemData),
                 'hash' => $itemData['hash'] ?? null,
 
                 // Content metadata
@@ -265,4 +265,35 @@ class CivitAIService
             ]
         ];
     }
+    private function getFileExtension(array $itemData): string
+    {
+        return pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+    }
+
+    private function getMimeType(array $itemData): string
+    {
+        $extension = strtolower($this->getFileExtension($itemData));
+
+        switch ($extension) {
+            case 'jpeg':
+            case 'jpg':
+                return 'image/jpeg';
+            case 'png':
+                return 'image/png';
+            case 'gif':
+                return 'image/gif';
+            case 'webp':
+                return 'image/webp';
+            case 'mp4':
+                return 'video/mp4';
+            case 'avi':
+                return 'video/x-msvideo';
+            case 'mov':
+                return 'video/quicktime';
+            // Add more types as needed
+            default:
+                return 'application/octet-stream';
+        }
+    }
+
 }
