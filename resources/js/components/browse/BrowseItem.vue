@@ -1,7 +1,8 @@
 <script lang="ts" setup>
 import FileReactions from '@/components/audio/FileReactions.vue';
+import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 interface Props {
     item: BrowseItem;
@@ -62,6 +63,37 @@ const isImage = computed(() => {
         !isVideo.value
     );
 });
+
+// Use the seen status composable
+const { markAsSeen } = useSeenStatus();
+const hasMarkedPreview = ref(false);
+
+// Determine the status badge
+const statusBadge = computed(() => {
+    if (props.item.seen_file_at) {
+        return { text: 'Viewed', class: 'bg-blue-500' };
+    }
+    if (props.item.seen_preview_at) {
+        return { text: 'Previewed', class: 'bg-yellow-500' };
+    }
+    return { text: 'New', class: 'bg-red-500' };
+});
+
+// Handle marking as seen when preview is loaded
+const handlePreviewLoaded = () => {
+    if (!props.item.seen_preview_at && !hasMarkedPreview.value) {
+        hasMarkedPreview.value = true;
+        markAsSeen(props.item.id, 'preview');
+    }
+};
+
+// Handle marking as seen when video completes (for videos only)
+const handleVideoCompleted = () => {
+    if (!props.item.seen_preview_at && !hasMarkedPreview.value) {
+        hasMarkedPreview.value = true;
+        markAsSeen(props.item.id, 'preview');
+    }
+};
 </script>
 
 <template>
@@ -76,7 +108,7 @@ const isImage = computed(() => {
                 class="h-full w-full cursor-pointer object-cover"
                 loading="lazy"
                 @error="(e) => console.warn('Failed to load image:', item.id, e)"
-                @load="() => console.debug('Loaded image:', item.id)"
+                @load="handlePreviewLoaded"
                 @click.left.exact="handleLeftClick"
                 @click.alt.exact.prevent="handleAltClick"
                 @contextmenu.alt.exact.prevent="handleAltRightClick"
@@ -92,7 +124,8 @@ const isImage = computed(() => {
                 playsinline
                 preload="metadata"
                 @error="(e) => console.warn('Failed to load video:', item.id, e)"
-                @loadeddata="() => console.debug('Loaded video:', item.id)"
+                @loadeddata="handlePreviewLoaded"
+                @ended="handleVideoCompleted"
                 @mouseenter="(e) => e.target.play().catch(() => {})"
                 @mouseleave="(e) => e.target.pause()"
                 @click.left.exact="handleLeftClick"
@@ -102,6 +135,13 @@ const isImage = computed(() => {
                 <source :src="item.src" type="video/mp4" />
                 Your browser does not support the video tag.
             </video>
+        </div>
+
+        <!-- Status Badge -->
+        <div class="absolute top-2 right-2 z-10">
+            <div :class="statusBadge.class" class="rounded px-2 py-1 text-xs font-medium text-white shadow-lg">
+                {{ statusBadge.text }}
+            </div>
         </div>
 
         <!-- Footer area for reactions -->

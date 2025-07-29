@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { useDownloadProgress } from '@/composables/useDownloadProgress';
 import { useImageZoom } from '@/composables/useImageZoom';
 import { useItemReactions } from '@/composables/useItemReactions';
+import { useSeenStatus } from '@/composables/useSeenStatus';
 import { AUTOCYCLE_DELAY, MAX_AUTOCYCLE_ATTEMPTS } from '@/constants/browse';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import type { BrowseProps, BrowseFilters as IBrowseFilters, BrowseItem as IBrowseItem, PaginationState } from '@/types/browse';
 import { Head, router } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps<BrowseProps>();
 
@@ -48,6 +49,7 @@ const paginationState = ref<PaginationState>({
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
 const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
+const { markAsSeen } = useSeenStatus();
 const {
     isImageViewerOpen,
     imageViewerZoom,
@@ -350,6 +352,30 @@ const handleUndoBlacklist = async () => {
         }
     }
 };
+
+// Track full screen view status for marking as viewed
+const viewedFileIds = ref(new Set<number>());
+
+// Watch for changes in the current image to mark as viewed
+watch(
+    currentImage,
+    async (newImage) => {
+        if (newImage && !newImage.seen_file_at && !viewedFileIds.value.has(newImage.id)) {
+            viewedFileIds.value.add(newImage.id);
+            const response = await markAsSeen(newImage.id, 'file');
+
+            // Find the item in the masonry list and update it to trigger reactivity
+            const itemIndex = masonryItems.value.findIndex((item) => item.id === newImage.id);
+            if (itemIndex !== -1) {
+                masonryItems.value[itemIndex] = {
+                    ...masonryItems.value[itemIndex],
+                    seen_file_at: response.timestamp,
+                };
+            }
+        }
+    },
+    { immediate: true },
+);
 </script>
 
 <template>

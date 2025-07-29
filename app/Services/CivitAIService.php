@@ -282,6 +282,8 @@ class CivitAIService
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
                 'funny' => $file->funny,
+                'seen_preview_at' => $file->seen_preview_at?->toISOString(),
+                'seen_file_at' => $file->seen_file_at?->toISOString(),
             ];
         }
 

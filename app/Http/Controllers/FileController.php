@@ -125,6 +125,32 @@ class FileController extends Controller
     }
 
     /**
+     * Mark a file as seen (preview or full view)
+     */
+    public function markAsSeen(Request $request, File $file)
+    {
+        $request->validate([
+            'type' => 'required|in:preview,file'
+        ]);
+
+        $type = $request->input('type');
+        $now = now();
+
+        if ($type === 'preview' && !$file->seen_preview_at) {
+            $file->update(['seen_preview_at' => $now]);
+        } elseif ($type === 'file' && !$file->seen_file_at) {
+            $file->update(['seen_file_at' => $now]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'File marked as seen',
+            'type' => $type,
+            'timestamp' => $now
+        ]);
+    }
+
+    /**
      * Remove the specified file from storage.
      */
     public function destroy(File $file)

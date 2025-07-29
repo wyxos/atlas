@@ -11,6 +11,8 @@ export interface BrowseItem {
     disliked?: boolean;
     funny?: boolean;
     imageHeight?: number;
+    seen_preview_at?: string | null;
+    seen_file_at?: string | null;
 }
 
 export interface BrowseFilters {
