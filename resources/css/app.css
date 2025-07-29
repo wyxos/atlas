@@ -4,6 +4,7 @@
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../../node_modules/@wyxos/vibe/src/*.vue';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -173,7 +174,7 @@
     .transition-\[top\,left\,opacity\] {
         transition-property: top, left, opacity;
     }
-    
+
     /* Enhanced button styling with Atlas colors */
     .btn-atlas-primary {
         @apply bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium transition-colors;

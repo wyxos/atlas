@@ -62,7 +62,6 @@ const isImage = computed(() => {
         !isVideo.value
     );
 });
-
 </script>
 
 <template>
@@ -74,7 +73,7 @@ const isImage = computed(() => {
                 v-if="isImage"
                 :alt="`Image ${item.id}`"
                 :src="item.src"
-                class="h-full w-full cursor-pointer object-cover transition-all duration-500 ease-in-out"
+                class="h-full w-full cursor-pointer object-cover"
                 loading="lazy"
                 @error="(e) => console.warn('Failed to load image:', item.id, e)"
                 @load="() => console.debug('Loaded image:', item.id)"
@@ -126,6 +125,5 @@ const isImage = computed(() => {
 
         <!-- Downloaded indicator -->
         <div v-if="isDownloaded" class="absolute top-2 left-2 rounded bg-green-500 px-2 py-1 text-xs text-white">✓ Downloaded</div>
-
     </div>
 </template>

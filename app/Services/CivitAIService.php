@@ -74,7 +74,7 @@ class CivitAIService
 
         $response = Http::get(self::CIVITAI_API_BASE.'/images', $params);
 
-        if(app()->environment('local')){
+        if(app()->environment('local') && env('SERVICE_LOG')){
             // log to a file {time}_civitai.json, the params used and the response returned in storage/logs
             $logData = [
                 'time' => Carbon::now()->toDateTimeString(),
