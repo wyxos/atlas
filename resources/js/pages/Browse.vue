@@ -117,58 +117,68 @@ const handleLeftClick = (item: IBrowseItem) => {
 
 // Reaction handlers for full screen mode
 const handleFullScreenFavorite = (item: IBrowseItem, event: Event) => {
-    handleFavorite(item, event, () => {
-        // Remove from both masonry and viewer array
-        removeItemFromView(item);
-        removeCurrentAndGoNext();
-    });
+    // Immediately advance to next item for responsive UI
+    removeCurrentAndGoNext();
+    removeItemFromView(item);
+    
+    // Handle the reaction in the background (already optimistic)
+    handleFavorite(item, event);
 };
 
 const handleFullScreenLike = (item: IBrowseItem, event: Event) => {
-    handleLike(item, event, () => {
-        // Remove from both masonry and viewer array
-        removeItemFromView(item);
-        removeCurrentAndGoNext();
-    });
+    // Immediately advance to next item for responsive UI
+    removeCurrentAndGoNext();
+    removeItemFromView(item);
+    
+    // Handle the reaction in the background (already optimistic)
+    handleLike(item, event);
 };
 
 const handleFullScreenDislike = (item: IBrowseItem, event: Event) => {
-    handleDislike(item, event, (item) => {
-        // Use blacklist for dislike in full screen
-        blacklistImage(item, () => {
-            removeItemFromView(item);
-            removeCurrentAndGoNext();
-        });
+    // Immediately advance to next item for responsive UI
+    removeCurrentAndGoNext();
+    removeItemFromView(item);
+    
+    // Handle the reaction in the background
+    handleDislike(item, event, () => {
+        // Blacklist is already handled by dislike
     });
 };
 
 const handleFullScreenLaughedAt = (item: IBrowseItem, event: Event) => {
-    handleLaughedAt(item, event, () => {
-        // Remove from both masonry and viewer array
-        removeItemFromView(item);
-        removeCurrentAndGoNext();
-    });
+    // Immediately advance to next item for responsive UI
+    removeCurrentAndGoNext();
+    removeItemFromView(item);
+    
+    // Handle the reaction in the background (already optimistic)
+    handleLaughedAt(item, event);
 };
 
 // Alt+Click shortcuts for full screen mode
 const handleFullScreenAltClick = () => {
     if (currentImage.value) {
-        // Same behavior as browse grid: download + like + remove + next
-        startDownload(currentImage.value);
-        handleLike(currentImage.value, new Event('click'), () => {
-            removeItemFromView(currentImage.value!);
-            removeCurrentAndGoNext();
-        });
+        const itemToProcess = currentImage.value;
+        
+        // Immediately advance to next item for responsive UI
+        removeCurrentAndGoNext();
+        removeItemFromView(itemToProcess);
+        
+        // Handle the reaction in the background
+        startDownload(itemToProcess);
+        handleLike(itemToProcess, new Event('click'));
     }
 };
 
 const handleFullScreenAltRightClick = () => {
     if (currentImage.value) {
-        // Same behavior as browse grid: blacklist + remove + next
-        blacklistImage(currentImage.value, () => {
-            removeItemFromView(currentImage.value!);
-            removeCurrentAndGoNext();
-        });
+        const itemToProcess = currentImage.value;
+        
+        // Immediately advance to next item for responsive UI
+        removeCurrentAndGoNext();
+        removeItemFromView(itemToProcess);
+        
+        // Handle the blacklist in the background
+        blacklistImage(itemToProcess);
     }
 };
 
