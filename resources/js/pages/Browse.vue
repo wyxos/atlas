@@ -549,7 +549,6 @@ watch(
                         }"
                         class="max-h-full max-w-full object-contain transition-transform"
                         @click.alt.exact.prevent="handleFullScreenAltClick"
-                        @contextmenu.alt.exact.prevent="handleFullScreenAltRightClick"
                         @click.stop
                         @dragstart.prevent
                     />

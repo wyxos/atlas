@@ -12,6 +12,7 @@ Designed for users who want to host their own media server without relying on cl
 
 ## Key Features
 
+- **CivitAI Enhanced Browsing**: Intelligent content curation with automated filtering and efficient navigation
 - **Audio-First Design**: Optimized for music libraries with full metadata support
 - **AI-Powered Organization**: Automated file categorization and tagging
 - **Search**: Powered by Typesense for full-text search across metadata
@@ -22,6 +23,14 @@ Designed for users who want to host their own media server without relying on cl
 - **Analytics Dashboard**: Library statistics and health monitoring
 
 ## Core Features
+
+### CivitAI Enhanced Browsing
+- **Intelligent Content Filtering**: Automatically excludes previously viewed or interacted content from feed
+- **Persistent Interaction Tracking**: Saves user reactions (likes, dislikes, blacklists) locally for personalized curation
+- **Automated Pagination**: Auto-advance through pages with intelligent skipping of fully-viewed content
+- **Masonry Layout**: Infinite scroll grid layout for continuous content discovery
+- **Keyboard Shortcuts**: Alt+Click for like/download, Alt+Right-Click for blacklist operations
+- **Full-Screen Navigation**: Arrow key navigation with immediate reaction feedback and content removal
 
 ### Audio Library Management
 - **Automated Metadata Extraction**: Processes audio files to extract ID3v1/ID3v2 tags, cover art, and technical information
