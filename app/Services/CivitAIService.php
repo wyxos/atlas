@@ -59,7 +59,7 @@ class CivitAIService
 
         // For CivitAI, if page is null (first request), don't send cursor
         // If page has a value, it's a cursor string
-        if ($page !== null) {
+        if ($page != 1) {
             $params['cursor'] = $page;
         }
         else{
@@ -303,7 +303,7 @@ class CivitAIService
         return [
             'items' => $transformedItems,
             'filters' => [
-                'page' => $currentPage, // Current page value (cursor or null for first page)
+                'page' => $currentPage ?? 1, // Current page value (cursor or null for first page)
                 'nextPage' => $nextPage, // Next page value (cursor or null if no more)
                 'sort' => $this->request->get('sort', 'Most Reactions'),
                 'period' => $this->request->get('period', 'AllTime'),

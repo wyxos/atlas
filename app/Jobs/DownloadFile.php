@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class DownloadFile implements ShouldQueue
@@ -35,7 +34,6 @@ class DownloadFile implements ShouldQueue
             $fileUrl = $this->file->url;
             $filePath = 'downloads/' . $this->file->filename;
 
-            Log::info("Starting download for file {$this->file->id}: {$fileUrl}");
 
             // Initialize progress
             $this->file->update(['download_progress' => 0]);
@@ -55,7 +53,6 @@ class DownloadFile implements ShouldQueue
                         if ($progress >= $lastReportedProgress + 5 || $progress === 100) {
                             $this->file->update(['download_progress' => $progress]);
                             event(new FileDownloadProgress($this->file->id, $progress));
-                            Log::info("Download progress for file {$this->file->id}: {$progress}%");
                         }
                     }
                 }
@@ -87,10 +84,8 @@ class DownloadFile implements ShouldQueue
                 'download_progress' => 100
             ]);
 
-            Log::info("Download completed for file {$this->file->id}");
             
         } catch (\Exception $e) {
-            Log::error("Download failed for file {$this->file->id}: " . $e->getMessage());
             
             // Update file with error status
             $this->file->update([

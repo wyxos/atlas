@@ -112,7 +112,6 @@ const handleAltRightClick = (item: IBrowseItem) => {
 
 // Handle left click for single image view
 const handleLeftClick = (item: IBrowseItem) => {
-    console.log('Left clicked item:', item.id);
     // Open image viewer with full list for navigation
     openImageViewer(item, masonryItems.value);
 };
@@ -184,18 +183,19 @@ const handleFullScreenAltRightClick = () => {
     }
 };
 
-// Autocycle function - uses masonry's loadNext method repeatedly until it finds unpreviewed items
+// Autocycle function - uses masonry's loadNext method repeatedly until it finds 40 unpreviewed items
 const autocycleUntilItems = async (): Promise<void> => {
     isAutocycling.value = true;
     autocycleAttempts.value = 0;
 
     let attempts = 0;
+    let totalUnpreviewedItems = 0;
+    const targetUnpreviewedItems = 40;
 
     try {
-        while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.nextPage) {
+        while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.nextPage && totalUnpreviewedItems < targetUnpreviewedItems) {
             attempts++;
             autocycleAttempts.value = attempts;
-            console.log(`Autocycle attempt ${attempts}/${MAX_AUTOCYCLE_ATTEMPTS}`);
 
             if (masonry.value && typeof masonry.value.loadNext === 'function') {
                 // Get the response from loadNext which internally calls getPage
@@ -203,17 +203,15 @@ const autocycleUntilItems = async (): Promise<void> => {
 
                 // Check the items from the API response, not the masonry items
                 if (response && response.items && response.items.length > 0) {
-                    const hasUnpreviewedItems = response.items.some((item) => item.seen_preview_at === null);
+                    const unpreviewedItems = response.items.filter((item) => item.seen_preview_at === null);
+                    totalUnpreviewedItems += unpreviewedItems.length;
 
-                    if (hasUnpreviewedItems) {
-                        console.log('Autocycle successful: found unpreviewed items.');
-                        break; // Stop cycling, we found what we wanted.
-                    } else {
-                        console.log('Autocycle continues: all new items are already previewed.');
-                        // Continue to next iteration
+                    // Continue cycling until we have enough unpreviewed items
+                    if (totalUnpreviewedItems >= targetUnpreviewedItems) {
+                        break; // Stop cycling, we have enough unpreviewed items
                     }
+                    // Otherwise continue to next iteration
                 } else {
-                    console.log('Autocycle: no new items returned, checking if more pages available.');
                     // If no items returned but nextPage still exists, continue
                     // If no more pages, the while condition will break the loop
                 }
@@ -221,20 +219,11 @@ const autocycleUntilItems = async (): Promise<void> => {
                 // Small delay to prevent overwhelming the API
                 await new Promise((resolve) => setTimeout(resolve, AUTOCYCLE_DELAY));
             } else {
-                console.warn('Masonry component not ready or loadNext function not available');
                 break;
             }
         }
-
-        if (attempts >= MAX_AUTOCYCLE_ATTEMPTS) {
-            console.warn('Autocycle stopped after maximum attempts');
-        }
-
-        if (!paginationState.value.nextPage) {
-            console.log('Autocycle complete - no more pages available.');
-        }
     } catch (error) {
-        console.error('Error during autocycle:', error);
+        // Handle errors silently in production
     } finally {
         isAutocycling.value = false;
     }
@@ -274,11 +263,10 @@ const getPage = async (pageParam: number | string) => {
                             };
 
                             const allNewItemsSeen = newItems.length > 0 && newItems.every((item) => item.seen_preview_at !== null);
-                            const noNewItems = newItems.length === 0;
 
                             // Check if we should auto cycle
-                            if (!isAutocycling.value && nextPage && currentFilters.value.autoNext && (noNewItems || allNewItemsSeen)) {
-                                // Automatically trigger next page if auto next is enabled and we either got an empty page or a page of fully-seen items
+                            if (!isAutocycling.value && nextPage && currentFilters.value.autoNext && (newItems.length < 40 || allNewItemsSeen)) {
+                                // Automatically trigger autocycling if we have less than 40 items, or all items have been seen
                                 setTimeout(() => autocycleUntilItems(), 100);
                             }
 
@@ -287,19 +275,16 @@ const getPage = async (pageParam: number | string) => {
                                 nextPage: paginationState.value.nextPage,
                             });
                         } catch (error) {
-                            console.error('Error processing response:', error);
                             resolve({ items: [], nextPage: null });
                         }
                     },
                     onError: (errors) => {
-                        console.error('Failed to fetch more images:', errors);
                         resolve({ items: [], nextPage: null });
                     },
                 },
             );
         });
     } catch (error) {
-        console.error('Failed to fetch more images:', error);
         return { items: [], nextPage: null };
     }
 };
@@ -432,6 +417,7 @@ watch(
                             :download-progress="downloadProgress[item.id]"
                             :is-downloaded="downloadedItems.has(item.id)"
                             :item="item"
+                            :page-size="40"
                             @dislike="(file, event) => handleDislike(file, event, (item) => blacklistImage(item, removeItemFromView))"
                             @favorite="(file, event) => handleFavorite(file, event, removeItemFromView)"
                             @like="(file, event) => handleLike(file, event, removeItemFromView)"

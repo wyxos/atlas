@@ -20,7 +20,7 @@ export interface BrowseFilters {
     period: string;
     nsfw: boolean;
     autoNext: boolean;
-    page: number | string | null;
+    page: number | string;
     nextPage: number | string | null;
 }
 
