@@ -202,12 +202,12 @@ const handleFullScreenAltRightClick = () => {
 };
 
 // Autocycle function - uses masonry's loadNext method repeatedly until it finds unpreviewed items based on current limit
-const autocycleUntilItems = async (): Promise<void> => {
+const autocycleUntilItems = async (initialUnpreviewedCount: number = 0): Promise<void> => {
     isAutocycling.value = true;
     autocycleAttempts.value = 0;
 
     let attempts = 0;
-    let totalUnpreviewedItems = 0;
+    let totalUnpreviewedItems = initialUnpreviewedCount;
     const targetUnpreviewedItems = currentFilters.value.limit;
 
     try {
@@ -290,8 +290,9 @@ const getPage = async (pageParam: number | string) => {
                                 currentFilters.value.autoNext &&
                                 (newItems.length < currentFilters.value.limit || allNewItemsSeen)
                             ) {
+                                const unpreviewedInNewItems = newItems.filter((item) => item.seen_preview_at === null).length;
                                 // Automatically trigger autocycling if we have less items than the limit, or all items have been seen
-                                setTimeout(() => autocycleUntilItems(), 100);
+                                setTimeout(() => autocycleUntilItems(unpreviewedInNewItems), 100);
                             }
 
                             resolve({

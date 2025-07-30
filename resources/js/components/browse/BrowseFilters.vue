@@ -80,11 +80,7 @@
 
         <!-- Auto Next Checkbox -->
         <div class="flex items-center gap-2">
-            <Checkbox 
-                :id="'auto-next-checkbox'" 
-                :model-value="filters.autoNext" 
-                @update:model-value="$emit('autoNextChange', $event)" 
-            />
+            <Checkbox :id="'auto-next-checkbox'" :model-value="filters.autoNext" @update:model-value="$emit('autoNextChange', $event)" />
             <label class="cursor-pointer text-sm font-medium" for="auto-next-checkbox">Auto Next</label>
         </div>
 
@@ -93,7 +89,7 @@
 
         <!-- Undo Blacklist Button -->
         <Button variant="outline" @click="$emit('undoBlacklist')">
-            <Undo class="h-4 w-4 mr-2" />
+            <Undo class="mr-2 h-4 w-4" />
             Undo Blacklist
         </Button>
 
@@ -102,14 +98,14 @@
     </div>
 </template>
 
-<script setup lang="ts">
-import { computed } from 'vue';
+<script lang="ts" setup>
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Undo } from 'lucide-vue-next';
-import { SORT_OPTIONS, PERIOD_OPTIONS, LIMIT_OPTIONS } from '@/constants/browse';
+import { LIMIT_OPTIONS, PERIOD_OPTIONS, SORT_OPTIONS } from '@/constants/browse';
 import type { BrowseFilters } from '@/types/browse';
+import { ChevronDown, Undo } from 'lucide-vue-next';
+import { computed } from 'vue';
 
 interface Props {
     filters: BrowseFilters;
