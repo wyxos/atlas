@@ -423,7 +423,7 @@ watch(
                         sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
                         footer: 32,
                     }"
-                    :load-at-page="filters.page"
+                    :load-at-page="props.filters.page"
                     :max-items="300"
                     class="h-full"
                 >
