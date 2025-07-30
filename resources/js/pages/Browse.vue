@@ -36,6 +36,7 @@ const currentFilters = ref<IBrowseFilters>({
     nextPage: props.filters.nextPage,
     sort: props.filters.sort,
     period: props.filters.period,
+    limit: props.filters.limit,
     nsfw: props.filters.nsfw,
     autoNext: props.filters.autoNext,
 });
@@ -200,14 +201,14 @@ const handleFullScreenAltRightClick = () => {
     }
 };
 
-// Autocycle function - uses masonry's loadNext method repeatedly until it finds 40 unpreviewed items
+// Autocycle function - uses masonry's loadNext method repeatedly until it finds unpreviewed items based on current limit
 const autocycleUntilItems = async (): Promise<void> => {
     isAutocycling.value = true;
     autocycleAttempts.value = 0;
 
     let attempts = 0;
     let totalUnpreviewedItems = 0;
-    const targetUnpreviewedItems = 40;
+    const targetUnpreviewedItems = currentFilters.value.limit;
 
     try {
         while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.nextPage && totalUnpreviewedItems < targetUnpreviewedItems) {
@@ -253,6 +254,7 @@ const getPage = async (pageParam: number | string) => {
             page: pageParam,
             sort: currentFilters.value.sort,
             period: currentFilters.value.period,
+            limit: currentFilters.value.limit,
             nsfw: currentFilters.value.nsfw,
             autoNext: currentFilters.value.autoNext,
             search: 1,
@@ -282,8 +284,13 @@ const getPage = async (pageParam: number | string) => {
                             const allNewItemsSeen = newItems.length > 0 && newItems.every((item) => item.seen_preview_at !== null);
 
                             // Check if we should auto cycle
-                            if (!isAutocycling.value && nextPage && currentFilters.value.autoNext && (newItems.length < 40 || allNewItemsSeen)) {
-                                // Automatically trigger autocycling if we have less than 40 items, or all items have been seen
+                            if (
+                                !isAutocycling.value &&
+                                nextPage &&
+                                currentFilters.value.autoNext &&
+                                (newItems.length < currentFilters.value.limit || allNewItemsSeen)
+                            ) {
+                                // Automatically trigger autocycling if we have less items than the limit, or all items have been seen
                                 setTimeout(() => autocycleUntilItems(), 100);
                             }
 
@@ -327,6 +334,11 @@ const handleAutoNextChange = (checked: boolean) => {
     applyFilters();
 };
 
+const handleLimitChange = (newLimit: number) => {
+    currentFilters.value.limit = newLimit;
+    applyFilters();
+};
+
 const handleBackToFirst = () => {
     applyFilters();
 };
@@ -336,8 +348,7 @@ const applyFilters = () => {
     paginationState.value.page = null;
     paginationState.value.nextPage = null;
 
-    masonryItems.value = [];
-
+    masonry.value?.reset();
     masonry.value?.loadPage(null);
 };
 
@@ -406,6 +417,7 @@ watch(
                         :filters="currentFilters"
                         @sort-change="handleSortChange"
                         @period-change="handlePeriodChange"
+                        @limit-change="handleLimitChange"
                         @nsfw-change="handleNsfwChange"
                         @auto-next-change="handleAutoNextChange"
                         @back-to-first="handleBackToFirst"
@@ -422,7 +434,7 @@ watch(
                     v-model:items="masonryItems"
                     :get-next-page="getPage"
                     :layout="{
-                        sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 6 },
+                        sizes: { base: 1, sm: 2, md: 3, lg: 3, xl: 5, '2xl': 6 },
                         footer: 32,
                     }"
                     :load-at-page="props.filters.page"
@@ -434,7 +446,7 @@ watch(
                             :download-progress="downloadProgress[item.id]"
                             :is-downloaded="downloadedItems.has(item.id)"
                             :item="item"
-                            :page-size="40"
+                            :page-size="currentFilters.limit"
                             @dislike="handleItemDislike"
                             @favorite="handleItemFavorite"
                             @like="handleItemLike"

@@ -48,6 +48,30 @@
             </DropdownMenu>
         </div>
 
+        <!-- Limit Dropdown -->
+        <div class="flex items-center gap-2">
+            <label class="text-sm font-medium">Limit:</label>
+            <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                    <Button class="min-w-[80px] justify-between" variant="outline">
+                        {{ currentLimitLabel }}
+                        <ChevronDown class="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem
+                        v-for="option in limitOptions"
+                        :key="option.value"
+                        :class="{ 'bg-accent': filters.limit === option.value }"
+                        class="cursor-pointer"
+                        @click="$emit('limitChange', option.value)"
+                    >
+                        {{ option.label }}
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+
         <!-- NSFW Checkbox -->
         <div class="flex items-center gap-2">
             <Checkbox :id="'nsfw-checkbox'" :model-value="filters.nsfw" @update:model-value="$emit('nsfwChange', $event)" />
@@ -84,7 +108,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ChevronDown, Undo } from 'lucide-vue-next';
-import { SORT_OPTIONS, PERIOD_OPTIONS } from '@/constants/browse';
+import { SORT_OPTIONS, PERIOD_OPTIONS, LIMIT_OPTIONS } from '@/constants/browse';
 import type { BrowseFilters } from '@/types/browse';
 
 interface Props {
@@ -96,6 +120,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
     sortChange: [value: string];
     periodChange: [value: string];
+    limitChange: [value: number];
     nsfwChange: [value: boolean];
     autoNextChange: [value: boolean];
     loadNext: [];
@@ -105,6 +130,7 @@ const emit = defineEmits<{
 
 const sortOptions = SORT_OPTIONS;
 const periodOptions = PERIOD_OPTIONS;
+const limitOptions = LIMIT_OPTIONS;
 
 const currentSortLabel = computed(() => {
     return sortOptions.find((option) => option.value === props.filters.sort)?.label || props.filters.sort;
@@ -112,5 +138,9 @@ const currentSortLabel = computed(() => {
 
 const currentPeriodLabel = computed(() => {
     return periodOptions.find((option) => option.value === props.filters.period)?.label || props.filters.period;
+});
+
+const currentLimitLabel = computed(() => {
+    return limitOptions.find((option) => option.value === props.filters.limit)?.label || props.filters.limit.toString();
 });
 </script>

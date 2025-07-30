@@ -24,6 +24,7 @@ class BrowseController extends Controller
                 'nextPage' => null, // Next page value (cursor or null if no more)
                 'sort' => $request->get('sort', 'Newest'),
                 'period' => $request->get('period', 'AllTime'),
+                'limit' => $request->get('limit', 40), // Default to 40 items per page
                 'nsfw' => $request->boolean('nsfw', false),
                 'autoNext' => $request->boolean('autoNext', false),
             ]

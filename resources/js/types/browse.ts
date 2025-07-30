@@ -18,6 +18,7 @@ export interface BrowseItem {
 export interface BrowseFilters {
     sort: string;
     period: string;
+    limit: number;
     nsfw: boolean;
     autoNext: boolean;
     page: number | string;
@@ -41,5 +42,10 @@ export interface SortOption {
 
 export interface PeriodOption {
     value: string;
+    label: string;
+}
+
+export interface LimitOption {
+    value: number;
     label: string;
 }

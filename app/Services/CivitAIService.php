@@ -28,7 +28,7 @@ class CivitAIService
     public function fetch(): array
     {
         // Get the unified 'page' parameter - could be cursor or page number
-        $page = $this->request->get('page');
+        $page = $this->request->get('page', 1);
         $limit = (int) $this->request->get('limit', 40);
 
         $result = $this->fetchItems($page, $limit);
@@ -307,6 +307,7 @@ class CivitAIService
                 'nextPage' => $nextPage, // Next page value (cursor or null if no more)
                 'sort' => $this->request->get('sort', 'Most Reactions'),
                 'period' => $this->request->get('period', 'AllTime'),
+                'limit' => (int) $this->request->get('limit', 40), // Items per page
                 'nsfw' => $this->request->boolean('nsfw', false),
                 'autoNext' => $this->request->boolean('autoNext', false),
             ]
