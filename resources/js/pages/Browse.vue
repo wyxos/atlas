@@ -200,10 +200,10 @@ const autocycleUntilItems = async (): Promise<void> => {
             if (masonry.value && typeof masonry.value.loadNext === 'function') {
                 // Get the response from loadNext which internally calls getPage
                 const response = await masonry.value.loadNext();
-                
+
                 // Check the items from the API response, not the masonry items
                 if (response && response.items && response.items.length > 0) {
-                    const hasUnpreviewedItems = response.items.some(item => item.seen_preview_at === null);
+                    const hasUnpreviewedItems = response.items.some((item) => item.seen_preview_at === null);
 
                     if (hasUnpreviewedItems) {
                         console.log('Autocycle successful: found unpreviewed items.');
@@ -424,7 +424,7 @@ watch(
                         footer: 32,
                     }"
                     :load-at-page="props.filters.page"
-                    :max-items="300"
+                    :max-items="150"
                     class="h-full"
                 >
                     <template #item="{ item }">
