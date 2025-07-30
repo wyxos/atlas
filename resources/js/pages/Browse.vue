@@ -97,6 +97,23 @@ const removeItemFromView = async (item: IBrowseItem) => {
     }
 };
 
+// Simplified reaction handlers that include removal
+const handleItemFavorite = (item: IBrowseItem, event: Event) => {
+    handleFavorite(item, event, removeItemFromView);
+};
+
+const handleItemLike = (item: IBrowseItem, event: Event) => {
+    handleLike(item, event, removeItemFromView);
+};
+
+const handleItemDislike = (item: IBrowseItem, event: Event) => {
+    handleDislike(item, event, (item) => blacklistImage(item, removeItemFromView));
+};
+
+const handleItemLaughedAt = (item: IBrowseItem, event: Event) => {
+    handleLaughedAt(item, event, removeItemFromView);
+};
+
 // Handle Alt+click for download and like
 const handleAltClick = (item: IBrowseItem) => {
     // Start download
@@ -418,10 +435,10 @@ watch(
                             :is-downloaded="downloadedItems.has(item.id)"
                             :item="item"
                             :page-size="40"
-                            @dislike="(file, event) => handleDislike(file, event, (item) => blacklistImage(item, removeItemFromView))"
-                            @favorite="(file, event) => handleFavorite(file, event, removeItemFromView)"
-                            @like="(file, event) => handleLike(file, event, removeItemFromView)"
-                            @laughed-at="(file, event) => handleLaughedAt(file, event, removeItemFromView)"
+                            @dislike="handleItemDislike"
+                            @favorite="handleItemFavorite"
+                            @like="handleItemLike"
+                            @laughed-at="handleItemLaughedAt"
                             @alt-click="handleAltClick"
                             @alt-right-click="handleAltRightClick"
                             @left-click="handleLeftClick"

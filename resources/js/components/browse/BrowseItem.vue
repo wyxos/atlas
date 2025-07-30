@@ -13,10 +13,10 @@ interface Props {
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-    favorite: [file: any, event: Event];
-    like: [file: any, event: Event];
-    dislike: [file: any, event: Event];
-    laughedAt: [file: any, event: Event];
+    favorite: [item: BrowseItem, event: Event];
+    like: [item: BrowseItem, event: Event];
+    dislike: [item: BrowseItem, event: Event];
+    laughedAt: [item: BrowseItem, event: Event];
     altClick: [item: BrowseItem];
     altRightClick: [item: BrowseItem];
     leftClick: [item: BrowseItem];
@@ -150,10 +150,10 @@ const handleVideoCompleted = () => {
                 :file="item"
                 :icon-size="16"
                 variant="list"
-                @dislike="(file, event) => $emit('dislike', file, event)"
-                @favorite="(file, event) => $emit('favorite', file, event)"
-                @laughedAt="(file, event) => $emit('laughedAt', file, event)"
-                @like="(file, event) => $emit('like', file, event)"
+                @dislike="(file, event) => $emit('dislike', item, event)"
+                @favorite="(file, event) => $emit('favorite', item, event)"
+                @laughedAt="(file, event) => $emit('laughedAt', item, event)"
+                @like="(file, event) => $emit('like', item, event)"
             />
         </div>
 
