@@ -250,6 +250,8 @@ class CivitAIService
 
         return File::query()
             ->whereIn('referrer_url', $referrerUrls)
+            ->whereNull('seen_preview_at')
+            ->whereNull('seen_file_at')
             ->where('liked', false)
             ->where('disliked', false)
             ->where('funny', false)

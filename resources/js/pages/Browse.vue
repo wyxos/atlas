@@ -122,7 +122,7 @@ const handleFullScreenFavorite = (item: IBrowseItem, event: Event) => {
     // Immediately advance to next item for responsive UI
     removeCurrentAndGoNext();
     removeItemFromView(item);
-    
+
     // Handle the reaction in the background (already optimistic)
     handleFavorite(item, event);
 };
@@ -131,7 +131,7 @@ const handleFullScreenLike = (item: IBrowseItem, event: Event) => {
     // Immediately advance to next item for responsive UI
     removeCurrentAndGoNext();
     removeItemFromView(item);
-    
+
     // Handle the reaction in the background (already optimistic)
     handleLike(item, event);
 };
@@ -140,7 +140,7 @@ const handleFullScreenDislike = (item: IBrowseItem, event: Event) => {
     // Immediately advance to next item for responsive UI
     removeCurrentAndGoNext();
     removeItemFromView(item);
-    
+
     // Handle the reaction in the background
     handleDislike(item, event, () => {
         // Blacklist is already handled by dislike
@@ -151,7 +151,7 @@ const handleFullScreenLaughedAt = (item: IBrowseItem, event: Event) => {
     // Immediately advance to next item for responsive UI
     removeCurrentAndGoNext();
     removeItemFromView(item);
-    
+
     // Handle the reaction in the background (already optimistic)
     handleLaughedAt(item, event);
 };
@@ -160,11 +160,11 @@ const handleFullScreenLaughedAt = (item: IBrowseItem, event: Event) => {
 const handleFullScreenAltClick = () => {
     if (currentImage.value) {
         const itemToProcess = currentImage.value;
-        
+
         // Immediately advance to next item for responsive UI
         removeCurrentAndGoNext();
         removeItemFromView(itemToProcess);
-        
+
         // Handle the reaction in the background
         startDownload(itemToProcess);
         handleLike(itemToProcess, new Event('click'));
@@ -174,23 +174,22 @@ const handleFullScreenAltClick = () => {
 const handleFullScreenAltRightClick = () => {
     if (currentImage.value) {
         const itemToProcess = currentImage.value;
-        
+
         // Immediately advance to next item for responsive UI
         removeCurrentAndGoNext();
         removeItemFromView(itemToProcess);
-        
+
         // Handle the blacklist in the background
         blacklistImage(itemToProcess);
     }
 };
 
-// Autocycle function - uses masonry's loadNext method repeatedly until items are found
+// Autocycle function - uses masonry's loadNext method repeatedly until it finds unpreviewed items
 const autocycleUntilItems = async (): Promise<void> => {
     isAutocycling.value = true;
     autocycleAttempts.value = 0;
 
     let attempts = 0;
-    const initialItemCount = masonryItems.value.length;
 
     try {
         while (attempts < MAX_AUTOCYCLE_ATTEMPTS && paginationState.value.nextPage) {
@@ -199,12 +198,24 @@ const autocycleUntilItems = async (): Promise<void> => {
             console.log(`Autocycle attempt ${attempts}/${MAX_AUTOCYCLE_ATTEMPTS}`);
 
             if (masonry.value && typeof masonry.value.loadNext === 'function') {
-                await masonry.value.loadNext();
+                // Get the response from loadNext which internally calls getPage
+                const response = await masonry.value.loadNext();
+                
+                // Check the items from the API response, not the masonry items
+                if (response && response.items && response.items.length > 0) {
+                    const hasUnpreviewedItems = response.items.some(item => item.seen_preview_at === null);
 
-                // Check if new items were added after loadNext
-                if (masonryItems.value.length > initialItemCount) {
-                    console.log(`Autocycle successful after ${attempts} attempts - found ${masonryItems.value.length - initialItemCount} new items`);
-                    break;
+                    if (hasUnpreviewedItems) {
+                        console.log('Autocycle successful: found unpreviewed items.');
+                        break; // Stop cycling, we found what we wanted.
+                    } else {
+                        console.log('Autocycle continues: all new items are already previewed.');
+                        // Continue to next iteration
+                    }
+                } else {
+                    console.log('Autocycle: no new items returned, checking if more pages available.');
+                    // If no items returned but nextPage still exists, continue
+                    // If no more pages, the while condition will break the loop
                 }
 
                 // Small delay to prevent overwhelming the API
@@ -219,8 +230,8 @@ const autocycleUntilItems = async (): Promise<void> => {
             console.warn('Autocycle stopped after maximum attempts');
         }
 
-        if (masonryItems.value.length === initialItemCount) {
-            console.log('Autocycle complete - no more pages available or no new items found');
+        if (!paginationState.value.nextPage) {
+            console.log('Autocycle complete - no more pages available.');
         }
     } catch (error) {
         console.error('Error during autocycle:', error);
@@ -262,9 +273,12 @@ const getPage = async (pageParam: number | string) => {
                                 nextPage: nextPage ? nextPage : null,
                             };
 
-                            // Check if we should auto cycle after getting empty results
-                            if (!isAutocycling.value && newItems.length === 0 && nextPage && currentFilters.value.autoNext) {
-                                // Automatically trigger next page if auto next is enabled
+                            const allNewItemsSeen = newItems.length > 0 && newItems.every((item) => item.seen_preview_at !== null);
+                            const noNewItems = newItems.length === 0;
+
+                            // Check if we should auto cycle
+                            if (!isAutocycling.value && nextPage && currentFilters.value.autoNext && (noNewItems || allNewItemsSeen)) {
+                                // Automatically trigger next page if auto next is enabled and we either got an empty page or a page of fully-seen items
                                 setTimeout(() => autocycleUntilItems(), 100);
                             }
 
@@ -453,26 +467,34 @@ watch(
         <!-- Full Screen Media Viewer Modal -->
         <div
             v-if="isImageViewerOpen"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+            class="fixed inset-0 z-50 flex flex-col bg-black/90"
             tabindex="0"
             @click="closeImageViewer"
             @keydown.escape="closeImageViewer"
             @keydown.left="goToPrevious"
             @keydown.right="goToNext"
         >
-            <div class="relative h-full w-full">
-                <!-- Close Button -->
-                <Button
-                    class="absolute top-4 right-4 z-10 bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                    size="sm"
-                    variant="outline"
-                    @click.stop="closeImageViewer"
-                >
-                    <Icon class="h-4 w-4" name="x" />
-                </Button>
+            <!-- Top gutter -->
+            <div class="flex h-16 flex-shrink-0 items-center justify-between px-4">
+                <!-- Zoom Controls (only for images) -->
+                <div v-if="isCurrentImage" class="flex gap-2">
+                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomOut">
+                        <Icon class="h-4 w-4" name="zoomOut" />
+                    </Button>
+                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="resetZoom">
+                        <Icon class="h-4 w-4" name="maximize" />
+                    </Button>
+                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomIn">
+                        <Icon class="h-4 w-4" name="zoomIn" />
+                    </Button>
+                    <!-- Zoom Level Indicator -->
+                    <div class="rounded bg-white/10 px-2 py-1 text-sm text-white backdrop-blur-sm">{{ Math.round(imageViewerZoom * 100) }}%</div>
+                </div>
+                <div v-else></div>
+                <!-- Empty div for spacing when no zoom controls -->
 
                 <!-- Navigation Controls -->
-                <div class="absolute top-4 left-1/2 z-10 flex -translate-x-1/2 transform gap-2">
+                <div class="flex gap-2">
                     <Button
                         v-if="canGoPrevious"
                         class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
@@ -498,40 +520,14 @@ watch(
                     </Button>
                 </div>
 
-                <!-- Zoom Controls (only for images) -->
-                <div v-if="isCurrentImage" class="absolute top-4 left-4 z-10 flex gap-2">
-                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomOut">
-                        <Icon class="h-4 w-4" name="zoomOut" />
-                    </Button>
-                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="resetZoom">
-                        <Icon class="h-4 w-4" name="maximize" />
-                    </Button>
-                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomIn">
-                        <Icon class="h-4 w-4" name="zoomIn" />
-                    </Button>
-                </div>
+                <!-- Close Button -->
+                <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="closeImageViewer">
+                    <Icon class="h-4 w-4" name="x" />
+                </Button>
+            </div>
 
-                <!-- Reactions Panel -->
-                <div class="absolute right-4 bottom-4 z-10" @click.stop>
-                    <div v-if="currentImage" class="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
-                        <FileReactions
-                            :file="currentImage"
-                            :icon-size="20"
-                            variant="player"
-                            @dislike="(file, event) => handleFullScreenDislike(file, event)"
-                            @favorite="(file, event) => handleFullScreenFavorite(file, event)"
-                            @laughedAt="(file, event) => handleFullScreenLaughedAt(file, event)"
-                            @like="(file, event) => handleFullScreenLike(file, event)"
-                        />
-                    </div>
-                </div>
-
-                <!-- Zoom Level Indicator (only for images) -->
-                <div v-if="isCurrentImage" class="absolute bottom-4 left-4 z-10 rounded bg-white/10 px-2 py-1 text-sm text-white backdrop-blur-sm">
-                    {{ Math.round(imageViewerZoom * 100) }}%
-                </div>
-
-                <!-- Media Container -->
+            <!-- Media Container -->
+            <div class="relative flex-1 overflow-hidden">
                 <div
                     :class="{ 'cursor-pointer': !isCurrentImage }"
                     class="flex h-full w-full items-center justify-center overflow-hidden"
@@ -594,6 +590,21 @@ watch(
                 >
                     <Icon class="h-6 w-6" name="chevronRight" />
                 </Button>
+            </div>
+
+            <!-- Bottom gutter with reactions -->
+            <div class="flex h-16 flex-shrink-0 items-center justify-center px-4" @click.stop>
+                <div v-if="currentImage" class="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
+                    <FileReactions
+                        :file="currentImage"
+                        :icon-size="20"
+                        variant="player"
+                        @dislike="(file, event) => handleFullScreenDislike(file, event)"
+                        @favorite="(file, event) => handleFullScreenFavorite(file, event)"
+                        @laughedAt="(file, event) => handleFullScreenLaughedAt(file, event)"
+                        @like="(file, event) => handleFullScreenLike(file, event)"
+                    />
+                </div>
             </div>
         </div>
     </AppLayout>
