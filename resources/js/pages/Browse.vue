@@ -332,7 +332,10 @@ const handleNsfwChange = (checked: boolean) => {
 
 const handleAutoNextChange = (checked: boolean) => {
     currentFilters.value.autoNext = checked;
-    applyFilters();
+    // If autoNext is enabled, trigger next page load
+    if (checked) {
+        loadNext();
+    }
 };
 
 const handleLimitChange = (newLimit: number) => {
