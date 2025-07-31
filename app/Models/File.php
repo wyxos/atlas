@@ -133,6 +133,14 @@ class File extends Model
     }
 
     /**
+     * Get the containers associated with the file.
+     */
+    public function containers(): BelongsToMany
+    {
+        return $this->belongsToMany(Container::class);
+    }
+
+    /**
      * Scope a query to only include audio files.
      */
     public function scopeAudio(Builder $query): Builder

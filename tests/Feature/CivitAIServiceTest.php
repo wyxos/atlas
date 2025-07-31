@@ -26,9 +26,8 @@ it('fetches and transforms images correctly from CivitAI API', function () {
     $service = new CivitAIService($request);
     $result = $service->fetch();
 
-    expect($result['page'])->toBe(1); // Current page value
-    expect($result['hasNextPage'])->toBeTrue();
-    expect($result['nextPage'])->toBe('next_cursor_token'); // Next page value
+    expect($result['filters']['page'])->toBe(1); // Current page value
+    expect($result['filters']['nextPage'])->toBe('next_cursor_token'); // Next page value
     expect($result['items'])->toHaveCount(1);
 
     $item = $result['items'][0];
@@ -42,9 +41,9 @@ it('fetches and transforms images correctly from CivitAI API', function () {
     Http::assertSent(function ($request) {
         $data = $request->data();
         return str_contains($request->url(), 'civitai.com/api/v1/images') &&
-               $data['cursor'] === 1 && // Page parameter becomes cursor
-               $data['limit'] === 20 && // Default limit from service
-               $data['sort'] === 'Most Reactions' &&
+               !isset($data['cursor']) && // First page should not have cursor
+               $data['limit'] === 40 && // Default limit from service
+               $data['sort'] === 'Newest' &&
                $data['period'] === 'AllTime';
     });
 });
@@ -70,8 +69,8 @@ it('handles cursor-based pagination correctly', function () {
     $service = new CivitAIService($request);
     $result = $service->fetch();
 
-    expect($result['nextPage'])->toBe('new_cursor_token'); // Check nextPage instead of nextCursor
-    expect($result['page'])->toBe('existing_cursor_token'); // Current page value
+    expect($result['filters']['nextPage'])->toBe('new_cursor_token'); // Check nextPage instead of nextCursor
+    expect($result['filters']['page'])->toBe('existing_cursor_token'); // Current page value
 
     // Verify cursor-based page attribute format
     $item = $result['items'][0];
@@ -153,8 +152,7 @@ it('handles empty API response', function () {
     $result = $service->fetch();
 
     expect($result['items'])->toBeEmpty();
-    expect($result['hasNextPage'])->toBeFalse();
-    expect($result['nextPage'])->toBeNull();
+    expect($result['filters']['nextPage'])->toBeNull();
 });
 
 it('validates page parameter correctly', function () {
@@ -170,7 +168,7 @@ it('validates page parameter correctly', function () {
     $service = new CivitAIService($request);
     $result = $service->fetch();
 
-    expect($result['page'])->toBe('5'); // Page value as received
+    expect($result['filters']['page'])->toBe('5'); // Page value as received
 
     // Verify API was called with correct cursor parameter
     Http::assertSent(function ($request) {
@@ -193,10 +191,10 @@ it('uses correct API parameters', function () {
     // Verify all required parameters are sent to CivitAI API
     Http::assertSent(function ($request) {
         $data = $request->data();
-        return $data['limit'] === 20 && // Default limit from service
-               $data['sort'] === 'Most Reactions' &&
+        return $data['limit'] === 40 && // Default limit from service
+               $data['sort'] === 'Newest' &&
                $data['period'] === 'AllTime' &&
-               $data['cursor'] === 1; // Page parameter becomes cursor
+               !isset($data['cursor']); // First page should not have cursor
     });
 });
 

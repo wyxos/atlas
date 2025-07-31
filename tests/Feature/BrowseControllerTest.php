@@ -37,33 +37,29 @@ it('can access browse page', function () {
         ], 200)
     ]);
 
-    $response = $this->get('/browse');
+    $response = $this->get('/browse/data');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
         ->has('items')
-        ->has('page')
-        ->has('hasNextPage')
-        ->has('nextPage')
-        ->where('page', null) // First page is null
-        ->where('hasNextPage', true)
-        ->where('nextPage', 'next_cursor_token')
         ->has('filters')
-        ->where('filters', [
-            'sort' => 'Most Reactions',
-            'period' => 'AllTime',
-            'nsfw' => false,
-            'autoNext' => false,
-        ])
+        ->where('filters.page', 1) // First page is 1
+        ->where('filters.nextPage', 'next_cursor_token')
+        ->where('filters.sort', 'Most Reactions')
+        ->where('filters.period', 'AllTime')
+        ->where('filters.limit', 40)
+        ->where('filters.nsfw', false)
+        ->where('filters.autoNext', false)
+        ->where('filters.container', 'Images')
     );
 
     // Verify that the CivitAI API was called correctly
     Http::assertSent(function ($request) {
         $data = $request->data();
         return str_contains($request->url(), 'civitai.com/api/v1/images') &&
-               $data['limit'] === 20 && // Default limit from service
-               $data['sort'] === 'Most Reactions' &&
+               $data['limit'] === 40 && // Default limit from service
+               $data['sort'] === 'Newest' &&
                $data['period'] === 'AllTime' &&
                !isset($data['cursor']); // First request should not have cursor
     });
@@ -93,7 +89,7 @@ it('handles cursor-based pagination correctly', function () {
         ], 200)
     ]);
 
-    $response = $this->get('/browse?page=existing_cursor_token');
+    $response = $this->get('/browse/data?page=existing_cursor_token');
 
     $response->assertStatus(200);
 
@@ -107,10 +103,9 @@ it('handles cursor-based pagination correctly', function () {
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
         ->has('items')
-        ->has('nextPage')
-        ->has('page')
-        ->where('nextPage', 'new_cursor_token')
-        ->where('page', 'existing_cursor_token')
+        ->has('filters')
+        ->where('filters.nextPage', 'new_cursor_token')
+        ->where('filters.page', 'existing_cursor_token')
     );
 
     // Verify the page attribute is correctly set for cursor-based pagination
@@ -125,7 +120,7 @@ it('handles CivitAI API errors gracefully', function () {
         'civitai.com/api/v1/images*' => Http::response([], 500)
     ]);
 
-    $response = $this->get('/browse');
+    $response = $this->get('/browse/data');
 
     // Should return 500 since the controller throws an exception
     $response->assertStatus(500);
@@ -140,14 +135,13 @@ it('handles empty CivitAI response', function () {
         ], 200)
     ]);
 
-    $response = $this->get('/browse');
+    $response = $this->get('/browse/data');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
         ->where('items', [])
-        ->where('hasNextPage', false)
-        ->where('nextPage', null)
+        ->where('filters.nextPage', null)
     );
 });
 
@@ -255,14 +249,13 @@ it('handles empty results with next cursor scenario for autocycle', function () 
         ], 200)
     ]);
 
-    $response = $this->get('/browse');
+    $response = $this->get('/browse/data');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Browse')
         ->where('items', [])
-        ->where('hasNextPage', true)
-        ->where('nextPage', 'cursor_with_potential_items')
+        ->where('filters.nextPage', 'cursor_with_potential_items')
     );
 
     // This scenario should trigger the autocycle prompt in the frontend
@@ -271,8 +264,7 @@ it('handles empty results with next cursor scenario for autocycle', function () 
     $props = $data['page']['props'];
     
     expect($props['items'])->toBeEmpty();
-    expect($props['hasNextPage'])->toBeTrue();
-    expect($props['nextPage'])->toBe('cursor_with_potential_items');
+    expect($props['filters']['nextPage'])->toBe('cursor_with_potential_items');
 });
 
 it('handles autoNext parameter correctly', function () {
@@ -285,7 +277,7 @@ it('handles autoNext parameter correctly', function () {
     ]);
 
     // Test with autoNext=true
-    $response = $this->get('/browse?autoNext=true');
+    $response = $this->get('/browse/data?autoNext=true');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
@@ -295,7 +287,7 @@ it('handles autoNext parameter correctly', function () {
     );
 
     // Test with autoNext=false
-    $response = $this->get('/browse?autoNext=false');
+    $response = $this->get('/browse/data?autoNext=false');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
