@@ -23,6 +23,7 @@ export interface BrowseFilters {
     autoNext: boolean;
     page: number | string;
     nextPage: number | string | null;
+    container: string;
 }
 
 export interface BrowseProps {
@@ -47,5 +48,10 @@ export interface PeriodOption {
 
 export interface LimitOption {
     value: number;
+    label: string;
+}
+
+export interface ContainerOption {
+    value: string;
     label: string;
 }

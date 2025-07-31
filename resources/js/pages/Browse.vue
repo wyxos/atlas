@@ -39,6 +39,7 @@ const currentFilters = ref<IBrowseFilters>({
     limit: props.filters.limit,
     nsfw: props.filters.nsfw,
     autoNext: props.filters.autoNext,
+    container: props.filters.container,
 });
 
 // Unified pagination state - works with both cursor and page-based pagination
@@ -257,6 +258,7 @@ const getPage = async (pageParam: number | string) => {
             limit: currentFilters.value.limit,
             nsfw: currentFilters.value.nsfw,
             autoNext: currentFilters.value.autoNext,
+            container: currentFilters.value.container,
             search: 1,
         };
 
@@ -315,6 +317,11 @@ const getPage = async (pageParam: number | string) => {
 };
 
 // Filter change handlers - navigate back to page 1 when filters change
+const handleContainerChange = (newContainer: string) => {
+    currentFilters.value.container = newContainer;
+    applyFilters();
+};
+
 const handleSortChange = (newSort: string) => {
     currentFilters.value.sort = newSort;
     applyFilters();
@@ -419,6 +426,7 @@ watch(
                 <div class="flex flex-col items-center gap-4">
                     <BrowseFilters
                         :filters="currentFilters"
+                        @container-change="handleContainerChange"
                         @sort-change="handleSortChange"
                         @period-change="handlePeriodChange"
                         @limit-change="handleLimitChange"

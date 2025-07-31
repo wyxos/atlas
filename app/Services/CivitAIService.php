@@ -302,6 +302,7 @@ class CivitAIService
                 'limit' => (int) $this->request->get('limit', 40), // Items per page
                 'nsfw' => $this->request->boolean('nsfw', false),
                 'autoNext' => $this->request->boolean('autoNext', false),
+                'container' => $this->request->get('container', 'Images'),
             ]
         ];
     }

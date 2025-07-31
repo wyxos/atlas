@@ -1,5 +1,29 @@
 <template>
     <div class="flex flex-wrap items-center gap-4">
+        <!-- Container Dropdown -->
+        <div class="flex items-center gap-2">
+            <label class="text-sm font-medium">Container:</label>
+            <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                    <Button class="min-w-[120px] justify-between" variant="outline">
+                        {{ currentContainerLabel }}
+                        <ChevronDown class="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem
+                        v-for="option in containerOptions"
+                        :key="option.value"
+                        :class="{ 'bg-accent': filters.container === option.value }"
+                        class="cursor-pointer"
+                        @click="$emit('containerChange', option.value)"
+                    >
+                        {{ option.label }}
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+
         <!-- Sort Dropdown -->
         <div class="flex items-center gap-2">
             <label class="text-sm font-medium">Sort:</label>
@@ -102,7 +126,7 @@
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LIMIT_OPTIONS, PERIOD_OPTIONS, SORT_OPTIONS } from '@/constants/browse';
+import { CONTAINER_OPTIONS, LIMIT_OPTIONS, PERIOD_OPTIONS, SORT_OPTIONS } from '@/constants/browse';
 import type { BrowseFilters } from '@/types/browse';
 import { ChevronDown, Undo } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -114,6 +138,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
+    containerChange: [value: string];
     sortChange: [value: string];
     periodChange: [value: string];
     limitChange: [value: number];
@@ -124,6 +149,7 @@ const emit = defineEmits<{
     undoBlacklist: [];
 }>();
 
+const containerOptions = CONTAINER_OPTIONS;
 const sortOptions = SORT_OPTIONS;
 const periodOptions = PERIOD_OPTIONS;
 const limitOptions = LIMIT_OPTIONS;
@@ -134,6 +160,10 @@ const currentSortLabel = computed(() => {
 
 const currentPeriodLabel = computed(() => {
     return periodOptions.find((option) => option.value === props.filters.period)?.label || props.filters.period;
+});
+
+const currentContainerLabel = computed(() => {
+    return containerOptions.find((option) => option.value === props.filters.container)?.label || props.filters.container;
 });
 
 const currentLimitLabel = computed(() => {
