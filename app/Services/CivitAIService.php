@@ -52,7 +52,6 @@ class CivitAIService
         $params = [
             'limit' => $limit,
             'sort' => $this->request->get('sort', 'Newest'),
-//            "baseModels" => ["SDXL 1.0"],
             'period' => $this->request->get('period', 'AllTime'),
             'nsfw' => $this->request->boolean('nsfw', false),
         ];
@@ -62,28 +61,21 @@ class CivitAIService
         if ($page != 1) {
             $params['cursor'] = $page;
         }
-        else{
-            // If no page is specified, we assume it's the first page
-            $params['cursor'] = null; // CivitAI API does not require a cursor for the first page
-        }
 
         // Note: CivitAI doesn't use traditional page numbers, only cursors
 
-        // delete page and autoNext
-        unset($params['page'], $params['autoNext']);
-
         $response = Http::get(self::CIVITAI_API_BASE.'/images', $params);
 
-        if(app()->environment('local') && env('SERVICE_LOG')){
-            // log to a file {time}_civitai.json, the params used and the response returned in storage/logs
-            $logData = [
-                'time' => Carbon::now()->toDateTimeString(),
-                'params' => $params,
-                'response' => $response->json(),
-            ];
-
-            file_put_contents(storage_path('logs/'.Carbon::now()->format('Y-m-d_H-i-s').'_civitai.json'), json_encode($logData, JSON_PRETTY_PRINT));
-        }
+//        if(app()->environment('local')){
+//            // log to a file {time}_civitai.json, the params used and the response returned in storage/logs
+//            $logData = [
+//                'time' => Carbon::now()->toDateTimeString(),
+//                'params' => $params,
+//                'response' => $response->json(),
+//            ];
+//
+//            file_put_contents(storage_path('logs/'.Carbon::now()->format('Y-m-d_H-i-s').'_civitai.json'), json_encode($logData, JSON_PRETTY_PRINT));
+//        }
 
         if (! $response->successful()) {
             throw new Exception('CivitAI API request failed: '.$response->status());
@@ -251,7 +243,7 @@ class CivitAIService
         return File::query()
             ->whereIn('referrer_url', $referrerUrls)
             ->whereNull('seen_preview_at')
-            ->whereNull('seen_file_at')
+//            ->whereNull('seen_file_at')
             ->where('liked', false)
             ->where('disliked', false)
             ->where('funny', false)
@@ -284,8 +276,8 @@ class CivitAIService
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
                 'funny' => $file->funny,
-                'seen_preview_at' => $file->seen_preview_at?->toISOString(),
-                'seen_file_at' => $file->seen_file_at?->toISOString(),
+                'seen_preview_at' => $file->seen_preview_at,
+                'seen_file_at' => $file->seen_file_at,
             ];
         }
 

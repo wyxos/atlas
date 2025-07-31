@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\File;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class SyncFilesToAtlasCommand extends Command
@@ -106,7 +105,6 @@ class SyncFilesToAtlasCommand extends Command
                 } catch (\Exception $e) {
                     $errorCount++;
                     $this->error("Error processing file ID {$file->id}: " . $e->getMessage());
-                    Log::error("SyncFilesToAtlas error for file ID {$file->id}: " . $e->getMessage());
                 }
 
                 $bar->advance();
@@ -181,7 +179,6 @@ class SyncFilesToAtlasCommand extends Command
                     'status' => 'Moved to atlas disk successfully',
                 ];
             } catch (\Exception $e) {
-                Log::error("Failed to move file to atlas disk. File ID: {$file->id}, Path: {$path}, Error: " . $e->getMessage());
                 throw $e;
             }
         } else {

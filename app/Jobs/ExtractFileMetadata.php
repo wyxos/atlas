@@ -8,7 +8,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class ExtractFileMetadata implements ShouldQueue
@@ -48,9 +47,6 @@ class ExtractFileMetadata implements ShouldQueue
                 ['is_extracted' => true]
             );
 
-            Log::info("Metadata extracted successfully for file: {$this->file->path}");
-        } else {
-            Log::error("Failed to extract metadata for file: {$this->file->path}");
         }
     }
 

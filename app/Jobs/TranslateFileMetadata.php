@@ -12,7 +12,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -46,8 +45,6 @@ class TranslateFileMetadata implements ShouldQueue
             $metadataPath = "metadata/{$this->file->id}.json";
 
             if (! Storage::disk('atlas')->exists($metadataPath)) {
-                Log::warning("Metadata file not found for file ID: {$this->file->id}");
-
                 return;
             }
 
@@ -55,16 +52,12 @@ class TranslateFileMetadata implements ShouldQueue
             $metadata = json_decode($metadataJson, true);
 
             if (! $metadata) {
-                Log::error("Failed to parse metadata JSON for file ID: {$this->file->id}");
-
                 // Mark as review required
                 if ($this->file->metadata()->exists()) {
-                    Log::warning("Marking file {$this->file->id} as review required due to invalid metadata.");
                     $this->file->metadata()->update([
                         'is_review_required' => true,
                     ]);
                 } else {
-                    Log::warning("Creating metadata record for file {$this->file->id} with review required status.");
                     $this->file->metadata()->create([
                         'is_review_required' => true,
                     ]);
@@ -84,8 +77,6 @@ class TranslateFileMetadata implements ShouldQueue
                 $this->file->metadata()->create($translatedData);
             }
         } catch (\Exception $e) {
-            Log::error("Error processing file {$this->file->id}: ".$e->getMessage());
-
             // Mark as review required
             $this->file->metadata()->update([
                 'is_review_required' => true,
@@ -294,7 +285,6 @@ class TranslateFileMetadata implements ShouldQueue
 
                     DB::commit();
                 } catch (\Exception $e) {
-                    Log::error("Error processing cover for file {$file->id}: ".$e->getMessage());
                     DB::rollBack();
                 }
             }

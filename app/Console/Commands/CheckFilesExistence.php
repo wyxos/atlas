@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\File;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class CheckFilesExistence extends Command
@@ -178,8 +177,7 @@ class CheckFilesExistence extends Command
 
                 return true;
             } catch (\Exception $e) {
-                // Log the error but don't throw - just return false
-                Log::error("Failed to rename double-dot file: {$doubleDotsPath} to {$path}. Error: " . $e->getMessage());
+                // Return false on error
                 return false;
             }
         }

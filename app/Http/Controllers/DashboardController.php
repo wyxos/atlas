@@ -259,9 +259,7 @@ class DashboardController extends Controller
                 'used_percent' => (float) $usedPercent,
             ];
         } catch (Exception $e) {
-            // Log the error and return fallback values
-            \Log::warning('Failed to get disk space information: ' . $e->getMessage());
-
+            // Return fallback values
             return [
                 'total' => 0,
                 'used' => 0,

@@ -9,7 +9,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -43,11 +42,6 @@ class MoveFileToAtlasJob implements ShouldQueue
         // Sanitize the file path to remove problematic Unicode characters
         $sanitizedPath = $this->sanitizePath($this->file->path);
         if ($sanitizedPath !== $this->file->path) {
-            Log::info("Path sanitized for file ID {$this->file->id}", [
-                'original_path' => $this->file->path,
-                'sanitized_path' => $sanitizedPath,
-            ]);
-
             // Update the file record with sanitized path
             $this->file->path = $sanitizedPath;
             $this->file->save();
@@ -136,11 +130,6 @@ class MoveFileToAtlasJob implements ShouldQueue
 
                 // Attempt to delete the file
                 if (unlink($filePath)) {
-                    Log::info("Successfully deleted original file after {$retryCount} retries", [
-                        'file_path' => $filePath,
-                        'file_id' => $this->file->id,
-                    ]);
-
                     return;
                 }
 
@@ -148,12 +137,6 @@ class MoveFileToAtlasJob implements ShouldQueue
             } catch (Exception $e) {
                 $lastError = $e;
                 $retryCount++;
-
-                Log::warning("Failed to delete original file (attempt {$retryCount}/{$maxRetries})", [
-                    'file_path' => $filePath,
-                    'file_id' => $this->file->id,
-                    'error' => $e->getMessage(),
-                ]);
 
                 // If this isn't the last retry, wait before trying again
                 if ($retryCount < $maxRetries) {
@@ -169,12 +152,7 @@ class MoveFileToAtlasJob implements ShouldQueue
             }
         }
 
-        // If we've exhausted all retries, log the final error and mark for manual cleanup
-        Log::error("Failed to delete original file after {$maxRetries} attempts - marking for manual cleanup", [
-            'file_path' => $filePath,
-            'file_id' => $this->file->id,
-            'final_error' => $lastError ? $lastError->getMessage() : 'Unknown error',
-        ]);
+        // If we've exhausted all retries, mark for manual cleanup
 
         // Mark the file for manual cleanup by adding a note to the file record
         $this->markFileForManualCleanup($filePath, $lastError ? $lastError->getMessage() : 'Unknown error');
@@ -194,19 +172,9 @@ class MoveFileToAtlasJob implements ShouldQueue
                 $existingNotes = $this->file->notes ?? '';
                 $this->file->notes = $existingNotes.($existingNotes ? "\n" : '').$cleanupNote;
                 $this->file->save();
-            } else {
-                // If no notes field exists, we'll just rely on the log entry above
-                Log::info('File marked for manual cleanup (no notes field available)', [
-                    'file_id' => $this->file->id,
-                    'cleanup_note' => $cleanupNote,
-                ]);
             }
         } catch (Exception $e) {
-            Log::error('Failed to mark file for manual cleanup', [
-                'file_id' => $this->file->id,
-                'original_path' => $originalPath,
-                'marking_error' => $e->getMessage(),
-            ]);
+            // Failed to mark file for manual cleanup
         }
     }
 

@@ -292,7 +292,7 @@ const getPage = async (pageParam: number | string) => {
                             ) {
                                 const unpreviewedInNewItems = newItems.filter((item) => item.seen_preview_at === null).length;
                                 // Automatically trigger autocycling if we have less items than the limit, or all items have been seen
-                                setTimeout(() => autocycleUntilItems(unpreviewedInNewItems), 100);
+                                setTimeout(() => autocycleUntilItems(unpreviewedInNewItems), 500);
                             }
 
                             resolve({
