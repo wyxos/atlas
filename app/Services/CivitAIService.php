@@ -27,6 +27,24 @@ class CivitAIService
      */
     public function fetch(): array
     {
+        $container = $this->request->get('container', 'images');
+        
+        switch ($container) {
+            case 'users':
+                return $this->fetchUsers();
+            case 'models':
+                return $this->fetchModels();
+            case 'images':
+            default:
+                return $this->fetchImages();
+        }
+    }
+
+    /**
+     * Fetch and transform CivitAI images for the browse page.
+     */
+    public function fetchImages(): array
+    {
         // Get the unified 'page' parameter - could be cursor or page number
         $page = $this->request->get('page', 1);
         $limit = (int) $this->request->get('limit', 40);
@@ -41,6 +59,157 @@ class CivitAIService
         $uiItems = $this->formatForUI($files, $page);
 
         return $this->transformResponse($result, $uiItems, $page);
+    }
+
+    /**
+     * Fetch users from CivitAI API.
+     */
+    public function fetchUsers(): array
+    {
+        $page = $this->request->get('page', 1);
+        $limit = (int) $this->request->get('limit', 40);
+        $query = $this->request->get('query');
+
+        $params = [
+            'limit' => min($limit, 200), // CivitAI allows max 200 for creators
+            'page' => $page,
+        ];
+
+        if ($query) {
+            $params['query'] = $query;
+        }
+
+        $response = Http::get(self::CIVITAI_API_BASE . '/creators', $params);
+
+        if (!$response->successful()) {
+            throw new Exception('CivitAI API request failed: ' . $response->status());
+        }
+
+        $data = $response->json();
+        $items = $data['items'] ?? [];
+        $metadata = $data['metadata'] ?? [];
+
+        // Transform creators data for UI
+        $transformedItems = collect($items)->map(function ($creator, $index) use ($page) {
+            return [
+                'id' => 'creator_' . $creator['username'], // Use username as unique ID
+                'src' => null, // No image for creators
+                'original' => null,
+                'width' => null,
+                'height' => null,
+                'page' => $page,
+                'index' => $index,
+                'username' => $creator['username'],
+                'modelCount' => $creator['modelCount'] ?? 0,
+                'link' => $creator['link'] ?? null,
+                'type' => 'user',
+            ];
+        })->toArray();
+
+        return [
+            'items' => $transformedItems,
+            'filters' => [
+                'page' => (int) $page,
+                'nextPage' => isset($metadata['nextPage']) ? $page + 1 : null,
+                'sort' => $this->request->get('sort', 'Newest'),
+                'period' => $this->request->get('period', 'AllTime'),
+                'limit' => $limit,
+                'nsfw' => $this->request->boolean('nsfw', false),
+                'autoNext' => $this->request->boolean('autoNext', false),
+                'container' => 'users',
+            ]
+        ];
+    }
+
+    /**
+     * Fetch models from CivitAI API.
+     */
+    public function fetchModels(): array
+    {
+        $page = $this->request->get('page', 1);
+        $limit = (int) $this->request->get('limit', 40);
+        $query = $this->request->get('query');
+        $sort = $this->request->get('sort', 'Newest');
+        $period = $this->request->get('period', 'AllTime');
+        $nsfw = $this->request->boolean('nsfw', false);
+
+        $params = [
+            'limit' => min($limit, 100), // CivitAI allows max 100 for models
+            'page' => $page,
+            'nsfw' => $nsfw,
+        ];
+
+        // Map our sort options to CivitAI's model sort options
+        $sortMapping = [
+            'Most Reactions' => 'Highest Rated',
+            'Most Comments' => 'Most Downloaded',
+            'Newest' => 'Newest',
+        ];
+        
+        if (isset($sortMapping[$sort])) {
+            $params['sort'] = $sortMapping[$sort];
+        }
+
+        if ($period !== 'AllTime') {
+            $params['period'] = $period;
+        }
+
+        if ($query) {
+            $params['query'] = $query;
+        }
+
+        $response = Http::get(self::CIVITAI_API_BASE . '/models', $params);
+
+        if (!$response->successful()) {
+            throw new Exception('CivitAI API request failed: ' . $response->status());
+        }
+
+        $data = $response->json();
+        $items = $data['items'] ?? [];
+        $metadata = $data['metadata'] ?? [];
+
+        // Transform models data for UI
+        $transformedItems = collect($items)->map(function ($model, $index) use ($page) {
+            // Get the first image from the first model version if available
+            $firstImage = null;
+            if (!empty($model['modelVersions']) && !empty($model['modelVersions'][0]['images'])) {
+                $firstImage = $model['modelVersions'][0]['images'][0];
+            }
+
+            return [
+                'id' => 'model_' . $model['id'],
+                'src' => $firstImage ? $firstImage['url'] : null,
+                'original' => $firstImage ? $firstImage['url'] : null,
+                'width' => $firstImage['width'] ?? null,
+                'height' => $firstImage['height'] ?? null,
+                'page' => $page,
+                'index' => $index,
+                'modelId' => $model['id'],
+                'name' => $model['name'],
+                'description' => $model['description'] ?? null,
+                'type' => 'model',
+                'modelType' => $model['type'] ?? null,
+                'nsfw' => $model['nsfw'] ?? false,
+                'tags' => $model['tags'] ?? [],
+                'creator' => $model['creator'] ?? null,
+                'stats' => $model['stats'] ?? null,
+                'modelVersions' => $model['modelVersions'] ?? [],
+            ];
+        })->toArray();
+
+        return [
+            'items' => $transformedItems,
+            'filters' => [
+                'page' => (int) $page,
+                'nextPage' => isset($metadata['nextPage']) ? $page + 1 : null,
+                'sort' => $sort,
+                'period' => $period,
+                'limit' => $limit,
+                'nsfw' => $nsfw,
+                'autoNext' => $this->request->boolean('autoNext', false),
+                'container' => 'models',
+            ]
+        ];
     }
 
     /**
@@ -302,7 +471,7 @@ class CivitAIService
                 'limit' => (int) $this->request->get('limit', 40), // Items per page
                 'nsfw' => $this->request->boolean('nsfw', false),
                 'autoNext' => $this->request->boolean('autoNext', false),
-                'container' => $this->request->get('container', 'Images'),
+                'container' => $this->request->get('container', 'images'),
             ]
         ];
     }

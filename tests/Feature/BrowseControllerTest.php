@@ -51,7 +51,7 @@ it('can access browse page', function () {
         ->where('filters.limit', 40)
         ->where('filters.nsfw', false)
         ->where('filters.autoNext', false)
-        ->where('filters.container', 'Images')
+        ->where('filters.container', 'images')
     );
 
     // Verify that the CivitAI API was called correctly

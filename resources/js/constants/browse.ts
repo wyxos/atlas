@@ -21,11 +21,9 @@ export const AUTOCYCLE_DELAY = 100;
 
 // Container options
 export const CONTAINER_OPTIONS: ContainerOption[] = [
-    { value: 'Images', label: 'Images' },
-    { value: 'Users', label: 'Users' },
-    { value: 'Models', label: 'Models' },
-    { value: 'Posts', label: 'Posts' },
-    { value: 'Collections', label: 'Collections' },
+    { value: 'images', label: 'Images' },
+    { value: 'users', label: 'Users' },
+    { value: 'models', label: 'Models' },
 ];
 
 // Limit options

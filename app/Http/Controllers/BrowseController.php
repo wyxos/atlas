@@ -27,7 +27,7 @@ class BrowseController extends Controller
                 'limit' => $request->get('limit', 40), // Default to 40 items per page
                 'nsfw' => $request->boolean('nsfw', false),
                 'autoNext' => $request->boolean('autoNext', false),
-                'container' => $request->get('container', 'Images'),
+                'container' => $request->get('container', 'images'),
             ]
         ];
 
