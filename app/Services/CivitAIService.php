@@ -228,11 +228,11 @@ class CivitAIService
             'input' => json_encode([
                 'json' => [
                     'browsingLevel' => 31,
-                    'period' => 'Week',
+                    'period' => $this->request->get('period', 'AllTime'),
                     'periodMode' => 'published',
-                    'sort' => 'Newest',
-                    'include' => ['cosmetics'],
-                    'excludedTagIds' => [415792, 426772, 5188, 5249, 130818, 130820, 133182, 5351, 306619, 154326, 161829, 163032],
+                    'sort' => $this->request->get('sort', 'Most Reactions'),
+                    'include' => [],
+                    'excludedTagIds' => [],
                     'disablePoi' => true,
                     'disableMinor' => true,
                     'cursor' => $page != 1 ? $page : null,
@@ -300,7 +300,7 @@ class CivitAIService
                 'hash' => $image['hash'] ?? null,
 
                 // Content metadata
-                'title' => $image['prompt'] ?? null,
+                'title' => null,
                 'description' => null,
                 'thumbnail_url' => $thumbnail,
 
@@ -515,8 +515,8 @@ class CivitAIService
      */
     private function transformPostsResponse(array $result, array $transformedItems, $currentPage): array
     {
-        $hasNextPage = !empty($result['metadata']['nextCursor']);
-        $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
+        $hasNextPage = !empty($result['meta']['values'][0]['cursor']);
+        $nextPage = $hasNextPage ? $result['meta']['values'][0]['cursor'] : null;
 
         return [
             'items' => $transformedItems,
@@ -632,7 +632,7 @@ class CivitAIService
                 'hash' => $itemData['hash'] ?? null,
 
                 // Content metadata
-                'title' => $meta['prompt'] ?? null,
+                'title' => null,
                 'description' => null,
                 'thumbnail_url' => $thumbnail,
 
