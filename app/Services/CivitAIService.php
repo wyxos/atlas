@@ -227,6 +227,7 @@ class CivitAIService
         $queryParams = [
             'input' => json_encode([
                 'json' => [
+                    'limit' => 20,
                     'browsingLevel' => 31,
                     'period' => $this->request->get('period', 'AllTime'),
                     'periodMode' => 'published',
@@ -246,15 +247,15 @@ class CivitAIService
             ])
         ];
 
-        $response = Http::timeout(30)
-            ->get($url, $queryParams);
+        $response = Http::get($url, $queryParams);
 
         if (! $response->successful()) {
             throw new Exception('CivitAI API request failed: '.$response->status());
         }
 
         $data = $response->json();
-        $metadata = $data['result']['data']['json']['meta'] ?? [];
+
+        $metadata = $data['result']['data']['json'] ?? [];
 
         return [
             'items' => $data['result']['data']['json']['items'] ?? [],
@@ -515,8 +516,8 @@ class CivitAIService
      */
     private function transformPostsResponse(array $result, array $transformedItems, $currentPage): array
     {
-        $hasNextPage = !empty($result['meta']['values'][0]['cursor']);
-        $nextPage = $hasNextPage ? $result['meta']['values'][0]['cursor'] : null;
+        $hasNextPage = !empty($result['metadata']['nextCursor']);
+        $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
 
         return [
             'items' => $transformedItems,
