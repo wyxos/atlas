@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
 use Carbon\Carbon;
@@ -24,6 +25,7 @@ class CivitAIService
 
     /**
      * Fetch and transform CivitAI items for the browse page.
+     * @throws Exception
      */
     public function fetch(): array
     {
@@ -193,7 +195,32 @@ class CivitAIService
         ];
     }
 
-    private function fetchPosts()
+    /**
+     * Fetch posts from CivitAI API with dynamic parameters.
+     */
+    public function fetchPosts(): array
+    {
+        // Get the unified 'page' parameter - could be cursor or page number
+        $page = $this->request->get('page', 1);
+        $limit = (int) $this->request->get('limit', 40);
+
+        $result = $this->fetchPostItems($page, $limit);
+        $transformedItems = $this->transformPostsForDatabase($result['items']);
+
+        // Upsert items as File instances with Container relationships
+        $files = $this->upsertPostFiles($transformedItems);
+
+        // Format for UI display
+        $uiItems = $this->formatPostsForUI($files, $page);
+
+        return $this->transformPostsResponse($result, $uiItems, $page);
+    }
+
+    /**
+     * Fetch post items from CivitAI API using unified page parameter.
+     * @throws ConnectionException
+     */
+    private function fetchPostItems($page, int $limit): array
     {
         $url = "https://civitai.com/api/trpc/post.getInfinite";
 
@@ -208,7 +235,7 @@ class CivitAIService
                     'excludedTagIds' => [415792, 426772, 5188, 5249, 130818, 130820, 133182, 5351, 306619, 154326, 161829, 163032],
                     'disablePoi' => true,
                     'disableMinor' => true,
-                    'cursor' => '2025-07-31T20:33:57.046Z',
+                    'cursor' => $page != 1 ? $page : null,
                     'authed' => true
                 ],
                 'meta' => [
@@ -219,46 +246,31 @@ class CivitAIService
             ])
         ];
 
-        try {
-            $response = Http::timeout(30)
-                ->get($url, $queryParams);
-            if (!$response->successful()) {
-                throw new Exception('CivitAI API request failed: ' . $response->status());
-            }
+        $response = Http::timeout(30)
+            ->get($url, $queryParams);
 
-            $data = $response->json();
-
-            $items = $data['result']['data']['json']['items'] ?? [];
-
-            $meta = $data['result']['data']['json']['meta'] ?? [];
-
-            $posts = $this->transformPosts($items);
-
-            dd($items[0], $items[0]['images'], $posts);
+        if (! $response->successful()) {
+            throw new Exception('CivitAI API request failed: '.$response->status());
         }
-        catch (Exception $e) {
-            throw new Exception('CivitAI API error: ' . $e->getMessage());
-        }
+
+        $data = $response->json();
+        $metadata = $data['result']['data']['json']['meta'] ?? [];
+
+        return [
+            'items' => $data['result']['data']['json']['items'] ?? [],
+            'metadata' => $metadata,
+            'currentPage' => $page,
+        ];
     }
 
-    public function transformPosts($data = [])
+    /**
+     * Transform CivitAI post items data to align with files and containers.
+     */
+    private function transformPostsForDatabase(array $items): array
     {
-        // thumbnail url
-        // https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/3a3e7dd5-3d10-4168-b1da-9bf7d6467a7e/anim=false,width=450,optimized=true/8.jpeg
-        // domain/{get filename from $item[0]['name']}/$item[0]['url']/anim=false,width=450,optimized=true/$item[0]['nsfwLevel'].{get extention from $item[0]['name']}
-
-        // full image url
-        // https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/3a3e7dd5-3d10-4168-b1da-9bf7d6467a7e/original=true,quality=90/8.jpeg
-        // domain/{get filename from $item[0]['name']}/$item[0]['url']/original=true,quality=90/$item[0]['nsfwLevel'].{get extention from $item[0]['name']}
-
-        // image url
-        // https://civitai.com/images/91097383
-        // domain/$item[0]['id']
-
-        return collect($data)->map(function($post){
+        $transformedItems = collect($items)->map(function($post){
 
             $image = $post['images'][0];
-
             // $image['name'] = '8.jpeg';
             $filenameOnly = pathinfo($image['name'], PATHINFO_FILENAME);
 
@@ -268,45 +280,44 @@ class CivitAIService
 
             $referrer = "https://civitai.com/images/{$image['id']}";
 
-            $postReferrer = "https://civitai.com/posts/{$post['id']}";
+            $containerData = [
+                'type' => 'post',
+                'source' => 'CivitAI',
+                'source_id' => (string) $post['id'],
+                'referrer' => "https://civitai.com/posts/{$post['id']}",
+            ];
 
-            return [
-                // Core identification
-                'container' => [
-                    'source' => 'CivitAI',
-                    'source_id' => (string) $post['id'],
-                    'referrer' => $postReferrer,
-                    '_metadata' => [
-                        'data' => $post
-                    ]
-                ],
+            $fileData = [
+                'source' => 'CivitAI',
+                'source_id' => (string) $image['id'], // CivitAI image ID
+                'url' => $url,
+                'referrer_url' => $referrer,
 
-                'file' => [
-                    'url' => $url,
-                    'referrer_url' => $referrer,
+                // File properties
+                'filename' => $image['name'],
+                'ext' => $this->getFileExtension($image['name']),
+                'mime_type' => $this->getMimeType($image['name']),
+                'hash' => $image['hash'] ?? null,
 
-                    // File properties
-                    'filename' => $image['name'],
-                    'ext' => $this->getFileExtension($image['name']),
-                    'mime_type' => $this->getMimeType($image['name']),
-                    'hash' => $image['hash'] ?? null,
+                // Content metadata
+                'title' => $image['prompt'] ?? null,
+                'description' => null,
+                'thumbnail_url' => $thumbnail,
 
-                    // Content metadata
-                    'title' => $image['prompt'] ?? null,
-                    'description' => null,
-                    'thumbnail_url' => $thumbnail,
-
-                    // Metadata for FileMetadata relationship
-                    '_metadata' => [
-                        'width' => $image['width'] ?? null,
-                        'height' => $image['height'] ?? null,
-                        'civitai_id' => $image['id'],
-                        'civitai_stats' => $image['stats'] ?? null,
-                        'data' => $image,
-                    ]
+                // Metadata for FileMetadata relationship
+                '_metadata' => [
+                    'width' => $image['width'] ?? null,
+                    'height' => $image['height'] ?? null,
+                    'civitai_id' => $image['id'],
+                    'civitai_stats' => $image['stats'] ?? null,
+                    'data' => $image,
                 ]
             ];
+
+            return compact('containerData', 'fileData');
         })->toArray();
+
+        return $transformedItems;
     }
 
     private function getFileExtension(array|string $itemData): string
@@ -343,6 +354,183 @@ class CivitAIService
             default:
                 return 'application/octet-stream';
         }
+    }
+
+    /**
+     * Upsert transformed post items as File instances with related containers.
+     */
+    private function upsertPostFiles(array $transformedItems): array
+    {
+        if (empty($transformedItems)) {
+            return [];
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $fileData = collect($transformedItems)->map(function($item) {
+                $data = $item['fileData'];
+                unset($data['_metadata']); // Remove metadata from file data as it goes to FileMetadata table
+                $data['created_at'] = Carbon::now();
+                $data['updated_at'] = Carbon::now();
+                return $data;
+            })->toArray();
+
+            // Upsert File records
+            File::upsert(
+                $fileData,
+                ['referrer_url'], // Unique identifier column(s)
+                ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'updated_at'] // Columns to update on conflict
+            );
+
+            $referrerUrls = collect($fileData)->pluck('referrer_url')->toArray();
+
+            // Retrieve the files that were upserted
+            $upsertedFiles = File::whereIn('referrer_url', $referrerUrls)->get()->keyBy('referrer_url');
+
+            // Prepare container data for batch upsert
+            $containerData = collect($transformedItems)->map(function($item) {
+                $data = $item['containerData'];
+                $data['created_at'] = Carbon::now();
+                $data['updated_at'] = Carbon::now();
+                return $data;
+            })->toArray();
+
+            // Batch upsert Container records
+            Container::upsert(
+                $containerData,
+                ['source_id', 'source'], // Unique identifier columns
+                ['type', 'referrer', 'updated_at'] // Columns to update on conflict
+            );
+
+            // Get upserted containers
+            $containerSourceIds = collect($containerData)->pluck('source_id')->toArray();
+            $upsertedContainers = Container::where('source', 'CivitAI')
+                ->whereIn('source_id', $containerSourceIds)
+                ->get()
+                ->keyBy('source_id');
+
+            // Prepare pivot data for container-file relationships
+            $pivotData = [];
+            $metadataData = [];
+
+            foreach ($transformedItems as $item) {
+                $file = $upsertedFiles->get($item['fileData']['referrer_url']);
+                if ($file) {
+                    $container = $upsertedContainers->get($item['containerData']['source_id']);
+                    if ($container) {
+                        $pivotData[] = [
+                            'file_id' => $file->id,
+                            'container_id' => $container->id,
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ];
+                    }
+
+                    // Prepare metadata for batch upsert
+                    if (isset($item['fileData']['_metadata'])) {
+                        $metadataData[] = [
+                            'file_id' => $file->id,
+                            'payload' => json_encode($item['fileData']['_metadata']), // Ensure JSON string for upsert
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ];
+                    }
+                }
+            }
+
+            // Batch upsert pivot relationships (container_file)
+            if (!empty($pivotData)) {
+                DB::table('container_file')->upsert(
+                    $pivotData,
+                    ['file_id', 'container_id'], // Unique identifier columns
+                    ['updated_at'] // Columns to update on conflict
+                );
+            }
+
+            // Batch upsert FileMetadata records
+            if (!empty($metadataData)) {
+                FileMetadata::upsert(
+                    $metadataData,
+                    ['file_id'], // Unique identifier column
+                    ['payload', 'updated_at'] // Columns to update on conflict
+                );
+            }
+
+            DB::commit();
+
+            // Return files with containers loaded
+            return File::whereIn('referrer_url', $referrerUrls)
+                ->with(['containers', 'metadata'])
+                ->get()
+                ->all();
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw new Exception('Failed to upsert post files: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Format File instances for UI display with container relationship loaded.
+     */
+    private function formatPostsForUI(array $files, $currentPage): array
+    {
+        $uiItems = [];
+        $pageIdentifier = $currentPage ?: null;
+
+        foreach ($files as $index => $file) {
+            // Decode metadata payload if it's a JSON string
+            $metadata = $file->metadata?->payload ?? [];
+            if (is_string($metadata)) {
+                $metadata = json_decode($metadata, true) ?? [];
+            }
+
+            // Format container as array
+            $container = $file->containers->first();
+            $containerData = $container ? $container->toArray() : [];
+
+            $uiItems[] = [
+                'id' => $file->id,
+                'src' => $file->thumbnail_url,
+                'original' => $file->url,
+                'width' => $metadata['width'] ?? null,
+                'height' => $metadata['height'] ?? null,
+                'page' => $pageIdentifier,
+                'index' => $index,
+                'container' => $containerData,
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+                'funny' => $file->funny,
+                'seen_preview_at' => $file->seen_preview_at,
+                'seen_file_at' => $file->seen_file_at,
+            ];
+        }
+
+        return $uiItems;
+    }
+
+    /**
+     * Transform the response from fetchPostItems into the final format for the frontend.
+     */
+    private function transformPostsResponse(array $result, array $transformedItems, $currentPage): array
+    {
+        $hasNextPage = !empty($result['metadata']['nextCursor']);
+        $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
+
+        return [
+            'items' => $transformedItems,
+            'filters' => [
+                'page' => $currentPage ?? 1, // Current page value (cursor or null for first page)
+                'nextPage' => $nextPage, // Next page value (cursor or null if no more)
+                'sort' => $this->request->get('sort', 'Most Reactions'),
+                'period' => $this->request->get('period', 'AllTime'),
+                'limit' => (int) $this->request->get('limit', 40), // Items per page
+                'nsfw' => $this->request->boolean('nsfw', false),
+                'autoNext' => $this->request->boolean('autoNext', false),
+                'container' => $this->request->get('container', 'posts'),
+            ]
+        ];
     }
 
     /**

@@ -29,6 +29,7 @@ class Container extends Model
         'type',
         'source',
         'source_id',
+        'referrer',
     ];
 
     /**

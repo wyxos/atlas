@@ -198,3 +198,225 @@ it('uses correct API parameters', function () {
     });
 });
 
+it('fetches and transforms posts correctly from CivitAI API', function () {
+    Http::fake([
+        'civitai.com/api/trpc/post.getInfinite*' => Http::response([
+            'result' => [
+                'data' => [
+                    'json' => [
+                        'items' => [
+                            [
+                                'id' => 123456,
+                                'images' => [
+                                    [
+                                        'id' => 789012,
+                                        'name' => 'sample.jpeg',
+                                        'url' => 'abc123-def456-ghi789',
+                                        'width' => 768,
+                                        'height' => 1024,
+                                        'hash' => 'sample_hash',
+                                        'prompt' => 'A beautiful test image',
+                                        'stats' => ['likes' => 10]
+                                    ]
+                                ]
+                            ]
+                        ],
+                        'meta' => [
+                            'nextCursor' => 'next_cursor_token'
+                        ]
+                    ]
+                ]
+            ]
+        ], 200)
+    ]);
+
+    $request = new Request(['container' => 'posts', 'page' => 1]);
+    $service = new CivitAIService($request);
+    $result = $service->fetch();
+
+    expect($result['filters']['container'])->toBe('posts');
+    expect($result['filters']['page'])->toBe(1);
+    expect($result['filters']['nextPage'])->toBe('next_cursor_token');
+    expect($result['items'])->toHaveCount(1);
+
+    $item = $result['items'][0];
+    expect($item['id'])->toBeInt(); // Database File ID
+    expect($item['src'])->toContain('anim=false,width=450,optimized=true');
+    expect($item['original'])->toContain('original=true,quality=90');
+    expect($item['width'])->toBe(768);
+    expect($item['height'])->toBe(1024);
+    expect($item['container'])->toBeArray();
+    
+    // Verify that the container relationship is loaded
+    if (!empty($item['container'])) {
+        expect($item['container']['source'])->toBe('CivitAI');
+        expect($item['container']['source_id'])->toBe('123456');
+        expect($item['container']['referrer'])->toBe('https://civitai.com/posts/123456');
+    }
+
+    // Verify that the API was called correctly
+    Http::assertSent(function ($request) {
+        $input = json_decode($request->data()['input'], true);
+        return str_contains($request->url(), 'civitai.com/api/trpc/post.getInfinite') &&
+               $input['json']['browsingLevel'] === 31 &&
+               $input['json']['period'] === 'Week' &&
+               $input['json']['sort'] === 'Newest' &&
+               !isset($input['json']['cursor']); // First page should not have cursor
+    });
+});
+
+it('handles posts cursor-based pagination correctly', function () {
+    Http::fake([
+        'civitai.com/api/trpc/post.getInfinite*' => Http::response([
+            'result' => [
+                'data' => [
+                    'json' => [
+                        'items' => [
+                            [
+                                'id' => 654321,
+                                'images' => [
+                                    [
+                                        'id' => 999888,
+                                        'name' => 'paginated.png',
+                                        'url' => 'xyz789-uvw456-rst123',
+                                        'width' => 512,
+                                        'height' => 512,
+                                        'hash' => 'paginated_hash',
+                                        'prompt' => 'Paginated test',
+                                        'stats' => ['likes' => 5]
+                                    ]
+                                ]
+                            ]
+                        ],
+                        'meta' => [
+                            'nextCursor' => 'new_cursor_token'
+                        ]
+                    ]
+                ]
+            ]
+        ], 200)
+    ]);
+
+    $request = new Request(['container' => 'posts', 'page' => 'existing_cursor_token']);
+    $service = new CivitAIService($request);
+    $result = $service->fetch();
+
+    expect($result['filters']['nextPage'])->toBe('new_cursor_token');
+    expect($result['filters']['page'])->toBe('existing_cursor_token');
+    expect($result['items'])->toHaveCount(1);
+
+    $item = $result['items'][0];
+    expect($item['page'])->toBe('existing_cursor_token');
+    expect($item['container'])->toBeArray();
+
+    // Verify cursor-based API call
+    Http::assertSent(function ($request) {
+        $input = json_decode($request->data()['input'], true);
+        return $input['json']['cursor'] === 'existing_cursor_token';
+    });
+});
+
+it('creates container and file relationships correctly for posts', function () {
+    Http::fake([
+        'civitai.com/api/trpc/post.getInfinite*' => Http::response([
+            'result' => [
+                'data' => [
+                    'json' => [
+                        'items' => [
+                            [
+                                'id' => 111222,
+                                'images' => [
+                                    [
+                                        'id' => 333444,
+                                        'name' => 'relationship.webp',
+                                        'url' => 'rel123-ation456-ship789',
+                                        'width' => 1024,
+                                        'height' => 768,
+                                        'hash' => 'relationship_hash',
+                                        'prompt' => 'Testing relationships',
+                                        'stats' => ['likes' => 15]
+                                    ]
+                                ]
+                            ]
+                        ],
+                        'meta' => []
+                    ]
+                ]
+            ]
+        ], 200)
+    ]);
+
+    // Run the migration first to ensure tables exist
+    $this->artisan('migrate');
+
+    $request = new Request(['container' => 'posts', 'page' => 1]);
+    $service = new CivitAIService($request);
+    $result = $service->fetch();
+
+    // Verify file was created
+    $this->assertDatabaseHas('files', [
+        'source' => 'CivitAI',
+        'source_id' => '333444', // Image ID
+        'referrer_url' => 'https://civitai.com/images/333444',
+        'filename' => 'relationship.webp'
+    ]);
+
+    // Verify container was created
+    $this->assertDatabaseHas('containers', [
+        'source' => 'CivitAI',
+        'source_id' => '111222', // Post ID
+        'referrer' => 'https://civitai.com/posts/111222'
+    ]);
+
+    // Verify file metadata was created
+    $file = \App\Models\File::where('referrer_url', 'https://civitai.com/images/333444')->first();
+    expect($file)->not->toBeNull();
+    expect($file->metadata)->not->toBeNull();
+    
+    // The model cast converts JSON to array automatically
+    $metadata = $file->metadata->payload;
+    expect($metadata)->toBeArray();
+    expect($metadata['civitai_id'])->toBe(333444);
+    expect($metadata['width'])->toBe(1024);
+    expect($metadata['height'])->toBe(768);
+
+    // Verify container-file relationship exists
+    $container = \App\Models\Container::where('source_id', '111222')->first();
+    expect($container)->not->toBeNull();
+    expect($container->files->count())->toBe(1);
+    expect($container->files->first()->id)->toBe($file->id);
+});
+
+it('handles posts API errors gracefully', function () {
+    Http::fake([
+        'civitai.com/api/trpc/post.getInfinite*' => Http::response([], 500)
+    ]);
+
+    $request = new Request(['container' => 'posts', 'page' => 1]);
+    $service = new CivitAIService($request);
+
+    expect(fn() => $service->fetch())->toThrow(Exception::class, 'CivitAI API request failed: 500');
+});
+
+it('handles empty posts response', function () {
+    Http::fake([
+        'civitai.com/api/trpc/post.getInfinite*' => Http::response([
+            'result' => [
+                'data' => [
+                    'json' => [
+                        'items' => [],
+                        'meta' => []
+                    ]
+                ]
+            ]
+        ], 200)
+    ]);
+
+    $request = new Request(['container' => 'posts', 'page' => 1]);
+    $service = new CivitAIService($request);
+    $result = $service->fetch();
+
+    expect($result['items'])->toBeEmpty();
+    expect($result['filters']['nextPage'])->toBeNull();
+});
+
