@@ -28,37 +28,18 @@ class CivitAIService
     public function fetch(): array
     {
         $container = $this->request->get('container', 'images');
-        
+
         switch ($container) {
             case 'users':
                 return $this->fetchUsers();
             case 'models':
                 return $this->fetchModels();
+            case 'posts':
+                return $this->fetchPosts();
             case 'images':
             default:
                 return $this->fetchImages();
         }
-    }
-
-    /**
-     * Fetch and transform CivitAI images for the browse page.
-     */
-    public function fetchImages(): array
-    {
-        // Get the unified 'page' parameter - could be cursor or page number
-        $page = $this->request->get('page', 1);
-        $limit = (int) $this->request->get('limit', 40);
-
-        $result = $this->fetchItems($page, $limit);
-        $transformedItems = $this->transformItems($result['items']);
-
-        // Upsert items as File instances
-        $files = $this->upsertFiles($transformedItems);
-
-        // Format for UI display
-        $uiItems = $this->formatForUI($files, $page);
-
-        return $this->transformResponse($result, $uiItems, $page);
     }
 
     /**
@@ -145,7 +126,7 @@ class CivitAIService
             'Most Comments' => 'Most Downloaded',
             'Newest' => 'Newest',
         ];
-        
+
         if (isset($sortMapping[$sort])) {
             $params['sort'] = $sortMapping[$sort];
         }
@@ -210,6 +191,179 @@ class CivitAIService
                 'container' => 'models',
             ]
         ];
+    }
+
+    private function fetchPosts()
+    {
+        $url = "https://civitai.com/api/trpc/post.getInfinite";
+
+        $queryParams = [
+            'input' => json_encode([
+                'json' => [
+                    'browsingLevel' => 31,
+                    'period' => 'Week',
+                    'periodMode' => 'published',
+                    'sort' => 'Newest',
+                    'include' => ['cosmetics'],
+                    'excludedTagIds' => [415792, 426772, 5188, 5249, 130818, 130820, 133182, 5351, 306619, 154326, 161829, 163032],
+                    'disablePoi' => true,
+                    'disableMinor' => true,
+                    'cursor' => '2025-07-31T20:33:57.046Z',
+                    'authed' => true
+                ],
+                'meta' => [
+                    'values' => [
+                        'cursor' => ['Date']
+                    ]
+                ]
+            ])
+        ];
+
+        try {
+            $response = Http::timeout(30)
+                ->get($url, $queryParams);
+            if (!$response->successful()) {
+                throw new Exception('CivitAI API request failed: ' . $response->status());
+            }
+
+            $data = $response->json();
+
+            $items = $data['result']['data']['json']['items'] ?? [];
+
+            $meta = $data['result']['data']['json']['meta'] ?? [];
+
+            $posts = $this->transformPosts($items);
+
+            dd($items[0], $items[0]['images'], $posts);
+        }
+        catch (Exception $e) {
+            throw new Exception('CivitAI API error: ' . $e->getMessage());
+        }
+    }
+
+    public function transformPosts($data = [])
+    {
+        // thumbnail url
+        // https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/3a3e7dd5-3d10-4168-b1da-9bf7d6467a7e/anim=false,width=450,optimized=true/8.jpeg
+        // domain/{get filename from $item[0]['name']}/$item[0]['url']/anim=false,width=450,optimized=true/$item[0]['nsfwLevel'].{get extention from $item[0]['name']}
+
+        // full image url
+        // https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/3a3e7dd5-3d10-4168-b1da-9bf7d6467a7e/original=true,quality=90/8.jpeg
+        // domain/{get filename from $item[0]['name']}/$item[0]['url']/original=true,quality=90/$item[0]['nsfwLevel'].{get extention from $item[0]['name']}
+
+        // image url
+        // https://civitai.com/images/91097383
+        // domain/$item[0]['id']
+
+        return collect($data)->map(function($post){
+
+            $image = $post['images'][0];
+
+            // $image['name'] = '8.jpeg';
+            $filenameOnly = pathinfo($image['name'], PATHINFO_FILENAME);
+
+            $thumbnail = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{$image['url']}/anim=false,width=450,optimized=true/{$filenameOnly}.{$this->getFileExtension($image['name'])}";
+
+            $url = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{$image['url']}/original=true,quality=90/{$filenameOnly}.{$this->getFileExtension($image['name'])}";
+
+            $referrer = "https://civitai.com/images/{$image['id']}";
+
+            $postReferrer = "https://civitai.com/posts/{$post['id']}";
+
+            return [
+                // Core identification
+                'container' => [
+                    'source' => 'CivitAI',
+                    'source_id' => (string) $post['id'],
+                    'referrer' => $postReferrer,
+                    '_metadata' => [
+                        'data' => $post
+                    ]
+                ],
+
+                'file' => [
+                    'url' => $url,
+                    'referrer_url' => $referrer,
+
+                    // File properties
+                    'filename' => $image['name'],
+                    'ext' => $this->getFileExtension($image['name']),
+                    'mime_type' => $this->getMimeType($image['name']),
+                    'hash' => $image['hash'] ?? null,
+
+                    // Content metadata
+                    'title' => $image['prompt'] ?? null,
+                    'description' => null,
+                    'thumbnail_url' => $thumbnail,
+
+                    // Metadata for FileMetadata relationship
+                    '_metadata' => [
+                        'width' => $image['width'] ?? null,
+                        'height' => $image['height'] ?? null,
+                        'civitai_id' => $image['id'],
+                        'civitai_stats' => $image['stats'] ?? null,
+                        'data' => $image,
+                    ]
+                ]
+            ];
+        })->toArray();
+    }
+
+    private function getFileExtension(array|string $itemData): string
+    {
+        if (is_string($itemData)) {
+            // If it's a string, assume it's a filename
+            return pathinfo($itemData, PATHINFO_EXTENSION) ?: 'jpg';
+        }
+
+        return pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+    }
+
+    private function getMimeType(array|string $itemData): string
+    {
+        $extension = strtolower($this->getFileExtension($itemData));
+
+        switch ($extension) {
+            case 'jpeg':
+            case 'jpg':
+                return 'image/jpeg';
+            case 'png':
+                return 'image/png';
+            case 'gif':
+                return 'image/gif';
+            case 'webp':
+                return 'image/webp';
+            case 'mp4':
+                return 'video/mp4';
+            case 'avi':
+                return 'video/x-msvideo';
+            case 'mov':
+                return 'video/quicktime';
+            // Add more types as needed
+            default:
+                return 'application/octet-stream';
+        }
+    }
+
+    /**
+     * Fetch and transform CivitAI images for the browse page.
+     */
+    public function fetchImages(): array
+    {
+        // Get the unified 'page' parameter - could be cursor or page number
+        $page = $this->request->get('page', 1);
+        $limit = (int) $this->request->get('limit', 40);
+
+        $result = $this->fetchItems($page, $limit);
+        $transformedItems = $this->transformItems($result['items']);
+
+        // Upsert items as File instances
+        $files = $this->upsertFiles($transformedItems);
+
+        // Format for UI display
+        $uiItems = $this->formatForUI($files, $page);
+
+        return $this->transformResponse($result, $uiItems, $page);
     }
 
     /**
@@ -306,37 +460,6 @@ class CivitAIService
         }
 
         return $transformedItems;
-    }
-
-    private function getFileExtension(array $itemData): string
-    {
-        return pathinfo(parse_url($itemData['url'], PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
-    }
-
-    private function getMimeType(array $itemData): string
-    {
-        $extension = strtolower($this->getFileExtension($itemData));
-
-        switch ($extension) {
-            case 'jpeg':
-            case 'jpg':
-                return 'image/jpeg';
-            case 'png':
-                return 'image/png';
-            case 'gif':
-                return 'image/gif';
-            case 'webp':
-                return 'image/webp';
-            case 'mp4':
-                return 'video/mp4';
-            case 'avi':
-                return 'video/x-msvideo';
-            case 'mov':
-                return 'video/quicktime';
-            // Add more types as needed
-            default:
-                return 'application/octet-stream';
-        }
     }
 
     /**

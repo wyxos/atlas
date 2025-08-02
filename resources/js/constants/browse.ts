@@ -1,4 +1,4 @@
-import type { LimitOption, PeriodOption, SortOption, ContainerOption } from '@/types/browse';
+import type { ContainerOption, LimitOption, PeriodOption, SortOption } from '@/types/browse';
 
 // Sort options based on CivitAI API specification
 export const SORT_OPTIONS: SortOption[] = [
@@ -24,6 +24,7 @@ export const CONTAINER_OPTIONS: ContainerOption[] = [
     { value: 'images', label: 'Images' },
     { value: 'users', label: 'Users' },
     { value: 'models', label: 'Models' },
+    { value: 'posts', label: 'Posts' },
 ];
 
 // Limit options

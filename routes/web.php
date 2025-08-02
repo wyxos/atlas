@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AudioController;
 use App\Http\Controllers\BrowseController;
+use App\Http\Controllers\CivitaiTestController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VideoController;
@@ -126,6 +127,9 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('files', [FileController::class, 'index'])->name('files.index');
     Route::post('files/{file}/seen', [FileController::class, 'markAsSeen'])->name('files.seen');
     Route::delete('files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
+    
+    // Test route for Civitai API
+    Route::get('test/civitai', [CivitaiTestController::class, 'testQuery'])->name('test.civitai');
 });
 
 require __DIR__.'/settings.php';
