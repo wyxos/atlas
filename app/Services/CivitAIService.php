@@ -461,14 +461,16 @@ class CivitAIService
             DB::commit();
 
             // Return files with containers loaded
-            return File::whereIn('referrer_url', $referrerUrls)
-                ->whereNull('seen_preview_at') // Exclude files that have been seen
-                ->whereNull('seen_file_at') // Exclude files that have been fully seen
-                ->where('loved', false) // Exclude loved files
-                ->where('liked', false) // Exclude liked files
-                ->where('disliked', false) // Exclude disliked files
-                ->where('funny', false) // Exclude funny files
-                ->with(['containers', 'metadata'])
+            return File::query()
+                ->with('metadata')
+                ->whereIn('referrer_url', $referrerUrls)
+                ->whereNull('seen_preview_at')
+                ->whereNull('seen_file_at')
+                ->where('liked', false)
+                ->where('disliked', false)
+                ->where('funny', false)
+                ->where('downloaded', false)
+                ->where('is_blacklisted', false)
                 ->get()
                 ->all();
         } catch (Exception $e) {
@@ -728,6 +730,7 @@ class CivitAIService
         }
 
         return File::query()
+            ->with('metadata')
             ->whereIn('referrer_url', $referrerUrls)
             ->whereNull('seen_preview_at')
             ->whereNull('seen_file_at')
