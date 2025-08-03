@@ -1,14 +1,14 @@
-<script setup lang="ts">
+<script lang="ts" setup>
+import useContextMenu from '@/composables/useContextMenu';
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
 import type { BreadcrumbItemType } from '@/types';
-import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuGroup } from '@imengyu/vue3-context-menu';
-import useContextMenu from '@/composables/useContextMenu';
-import { usePage, router } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { ContextMenu, ContextMenuGroup, ContextMenuItem, ContextMenuSeparator } from '@imengyu/vue3-context-menu';
+import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { PlusIcon, MinusIcon } from 'lucide-vue-next';
+import { MinusIcon, PlusIcon } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
-const { show, options, currentContent } = useContextMenu();
+const { show, options, currentContent, loading } = useContextMenu();
 const page = usePage();
 
 interface Props {
@@ -20,7 +20,7 @@ withDefaults(defineProps<Props>(), {
 });
 
 // Get playlists from global props
-const playlists = computed(() => page.props.playlists as Array<{ id: number; name: string }> || []);
+const playlists = computed(() => (page.props.playlists as Array<{ id: number; name: string }>) || []);
 
 // Check if current item is an audio file
 const isAudioContext = computed(() => currentContent.value?.handler === 'audio-list');
@@ -29,41 +29,49 @@ const isAudioContext = computed(() => currentContent.value?.handler === 'audio-l
 const filePlaylistIds = ref<number[]>([]);
 
 // Fetch playlist membership when context menu content changes
-watch(currentContent, async (newContent) => {
-    if (newContent?.handler === 'audio-list' && newContent?.item?.id) {
-        try {
-            const response = await axios.get(route('files.playlists', { file: newContent.item.id }));
-            filePlaylistIds.value = response.data;
-        } catch (error) {
-            console.error('Failed to fetch playlist membership:', error);
+watch(
+    currentContent,
+    async (newContent) => {
+        if (newContent?.handler === 'audio-list' && newContent?.item?.id) {
+            try {
+                const response = await axios.get(route('files.playlists', { file: newContent.item.id }));
+                filePlaylistIds.value = response.data;
+            } catch (error) {
+                console.error('Failed to fetch playlist membership:', error);
+                filePlaylistIds.value = [];
+            }
+        } else {
             filePlaylistIds.value = [];
         }
-    } else {
-        filePlaylistIds.value = [];
-    }
-}, { immediate: true });
+    },
+    { immediate: true },
+);
 
 // Handle adding/removing file to/from playlist (toggle)
 async function togglePlaylist(playlistId: number): Promise<void> {
     if (!currentContent.value?.item?.id) return;
 
-    router.post(route('playlists.files.store', { playlist: playlistId }), {
-        file_id: currentContent.value.item.id,
-    }, {
-        preserveScroll: true,
-        onSuccess: async () => {
-            // Refresh playlist membership data
-            try {
-                const response = await axios.get(route('files.playlists', { file: currentContent.value!.item!.id }));
-                filePlaylistIds.value = response.data;
-            } catch (error) {
-                console.error('Failed to refresh playlist membership:', error);
-            }
+    router.post(
+        route('playlists.files.store', { playlist: playlistId }),
+        {
+            file_id: currentContent.value.item.id,
         },
-        onError: (errors) => {
-            console.error('Failed to toggle playlist:', errors);
-        }
-    });
+        {
+            preserveScroll: true,
+            onSuccess: async () => {
+                // Refresh playlist membership data
+                try {
+                    const response = await axios.get(route('files.playlists', { file: currentContent.value!.item!.id }));
+                    filePlaylistIds.value = response.data;
+                } catch (error) {
+                    console.error('Failed to refresh playlist membership:', error);
+                }
+            },
+            onError: (errors) => {
+                console.error('Failed to toggle playlist:', errors);
+            },
+        },
+    );
 }
 
 // Check if a track is already in a playlist
@@ -75,30 +83,36 @@ function isInPlaylist(playlistId: number): boolean {
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
         <slot />
-        <context-menu
-            v-model:show="show"
-            :options="options"
-        >
-            <!-- Show playlist options only for audio files -->
-            <template v-if="isAudioContext && playlists.length > 0">
-                <context-menu-group label="Playlists">
-                    <context-menu-item
-                        v-for="playlist in playlists"
-                        :key="playlist.id"
-                        :class="{ 'bg-primary text-primary-foreground block': isInPlaylist(playlist.id) }"
-                        @click="togglePlaylist(playlist.id)"
-                        >
-                        <span>{{ playlist.name }}</span>
-                        <PlusIcon v-if="!isInPlaylist(playlist.id)" size="16" />
-                        <MinusIcon v-else size="16" />
-                    </context-menu-item>
-                </context-menu-group>
-                <context-menu-separator />
+        <context-menu v-model:show="show" :options="options">
+            <template v-if="loading">
+                <!-- Spinner with Tailwind CSS -->
+                <div class="flex items-center justify-center p-4">
+                    <div class="h-6 w-6 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+                    <span class="ml-2 text-sm">Loading...</span>
+                </div>
             </template>
+            <template v-else>
+                <!-- Show playlist options only for audio files -->
+                <template v-if="isAudioContext && playlists.length > 0">
+                    <context-menu-group label="Playlists">
+                        <context-menu-item
+                            v-for="playlist in playlists"
+                            :key="playlist.id"
+                            :class="{ 'block bg-primary text-primary-foreground': isInPlaylist(playlist.id) }"
+                            @click="togglePlaylist(playlist.id)"
+                        >
+                            <span>{{ playlist.name }}</span>
+                            <PlusIcon v-if="!isInPlaylist(playlist.id)" :size="16" />
+                            <MinusIcon v-else :size="16" />
+                        </context-menu-item>
+                    </context-menu-group>
+                    <context-menu-separator />
+                </template>
 
-            <!-- Default context menu items -->
-            <context-menu-item label="Play" v-if="isAudioContext" />
-            <context-menu-item label="View Details" />
+                <!-- Default context menu items -->
+                <context-menu-item v-if="isAudioContext" label="Play" />
+                <context-menu-item label="View Details" />
+            </template>
         </context-menu>
     </AppLayout>
 </template>

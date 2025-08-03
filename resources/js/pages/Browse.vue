@@ -4,6 +4,7 @@ import BrowseFilters from '@/components/browse/BrowseFilters.vue';
 import BrowseItem from '@/components/browse/BrowseItem.vue';
 import Icon from '@/components/Icon.vue';
 import { Button } from '@/components/ui/button';
+import useContextMenu from '@/composables/useContextMenu';
 import { useDownloadProgress } from '@/composables/useDownloadProgress';
 import { useImageZoom } from '@/composables/useImageZoom';
 import { useItemReactions } from '@/composables/useItemReactions';
@@ -52,6 +53,7 @@ const paginationState = ref<PaginationState>({
 const { downloadProgress, downloadedItems } = useDownloadProgress();
 const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
 const { markAsSeen } = useSeenStatus();
+const { handleContextMenu } = useContextMenu();
 const {
     isImageViewerOpen,
     imageViewerZoom,
@@ -133,6 +135,15 @@ const handleAltRightClick = (item: IBrowseItem) => {
 const handleLeftClick = (item: IBrowseItem) => {
     // Open image viewer with full list for navigation
     openImageViewer(item, masonryItems.value);
+};
+
+// Handle right click for context menu
+const handleRightClick = (event: MouseEvent, item: IBrowseItem) => {
+    event.preventDefault();
+    handleContextMenu(event, {
+        handler: 'browse-list',
+        item: { id: item.id, name: `File ${item.id}` },
+    });
 };
 
 // Reaction handlers for full screen mode
@@ -459,6 +470,7 @@ watch(
                             :is-downloaded="downloadedItems.has(item.id)"
                             :item="item"
                             :page-size="currentFilters.limit"
+                            @contextmenu="(event) => handleRightClick(event, item)"
                             @dislike="handleItemDislike"
                             @favorite="handleItemFavorite"
                             @like="handleItemLike"

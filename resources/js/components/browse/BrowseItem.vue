@@ -20,6 +20,7 @@ const emit = defineEmits<{
     altClick: [item: BrowseItem];
     altRightClick: [item: BrowseItem];
     leftClick: [item: BrowseItem];
+    contextmenu: [event: MouseEvent];
 }>();
 
 const handleLeftClick = () => {
@@ -97,7 +98,7 @@ const handleVideoCompleted = () => {
 </script>
 
 <template>
-    <div class="relative h-full">
+    <div class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
         <!-- Media container with fixed imageHeight -->
         <div :style="{ height: item.imageHeight + 'px' }" class="relative">
             <!-- Image element for image files -->
