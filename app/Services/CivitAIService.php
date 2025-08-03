@@ -366,9 +366,6 @@ class CivitAIService
             return [];
         }
 
-        DB::beginTransaction();
-
-        try {
             $fileData = collect($transformedItems)->map(function($item) {
                 $data = $item['fileData'];
                 unset($data['_metadata']); // Remove metadata from file data as it goes to FileMetadata table
@@ -458,25 +455,22 @@ class CivitAIService
                 );
             }
 
-            DB::commit();
-
             // Return files with containers loaded
-            return File::query()
+            $allFiles = File::query()
                 ->with('metadata')
                 ->whereIn('referrer_url', $referrerUrls)
-                ->whereNull('seen_preview_at')
-                ->whereNull('seen_file_at')
-                ->where('liked', false)
-                ->where('disliked', false)
-                ->where('funny', false)
-                ->where('downloaded', false)
-                ->where('is_blacklisted', false)
-                ->get()
-                ->all();
-        } catch (Exception $e) {
-            DB::rollBack();
-            throw new Exception('Failed to upsert post files: ' . $e->getMessage());
-        }
+                ->get();
+
+            // Apply filters in memory for better performance
+            return $allFiles->filter(function($file) {
+                return $file->seen_preview_at === null &&
+                       $file->seen_file_at === null &&
+                       $file->liked === false &&
+                       $file->disliked === false &&
+                       $file->funny === false &&
+                       $file->downloaded === false &&
+                       $file->is_blacklisted === false;
+            })->values()->all();
     }
 
     /**
