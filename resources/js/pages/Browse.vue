@@ -462,7 +462,10 @@ watch(
                     }"
                     :load-at-page="props.filters.page"
                     :max-items="150"
-                    class="h-full"
+                    :class="[
+                        'h-full',
+                        (masonry?.isLoading || isAutocycling) && 'pointer-events-none'
+                    ]"
                 >
                     <template #item="{ item }">
                         <BrowseItem
@@ -482,10 +485,10 @@ watch(
                     </template>
                 </Masonry>
 
-                <!-- Loading Overlay -->
+                <!-- Loading Popup (without background mask) -->
                 <div
                     v-if="masonry?.isLoading || isAutocycling"
-                    class="bg-opacity-30 absolute inset-0 z-50 flex items-center justify-center backdrop-blur-[2px]"
+                    class="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
                 >
                     <div class="flex flex-col items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
                         <div class="flex items-center gap-3">
