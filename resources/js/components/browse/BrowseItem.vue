@@ -2,7 +2,7 @@
 import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 interface Props {
     item: BrowseItem;
@@ -138,13 +138,14 @@ const handleVideoCompleted = () => {
 </script>
 
 <template>
-<div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
+    <div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
         <!-- Media container with fixed imageHeight -->
-        <div :style="{ height: item.imageHeight + 'px' }" class="relative">
+        <div>
             <!-- Image element for image files -->
             <img
                 v-if="isImage"
                 :alt="`Image ${item.id}`"
+                :height="item.imageHeight"
                 :src="isInViewport ? item.src : undefined"
                 class="h-full w-full cursor-pointer object-cover"
                 loading="lazy"
@@ -164,9 +165,9 @@ const handleVideoCompleted = () => {
                 muted
                 playsinline
                 preload="metadata"
+                @ended="handleVideoCompleted"
                 @error="(e) => console.warn('Failed to load video:', item.id, e)"
                 @loadeddata="handlePreviewLoaded"
-                @ended="handleVideoCompleted"
                 @mouseenter="(e) => e.target.play().catch(() => {})"
                 @mouseleave="(e) => e.target.pause()"
                 @click.left.exact="handleLeftClick"

@@ -140,10 +140,14 @@ const handleLeftClick = (item: IBrowseItem) => {
 // Handle right click for context menu
 const handleRightClick = (event: MouseEvent, item: IBrowseItem) => {
     event.preventDefault();
-    handleContextMenu(event, {
-        handler: 'browse-list',
-        item: { id: item.id, name: `File ${item.id}` },
-    }, '/api/browse-context-menu'); // Add endpoint for browse list context menu data
+    handleContextMenu(
+        event,
+        {
+            handler: 'browse-list',
+            item: { id: item.id, name: `File ${item.id}` },
+        },
+        '/api/browse-context-menu',
+    ); // Add endpoint for browse list context menu data
 };
 
 // Reaction handlers for full screen mode
@@ -465,7 +469,7 @@ watch(
                     class="h-full"
                 >
                     <template #item="{ item }">
-                        <div :class="(masonry?.isLoading || isAutocycling) && 'pointer-events-none'">
+                        <div :class="(masonry?.isLoading || isAutocycling) && 'pointer-events-none'" class="h-full">
                             <BrowseItem
                                 :download-progress="downloadProgress[item.id]"
                                 :is-downloaded="downloadedItems.has(item.id)"
@@ -485,10 +489,7 @@ watch(
                 </Masonry>
 
                 <!-- Loading Popup (without background mask) -->
-                <div
-                    v-if="masonry?.isLoading || isAutocycling"
-                    class="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
-                >
+                <div v-if="masonry?.isLoading || isAutocycling" class="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
                     <div class="flex flex-col items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
                         <div class="flex items-center gap-3">
                             <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-500"></div>

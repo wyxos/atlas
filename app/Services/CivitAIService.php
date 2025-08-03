@@ -11,6 +11,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class CivitAIService
 {
@@ -200,20 +201,100 @@ class CivitAIService
      */
     public function fetchPosts(): array
     {
-        // Get the unified 'page' parameter - could be cursor or page number
-        $page = $this->request->get('page', 1);
-        $limit = (int)$this->request->get('limit', 40);
+        $startTime = microtime(true);
+        $container = 'posts';
+        $requestId = uniqid('posts_', true);
 
-        $result = $this->fetchPostItems($page, $limit);
-        $transformedItems = $this->transformPostsForDatabase($result['items']);
+        Log::info("[Timeout Tracker] Starting posts fetch", [
+            'request_id' => $requestId,
+            'container' => $container,
+            'start_time' => $startTime,
+            'params' => $this->request->all()
+        ]);
 
-        // Upsert items as File instances with Container relationships
-        $files = $this->upsertPostFiles($transformedItems);
+        try {
+            // Get the unified 'page' parameter - could be cursor or page number
+            $page = $this->request->get('page', 1);
+            $limit = (int)$this->request->get('limit', 40);
 
-        // Format for UI display
-        $uiItems = $this->formatPostsForUI($files, $page);
+            $step1Time = microtime(true);
+            Log::info("[Timeout Tracker] Step 1: Fetching post items", [
+                'request_id' => $requestId,
+                'elapsed' => ($step1Time - $startTime) * 1000 . 'ms'
+            ]);
 
-        return $this->transformPostsResponse($result, $uiItems, $page);
+            $result = $this->fetchPostItems($page, $limit);
+
+            $step2Time = microtime(true);
+            Log::info("[Timeout Tracker] Step 2: Transforming posts for database", [
+                'request_id' => $requestId,
+                'fetch_duration' => ($step2Time - $step1Time) * 1000 . 'ms',
+                'total_elapsed' => ($step2Time - $startTime) * 1000 . 'ms',
+                'items_count' => count($result['items'] ?? [])
+            ]);
+
+            $transformedItems = $this->transformPostsForDatabase($result['items']);
+
+            $step3Time = microtime(true);
+            Log::info("[Timeout Tracker] Step 3: Upserting post files", [
+                'request_id' => $requestId,
+                'transform_duration' => ($step3Time - $step2Time) * 1000 . 'ms',
+                'total_elapsed' => ($step3Time - $startTime) * 1000 . 'ms',
+                'transformed_count' => count($transformedItems)
+            ]);
+
+            // Upsert items as File instances with Container relationships
+            $files = $this->upsertPostFiles($transformedItems);
+
+            $step4Time = microtime(true);
+            Log::info("[Timeout Tracker] Step 4: Formatting posts for UI", [
+                'request_id' => $requestId,
+                'upsert_duration' => ($step4Time - $step3Time) * 1000 . 'ms',
+                'total_elapsed' => ($step4Time - $startTime) * 1000 . 'ms',
+                'files_count' => count($files)
+            ]);
+
+            // Format for UI display
+            $uiItems = $this->formatPostsForUI($files, $page);
+
+            $endTime = microtime(true);
+            $totalDuration = ($endTime - $startTime) * 1000;
+
+            Log::info("[Timeout Tracker] Posts fetch completed successfully", [
+                'request_id' => $requestId,
+                'format_ui_duration' => ($endTime - $step4Time) * 1000 . 'ms',
+                'total_duration' => $totalDuration . 'ms',
+                'final_ui_items' => count($uiItems)
+            ]);
+
+            // Log warning if request took longer than 10 seconds
+            if ($totalDuration > 10000) {
+                Log::warning("[Timeout Tracker] Slow posts request detected", [
+                    'request_id' => $requestId,
+                    'total_duration' => $totalDuration . 'ms',
+                    'container' => $container,
+                    'params' => $this->request->all()
+                ]);
+            }
+
+            return $this->transformPostsResponse($result, $uiItems, $page);
+
+        } catch (Exception $e) {
+            $errorTime = microtime(true);
+            $totalDuration = ($errorTime - $startTime) * 1000;
+
+            Log::error("[Timeout Tracker] Posts fetch failed", [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+                'error_code' => $e->getCode(),
+                'total_duration' => $totalDuration . 'ms',
+                'container' => $container,
+                'params' => $this->request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw $e;
+        }
     }
 
     /**
@@ -222,6 +303,7 @@ class CivitAIService
      */
     private function fetchPostItems($page, int $limit): array
     {
+        $startTime = microtime(true);
         $url = "https://civitai.com/api/trpc/post.getInfinite";
 
         $queryParams = [
@@ -247,15 +329,51 @@ class CivitAIService
             ])
         ];
 
-        $response = Http::get($url, $queryParams);
+        Log::info("[Timeout Tracker] Making HTTP request to CivitAI", [
+            'url' => $url,
+            'params_size' => strlen(json_encode($queryParams)),
+            'page' => $page,
+            'limit' => $limit
+        ]);
+
+        $httpStartTime = microtime(true);
+        $response = Http::timeout(120)->get($url, $queryParams);
+        $httpEndTime = microtime(true);
+        $httpDuration = ($httpEndTime - $httpStartTime) * 1000;
+
+        Log::info("[Timeout Tracker] HTTP request completed", [
+            'http_duration' => $httpDuration . 'ms',
+            'status_code' => $response->status(),
+            'response_size' => strlen($response->body())
+        ]);
 
         if (!$response->successful()) {
+            Log::error("[Timeout Tracker] CivitAI API request failed", [
+                'status_code' => $response->status(),
+                'response_body' => $response->body(),
+                'http_duration' => $httpDuration . 'ms'
+            ]);
             throw new Exception('CivitAI API request failed: ' . $response->status());
         }
 
+        $parseStartTime = microtime(true);
         $data = $response->json();
+        $parseEndTime = microtime(true);
+        $parseDuration = ($parseEndTime - $parseStartTime) * 1000;
+
+        Log::info("[Timeout Tracker] JSON parsing completed", [
+            'parse_duration' => $parseDuration . 'ms',
+            'items_count' => count($data['result']['data']['json']['items'] ?? [])
+        ]);
 
         $metadata = $data['result']['data']['json'] ?? [];
+
+        $totalDuration = (microtime(true) - $startTime) * 1000;
+        Log::info("[Timeout Tracker] fetchPostItems completed", [
+            'total_duration' => $totalDuration . 'ms',
+            'http_duration' => $httpDuration . 'ms',
+            'parse_duration' => $parseDuration . 'ms'
+        ]);
 
         return [
             'items' => $data['result']['data']['json']['items'] ?? [],
