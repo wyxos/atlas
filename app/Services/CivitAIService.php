@@ -210,11 +210,8 @@ class CivitAIService
         // Upsert items as File instances with Container relationships
         $files = $this->upsertPostFiles($transformedItems);
 
-        // Apply user interaction filtering
-        $filteredFiles = $this->applyUserInteractionFiltering($files);
-
         // Format for UI display
-        $uiItems = $this->formatPostsForUI($filteredFiles, $page);
+        $uiItems = $this->formatPostsForUI($files, $page);
 
         return $this->transformPostsResponse($result, $uiItems, $page);
     }
@@ -463,8 +460,14 @@ class CivitAIService
 
             DB::commit();
 
-            // Return all upserted files without filtering - filtering will be done separately
+            // Return files with containers loaded
             return File::whereIn('referrer_url', $referrerUrls)
+                ->whereNull('seen_preview_at') // Exclude files that have been seen
+                ->whereNull('seen_file_at') // Exclude files that have been fully seen
+                ->where('loved', false) // Exclude loved files
+                ->where('liked', false) // Exclude liked files
+                ->where('disliked', false) // Exclude disliked files
+                ->where('funny', false) // Exclude funny files
                 ->with(['containers', 'metadata'])
                 ->get()
                 ->all();
@@ -472,31 +475,6 @@ class CivitAIService
             DB::rollBack();
             throw new Exception('Failed to upsert post files: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Apply user interaction filtering to exclude files based on user activity.
-     */
-    private function applyUserInteractionFiltering(array $files): array
-    {
-        // Extract file IDs for efficient querying
-        $fileIds = collect($files)->pluck('id')->toArray();
-        
-        if (empty($fileIds)) {
-            return [];
-        }
-        
-        // Use a single optimized query to get filtered files
-        return File::whereIn('id', $fileIds)
-            ->whereNull('seen_preview_at') // Exclude files that have been seen
-            ->whereNull('seen_file_at') // Exclude files that have been fully seen
-            ->where('loved', false) // Exclude loved files
-            ->where('liked', false) // Exclude liked files
-            ->where('disliked', false) // Exclude disliked files
-            ->where('funny', false) // Exclude funny files
-            ->with(['containers', 'metadata']) // Eager load relationships
-            ->get()
-            ->all();
     }
 
     /**
