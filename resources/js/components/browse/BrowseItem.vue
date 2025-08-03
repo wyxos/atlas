@@ -2,7 +2,7 @@
 import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 
 interface Props {
     item: BrowseItem;
@@ -80,6 +80,17 @@ const statusBadge = computed(() => {
     return { text: 'New', class: 'bg-red-500' };
 });
 
+// Check if element is within the viewport
+const isElementInViewport = (el) => {
+    const rect = el.getBoundingClientRect();
+    return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
+};
+
 // Handle marking as seen when preview is loaded
 const handlePreviewLoaded = () => {
     if (!props.item.seen_preview_at && !hasMarkedPreview.value) {
@@ -87,6 +98,35 @@ const handlePreviewLoaded = () => {
         markAsSeen(props.item.id, 'preview');
     }
 };
+
+// Lazy loading state
+const isInViewport = ref(false);
+
+// Observer for lazy loading
+let observer;
+
+onMounted(() => {
+    const options = { root: null, rootMargin: '50px', threshold: 0.1 };
+    observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                isInViewport.value = true;
+                observer.unobserve(entry.target);
+            }
+        });
+    }, options);
+
+    const element = document.getElementById(`browse-item-${props.item.id}`);
+    if (element) {
+        observer.observe(element);
+    }
+});
+
+onUnmounted(() => {
+    if (observer) {
+        observer.disconnect();
+    }
+});
 
 // Handle marking as seen when video completes (for videos only)
 const handleVideoCompleted = () => {
@@ -98,14 +138,14 @@ const handleVideoCompleted = () => {
 </script>
 
 <template>
-    <div class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
+<div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
         <!-- Media container with fixed imageHeight -->
         <div :style="{ height: item.imageHeight + 'px' }" class="relative">
             <!-- Image element for image files -->
             <img
                 v-if="isImage"
                 :alt="`Image ${item.id}`"
-                :src="item.src"
+                :src="isInViewport ? item.src : undefined"
                 class="h-full w-full cursor-pointer object-cover"
                 loading="lazy"
                 @error="(e) => console.warn('Failed to load image:', item.id, e)"
@@ -118,7 +158,7 @@ const handleVideoCompleted = () => {
             <!-- Video element for video files -->
             <video
                 v-else-if="isVideo"
-                :src="item.src"
+                :src="isInViewport ? item.src : undefined"
                 class="h-full w-full cursor-pointer object-cover transition-all duration-500 ease-in-out"
                 loop
                 muted
@@ -133,7 +173,7 @@ const handleVideoCompleted = () => {
                 @click.alt.exact.prevent="handleAltClick"
                 @contextmenu.alt.exact.prevent="handleAltRightClick"
             >
-                <source :src="item.src" type="video/mp4" />
+                <source v-if="isInViewport" :src="item.src" type="video/mp4" />
                 Your browser does not support the video tag.
             </video>
         </div>

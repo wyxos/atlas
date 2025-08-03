@@ -143,7 +143,7 @@ const handleRightClick = (event: MouseEvent, item: IBrowseItem) => {
     handleContextMenu(event, {
         handler: 'browse-list',
         item: { id: item.id, name: `File ${item.id}` },
-    });
+    }, '/api/browse-context-menu'); // Add endpoint for browse list context menu data
 };
 
 // Reaction handlers for full screen mode

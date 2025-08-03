@@ -50,7 +50,7 @@ class CivitAIService
     public function fetchUsers(): array
     {
         $page = $this->request->get('page', 1);
-        $limit = (int) $this->request->get('limit', 40);
+        $limit = (int)$this->request->get('limit', 40);
         $query = $this->request->get('query');
 
         $params = [
@@ -92,7 +92,7 @@ class CivitAIService
         return [
             'items' => $transformedItems,
             'filters' => [
-                'page' => (int) $page,
+                'page' => (int)$page,
                 'nextPage' => isset($metadata['nextPage']) ? $page + 1 : null,
                 'sort' => $this->request->get('sort', 'Newest'),
                 'period' => $this->request->get('period', 'AllTime'),
@@ -110,7 +110,7 @@ class CivitAIService
     public function fetchModels(): array
     {
         $page = $this->request->get('page', 1);
-        $limit = (int) $this->request->get('limit', 40);
+        $limit = (int)$this->request->get('limit', 40);
         $query = $this->request->get('query');
         $sort = $this->request->get('sort', 'Newest');
         $period = $this->request->get('period', 'AllTime');
@@ -183,7 +183,7 @@ class CivitAIService
         return [
             'items' => $transformedItems,
             'filters' => [
-                'page' => (int) $page,
+                'page' => (int)$page,
                 'nextPage' => isset($metadata['nextPage']) ? $page + 1 : null,
                 'sort' => $sort,
                 'period' => $period,
@@ -202,7 +202,7 @@ class CivitAIService
     {
         // Get the unified 'page' parameter - could be cursor or page number
         $page = $this->request->get('page', 1);
-        $limit = (int) $this->request->get('limit', 40);
+        $limit = (int)$this->request->get('limit', 40);
 
         $result = $this->fetchPostItems($page, $limit);
         $transformedItems = $this->transformPostsForDatabase($result['items']);
@@ -249,8 +249,8 @@ class CivitAIService
 
         $response = Http::get($url, $queryParams);
 
-        if (! $response->successful()) {
-            throw new Exception('CivitAI API request failed: '.$response->status());
+        if (!$response->successful()) {
+            throw new Exception('CivitAI API request failed: ' . $response->status());
         }
 
         $data = $response->json();
@@ -269,7 +269,7 @@ class CivitAIService
      */
     private function transformPostsForDatabase(array $items): array
     {
-        $transformedItems = collect($items)->map(function($post){
+        $transformedItems = collect($items)->map(function ($post) {
 
             $image = $post['images'][0];
             // $image['name'] = '8.jpeg';
@@ -284,13 +284,13 @@ class CivitAIService
             $containerData = [
                 'type' => 'post',
                 'source' => 'CivitAI',
-                'source_id' => (string) $post['id'],
+                'source_id' => (string)$post['id'],
                 'referrer' => "https://civitai.com/posts/{$post['id']}",
             ];
 
             $fileData = [
                 'source' => 'CivitAI',
-                'source_id' => (string) $image['id'], // CivitAI image ID
+                'source_id' => (string)$image['id'], // CivitAI image ID
                 'url' => $url,
                 'referrer_url' => $referrer,
 
@@ -366,111 +366,111 @@ class CivitAIService
             return [];
         }
 
-            $fileData = collect($transformedItems)->map(function($item) {
-                $data = $item['fileData'];
-                unset($data['_metadata']); // Remove metadata from file data as it goes to FileMetadata table
-                $data['created_at'] = Carbon::now();
-                $data['updated_at'] = Carbon::now();
-                return $data;
-            })->toArray();
+        $fileData = collect($transformedItems)->map(function ($item) {
+            $data = $item['fileData'];
+            unset($data['_metadata']); // Remove metadata from file data as it goes to FileMetadata table
+            $data['created_at'] = Carbon::now();
+            $data['updated_at'] = Carbon::now();
+            return $data;
+        })->toArray();
 
-            // Upsert File records
-            File::upsert(
-                $fileData,
-                ['referrer_url'], // Unique identifier column(s)
-                ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'updated_at'] // Columns to update on conflict
-            );
+        // Upsert File records
+        File::upsert(
+            $fileData,
+            ['referrer_url'], // Unique identifier column(s)
+            ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'updated_at'] // Columns to update on conflict
+        );
 
-            $referrerUrls = collect($fileData)->pluck('referrer_url')->toArray();
+        $referrerUrls = collect($fileData)->pluck('referrer_url')->toArray();
 
-            // Retrieve the files that were upserted
-            $upsertedFiles = File::whereIn('referrer_url', $referrerUrls)->get()->keyBy('referrer_url');
+        // Retrieve the files that were upserted
+        $upsertedFiles = File::whereIn('referrer_url', $referrerUrls)->get()->keyBy('referrer_url');
 
-            // Prepare container data for batch upsert
-            $containerData = collect($transformedItems)->map(function($item) {
-                $data = $item['containerData'];
-                $data['created_at'] = Carbon::now();
-                $data['updated_at'] = Carbon::now();
-                return $data;
-            })->toArray();
+        // Prepare container data for batch upsert
+//        $containerData = collect($transformedItems)->map(function ($item) {
+//            $data = $item['containerData'];
+//            $data['created_at'] = Carbon::now();
+//            $data['updated_at'] = Carbon::now();
+//            return $data;
+//        })->toArray();
 
-            // Batch upsert Container records
-            Container::upsert(
-                $containerData,
-                ['source_id', 'source'], // Unique identifier columns
-                ['type', 'referrer', 'updated_at'] // Columns to update on conflict
-            );
+        // Batch upsert Container records
+//        Container::upsert(
+//            $containerData,
+//            ['source_id', 'source'], // Unique identifier columns
+//            ['type', 'referrer', 'updated_at'] // Columns to update on conflict
+//        );
 
-            // Get upserted containers
-            $containerSourceIds = collect($containerData)->pluck('source_id')->toArray();
-            $upsertedContainers = Container::where('source', 'CivitAI')
-                ->whereIn('source_id', $containerSourceIds)
-                ->get()
-                ->keyBy('source_id');
+        // Get upserted containers
+//        $containerSourceIds = collect($containerData)->pluck('source_id')->toArray();
+//        $upsertedContainers = Container::where('source', 'CivitAI')
+//            ->whereIn('source_id', $containerSourceIds)
+//            ->get()
+//            ->keyBy('source_id');
 
-            // Prepare pivot data for container-file relationships
-            $pivotData = [];
-            $metadataData = [];
+        // Prepare pivot data for container-file relationships
+        $pivotData = [];
+        $metadataData = [];
 
-            foreach ($transformedItems as $item) {
-                $file = $upsertedFiles->get($item['fileData']['referrer_url']);
-                if ($file) {
-                    $container = $upsertedContainers->get($item['containerData']['source_id']);
-                    if ($container) {
-                        $pivotData[] = [
-                            'file_id' => $file->id,
-                            'container_id' => $container->id,
-                            'created_at' => Carbon::now(),
-                            'updated_at' => Carbon::now()
-                        ];
-                    }
+        foreach ($transformedItems as $item) {
+            $file = $upsertedFiles->get($item['fileData']['referrer_url']);
+            if ($file) {
+//                $container = $upsertedContainers->get($item['containerData']['source_id']);
+//                if ($container) {
+//                    $pivotData[] = [
+//                        'file_id' => $file->id,
+//                        'container_id' => $container->id,
+//                        'created_at' => Carbon::now(),
+//                        'updated_at' => Carbon::now()
+//                    ];
+//                }
 
-                    // Prepare metadata for batch upsert
-                    if (isset($item['fileData']['_metadata'])) {
-                        $metadataData[] = [
-                            'file_id' => $file->id,
-                            'payload' => json_encode($item['fileData']['_metadata']), // Ensure JSON string for upsert
-                            'created_at' => Carbon::now(),
-                            'updated_at' => Carbon::now()
-                        ];
-                    }
+                // Prepare metadata for batch upsert
+                if (isset($item['fileData']['_metadata'])) {
+                    $metadataData[] = [
+                        'file_id' => $file->id,
+                        'payload' => json_encode($item['fileData']['_metadata']), // Ensure JSON string for upsert
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now()
+                    ];
                 }
             }
+        }
 
-            // Batch upsert pivot relationships (container_file)
-            if (!empty($pivotData)) {
-                DB::table('container_file')->upsert(
-                    $pivotData,
-                    ['file_id', 'container_id'], // Unique identifier columns
-                    ['updated_at'] // Columns to update on conflict
-                );
-            }
+        // Batch upsert pivot relationships (container_file)
+//        if (!empty($pivotData)) {
+//            DB::table('container_file')->upsert(
+//                $pivotData,
+//                ['file_id', 'container_id'], // Unique identifier columns
+//                ['updated_at'] // Columns to update on conflict
+//            );
+//        }
 
-            // Batch upsert FileMetadata records
-            if (!empty($metadataData)) {
-                FileMetadata::upsert(
-                    $metadataData,
-                    ['file_id'], // Unique identifier column
-                    ['payload', 'updated_at'] // Columns to update on conflict
-                );
-            }
+        // Batch upsert FileMetadata records
+        if (!empty($metadataData)) {
+            FileMetadata::upsert(
+                $metadataData,
+                ['file_id'], // Unique identifier column
+                ['payload', 'updated_at'] // Columns to update on conflict
+            );
+        }
 
-            // Return files with containers loaded
-            $allFiles = File::query()
-                ->with('metadata')
-                ->whereIn('referrer_url', $referrerUrls)
-                ->get();
+        // Return files with containers loaded
+        $allFiles = File::query()
+            ->with('metadata')
+            ->whereIn('referrer_url', $referrerUrls)
+            ->get();
 
-            // Apply filters in memory for better performance
-            return $allFiles->filter(function($file) {
-                return $file->seen_preview_at === null &&
-                       $file->seen_file_at === null &&
-                       $file->liked === false &&
-                       $file->disliked === false &&
-                       $file->funny === false &&
-                       $file->downloaded === false &&
-                       $file->is_blacklisted === false;
-            })->values()->all();
+        // Apply filters in memory for better performance
+        return $allFiles->filter(function ($file) {
+            return $file->seen_preview_at === null &&
+                $file->seen_file_at === null &&
+                $file->liked === false &&
+                $file->disliked === false &&
+                $file->funny === false &&
+                $file->downloaded === false &&
+                $file->is_blacklisted === false;
+        })->values()->all();
     }
 
     /**
@@ -528,7 +528,7 @@ class CivitAIService
                 'nextPage' => $nextPage, // Next page value (cursor or null if no more)
                 'sort' => $this->request->get('sort', 'Most Reactions'),
                 'period' => $this->request->get('period', 'AllTime'),
-                'limit' => (int) $this->request->get('limit', 40), // Items per page
+                'limit' => (int)$this->request->get('limit', 40), // Items per page
                 'nsfw' => $this->request->boolean('nsfw', false),
                 'autoNext' => $this->request->boolean('autoNext', false),
                 'container' => $this->request->get('container', 'posts'),
@@ -543,7 +543,7 @@ class CivitAIService
     {
         // Get the unified 'page' parameter - could be cursor or page number
         $page = $this->request->get('page', 1);
-        $limit = (int) $this->request->get('limit', 40);
+        $limit = (int)$this->request->get('limit', 40);
 
         $result = $this->fetchItems($page, $limit);
         $transformedItems = $this->transformItems($result['items']);
@@ -578,7 +578,7 @@ class CivitAIService
 
         // Note: CivitAI doesn't use traditional page numbers, only cursors
 
-        $response = Http::get(self::CIVITAI_API_BASE.'/images', $params);
+        $response = Http::get(self::CIVITAI_API_BASE . '/images', $params);
 
 //        if(app()->environment('local')){
 //            // log to a file {time}_civitai.json, the params used and the response returned in storage/logs
@@ -591,8 +591,8 @@ class CivitAIService
 //            file_put_contents(storage_path('logs/'.Carbon::now()->format('Y-m-d_H-i-s').'_civitai.json'), json_encode($logData, JSON_PRETTY_PRINT));
 //        }
 
-        if (! $response->successful()) {
-            throw new Exception('CivitAI API request failed: '.$response->status());
+        if (!$response->successful()) {
+            throw new Exception('CivitAI API request failed: ' . $response->status());
         }
 
         $data = $response->json();
@@ -624,12 +624,12 @@ class CivitAIService
             $transformedItems[] = [
                 // Core identification
                 'source' => 'CivitAI',
-                'source_id' => (string) $itemData['id'],
+                'source_id' => (string)$itemData['id'],
                 'url' => $itemData['url'],
                 'referrer_url' => "https://civitai.com/images/{$itemData['id']}",
 
                 // File properties
-                'filename' => basename(parse_url($itemData['url'], PHP_URL_PATH)) ?: 'civitai_'.$itemData['id'],
+                'filename' => basename(parse_url($itemData['url'], PHP_URL_PATH)) ?: 'civitai_' . $itemData['id'],
                 'ext' => $this->getFileExtension($itemData),
                 'mime_type' => $this->getMimeType($itemData),
                 'hash' => $itemData['hash'] ?? null,
@@ -729,7 +729,7 @@ class CivitAIService
             ->get();
 
         // Apply filters in memory for better performance
-        return $allFiles->filter(function($file) {
+        return $allFiles->filter(function ($file) {
             return $file->seen_preview_at === null &&
                 $file->seen_file_at === null &&
                 $file->liked === false &&
@@ -776,7 +776,7 @@ class CivitAIService
      */
     private function transformResponse(array $result, array $transformedItems, $currentPage): array
     {
-        $hasNextPage = ! empty($result['metadata']['nextCursor']);
+        $hasNextPage = !empty($result['metadata']['nextCursor']);
         $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;
 
         return [
@@ -786,7 +786,7 @@ class CivitAIService
                 'nextPage' => $nextPage, // Next page value (cursor or null if no more)
                 'sort' => $this->request->get('sort', 'Most Reactions'),
                 'period' => $this->request->get('period', 'AllTime'),
-                'limit' => (int) $this->request->get('limit', 40), // Items per page
+                'limit' => (int)$this->request->get('limit', 40), // Items per page
                 'nsfw' => $this->request->boolean('nsfw', false),
                 'autoNext' => $this->request->boolean('autoNext', false),
                 'container' => $this->request->get('container', 'images'),
