@@ -462,26 +462,25 @@ watch(
                     }"
                     :load-at-page="props.filters.page"
                     :max-items="150"
-                    :class="[
-                        'h-full',
-                        (masonry?.isLoading || isAutocycling) && 'pointer-events-none'
-                    ]"
+                    class="h-full"
                 >
                     <template #item="{ item }">
-                        <BrowseItem
-                            :download-progress="downloadProgress[item.id]"
-                            :is-downloaded="downloadedItems.has(item.id)"
-                            :item="item"
-                            :page-size="currentFilters.limit"
-                            @contextmenu="(event) => handleRightClick(event, item)"
-                            @dislike="handleItemDislike"
-                            @favorite="handleItemFavorite"
-                            @like="handleItemLike"
-                            @laughed-at="handleItemLaughedAt"
-                            @alt-click="handleAltClick"
-                            @alt-right-click="handleAltRightClick"
-                            @left-click="handleLeftClick"
-                        />
+                        <div :class="(masonry?.isLoading || isAutocycling) && 'pointer-events-none'">
+                            <BrowseItem
+                                :download-progress="downloadProgress[item.id]"
+                                :is-downloaded="downloadedItems.has(item.id)"
+                                :item="item"
+                                :page-size="currentFilters.limit"
+                                @contextmenu="(event) => handleRightClick(event, item)"
+                                @dislike="handleItemDislike"
+                                @favorite="handleItemFavorite"
+                                @like="handleItemLike"
+                                @laughed-at="handleItemLaughedAt"
+                                @alt-click="handleAltClick"
+                                @alt-right-click="handleAltRightClick"
+                                @left-click="handleLeftClick"
+                            />
+                        </div>
                     </template>
                 </Masonry>
 
