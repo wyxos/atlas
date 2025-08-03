@@ -227,7 +227,7 @@ class CivitAIService
         $queryParams = [
             'input' => json_encode([
                 'json' => [
-                    'limit' => 20,
+                    'limit' => $limit,
                     'browsingLevel' => 31,
                     'period' => $this->request->get('period', 'AllTime'),
                     'periodMode' => 'published',
@@ -462,6 +462,12 @@ class CivitAIService
 
             // Return files with containers loaded
             return File::whereIn('referrer_url', $referrerUrls)
+                ->whereNull('seen_preview_at') // Exclude files that have been seen
+                ->whereNull('seen_file_at') // Exclude files that have been fully seen
+                ->where('loved', false) // Exclude loved files
+                ->where('liked', false) // Exclude liked files
+                ->where('disliked', false) // Exclude disliked files
+                ->where('funny', false) // Exclude funny files
                 ->with(['containers', 'metadata'])
                 ->get()
                 ->all();
