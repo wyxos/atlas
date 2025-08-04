@@ -3,6 +3,7 @@ import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { toast } from '@/components/ui/toast';
 
 interface Props {
     item: BrowseItem;
@@ -24,6 +25,14 @@ const emit = defineEmits<{
     contextmenu: [event: MouseEvent];
 }>();
 
+// Show loading toast when user tries to interact during loading
+const showLoadingToast = () => {
+    toast({
+        title: 'Hold on!',
+        description: 'We\'re loading content. Please wait a moment.',
+    });
+};
+
 const handleLeftClick = () => {
     // Navigate to single file view with preserved state
     emit('leftClick', props.item);
@@ -32,12 +41,23 @@ const handleLeftClick = () => {
 const handleAltClick = () => {
     if (!props.isLoading) {
         emit('altClick', props.item);
+    } else {
+        showLoadingToast();
     }
 };
 
 const handleAltRightClick = () => {
     if (!props.isLoading) {
         emit('altRightClick', props.item);
+    } else {
+        showLoadingToast();
+    }
+};
+
+// Show loading toast when reactions area is clicked during loading
+const handleReactionsAreaClick = () => {
+    if (props.isLoading) {
+        showLoadingToast();
     }
 };
 

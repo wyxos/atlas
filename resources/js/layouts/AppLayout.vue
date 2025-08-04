@@ -7,6 +7,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { MinusIcon, PlusIcon } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import { Toaster } from '@/components/ui/toast';
 
 const { show, options, currentContent, loading } = useContextMenu();
 const page = usePage();
@@ -115,6 +116,7 @@ function isInPlaylist(playlistId: number): boolean {
             </template>
         </context-menu>
     </AppLayout>
+    <Toaster />
 </template>
 
 <style scoped>

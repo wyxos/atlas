@@ -88,14 +88,18 @@ const removeItemFromView = async (item: IBrowseItem) => {
         // Check if we need to load more items after removal
         // Use a small delay to allow the masonry to update its internal state
         setTimeout(async () => {
-            // Check if there are no visible items left and more pages are available
-            if (masonryItems.value.length === 0 && paginationState.value.nextPage) {
-                // If auto next is enabled, trigger autocycle, otherwise just load next page
-                if (currentFilters.value.autoNext) {
-                    await autocycleUntilItems();
-                } else {
-                    await loadNext();
+            try {
+                // Check if there are no visible items left and more pages are available
+                if (masonryItems.value.length === 0 && paginationState.value.nextPage) {
+                    // If auto next is enabled, trigger autocycle, otherwise just load next page
+                    if (currentFilters.value.autoNext) {
+                        await autocycleUntilItems();
+                    } else {
+                        await loadNext();
+                    }
                 }
+            } catch (error) {
+                console.error('Error auto-loading after item removal:', error);
             }
         }, 500); // Small delay to allow masonry state to update
     }
@@ -232,22 +236,28 @@ const autocycleUntilItems = async (initialUnpreviewedCount: number = 0): Promise
             autocycleAttempts.value = attempts;
 
             if (masonry.value && typeof masonry.value.loadNext === 'function') {
-                // Get the response from loadNext which internally calls getPage
-                const response = await masonry.value.loadNext();
+                try {
+                    // Get the response from loadNext which internally calls getPage
+                    const response = await masonry.value.loadNext();
 
-                // Check the items from the API response, not the masonry items
-                if (response && response.items && response.items.length > 0) {
-                    const unpreviewedItems = response.items.filter((item) => item.seen_preview_at === null);
-                    totalUnpreviewedItems += unpreviewedItems.length;
+                    // Check the items from the API response, not the masonry items
+                    if (response && response.items && response.items.length > 0) {
+                        const unpreviewedItems = response.items.filter((item) => item.seen_preview_at === null);
+                        totalUnpreviewedItems += unpreviewedItems.length;
 
-                    // Continue cycling until we have enough unpreviewed items
-                    if (totalUnpreviewedItems >= targetUnpreviewedItems) {
-                        break; // Stop cycling, we have enough unpreviewed items
+                        // Continue cycling until we have enough unpreviewed items
+                        if (totalUnpreviewedItems >= targetUnpreviewedItems) {
+                            break; // Stop cycling, we have enough unpreviewed items
+                        }
+                        // Otherwise continue to next iteration
+                    } else {
+                        // If no items returned but nextPage still exists, continue
+                        // If no more pages, the while condition will break the loop
                     }
-                    // Otherwise continue to next iteration
-                } else {
-                    // If no items returned but nextPage still exists, continue
-                    // If no more pages, the while condition will break the loop
+                } catch (loadError) {
+                    console.error('Error loading next page during autocycle:', loadError);
+                    // Break the autocycle loop on error to avoid infinite retries
+                    break;
                 }
 
                 // Small delay to prevent overwhelming the API
@@ -257,7 +267,7 @@ const autocycleUntilItems = async (initialUnpreviewedCount: number = 0): Promise
             }
         }
     } catch (error) {
-        // Handle errors silently in production
+        console.error('Error in autocycleUntilItems:', error);
     } finally {
         isAutocycling.value = false;
     }
@@ -278,7 +288,7 @@ const getPage = async (pageParam: number | string) => {
         };
 
         // Use Inertia to fetch data
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             router.get(
                 route('browse.data', queryParams),
                 {},
@@ -317,17 +327,20 @@ const getPage = async (pageParam: number | string) => {
                                 nextPage: paginationState.value.nextPage,
                             });
                         } catch (error) {
-                            resolve({ items: [], nextPage: null });
+                            console.error('Error parsing response data:', error);
+                            reject(error);
                         }
                     },
                     onError: (errors) => {
-                        resolve({ items: [], nextPage: null });
+                        console.error('Error fetching page data:', errors);
+                        reject(new Error('Failed to fetch page data'));
                     },
                 },
             );
         });
     } catch (error) {
-        return { items: [], nextPage: null };
+        console.error('Error in getPage:', error);
+        throw error;
     }
 };
 
@@ -381,7 +394,11 @@ const applyFilters = () => {
 // Load next page of images
 const loadNext = async () => {
     if (masonry.value && typeof masonry.value.loadNext === 'function') {
-        await masonry.value.loadNext();
+        try {
+            await masonry.value.loadNext();
+        } catch (error) {
+            console.error('Error loading next page:', error);
+        }
     } else {
         console.warn('Masonry component not ready or loadNext function not available');
     }
