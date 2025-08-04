@@ -8,6 +8,7 @@ interface Props {
     item: BrowseItem;
     downloadProgress?: number;
     isDownloaded: boolean;
+    isLoading?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -29,11 +30,15 @@ const handleLeftClick = () => {
 };
 
 const handleAltClick = () => {
-    emit('altClick', props.item);
+    if (!props.isLoading) {
+        emit('altClick', props.item);
+    }
 };
 
 const handleAltRightClick = () => {
-    emit('altRightClick', props.item);
+    if (!props.isLoading) {
+        emit('altRightClick', props.item);
+    }
 };
 
 // Utility function to detect if the file is a video based on its URL
@@ -138,7 +143,7 @@ const handleVideoCompleted = () => {
 </script>
 
 <template>
-    <div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
+    <div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && !isLoading && $emit('contextmenu', event)">
         <!-- Media container with fixed imageHeight -->
         <div>
             <!-- Image element for image files -->
@@ -188,15 +193,17 @@ const handleVideoCompleted = () => {
 
         <!-- Footer area for reactions -->
         <div class="absolute right-0 bottom-0 left-0 flex items-center justify-end p-2" style="height: 32px">
-            <FileReactions
-                :file="item"
-                :icon-size="16"
-                variant="list"
-                @dislike="(file, event) => $emit('dislike', item, event)"
-                @favorite="(file, event) => $emit('favorite', item, event)"
-                @laughedAt="(file, event) => $emit('laughedAt', item, event)"
-                @like="(file, event) => $emit('like', item, event)"
-            />
+            <div :class="isLoading && 'pointer-events-none'">
+                <FileReactions
+                    :file="item"
+                    :icon-size="16"
+                    variant="list"
+                    @dislike="(file, event) => $emit('dislike', item, event)"
+                    @favorite="(file, event) => $emit('favorite', item, event)"
+                    @laughedAt="(file, event) => $emit('laughedAt', item, event)"
+                    @like="(file, event) => $emit('like', item, event)"
+                />
+            </div>
         </div>
 
         <!-- Download progress bar - positioned at bottom of image area -->

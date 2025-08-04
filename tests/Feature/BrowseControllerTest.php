@@ -46,7 +46,7 @@ it('can access browse page', function () {
         ->has('filters')
         ->where('filters.page', 1) // First page is 1
         ->where('filters.nextPage', 'next_cursor_token')
-        ->where('filters.sort', 'Most Reactions')
+        ->where('filters.sort', 'Newest')
         ->where('filters.period', 'AllTime')
         ->where('filters.limit', 40)
         ->where('filters.nsfw', false)

@@ -469,22 +469,21 @@ watch(
                     class="h-full"
                 >
                     <template #item="{ item }">
-                        <div :class="(masonry?.isLoading || isAutocycling) && 'pointer-events-none'" class="h-full">
-                            <BrowseItem
-                                :download-progress="downloadProgress[item.id]"
-                                :is-downloaded="downloadedItems.has(item.id)"
-                                :item="item"
-                                :page-size="currentFilters.limit"
-                                @contextmenu="(event) => handleRightClick(event, item)"
-                                @dislike="handleItemDislike"
-                                @favorite="handleItemFavorite"
-                                @like="handleItemLike"
-                                @laughed-at="handleItemLaughedAt"
-                                @alt-click="handleAltClick"
-                                @alt-right-click="handleAltRightClick"
-                                @left-click="handleLeftClick"
-                            />
-                        </div>
+                        <BrowseItem
+                            :download-progress="downloadProgress[item.id]"
+                            :is-downloaded="downloadedItems.has(item.id)"
+                            :item="item"
+                            :page-size="currentFilters.limit"
+                            :is-loading="masonry?.isLoading || isAutocycling"
+                            @contextmenu="(event) => handleRightClick(event, item)"
+                            @dislike="handleItemDislike"
+                            @favorite="handleItemFavorite"
+                            @like="handleItemLike"
+                            @laughed-at="handleItemLaughedAt"
+                            @alt-click="handleAltClick"
+                            @alt-right-click="handleAltRightClick"
+                            @left-click="handleLeftClick"
+                        />
                     </template>
                 </Masonry>
 
