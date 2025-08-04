@@ -423,6 +423,19 @@ const handleUndoBlacklist = async () => {
     }
 };
 
+// Handle mouse button navigation in full screen mode
+const handleMouseNavigation = (event: MouseEvent) => {
+    // Mouse button 3 = back button (previous)
+    // Mouse button 4 = forward button (next)
+    if (event.button === 3 && canGoPrevious.value) {
+        event.preventDefault();
+        goToPrevious();
+    } else if (event.button === 4 && canGoNext.value) {
+        event.preventDefault();
+        goToNext();
+    }
+};
+
 // Track full screen view status for marking as viewed
 const viewedFileIds = ref(new Set<number>());
 
@@ -531,6 +544,7 @@ watch(
             @keydown.escape="closeImageViewer"
             @keydown.left="goToPrevious"
             @keydown.right="goToNext"
+            @mousedown="handleMouseNavigation"
         >
             <!-- Top gutter -->
             <div class="flex h-16 flex-shrink-0 items-center justify-between px-4">
