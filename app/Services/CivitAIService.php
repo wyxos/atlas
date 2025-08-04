@@ -41,7 +41,7 @@ class CivitAIService
                 return $this->fetchPosts();
             case 'images':
             default:
-                return $this->fetchImages();
+                return $this->fetchFiles();
         }
     }
 
@@ -229,7 +229,7 @@ class CivitAIService
                 'elapsed' => ($step1Time - $startTime) * 1000 . 'ms'
             ]);
 
-            $result = $this->fetchPostItems($page, $limit);
+            $result = $this->fetchPostData($page, $limit);
 
             $step2Time = microtime(true);
             Log::info("[Timeout Tracker] Step 2: Transforming posts for database", [
@@ -239,7 +239,7 @@ class CivitAIService
                 'items_count' => count($result['items'] ?? [])
             ]);
 
-            $transformedItems = $this->transformPostsForDatabase($result['items']);
+            $transformedItems = $this->transformPostData($result['items']);
 
             $step3Time = microtime(true);
             Log::info("[Timeout Tracker] Step 3: Upserting post files", [
@@ -314,10 +314,10 @@ class CivitAIService
     }
 
     /**
-     * Fetch post items from CivitAI API using unified page parameter with retry logic.
+     * Fetch post data from CivitAI API using unified page parameter with retry logic.
      * @throws ConnectionException
      */
-    private function fetchPostItems($page, int $limit): array
+    private function fetchPostData($page, int $limit): array
     {
         $startTime = microtime(true);
         $url = "https://civitai.com/api/trpc/post.getInfinite";
@@ -419,7 +419,7 @@ class CivitAIService
                 $metadata = $data['result']['data']['json'] ?? [];
 
                 $totalDuration = (microtime(true) - $startTime) * 1000;
-                Log::info("[Timeout Tracker] fetchPostItems completed successfully", [
+                Log::info("[Timeout Tracker] fetchPostData completed successfully", [
                     'total_duration' => $totalDuration . 'ms',
                     'http_duration' => $httpDuration . 'ms',
                     'parse_duration' => $parseDuration . 'ms',
@@ -468,9 +468,9 @@ class CivitAIService
     }
 
     /**
-     * Transform CivitAI post items data to align with files and containers.
+     * Transform CivitAI post data to align with files and containers.
      */
-    private function transformPostsForDatabase(array $items): array
+    private function transformPostData(array $items): array
     {
         $transformedItems = collect($items)->map(function ($post) {
 
@@ -590,26 +590,26 @@ class CivitAIService
         $upsertedFiles = File::whereIn('referrer_url', $referrerUrls)->get()->keyBy('referrer_url');
 
         // Prepare container data for batch upsert
-//        $containerData = collect($transformedItems)->map(function ($item) {
-//            $data = $item['containerData'];
-//            $data['created_at'] = Carbon::now();
-//            $data['updated_at'] = Carbon::now();
-//            return $data;
-//        })->toArray();
+        $containerData = collect($transformedItems)->map(function ($item) {
+            $data = $item['containerData'];
+            $data['created_at'] = Carbon::now();
+            $data['updated_at'] = Carbon::now();
+            return $data;
+        })->toArray();
 
         // Batch upsert Container records
-//        Container::upsert(
-//            $containerData,
-//            ['source_id', 'source'], // Unique identifier columns
-//            ['type', 'referrer', 'updated_at'] // Columns to update on conflict
-//        );
+        Container::upsert(
+            $containerData,
+            ['source_id', 'source'], // Unique identifier columns
+            ['type', 'referrer', 'updated_at'] // Columns to update on conflict
+        );
 
         // Get upserted containers
-//        $containerSourceIds = collect($containerData)->pluck('source_id')->toArray();
-//        $upsertedContainers = Container::where('source', 'CivitAI')
-//            ->whereIn('source_id', $containerSourceIds)
-//            ->get()
-//            ->keyBy('source_id');
+        $containerSourceIds = collect($containerData)->pluck('source_id')->toArray();
+        $upsertedContainers = Container::where('source', 'CivitAI')
+            ->whereIn('source_id', $containerSourceIds)
+            ->get()
+            ->keyBy('source_id');
 
         // Prepare pivot data for container-file relationships
         $pivotData = [];
@@ -618,15 +618,15 @@ class CivitAIService
         foreach ($transformedItems as $item) {
             $file = $upsertedFiles->get($item['fileData']['referrer_url']);
             if ($file) {
-//                $container = $upsertedContainers->get($item['containerData']['source_id']);
-//                if ($container) {
-//                    $pivotData[] = [
-//                        'file_id' => $file->id,
-//                        'container_id' => $container->id,
-//                        'created_at' => Carbon::now(),
-//                        'updated_at' => Carbon::now()
-//                    ];
-//                }
+                $container = $upsertedContainers->get($item['containerData']['source_id']);
+                if ($container) {
+                    $pivotData[] = [
+                        'file_id' => $file->id,
+                        'container_id' => $container->id,
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now()
+                    ];
+                }
 
                 // Prepare metadata for batch upsert
                 if (isset($item['fileData']['_metadata'])) {
@@ -641,13 +641,13 @@ class CivitAIService
         }
 
         // Batch upsert pivot relationships (container_file)
-//        if (!empty($pivotData)) {
-//            DB::table('container_file')->upsert(
-//                $pivotData,
-//                ['file_id', 'container_id'], // Unique identifier columns
-//                ['updated_at'] // Columns to update on conflict
-//            );
-//        }
+        if (!empty($pivotData)) {
+            DB::table('container_file')->upsert(
+                $pivotData,
+                ['file_id', 'container_id'], // Unique identifier columns
+                ['updated_at'] // Columns to update on conflict
+            );
+        }
 
         // Batch upsert FileMetadata records
         if (!empty($metadataData)) {
@@ -740,31 +740,31 @@ class CivitAIService
     }
 
     /**
-     * Fetch and transform CivitAI images for the browse page.
+     * Fetch and transform CivitAI files (images/videos) for the browse page.
      */
-    public function fetchImages(): array
+    public function fetchFiles(): array
     {
         // Get the unified 'page' parameter - could be cursor or page number
         $page = $this->request->get('page', 1);
         $limit = (int)$this->request->get('limit', 40);
 
-        $result = $this->fetchItems($page, $limit);
-        $transformedItems = $this->transformItems($result['items']);
+        $result = $this->fetchFileData($page, $limit);
+        $transformedItems = $this->transformFileData($result['items']);
 
         // Upsert items as File instances
         $files = $this->upsertFiles($transformedItems);
 
         // Format for UI display
-        $uiItems = $this->formatForUI($files, $page);
+        $uiItems = $this->formatFilesForUI($files, $page);
 
-        return $this->transformResponse($result, $uiItems, $page);
+        return $this->transformFilesResponse($result, $uiItems, $page);
     }
 
     /**
-     * Fetch images from CivitAI API using unified page parameter.
+     * Fetch file data from CivitAI API using unified page parameter.
      * @throws ConnectionException
      */
-    private function fetchItems($page, int $limit): array
+    private function fetchFileData($page, int $limit): array
     {
         $params = [
             'limit' => $limit,
@@ -809,9 +809,9 @@ class CivitAIService
     }
 
     /**
-     * Transform CivitAI items data to align with files table schema.
+     * Transform CivitAI file data to align with files table schema.
      */
-    private function transformItems(array $items): array
+    private function transformFileData(array $items): array
     {
         $transformedItems = [];
 
@@ -946,7 +946,7 @@ class CivitAIService
     /**
      * Format File instances for UI display.
      */
-    private function formatForUI(array $files, $currentPage): array
+    private function formatFilesForUI(array $files, $currentPage): array
     {
         $uiItems = [];
         $pageIdentifier = $currentPage ?: null;
@@ -975,9 +975,9 @@ class CivitAIService
     }
 
     /**
-     * Transform the response from fetchItems into the final format for the frontend.
+     * Transform the response from fetchFileData into the final format for the frontend.
      */
-    private function transformResponse(array $result, array $transformedItems, $currentPage): array
+    private function transformFilesResponse(array $result, array $transformedItems, $currentPage): array
     {
         $hasNextPage = !empty($result['metadata']['nextCursor']);
         $nextPage = $hasNextPage ? $result['metadata']['nextCursor'] : null;

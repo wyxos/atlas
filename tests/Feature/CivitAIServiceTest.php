@@ -221,9 +221,7 @@ it('fetches and transforms posts correctly from CivitAI API', function () {
                                 ]
                             ]
                         ],
-                        'meta' => [
-                            'nextCursor' => 'next_cursor_token'
-                        ]
+                        'nextCursor' => 'next_cursor_token'
                     ]
                 ]
             ]
@@ -288,9 +286,7 @@ it('handles posts cursor-based pagination correctly', function () {
                                 ]
                             ]
                         ],
-                        'meta' => [
-                            'nextCursor' => 'new_cursor_token'
-                        ]
+                        'nextCursor' => 'new_cursor_token'
                     ]
                 ]
             ]
@@ -395,7 +391,7 @@ it('handles posts API errors gracefully', function () {
     $request = new Request(['container' => 'posts', 'page' => 1]);
     $service = new CivitAIService($request);
 
-    expect(fn() => $service->fetch())->toThrow(Exception::class, 'CivitAI API request failed: 500');
+    expect(fn() => $service->fetch())->toThrow(Exception::class, 'CivitAI API request failed after 3 attempts:');
 });
 
 it('handles empty posts response', function () {
