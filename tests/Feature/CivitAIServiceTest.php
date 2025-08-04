@@ -257,7 +257,7 @@ it('fetches and transforms posts correctly from CivitAI API', function () {
         $input = json_decode($request->data()['input'], true);
         return str_contains($request->url(), 'civitai.com/api/trpc/post.getInfinite') &&
                $input['json']['browsingLevel'] === 31 &&
-               $input['json']['period'] === 'Week' &&
+               $input['json']['period'] === 'AllTime' &&
                $input['json']['sort'] === 'Newest' &&
                !isset($input['json']['cursor']); // First page should not have cursor
     });

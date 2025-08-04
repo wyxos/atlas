@@ -332,7 +332,7 @@ class CivitAIService
                     'browsingLevel' => 31,
                     'period' => $this->request->get('period', 'AllTime'),
                     'periodMode' => 'published',
-                    'sort' => $this->request->get('sort', 'Most Reactions'),
+                    'sort' => $this->request->get('sort', 'Newest'),
                     'include' => [],
                     'excludedTagIds' => [],
                     'disablePoi' => true,
@@ -729,7 +729,7 @@ class CivitAIService
             'filters' => [
                 'page' => $currentPage ?? 1, // Current page value (cursor or null for first page)
                 'nextPage' => $nextPage, // Next page value (cursor or null if no more)
-                'sort' => $this->request->get('sort', 'Most Reactions'),
+                'sort' => $this->request->get('sort', 'Newest'),
                 'period' => $this->request->get('period', 'AllTime'),
                 'limit' => (int)$this->request->get('limit', 40), // Items per page
                 'nsfw' => $this->request->boolean('nsfw', false),
@@ -987,7 +987,7 @@ class CivitAIService
             'filters' => [
                 'page' => $currentPage ?? 1, // Current page value (cursor or null for first page)
                 'nextPage' => $nextPage, // Next page value (cursor or null if no more)
-                'sort' => $this->request->get('sort', 'Most Reactions'),
+                'sort' => $this->request->get('sort', 'Newest'),
                 'period' => $this->request->get('period', 'AllTime'),
                 'limit' => (int)$this->request->get('limit', 40), // Items per page
                 'nsfw' => $this->request->boolean('nsfw', false),
