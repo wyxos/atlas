@@ -201,6 +201,10 @@ class CivitAIService
      */
     public function fetchPosts(): array
     {
+        // Extend execution time for CivitAI posts since their API can be slow
+        $originalTimeLimit = ini_get('max_execution_time');
+        set_time_limit(120); // 2 minutes for CivitAI posts
+        
         $startTime = microtime(true);
         $container = 'posts';
         $requestId = uniqid('posts_', true);
@@ -209,7 +213,9 @@ class CivitAIService
             'request_id' => $requestId,
             'container' => $container,
             'start_time' => $startTime,
-            'params' => $this->request->all()
+            'params' => $this->request->all(),
+            'original_time_limit' => $originalTimeLimit,
+            'extended_time_limit' => 120
         ]);
 
         try {
@@ -294,17 +300,30 @@ class CivitAIService
             ]);
 
             throw $e;
+        } finally {
+            // Restore original time limit
+            if ($originalTimeLimit !== false) {
+                set_time_limit((int)$originalTimeLimit);
+            }
+            
+            Log::debug("[Timeout Tracker] Execution time limit restored", [
+                'request_id' => $requestId ?? 'unknown',
+                'restored_limit' => $originalTimeLimit
+            ]);
         }
     }
 
     /**
-     * Fetch post items from CivitAI API using unified page parameter.
+     * Fetch post items from CivitAI API using unified page parameter with retry logic.
      * @throws ConnectionException
      */
     private function fetchPostItems($page, int $limit): array
     {
         $startTime = microtime(true);
         $url = "https://civitai.com/api/trpc/post.getInfinite";
+        $maxRetries = 3;
+        $timeoutSeconds = 25; // Keep under PHP's max_execution_time
+        $retryDelay = 2; // seconds
 
         $queryParams = [
             'input' => json_encode([
@@ -333,53 +352,119 @@ class CivitAIService
             'url' => $url,
             'params_size' => strlen(json_encode($queryParams)),
             'page' => $page,
-            'limit' => $limit
+            'limit' => $limit,
+            'timeout' => $timeoutSeconds,
+            'max_retries' => $maxRetries
         ]);
 
-        $httpStartTime = microtime(true);
-        $response = Http::timeout(120)->get($url, $queryParams);
-        $httpEndTime = microtime(true);
-        $httpDuration = ($httpEndTime - $httpStartTime) * 1000;
+        $lastException = null;
+        
+        // Retry loop
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $httpStartTime = microtime(true);
+                
+                Log::info("[Timeout Tracker] HTTP request attempt", [
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxRetries
+                ]);
+                
+                // Use shorter timeout to stay within PHP's execution limit
+                $response = Http::timeout($timeoutSeconds)
+                    ->connectTimeout(10)
+                    ->retry(1, 1000) // Built-in retry for connection issues
+                    ->get($url, $queryParams);
+                    
+                $httpEndTime = microtime(true);
+                $httpDuration = ($httpEndTime - $httpStartTime) * 1000;
 
-        Log::info("[Timeout Tracker] HTTP request completed", [
-            'http_duration' => $httpDuration . 'ms',
-            'status_code' => $response->status(),
-            'response_size' => strlen($response->body())
-        ]);
+                Log::info("[Timeout Tracker] HTTP request completed", [
+                    'attempt' => $attempt,
+                    'http_duration' => $httpDuration . 'ms',
+                    'status_code' => $response->status(),
+                    'response_size' => strlen($response->body())
+                ]);
 
-        if (!$response->successful()) {
-            Log::error("[Timeout Tracker] CivitAI API request failed", [
-                'status_code' => $response->status(),
-                'response_body' => $response->body(),
-                'http_duration' => $httpDuration . 'ms'
-            ]);
-            throw new Exception('CivitAI API request failed: ' . $response->status());
+                // Handle different types of failures
+                if ($response->status() === 504 || $response->status() === 502) {
+                    throw new Exception("CivitAI gateway timeout (HTTP {$response->status()})");
+                }
+                
+                if ($response->status() === 503) {
+                    throw new Exception("CivitAI service unavailable (HTTP 503)");
+                }
+                
+                if (!$response->successful()) {
+                    Log::error("[Timeout Tracker] CivitAI API request failed", [
+                        'attempt' => $attempt,
+                        'status_code' => $response->status(),
+                        'response_body' => substr($response->body(), 0, 500), // Limit log size
+                        'http_duration' => $httpDuration . 'ms'
+                    ]);
+                    throw new Exception("CivitAI API request failed: HTTP {$response->status()}");
+                }
+
+                // Success - parse the response
+                $parseStartTime = microtime(true);
+                $data = $response->json();
+                $parseEndTime = microtime(true);
+                $parseDuration = ($parseEndTime - $parseStartTime) * 1000;
+
+                Log::info("[Timeout Tracker] JSON parsing completed", [
+                    'attempt' => $attempt,
+                    'parse_duration' => $parseDuration . 'ms',
+                    'items_count' => count($data['result']['data']['json']['items'] ?? [])
+                ]);
+
+                $metadata = $data['result']['data']['json'] ?? [];
+
+                $totalDuration = (microtime(true) - $startTime) * 1000;
+                Log::info("[Timeout Tracker] fetchPostItems completed successfully", [
+                    'total_duration' => $totalDuration . 'ms',
+                    'http_duration' => $httpDuration . 'ms',
+                    'parse_duration' => $parseDuration . 'ms',
+                    'successful_attempt' => $attempt
+                ]);
+
+                return [
+                    'items' => $data['result']['data']['json']['items'] ?? [],
+                    'metadata' => $metadata,
+                    'currentPage' => $page,
+                ];
+                
+            } catch (Exception $e) {
+                $lastException = $e;
+                $errorDuration = (microtime(true) - $httpStartTime) * 1000;
+                
+                Log::warning("[Timeout Tracker] HTTP request attempt failed", [
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxRetries,
+                    'error' => $e->getMessage(),
+                    'error_duration' => $errorDuration . 'ms',
+                    'will_retry' => $attempt < $maxRetries
+                ]);
+                
+                // If this was the last attempt, don't sleep
+                if ($attempt < $maxRetries) {
+                    Log::info("[Timeout Tracker] Waiting before retry", [
+                        'retry_delay' => $retryDelay . 's',
+                        'next_attempt' => $attempt + 1
+                    ]);
+                    sleep($retryDelay);
+                    $retryDelay *= 2; // Exponential backoff
+                }
+            }
         }
-
-        $parseStartTime = microtime(true);
-        $data = $response->json();
-        $parseEndTime = microtime(true);
-        $parseDuration = ($parseEndTime - $parseStartTime) * 1000;
-
-        Log::info("[Timeout Tracker] JSON parsing completed", [
-            'parse_duration' => $parseDuration . 'ms',
-            'items_count' => count($data['result']['data']['json']['items'] ?? [])
-        ]);
-
-        $metadata = $data['result']['data']['json'] ?? [];
-
+        
+        // All attempts failed
         $totalDuration = (microtime(true) - $startTime) * 1000;
-        Log::info("[Timeout Tracker] fetchPostItems completed", [
+        Log::error("[Timeout Tracker] All HTTP request attempts failed", [
+            'total_attempts' => $maxRetries,
             'total_duration' => $totalDuration . 'ms',
-            'http_duration' => $httpDuration . 'ms',
-            'parse_duration' => $parseDuration . 'ms'
+            'final_error' => $lastException->getMessage()
         ]);
-
-        return [
-            'items' => $data['result']['data']['json']['items'] ?? [],
-            'metadata' => $metadata,
-            'currentPage' => $page,
-        ];
+        
+        throw new Exception("CivitAI API request failed after {$maxRetries} attempts: " . $lastException->getMessage());
     }
 
     /**
