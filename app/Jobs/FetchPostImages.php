@@ -28,15 +28,33 @@ class FetchPostImages implements ShouldQueue
     public function handle(): void
     {
         try {
-            // check for container of type post associated to the file
+            // Check if the file has a post_id in metadata but no container
+            $metadata = $this->file->metadata?->payload ?? [];
+            if (is_string($metadata)) {
+                $metadata = json_decode($metadata, true) ?? [];
+            }
+
+            $postId = $metadata['data']['postId'] ?? null;
+
             $postContainer = $this->file->containers()->where('type', 'post')->first();
-            
+
+            // Create a container if it doesn't exist
+            if (!$postContainer && $postId) {
+                $postContainer = Container::create([
+                    'type' => 'post',
+                    'source' => 'CivitAI',
+                    'source_id' => $postId,
+                    'referrer' => "https://civitai.com/posts/{$postId}",
+                ]);
+
+                // Link the new container with the file
+                $this->file->containers()->attach($postContainer);
+            }
+
+            // If the container still doesn't exist and there's no postId, exit
             if (!$postContainer) {
                 return;
             }
-
-            // retrieve the source_id of the container
-            $postId = $postContainer->source_id;
 
             // use the fetchItems logic from CivitAIService as reference, and perform a get request to retrieve items, but pass the post_id
             $images = $this->fetchPostImages($postId);
