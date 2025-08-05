@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\FetchPostImages;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
@@ -509,6 +510,15 @@ class CivitAIService
             ->with('metadata')
             ->whereIn('referrer_url', $referrerUrls)
             ->get();
+
+        // Temporarily disabled: Dispatch FetchPostImages job for all files that aren't blacklisted
+        // $delay = 0;
+        // foreach ($allFiles as $file) {
+        //     if (!$file->is_blacklisted) {
+        //         FetchPostImages::dispatch($file)->delay(now()->addSeconds($delay));
+        //         $delay += 5; // 5 second delay between each job
+        //     }
+        // }
 
         // Apply filters in memory for better performance
         return $allFiles->filter(function ($file) {
