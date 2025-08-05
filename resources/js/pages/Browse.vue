@@ -496,7 +496,7 @@ watch(
                     v-model:items="masonryItems"
                     :get-next-page="getPage"
                     :layout="{
-                        sizes: { base: 1, sm: 2, md: 3, lg: 3, xl: 5, '2xl': 6 },
+                        sizes: { base: 1, sm: 2, md: 3, lg: 3, xl: 5, '2xl': 8 },
                         footer: 32,
                     }"
                     :load-at-page="props.filters.page"

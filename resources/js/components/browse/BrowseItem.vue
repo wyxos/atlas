@@ -3,7 +3,6 @@ import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { toast } from '@/components/ui/toast';
 
 interface Props {
     item: BrowseItem;
@@ -25,13 +24,6 @@ const emit = defineEmits<{
     contextmenu: [event: MouseEvent];
 }>();
 
-// Show loading toast when user tries to interact during loading
-const showLoadingToast = () => {
-    toast({
-        title: 'Hold on!',
-        description: 'We\'re loading content. Please wait a moment.',
-    });
-};
 
 const handleLeftClick = () => {
     // Navigate to single file view with preserved state
@@ -39,27 +31,13 @@ const handleLeftClick = () => {
 };
 
 const handleAltClick = () => {
-    if (!props.isLoading) {
-        emit('altClick', props.item);
-    } else {
-        showLoadingToast();
-    }
+    emit('altClick', props.item);
 };
 
 const handleAltRightClick = () => {
-    if (!props.isLoading) {
-        emit('altRightClick', props.item);
-    } else {
-        showLoadingToast();
-    }
+    emit('altRightClick', props.item);
 };
 
-// Show loading toast when reactions area is clicked during loading
-const handleReactionsAreaClick = () => {
-    if (props.isLoading) {
-        showLoadingToast();
-    }
-};
 
 // Utility function to detect if the file is a video based on its URL
 const isVideo = computed(() => {
@@ -188,7 +166,7 @@ const handleVideoCompleted = () => {
 </script>
 
 <template>
-    <div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && !isLoading && $emit('contextmenu', event)">
+    <div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
         <!-- Media container with fixed imageHeight -->
         <div>
             <!-- Image element for image files -->
@@ -238,7 +216,7 @@ const handleVideoCompleted = () => {
 
         <!-- Footer area for reactions -->
         <div class="absolute right-0 bottom-0 left-0 flex items-center justify-end p-2" style="height: 32px">
-            <div :class="isLoading && 'pointer-events-none'">
+            <div>
                 <FileReactions
                     :file="item"
                     :icon-size="16"

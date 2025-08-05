@@ -56,6 +56,11 @@ class FetchPostImages implements ShouldQueue
                 return;
             }
 
+            // Get the final postId from either metadata or container
+            if (!$postId) {
+                $postId = $postContainer->source_id;
+            }
+
             // use the fetchItems logic from CivitAIService as reference, and perform a get request to retrieve items, but pass the post_id
             $images = $this->fetchPostImages($postId);
 
