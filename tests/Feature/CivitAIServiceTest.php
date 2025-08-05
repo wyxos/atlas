@@ -243,18 +243,13 @@ it('fetches and transforms posts correctly from CivitAI API', function () {
     expect($item['original'])->toContain('original=true,quality=90');
     expect($item['width'])->toBe(768);
     expect($item['height'])->toBe(1024);
-    expect($item['container'])->toBeArray();
-    
-    // Verify that the container relationship is loaded
-    if (!empty($item['container'])) {
-        expect($item['container']['source'])->toBe('CivitAI');
-        expect($item['container']['source_id'])->toBe('123456');
-        expect($item['container']['referrer'])->toBe('https://civitai.com/posts/123456');
-    }
+    // Container field has been removed from the response array
 
     // Verify that the API was called correctly
     Http::assertSent(function ($request) {
-        $input = json_decode($request->data()['input'], true);
+        $data = $request->data();
+        if (!isset($data['input'])) return false;
+        $input = json_decode($data['input'], true);
         return str_contains($request->url(), 'civitai.com/api/trpc/post.getInfinite') &&
                $input['json']['browsingLevel'] === 31 &&
                $input['json']['period'] === 'AllTime' &&
@@ -303,11 +298,13 @@ it('handles posts cursor-based pagination correctly', function () {
 
     $item = $result['items'][0];
     expect($item['page'])->toBe('existing_cursor_token');
-    expect($item['container'])->toBeArray();
+    // Container field has been removed from the response array
 
     // Verify cursor-based API call
     Http::assertSent(function ($request) {
-        $input = json_decode($request->data()['input'], true);
+        $data = $request->data();
+        if (!isset($data['input'])) return false;
+        $input = json_decode($data['input'], true);
         return $input['json']['cursor'] === 'existing_cursor_token';
     });
 });

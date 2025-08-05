@@ -15,7 +15,7 @@ class FetchPostImagesJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_job_is_not_dispatched_when_fetching_posts()
+    public function test_job_is_dispatched_when_fetching_posts()
     {
         Queue::fake();
 
@@ -50,16 +50,16 @@ class FetchPostImagesJobTest extends TestCase
 
         // Create a mock request for posts
         $request = \Illuminate\Http\Request::create('/', 'GET', ['container' => 'posts']);
-        
+
         // Test CivitAIService directly
         $service = new \App\Services\CivitAIService($request);
         $result = $service->fetchPosts();
-        
+
         // Assert that the service worked
         $this->assertNotEmpty($result);
-        
-        // Assert that FetchPostImages job was NOT dispatched
-        Queue::assertNotPushed(FetchPostImages::class);
+
+        // Assert that FetchPostImages job was dispatched
+        Queue::assertPushed(FetchPostImages::class);
     }
 
     public function test_fetch_post_images_job_execution()
@@ -173,17 +173,17 @@ class FetchPostImagesJobTest extends TestCase
 
         // Execute the job - should handle API failure gracefully
         $job = new FetchPostImages($file);
-        
+
         // The job should fail gracefully without throwing an uncaught exception
         // We expect it to call $this->fail() internally, which in test context just returns
         $job->handle();
-        
+
         // Since the API call failed, no new files should be created
         $this->assertDatabaseMissing('files', [
             'source_id' => '789',
             'source' => 'CivitAI',
         ]);
-        
+
         // Verify the API was called
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'civitai.com/api/v1/images');

@@ -116,9 +116,9 @@ const isElementInViewport = (el) => {
     );
 };
 
-// Handle marking as seen when preview is loaded
+// Handle marking as seen when preview is loaded (but only if fully visible)
 const handlePreviewLoaded = () => {
-    if (!props.item.seen_preview_at && !hasMarkedPreview.value) {
+    if (!props.item.seen_preview_at && !hasMarkedPreview.value && isFullyVisible.value) {
         hasMarkedPreview.value = true;
         markAsSeen(props.item.id, 'preview');
     }
@@ -126,36 +126,61 @@ const handlePreviewLoaded = () => {
 
 // Lazy loading state
 const isInViewport = ref(false);
+const isFullyVisible = ref(false);
 
 // Observer for lazy loading
-let observer;
+let lazyLoadObserver;
+// Observer for full visibility tracking
+let visibilityObserver;
 
 onMounted(() => {
-    const options = { root: null, rootMargin: '50px', threshold: 0.1 };
-    observer = new IntersectionObserver((entries) => {
+    // Lazy loading observer - loads content when partially visible
+    const lazyLoadOptions = { root: null, rootMargin: '50px', threshold: 0.1 };
+    lazyLoadObserver = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
             if (entry.isIntersecting) {
                 isInViewport.value = true;
-                observer.unobserve(entry.target);
+                lazyLoadObserver.unobserve(entry.target);
             }
         });
-    }, options);
+    }, lazyLoadOptions);
+
+    // Full visibility observer - marks as seen when fully visible
+    const visibilityOptions = { root: null, rootMargin: '0px', threshold: 1.0 };
+    visibilityObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting && entry.intersectionRatio >= 1.0) {
+                isFullyVisible.value = true;
+                // If content is already loaded and now fully visible, mark as seen
+                if (isInViewport.value && !props.item.seen_preview_at && !hasMarkedPreview.value) {
+                    hasMarkedPreview.value = true;
+                    markAsSeen(props.item.id, 'preview');
+                }
+            } else {
+                isFullyVisible.value = false;
+            }
+        });
+    }, visibilityOptions);
 
     const element = document.getElementById(`browse-item-${props.item.id}`);
     if (element) {
-        observer.observe(element);
+        lazyLoadObserver.observe(element);
+        visibilityObserver.observe(element);
     }
 });
 
 onUnmounted(() => {
-    if (observer) {
-        observer.disconnect();
+    if (lazyLoadObserver) {
+        lazyLoadObserver.disconnect();
+    }
+    if (visibilityObserver) {
+        visibilityObserver.disconnect();
     }
 });
 
-// Handle marking as seen when video completes (for videos only)
+// Handle marking as seen when video completes (for videos only) - but only if fully visible
 const handleVideoCompleted = () => {
-    if (!props.item.seen_preview_at && !hasMarkedPreview.value) {
+    if (!props.item.seen_preview_at && !hasMarkedPreview.value && isFullyVisible.value) {
         hasMarkedPreview.value = true;
         markAsSeen(props.item.id, 'preview');
     }

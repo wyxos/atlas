@@ -51,7 +51,7 @@ class CivitAIService
         // Extend execution time for CivitAI posts since their API can be slow
         $originalTimeLimit = ini_get('max_execution_time');
         set_time_limit(120); // 2 minutes for CivitAI posts
-        
+
         $startTime = microtime(true);
         $container = 'posts';
         $requestId = uniqid('posts_', true);
@@ -152,7 +152,7 @@ class CivitAIService
             if ($originalTimeLimit !== false) {
                 set_time_limit((int)$originalTimeLimit);
             }
-            
+
             Log::debug("[Timeout Tracker] Execution time limit restored", [
                 'request_id' => $requestId ?? 'unknown',
                 'restored_limit' => $originalTimeLimit
@@ -205,23 +205,23 @@ class CivitAIService
         ]);
 
         $lastException = null;
-        
+
         // Retry loop
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
                 $httpStartTime = microtime(true);
-                
+
                 Log::info("[Timeout Tracker] HTTP request attempt", [
                     'attempt' => $attempt,
                     'max_attempts' => $maxRetries
                 ]);
-                
+
                 // Use shorter timeout to stay within PHP's execution limit
                 $response = Http::timeout($timeoutSeconds)
                     ->connectTimeout(10)
                     ->retry(1, 1000) // Built-in retry for connection issues
                     ->get($url, $queryParams);
-                    
+
                 $httpEndTime = microtime(true);
                 $httpDuration = ($httpEndTime - $httpStartTime) * 1000;
 
@@ -236,11 +236,11 @@ class CivitAIService
                 if ($response->status() === 504 || $response->status() === 502) {
                     throw new Exception("CivitAI gateway timeout (HTTP {$response->status()})");
                 }
-                
+
                 if ($response->status() === 503) {
                     throw new Exception("CivitAI service unavailable (HTTP 503)");
                 }
-                
+
                 if (!$response->successful()) {
                     Log::error("[Timeout Tracker] CivitAI API request failed", [
                         'attempt' => $attempt,
@@ -278,11 +278,11 @@ class CivitAIService
                     'metadata' => $metadata,
                     'currentPage' => $page,
                 ];
-                
+
             } catch (Exception $e) {
                 $lastException = $e;
                 $errorDuration = (microtime(true) - $httpStartTime) * 1000;
-                
+
                 Log::warning("[Timeout Tracker] HTTP request attempt failed", [
                     'attempt' => $attempt,
                     'max_attempts' => $maxRetries,
@@ -290,7 +290,7 @@ class CivitAIService
                     'error_duration' => $errorDuration . 'ms',
                     'will_retry' => $attempt < $maxRetries
                 ]);
-                
+
                 // If this was the last attempt, don't sleep
                 if ($attempt < $maxRetries) {
                     Log::info("[Timeout Tracker] Waiting before retry", [
@@ -302,7 +302,7 @@ class CivitAIService
                 }
             }
         }
-        
+
         // All attempts failed
         $totalDuration = (microtime(true) - $startTime) * 1000;
         Log::error("[Timeout Tracker] All HTTP request attempts failed", [
@@ -310,7 +310,7 @@ class CivitAIService
             'total_duration' => $totalDuration . 'ms',
             'final_error' => $lastException->getMessage()
         ]);
-        
+
         throw new Exception("CivitAI API request failed after {$maxRetries} attempts: " . $lastException->getMessage());
     }
 
@@ -511,14 +511,14 @@ class CivitAIService
             ->whereIn('referrer_url', $referrerUrls)
             ->get();
 
-        // Temporarily disabled: Dispatch FetchPostImages job for all files that aren't blacklisted
-        // $delay = 0;
-        // foreach ($allFiles as $file) {
-        //     if (!$file->is_blacklisted) {
-        //         FetchPostImages::dispatch($file)->delay(now()->addSeconds($delay));
-        //         $delay += 5; // 5 second delay between each job
-        //     }
-        // }
+        // Dispatch FetchPostImages job for all files that aren't blacklisted
+        $delay = 0;
+        foreach ($allFiles as $file) {
+            if (!$file->is_blacklisted) {
+                FetchPostImages::dispatch($file)->delay(now()->addSeconds($delay));
+                $delay += 5; // 5 second delay between each job
+            }
+        }
 
         // Apply filters in memory for better performance
         return $allFiles->filter(function ($file) {
