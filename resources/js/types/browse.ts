@@ -13,6 +13,7 @@ export interface BrowseItem {
     imageHeight?: number;
     seen_preview_at?: string | null;
     seen_file_at?: string | null;
+    metadata?: any;
 }
 
 export interface BrowseFilters {

@@ -523,7 +523,7 @@ class CivitAIService
     }
 
     /**
-     * Format File instances for UI display with container relationship loaded.
+     * Format File instances for UI display with metadata.
      */
     private function formatPostsForUI(array $files, $currentPage): array
     {
@@ -537,10 +537,6 @@ class CivitAIService
                 $metadata = json_decode($metadata, true) ?? [];
             }
 
-            // Format container as array
-            $container = $file->containers->first();
-            $containerData = $container ? $container->toArray() : [];
-
             $uiItems[] = [
                 'id' => $file->id,
                 'src' => $file->thumbnail_url,
@@ -549,7 +545,7 @@ class CivitAIService
                 'height' => $metadata['height'] ?? null,
                 'page' => $pageIdentifier,
                 'index' => $index,
-                'container' => $containerData,
+                'metadata' => $metadata,
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
@@ -798,7 +794,11 @@ class CivitAIService
         $pageIdentifier = $currentPage ?: null;
 
         foreach ($files as $index => $file) {
+            // Decode metadata payload if it's a JSON string
             $metadata = $file->metadata?->payload ?? [];
+            if (is_string($metadata)) {
+                $metadata = json_decode($metadata, true) ?? [];
+            }
 
             $uiItems[] = [
                 'id' => $file->id,
@@ -808,6 +808,7 @@ class CivitAIService
                 'height' => $metadata['height'] ?? null,
                 'page' => $pageIdentifier,
                 'index' => $index,
+                'metadata' => $metadata,
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,

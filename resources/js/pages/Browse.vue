@@ -256,6 +256,8 @@ const autocycleUntilItems = async (initialUnpreviewedCount: number = 0): Promise
                     }
                 } catch (loadError) {
                     console.error('Error loading next page during autocycle:', loadError);
+                    // Set autoNext to false if loadNext fails during autocycle
+                    currentFilters.value.autoNext = false;
                     // Break the autocycle loop on error to avoid infinite retries
                     break;
                 }
@@ -340,7 +342,8 @@ const getPage = async (pageParam: number | string) => {
         });
     } catch (error) {
         console.error('Error in getPage:', error);
-        throw error;
+        // Explicitly throw the error
+        throw new Error('Failed to load page data.');
     }
 };
 
@@ -398,6 +401,8 @@ const loadNext = async () => {
             await masonry.value.loadNext();
         } catch (error) {
             console.error('Error loading next page:', error);
+            // Set autoNext to false if loadNext fails
+            currentFilters.value.autoNext = false;
         }
     } else {
         console.warn('Masonry component not ready or loadNext function not available');
@@ -502,9 +507,9 @@ watch(
                         <BrowseItem
                             :download-progress="downloadProgress[item.id]"
                             :is-downloaded="downloadedItems.has(item.id)"
+                            :is-loading="masonry?.isLoading || isAutocycling"
                             :item="item"
                             :page-size="currentFilters.limit"
-                            :is-loading="masonry?.isLoading || isAutocycling"
                             @contextmenu="(event) => handleRightClick(event, item)"
                             @dislike="handleItemDislike"
                             @favorite="handleItemFavorite"
@@ -538,143 +543,157 @@ watch(
         <!-- Full Screen Media Viewer Modal -->
         <div
             v-if="isImageViewerOpen"
-            class="fixed inset-0 z-50 flex flex-col bg-black/90"
+            class="fixed inset-0 z-50 flex bg-black/90"
             tabindex="0"
             @click="closeImageViewer"
+            @mousedown="handleMouseNavigation"
             @keydown.escape="closeImageViewer"
             @keydown.left="goToPrevious"
             @keydown.right="goToNext"
-            @mousedown="handleMouseNavigation"
         >
-            <!-- Top gutter -->
-            <div class="flex h-16 flex-shrink-0 items-center justify-between px-4">
-                <!-- Zoom Controls (only for images) -->
-                <div v-if="isCurrentImage" class="flex gap-2">
-                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomOut">
-                        <Icon class="h-4 w-4" name="zoomOut" />
-                    </Button>
-                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="resetZoom">
-                        <Icon class="h-4 w-4" name="maximize" />
-                    </Button>
-                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomIn">
-                        <Icon class="h-4 w-4" name="zoomIn" />
-                    </Button>
-                    <!-- Zoom Level Indicator -->
-                    <div class="rounded bg-white/10 px-2 py-1 text-sm text-white backdrop-blur-sm">{{ Math.round(imageViewerZoom * 100) }}%</div>
-                </div>
-                <div v-else></div>
-                <!-- Empty div for spacing when no zoom controls -->
+            <!-- Main Content Area -->
+            <div class="flex flex-1 flex-col">
+                <!-- Top gutter -->
+                <div class="flex h-16 flex-shrink-0 items-center justify-between px-4">
+                    <!-- Zoom Controls (only for images) -->
+                    <div v-if="isCurrentImage" class="flex gap-2">
+                        <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomOut">
+                            <Icon class="h-4 w-4" name="zoomOut" />
+                        </Button>
+                        <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="resetZoom">
+                            <Icon class="h-4 w-4" name="maximize" />
+                        </Button>
+                        <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="zoomIn">
+                            <Icon class="h-4 w-4" name="zoomIn" />
+                        </Button>
+                        <!-- Zoom Level Indicator -->
+                        <div class="rounded bg-white/10 px-2 py-1 text-sm text-white backdrop-blur-sm">{{ Math.round(imageViewerZoom * 100) }}%</div>
+                    </div>
+                    <div v-else></div>
+                    <!-- Empty div for spacing when no zoom controls -->
 
-                <!-- Navigation Controls -->
-                <div class="flex gap-2">
+                    <!-- Navigation Controls -->
+                    <div class="flex gap-2">
+                        <Button
+                            v-if="canGoPrevious"
+                            class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                            size="sm"
+                            variant="outline"
+                            @click.stop="goToPrevious"
+                        >
+                            <Icon class="h-4 w-4" name="chevronLeft" />
+                            Previous
+                        </Button>
+                        <div class="rounded bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm">
+                            {{ currentIndex + 1 }} / {{ allImages.length }}
+                        </div>
+                        <Button
+                            v-if="canGoNext"
+                            class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                            size="sm"
+                            variant="outline"
+                            @click.stop="goToNext"
+                        >
+                            Next
+                            <Icon class="h-4 w-4" name="chevronRight" />
+                        </Button>
+                    </div>
+
+                    <!-- Close Button -->
+                    <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="closeImageViewer">
+                        <Icon class="h-4 w-4" name="x" />
+                    </Button>
+                </div>
+
+                <!-- Media Container -->
+                <div class="relative flex-1 overflow-hidden">
+                    <div
+                        :class="{ 'cursor-pointer': !isCurrentImage }"
+                        class="flex h-full w-full items-center justify-center overflow-hidden"
+                        @mousedown="isCurrentImage ? startDrag : null"
+                        @mouseleave="isCurrentImage ? stopDrag : null"
+                        @mousemove="isCurrentImage ? onDrag : null"
+                        @mouseup="isCurrentImage ? stopDrag : null"
+                        @click.alt.exact.prevent="handleFullScreenAltClick"
+                        @contextmenu.alt.exact.prevent="handleFullScreenAltRightClick"
+                    >
+                        <!-- Image Display -->
+                        <img
+                            v-if="currentImage && isCurrentImage"
+                            :alt="currentImage.name || `Image ${currentImage.id}`"
+                            :src="imageUrl"
+                            :style="{
+                                transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x / imageViewerZoom}px, ${imageViewerPosition.y / imageViewerZoom}px)`,
+                                cursor: imageViewerZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                            }"
+                            class="max-h-full max-w-full object-contain transition-transform"
+                            @click.alt.exact.prevent="handleFullScreenAltClick"
+                            @click.stop
+                            @dragstart.prevent
+                        />
+
+                        <!-- Video Display -->
+                        <video
+                            v-else-if="currentImage && isCurrentVideo"
+                            :alt="currentImage.name || `Video ${currentImage.id}`"
+                            :src="imageUrl"
+                            autoplay
+                            class="max-h-full max-w-full object-contain"
+                            controls
+                            loop
+                            @click.stop
+                        >
+                            <source :src="imageUrl" type="video/mp4" />
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+
+                    <!-- Left/Right Navigation Arrows -->
                     <Button
                         v-if="canGoPrevious"
-                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                        size="sm"
+                        class="absolute top-1/2 left-4 z-10 h-12 w-12 -translate-y-1/2 transform bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                        size="lg"
                         variant="outline"
                         @click.stop="goToPrevious"
                     >
-                        <Icon class="h-4 w-4" name="chevronLeft" />
-                        Previous
+                        <Icon class="h-6 w-6" name="chevronLeft" />
                     </Button>
-                    <div class="rounded bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm">
-                        {{ currentIndex + 1 }} / {{ allImages.length }}
-                    </div>
+
                     <Button
                         v-if="canGoNext"
-                        class="bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                        size="sm"
+                        class="absolute top-1/2 right-4 z-10 h-12 w-12 -translate-y-1/2 transform bg-white/10 backdrop-blur-sm hover:bg-white/20"
+                        size="lg"
                         variant="outline"
                         @click.stop="goToNext"
                     >
-                        Next
-                        <Icon class="h-4 w-4" name="chevronRight" />
+                        <Icon class="h-6 w-6" name="chevronRight" />
                     </Button>
                 </div>
 
-                <!-- Close Button -->
-                <Button class="bg-white/10 backdrop-blur-sm hover:bg-white/20" size="sm" variant="outline" @click.stop="closeImageViewer">
-                    <Icon class="h-4 w-4" name="x" />
-                </Button>
-            </div>
-
-            <!-- Media Container -->
-            <div class="relative flex-1 overflow-hidden">
-                <div
-                    :class="{ 'cursor-pointer': !isCurrentImage }"
-                    class="flex h-full w-full items-center justify-center overflow-hidden"
-                    @mousedown="isCurrentImage ? startDrag : null"
-                    @mouseleave="isCurrentImage ? stopDrag : null"
-                    @mousemove="isCurrentImage ? onDrag : null"
-                    @mouseup="isCurrentImage ? stopDrag : null"
-                    @click.alt.exact.prevent="handleFullScreenAltClick"
-                    @contextmenu.alt.exact.prevent="handleFullScreenAltRightClick"
-                >
-                    <!-- Image Display -->
-                    <img
-                        v-if="currentImage && isCurrentImage"
-                        :alt="currentImage.name || `Image ${currentImage.id}`"
-                        :src="imageUrl"
-                        :style="{
-                            transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x / imageViewerZoom}px, ${imageViewerPosition.y / imageViewerZoom}px)`,
-                            cursor: imageViewerZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-                        }"
-                        class="max-h-full max-w-full object-contain transition-transform"
-                        @click.alt.exact.prevent="handleFullScreenAltClick"
-                        @click.stop
-                        @dragstart.prevent
-                    />
-
-                    <!-- Video Display -->
-                    <video
-                        v-else-if="currentImage && isCurrentVideo"
-                        :alt="currentImage.name || `Video ${currentImage.id}`"
-                        :src="imageUrl"
-                        autoplay
-                        class="max-h-full max-w-full object-contain"
-                        controls
-                        loop
-                        @click.stop
-                    >
-                        <source :src="imageUrl" type="video/mp4" />
-                        Your browser does not support the video tag.
-                    </video>
+                <!-- Bottom gutter with reactions -->
+                <div class="flex h-16 flex-shrink-0 items-center justify-center px-4" @click.stop>
+                    <div v-if="currentImage" class="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
+                        <FileReactions
+                            :file="currentImage"
+                            :icon-size="20"
+                            variant="player"
+                            @dislike="(file, event) => handleFullScreenDislike(file, event)"
+                            @favorite="(file, event) => handleFullScreenFavorite(file, event)"
+                            @laughedAt="(file, event) => handleFullScreenLaughedAt(file, event)"
+                            @like="(file, event) => handleFullScreenLike(file, event)"
+                        />
+                    </div>
                 </div>
-
-                <!-- Left/Right Navigation Arrows -->
-                <Button
-                    v-if="canGoPrevious"
-                    class="absolute top-1/2 left-4 z-10 h-12 w-12 -translate-y-1/2 transform bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                    size="lg"
-                    variant="outline"
-                    @click.stop="goToPrevious"
-                >
-                    <Icon class="h-6 w-6" name="chevronLeft" />
-                </Button>
-
-                <Button
-                    v-if="canGoNext"
-                    class="absolute top-1/2 right-4 z-10 h-12 w-12 -translate-y-1/2 transform bg-white/10 backdrop-blur-sm hover:bg-white/20"
-                    size="lg"
-                    variant="outline"
-                    @click.stop="goToNext"
-                >
-                    <Icon class="h-6 w-6" name="chevronRight" />
-                </Button>
             </div>
 
-            <!-- Bottom gutter with reactions -->
-            <div class="flex h-16 flex-shrink-0 items-center justify-center px-4" @click.stop>
-                <div v-if="currentImage" class="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
-                    <FileReactions
-                        :file="currentImage"
-                        :icon-size="20"
-                        variant="player"
-                        @dislike="(file, event) => handleFullScreenDislike(file, event)"
-                        @favorite="(file, event) => handleFullScreenFavorite(file, event)"
-                        @laughedAt="(file, event) => handleFullScreenLaughedAt(file, event)"
-                        @like="(file, event) => handleFullScreenLike(file, event)"
-                    />
+            <!-- Metadata Panel -->
+            <div v-if="currentImage && currentImage.metadata" class="w-80 flex-shrink-0 overflow-y-auto bg-black/80" @click.stop>
+                <div class="p-4">
+                    <h3 class="mb-3 text-sm font-medium text-white">Metadata</h3>
+                    <pre v-if="currentImage.metadata.data?.meta?.prompt" class="text-xs whitespace-pre-wrap text-gray-300">{{
+                        JSON.stringify(currentImage.metadata.data.meta.prompt, null, 2)
+                    }}</pre>
+                    <pre v-else class="text-xs whitespace-pre-wrap text-gray-300">{{ JSON.stringify(currentImage.metadata, null, 2) }}</pre>
                 </div>
             </div>
         </div>
