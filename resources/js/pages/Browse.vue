@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import useContextMenu from '@/composables/useContextMenu';
 import { useDownloadProgress } from '@/composables/useDownloadProgress';
 import { useImageZoom } from '@/composables/useImageZoom';
+import { useMetadataUpdates } from '@/composables/useMetadataUpdates';
 import { useItemReactions } from '@/composables/useItemReactions';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import { AUTOCYCLE_DELAY, MAX_AUTOCYCLE_ATTEMPTS } from '@/constants/browse';
@@ -51,6 +52,7 @@ const paginationState = ref<PaginationState>({
 
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
+const { updatedMetadata } = useMetadataUpdates();
 const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
 const { markAsSeen } = useSeenStatus();
 const { handleContextMenu } = useContextMenu();
@@ -463,6 +465,31 @@ watch(
         }
     },
     { immediate: true },
+);
+
+// Watch for metadata updates and update the masonry items
+watch(
+    updatedMetadata,
+    (newMetadata) => {
+        for (const fileId in newMetadata) {
+            const itemIndex = masonryItems.value.findIndex((item) => item.id === parseInt(fileId));
+            if (itemIndex !== -1) {
+                masonryItems.value[itemIndex] = {
+                    ...masonryItems.value[itemIndex],
+                    metadata: newMetadata[fileId],
+                };
+            }
+
+            // Also update the currentImage if it matches the updated file
+            if (currentImage.value && currentImage.value.id === parseInt(fileId)) {
+                currentImage.value = {
+                    ...currentImage.value,
+                    metadata: newMetadata[fileId],
+                };
+            }
+        }
+    },
+    { deep: true },
 );
 </script>
 

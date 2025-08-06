@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Events\FileMetadataUpdated;
 use App\Jobs\FetchPostImages;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -187,6 +189,54 @@ class FetchPostImagesJobTest extends TestCase
         // Verify the API was called
         Http::assertSent(function ($request) {
             return str_contains($request->url(), 'civitai.com/api/v1/images');
+        });
+    }
+
+    public function test_job_dispatches_metadata_updated_event()
+    {
+        Event::fake();
+
+        // Create a file with a post container
+        $file = File::factory()->create([
+            'source' => 'CivitAI',
+            'source_id' => '456',
+            'is_blacklisted' => false,
+        ]);
+
+        $container = Container::factory()->create([
+            'type' => 'post',
+            'source' => 'CivitAI',
+            'source_id' => '123',
+        ]);
+
+        // Associate file with container
+        $file->containers()->attach($container);
+
+        // Mock the CivitAI API response for images
+        Http::fake([
+            'civitai.com/api/v1/images*' => Http::response([
+                'items' => [
+                    [
+                        'id' => 789,
+                        'url' => 'https://image.civitai.com/new-image.jpg',
+                        'width' => 1024,
+                        'height' => 768,
+                        'hash' => 'new-hash',
+                        'meta' => ['new' => 'metadata']
+                    ]
+                ]
+            ], 200)
+        ]);
+
+        // Execute the job
+        $job = new FetchPostImages($file);
+        $job->handle();
+
+        // Assert that FileMetadataUpdated event was dispatched
+        Event::assertDispatched(FileMetadataUpdated::class, function ($event) {
+            return $event->fileId !== null && 
+                   is_array($event->metadata) && 
+                   isset($event->metadata['civitai_id']);
         });
     }
 }
