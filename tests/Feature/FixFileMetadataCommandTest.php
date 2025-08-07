@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 
 
 test('command identifies double-encoded records correctly', function () {
-    $file = File::factory()->create();
+    $file = File::factory()->create(['source' => 'CivitAI']);
     
     // Create a properly encoded record (this should NOT be detected)
     $properMetadata = FileMetadata::create([
@@ -15,7 +15,7 @@ test('command identifies double-encoded records correctly', function () {
     ]);
     
     // Create a double-encoded record by directly inserting JSON string
-    $doubleEncodedFile = File::factory()->create();
+    $doubleEncodedFile = File::factory()->create(['source' => 'CivitAI']);
     $metadata = ['width' => 1024, 'height' => 768, 'civitai_id' => 123];
     DB::table('file_metadata')->insert([
         'file_id' => $doubleEncodedFile->id,
@@ -23,6 +23,16 @@ test('command identifies double-encoded records correctly', function () {
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+    
+    // Debug: Check what we actually inserted
+    $insertedRecord = DB::selectOne('SELECT JSON_TYPE(payload) as json_type, payload FROM file_metadata WHERE file_id = ?', [$doubleEncodedFile->id]);
+    expect($insertedRecord->json_type)->toBe('STRING', 'Double-encoded record should have JSON_TYPE of STRING');
+    
+    // Debug: Check if the command query finds it
+    $queryResult = DB::select(
+        'SELECT fm.id FROM file_metadata fm JOIN files f ON fm.file_id = f.id WHERE f.source = "CivitAI" AND JSON_TYPE(fm.payload) = "STRING"'
+    );
+    expect(count($queryResult))->toBe(1, 'Query should find exactly 1 double-encoded record');
     
     // Run command in dry-run mode
     $this->artisan('metadata:fix-records --dry-run')
@@ -32,7 +42,7 @@ test('command identifies double-encoded records correctly', function () {
 });
 
 test('command fixes double-encoded records', function () {
-    $file = File::factory()->create();
+    $file = File::factory()->create(['source' => 'CivitAI']);
     $metadata = ['width' => 1024, 'height' => 768, 'civitai_id' => 123, 'data' => ['test' => 'value']];
     
     // Create double-encoded record
@@ -63,7 +73,7 @@ test('command fixes double-encoded records', function () {
 });
 
 test('command skips properly encoded records', function () {
-    $file = File::factory()->create();
+    $file = File::factory()->create(['source' => 'CivitAI']);
     
     // Create properly encoded record
     FileMetadata::create([
@@ -80,7 +90,7 @@ test('command skips properly encoded records', function () {
 test('command respects limit option', function () {
     // Create 3 double-encoded records
     for ($i = 1; $i <= 3; $i++) {
-        $file = File::factory()->create();
+        $file = File::factory()->create(['source' => 'CivitAI']);
         DB::table('file_metadata')->insert([
             'file_id' => $file->id,
             'payload' => json_encode(json_encode(['width' => 512 * $i])),
