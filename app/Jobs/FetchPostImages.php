@@ -131,7 +131,7 @@ class FetchPostImages implements ShouldQueue
 
         $fileMetadata = FileMetadata::updateOrCreate(
             ['file_id' => $file->id],
-            ['payload' => json_encode($metadata)]
+            ['payload' => $metadata]
         );
 
         event(new FileMetadataUpdated($file->id, $metadata));

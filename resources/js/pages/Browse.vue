@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import useContextMenu from '@/composables/useContextMenu';
 import { useDownloadProgress } from '@/composables/useDownloadProgress';
 import { useImageZoom } from '@/composables/useImageZoom';
-import { useMetadataUpdates } from '@/composables/useMetadataUpdates';
 import { useItemReactions } from '@/composables/useItemReactions';
+import { useMetadataUpdates } from '@/composables/useMetadataUpdates';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import { AUTOCYCLE_DELAY, MAX_AUTOCYCLE_ATTEMPTS } from '@/constants/browse';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -717,6 +717,7 @@ watch(
             <div v-if="currentImage && currentImage.metadata" class="w-80 flex-shrink-0 overflow-y-auto bg-black/80" @click.stop>
                 <div class="p-4">
                     <h3 class="mb-3 text-sm font-medium text-white">Metadata</h3>
+                    <p>{{ currentImage.id }}</p>
                     <pre v-if="currentImage.metadata.data?.meta?.prompt" class="text-xs whitespace-pre-wrap text-gray-300">{{
                         JSON.stringify(currentImage.metadata.data.meta.prompt, null, 2)
                     }}</pre>
