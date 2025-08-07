@@ -45,7 +45,8 @@ class FileMetadataUpdated implements ShouldBroadcast
     {
         return [
             'fileId' => $this->fileId,
-            'metadata' => $this->metadata,
+            // Metadata removed to avoid Pusher payload size limit
+            // Frontend should fetch updated metadata via AJAX
         ];
     }
 }

@@ -151,6 +151,19 @@ class FileController extends Controller
     }
 
     /**
+     * Get the metadata for a specific file (for AJAX requests)
+     */
+    public function getMetadata(File $file)
+    {
+        $file->load('metadata');
+        
+        return response()->json([
+            'fileId' => $file->id,
+            'metadata' => $file->metadata
+        ]);
+    }
+
+    /**
      * Remove the specified file from storage.
      */
     public function destroy(File $file)

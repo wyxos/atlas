@@ -126,6 +126,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     // Files routes
     Route::get('files', [FileController::class, 'index'])->name('files.index');
     Route::post('files/{file}/seen', [FileController::class, 'markAsSeen'])->name('files.seen');
+    Route::get('files/{file}/metadata', [FileController::class, 'getMetadata'])->name('files.metadata');
     Route::delete('files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
     
     // Test route for Civitai API
