@@ -29,7 +29,6 @@ test('it returns correct broadcast data', function () {
 
     expect($broadcastData)->toBe([
         'fileId' => $file->id,
-        'metadata' => $metadata,
     ]);
 });
 

@@ -718,10 +718,10 @@ watch(
                 <div class="p-4">
                     <h3 class="mb-3 text-sm font-medium text-white">Metadata</h3>
                     <p>{{ currentImage.id }}</p>
-                    <pre v-if="currentImage.metadata.data?.meta?.prompt" class="text-xs whitespace-pre-wrap text-gray-300">{{
-                        JSON.stringify(currentImage.metadata.data.meta.prompt, null, 2)
+                    <pre v-if="currentImage.listingMetadata?.data?.meta?.prompt" class="text-xs whitespace-pre-wrap text-gray-300">{{
+                        JSON.stringify(currentImage.listingMetadata.data.meta.prompt, null, 2)
                     }}</pre>
-                    <pre v-else class="text-xs whitespace-pre-wrap text-gray-300">{{ JSON.stringify(currentImage.metadata, null, 2) }}</pre>
+                    <pre v-else class="text-xs whitespace-pre-wrap text-gray-300">{{ JSON.stringify(currentImage.listingMetadata ?? currentImage.metadata, null, 2) }}</pre>
                 </div>
             </div>
         </div>

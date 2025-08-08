@@ -1,5 +1,6 @@
 export interface BrowseItem {
-    id: number; // Use actual CivitAI numeric ID
+    // Database File ID (not external source ID)
+    id: number;
     src: string;
     original: string; // Full resolution image URL
     width: number;
@@ -13,7 +14,10 @@ export interface BrowseItem {
     imageHeight?: number;
     seen_preview_at?: string | null;
     seen_file_at?: string | null;
+    // Current metadata payload (FileMetadata.payload)
     metadata?: any;
+    // Listing metadata payload from files.listing_metadata
+    listingMetadata?: any;
 }
 
 export interface BrowseFilters {

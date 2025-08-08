@@ -53,6 +53,8 @@ class File extends Model
         'download_progress',
         'downloaded_at',
         'not_found',
+        'listing_metadata',
+        'detail_metadata',
     ];
 
     /**
@@ -79,6 +81,8 @@ class File extends Model
         'loved_at' => 'datetime',
         'laughed_at' => 'datetime',
         'downloaded_at' => 'datetime',
+        'listing_metadata' => 'array',
+        'detail_metadata' => 'array',
     ];
 
     /**

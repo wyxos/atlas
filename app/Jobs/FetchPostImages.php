@@ -29,13 +29,13 @@ class FetchPostImages implements ShouldQueue
     public function handle(): void
     {
         try {
-            // Check if the file has a post_id in metadata but no container
-            $metadata = $this->file->metadata?->payload ?? [];
-            if (is_string($metadata)) {
-                $metadata = json_decode($metadata, true) ?? [];
+            // Get postId from new listing_metadata only
+            $listing = $this->file->listing_metadata ?? [];
+            if (is_string($listing)) {
+                $listing = json_decode($listing, true) ?? [];
             }
 
-            $postId = $metadata['data']['postId'] ?? null;
+            $postId = $listing['postId'] ?? null;
 
             $postContainer = $this->file->containers()->where('type', 'post')->first();
 
@@ -120,19 +120,19 @@ class FetchPostImages implements ShouldQueue
         // Associate with container
         $postContainer->files()->syncWithoutDetaching([$file->id]);
 
-        // update their metadata
+        // Minimal metadata payload (no big data blob, no civitai fields)
         $metadata = array_merge($image['meta'] ?? [], [
             'width' => $image['width'] ?? null,
             'height' => $image['height'] ?? null,
-            'civitai_id' => $image['id'],
-            'civitai_stats' => $image['stats'] ?? null,
-            'data' => $image,
         ]);
 
-        $fileMetadata = FileMetadata::updateOrCreate(
+        FileMetadata::updateOrCreate(
             ['file_id' => $file->id],
             ['payload' => $metadata]
         );
+
+        // Store original listing payload on the file
+        $file->update(['listing_metadata' => $image]);
 
         event(new FileMetadataUpdated($file->id, $metadata));
     }

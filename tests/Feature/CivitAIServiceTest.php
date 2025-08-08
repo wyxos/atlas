@@ -369,7 +369,6 @@ it('creates container and file relationships correctly for posts', function () {
     // The model cast converts JSON to array automatically
     $metadata = $file->metadata->payload;
     expect($metadata)->toBeArray();
-    expect($metadata['civitai_id'])->toBe(333444);
     expect($metadata['width'])->toBe(1024);
     expect($metadata['height'])->toBe(768);
 

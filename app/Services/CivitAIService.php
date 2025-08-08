@@ -319,16 +319,13 @@ class CivitAIService
      */
     private function transformPostData(array $items): array
     {
-        $transformedItems = collect($items)->map(function ($post) {
-
+        $now = Carbon::now();
+        return collect($items)->map(function ($post) use ($now) {
             $image = $post['images'][0];
-            // $image['name'] = '8.jpeg';
             $filenameOnly = pathinfo($image['name'], PATHINFO_FILENAME);
 
             $thumbnail = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{$image['url']}/anim=false,width=450,optimized=true/{$filenameOnly}.{$this->getFileExtension($image['name'])}";
-
             $url = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{$image['url']}/original=true,quality=90/{$filenameOnly}.{$this->getFileExtension($image['name'])}";
-
             $referrer = "https://civitai.com/images/{$image['id']}";
 
             $containerData = [
@@ -336,39 +333,43 @@ class CivitAIService
                 'source' => 'CivitAI',
                 'source_id' => (string)$post['id'],
                 'referrer' => "https://civitai.com/posts/{$post['id']}",
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
 
             $fileData = [
                 'source' => 'CivitAI',
-                'source_id' => (string)$image['id'], // CivitAI image ID
+                'source_id' => (string)$image['id'],
                 'url' => $url,
                 'referrer_url' => $referrer,
-
-                // File properties
                 'filename' => $image['name'],
                 'ext' => $this->getFileExtension($image['name']),
                 'mime_type' => $this->getMimeType($image['name']),
                 'hash' => $image['hash'] ?? null,
-
-                // Content metadata
                 'title' => null,
                 'description' => null,
                 'thumbnail_url' => $thumbnail,
-
-                // Metadata for FileMetadata relationship
-                '_metadata' => [
-                    'width' => $image['width'] ?? null,
-                    'height' => $image['height'] ?? null,
-                    'civitai_id' => $image['id'],
-                    'civitai_stats' => $image['stats'] ?? null,
-                    'data' => $image,
-                ]
+                'listing_metadata' => json_encode($image),
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
 
-            return compact('containerData', 'fileData');
-        })->toArray();
+            $metaData = [
+                'file_referrer_url' => $referrer,
+                'payload' => json_encode([
+                    'width' => $image['width'] ?? null,
+                    'height' => $image['height'] ?? null,
+                ]),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
 
-        return $transformedItems;
+            return [
+                'fileData' => $fileData,
+                'metaData' => $metaData,
+                'containerData' => $containerData,
+            ];
+        })->toArray();
     }
 
     private function getFileExtension(array|string $itemData): string
@@ -416,111 +417,74 @@ class CivitAIService
             return [];
         }
 
-        $fileData = collect($transformedItems)->map(function ($item) {
-            $data = $item['fileData'];
-            unset($data['_metadata']); // Remove metadata from file data as it goes to FileMetadata table
-            $data['created_at'] = Carbon::now();
-            $data['updated_at'] = Carbon::now();
-            return $data;
-        })->toArray();
-
-        // Upsert File records
+        // 1) Upsert files
+        $fileRows = collect($transformedItems)->map(fn($i) => $i['fileData'])->toArray();
         File::upsert(
-            $fileData,
-            ['referrer_url'], // Unique identifier column(s)
-            ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'updated_at'] // Columns to update on conflict
+            $fileRows,
+            ['referrer_url'],
+            ['url','filename','ext','mime_type','description','thumbnail_url','listing_metadata','updated_at']
         );
 
-        $referrerUrls = collect($fileData)->pluck('referrer_url')->toArray();
-
-        // Retrieve the files that were upserted
-        $upsertedFiles = File::whereIn('referrer_url', $referrerUrls)->get()->keyBy('referrer_url');
-
-        // Prepare container data for batch upsert
-        $containerData = collect($transformedItems)->map(function ($item) {
-            $data = $item['containerData'];
-            $data['created_at'] = Carbon::now();
-            $data['updated_at'] = Carbon::now();
-            return $data;
-        })->toArray();
-
-        // Batch upsert Container records
+        // 2) Upsert containers
+        $containerRows = collect($transformedItems)->map(fn($i) => $i['containerData'])->toArray();
         Container::upsert(
-            $containerData,
-            ['source_id', 'source'], // Unique identifier columns
-            ['type', 'referrer', 'updated_at'] // Columns to update on conflict
+            $containerRows,
+            ['source_id','source'],
+            ['type','referrer','updated_at']
         );
 
-        // Get upserted containers
-        $containerSourceIds = collect($containerData)->pluck('source_id')->toArray();
-        $upsertedContainers = Container::where('source', 'CivitAI')
-            ->whereIn('source_id', $containerSourceIds)
-            ->get()
-            ->keyBy('source_id');
+        // 3) Build maps
+        $referrers = collect($transformedItems)->map(fn($i) => $i['fileData']['referrer_url'])->toArray();
+        $containers = collect($transformedItems)->map(fn($i) => $i['containerData']['source_id'])->toArray();
 
-        // Prepare pivot data for container-file relationships
-        $pivotData = [];
-        $metadataData = [];
+        $fileMap = File::whereIn('referrer_url', $referrers)->get()->keyBy('referrer_url');
+        $containerMap = Container::where('source','CivitAI')->whereIn('source_id', $containers)->get()->keyBy('source_id');
 
-        foreach ($transformedItems as $item) {
-            $file = $upsertedFiles->get($item['fileData']['referrer_url']);
-            if ($file) {
-                $container = $upsertedContainers->get($item['containerData']['source_id']);
-                if ($container) {
-                    $pivotData[] = [
-                        'file_id' => $file->id,
-                        'container_id' => $container->id,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now()
-                    ];
-                }
+        // 4) Pivot rows
+        $pivotRows = collect($transformedItems)->map(function ($i) use ($fileMap, $containerMap) {
+            $file = $fileMap->get($i['fileData']['referrer_url']);
+            $container = $containerMap->get($i['containerData']['source_id']);
+            if (!$file || !$container) return null;
+            return [
+                'file_id' => $file->id,
+                'container_id' => $container->id,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ];
+        })->filter()->toArray();
 
-                // Prepare metadata for batch upsert
-                if (isset($item['fileData']['_metadata'])) {
-                    $metadataData[] = [
-                        'file_id' => $file->id,
-                        'payload' => json_encode($item['fileData']['_metadata']), // Ensure JSON string for upsert
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now()
-                    ];
-                }
-            }
+        if (!empty($pivotRows)) {
+            DB::table('container_file')->upsert($pivotRows, ['file_id','container_id'], ['updated_at']);
         }
 
-        // Batch upsert pivot relationships (container_file)
-        if (!empty($pivotData)) {
-            DB::table('container_file')->upsert(
-                $pivotData,
-                ['file_id', 'container_id'], // Unique identifier columns
-                ['updated_at'] // Columns to update on conflict
-            );
+        // 5) FileMetadata rows
+        $metaRows = collect($transformedItems)->map(function ($i) use ($fileMap) {
+            $meta = $i['metaData'];
+            $file = $fileMap->get($meta['file_referrer_url'] ?? $i['fileData']['referrer_url']);
+            if (!$file) return null;
+            return [
+                'file_id' => $file->id,
+                'payload' => $meta['payload'],
+                'created_at' => $meta['created_at'],
+                'updated_at' => $meta['updated_at'],
+            ];
+        })->filter()->toArray();
+
+        if (!empty($metaRows)) {
+            FileMetadata::upsert($metaRows, ['file_id'], ['payload','updated_at']);
         }
 
-        // Batch upsert FileMetadata records
-        if (!empty($metadataData)) {
-            FileMetadata::upsert(
-                $metadataData,
-                ['file_id'], // Unique identifier column
-                ['payload', 'updated_at'] // Columns to update on conflict
-            );
-        }
+        $allFiles = File::with('metadata')->whereIn('referrer_url', $referrers)->get();
 
-        // Return files with containers loaded
-        $allFiles = File::query()
-            ->with('metadata')
-            ->whereIn('referrer_url', $referrerUrls)
-            ->get();
-
-        // Dispatch FetchPostImages job for all files that aren't blacklisted
+        // Dispatch jobs (unchanged)
         $delay = 0;
         foreach ($allFiles as $file) {
             if (!$file->is_blacklisted) {
                 FetchPostImages::dispatch($file)->delay(now()->addSeconds($delay));
-                $delay += 5; // 5 second delay between each job
+                $delay += 5;
             }
         }
 
-        // Apply filters in memory for better performance
         return $allFiles->filter(function ($file) {
             return $file->seen_preview_at === null &&
                 $file->seen_file_at === null &&
@@ -541,21 +505,26 @@ class CivitAIService
         $pageIdentifier = $currentPage ?: null;
 
         foreach ($files as $index => $file) {
-            // Decode metadata payload if it's a JSON string
-            $metadata = $file->metadata?->payload ?? [];
-            if (is_string($metadata)) {
-                $metadata = json_decode($metadata, true) ?? [];
+            // Decode listing metadata
+            $listing = $file->listing_metadata ?? [];
+            if (is_string($listing)) {
+                $listing = json_decode($listing, true) ?? [];
             }
+            // Current metadata from FileMetadata payload
+            $meta = $file->metadata?->payload ?? [];
 
             $uiItems[] = [
                 'id' => $file->id,
                 'src' => $file->thumbnail_url,
                 'original' => $file->url,
-                'width' => $metadata['width'] ?? null,
-                'height' => $metadata['height'] ?? null,
+                // Width/height sourced from current metadata
+                'width' => $meta['width'] ?? null,
+                'height' => $meta['height'] ?? null,
                 'page' => $pageIdentifier,
                 'index' => $index,
-                'metadata' => $metadata,
+                // Provide both payloads to the UI
+                'metadata' => $meta,
+                'listingMetadata' => $listing,
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
@@ -665,47 +634,50 @@ class CivitAIService
      */
     private function transformFileData(array $items): array
     {
-        $transformedItems = [];
+        $transformed = [];
+        $now = Carbon::now();
 
         foreach ($items as $itemData) {
-            // Extract metadata if available
             $meta = $itemData['meta'] ?? [];
 
-            $thumbnail = $itemData['url'];
+            $thumbnail = preg_replace('/width=\d+/', 'width=450', $itemData['url']);
+            $referrer = "https://civitai.com/images/{$itemData['id']}";
 
-            //  replace in string $thumbnail width=xxx with width=450
-            $thumbnail = preg_replace('/width=\d+/', 'width=450', $thumbnail);
-
-            $transformedItems[] = [
-                // Core identification
+            $fileData = [
                 'source' => 'CivitAI',
                 'source_id' => (string)$itemData['id'],
                 'url' => $itemData['url'],
-                'referrer_url' => "https://civitai.com/images/{$itemData['id']}",
-
-                // File properties
+                'referrer_url' => $referrer,
                 'filename' => basename(parse_url($itemData['url'], PHP_URL_PATH)) ?: 'civitai_' . $itemData['id'],
                 'ext' => $this->getFileExtension($itemData),
                 'mime_type' => $this->getMimeType($itemData),
                 'hash' => $itemData['hash'] ?? null,
-
-                // Content metadata
                 'title' => null,
                 'description' => null,
                 'thumbnail_url' => $thumbnail,
+                // Listing payload stored as JSON string ready for DB
+                'listing_metadata' => json_encode($itemData),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
 
-                // Metadata for FileMetadata relationship
-                '_metadata' => array_merge($meta, [
+            $metaData = [
+                'file_referrer_url' => $referrer, // temporary join key
+                'payload' => json_encode(array_merge($meta, [
                     'width' => $itemData['width'] ?? null,
                     'height' => $itemData['height'] ?? null,
-                    'civitai_id' => $itemData['id'],
-                    'civitai_stats' => $itemData['stats'] ?? null,
-                    'data' => $itemData,
-                ]),
+                ])),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+
+            $transformed[] = [
+                'fileData' => $fileData,
+                'metaData' => $metaData,
             ];
         }
 
-        return $transformedItems;
+        return $transformed;
     }
 
     /**
@@ -717,73 +689,40 @@ class CivitAIService
             return [];
         }
 
-        // Prepare data for upsert operation
-        $fileData = collect($transformedItems)->map(function ($item) {
-            return [
-                'source' => $item['source'],
-                'source_id' => $item['source_id'],
-                'url' => $item['url'],
-                'referrer_url' => $item['referrer_url'],
-                'filename' => $item['filename'],
-                'ext' => $item['ext'],
-                'mime_type' => $item['mime_type'],
-                'description' => $item['description'],
-                'thumbnail_url' => $item['thumbnail_url'],
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ];
-        })->toArray();
-
-        // Single atomic upsert operation
+        // 1) Upsert files with pre-shaped rows
+        $fileRows = collect($transformedItems)->map(fn($i) => $i['fileData'])->toArray();
         File::upsert(
-            $fileData,
-            ['referrer_url'], // Unique identifier column(s)
-            ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'updated_at'] // Columns to update on conflict
+            $fileRows,
+            ['referrer_url'],
+            ['url','filename','ext','mime_type','description','thumbnail_url','listing_metadata','updated_at']
         );
 
-        $referrerUrls = collect($transformedItems)->pluck('referrer_url')->toArray();
+        // 2) Map referrer_url -> file_id
+        $referrers = collect($transformedItems)->map(fn($i) => $i['fileData']['referrer_url'])->toArray();
+        $fileMap = File::whereIn('referrer_url', $referrers)->get()->keyBy('referrer_url');
 
-        // Get all files that were upserted
-        $upsertedFiles = File::query()
-            ->whereIn('referrer_url', $referrerUrls)
-            ->get()
-            ->keyBy('referrer_url');
-
-        // Prepare metadata for upsert
-        $metadataToUpsert = collect($transformedItems)
-            ->filter(function ($item) {
-                return isset($item['_metadata']);
-            })
-            ->map(function ($item) use ($upsertedFiles) {
-                $file = $upsertedFiles->get($item['referrer_url']);
-                if ($file) {
-                    return [
-                        'file_id' => $file->id,
-                        'payload' => json_encode($item['_metadata']),
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now(),
-                    ];
-                }
-                return null;
+        // 3) Upsert metadata rows
+        $metaRows = collect($transformedItems)
+            ->map(function ($i) use ($fileMap) {
+                $meta = $i['metaData'];
+                $file = $fileMap->get($meta['file_referrer_url'] ?? $i['fileData']['referrer_url']);
+                if (!$file) return null;
+                return [
+                    'file_id' => $file->id,
+                    'payload' => $meta['payload'],
+                    'created_at' => $meta['created_at'],
+                    'updated_at' => $meta['updated_at'],
+                ];
             })
             ->filter()
             ->toArray();
 
-        // Upsert metadata (insert new, update existing)
-        if (!empty($metadataToUpsert)) {
-            FileMetadata::upsert(
-                $metadataToUpsert,
-                ['file_id'], // Unique identifier
-                ['payload', 'updated_at'] // Columns to update on conflict
-            );
+        if (!empty($metaRows)) {
+            FileMetadata::upsert($metaRows, ['file_id'], ['payload','updated_at']);
         }
 
-        $allFiles = File::query()
-            ->with('metadata')
-            ->whereIn('referrer_url', $referrerUrls)
-            ->get();
+        $allFiles = File::with('metadata')->whereIn('referrer_url', $referrers)->get();
 
-        // Apply filters in memory for better performance
         return $allFiles->filter(function ($file) {
             return $file->seen_preview_at === null &&
                 $file->seen_file_at === null &&
@@ -804,21 +743,26 @@ class CivitAIService
         $pageIdentifier = $currentPage ?: null;
 
         foreach ($files as $index => $file) {
-            // Decode metadata payload if it's a JSON string
-            $metadata = $file->metadata?->payload ?? [];
-            if (is_string($metadata)) {
-                $metadata = json_decode($metadata, true) ?? [];
+            // Decode listing metadata
+            $listing = $file->listing_metadata ?? [];
+            if (is_string($listing)) {
+                $listing = json_decode($listing, true) ?? [];
             }
+            // Current metadata from FileMetadata payload
+            $meta = $file->metadata?->payload ?? [];
 
             $uiItems[] = [
                 'id' => $file->id,
                 'src' => $file->thumbnail_url,
                 'original' => $file->url,
-                'width' => $metadata['width'] ?? null,
-                'height' => $metadata['height'] ?? null,
+                // Width/height sourced from current metadata
+                'width' => $meta['width'] ?? null,
+                'height' => $meta['height'] ?? null,
                 'page' => $pageIdentifier,
                 'index' => $index,
-                'metadata' => $metadata,
+                // Provide both payloads to the UI
+                'metadata' => $meta,
+                'listingMetadata' => $listing,
                 'loved' => $file->loved,
                 'liked' => $file->liked,
                 'disliked' => $file->disliked,
