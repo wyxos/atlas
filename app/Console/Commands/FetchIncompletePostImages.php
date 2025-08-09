@@ -28,9 +28,9 @@ class FetchIncompletePostImages extends Command
         $query = File::query()
             ->where('source', 'CivitAI')
             ->where('is_blacklisted', false)
-            ->whereHas('metadata', function ($metadataQuery) {
-                $metadataQuery->whereRaw("JSON_EXTRACT(payload, '$.data.postId') IS NOT NULL");
-            })
+            // listing_metadata is our source of truth; ensure it has a postId
+            ->whereNotNull('listing_metadata')
+            ->whereRaw("JSON_EXTRACT(listing_metadata, '$.postId') IS NOT NULL")
             ->with(['metadata', 'containers' => function ($containerQuery) {
                 $containerQuery->where('type', 'post')->where('source', 'CivitAI');
             }]);
@@ -49,10 +49,10 @@ class FetchIncompletePostImages extends Command
             $shouldProcess = false;
             $reason = '';
 
-            // Get metadata payload
-            $metadata = $file->metadata?->payload ?? [];
-            if (is_string($metadata)) {
-                $metadata = json_decode($metadata, true) ?? [];
+            // Load listing metadata (array cast on model handles JSON)
+            $listing = $file->listing_metadata ?? [];
+            if (is_string($listing)) {
+                $listing = json_decode($listing, true) ?? [];
             }
 
             // Check if file has post_id but no container
@@ -60,7 +60,7 @@ class FetchIncompletePostImages extends Command
             
             if ($postContainers->isEmpty()) {
                 $shouldProcess = true;
-                $reason = 'Has post_id but no post container';
+                $reason = 'Has postId but no post container';
             } else {
                 // Check if any of the post containers have only one image
                 foreach ($postContainers as $container) {
@@ -74,7 +74,7 @@ class FetchIncompletePostImages extends Command
             }
 
             if ($shouldProcess) {
-                $postId = $metadata['data']['postId'] ?? 'unknown';
+                $postId = $listing['postId'] ?? 'unknown';
                 $filesToProcess->push([
                     'file' => $file,
                     'reason' => $reason,

@@ -309,7 +309,7 @@ const getPage = async (pageParam: number | string) => {
 
                             paginationState.value = {
                                 page: currentPage,
-                                nextPage: nextPage ? nextPage : null,
+                                nextPage: nextPage,
                             };
 
                             const allNewItemsSeen = newItems.length > 0 && newItems.every((item) => item.seen_preview_at !== null);
@@ -721,7 +721,9 @@ watch(
                     <pre v-if="currentImage.listingMetadata?.data?.meta?.prompt" class="text-xs whitespace-pre-wrap text-gray-300">{{
                         JSON.stringify(currentImage.listingMetadata.data.meta.prompt, null, 2)
                     }}</pre>
-                    <pre v-else class="text-xs whitespace-pre-wrap text-gray-300">{{ JSON.stringify(currentImage.listingMetadata ?? currentImage.metadata, null, 2) }}</pre>
+                    <pre v-else class="text-xs whitespace-pre-wrap text-gray-300">{{
+                        JSON.stringify(currentImage.listingMetadata ?? currentImage.metadata, null, 2)
+                    }}</pre>
                 </div>
             </div>
         </div>

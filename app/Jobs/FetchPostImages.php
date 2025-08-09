@@ -132,7 +132,7 @@ class FetchPostImages implements ShouldQueue
         );
 
         // Store original listing payload on the file
-        $file->update(['listing_metadata' => $image]);
+        $file->update(['listing_metadata' => json_encode($image)]);
 
         event(new FileMetadataUpdated($file->id, $metadata));
     }
