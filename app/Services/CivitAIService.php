@@ -604,16 +604,16 @@ class CivitAIService
 
         $response = Http::get(self::CIVITAI_API_BASE . '/images', $params);
 
-//        if(app()->environment('local')){
-//            // log to a file {time}_civitai.json, the params used and the response returned in storage/logs
-//            $logData = [
-//                'time' => Carbon::now()->toDateTimeString(),
-//                'params' => $params,
-//                'response' => $response->json(),
-//            ];
-//
-//            file_put_contents(storage_path('logs/'.Carbon::now()->format('Y-m-d_H-i-s').'_civitai.json'), json_encode($logData, JSON_PRETTY_PRINT));
-//        }
+        if(app()->environment('local')){
+            // log to a file {time}_civitai.json, the params used and the response returned in storage/logs
+            $logData = [
+                'time' => Carbon::now()->toDateTimeString(),
+                'params' => $params,
+                'response' => $response->json(),
+            ];
+
+            file_put_contents(storage_path('logs/'.Carbon::now()->format('Y-m-d_H-i-s').'_civitai.json'), json_encode($logData, JSON_PRETTY_PRINT));
+        }
 
         if (!$response->successful()) {
             throw new Exception('CivitAI API request failed: ' . $response->status());

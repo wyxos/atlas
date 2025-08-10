@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Container;
 use App\Services\CivitAIService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -365,7 +366,7 @@ it('creates container and file relationships correctly for posts', function () {
     $file = \App\Models\File::where('referrer_url', 'https://civitai.com/images/333444')->first();
     expect($file)->not->toBeNull();
     expect($file->metadata)->not->toBeNull();
-    
+
     // The model cast converts JSON to array automatically
     $metadata = $file->metadata->payload;
     expect($metadata)->toBeArray();
@@ -373,7 +374,7 @@ it('creates container and file relationships correctly for posts', function () {
     expect($metadata['height'])->toBe(768);
 
     // Verify container-file relationship exists
-    $container = \App\Models\Container::where('source_id', '111222')->first();
+    $container = Container::where('source_id', '111222')->first();
     expect($container)->not->toBeNull();
     expect($container->files->count())->toBe(1);
     expect($container->files->first()->id)->toBe($file->id);
@@ -415,7 +416,7 @@ it('handles empty posts response', function () {
 it('performs real fetch across up to 4 pages without fakes', function () {
     // This test intentionally makes live requests to CivitAI to verify pagination works from page 1 (no cursor)
     // up to 3-4 pages by following nextPage cursors. It will be skipped if the network/service is unavailable.
-    $maxPages = 4;
+    $maxPages = 6;
     $pageCount = 0;
     $page = 1; // First request should not include cursor
     $seenCursors = [];
