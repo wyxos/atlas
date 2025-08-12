@@ -39,4 +39,7 @@ return [
         'id' => env('GOOGLE_ANALYTICS_ID'),
     ],
 
+    'civitai' => [
+        'api_token' => env('CIVITAI_API_TOKEN'),
+    ]
 ];

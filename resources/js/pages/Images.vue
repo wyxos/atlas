@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { Card, CardContent } from '@/components/ui/card';
 import { Pagination } from '@/components/ui/pagination';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,27 @@ const props = defineProps<{
 }>();
 
 const { images } = props;
+
+// Refresh list handler
+const isRefreshing = ref(false);
+const handleRefresh = async () => {
+    try {
+        isRefreshing.value = true;
+        // Preserve current query string (search, page, etc.)
+        const query = typeof window !== 'undefined' ? window.location.search : '';
+        // Hit the same route to re-fetch data without full reload
+        router.get(route('images.index') + query, {}, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            only: ['images'],
+            onFinish: () => { isRefreshing.value = false; },
+        });
+    } catch (e) {
+        isRefreshing.value = false;
+        console.error('Failed to refresh images', e);
+    }
+};
 
 // Get initial query from URL
 function getInitialQuery(): string {
@@ -142,9 +163,15 @@ const isImageDeleting = (image: ImageFile): boolean => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-6">
-            <div class="mb-6">
-                <h1 class="text-3xl font-bold">Images</h1>
-                <p class="text-gray-600 mt-2">Browse your image collection</p>
+            <div class="mb-6 flex items-end justify-between gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold">Images</h1>
+                    <p class="text-gray-600 mt-2">Browse your image collection</p>
+                </div>
+                <Button :disabled="isRefreshing" variant="outline" @click="handleRefresh">
+                    <span v-if="isRefreshing" class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></span>
+                    Refresh
+                </Button>
             </div>
 
             <!-- Search Component -->

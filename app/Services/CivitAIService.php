@@ -9,6 +9,7 @@ use App\Models\FileMetadata;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -242,13 +243,15 @@ class CivitAIService
                 }
 
                 if (!$response->successful()) {
+                    $reason = $this->extractErrorReason($response);
                     Log::error("[Timeout Tracker] CivitAI API request failed", [
                         'attempt' => $attempt,
                         'status_code' => $response->status(),
-                        'response_body' => substr($response->body(), 0, 500), // Limit log size
-                        'http_duration' => $httpDuration . 'ms'
+                        'response_body' => substr($response->body(), 0, 2000), // Limit log size
+                        'http_duration' => $httpDuration . 'ms',
+                        'reason' => $reason,
                     ]);
-                    throw new Exception("CivitAI API request failed: HTTP {$response->status()}");
+                    throw new Exception("CivitAI API request failed: HTTP {$response->status()}" . ($reason ? " - $reason" : ''));
                 }
 
                 // Success - parse the response
@@ -312,6 +315,41 @@ class CivitAIService
         ]);
 
         throw new Exception("CivitAI API request failed after {$maxRetries} attempts: " . $lastException->getMessage());
+    }
+
+    /**
+     * Extract a concise reason from a failed HTTP response body, if present.
+     */
+    private function extractErrorReason(Response $response): string
+    {
+        $body = (string) $response->body();
+        if (!$body) {
+            return '';
+        }
+        // Try to parse JSON error structure
+        $json = json_decode($body, true);
+        $candidates = [];
+        if (is_array($json)) {
+            foreach (['message', 'error', 'detail', 'title'] as $key) {
+                if (!empty($json[$key]) && is_string($json[$key])) {
+                    $candidates[] = $json[$key];
+                }
+            }
+            // Some TRPC-like errors embed in error.data or result.error
+            if (isset($json['error']['message']) && is_string($json['error']['message'])) {
+                $candidates[] = $json['error']['message'];
+            }
+            if (isset($json['result']['error']['message']) && is_string($json['result']['error']['message'])) {
+                $candidates[] = $json['result']['error']['message'];
+            }
+        }
+        $reason = implode(' | ', array_unique($candidates));
+        if (!$reason) {
+            // Fallback: textual snippet
+            $snippet = trim(strip_tags($body));
+            $reason = substr($snippet, 0, 300);
+        }
+        return $reason;
     }
 
     /**
@@ -592,6 +630,7 @@ class CivitAIService
             'sort' => $this->request->get('sort', 'Newest'),
             'period' => $this->request->get('period', 'AllTime'),
             'nsfw' => $this->request->boolean('nsfw', false),
+            'apiToken' => config('services.civitai.api_token', null),
         ];
 
         // For CivitAI, if page is null (first request), don't send cursor
@@ -616,7 +655,8 @@ class CivitAIService
         }
 
         if (!$response->successful()) {
-            throw new Exception('CivitAI API request failed: ' . $response->status());
+            $reason = $this->extractErrorReason($response);
+            throw new Exception('CivitAI API request failed: HTTP ' . $response->status() . ($reason ? " - $reason" : ''));
         }
 
         $data = $response->json();
@@ -797,5 +837,4 @@ class CivitAIService
             ]
         ];
     }
-
 }

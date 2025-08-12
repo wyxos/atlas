@@ -159,7 +159,9 @@ class FileController extends Controller
         
         return response()->json([
             'fileId' => $file->id,
-            'metadata' => $file->metadata
+            'metadata' => $file->metadata,
+            // Also include listing metadata so the UI can update without a full reload
+            'listing_metadata' => $file->listing_metadata,
         ]);
     }
 

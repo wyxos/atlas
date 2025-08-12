@@ -52,7 +52,7 @@ const paginationState = ref<PaginationState>({
 
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
-const { updatedMetadata } = useMetadataUpdates();
+const { updatedMetadata, updatedListingMetadata } = useMetadataUpdates();
 const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
 const { markAsSeen } = useSeenStatus();
 const { handleContextMenu } = useContextMenu();
@@ -301,17 +301,17 @@ const getPage = async (pageParam: number | string) => {
                     preserveScroll: true,
                     only: ['items', 'filters'],
                     onSuccess: (response) => {
-                        try {
-                            const newItems = response.props.items as IBrowseItem[];
-                            const filters = response.props.filters as IBrowseFilters;
-                            const nextPage = filters.nextPage;
-                            const currentPage = filters.page;
+                        const newItems = response.props.items as IBrowseItem[];
+                        const filters = response.props.filters as IBrowseFilters;
+                        const nextPage = filters.nextPage;
+                        const currentPage = filters.page;
 
-                            paginationState.value = {
-                                page: currentPage,
-                                nextPage: nextPage,
-                            };
+                        paginationState.value = {
+                            page: currentPage,
+                            nextPage: nextPage,
+                        };
 
+                        if (nextPage) {
                             const allNewItemsSeen = newItems.length > 0 && newItems.every((item) => item.seen_preview_at !== null);
 
                             // Check if we should auto cycle
@@ -330,9 +330,8 @@ const getPage = async (pageParam: number | string) => {
                                 items: newItems,
                                 nextPage: paginationState.value.nextPage,
                             });
-                        } catch (error) {
-                            console.error('Error parsing response data:', error);
-                            reject(error);
+                        } else {
+                            reject(new Error('No more pages available'));
                         }
                     },
                     onError: (errors) => {
@@ -491,6 +490,30 @@ watch(
     },
     { deep: true },
 );
+
+// Watch for listing metadata updates and update masonry items
+watch(
+    updatedListingMetadata,
+    (newListing) => {
+        for (const fileId in newListing) {
+            const itemIndex = masonryItems.value.findIndex((item) => item.id === parseInt(fileId));
+            if (itemIndex !== -1) {
+                masonryItems.value[itemIndex] = {
+                    ...masonryItems.value[itemIndex],
+                    listingMetadata: newListing[fileId],
+                };
+            }
+
+            if (currentImage.value && currentImage.value.id === parseInt(fileId)) {
+                currentImage.value = {
+                    ...currentImage.value,
+                    listingMetadata: newListing[fileId],
+                };
+            }
+        }
+    },
+    { deep: true },
+);
 </script>
 
 <template>
@@ -515,6 +538,8 @@ watch(
                     />
                 </div>
             </div>
+
+            <p>{{ masonry?.paginationHistory }}</p>
 
             <!-- Masonry Container -->
             <div class="relative min-h-0 flex-1">

@@ -446,12 +446,12 @@ it('performs real fetch across up to 4 pages without fakes', function () {
 
             $pageCount++;
             if (!$next) {
-                break; // no more pages
+                throw new Exception('No nextPage cursor found, stopping pagination after ' . $pageCount . ' pages');
             }
 
             // Avoid infinite loops if a cursor repeats
             if (in_array($next, $seenCursors, true)) {
-                break;
+                throw new Exception('Detected repeated nextPage cursor, stopping pagination');
             }
             $seenCursors[] = $next;
             $page = $next; // Use next cursor as page for the following request
@@ -461,7 +461,8 @@ it('performs real fetch across up to 4 pages without fakes', function () {
         expect($pageCount)->toBeLessThanOrEqual($maxPages);
     } catch (Exception $e) {
         // Skip if network/service issues occur to keep the suite reliable
-        $this->markTestSkipped('CivitAI live test skipped due to network/service unavailability: ' . $e->getMessage());
+//        $this->markTestSkipped('CivitAI live test skipped due to network/service unavailability: ' . $e->getMessage());
+        throw $e;
     }
 });
 
