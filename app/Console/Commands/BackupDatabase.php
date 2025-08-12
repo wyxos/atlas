@@ -14,7 +14,7 @@ class BackupDatabase extends Command
      *
      * @var string
      */
-    protected $signature = 'db:backup {--connection= : The database connection to backup (defaults to default connection)} {--output= : Custom output path for backup file}';
+    protected $signature = 'db:backup {--connection= : The database connection to backup (defaults to default connection)} {--output= : Custom output path for backup file} {--retention=3 : Number of recent SQL backups to retain (older files will be deleted)}';
 
     /**
      * The console command description.
@@ -116,6 +116,10 @@ class BackupDatabase extends Command
             $fileSize = File::size($backupPath);
             $this->info("MySQL/MariaDB database backup created successfully: {$backupPath}");
             $this->info("Backup size: " . $this->formatBytes($fileSize));
+
+            // Enforce retention policy
+            $this->pruneBackups((int) $this->option('retention'));
+
             return 0;
         } else {
             $this->error('Failed to create MySQL/MariaDB backup');
@@ -191,5 +195,36 @@ class BackupDatabase extends Command
         $bytes /= (1 << (10 * $pow));
         
         return round($bytes, 2) . ' ' . $units[$pow];
+    }
+
+    private function pruneBackups(int $keepCount = 3): void
+    {
+        if ($keepCount < 0) {
+            $keepCount = 0;
+        }
+
+        $backupDir = storage_path('backups');
+        if (! File::exists($backupDir)) {
+            return;
+        }
+
+        $files = collect(File::files($backupDir))
+            ->filter(fn ($f) => str_ends_with(strtolower($f->getFilename()), '.sql'))
+            ->sortByDesc(fn ($f) => $f->getMTime())
+            ->values();
+
+        if ($files->count() <= $keepCount) {
+            return;
+        }
+
+        $toDelete = $files->slice($keepCount);
+        foreach ($toDelete as $file) {
+            try {
+                File::delete($file->getPathname());
+                $this->line('Pruned old backup: ' . $file->getFilename());
+            } catch (\Throwable $t) {
+                $this->warn('Warning: failed to delete old backup ' . $file->getFilename() . ': ' . $t->getMessage());
+            }
+        }
     }
 }

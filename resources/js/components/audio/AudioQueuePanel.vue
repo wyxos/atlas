@@ -50,7 +50,6 @@ function getFileData(item: any): any {
 // Reaction handlers (simplified for queue panel)
 function handleReaction(item: any, event: Event, reactionType: string): void {
     // Implementation similar to useAudioList but simplified for queue
-    console.log('Queue panel reaction:', reactionType, item.id);
 }
 
 function toggleFavorite(item: any, event: Event): void {

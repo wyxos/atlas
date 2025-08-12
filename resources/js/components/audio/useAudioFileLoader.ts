@@ -41,7 +41,7 @@ export function useAudioFileLoader() {
             return response.data;
         } catch (error) {
             if (axios.isCancel(error)) {
-                console.log('Request canceled for file:', fileId);
+                // Request canceled for this file
             } else {
                 console.error('Error loading file details:', error);
             }
@@ -90,7 +90,7 @@ export function useAudioFileLoader() {
             });
         } catch (error) {
             if (axios.isCancel(error)) {
-                console.log('Batch request canceled for files:', idsToLoad);
+                // Batch request canceled for files
             } else {
                 console.error('Error loading batch file details:', error);
             }

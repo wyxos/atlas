@@ -38,11 +38,11 @@ class PushDatabaseToRemoteServer extends Command
         // Step 1: Create local backup
         $backupCommand = 'php artisan db:backup --connection=' . escapeshellarg($connection);
 
-        // Step 2: Copy latest SQL to server
-        $copyCommand = 'scp storage/backups/*.sql ' . escapeshellarg($host) . ':~/';
+        // Step 2: Copy latest SQL to server app storage so import can see it
+        $copyCommand = 'scp storage/backups/*.sql ' . escapeshellarg($host) . ':/home/wyxos/webapps/atlas/storage/backups/';
 
-        // Step 3: Run import on server
-        $importCommand = 'ssh ' . escapeshellarg($host) . ' "php artisan db:import --connection=' . escapeshellarg($remoteConnection) . '"';
+        // Step 3: Run import on server in app dir; prefer art82 alias with fallback to php artisan
+        $importCommand = 'ssh ' . escapeshellarg($host) . ' "cd /home/wyxos/webapps/atlas && (art82 db:import --connection=' . escapeshellarg($remoteConnection) . ' --force || php artisan db:import --connection=' . escapeshellarg($remoteConnection) . ' --force)"';
 
         if ($isDryRun) {
             $this->warn('DRY RUN MODE: No actual sync will be performed');

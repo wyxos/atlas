@@ -16,7 +16,9 @@ class ImportDatabase extends Command
     protected $signature = 'db:import 
                             {--connection= : The database connection to import into (defaults to default connection)}
                             {--dry-run : Show what would be done without actually doing it}
-                            {--force : Skip confirmation prompt}';
+                            {--force : Skip confirmation prompt}
+                            {--no-cleanup : Do not delete the imported SQL file after a successful import}
+                            {--retention=3 : Number of recent SQL backups to retain (older files will be deleted)}';
 
     /**
      * The console command description.
@@ -84,6 +86,20 @@ class ImportDatabase extends Command
             if ($result === 0) {
                 $fileSize = $this->formatBytes($latestFile->getSize());
                 $this->info("✓ Database imported successfully from {$filePath} ({$fileSize})");
+
+                // Cleanup imported file unless explicitly disabled
+                if (! $this->option('no-cleanup')) {
+                    try {
+                        File::delete($filePath);
+                        $this->line("Deleted imported SQL file: {$filePath}");
+                    } catch (\Throwable $t) {
+                        $this->warn('Warning: failed to delete imported SQL file: ' . $t->getMessage());
+                    }
+                }
+
+                // Enforce retention policy
+                $this->pruneBackups((int) $this->option('retention'));
+
                 return Command::SUCCESS;
             } else {
                 $this->error('✗ Failed to import database');
@@ -217,6 +233,40 @@ class ImportDatabase extends Command
         $bytes /= (1 << (10 * $pow));
 
         return round($bytes, 2) . ' ' . $units[$pow];
+    }
+
+    /**
+     * Keep only the most recent $keepCount .sql files in storage/backups.
+     */
+    private function pruneBackups(int $keepCount = 3): void
+    {
+        if ($keepCount < 0) {
+            $keepCount = 0;
+        }
+
+        $backupDir = storage_path('backups');
+        if (! File::exists($backupDir)) {
+            return;
+        }
+
+        $files = collect(File::files($backupDir))
+            ->filter(fn ($f) => str_ends_with(strtolower($f->getFilename()), '.sql'))
+            ->sortByDesc(fn ($f) => $f->getMTime())
+            ->values();
+
+        if ($files->count() <= $keepCount) {
+            return;
+        }
+
+        $toDelete = $files->slice($keepCount);
+        foreach ($toDelete as $file) {
+            try {
+                File::delete($file->getPathname());
+                $this->line('Pruned old backup: ' . $file->getFilename());
+            } catch (\Throwable $t) {
+                $this->warn('Warning: failed to delete old backup ' . $file->getFilename() . ': ' . $t->getMessage());
+            }
+        }
     }
 }
 
