@@ -67,7 +67,8 @@ class ImportDatabase extends Command
                 return Command::FAILURE;
             }
 
-            if ($config['driver'] !== 'mysql') {
+            // Accept both MySQL and MariaDB drivers
+            if (!in_array($config['driver'], ['mysql', 'mariadb'], true)) {
                 $this->error("This command only supports MySQL/MariaDB connections");
                 return Command::FAILURE;
             }
