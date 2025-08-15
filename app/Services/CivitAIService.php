@@ -251,7 +251,11 @@ class CivitAIService
                         'http_duration' => $httpDuration . 'ms',
                         'reason' => $reason,
                     ]);
-                    throw new Exception("CivitAI API request failed: HTTP {$response->status()}" . ($reason ? " - $reason" : ''));
+                    $message = 'CivitAI API request failed: ' . $response->status();
+                    if ($reason) {
+                        $message .= ' - ' . $reason;
+                    }
+                    throw new Exception($message);
                 }
 
                 // Success - parse the response
@@ -656,7 +660,11 @@ class CivitAIService
 
         if (!$response->successful()) {
             $reason = $this->extractErrorReason($response);
-            throw new Exception('CivitAI API request failed: HTTP ' . $response->status() . ($reason ? " - $reason" : ''));
+            $message = 'CivitAI API request failed: ' . $response->status();
+            if ($reason) {
+                $message .= ' - ' . $reason;
+            }
+            throw new Exception($message);
         }
 
         $data = $response->json();
