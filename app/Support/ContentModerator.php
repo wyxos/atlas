@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\ModerationRule;
+
 class ContentModerator
 {
     protected array $rules;
@@ -11,9 +13,28 @@ class ContentModerator
         $this->rules = $rules;
     }
 
-    public function shouldBlock(string $text): bool
+    /**
+    * Load active moderation rules from the database and build a ContentModerator instance.
+    */
+    public static function fromDatabase(): self
+    {
+        $rules = ModerationRule::query()
+            ->where('active', true)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (ModerationRule $rule) => $rule->toContentModeratorFormat() + ['id' => $rule->id, 'name' => $rule->name])
+            ->all();
+
+        return new self($rules);
+    }
+
+    /**
+    * Return all rules that match the provided text. Each returned item is the rule array that matched.
+    */
+    public function matches(string $text): array
     {
         $text = mb_strtolower($text);
+        $matches = [];
 
         foreach ($this->rules as $rule) {
             switch ($rule['type']) {
@@ -21,19 +42,25 @@ class ContentModerator
                     $matched = $this->matchTerms($text, $rule['terms'], $rule['match'] ?? 'any');
                     $unless = $rule['unless'] ?? [];
                     if ($matched && !$this->containsAny($text, $unless)) {
-                        return true;
+                        $matches[] = $rule;
                     }
                     break;
 
                 case 'contains-combo':
-                    if ($this->containsAny($text, $rule['terms']) && $this->containsAny($text, $rule['with'])) {
-                        return true;
+                    $with = $rule['with'] ?? [];
+                    if ($this->containsAny($text, $rule['terms']) && $this->containsAny($text, $with)) {
+                        $matches[] = $rule;
                     }
                     break;
             }
         }
 
-        return false;
+        return $matches;
+    }
+
+    public function shouldBlock(string $text): bool
+    {
+        return count($this->matches($text)) > 0;
     }
 
     protected function matchTerms(string $text, array $terms, string $mode = 'any'): bool
