@@ -132,6 +132,14 @@ const handleAltClick = (item: IBrowseItem) => {
     handleLike(item, new Event('click'), removeItemFromView);
 };
 
+// Handle Alt+middle-click for download and favorite/love
+const handleAltMiddleClick = (item: IBrowseItem) => {
+    // Start download
+    startDownload(item);
+    // Also trigger favorite reaction with removal callback
+    handleFavorite(item, new Event('click'), removeItemFromView);
+};
+
 // Handle Alt+right-click for blacklist
 const handleAltRightClick = (item: IBrowseItem) => {
     blacklistImage(item, removeItemFromView);
@@ -207,6 +215,20 @@ const handleFullScreenAltClick = () => {
         // Handle the reaction in the background
         startDownload(itemToProcess);
         handleLike(itemToProcess, new Event('click'));
+    }
+};
+
+const handleFullScreenAltMiddleClick = () => {
+    if (currentImage.value) {
+        const itemToProcess = currentImage.value;
+
+        // Immediately advance to next item for responsive UI
+        removeCurrentAndGoNext();
+        removeItemFromView(itemToProcess);
+
+        // Handle the reaction in the background
+        startDownload(itemToProcess);
+        handleFavorite(itemToProcess, new Event('click'));
     }
 };
 
@@ -568,6 +590,7 @@ watch(
                             @like="handleItemLike"
                             @laughed-at="handleItemLaughedAt"
                             @alt-click="handleAltClick"
+                            @alt-middle-click="handleAltMiddleClick"
                             @alt-right-click="handleAltRightClick"
                             @left-click="handleLeftClick"
                         />
@@ -667,6 +690,7 @@ watch(
                         @mousemove="isCurrentImage ? onDrag : null"
                         @mouseup="isCurrentImage ? stopDrag : null"
                         @click.alt.exact.prevent="handleFullScreenAltClick"
+                        @click.middle.alt.exact.prevent="handleFullScreenAltMiddleClick"
                         @contextmenu.alt.exact.prevent="handleFullScreenAltRightClick"
                     >
                         <!-- Image Display -->
@@ -680,6 +704,7 @@ watch(
                             }"
                             class="max-h-full max-w-full object-contain transition-transform"
                             @click.alt.exact.prevent="handleFullScreenAltClick"
+                            @click.middle.alt.exact.prevent="handleFullScreenAltMiddleClick"
                             @click.stop
                             @dragstart.prevent
                         />

@@ -19,6 +19,7 @@ const emit = defineEmits<{
     dislike: [item: BrowseItem, event: Event];
     laughedAt: [item: BrowseItem, event: Event];
     altClick: [item: BrowseItem];
+    altMiddleClick: [item: BrowseItem];
     altRightClick: [item: BrowseItem];
     leftClick: [item: BrowseItem];
     contextmenu: [event: MouseEvent];
@@ -32,6 +33,10 @@ const handleLeftClick = () => {
 
 const handleAltClick = () => {
     emit('altClick', props.item);
+};
+
+const handleAltMiddleClick = () => {
+    emit('altMiddleClick', props.item);
 };
 
 const handleAltRightClick = () => {
@@ -181,6 +186,7 @@ const handleVideoCompleted = () => {
                 @load="handlePreviewLoaded"
                 @click.left.exact="handleLeftClick"
                 @click.alt.exact.prevent="handleAltClick"
+                @click.middle.alt.exact.prevent="handleAltMiddleClick"
                 @contextmenu.alt.exact.prevent="handleAltRightClick"
             />
 
@@ -200,6 +206,7 @@ const handleVideoCompleted = () => {
                 @mouseleave="(e) => e.target.pause()"
                 @click.left.exact="handleLeftClick"
                 @click.alt.exact.prevent="handleAltClick"
+                @click.middle.alt.exact.prevent="handleAltMiddleClick"
                 @contextmenu.alt.exact.prevent="handleAltRightClick"
             >
                 <source v-if="isInViewport" :src="item.src" type="video/mp4" />

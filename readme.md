@@ -29,7 +29,7 @@ Designed for users who want to host their own media server without relying on cl
 - **Persistent Interaction Tracking**: Saves user reactions (likes, dislikes, blacklists) locally for personalized curation
 - **Automated Pagination**: Auto-advance through pages with intelligent skipping of fully-viewed content
 - **Masonry Layout**: Infinite scroll grid layout for continuous content discovery
-- **Keyboard Shortcuts**: Alt+Click for like/download, Alt+Right-Click for blacklist operations
+- **Keyboard Shortcuts**: Alt+Click for like/download, Alt+Middle-Click for favorite/love/download, Alt+Right-Click for blacklist operations
 - **Full-Screen Navigation**: Arrow key navigation with immediate reaction feedback and content removal
 
 ### Audio Library Management
