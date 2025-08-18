@@ -304,18 +304,40 @@ class ImageController extends Controller
             ->where('is_blacklisted', false)
             ->where('downloaded', false)
             ->where('loved', false)
+            ->where('disliked', false)
             ->where('liked', false)
             ->where('funny', false)
             ->orderByDesc('created_at')
             ->paginate(perPage: $limit, page: $page);
 
-        $items = $paginator->getCollection()->map(function (File $file) {
+$items = $paginator->getCollection()->map(function (File $file) {
             $file->append('image_url');
+            // Attempt to get dimensions from available metadata
+            $width = data_get($file->detail_metadata, 'width')
+                ?? data_get($file->listing_metadata, 'width')
+                ?? ($file->metadata->payload['width'] ?? null);
+            $height = data_get($file->detail_metadata, 'height')
+                ?? data_get($file->listing_metadata, 'height')
+                ?? ($file->metadata->payload['height'] ?? null);
+
             return [
                 'id' => $file->id,
-                'src' => $file->thumbnail_url,
-                'width' => $file->metadata->payload['width'] ?? 0,
-                'height' => $file->metadata->payload['height'] ?? 0,
+                'name' => $file->title ?: $file->filename,
+                'mime_type' => $file->mime_type,
+                'src' => $file->thumbnail_url ?: $file->image_url ?: $file->url,
+                'image_url' => $file->image_url,
+                'url' => $file->url,
+                'downloaded' => (bool) $file->downloaded,
+                'path' => $file->path,
+                'seen_preview_at' => $file->seen_preview_at ?? null,
+                'seen_file_at' => $file->seen_file_at ?? null,
+                'source' => $file->source,
+                'liked' => (bool) $file->liked,
+                'loved' => (bool) $file->loved,
+                'disliked' => (bool) $file->disliked,
+                'funny' => (bool) $file->funny,
+                'width' => (int) ($width ?? 0),
+                'height' => (int) ($height ?? 0),
             ];
         })->values();
 
