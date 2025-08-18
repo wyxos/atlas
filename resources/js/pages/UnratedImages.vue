@@ -67,17 +67,20 @@ const onAltRightClick = (item: IBrowseItem) => {
                 >
                     <template #item="{ item }">
                         <div class="group relative">
-<img
-                                :src="item.image_url || item.src"
-                                :width="item.width"
-                                :height="item.imageHeight || item.height"
-                                alt="Image"
-                                class="h-full w-full cursor-pointer object-cover"
-                                @click.alt.exact.prevent="onAltClick(item)"
-                                @click.middle.alt.exact.prevent="onAltMiddleClick(item)"
-                                @contextmenu.alt.exact.prevent="onAltRightClick(item)"
-                            />
-<!-- Footer area for reactions (mirror BrowseItem) -->
+                            <!-- Media container with reserved footer space (32px) -->
+                            <div style="padding-bottom: 32px">
+                                <img
+                                    :src="item.image_url || item.src"
+                                    :width="item.width"
+                                    :height="item.imageHeight || item.height"
+                                    alt="Image"
+                                    class="w-full cursor-pointer object-cover block"
+                                    @click.alt.exact.prevent="onAltClick(item)"
+                                    @click.middle.alt.exact.prevent="onAltMiddleClick(item)"
+                                    @contextmenu.alt.exact.prevent="onAltRightClick(item)"
+                                />
+                            </div>
+                            <!-- Footer area for reactions (mirror BrowseItem) -->
                             <div class="absolute right-0 bottom-0 left-0 flex items-center justify-end p-2" style="height: 32px">
                                 <div>
                                     <FileReactions
