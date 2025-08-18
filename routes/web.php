@@ -96,9 +96,9 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('images/blacklisted', [ImageController::class, 'blacklisted'])->name('images.blacklisted');
     Route::get('images/blacklisted/data', [ImageController::class, 'blacklistedData'])->name('images.blacklisted.data');
 
-    // Missing (no path) Images
-    Route::get('images/missing', [ImageController::class, 'missing'])->name('images.missing');
-    Route::get('images/missing/data', [ImageController::class, 'missingData'])->name('images.missing.data');
+    // Unrated (no reactions, not downloaded) Images
+    Route::get('images/unrated', [ImageController::class, 'unrated'])->name('images.unrated');
+    Route::get('images/unrated/data', [ImageController::class, 'unratedData'])->name('images.unrated.data');
 
     Route::get('images/books', [ImageController::class, 'books'])->name('images.books');
     Route::get('images/sets', [ImageController::class, 'sets'])->name('images.sets');

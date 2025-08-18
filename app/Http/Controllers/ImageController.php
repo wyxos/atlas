@@ -224,15 +224,15 @@ class ImageController extends Controller
         return Inertia::render('BlacklistedImages');
     }
 
-    public function missing()
+    public function unrated()
     {
-        return Inertia::render('MissingImages');
+        return Inertia::render('UnratedImages');
     }
 
     public function data(Request $request)
     {
-        $page = (int) $request->get('page', 1);
-        $limit = (int) $request->get('limit', 40);
+        $page = (int)$request->get('page', 1);
+        $limit = (int)$request->get('limit', 40);
 
         $paginator = File::search('*')
             ->whereNotIn('path', ['__missing__'])
@@ -264,8 +264,8 @@ class ImageController extends Controller
 
     public function blacklistedData(Request $request)
     {
-        $page = (int) $request->get('page', 1);
-        $limit = (int) $request->get('limit', 40);
+        $page = (int)$request->get('page', 1);
+        $limit = (int)$request->get('limit', 40);
 
         $paginator = File::search('*')
             ->where('is_blacklisted', true)
@@ -294,14 +294,18 @@ class ImageController extends Controller
         ]);
     }
 
-    public function missingData(Request $request)
+    public function unratedData(Request $request)
     {
-        $page = (int) $request->get('page', 1);
-        $limit = (int) $request->get('limit', 40);
+        $page = (int)$request->get('page', 1);
+        $limit = (int)$request->get('limit', 40);
 
         $paginator = File::search('*')
             ->whereIn('path', ['__missing__'])
             ->where('is_blacklisted', false)
+            ->where('downloaded', false)
+            ->where('loved', false)
+            ->where('liked', false)
+            ->where('funny', false)
             ->orderByDesc('created_at')
             ->paginate(perPage: $limit, page: $page);
 
@@ -317,7 +321,7 @@ class ImageController extends Controller
 
         $nextPage = $paginator->hasMorePages() ? ($page + 1) : null;
 
-        return Inertia::render('MissingImages', [
+        return Inertia::render('UnratedImages', [
             'items' => $items,
             'filters' => [
                 'page' => $page,
@@ -338,7 +342,7 @@ class ImageController extends Controller
         return Inertia::render('ImageShow', [
             'file' => $file,
             'metadata' => $file->metadata,
-            'rawMetadata' => Storage::disk('atlas')->json('metadata/'.$file->id.'.json'),
+            'rawMetadata' => Storage::disk('atlas')->json('metadata/' . $file->id . '.json'),
         ]);
     }
 
