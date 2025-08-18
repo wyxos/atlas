@@ -219,6 +219,16 @@ class ImageController extends Controller
         ]);
     }
 
+    public function blacklisted()
+    {
+        return Inertia::render('BlacklistedImages');
+    }
+
+    public function missing()
+    {
+        return Inertia::render('MissingImages');
+    }
+
     public function data(Request $request)
     {
         $page = (int) $request->get('page', 1);
@@ -243,6 +253,74 @@ class ImageController extends Controller
         $nextPage = $hasMore ? ($page + 1) : null;
 
         return Inertia::render('Images', [
+            'items' => $items,
+            'filters' => [
+                'page' => $page,
+                'nextPage' => $nextPage,
+                'limit' => $limit,
+            ],
+        ]);
+    }
+
+    public function blacklistedData(Request $request)
+    {
+        $page = (int) $request->get('page', 1);
+        $limit = (int) $request->get('limit', 40);
+
+        $paginator = File::search('*')
+            ->where('is_blacklisted', true)
+            ->orderByDesc('updated_at')
+            ->paginate(perPage: $limit, page: $page);
+
+        $items = $paginator->getCollection()->map(function (File $file) {
+            $file->append('image_url');
+            return [
+                'id' => $file->id,
+                'src' => $file->thumbnail_url,
+                'width' => $file->metadata->payload['width'] ?? 0,
+                'height' => $file->metadata->payload['height'] ?? 0,
+            ];
+        })->values();
+
+        $nextPage = $paginator->hasMorePages() ? ($page + 1) : null;
+
+        return Inertia::render('BlacklistedImages', [
+            'items' => $items,
+            'filters' => [
+                'page' => $page,
+                'nextPage' => $nextPage,
+                'limit' => $limit,
+            ],
+        ]);
+    }
+
+    public function missingData(Request $request)
+    {
+        $page = (int) $request->get('page', 1);
+        $limit = (int) $request->get('limit', 40);
+
+        $paginator = File::query()
+            ->where('mime_type', 'like', 'image/%')
+            ->where('not_found', 0)
+            ->where(function ($q) {
+                $q->whereNull('path')->orWhere('path', '=','__missing__');
+            })
+            ->orderByDesc('created_at')
+            ->paginate(perPage: $limit, page: $page);
+
+        $items = $paginator->getCollection()->map(function (File $file) {
+            $file->append('image_url');
+            return [
+                'id' => $file->id,
+                'src' => $file->thumbnail_url,
+                'width' => $file->metadata->payload['width'] ?? 0,
+                'height' => $file->metadata->payload['height'] ?? 0,
+            ];
+        })->values();
+
+        $nextPage = $paginator->hasMorePages() ? ($page + 1) : null;
+
+        return Inertia::render('MissingImages', [
             'items' => $items,
             'filters' => [
                 'page' => $page,

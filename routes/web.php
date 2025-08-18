@@ -91,6 +91,15 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::get('images', [ImageController::class, 'index'])->name('images.index');
     // Data endpoint for Images.vue pagination
     Route::get('images/data', [ImageController::class, 'data'])->name('images.data');
+
+    // Blacklisted Images
+    Route::get('images/blacklisted', [ImageController::class, 'blacklisted'])->name('images.blacklisted');
+    Route::get('images/blacklisted/data', [ImageController::class, 'blacklistedData'])->name('images.blacklisted.data');
+
+    // Missing (no path) Images
+    Route::get('images/missing', [ImageController::class, 'missing'])->name('images.missing');
+    Route::get('images/missing/data', [ImageController::class, 'missingData'])->name('images.missing.data');
+
     Route::get('images/books', [ImageController::class, 'books'])->name('images.books');
     Route::get('images/sets', [ImageController::class, 'sets'])->name('images.sets');
     Route::get('images/various', [ImageController::class, 'various'])->name('images.various');
@@ -130,7 +139,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::post('files/{file}/seen', [FileController::class, 'markAsSeen'])->name('files.seen');
     Route::get('files/{file}/metadata', [FileController::class, 'getMetadata'])->name('files.metadata');
     Route::delete('files/{file}', [FileController::class, 'destroy'])->name('files.destroy');
-    
+
     // Test route for Civitai API
     Route::get('test/civitai', [CivitaiTestController::class, 'testQuery'])->name('test.civitai');
 });

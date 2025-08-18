@@ -131,6 +131,16 @@ const mainNavItems = computed((): NavItem[] => {
                     href: '/images/various',
                     icon: Image,
                 },
+                {
+                    title: 'Blacklisted',
+                    href: '/images/blacklisted',
+                    icon: Image,
+                },
+                {
+                    title: 'Missing',
+                    href: '/images/missing',
+                    icon: Image,
+                },
             ],
         },
         {

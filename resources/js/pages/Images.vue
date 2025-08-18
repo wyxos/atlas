@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
 import { ref } from 'vue';
 
@@ -20,44 +20,9 @@ const items = ref([]);
 
 const masonry = ref(null);
 
-// Paginated data loader modeled after Browse.vue
-const getPage = async (pageParam: number | string) => {
-    try {
-        const limit = 40; // default page size for images
-        const queryParams = {
-            page: pageParam,
-            limit,
-        };
-
-        return new Promise((resolve, reject) => {
-            router.get(
-                route('images.data', queryParams),
-                {},
-                {
-                    preserveState: true,
-                    preserveScroll: true,
-                    only: ['items', 'filters'],
-                    onSuccess: (response) => {
-                        const newItems = (response.props.items || []) as any[];
-                        const filters = response.props.filters as { page: number | null; nextPage: number | null };
-                        console.log('Fetched images page data:', newItems, filters);
-                        resolve({
-                            items: newItems,
-                            nextPage: filters?.nextPage ?? null,
-                        });
-                    },
-                    onError: (errors) => {
-                        console.error('Error fetching images page data:', errors);
-                        reject(new Error('Failed to fetch images page data'));
-                    },
-                },
-            );
-        });
-    } catch (error) {
-        console.error('Error in getPage (Images):', error);
-        throw new Error('Failed to load images page data.');
-    }
-};
+// Paginated data loader via composable
+import { createMasonryPageLoader } from '@/composables/useMasonryData';
+const getPage = createMasonryPageLoader({ routeName: 'images.data', defaultLimit: 40 });
 </script>
 
 <template>
