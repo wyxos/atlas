@@ -64,27 +64,26 @@ const getPage = async (pageParam: number | string) => {
     <Head title="Images" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="h-screen p-6">
-            <Masonry
-                ref="masonry"
-                v-model:items="items"
-                :get-next-page="getPage"
-                :layout="{
-                    sizes: { base: 1, sm: 2, md: 3, lg: 3, xl: 5, '2xl': 8 },
-                    footer: 32,
-                }"
-                :load-at-page="1"
-                :max-items="150"
-                class="h-full"
-            >
-                <template #item="{ item }">
-                    <img
-                        :src="item.src"
-                        alt="Image"
-                        class="h-auto w-full rounded-lg object-cover shadow-md transition-transform duration-300 hover:scale-105"
-                    />
-                </template>
-            </Masonry>
+        <div class="flex h-screen flex-col overflow-hidden">
+            <!-- Masonry Container -->
+            <div class="relative min-h-0 flex-1">
+                <Masonry
+                    ref="masonry"
+                    v-model:items="items"
+                    :get-next-page="getPage"
+                    :layout="{
+                        sizes: { base: 1, sm: 2, md: 3, lg: 3, xl: 5, '2xl': 8 },
+                        footer: 32,
+                    }"
+                    :load-at-page="1"
+                    :max-items="150"
+                    class="h-full"
+                >
+                    <template #item="{ item }">
+                        <img :src="item.src" alt="Image" class="h-full w-full cursor-pointer object-cover" />
+                    </template>
+                </Masonry>
+            </div>
         </div>
     </AppLayout>
 </template>

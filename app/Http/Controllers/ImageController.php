@@ -224,19 +224,18 @@ class ImageController extends Controller
         $page = (int) $request->get('page', 1);
         $limit = (int) $request->get('limit', 40);
 
-        $paginator = File::query()
-            ->where('mime_type', 'like', 'image/%')
+        $paginator = File::search('*')
             ->whereNotIn('path', ['__missing__'])
             ->orderByDesc('created_at')
             ->paginate(perPage: $limit, page: $page);
 
         // Transform items to include image_url and any lightweight fields Masonry might use
         $items = $paginator->getCollection()->map(function (File $file) {
-            $file->append('image_url');
-            // Provide a minimal item structure
             return [
                 'id' => $file->id,
-                'src' => Storage::disk('atlas')->url($file->path)
+                'src' => Storage::disk('atlas')->url($file->path),
+                'width' => $file->metadata->payload['width'] ?? 0,
+                'height' => $file->metadata->payload['height'] ?? 0,
             ];
         })->values();
 
