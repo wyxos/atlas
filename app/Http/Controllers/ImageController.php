@@ -299,12 +299,9 @@ class ImageController extends Controller
         $page = (int) $request->get('page', 1);
         $limit = (int) $request->get('limit', 40);
 
-        $paginator = File::query()
-            ->where('mime_type', 'like', 'image/%')
-            ->where('not_found', 0)
-            ->where(function ($q) {
-                $q->whereNull('path')->orWhere('path', '=','__missing__');
-            })
+        $paginator = File::search('*')
+            ->whereIn('path', ['__missing__'])
+            ->where('is_blacklisted', false)
             ->orderByDesc('created_at')
             ->paginate(perPage: $limit, page: $page);
 
