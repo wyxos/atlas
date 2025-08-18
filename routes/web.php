@@ -89,6 +89,8 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
 
     // Images routes
     Route::get('images', [ImageController::class, 'index'])->name('images.index');
+    // Data endpoint for Images.vue pagination
+    Route::get('images/data', [ImageController::class, 'data'])->name('images.data');
     Route::get('images/books', [ImageController::class, 'books'])->name('images.books');
     Route::get('images/sets', [ImageController::class, 'sets'])->name('images.sets');
     Route::get('images/various', [ImageController::class, 'various'])->name('images.various');

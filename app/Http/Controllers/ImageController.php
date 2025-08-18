@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\File;
+use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -12,32 +13,8 @@ class ImageController extends Controller
 {
     public function index()
     {
-        $query = request()->input('query', '');
 
-        // Use Scout search for all cases - use wildcard '*' for empty queries
-        $searchQuery = empty($query) ? '*' : $query;
-
-        $images = File::search($searchQuery)
-            ->query(function (Builder $builder) {
-                $builder
-                    ->where('mime_type', 'like', 'image/%')
-                    ->where('is_blacklisted', 0)
-                    ->where('not_found', 0);
-            })
-            ->whereNotIn('path', ['__missing__'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(48);
-
-        // Append image_url attribute to results and include source
-        $images->getCollection()->transform(function ($file) {
-            $file->append('image_url');
-            $file->makeVisible(['source']); // Make source visible
-            return $file;
-        });
-
-        return Inertia::render('Images', [
-            'images' => $images,
-        ]);
+        return Inertia::render('Images');
     }
 
     public function books()
@@ -242,6 +219,40 @@ class ImageController extends Controller
         ]);
     }
 
+    public function data(Request $request)
+    {
+        $page = (int) $request->get('page', 1);
+        $limit = (int) $request->get('limit', 40);
+
+        $paginator = File::query()
+            ->where('mime_type', 'like', 'image/%')
+            ->whereNotIn('path', ['__missing__'])
+            ->orderByDesc('created_at')
+            ->paginate(perPage: $limit, page: $page);
+
+        // Transform items to include image_url and any lightweight fields Masonry might use
+        $items = $paginator->getCollection()->map(function (File $file) {
+            $file->append('image_url');
+            // Provide a minimal item structure
+            return [
+                'id' => $file->id,
+                'src' => Storage::disk('atlas')->url($file->path)
+            ];
+        })->values();
+
+        $hasMore = $paginator->hasMorePages();
+        $nextPage = $hasMore ? ($page + 1) : null;
+
+        return Inertia::render('Images', [
+            'items' => $items,
+            'filters' => [
+                'page' => $page,
+                'nextPage' => $nextPage,
+                'limit' => $limit,
+            ],
+        ]);
+    }
+
     public function show(File $file)
     {
         // Load the covers and metadata relationships
@@ -296,7 +307,7 @@ class ImageController extends Controller
                 'message' => 'Image has been deleted',
                 'action' => 'deleted'
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete image: ' . $e->getMessage()
