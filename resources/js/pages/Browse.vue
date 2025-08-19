@@ -4,6 +4,7 @@ import BrowseFilters from '@/components/browse/BrowseFilters.vue';
 import BrowseItem from '@/components/browse/BrowseItem.vue';
 import Icon from '@/components/Icon.vue';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toast/use-toast';
 import useContextMenu from '@/composables/useContextMenu';
 import { useDownloadProgress } from '@/composables/useDownloadProgress';
 import { useImageZoom } from '@/composables/useImageZoom';
@@ -16,8 +17,8 @@ import { type BreadcrumbItem } from '@/types';
 import type { BrowseProps, BrowseFilters as IBrowseFilters, BrowseItem as IBrowseItem, PaginationState } from '@/types/browse';
 import { Head, router } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
-import { ref, watch } from 'vue';
-import { toast } from '@/components/ui/toast/use-toast';
+import axios from 'axios';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<BrowseProps>();
 
@@ -162,7 +163,7 @@ const handleRightClick = (event: MouseEvent, item: IBrowseItem) => {
             // Include postId for menu condition
             item: { id: item.id, name: `File ${item.id}`, postId: item?.listingMetadata?.postId },
         },
-undefined,
+        undefined,
     ); // Add endpoint for browse list context menu data
 };
 
@@ -515,11 +516,47 @@ watch(
     { deep: true },
 );
 
+// Compute counts for same postId and same username
+const postCounts = computed(() => {
+    const map = new Map<string | number, number>();
+    for (const i of masonryItems.value) {
+        const postId = i?.listingMetadata?.postId;
+        if (postId) {
+            map.set(postId, (map.get(postId) || 0) + 1);
+        }
+    }
+    return map;
+});
+
+const userCounts = computed(() => {
+    const map = new Map<string, number>();
+    for (const i of masonryItems.value) {
+        const username = i?.listingMetadata?.data?.meta?.username;
+        if (username) {
+            map.set(username, (map.get(username) || 0) + 1);
+        }
+    }
+    return map;
+});
+
+const getPostRelatedCount = (item: IBrowseItem): number => {
+    const postId = item?.listingMetadata?.postId;
+    if (!postId) return 0;
+    const total = postCounts.value.get(postId) || 0;
+    return Math.max(0, total);
+};
+
+const getUserRelatedCount = (item: IBrowseItem): number => {
+    const username = item?.listingMetadata?.username;
+    if (!username) return 0;
+    const total = userCounts.value.get(username) || 0;
+    return Math.max(0, total);
+};
+
 // Watch for listing metadata updates and update masonry items
-import axios from 'axios';
 
 // Handle "Block post" context action dispatched from AppLayout
-window.addEventListener('browse:block-post', (e: any) => {
+window.addEventListener('browse:block-post', async (e: any) => {
     const postId = e?.detail?.postId;
     if (!postId) return;
 
@@ -529,34 +566,21 @@ window.addEventListener('browse:block-post', (e: any) => {
 
     const count = toRemove.length;
 
-    // Show confirmation toast with action and dismiss immediately on click
-    let toastHandle: { id: string; dismiss: () => void } | null = null;
-    toastHandle = toast({
-        title: 'Block post?',
-        description: `This will dislike + blacklist ${count} item${count > 1 ? 's' : ''} from post ${postId}.`,
-        action: {
-            label: 'Block now',
-            onClick: async () => {
-                // Dismiss confirmation immediately
-                toastHandle?.dismiss();
-                try {
-                    await axios.post(route('browse.block-post'), {
-                        postId,
-                        fileIds: toRemove.map((i) => i.id),
-                    });
+    try {
+        await axios.post(route('browse.block-post'), {
+            postId,
+            fileIds: toRemove.map((i) => i.id),
+        });
 
-                    for (const item of toRemove) {
-                        await removeItemFromView(item);
-                    }
+        for (const item of toRemove) {
+            await removeItemFromView(item);
+        }
 
-                    toast({ title: 'Post blocked', description: `${count} item${count > 1 ? 's' : ''} removed.` });
-                } catch (err) {
-                    console.error('Failed to block post:', err);
-                    toast({ title: 'Failed to block post', description: 'Please try again.' });
-                }
-            },
-        },
-    });
+        toast({ title: 'Post blocked', description: `${count} item${count > 1 ? 's' : ''} removed.` });
+    } catch (err) {
+        console.error('Failed to block post:', err);
+        toast({ title: 'Failed to block post', description: 'Please try again.' });
+    }
 });
 
 watch(
@@ -629,6 +653,8 @@ watch(
                             :is-loading="masonry?.isLoading || isAutocycling"
                             :item="item"
                             :page-size="currentFilters.limit"
+                            :post-related-count="getPostRelatedCount(item)"
+                            :user-related-count="getUserRelatedCount(item)"
                             @contextmenu="(event) => handleRightClick(event, item)"
                             @dislike="handleItemDislike"
                             @favorite="handleItemFavorite"

@@ -9,6 +9,9 @@ interface Props {
     downloadProgress?: number;
     isDownloaded: boolean;
     isLoading?: boolean;
+    // Counts (excluding this item) for badges
+    postRelatedCount?: number; // other items with same postId
+    userRelatedCount?: number; // other items with same username
 }
 
 const props = defineProps<Props>();
@@ -212,8 +215,22 @@ const handleVideoCompleted = () => {
             </video>
         </div>
 
-        <!-- Status Badge -->
-        <div class="absolute top-2 right-2 z-10">
+        <!-- Status Badge + Separate related badges -->
+        <div class="absolute top-2 right-2 z-10 flex items-center gap-1">
+            <div
+                v-if="props.postRelatedCount && props.postRelatedCount > 1"
+                class="rounded bg-black/70 px-1.5 py-0.5 font-bold text-white shadow"
+                title="Other items in same post"
+            >
+                P+{{ props.postRelatedCount }}
+            </div>
+            <div
+                v-if="props.userRelatedCount && props.userRelatedCount > 1"
+                class="rounded bg-black/70 px-1.5 py-0.5 font-bold text-white shadow"
+                title="Other items by same user"
+            >
+                U+{{ props.userRelatedCount }}
+            </div>
             <div :class="statusBadge.class" class="rounded px-2 py-1 text-xs font-medium text-white shadow-lg">
                 {{ statusBadge.text }}
             </div>
