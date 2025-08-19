@@ -18,7 +18,7 @@ import type { BrowseProps, BrowseFilters as IBrowseFilters, BrowseItem as IBrows
 import { Head, router } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<BrowseProps>();
 
@@ -454,29 +454,6 @@ const handleUndoBlacklist = async () => {
     }
 };
 
-// Global blockers for browser back/forward mouse buttons while fullscreen viewer is open
-const globalAuxMouseBlocker = (event: MouseEvent) => {
-    if (!isImageViewerOpen.value) return;
-    const btn = (event as any).button;
-    if (btn === 3 || btn === 4) {
-        event.preventDefault?.();
-        event.stopImmediatePropagation?.();
-    }
-};
-
-onMounted(() => {
-    // Capture phase to intercept before browser handles navigation
-    window.addEventListener('mousedown', globalAuxMouseBlocker, { capture: true });
-    window.addEventListener('mouseup', globalAuxMouseBlocker, { capture: true });
-    window.addEventListener('auxclick', globalAuxMouseBlocker, { capture: true } as any);
-});
-
-onBeforeUnmount(() => {
-    window.removeEventListener('mousedown', globalAuxMouseBlocker, { capture: true } as any);
-    window.removeEventListener('mouseup', globalAuxMouseBlocker, { capture: true } as any);
-    window.removeEventListener('auxclick', globalAuxMouseBlocker, { capture: true } as any);
-});
-
 // Handle mouse button navigation in full screen mode
 const handleMouseNavigation = (event: MouseEvent) => {
     // Normalize handling for auxiliary buttons to avoid browser navigation
@@ -784,8 +761,8 @@ watch(
             class="fixed inset-0 z-50 flex bg-black/90"
             tabindex="0"
             @click="closeImageViewer"
-@mousedown.prevent.stop="handleMouseNavigation"
-            @mouseup.prevent.stop="handleMouseNavigation"
+@mousedown="handleMouseNavigation"
+            @mouseup="handleMouseNavigation"
             @auxclick.prevent.stop="handleMouseNavigation"
             @keydown.escape="closeImageViewer"
             @keydown.left="goToPrevious"

@@ -162,34 +162,6 @@ onUnmounted(() => {
     }
 });
 
-// Intercept alt + back/forward mouse buttons to trigger batch actions without browser navigation
-const handleMouseButtons = (event: MouseEvent) => {
-    const btn = (event as any).button;
-    const postId = (props.item as any)?.listingMetadata?.postId;
-
-    if (!event.altKey || !postId) return;
-
-    if (btn === 3) {
-        // Alt + back => block post
-        event.preventDefault?.();
-        event.stopImmediatePropagation?.();
-        try {
-            window?.dispatchEvent?.(new CustomEvent('browse:block-post', { detail: { postId } }));
-        } catch (e) {
-            console.error('Failed to dispatch browse:block-post', e);
-        }
-    } else if (btn === 4) {
-        // Alt + forward => like post
-        event.preventDefault?.();
-        event.stopImmediatePropagation?.();
-        try {
-            window?.dispatchEvent?.(new CustomEvent('browse:like-post', { detail: { postId } }));
-        } catch (e) {
-            console.error('Failed to dispatch browse:like-post', e);
-        }
-    }
-};
-
 // Handle marking as seen when video completes (for videos only) - but only if fully visible
 const handleVideoCompleted = () => {
     if (!props.item.seen_preview_at && !hasMarkedPreview.value && isFullyVisible.value) {
@@ -200,12 +172,7 @@ const handleVideoCompleted = () => {
 </script>
 
 <template>
-<div :id="`browse-item-${item.id}`" class="relative h-full"
-         @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)"
-         @mousedown.capture="handleMouseButtons"
-         @mouseup.capture="handleMouseButtons"
-         @auxclick.prevent.stop="handleMouseButtons"
-    >
+    <div :id="`browse-item-${item.id}`" class="relative h-full" @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)">
         <!-- Media container with fixed imageHeight -->
         <div>
             <!-- Image element for image files -->
