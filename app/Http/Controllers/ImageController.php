@@ -324,7 +324,11 @@ $items = $paginator->getCollection()->map(function (File $file) {
                 'id' => $file->id,
                 'name' => $file->title ?: $file->filename,
                 'mime_type' => $file->mime_type,
+                // Thumbnail/preview image (like Browse items)
                 'src' => $file->thumbnail_url ?: $file->image_url ?: $file->url,
+                // Full image/video URL for the viewer (useImageZoom prioritizes 'original')
+                'original' => $file->url,
+                // Keep for compatibility
                 'image_url' => $file->image_url,
                 'url' => $file->url,
                 'downloaded' => (bool) $file->downloaded,
@@ -338,6 +342,8 @@ $items = $paginator->getCollection()->map(function (File $file) {
                 'funny' => (bool) $file->funny,
                 'width' => (int) ($width ?? 0),
                 'height' => (int) ($height ?? 0),
+                // For components that expect imageHeight like BrowseItem
+                'imageHeight' => (int) ($height ?? 0),
             ];
         })->values();
 

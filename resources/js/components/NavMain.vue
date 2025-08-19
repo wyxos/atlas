@@ -12,12 +12,34 @@ const props = defineProps<{
 const page = usePage();
 const expandedItems = ref<Set<string>>(new Set());
 
+// Persist expanded state across navigations
+const STORAGE_KEY = 'sidebar_expanded_items';
+
+function loadExpandedFromStorage(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveExpandedToStorage() {
+  try {
+    const arr = Array.from(expandedItems.value);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  } catch {}
+}
+
 function toggleExpanded(itemTitle: string): void {
     if (expandedItems.value.has(itemTitle)) {
         expandedItems.value.delete(itemTitle);
     } else {
         expandedItems.value.add(itemTitle);
     }
+    saveExpandedToStorage();
 }
 
 function isExpanded(itemTitle: string): boolean {
@@ -34,16 +56,19 @@ function isItemActive(item: NavItem): boolean {
 }
 
 function initializeExpandedState(): void {
-    // Clear current expanded state
-    expandedItems.value.clear();
+    // Start from persisted state and ensure active parents are included
+    const persisted = loadExpandedFromStorage();
+    expandedItems.value = new Set(persisted);
 
-    // Auto-expand parent items that have active sub-items
     const currentBaseUrl = page.url.split('?')[0];
     props.items.forEach(item => {
         if (item.items && item.items.some(subItem => subItem.href === currentBaseUrl)) {
             expandedItems.value.add(item.title);
         }
     });
+
+    // Persist any changes
+    saveExpandedToStorage();
 }
 
 // Initialize expanded state on mount

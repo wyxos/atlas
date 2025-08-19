@@ -6,6 +6,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import type { BrowseItem as IBrowseItem } from '@/types/browse';
 import { Head } from '@inertiajs/vue3';
+import { useImageZoom } from '@/composables/useImageZoom';
 import { Masonry } from '@wyxos/vibe';
 import { ref } from 'vue';
 
@@ -18,6 +19,31 @@ const breadcrumbs: BreadcrumbItem[] = [
 const items = ref<IBrowseItem[]>([] as any);
 const masonry = ref<any>(null);
 const getPage = createMasonryPageLoader({ routeName: 'images.unrated.data', defaultLimit: 40 });
+
+// Full-screen viewer state/actions (same composable used by Browse.vue)
+const {
+    isImageViewerOpen,
+    imageViewerZoom,
+    imageViewerPosition,
+    currentImage,
+    allImages,
+    currentIndex,
+    imageUrl,
+    isCurrentVideo,
+    isCurrentImage,
+    canGoNext,
+    canGoPrevious,
+    openImageViewer,
+    closeImageViewer,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    startDrag,
+    onDrag,
+    stopDrag,
+    goToNext,
+    goToPrevious,
+} = useImageZoom();
 
 // Reactions
 const { handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, startDownload } = useItemReactions();
@@ -74,7 +100,8 @@ const onAltRightClick = (item: IBrowseItem) => {
                                     :width="item.width"
                                     :height="item.imageHeight || item.height"
                                     alt="Image"
-                                    class="w-full cursor-pointer object-cover block"
+class="w-full cursor-pointer object-cover block"
+                                    @click.left.exact="openImageViewer(item, items)"
                                     @click.alt.exact.prevent="onAltClick(item)"
                                     @click.middle.alt.exact.prevent="onAltMiddleClick(item)"
                                     @contextmenu.alt.exact.prevent="onAltRightClick(item)"
@@ -97,6 +124,73 @@ const onAltRightClick = (item: IBrowseItem) => {
                         </div>
                     </template>
                 </Masonry>
+            </div>
+        </div>
+        
+        <!-- Full Screen Media Viewer Modal (mirrors Browse.vue basics) -->
+        <div
+            v-if="isImageViewerOpen"
+            class="fixed inset-0 z-50 flex bg-black/90"
+            tabindex="0"
+            @click="closeImageViewer"
+            @keydown.escape="closeImageViewer"
+            @keydown.left="canGoPrevious && ( $event.preventDefault(), goToPrevious() )"
+            @keydown.right="canGoNext && ( $event.preventDefault(), goToNext() )"
+        >
+            <!-- Top bar -->
+            <div class="flex flex-1 flex-col" @click.stop>
+                <div class="flex h-16 flex-shrink-0 items-center justify-between px-4">
+                    <div class="flex gap-2" v-if="isCurrentImage">
+                        <button class="bg-white/10 px-2 py-1 rounded text-white" @click.stop="zoomOut">-</button>
+                        <button class="bg-white/10 px-2 py-1 rounded text-white" @click.stop="resetZoom">reset</button>
+                        <button class="bg-white/10 px-2 py-1 rounded text-white" @click.stop="zoomIn">+</button>
+                        <div class="rounded bg-white/10 px-2 py-1 text-sm text-white">{{ Math.round(imageViewerZoom * 100) }}%</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button v-if="canGoPrevious" class="bg-white/10 px-2 py-1 rounded text-white" @click.stop="goToPrevious">Prev</button>
+                        <div class="rounded bg-white/10 px-3 py-2 text-sm text-white">{{ currentIndex + 1 }} / {{ allImages.length }}</div>
+                        <button v-if="canGoNext" class="bg-white/10 px-2 py-1 rounded text-white" @click.stop="goToNext">Next</button>
+                    </div>
+                    <button class="bg-white/10 px-2 py-1 rounded text-white" @click.stop="closeImageViewer">Close</button>
+                </div>
+
+                <!-- Media area -->
+                <div class="relative flex-1 overflow-hidden">
+                    <div
+                        :class="{ 'cursor-pointer': !isCurrentImage }"
+                        class="flex h-full w-full items-center justify-center overflow-hidden"
+                        @mousedown="isCurrentImage ? startDrag : null"
+                        @mouseleave="isCurrentImage ? stopDrag : null"
+                        @mousemove="isCurrentImage ? onDrag : null"
+                        @mouseup="isCurrentImage ? stopDrag : null"
+                    >
+                        <!-- Image -->
+                        <img
+                            v-if="currentImage && isCurrentImage"
+                            :alt="currentImage.name || `Image ${currentImage.id}`"
+                            :src="imageUrl"
+                            :style="{
+                                transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x / imageViewerZoom}px, ${imageViewerPosition.y / imageViewerZoom}px)`,
+                                cursor: imageViewerZoom > 1 ? 'grab' : 'default',
+                            }"
+                            class="max-h-full max-w-full object-contain transition-transform"
+                            @dragstart.prevent
+                        />
+
+                        <!-- Video -->
+                        <video
+                            v-else-if="currentImage && isCurrentVideo"
+                            :src="imageUrl"
+                            autoplay
+                            class="max-h-full max-w-full object-contain"
+                            controls
+                            loop
+                        >
+                            <source :src="imageUrl" type="video/mp4" />
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                </div>
             </div>
         </div>
     </AppLayout>
