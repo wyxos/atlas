@@ -8,7 +8,7 @@ import type { BrowseItem as IBrowseItem } from '@/types/browse';
 import { Head } from '@inertiajs/vue3';
 import { useImageZoom } from '@/composables/useImageZoom';
 import { Masonry } from '@wyxos/vibe';
-import { ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: route('dashboard') },
@@ -43,6 +43,7 @@ const {
     stopDrag,
     goToNext,
     goToPrevious,
+    removeCurrentAndGoNext,
 } = useImageZoom();
 
 // Reactions
@@ -70,6 +71,93 @@ const onAltMiddleClick = (item: IBrowseItem) => {
 };
 const onAltRightClick = (item: IBrowseItem) => {
     blacklistImage(item, removeItemFromView);
+};
+
+// Fullscreen Alt shortcuts (mirror Browse.vue)
+const handleFullScreenAltClick = () => {
+    if (currentImage.value) {
+        const itemToProcess = currentImage.value as IBrowseItem;
+        removeCurrentAndGoNext();
+        removeItemFromView(itemToProcess);
+        startDownload(itemToProcess);
+        handleLike(itemToProcess, new Event('click'));
+    }
+};
+const handleFullScreenAltMiddleClick = () => {
+    if (currentImage.value) {
+        const itemToProcess = currentImage.value as IBrowseItem;
+        removeCurrentAndGoNext();
+        removeItemFromView(itemToProcess);
+        startDownload(itemToProcess);
+        handleFavorite(itemToProcess, new Event('click'));
+    }
+};
+const handleFullScreenAltRightClick = () => {
+    if (currentImage.value) {
+        const itemToProcess = currentImage.value as IBrowseItem;
+        removeCurrentAndGoNext();
+        removeItemFromView(itemToProcess);
+        blacklistImage(itemToProcess);
+    }
+};
+
+// Prevent browser back/forward when fullscreen viewer is open (like Browse.vue)
+const globalAuxMouseBlocker = (event: MouseEvent) => {
+    if (!isImageViewerOpen.value) return;
+    const btn = (event as any).button;
+    if (btn === 3 || btn === 4) {
+        event.preventDefault?.();
+        event.stopImmediatePropagation?.();
+    }
+};
+
+onMounted(() => {
+    window.addEventListener('mousedown', globalAuxMouseBlocker, { capture: true });
+    window.addEventListener('mouseup', globalAuxMouseBlocker, { capture: true });
+    window.addEventListener('auxclick', globalAuxMouseBlocker, { capture: true } as any);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('mousedown', globalAuxMouseBlocker, { capture: true } as any);
+    window.removeEventListener('mouseup', globalAuxMouseBlocker, { capture: true } as any);
+    window.removeEventListener('auxclick', globalAuxMouseBlocker, { capture: true } as any);
+});
+
+// Mouse navigation handler in fullscreen (like Browse.vue)
+const handleMouseNavigation = (event: MouseEvent) => {
+    const isBackButton = (event as any).button === 3;
+    const isForwardButton = (event as any).button === 4;
+
+    if (isBackButton || isForwardButton) {
+        event.preventDefault?.();
+        event.stopPropagation?.();
+    }
+
+    // Alt + back => block post of current image
+    if (isBackButton && event.altKey && (currentImage.value as any)?.listingMetadata?.postId) {
+        const postId = (currentImage.value as any).listingMetadata.postId;
+        window?.dispatchEvent?.(new CustomEvent('browse:block-post', { detail: { postId } }));
+        return;
+    }
+
+    // Previous image
+    if (isBackButton && canGoPrevious.value) {
+        goToPrevious();
+        return;
+    }
+
+    // Alt + forward => like post of current image
+    if (isForwardButton && event.altKey && (currentImage.value as any)?.listingMetadata?.postId) {
+        const postId = (currentImage.value as any).listingMetadata.postId;
+        window?.dispatchEvent?.(new CustomEvent('browse:like-post', { detail: { postId } }));
+        return;
+    }
+
+    // Next image
+    if (isForwardButton && canGoNext.value) {
+        goToNext();
+        return;
+    }
 };
 </script>
 
@@ -128,11 +216,14 @@ class="w-full cursor-pointer object-cover block"
         </div>
         
         <!-- Full Screen Media Viewer Modal (mirrors Browse.vue basics) -->
-        <div
+                <div
             v-if="isImageViewerOpen"
             class="fixed inset-0 z-50 flex bg-black/90"
             tabindex="0"
             @click="closeImageViewer"
+            @mousedown.prevent.stop="handleMouseNavigation"
+            @mouseup.prevent.stop="handleMouseNavigation"
+            @auxclick.prevent.stop="handleMouseNavigation"
             @keydown.escape="closeImageViewer"
             @keydown.left="canGoPrevious && ( $event.preventDefault(), goToPrevious() )"
             @keydown.right="canGoNext && ( $event.preventDefault(), goToNext() )"
@@ -163,6 +254,9 @@ class="w-full cursor-pointer object-cover block"
                         @mouseleave="isCurrentImage ? stopDrag : null"
                         @mousemove="isCurrentImage ? onDrag : null"
                         @mouseup="isCurrentImage ? stopDrag : null"
+                        @click.alt.exact.prevent="handleFullScreenAltClick"
+                        @click.middle.alt.exact.prevent="handleFullScreenAltMiddleClick"
+                        @contextmenu.alt.exact.prevent="handleFullScreenAltRightClick"
                     >
                         <!-- Image -->
                         <img
@@ -171,9 +265,12 @@ class="w-full cursor-pointer object-cover block"
                             :src="imageUrl"
                             :style="{
                                 transform: `scale(${imageViewerZoom}) translate(${imageViewerPosition.x / imageViewerZoom}px, ${imageViewerPosition.y / imageViewerZoom}px)`,
-                                cursor: imageViewerZoom > 1 ? 'grab' : 'default',
+                                cursor: imageViewerZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
                             }"
                             class="max-h-full max-w-full object-contain transition-transform"
+                            @click.alt.exact.prevent="handleFullScreenAltClick"
+                            @click.middle.alt.exact.prevent="handleFullScreenAltMiddleClick"
+                            @click.stop
                             @dragstart.prevent
                         />
 
