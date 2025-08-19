@@ -114,4 +114,32 @@ class BrowseController extends Controller
             ]
         ], 200);
     }
+
+    /**
+     * Block a post by disliking and blacklisting all provided files from that post.
+     */
+    public function blockPost(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'postId' => 'required',
+            'fileIds' => 'required|array',
+            'fileIds.*' => 'integer|exists:files,id',
+        ]);
+
+        $fileIds = $data['fileIds'];
+        $now = now();
+
+        // Update all matching files: dislike + blacklist
+        File::whereIn('id', $fileIds)->update([
+            'disliked' => true,
+            'disliked_at' => $now,
+            'is_blacklisted' => true,
+            'blacklist_reason' => 'Blocked post ' . $data['postId'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'removedIds' => $fileIds,
+        ]);
+    }
 }

@@ -26,6 +26,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::post('browse/blacklist/{file}', [BrowseController::class, 'blacklist'])->name('browse.blacklist');
     Route::post('browse/undo-blacklist', [BrowseController::class, 'undoLastBlacklist'])->name('browse.undo-blacklist');
     Route::post('browse/download/{file}', [BrowseController::class, 'download'])->name('browse.download');
+    Route::post('browse/block-post', [BrowseController::class, 'blockPost'])->name('browse.block-post');
 
     Route::get('audio', function () {
         $search = [];

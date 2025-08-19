@@ -17,6 +17,7 @@ import type { BrowseProps, BrowseFilters as IBrowseFilters, BrowseItem as IBrows
 import { Head, router } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
 import { ref, watch } from 'vue';
+import { toast } from '@/components/ui/toast/use-toast';
 
 const props = defineProps<BrowseProps>();
 
@@ -158,9 +159,10 @@ const handleRightClick = (event: MouseEvent, item: IBrowseItem) => {
         event,
         {
             handler: 'browse-list',
-            item: { id: item.id, name: `File ${item.id}` },
+            // Include postId for menu condition
+            item: { id: item.id, name: `File ${item.id}`, postId: item?.listingMetadata?.postId },
         },
-        '/api/browse-context-menu',
+undefined,
     ); // Add endpoint for browse list context menu data
 };
 
@@ -514,6 +516,49 @@ watch(
 );
 
 // Watch for listing metadata updates and update masonry items
+import axios from 'axios';
+
+// Handle "Block post" context action dispatched from AppLayout
+window.addEventListener('browse:block-post', (e: any) => {
+    const postId = e?.detail?.postId;
+    if (!postId) return;
+
+    // Gather current items with the same postId
+    const toRemove = masonryItems.value.filter((i) => i?.listingMetadata?.postId === postId);
+    if (toRemove.length === 0) return;
+
+    const count = toRemove.length;
+
+    // Show confirmation toast with action and dismiss immediately on click
+    let toastHandle: { id: string; dismiss: () => void } | null = null;
+    toastHandle = toast({
+        title: 'Block post?',
+        description: `This will dislike + blacklist ${count} item${count > 1 ? 's' : ''} from post ${postId}.`,
+        action: {
+            label: 'Block now',
+            onClick: async () => {
+                // Dismiss confirmation immediately
+                toastHandle?.dismiss();
+                try {
+                    await axios.post(route('browse.block-post'), {
+                        postId,
+                        fileIds: toRemove.map((i) => i.id),
+                    });
+
+                    for (const item of toRemove) {
+                        await removeItemFromView(item);
+                    }
+
+                    toast({ title: 'Post blocked', description: `${count} item${count > 1 ? 's' : ''} removed.` });
+                } catch (err) {
+                    console.error('Failed to block post:', err);
+                    toast({ title: 'Failed to block post', description: 'Please try again.' });
+                }
+            },
+        },
+    });
+});
+
 watch(
     updatedListingMetadata,
     (newListing) => {

@@ -10,6 +10,18 @@ import { computed, ref, watch } from 'vue';
 import { Toaster } from '@/components/ui/toast';
 
 const { show, options, currentContent, loading } = useContextMenu();
+
+function blockPostFromContext() {
+    const postId = (currentContent.value?.item as any)?.postId;
+    if (!postId) return;
+    try {
+        window?.dispatchEvent?.(new CustomEvent('browse:block-post', { detail: { postId } }));
+    } catch (e) {
+        console.error('Failed to dispatch block-post event', e);
+    } finally {
+        show.value = false;
+    }
+}
 const page = usePage();
 
 interface Props {
@@ -112,6 +124,14 @@ function isInPlaylist(playlistId: number): boolean {
 
                 <!-- Default context menu items -->
                 <context-menu-item v-if="isAudioContext" label="Play" />
+
+                <!-- Browse context menu actions -->
+                <context-menu-item
+                    v-if="currentContent?.handler === 'browse-list' && (currentContent?.item as any)?.postId"
+                    label="Block post"
+@click="blockPostFromContext"
+                />
+
                 <context-menu-item label="View Details" />
             </template>
         </context-menu>

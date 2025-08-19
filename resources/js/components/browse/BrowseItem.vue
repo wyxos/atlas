@@ -25,7 +25,6 @@ const emit = defineEmits<{
     contextmenu: [event: MouseEvent];
 }>();
 
-
 const handleLeftClick = () => {
     // Navigate to single file view with preserved state
     emit('leftClick', props.item);
@@ -42,7 +41,6 @@ const handleAltMiddleClick = () => {
 const handleAltRightClick = () => {
     emit('altRightClick', props.item);
 };
-
 
 // Utility function to detect if the file is a video based on its URL
 const isVideo = computed(() => {
