@@ -543,14 +543,14 @@ const getPostRelatedCount = (item: IBrowseItem): number => {
     const postId = item?.listingMetadata?.postId;
     if (!postId) return 0;
     const total = postCounts.value.get(postId) || 0;
-    return Math.max(0, total);
+    return Math.max(0, total); // exclude this item
 };
 
 const getUserRelatedCount = (item: IBrowseItem): number => {
-    const username = item?.listingMetadata?.username;
+    const username = item?.listingMetadata?.data?.meta?.username;
     if (!username) return 0;
     const total = userCounts.value.get(username) || 0;
-    return Math.max(0, total);
+    return Math.max(0, total); // exclude this item
 };
 
 // Watch for listing metadata updates and update masonry items
@@ -566,20 +566,21 @@ window.addEventListener('browse:block-post', async (e: any) => {
 
     const count = toRemove.length;
 
+    // Optimistically remove from UI first
+    for (const item of toRemove) {
+        await removeItemFromView(item);
+    }
+
     try {
         await axios.post(route('browse.block-post'), {
             postId,
             fileIds: toRemove.map((i) => i.id),
         });
 
-        for (const item of toRemove) {
-            await removeItemFromView(item);
-        }
-
         toast({ title: 'Post blocked', description: `${count} item${count > 1 ? 's' : ''} removed.` });
     } catch (err) {
         console.error('Failed to block post:', err);
-        toast({ title: 'Failed to block post', description: 'Please try again.' });
+        toast({ title: 'Failed to block post', description: 'They were removed locally; server update failed.' });
     }
 });
 
