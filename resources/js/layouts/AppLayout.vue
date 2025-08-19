@@ -22,6 +22,18 @@ function blockPostFromContext() {
         show.value = false;
     }
 }
+
+function likePostFromContext() {
+    const postId = (currentContent.value?.item as any)?.postId;
+    if (!postId) return;
+    try {
+        window?.dispatchEvent?.(new CustomEvent('browse:like-post', { detail: { postId } }));
+    } catch (e) {
+        console.error('Failed to dispatch like-post event', e);
+    } finally {
+        show.value = false;
+    }
+}
 const page = usePage();
 
 interface Props {
@@ -129,7 +141,12 @@ function isInPlaylist(playlistId: number): boolean {
                 <context-menu-item
                     v-if="currentContent?.handler === 'browse-list' && (currentContent?.item as any)?.postId"
                     label="Block post"
-@click="blockPostFromContext"
+                    @click="blockPostFromContext"
+                />
+                <context-menu-item
+                    v-if="currentContent?.handler === 'browse-list' && (currentContent?.item as any)?.postId"
+                    label="Like Post"
+                    @click="likePostFromContext"
                 />
 
                 <context-menu-item label="View Details" />

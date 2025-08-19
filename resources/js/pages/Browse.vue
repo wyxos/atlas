@@ -456,14 +456,43 @@ const handleUndoBlacklist = async () => {
 
 // Handle mouse button navigation in full screen mode
 const handleMouseNavigation = (event: MouseEvent) => {
+    // Normalize handling for auxiliary buttons to avoid browser navigation
     // Mouse button 3 = back button (previous)
     // Mouse button 4 = forward button (next)
-    if (event.button === 3 && canGoPrevious.value) {
-        event.preventDefault();
+
+    const isBackButton = event.button === 3;
+    const isForwardButton = event.button === 4;
+
+    if (isBackButton || isForwardButton) {
+        // Prevent default browser back/forward behavior for aux buttons
+        event.preventDefault?.();
+        event.stopPropagation?.();
+    }
+
+    // Alt + previous mouse button (button 3) => Block post of current image
+    if (isBackButton && event.altKey && currentImage.value?.listingMetadata?.postId) {
+        const postId = currentImage.value.listingMetadata.postId;
+        window?.dispatchEvent?.(new CustomEvent('browse:block-post', { detail: { postId } }));
+        return;
+    }
+
+    // Previous image
+    if (isBackButton && canGoPrevious.value) {
         goToPrevious();
-    } else if (event.button === 4 && canGoNext.value) {
-        event.preventDefault();
+        return;
+    }
+
+    // Alt + next mouse button (button 4) => Like post of current image
+    if (isForwardButton && event.altKey && currentImage.value?.listingMetadata?.postId) {
+        const postId = currentImage.value.listingMetadata.postId;
+        window?.dispatchEvent?.(new CustomEvent('browse:like-post', { detail: { postId } }));
+        return;
+    }
+
+    // Next image
+    if (isForwardButton && canGoNext.value) {
         goToNext();
+        return;
     }
 };
 
@@ -588,6 +617,41 @@ window.addEventListener('browse:block-post', async (e: any) => {
     }
 });
 
+// Handle "Like Post" context action dispatched from AppLayout
+window.addEventListener('browse:like-post', async (e: any) => {
+    const postId = e?.detail?.postId;
+    if (!postId) return;
+
+    // Collect current items with same postId
+    const toProcess = masonryItems.value.filter((i) => i?.listingMetadata?.postId === postId);
+    if (toProcess.length === 0) return;
+
+    const count = toProcess.length;
+
+    // Optimistically remove from UI first (batch if supported)
+    if (masonry.value && typeof masonry.value.removeMany === 'function') {
+        await masonry.value.removeMany(toProcess);
+    } else {
+        for (const item of toProcess) {
+            await removeItemFromView(item);
+        }
+    }
+
+    // Like and start downloads in background (no need to await all before notifying)
+    for (const item of toProcess) {
+        try {
+            // like without removal callback, we already removed optimistically
+            // do not await to keep UI snappy; but catch per-item errors
+            void handleLike(item, new Event('click'));
+            startDownload(item);
+        } catch (err) {
+            console.warn('Failed to like/download item', item.id, err);
+        }
+    }
+
+    toast({ title: 'Post liked', description: `${count} item${count > 1 ? 's' : ''} liked, removed, and downloading.` });
+});
+
 watch(
     updatedListingMetadata,
     (newListing) => {
@@ -697,7 +761,9 @@ watch(
             class="fixed inset-0 z-50 flex bg-black/90"
             tabindex="0"
             @click="closeImageViewer"
-            @mousedown="handleMouseNavigation"
+@mousedown="handleMouseNavigation"
+            @mouseup="handleMouseNavigation"
+            @auxclick.prevent.stop="handleMouseNavigation"
             @keydown.escape="closeImageViewer"
             @keydown.left="goToPrevious"
             @keydown.right="goToNext"

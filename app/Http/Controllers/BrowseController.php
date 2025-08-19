@@ -137,6 +137,8 @@ class BrowseController extends Controller
             'blacklist_reason' => 'Blocked post ' . $data['postId'],
         ]);
 
+        File::whereIn('id', $fileIds)->searchable();
+
         return response()->json([
             'success' => true,
             'removedIds' => $fileIds,
