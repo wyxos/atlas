@@ -547,7 +547,7 @@ const getPostRelatedCount = (item: IBrowseItem): number => {
 };
 
 const getUserRelatedCount = (item: IBrowseItem): number => {
-    const username = item?.listingMetadata?.data?.meta?.username;
+    const username = item?.listingMetadata?.username;
     if (!username) return 0;
     const total = userCounts.value.get(username) || 0;
     return Math.max(0, total); // exclude this item
@@ -566,9 +566,13 @@ window.addEventListener('browse:block-post', async (e: any) => {
 
     const count = toRemove.length;
 
-    // Optimistically remove from UI first
-    for (const item of toRemove) {
-        await removeItemFromView(item);
+    // Optimistically remove from UI first (batch if supported)
+    if (masonry.value && typeof masonry.value.removeMany === 'function') {
+        await masonry.value.removeMany(toRemove);
+    } else {
+        for (const item of toRemove) {
+            await removeItemFromView(item);
+        }
     }
 
     try {
