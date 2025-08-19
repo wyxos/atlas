@@ -18,7 +18,7 @@ import type { BrowseProps, BrowseFilters as IBrowseFilters, BrowseItem as IBrows
 import { Head, router } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = defineProps<BrowseProps>();
 
@@ -784,7 +784,7 @@ watch(
             class="fixed inset-0 z-50 flex bg-black/90"
             tabindex="0"
             @click="closeImageViewer"
-@mousedown.prevent.stop="handleMouseNavigation"
+            @mousedown.prevent.stop="handleMouseNavigation"
             @mouseup.prevent.stop="handleMouseNavigation"
             @auxclick.prevent.stop="handleMouseNavigation"
             @keydown.escape="closeImageViewer"
