@@ -599,8 +599,34 @@ const getUserRelatedCount = (item: IBrowseItem): number => {
     return Math.max(0, total); // exclude this item
 };
 
-// Hover state and blur logic
+// Hover state and blur logic with delayed activation
 const hoveredItemId = ref<number | null>(null);
+const blurActiveId = ref<number | null>(null);
+let blurHoverTimer: number | null = null;
+
+const handleHoverEnter = (item: IBrowseItem) => {
+    hoveredItemId.value = item.id;
+    // Clear any existing timer
+    if (blurHoverTimer !== null) {
+        clearTimeout(blurHoverTimer);
+        blurHoverTimer = null;
+    }
+    // Start delay before enabling blur
+    blurHoverTimer = window.setTimeout(() => {
+        blurActiveId.value = item.id;
+        blurHoverTimer = null;
+    }, 1500);
+};
+
+const handleHoverLeave = () => {
+    // Clear timer and disable blur immediately when leaving
+    if (blurHoverTimer !== null) {
+        clearTimeout(blurHoverTimer);
+        blurHoverTimer = null;
+    }
+    blurActiveId.value = null;
+    hoveredItemId.value = null;
+};
 
 const getItemById = (id: number | null): IBrowseItem | null => {
     if (id == null) return null;
@@ -615,21 +641,21 @@ const hasRelatedFor = (item: IBrowseItem | null): boolean => {
     return postCount > 1 || userCount > 1;
 };
 
-const isRelatedToHovered = (item: IBrowseItem): boolean => {
-    const hovered = getItemById(hoveredItemId.value);
-    if (!hovered) return false;
-    if (hovered.id === item.id) return true;
-    const samePost = hovered?.listingMetadata?.postId && hovered.listingMetadata.postId === item?.listingMetadata?.postId;
-    const sameUser = hovered?.listingMetadata?.username && hovered.listingMetadata.username === item?.listingMetadata?.username;
+const isRelatedToActive = (item: IBrowseItem): boolean => {
+    const active = getItemById(blurActiveId.value);
+    if (!active) return false;
+    if (active.id === item.id) return true;
+    const samePost = active?.listingMetadata?.postId && active.listingMetadata.postId === item?.listingMetadata?.postId;
+    const sameUser = active?.listingMetadata?.username && active.listingMetadata.username === item?.listingMetadata?.username;
     return Boolean(samePost || sameUser);
 };
 
 const shouldBlur = (item: IBrowseItem): boolean => {
-    const hovered = getItemById(hoveredItemId.value);
-    if (!hovered) return false;
-    // Only activate blur mode if the hovered item has related images
-    if (!hasRelatedFor(hovered)) return false;
-    return !isRelatedToHovered(item);
+    const active = getItemById(blurActiveId.value);
+    if (!active) return false; // not active yet (waiting 1.5s)
+    // Only activate blur mode if the active item has related images
+    if (!hasRelatedFor(active)) return false;
+    return !isRelatedToActive(item);
 };
 
 // Watch for listing metadata updates and update masonry items
@@ -766,8 +792,8 @@ watch(
                     <template #item="{ item }">
                         <div
                             :class="['transition duration-150', shouldBlur(item) ? 'blur-[1px] blur-md' : '']"
-                            @mouseenter="hoveredItemId = item.id"
-                            @mouseleave="hoveredItemId = null"
+                            @mouseenter="handleHoverEnter(item)"
+                            @mouseleave="handleHoverLeave()"
                         >
                             <BrowseItem
                                 :download-progress="downloadProgress[item.id]"

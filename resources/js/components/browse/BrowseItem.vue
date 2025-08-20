@@ -3,7 +3,7 @@ import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
 import axios from 'axios';
-import { RotateCcw } from 'lucide-vue-next';
+import { RotateCcw, ExternalLink } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 interface Props {
@@ -264,9 +264,30 @@ const handleVideoCompleted = () => {
     >
         <!-- Media container with fixed imageHeight -->
         <div>
+            <!-- Error placeholder replaces media area with same height -->
+            <div
+                v-if="hasError"
+                :style="{ height: (item.imageHeight ?? 0) + 'px' }"
+                class="w-full bg-black/60 flex items-center justify-center"
+            >
+                		<div class="flex flex-col items-center gap-2 text-white">
+                    <div class="flex items-center gap-2">
+                        <button class="inline-flex items-center gap-2 rounded bg-white/10 px-3 py-2 backdrop-blur hover:bg-white/20" @click="retryLoad">
+                            <RotateCcw :size="18" />
+                            <span>Reload</span>
+                        </button>
+                        		<a :href="props.item.original || props.item.src" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded bg-white/10 px-3 py-2 backdrop-blur hover:bg-white/20">
+                            <ExternalLink :size="18" />
+                            <span>Open</span>
+                        </a>
+                    </div>
+                    <div v-if="errorStatus === 404" class="text-xs text-red-300">404 Not Found</div>
+                </div>
+            </div>
+
             <!-- Image element for image files -->
             <img
-                v-if="isImage"
+                v-else-if="isImage"
                 :alt="`Image ${item.id}`"
                 :height="item.imageHeight"
                 :src="isInViewport ? currentSrc : undefined"
@@ -346,16 +367,6 @@ const handleVideoCompleted = () => {
             <div class="p-1 text-center text-xs text-white">Downloading... {{ downloadProgress }}%</div>
         </div>
 
-        <!-- Error overlay with centered refresh button -->
-        <div v-if="hasError" class="absolute inset-0 z-20 flex items-center justify-center bg-black/60">
-            <div class="flex flex-col items-center gap-2 text-white">
-                <button class="inline-flex items-center gap-2 rounded bg-white/10 px-3 py-2 backdrop-blur hover:bg-white/20" @click="retryLoad">
-                    <RotateCcw :size="18" />
-                    <span>Reload</span>
-                </button>
-                <div v-if="errorStatus === 404" class="text-xs text-red-300">404 Not Found</div>
-            </div>
-        </div>
 
         <!-- Downloaded indicator -->
         <div v-if="isDownloaded" class="absolute top-2 left-2 rounded bg-green-500 px-2 py-1 text-xs text-white">✓ Downloaded</div>
