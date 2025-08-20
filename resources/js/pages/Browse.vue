@@ -687,18 +687,17 @@ window.addEventListener('browse:like-post', async (e: any) => {
         }
     }
 
-    // Like and start downloads in background (no need to await all before notifying)
-    for (const item of toProcess) {
-        try {
-            // like without removal callback, we already removed optimistically
-            // handleLike triggers download internally
-            void handleLike(item, new Event('click'));
-        } catch (err) {
-            console.warn('Failed to like/download item', item.id, err);
-        }
+    try {
+        await axios.post(route('browse.like-post'), {
+            postId,
+            fileIds: toProcess.map((i) => i.id),
+            delayMs: 200,
+        });
+        toast({ title: 'Post liked', description: `${count} item${count > 1 ? 's' : ''} liked and queued for download.` });
+    } catch (err) {
+        console.error('Failed to like post:', err);
+        toast({ title: 'Failed to like post', description: 'They were removed locally; server update failed.' });
     }
-
-    toast({ title: 'Post liked', description: `${count} item${count > 1 ? 's' : ''} liked, removed, and downloading.` });
 });
 
 watch(

@@ -144,4 +144,54 @@ class BrowseController extends Controller
             'removedIds' => $fileIds,
         ]);
     }
+
+    /**
+     * Like a post by liking all provided files and enqueueing downloads with a small delay between each.
+     */
+    public function likePost(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'postId' => 'required',
+            'fileIds' => 'required|array',
+            'fileIds.*' => 'integer|exists:files,id',
+            'delayMs' => 'nullable|integer|min:0',
+        ]);
+
+        $fileIds = $data['fileIds'];
+        $delayMs = $data['delayMs'] ?? 1000; // default 200ms gap
+        $now = now();
+
+        $files = File::whereIn('id', $fileIds)->get();
+
+        $index = 0;
+        foreach ($files as $file) {
+            // Set liked and clear conflicting flags
+            $file->liked = true;
+            $file->liked_at = $now;
+            $file->loved = false;
+            $file->loved_at = null;
+            $file->disliked = false;
+            $file->disliked_at = null;
+            $file->funny = false;
+            $file->laughed_at = null;
+            // Remove blacklist on positive reaction
+            $file->is_blacklisted = false;
+            $file->blacklist_reason = null;
+            $file->save();
+
+            // Dispatch download with per-item delay if not already downloaded
+            if (!$file->downloaded) {
+                DownloadFile::dispatch($file)->delay(now()->addMilliseconds($index * $delayMs));
+                $index++;
+            }
+        }
+
+        File::whereIn('id', $fileIds)->searchable();
+
+        return response()->json([
+            'success' => true,
+            'processedIds' => $files->pluck('id'),
+            'count' => $files->count(),
+        ]);
+    }
 }
