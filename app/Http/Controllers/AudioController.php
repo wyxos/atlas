@@ -84,6 +84,10 @@ class AudioController extends Controller
             $file->disliked_at = null;
             $file->funny = false;
             $file->laughed_at = null;
+
+            // Positive reaction should remove blacklist
+            $file->is_blacklisted = false;
+            $file->blacklist_reason = null;
         }
 
         $file->save();
@@ -113,6 +117,10 @@ class AudioController extends Controller
             $file->disliked_at = null;
             $file->funny = false;
             $file->laughed_at = null;
+
+            // Positive reaction should remove blacklist
+            $file->is_blacklisted = false;
+            $file->blacklist_reason = null;
         }
 
         $file->save();
@@ -171,6 +179,10 @@ class AudioController extends Controller
             $file->liked_at = null;
             $file->disliked = false;
             $file->disliked_at = null;
+
+            // Positive reaction should remove blacklist
+            $file->is_blacklisted = false;
+            $file->blacklist_reason = null;
         }
 
         $file->save();
