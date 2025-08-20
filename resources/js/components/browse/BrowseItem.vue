@@ -2,9 +2,9 @@
 import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import axios from 'axios';
 import { RotateCcw } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 interface Props {
     item: BrowseItem;
@@ -87,49 +87,49 @@ const retryAttempts = ref(0);
 const currentSrc = ref<string>('');
 
 watch(
-  () => props.item.src,
-  (newSrc) => {
-    hasError.value = false;
-    errorStatus.value = null;
-    retryAttempts.value = 0;
-    currentSrc.value = newSrc;
-  },
-  { immediate: true }
+    () => props.item.src,
+    (newSrc) => {
+        hasError.value = false;
+        errorStatus.value = null;
+        retryAttempts.value = 0;
+        currentSrc.value = newSrc;
+    },
+    { immediate: true },
 );
 
 const handleMediaError = async () => {
-  hasError.value = true;
-  errorStatus.value = null; // unknown until probe
-  try {
-    const { data } = await axios.get(route('link.check'), { params: { url: props.item.src } });
-    errorStatus.value = data?.status ?? 0;
-  } catch {
-    errorStatus.value = 0; // unknown
-  }
+    hasError.value = true;
+    errorStatus.value = null; // unknown until probe
+    try {
+        const { data } = await axios.get(route('link.check'), { params: { url: props.item.src } });
+        errorStatus.value = data?.status ?? 0;
+    } catch {
+        errorStatus.value = 0; // unknown
+    }
 };
 
 const retryLoad = async () => {
-  if (errorStatus.value === 404) return; // don't retry confirmed 404
-  try {
-    const { data } = await axios.get(route('link.check'), { params: { url: props.item.src } });
-    if (data?.status === 404) {
-      errorStatus.value = 404;
-      return;
-    }
-  } catch {}
+    if (errorStatus.value === 404) return; // don't retry confirmed 404
+    try {
+        const { data } = await axios.get(route('link.check'), { params: { url: props.item.src } });
+        if (data?.status === 404) {
+            errorStatus.value = 404;
+            return;
+        }
+    } catch {}
 
-  retryAttempts.value += 1;
-  const ts = Date.now();
-  try {
-    const u = new URL(currentSrc.value || props.item.src, window.location.origin);
-    u.searchParams.set('_r', `${ts}-${retryAttempts.value}`);
-    currentSrc.value = u.toString();
-  } catch {
-    // If URL constructor fails due to cross-origin, fall back to simple query concat
-    const sep = (currentSrc.value || props.item.src).includes('?') ? '&' : '?';
-    currentSrc.value = (currentSrc.value || props.item.src) + `${sep}_r=${ts}-${retryAttempts.value}`;
-  }
-  hasError.value = false;
+    retryAttempts.value += 1;
+    const ts = Date.now();
+    try {
+        const u = new URL(currentSrc.value || props.item.src, window.location.origin);
+        u.searchParams.set('_r', `${ts}-${retryAttempts.value}`);
+        currentSrc.value = u.toString();
+    } catch {
+        // If URL constructor fails due to cross-origin, fall back to simple query concat
+        const sep = (currentSrc.value || props.item.src).includes('?') ? '&' : '?';
+        currentSrc.value = (currentSrc.value || props.item.src) + `${sep}_r=${ts}-${retryAttempts.value}`;
+    }
+    hasError.value = false;
 };
 
 // Determine the status badge
@@ -254,11 +254,13 @@ const handleVideoCompleted = () => {
 </script>
 
 <template>
-<div :id="`browse-item-${item.id}`" class="relative h-full"
-         @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)"
-         @mousedown.capture="handleMouseButtons"
-         @mouseup.capture="handleMouseButtons"
-         @auxclick.prevent.stop="handleMouseButtons"
+    <div
+        :id="`browse-item-${item.id}`"
+        class="relative h-full"
+        @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)"
+        @mousedown.capture="handleMouseButtons"
+        @mouseup.capture="handleMouseButtons"
+        @auxclick.prevent.stop="handleMouseButtons"
     >
         <!-- Media container with fixed imageHeight -->
         <div>
