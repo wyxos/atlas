@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use App\Models\File;
 
 class LinkProbeController extends Controller
 {
@@ -27,6 +28,15 @@ class LinkProbeController extends Controller
             } catch (\Throwable $e2) {
                 // Network or upstream issue; report as 0 to indicate unknown
                 $status = 0;
+            }
+        }
+
+        // If 404, flag matching file records as not found
+        if ($status === 404) {
+            try {
+                File::where('url', $url)->update(['not_found' => true]);
+            } catch (\Throwable $e) {
+                // Swallow DB errors to keep endpoint lightweight
             }
         }
 

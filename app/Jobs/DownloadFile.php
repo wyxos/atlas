@@ -46,6 +46,11 @@ class DownloadFile implements ShouldQueue
 
             try {
                 $head = Http::timeout(15)->head($fileUrl);
+                if ($head->status() === 404) {
+                    // Mark as not found and abort early
+                    $this->file->update(['not_found' => true]);
+                    throw new \Exception('Remote file not found (404)');
+                }
                 if ($head->ok()) {
                     $acceptRanges = $head->header('Accept-Ranges');
                     $contentLength = (int) $head->header('Content-Length');
@@ -58,6 +63,10 @@ class DownloadFile implements ShouldQueue
                 // Try a 1-byte range probe to detect support and size via Content-Range
                 try {
                     $probe = Http::withHeaders(['Range' => 'bytes=0-0'])->timeout(30)->get($fileUrl);
+                    if ($probe->status() === 404) {
+                        $this->file->update(['not_found' => true]);
+                        throw new \Exception('Remote file not found (404)');
+                    }
                     if ($probe->status() === 206) {
                         $acceptRanges = 'bytes';
                         $contentRange = $probe->header('Content-Range'); // e.g., bytes 0-0/12345
@@ -117,6 +126,11 @@ class DownloadFile implements ShouldQueue
                         }
                     ])->timeout(300)->get($fileUrl);
 
+                    if ($response->status() === 404) {
+                        fclose($fp);
+                        $this->file->update(['not_found' => true]);
+                        throw new \Exception('Remote file not found (404)');
+                    }
                     if ($response->status() !== 206) {
                         // Server did not honor range; fallback to full GET
                         fclose($fp);
@@ -149,6 +163,10 @@ class DownloadFile implements ShouldQueue
                     }
                 ])->timeout(300)->get($fileUrl); // 5 minute timeout
 
+                if ($response->status() === 404) {
+                    $this->file->update(['not_found' => true]);
+                    throw new \Exception('Remote file not found (404)');
+                }
                 if (!$response->successful()) {
                     throw new \Exception("Failed to download file: HTTP {$response->status()}");
                 }
