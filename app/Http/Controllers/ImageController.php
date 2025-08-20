@@ -221,7 +221,13 @@ class ImageController extends Controller
 
     public function blacklisted()
     {
-        return Inertia::render('BlacklistedImages');
+        return Inertia::render('BlacklistedImages', [
+            'filters' => [
+                'page' => request()->get('page', 1),
+                'nextPage' => request()->get('page', 1),
+                'limit' => request()->get('limit', 40),
+            ],
+        ]);
     }
 
     public function unrated()
@@ -236,7 +242,7 @@ class ImageController extends Controller
 
         $paginator = File::search('*')
             ->whereNotIn('path', ['__missing__'])
-            ->orderByDesc('created_at')
+            ->orderByDesc('downloaded_at')
             ->paginate(perPage: $limit, page: $page);
 
         // Transform items to include image_url and any lightweight fields Masonry might use

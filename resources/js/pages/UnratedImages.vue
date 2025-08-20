@@ -44,6 +44,7 @@ const {
     goToNext,
     goToPrevious,
     removeCurrentAndGoNext,
+    isDragging,
 } = useImageZoom();
 
 // Reactions
@@ -229,7 +230,7 @@ class="w-full cursor-pointer object-cover block"
             @keydown.right="canGoNext && ( $event.preventDefault(), goToNext() )"
         >
             <!-- Top bar -->
-            <div class="flex flex-1 flex-col" @click.stop>
+            	<div class="flex flex-1 flex-col">
                 <div class="flex h-16 flex-shrink-0 items-center justify-between px-4">
                     <div class="flex gap-2" v-if="isCurrentImage">
                         <button class="bg-white/10 px-2 py-1 rounded text-white" @click.stop="zoomOut">-</button>

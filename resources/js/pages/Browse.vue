@@ -583,7 +583,7 @@ const postCounts = computed(() => {
 const userCounts = computed(() => {
     const map = new Map<string, number>();
     for (const i of masonryItems.value) {
-        const username = i?.listingMetadata?.data?.meta?.username;
+        const username = i?.listingMetadata?.username;
         if (username) {
             map.set(username, (map.get(username) || 0) + 1);
         }
