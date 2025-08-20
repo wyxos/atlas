@@ -2,7 +2,9 @@
 import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import axios from 'axios';
+import { RotateCcw } from 'lucide-vue-next';
 
 interface Props {
     item: BrowseItem;
@@ -77,6 +79,58 @@ const isImage = computed(() => {
 // Use the seen status composable
 const { markAsSeen } = useSeenStatus();
 const hasMarkedPreview = ref(false);
+
+// Error handling and retry state
+const hasError = ref(false);
+const errorStatus = ref<number | null>(null);
+const retryAttempts = ref(0);
+const currentSrc = ref<string>('');
+
+watch(
+  () => props.item.src,
+  (newSrc) => {
+    hasError.value = false;
+    errorStatus.value = null;
+    retryAttempts.value = 0;
+    currentSrc.value = newSrc;
+  },
+  { immediate: true }
+);
+
+const handleMediaError = async () => {
+  hasError.value = true;
+  errorStatus.value = null; // unknown until probe
+  try {
+    const { data } = await axios.get(route('link.check'), { params: { url: props.item.src } });
+    errorStatus.value = data?.status ?? 0;
+  } catch {
+    errorStatus.value = 0; // unknown
+  }
+};
+
+const retryLoad = async () => {
+  if (errorStatus.value === 404) return; // don't retry confirmed 404
+  try {
+    const { data } = await axios.get(route('link.check'), { params: { url: props.item.src } });
+    if (data?.status === 404) {
+      errorStatus.value = 404;
+      return;
+    }
+  } catch {}
+
+  retryAttempts.value += 1;
+  const ts = Date.now();
+  try {
+    const u = new URL(currentSrc.value || props.item.src, window.location.origin);
+    u.searchParams.set('_r', `${ts}-${retryAttempts.value}`);
+    currentSrc.value = u.toString();
+  } catch {
+    // If URL constructor fails due to cross-origin, fall back to simple query concat
+    const sep = (currentSrc.value || props.item.src).includes('?') ? '&' : '?';
+    currentSrc.value = (currentSrc.value || props.item.src) + `${sep}_r=${ts}-${retryAttempts.value}`;
+  }
+  hasError.value = false;
+};
 
 // Determine the status badge
 const statusBadge = computed(() => {
@@ -213,10 +267,10 @@ const handleVideoCompleted = () => {
                 v-if="isImage"
                 :alt="`Image ${item.id}`"
                 :height="item.imageHeight"
-                :src="isInViewport ? item.src : undefined"
+                :src="isInViewport ? currentSrc : undefined"
                 class="h-full w-full cursor-pointer object-cover"
                 loading="lazy"
-                @error="(e) => console.warn('Failed to load image:', item.id, e)"
+                @error="handleMediaError"
                 @load="handlePreviewLoaded"
                 @click.left.exact="handleLeftClick"
                 @click.alt.exact.prevent="handleAltClick"
@@ -227,14 +281,14 @@ const handleVideoCompleted = () => {
             <!-- Video element for video files -->
             <video
                 v-else-if="isVideo"
-                :src="isInViewport ? item.src : undefined"
+                :src="isInViewport ? currentSrc : undefined"
                 class="h-full w-full cursor-pointer object-cover transition-all duration-500 ease-in-out"
                 loop
                 muted
                 playsinline
                 preload="metadata"
                 @ended="handleVideoCompleted"
-                @error="(e) => console.warn('Failed to load video:', item.id, e)"
+                @error="handleMediaError"
                 @loadeddata="handlePreviewLoaded"
                 @mouseenter="(e) => e.target.play().catch(() => {})"
                 @mouseleave="(e) => e.target.pause()"
@@ -243,7 +297,7 @@ const handleVideoCompleted = () => {
                 @click.middle.alt.exact.prevent="handleAltMiddleClick"
                 @contextmenu.alt.exact.prevent="handleAltRightClick"
             >
-                <source v-if="isInViewport" :src="item.src" type="video/mp4" />
+                <source v-if="isInViewport" :src="currentSrc" type="video/mp4" />
                 Your browser does not support the video tag.
             </video>
         </div>
@@ -288,6 +342,17 @@ const handleVideoCompleted = () => {
         <div v-if="downloadProgress !== undefined" :style="{ bottom: '32px' }" class="absolute right-0 left-0 bg-black/50">
             <div :style="{ width: downloadProgress + '%' }" class="h-1 bg-blue-500 transition-all duration-300"></div>
             <div class="p-1 text-center text-xs text-white">Downloading... {{ downloadProgress }}%</div>
+        </div>
+
+        <!-- Error overlay with centered refresh button -->
+        <div v-if="hasError" class="absolute inset-0 z-20 flex items-center justify-center bg-black/60">
+            <div class="flex flex-col items-center gap-2 text-white">
+                <button class="inline-flex items-center gap-2 rounded bg-white/10 px-3 py-2 backdrop-blur hover:bg-white/20" @click="retryLoad">
+                    <RotateCcw :size="18" />
+                    <span>Reload</span>
+                </button>
+                <div v-if="errorStatus === 404" class="text-xs text-red-300">404 Not Found</div>
+            </div>
         </div>
 
         <!-- Downloaded indicator -->

@@ -10,6 +10,7 @@ use App\Http\Controllers\ImageController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
 use Inertia\Inertia;
+use App\Http\Controllers\LinkProbeController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome');
@@ -28,6 +29,9 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::post('browse/download/{file}', [BrowseController::class, 'download'])->name('browse.download');
     Route::post('browse/block-post', [BrowseController::class, 'blockPost'])->name('browse.block-post');
     Route::post('browse/like-post', [BrowseController::class, 'likePost'])->name('browse.like-post');
+
+    // Link probe endpoint to check remote URL status (used by BrowseItem refresh)
+    Route::get('api/link/check', [LinkProbeController::class, 'check'])->name('link.check');
 
     Route::get('audio', function () {
         $search = [];
