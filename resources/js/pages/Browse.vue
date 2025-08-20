@@ -605,6 +605,39 @@ const getUserRelatedCount = (item: IBrowseItem): number => {
     return Math.max(0, total); // exclude this item
 };
 
+// Hover state and blur logic
+const hoveredItemId = ref<number | null>(null);
+
+const getItemById = (id: number | null): IBrowseItem | null => {
+    if (id == null) return null;
+    return masonryItems.value.find((i) => i.id === id) ?? null;
+};
+
+const hasRelatedFor = (item: IBrowseItem | null): boolean => {
+    if (!item) return false;
+    const postCount = getPostRelatedCount(item);
+    const userCount = getUserRelatedCount(item);
+    // We only blur others if there exists at least one other related item by post OR user
+    return postCount > 1 || userCount > 1;
+};
+
+const isRelatedToHovered = (item: IBrowseItem): boolean => {
+    const hovered = getItemById(hoveredItemId.value);
+    if (!hovered) return false;
+    if (hovered.id === item.id) return true;
+    const samePost = hovered?.listingMetadata?.postId && hovered.listingMetadata.postId === item?.listingMetadata?.postId;
+    const sameUser = hovered?.listingMetadata?.username && hovered.listingMetadata.username === item?.listingMetadata?.username;
+    return Boolean(samePost || sameUser);
+};
+
+const shouldBlur = (item: IBrowseItem): boolean => {
+    const hovered = getItemById(hoveredItemId.value);
+    if (!hovered) return false;
+    // Only activate blur mode if the hovered item has related images
+    if (!hasRelatedFor(hovered)) return false;
+    return !isRelatedToHovered(item);
+};
+
 // Watch for listing metadata updates and update masonry items
 
 // Handle "Block post" context action dispatched from AppLayout
@@ -739,24 +772,30 @@ watch(
                     class="h-full"
                 >
                     <template #item="{ item }">
-                        <BrowseItem
-                            :download-progress="downloadProgress[item.id]"
-                            :is-downloaded="downloadedItems.has(item.id)"
-                            :is-loading="masonry?.isLoading || isAutocycling"
-                            :item="item"
-                            :page-size="currentFilters.limit"
-                            :post-related-count="getPostRelatedCount(item)"
-                            :user-related-count="getUserRelatedCount(item)"
-                            @contextmenu="(event) => handleRightClick(event, item)"
-                            @dislike="handleItemDislike"
-                            @favorite="handleItemFavorite"
-                            @like="handleItemLike"
-                            @laughed-at="handleItemLaughedAt"
-                            @alt-click="handleAltClick"
-                            @alt-middle-click="handleAltMiddleClick"
-                            @alt-right-click="handleAltRightClick"
-                            @left-click="handleLeftClick"
-                        />
+                        <div
+                            :class="['transition duration-150', shouldBlur(item) ? 'blur-[1px] blur-md' : '']"
+                            @mouseenter="hoveredItemId = item.id"
+                            @mouseleave="hoveredItemId = null"
+                        >
+                            <BrowseItem
+                                :download-progress="downloadProgress[item.id]"
+                                :is-downloaded="downloadedItems.has(item.id)"
+                                :is-loading="masonry?.isLoading || isAutocycling"
+                                :item="item"
+                                :page-size="currentFilters.limit"
+                                :post-related-count="getPostRelatedCount(item)"
+                                :user-related-count="getUserRelatedCount(item)"
+                                @contextmenu="(event) => handleRightClick(event, item)"
+                                @dislike="handleItemDislike"
+                                @favorite="handleItemFavorite"
+                                @like="handleItemLike"
+                                @laughed-at="handleItemLaughedAt"
+                                @alt-click="handleAltClick"
+                                @alt-middle-click="handleAltMiddleClick"
+                                @alt-right-click="handleAltRightClick"
+                                @left-click="handleLeftClick"
+                            />
+                        </div>
                     </template>
                 </Masonry>
 
