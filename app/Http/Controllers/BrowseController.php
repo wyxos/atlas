@@ -158,7 +158,7 @@ class BrowseController extends Controller
         ]);
 
         $fileIds = $data['fileIds'];
-        $delayMs = $data['delayMs'] ?? 1000; // default 200ms gap
+        $delayMs = $data['delayMs'] ?? 3000; // default 2000ms gap
         $now = now();
 
         $files = File::whereIn('id', $fileIds)->get();

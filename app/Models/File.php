@@ -257,7 +257,8 @@ class File extends Model
             }
 
             if (isset($metadata['year'])) {
-                $array['metadata_year'] = $metadata['year'];
+                // Typesense schema expects string; normalize year to string
+                $array['metadata_year'] = trim((string) $metadata['year']);
             }
 
             if (isset($metadata['comment'])) {
@@ -265,7 +266,14 @@ class File extends Model
             }
 
             if (isset($metadata['track'])) {
-                $array['metadata_track'] = $metadata['track'];
+                // Normalize track to string; handle arrays like [track, total]
+                $track = $metadata['track'];
+                if (is_array($track)) {
+                    $track = implode('/', array_filter(array_map(fn($v) => trim((string) $v), $track)));
+                } else {
+                    $track = trim((string) $track);
+                }
+                $array['metadata_track'] = $track;
             }
         }
 
