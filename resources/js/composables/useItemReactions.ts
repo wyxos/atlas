@@ -27,8 +27,7 @@ export function useItemReactions() {
             // Update with server response
             Object.assign(file, response.data);
 
-            // Start download
-            startDownload(file);
+            // Download is now auto-triggered server-side on positive reactions
 
             // Remove from view if favorited
             if (file.loved && onRemove) {
@@ -58,8 +57,7 @@ export function useItemReactions() {
             // Update with server response
             Object.assign(file, response.data);
 
-            // Start download
-            startDownload(file);
+            // Download is now auto-triggered server-side on positive reactions
 
             // Remove from view if liked
             if (file.liked && onRemove) {
@@ -115,8 +113,7 @@ export function useItemReactions() {
             // Update with server response
             Object.assign(file, response.data);
 
-            // Start download
-            startDownload(file);
+            // Download is now auto-triggered server-side on positive reactions
 
             // Remove from view if laughed at
             if (file.funny && onRemove) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\DownloadFile;
 use App\Models\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -178,5 +179,145 @@ class FileController extends Controller
         $file->delete();
 
         return back()->with('success', 'File deleted successfully.');
+    }
+
+    // Reactions (moved from AudioController): also auto-queue download for positive reactions
+
+    public function toggleLove(File $file)
+    {
+        $file->loved = !$file->loved;
+        $file->loved_at = $file->loved ? now() : null;
+
+        if ($file->loved) {
+            $file->liked = false;
+            $file->liked_at = null;
+            $file->disliked = false;
+            $file->disliked_at = null;
+            $file->funny = false;
+            $file->laughed_at = null;
+            // Positive reaction should remove blacklist
+            $file->is_blacklisted = false;
+            $file->blacklist_reason = null;
+        }
+
+        $file->save();
+
+        // Auto-download on positive reaction
+        if ($file->loved && !$file->downloaded) {
+            DownloadFile::dispatch($file);
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+                'funny' => $file->funny,
+            ]);
+        }
+
+        return back(303);
+    }
+
+    public function toggleLike(File $file)
+    {
+        $file->liked = !$file->liked;
+        $file->liked_at = $file->liked ? now() : null;
+
+        if ($file->liked) {
+            $file->loved = false;
+            $file->loved_at = null;
+            $file->disliked = false;
+            $file->disliked_at = null;
+            $file->funny = false;
+            $file->laughed_at = null;
+            // Positive reaction should remove blacklist
+            $file->is_blacklisted = false;
+            $file->blacklist_reason = null;
+        }
+
+        $file->save();
+
+        // Auto-download on positive reaction
+        if ($file->liked && !$file->downloaded) {
+            DownloadFile::dispatch($file);
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+                'funny' => $file->funny,
+            ]);
+        }
+
+        return back(303);
+    }
+
+    public function toggleDislike(File $file)
+    {
+        $file->disliked = !$file->disliked;
+        $file->disliked_at = $file->disliked ? now() : null;
+
+        if ($file->disliked) {
+            $file->loved = false;
+            $file->loved_at = null;
+            $file->liked = false;
+            $file->liked_at = null;
+            $file->funny = false;
+            $file->laughed_at = null;
+        }
+
+        $file->save();
+
+        // No download on dislike/blacklist
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+                'funny' => $file->funny,
+            ]);
+        }
+
+        return back(303);
+    }
+
+    public function toggleLaughedAt(File $file)
+    {
+        $file->funny = !$file->funny;
+        $file->laughed_at = $file->funny ? now() : null;
+
+        if ($file->funny) {
+            $file->loved = false;
+            $file->loved_at = null;
+            $file->liked = false;
+            $file->liked_at = null;
+            $file->disliked = false;
+            $file->disliked_at = null;
+            // Positive reaction should remove blacklist
+            $file->is_blacklisted = false;
+            $file->blacklist_reason = null;
+        }
+
+        $file->save();
+
+        // Auto-download on positive reaction
+        if ($file->funny && !$file->downloaded) {
+            DownloadFile::dispatch($file);
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'loved' => $file->loved,
+                'liked' => $file->liked,
+                'disliked' => $file->disliked,
+                'funny' => $file->funny,
+            ]);
+        }
+
+        return back(303);
     }
 }

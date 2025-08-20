@@ -55,7 +55,7 @@ const paginationState = ref<PaginationState>({
 // Use composables
 const { downloadProgress, downloadedItems } = useDownloadProgress();
 const { updatedMetadata, updatedListingMetadata } = useMetadataUpdates();
-const { startDownload, handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
+const { handleFavorite, handleLike, handleDislike, handleLaughedAt, blacklistImage, undoLastBlacklist } = useItemReactions();
 const { markAsSeen } = useSeenStatus();
 const { handleContextMenu } = useContextMenu();
 const {
@@ -128,17 +128,13 @@ const handleItemLaughedAt = (item: IBrowseItem, event: Event) => {
 
 // Handle Alt+click for download and like
 const handleAltClick = (item: IBrowseItem) => {
-    // Start download
-    startDownload(item);
-    // Also trigger like reaction with removal callback
+    // Trigger like reaction with removal callback (also starts download internally)
     handleLike(item, new Event('click'), removeItemFromView);
 };
 
 // Handle Alt+middle-click for download and favorite/love
 const handleAltMiddleClick = (item: IBrowseItem) => {
-    // Start download
-    startDownload(item);
-    // Also trigger favorite reaction with removal callback
+    // Trigger favorite reaction with removal callback (also starts download internally)
     handleFavorite(item, new Event('click'), removeItemFromView);
 };
 
@@ -215,8 +211,7 @@ const handleFullScreenAltClick = () => {
         removeCurrentAndGoNext();
         removeItemFromView(itemToProcess);
 
-        // Handle the reaction in the background
-        startDownload(itemToProcess);
+        // Handle the reaction in the background (like triggers download internally)
         handleLike(itemToProcess, new Event('click'));
     }
 };
@@ -229,8 +224,7 @@ const handleFullScreenAltMiddleClick = () => {
         removeCurrentAndGoNext();
         removeItemFromView(itemToProcess);
 
-        // Handle the reaction in the background
-        startDownload(itemToProcess);
+        // Handle the reaction in the background (favorite triggers download internally)
         handleFavorite(itemToProcess, new Event('click'));
     }
 };
@@ -697,9 +691,8 @@ window.addEventListener('browse:like-post', async (e: any) => {
     for (const item of toProcess) {
         try {
             // like without removal callback, we already removed optimistically
-            // do not await to keep UI snappy; but catch per-item errors
+            // handleLike triggers download internally
             void handleLike(item, new Event('click'));
-            startDownload(item);
         } catch (err) {
             console.warn('Failed to like/download item', item.id, err);
         }
