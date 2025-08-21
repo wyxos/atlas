@@ -29,6 +29,7 @@ Route::group(['middleware' => ['auth', 'verified']], function () {
     Route::post('browse/download/{file}', [BrowseController::class, 'download'])->name('browse.download');
     Route::post('browse/block-post', [BrowseController::class, 'blockPost'])->name('browse.block-post');
     Route::post('browse/like-post', [BrowseController::class, 'likePost'])->name('browse.like-post');
+    Route::post('browse/block-user', [BrowseController::class, 'blockUser'])->name('browse.block-user');
 
     // Link probe endpoint to check remote URL status (used by BrowseItem refresh)
     Route::get('api/link/check', [LinkProbeController::class, 'check'])->name('link.check');

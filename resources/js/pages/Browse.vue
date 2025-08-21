@@ -156,8 +156,13 @@ const handleRightClick = (event: MouseEvent, item: IBrowseItem) => {
         event,
         {
             handler: 'browse-list',
-            // Include postId for menu condition
-            item: { id: item.id, name: `File ${item.id}`, postId: item?.listingMetadata?.postId },
+            // Include postId and username for menu conditions
+            item: {
+                id: item.id,
+                name: `File ${item.id}`,
+                postId: item?.listingMetadata?.postId,
+                username: item?.listingMetadata?.username,
+            },
         },
         undefined,
     ); // Add endpoint for browse list context menu data
@@ -723,6 +728,39 @@ window.addEventListener('browse:like-post', async (e: any) => {
     } catch (err) {
         console.error('Failed to like post:', err);
         toast({ title: 'Failed to like post', description: 'They were removed locally; server update failed.' });
+    }
+});
+
+// Handle "Block user" context action dispatched from AppLayout
+window.addEventListener('browse:block-user', async (e: any) => {
+    const username = e?.detail?.username;
+    if (!username) return;
+
+    // Gather current items with the same username
+    const toRemove = masonryItems.value.filter((i) => i?.listingMetadata?.username === username);
+    if (toRemove.length === 0) return;
+
+    const count = toRemove.length;
+
+    // Optimistically remove from UI first (batch if supported)
+    if (masonry.value && typeof masonry.value.removeMany === 'function') {
+        await masonry.value.removeMany(toRemove);
+    } else {
+        for (const item of toRemove) {
+            await removeItemFromView(item);
+        }
+    }
+
+    try {
+        // Backend may expose this route; if not, this will fail silently after local removal
+        await axios.post(route('browse.block-user'), {
+            username,
+            fileIds: toRemove.map((i) => i.id),
+        });
+        toast({ title: 'User blocked', description: `${username} • ${count} item${count > 1 ? 's' : ''} removed.` });
+    } catch (err) {
+        console.error('Failed to block user (server):', err);
+        toast({ title: 'User blocked locally', description: `${count} item${count > 1 ? 's' : ''} removed from view.` });
     }
 });
 

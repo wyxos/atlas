@@ -7,6 +7,7 @@ use App\Models\File;
 use App\Services\CivitAIService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,14 +52,35 @@ class BrowseController extends Controller
             'reason' => 'nullable|string|max:255'
         ]);
 
+        // If the file exists on the atlas disk, delete it from disk first
+        if (!empty($file->path)) {
+            try {
+                if (Storage::disk('atlas')->exists($file->path)) {
+                    Storage::disk('atlas')->delete($file->path);
+                }
+            } catch (\Throwable $e) {
+                // Continue even if deletion fails; we still blacklist the DB record
+            }
+        }
+
+        $now = now();
         $file->update([
             'is_blacklisted' => true,
-            'blacklist_reason' => $request->input('reason')
+            'blacklist_reason' => $request->input('reason'),
+            // normalize reactions on blacklist
+            'disliked' => true,
+            'disliked_at' => $now,
+            'liked' => false,
+            'liked_at' => null,
+            'loved' => false,
+            'loved_at' => null,
+            'funny' => false,
+            'laughed_at' => null,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Item has been blacklisted'
+            'message' => 'Item has been blacklisted and removed from disk if present'
         ], 200);
     }
 
@@ -129,12 +151,18 @@ class BrowseController extends Controller
         $fileIds = $data['fileIds'];
         $now = now();
 
-        // Update all matching files: dislike + blacklist
+        // Update all matching files: dislike + blacklist + clear other reactions
         File::whereIn('id', $fileIds)->update([
             'disliked' => true,
             'disliked_at' => $now,
             'is_blacklisted' => true,
             'blacklist_reason' => 'Blocked post ' . $data['postId'],
+            'liked' => false,
+            'liked_at' => null,
+            'loved' => false,
+            'loved_at' => null,
+            'funny' => false,
+            'laughed_at' => null,
         ]);
 
         File::whereIn('id', $fileIds)->searchable();
@@ -192,6 +220,44 @@ class BrowseController extends Controller
             'success' => true,
             'processedIds' => $files->pluck('id'),
             'count' => $files->count(),
+        ]);
+    }
+
+    /**
+     * Block a user by disliking and blacklisting all provided files from that username.
+     * This is a lightweight action that operates on the provided file IDs and
+     * records the reason with the username for traceability.
+     */
+    public function blockUser(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'username' => 'required|string',
+            'fileIds' => 'required|array',
+            'fileIds.*' => 'integer|exists:files,id',
+        ]);
+
+        $fileIds = $data['fileIds'];
+        $now = now();
+
+        File::whereIn('id', $fileIds)->update([
+            'disliked' => true,
+            'disliked_at' => $now,
+            'is_blacklisted' => true,
+            'blacklist_reason' => 'Blocked user ' . $data['username'],
+            'liked' => false,
+            'liked_at' => null,
+            'loved' => false,
+            'loved_at' => null,
+            'funny' => false,
+            'laughed_at' => null,
+        ]);
+
+        File::whereIn('id', $fileIds)->searchable();
+
+        return response()->json([
+            'success' => true,
+            'removedIds' => $fileIds,
+            'username' => $data['username'],
         ]);
     }
 }

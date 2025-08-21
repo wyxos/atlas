@@ -242,6 +242,7 @@ class ImageController extends Controller
 
         $paginator = File::search('*')
             ->whereNotIn('path', ['__missing__'])
+            ->where('is_blacklisted', false)
             ->orderByDesc('downloaded_at')
             ->paginate(perPage: $limit, page: $page);
 
@@ -392,9 +393,19 @@ $items = $paginator->getCollection()->map(function (File $file) {
                 Storage::disk('atlas')->delete($file->path);
             }
 
+            $now = now();
             $file->update([
                 'is_blacklisted' => true,
-                'blacklist_reason' => 'Blacklisted from images page'
+                'blacklist_reason' => 'Blacklisted from images page',
+                // normalize reactions on blacklist
+                'disliked' => true,
+                'disliked_at' => $now,
+                'liked' => false,
+                'liked_at' => null,
+                'loved' => false,
+                'loved_at' => null,
+                'funny' => false,
+                'laughed_at' => null,
             ]);
 
             return response()->json([

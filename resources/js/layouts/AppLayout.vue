@@ -34,6 +34,18 @@ function likePostFromContext() {
         show.value = false;
     }
 }
+
+function blockUserFromContext() {
+    const username = (currentContent.value?.item as any)?.username;
+    if (!username) return;
+    try {
+        window?.dispatchEvent?.(new CustomEvent('browse:block-user', { detail: { username } }));
+    } catch (e) {
+        console.error('Failed to dispatch block-user event', e);
+    } finally {
+        show.value = false;
+    }
+}
 const page = usePage();
 
 interface Props {
@@ -142,6 +154,11 @@ function isInPlaylist(playlistId: number): boolean {
                     v-if="currentContent?.handler === 'browse-list' && (currentContent?.item as any)?.postId"
                     label="Block post"
                     @click="blockPostFromContext"
+                />
+                <context-menu-item
+                    v-if="currentContent?.handler === 'browse-list' && (currentContent?.item as any)?.username"
+                    label="Block user"
+                    @click="blockUserFromContext"
                 />
                 <context-menu-item
                     v-if="currentContent?.handler === 'browse-list' && (currentContent?.item as any)?.postId"
