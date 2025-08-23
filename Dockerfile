@@ -86,6 +86,10 @@ COPY --from=node /app/public/build /var/www/html/public/build
 # Now that the full app is present, generate optimized autoloads (triggers post-autoload-dump scripts)
 RUN composer dump-autoload --no-dev --optimize
 
+# Ensure storage directories and public symlinks exist at build time so the web image inherits them
+RUN mkdir -p storage/app/public storage/app/atlas \
+ && php artisan storage:link || true
+
 # Entrypoint script
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 # Normalize line endings to LF to avoid /usr/bin/env 'bash\r' errors on Alpine

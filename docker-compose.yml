@@ -80,6 +80,7 @@ services:
       REDIS_PORT: 6379
       FORCE_HTTPS: "false"
       MIGRATE_ON_BOOT: "false"
+      RUN_MIGRATIONS: "true"
     depends_on:
       db:
         condition: service_started
@@ -117,6 +118,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      RUN_MIGRATIONS: "false"
     volumes:
       - storage_data:/var/www/html/storage
       - cache_data:/var/www/html/bootstrap/cache
@@ -133,6 +136,7 @@ services:
     environment:
       APP_ENV: production
       BROADCAST_CONNECTION: reverb
+      RUN_MIGRATIONS: "false"
       REVERB_SERVER_HOST: 0.0.0.0
       REVERB_SERVER_PORT: 8081
       REVERB_HOST: localhost
@@ -163,9 +167,11 @@ services:
     container_name: atlas_web
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8080:80"
+    volumes:
+      - storage_data:/var/www/html/storage
 
 volumes:
   storage_data:
