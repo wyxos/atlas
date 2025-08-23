@@ -71,6 +71,31 @@ Designed for users who want to host their own media server without relying on cl
 
 ## Installation
 
+### Quick Start (Docker)
+
+If you have Docker Desktop installed, you can run ATLAS with a single command. This starts all required services (web, app, Redis, MariaDB, Typesense, Reverb), generates an app key, runs database migrations, and creates public storage links automatically.
+
+1. Build and start the stack
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. Open the app
+   - Web UI: http://localhost:8080
+   - Health check: http://localhost:8080/up should return 200
+
+3. First-time setup
+   - Register a user. The first registered account is automatically granted admin privileges.
+   - Add media to your atlas storage (files saved to the atlas disk are served under `/atlas/...`).
+
+Notes
+- The stack waits for the database and Typesense, runs all pending migrations on each start (app service only), and creates storage symlinks so static files are served immediately.
+- If you need to reset everything and start fresh:
+  ```bash
+  docker compose down -v --remove-orphans
+  docker compose up -d --build
+  ```
+
 ### Prerequisites
 - **PHP 8.2+** with extensions: `mbstring`, `xml`, `json`, `gd`
 - **Composer** for PHP dependency management
