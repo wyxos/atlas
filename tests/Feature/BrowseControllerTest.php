@@ -159,7 +159,7 @@ it('can blacklist a file via POST request', function () {
     $response->assertStatus(200)
         ->assertJson([
             'success' => true,
-            'message' => 'Item has been blacklisted'
+            'message' => 'Item has been blacklisted and removed from disk if present'
         ]);
 
     // Verify the file was blacklisted in the database
@@ -180,7 +180,7 @@ it('can blacklist a file without a reason', function () {
     $response->assertStatus(200)
         ->assertJson([
             'success' => true,
-            'message' => 'Item has been blacklisted'
+            'message' => 'Item has been blacklisted and removed from disk if present'
         ]);
 
     // Verify the file was blacklisted in the database

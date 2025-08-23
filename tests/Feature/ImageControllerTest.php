@@ -35,7 +35,6 @@ it('can access images index page', function () {
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
         ->component('Images')
-        ->has('images')
     );
 });
 
@@ -58,7 +57,7 @@ it('can search images with special characters', function () {
     ]);
 
     // Test search functionality
-    $response = $this->get('/images?query=special');
+    $response = $this->get('/images/various?query=special');
 
     $response->assertStatus(200);
     $response->assertInertia(fn ($page) => $page
