@@ -1,0 +1,131 @@
+services:
+  db:
+    image: mariadb:11
+    container_name: atlas_db
+    environment:
+      MARIADB_DATABASE: atlas
+      MARIADB_USER: atlas
+      MARIADB_PASSWORD: atlas
+      MARIADB_ROOT_PASSWORD: secret
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uatlas -patlas --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  redis:
+    image: redis:7-alpine
+    container_name: atlas_redis
+    ports:
+      - "6379:6379"
+
+  typesense:
+    image: typesense/typesense:0.25.2
+    container_name: atlas_typesense
+    environment:
+      TYPESENSE_API_KEY: dev-typesense-api-key-2024
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_ENABLE_CORS: "true"
+    command: ["--api-key=dev-typesense-api-key-2024", "--data-dir=/data", "--listen-port=8108", "--enable-cors"]
+    volumes:
+      - typesense_data:/data
+
+  app:
+    image: atlas_app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+      args:
+        PHP_VERSION: "8.4"
+        NODE_VERSION: "22"
+    container_name: atlas_app
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: mariadb
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: atlas
+      DB_USERNAME: atlas
+      DB_PASSWORD: atlas
+      SCOUT_DRIVER: typesense
+      TYPESENSE_HOST: typesense
+      TYPESENSE_PORT: 8108
+      TYPESENSE_API_KEY: dev-typesense-api-key-2024
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      FILESYSTEM_DISK: local
+      BROADCAST_CONNECTION: log
+      HORIZON_PREFIX: atlas
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FORCE_HTTPS: "false"
+      MIGRATE_ON_BOOT: "false"
+    depends_on:
+      db:
+        condition: service_started
+      typesense:
+        condition: service_started
+      redis:
+        condition: service_started
+    volumes:
+      - storage_data:/var/www/html/storage
+      - cache_data:/var/www/html/bootstrap/cache
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit((int)!@fsockopen(\"127.0.0.1\", 9000));'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  horizon:
+    image: atlas_app:latest
+    container_name: atlas_horizon
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: mariadb
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: atlas
+      DB_USERNAME: atlas
+      DB_PASSWORD: atlas
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: redis
+    volumes:
+      - storage_data:/var/www/html/storage
+      - cache_data:/var/www/html/bootstrap/cache
+    command: ["php", "artisan", "horizon"]
+
+  web:
+    image: atlas_web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+      args:
+        PHP_VERSION: "8.4"
+        NODE_VERSION: "22"
+    container_name: atlas_web
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "8080:80"
+
+volumes:
+  storage_data:
+  cache_data:
+  mariadb_data:
+  typesense_data:

@@ -1,0 +1,40 @@
+# Ignore Node caches and local artifacts
+node_modules
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+.bun
+
+# Ignore Composer artifacts and caches (we copy vendor from builder)
+vendor
+
+# Laravel caches / runtime files
+storage/logs
+storage/framework/*
+bootstrap/cache/*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# IDEs and OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Test/coverage artifacts
+coverage
+.phpunit.result.cache
+
+# Git
+.git
+.gitignore
+
+# Exclude Windows junctions that point outside the repo (breaks Docker build context)
+public/atlas
+public/atlas/**
+public/storage
+public/storage/**
+
