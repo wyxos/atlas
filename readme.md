@@ -6,295 +6,211 @@
 [![PHP](https://img.shields.io/badge/PHP-8.2+-777BB4?logo=php)](https://php.net)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://typescriptlang.org)
 
-ATLAS is an open-source self-hosted media server and streaming platform for managing your digital media collection. Built with Laravel and Vue.js, ATLAS provides automated metadata extraction, file organization, and a web interface for streaming personal music, videos, and images.
+*Your media. Your server. Your rules.*
 
-Designed for users who want to host their own media server without relying on cloud services.
+ATLAS is a work-in-progress, self-hosted media server for people who want reliable organization, fast search, and direct streaming of their own libraries.
 
-## Key Features
+## Why ATLAS?
 
-- **CivitAI Enhanced Browsing**: Intelligent content curation with automated filtering and efficient navigation
-- **Audio-First Design**: Optimized for music libraries with full metadata support
-- **AI-Powered Organization**: Automated file categorization and tagging
-- **Search**: Powered by Typesense for full-text search across metadata
-- **Responsive Design**: Works on desktop, tablet, and mobile devices
-- **Self-Hosted**: Your data remains on your server
-- **Modern Tech Stack**: Laravel 12, Vue.js 3, TypeScript, Tailwind CSS
-- **Multi-User Support**: User management with admin controls
-- **Analytics Dashboard**: Library statistics and health monitoring
+- I built ATLAS because reliability and simplicity mattered more than knobs and toggles.
+- I wanted better organization and sorting without waiting on upstream features.
+- I care about first-class content browsing with blacklist and curation.
+- I prefer one-click or shortcut-driven workflows to download and manage content.
+- I want content permanence: keep what you love even if platforms or creators remove it.
 
-## Core Features
+Existing media servers like Plex, Jellyfin, and Emby are powerful. ATLAS focuses on reliability, frictionless organization, and image-first browsing.
 
-### CivitAI Enhanced Browsing
-- **Intelligent Content Filtering**: Automatically excludes previously viewed or interacted content from feed
-- **Persistent Interaction Tracking**: Saves user reactions (likes, dislikes, blacklists) locally for personalized curation
-- **Automated Pagination**: Auto-advance through pages with intelligent skipping of fully-viewed content
-- **Masonry Layout**: Infinite scroll grid layout for continuous content discovery
-- **Keyboard Shortcuts**: Alt+Click for like/download, Alt+Middle-Click for favorite/love/download, Alt+Right-Click for blacklist operations
-- **Full-Screen Navigation**: Arrow key navigation with immediate reaction feedback and content removal
+## Status: Work in Progress
 
-### Audio Library Management
-- **Automated Metadata Extraction**: Processes audio files to extract ID3v1/ID3v2 tags, cover art, and technical information
-- **File Organization**: Automatically organizes files by artists, albums, and metadata
-- **Cover Art Management**: Extracts and manages album artwork with deduplication
-- **File Status Tracking**: Monitors missing files, metadata extraction status, and files requiring review
+ATLAS is under active development. Features ship incrementally and may change. Feedback is welcome. Open issues and ideas here: https://github.com/wyxos/atlas/issues
 
-### Search and Discovery
-- **Full-Text Search**: Powered by Typesense for search across metadata
-- **Faceted Browsing**: Filter by artists, albums, years, genres, and file properties
-- **Audio-Only Results**: Filters ensure only playable audio content is displayed
+## What Works Today
 
-### Streaming and Playback
-- **Direct Audio Streaming**: Stream audio files directly from your library
-- **Rating System**: Rate and organize tracks with love/like/dislike options
-- **Listen Tracking**: Keep track of what you've listened to
+- Audio library management with metadata extraction (ID3, cover art).
+- File organization by artist and album.
+- Typesense search when configured (SCOUT_DRIVER=typesense).
+- Direct audio streaming, rating, and listen tracking.
+- Dashboard statistics and health indicators.
+- Multi-user accounts with admin controls.
 
-### Dashboard and Analytics
-- **File Statistics**: Visual breakdown of library composition and storage usage
-- **Health Monitoring**: Track files needing attention (missing, no metadata, review required)
-- **Storage Analysis**: View storage consumption by file type
+## Quick Start (Docker)
 
-### User Management
-- **Multi-User Support**: User registration and authentication
-- **Admin Controls**: Super admin role for user and system management
-- **Individual Preferences**: Personal ratings and listening history
+Run, Open, Setup.
 
-## Technology Stack
-- **Backend**: Laravel 12 (PHP 8.2+)
-- **Frontend**: Vue.js 3 with TypeScript and Inertia.js
-- **UI Framework**: Tailwind CSS 4 with Reka UI components
-- **Search Engine**: Typesense with Laravel Scout (optional)
-- **Queue System**: Laravel Queues for background processing
-- **Metadata Processing**: PHP-FFMpeg for audio file analysis
-- **Authentication**: Laravel Breeze with Inertia.js
-- **Testing Framework**: PEST for PHP testing
-- **Additional Libraries**: wyxos/harmonie for enhanced functionality
+1) Run
 
-## Installation
+```bash path=null start=null
+docker compose up -d --build
+```
 
-### Quick Start (Docker)
+2) Open
 
-If you have Docker Desktop installed, you can run ATLAS with a single command. This starts all required services (web, app, Redis, MariaDB, Typesense, Reverb), generates an app key, runs database migrations, and creates public storage links automatically.
+- Web UI: http://localhost:8080
+- Health check: http://localhost:8080/up should return 200
 
-1. Build and start the stack
-   ```bash
-   docker compose up -d --build
-   ```
+3) Setup
 
-2. Open the app
-   - Web UI: http://localhost:8080
-   - Health check: http://localhost:8080/up should return 200
+- Register your account. The first user becomes admin.
+- Add media to the atlas storage (files on the atlas disk are served under `/atlas/...`).
 
-3. First-time setup
-   - Register a user. The first registered account is automatically granted admin privileges.
-   - Add media to your atlas storage (files saved to the atlas disk are served under `/atlas/...`).
+Reset
 
-Notes
-- The stack waits for the database and Typesense, runs all pending migrations on each start (app service only), and creates storage symlinks so static files are served immediately.
-- If you need to reset everything and start fresh:
-  ```bash
-  docker compose down -v --remove-orphans
-  docker compose up -d --build
+```bash path=null start=null
+docker compose down -v --remove-orphans
+docker compose up -d --build
+```
+
+### Troubleshooting
+
+- Database not ready: the app waits, but first boot can take time. Check logs and container health.
+  ```bash path=null start=null
+  docker compose ps
+  docker compose logs -f db
   ```
-
-### Prerequisites
-- **PHP 8.2+** with extensions: `mbstring`, `xml`, `json`, `gd`
-- **Composer** for PHP dependency management
-- **Node.js** and npm for frontend assets
-- **Database**: SQLite (default), MySQL 8.0+, or PostgreSQL 13+
-- **Queue Worker**: Database queues (default) or Redis for job queuing
-- **Search Engine**: Typesense server for full-text search (optional)
-- **Storage**: Local file system or cloud storage for media files
-
-### Setup Steps
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/wyxos/atlas.git
-   cd atlas
-   ```
-
-2. **Install PHP dependencies**
-   ```bash
-   composer install
-   ```
-
-3. **Install JavaScript dependencies**
-   ```bash
-   npm install
-   ```
-
-4. **Environment configuration**
-   ```bash
-   cp .env.example .env
-   php artisan key:generate
-   ```
-
-5. **Configure services in `.env`**
-   ```env
-   # Database (SQLite is default, or configure MySQL/PostgreSQL)
-   DB_CONNECTION=sqlite
-   # For MySQL/PostgreSQL, uncomment and configure:
-   # DB_CONNECTION=mysql
-   # DB_HOST=127.0.0.1
-   # DB_DATABASE=atlas
-   # DB_USERNAME=your_username
-   # DB_PASSWORD=your_password
-   
-   # Queue (database is default)
-   QUEUE_CONNECTION=database
-   
-   # Optional: User registration
-   REGISTRATION_ENABLED=true
-   
-   # Optional: Typesense Search (if using full-text search)
-   # SCOUT_DRIVER=typesense
-   # TYPESENSE_API_KEY=your_typesense_key
-   # TYPESENSE_HOST=localhost
-   # TYPESENSE_PORT=8108
-   ```
-
-6. **Run database migrations**
-   ```bash
-   php artisan migrate
-   ```
-
-7. **Build frontend assets**
-   ```bash
-   npm run dev  # or npm run build for production
-   ```
-
-8. **Start the queue worker** (separate terminal)
-   ```bash
-   php artisan queue:work
-   ```
-
-9. **Start the development server**
-   ```bash
-   php artisan serve
-   ```
-
-## Usage
-
-### Adding Audio Files to Your Library
-
-1. **Add files to your storage location** (configured in `.env`)
-2. **Extract metadata from audio files**:
-   ```bash
-   # Process all audio files
-   php artisan files:extract-metadata
-   
-   # Process a specific file
-   php artisan files:extract-metadata --file=123
-   ```
-
-3. **Translate extracted metadata**:
-   ```bash
-   # Translate all extracted metadata
-   php artisan files:translate-metadata
-   
-   # Force reprocessing of existing metadata
-   php artisan files:translate-metadata --force
-   
-   # Process a specific file
-   php artisan files:translate-metadata --file=123
-   ```
-
-### Administrative Commands
-
-1. **Create admin user**:
-   ```bash
-   # Create admin with email (password will be generated)
-   php artisan make:admin admin@example.com
-   
-   # Create admin with specific password
-   php artisan make:admin admin@example.com --password=yourpassword
-   ```
-
-2. **Database management**:
-   ```bash
-   # Create database backup
-   php artisan db:backup
-   
-   # Push database to remote server
-   php artisan db:push-to-remote hostname /local/path /remote/path
-   
-   # Pull database from remote server
-   php artisan db:pull-from-remote hostname /remote/path /local/path
-   
-   # Dry run (see what would happen without executing)
-   php artisan db:push-to-remote hostname /local/path /remote/path --dry-run
-   ```
-
-3. **File management**:
-   ```bash
-   # Check file existence and integrity
-   php artisan files:check-existence
-   
-   # Scan and sync files to ATLAS
-   php artisan files:sync-to-atlas
-   
-   # Scan ATLAS files
-   php artisan files:scan-atlas
-   ```
-
-### Development Commands
-
-- **Start development environment**: `composer run dev` (runs server, queue worker, and vite concurrently)
-- **Run with SSR**: `composer run dev:ssr` (includes SSR server and log monitoring)
-- **Run tests**: `composer run test` or `php artisan test`
-- **Watch frontend changes**: `npm run dev`
-- **Build for production**: `npm run build`
-- **Build with SSR**: `npm run build:ssr`
-- **Code formatting**: `npm run format` (Prettier)
-- **Code linting**: `npm run lint` (ESLint)
-- **Queue worker**: `php artisan queue:work` (if running manually)
-
-## Roadmap
-
-- [ ] **Playlist Management**: Create and manage custom playlists
-- [ ] **Enhanced Audio Player**: Improved playback controls and queue management
-- [ ] **Batch Operations**: Bulk metadata editing and file operations
-- [ ] **Docker Support**: Containerized deployment options
-- [ ] **Metadata Editing**: In-app metadata correction and enhancement
-- [ ] **Plugin System**: Extensible architecture for custom features
+- Typesense not reachable: confirm SCOUT_DRIVER and Typesense env vars; ensure the container is healthy.
+  ```bash path=null start=null
+  docker compose logs -f typesense
+  ```
+- Storage link missing: create the public storage link inside the app container.
+  ```bash path=null start=null
+  docker compose exec app php artisan storage:link
+  ```
 
 ## Screenshots
 
 ![Dashboard](docs/images/dashboard.png)
-*ATLAS Dashboard showing file statistics and distribution*
+Dashboard with library stats and storage breakdown.
+
 ![Audio Player](docs/images/audio-player.png)
-*Audio player interface with playback controls and metadata*
+Audio player with track metadata and playback controls.
+
+## Usage Examples
+
+1) Import audio and build metadata
+
+- Put audio files in the configured storage path for the `atlas` disk.
+- Extract metadata from files.
+
+```bash path=null start=null
+php artisan files:extract-metadata
+# Or for a specific file
+php artisan files:extract-metadata --file=123
+```
+
+- Translate extracted metadata (optional).
+
+```bash path=null start=null
+php artisan files:translate-metadata
+# Force reprocessing
+php artisan files:translate-metadata --force
+# Specific file
+php artisan files:translate-metadata --file=123
+```
+
+2) Search and browse
+
+- Use the search bar and filters in the UI.
+- If Typesense is configured, full-text search spans artists, albums, and track fields.
+
+## Roadmap (Near-term)
+
+### Near-term (next)
+
+- [ ] Playlist management
+- [ ] Enhanced audio player (queue and playback controls)
+- [ ] Batch operations for metadata and file tasks
+- [ ] In-app metadata editing
+
+### Later
+
+- [ ] Plugin system for extensibility
+
+### Done
+
+- [x] Docker support
+
+## Developer Setup (Manual)
+
+### Prerequisites
+
+- PHP 8.2+ with extensions: mbstring, xml, json, gd
+- Composer
+- Node.js and npm
+- Database: SQLite (default), MySQL 8.0+, or PostgreSQL 13+
+- Queue: database (default) or Redis
+- Optional: Typesense for search
+
+### Steps
+
+1. Clone
+
+```bash path=null start=null
+git clone https://github.com/wyxos/atlas.git
+cd atlas
+```
+
+2. Install dependencies
+
+```bash path=null start=null
+composer install
+npm install
+```
+
+3. Configure environment
+
+```bash path=null start=null
+cp .env.example .env
+php artisan key:generate
+```
+
+- Set DB/queue and optional Typesense variables in `.env`.
+
+4. Migrate
+
+```bash path=null start=null
+php artisan migrate
+```
+
+5. Run locally
+
+```bash path=null start=null
+# start queue worker (separate terminal)
+php artisan queue:work
+# start dev server
+php artisan serve
+```
+
+6. Build assets
+
+```bash path=null start=null
+npm run dev
+# or
+npm run build
+```
+
+### Dev scripts
+
+| Task                         | Command                         |
+|------------------------------|---------------------------------|
+| Start dev (app + queue + Vite) | `composer run dev`              |
+| Start dev with SSR           | `composer run dev:ssr`           |
+| Run tests                    | `composer run test` or `php artisan test` |
+| Lint                         | `npm run lint`                   |
+| Format                       | `npm run format`                 |
+| Build                        | `npm run build`                  |
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Open an issue or submit a pull request:
 
-## Support
+- Issues: https://github.com/wyxos/atlas/issues
+- Pull Requests: https://github.com/wyxos/atlas/pulls
 
-- **[Report Issues](https://github.com/wyxos/atlas/issues)** - Bug reports and feature requests
-- **[Website](https://wyxos.com)** - More information about Wyxos
-
----
-
-## License
+## License & Acknowledgments
 
 ATLAS is open-source software licensed under the [MIT License](LICENSE). You're free to use, modify, and distribute this software according to the license terms.
-
----
-
-## Acknowledgments
 
 - Created by [Wyxos](https://wyxos.com)
 - Built with [Laravel](https://laravel.com/) and [Vue.js](https://vuejs.org/)
 - UI components from [Shadcn Vue](https://www.shadcn-vue.com/)
 - Search powered by [Typesense](https://typesense.org/)
-
----
-
-<div align="center">
-
-**[Back to Top](#atlas)**
-
-**Open Source Self-Hosted Media Server**
-
-</div>
