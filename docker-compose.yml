@@ -42,10 +42,16 @@ services:
       args:
         PHP_VERSION: "8.4"
         NODE_VERSION: "22"
+        VITE_REVERB_APP_KEY: atlaslocal
+        VITE_REVERB_HOST: localhost
+        VITE_REVERB_PORT: 8081
+        VITE_REVERB_SCHEME: http
     container_name: atlas_app
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+      APP_URL: http://localhost:8080
+      ASSET_URL: http://localhost:8080
       DB_CONNECTION: mariadb
       DB_HOST: db
       DB_PORT: 3306
@@ -56,11 +62,19 @@ services:
       TYPESENSE_HOST: typesense
       TYPESENSE_PORT: 8108
       TYPESENSE_API_KEY: dev-typesense-api-key-2024
+      BROADCAST_CONNECTION: reverb
+
+      REVERB_SERVER_PORT: 8081
+      REVERB_HOST: reverb
+      REVERB_PORT: 8081
+      REVERB_SCHEME: http
+      REVERB_APP_KEY: atlaslocal
+      REVERB_APP_SECRET: atlassecret
+      REVERB_APP_ID: atlas
       QUEUE_CONNECTION: redis
       CACHE_STORE: redis
       SESSION_DRIVER: redis
       FILESYSTEM_DISK: local
-      BROADCAST_CONNECTION: log
       HORIZON_PREFIX: atlas
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -108,6 +122,31 @@ services:
       - cache_data:/var/www/html/bootstrap/cache
     command: ["php", "artisan", "horizon"]
 
+  reverb:
+    image: atlas_app:latest
+    container_name: atlas_reverb
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      APP_ENV: production
+      BROADCAST_CONNECTION: reverb
+      REVERB_SERVER_HOST: 0.0.0.0
+      REVERB_SERVER_PORT: 8081
+      REVERB_HOST: localhost
+      REVERB_PORT: 8081
+      REVERB_SCHEME: http
+      REVERB_APP_KEY: atlaslocal
+      REVERB_APP_SECRET: atlassecret
+      REVERB_APP_ID: atlas
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8081"]
+    ports:
+      - "8081:8081"
+
   web:
     image: atlas_web:latest
     build:
@@ -117,6 +156,10 @@ services:
       args:
         PHP_VERSION: "8.4"
         NODE_VERSION: "22"
+        VITE_REVERB_APP_KEY: atlaslocal
+        VITE_REVERB_HOST: localhost
+        VITE_REVERB_PORT: 8081
+        VITE_REVERB_SCHEME: http
     container_name: atlas_web
     depends_on:
       app:

@@ -46,10 +46,14 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
+        // Auto-assign admin to the very first registered user
+        $makeAdmin = User::count() === 0;
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'is_admin' => $makeAdmin,
         ]);
 
         event(new Registered($user));

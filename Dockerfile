@@ -12,6 +12,16 @@ COPY composer.json composer.lock* ./
 # --- Frontend build (Vite) ---
 FROM node:${NODE_VERSION}-alpine AS node
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# Provide Vite build-time envs for Reverb
+ARG VITE_REVERB_APP_KEY
+ARG VITE_REVERB_HOST
+ARG VITE_REVERB_PORT
+ARG VITE_REVERB_SCHEME
+ENV VITE_REVERB_APP_KEY=${VITE_REVERB_APP_KEY}
+ENV VITE_REVERB_HOST=${VITE_REVERB_HOST}
+ENV VITE_REVERB_PORT=${VITE_REVERB_PORT}
+ENV VITE_REVERB_SCHEME=${VITE_REVERB_SCHEME}
+
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # Cache npm store between builds
