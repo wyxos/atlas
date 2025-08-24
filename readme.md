@@ -18,7 +18,7 @@ ATLAS is a work-in-progress, self-hosted media server for people who want reliab
 - I prefer one-click or shortcut-driven workflows to download and manage content.
 - I want content permanence: keep what you love even if platforms or creators remove it.
 
-Existing media servers like Plex, Jellyfin, and Emby are powerful. ATLAS focuses on reliability, frictionless organization, and image-first browsing.
+Existing media servers like Plex, Jellyfin, and Emby are powerful. ATLAS focuses on reliability, frictionless organization, and content browsing.
 
 ## Status: Work in Progress
 
