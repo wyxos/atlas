@@ -125,10 +125,6 @@ php artisan files:translate-metadata --file=123
 
 - [ ] Plugin system for extensibility
 
-### Done
-
-- [x] Docker support
-
 ## Developer Setup (Manual)
 
 ### Prerequisites
