@@ -604,33 +604,15 @@ const getUserRelatedCount = (item: IBrowseItem): number => {
     return Math.max(0, total); // exclude this item
 };
 
-// Hover state and blur logic with delayed activation
-const hoveredItemId = ref<number | null>(null);
+// Hover focus logic (instant) triggered by post count badge
 const blurActiveId = ref<number | null>(null);
-let blurHoverTimer: number | null = null;
 
-const handleHoverEnter = (item: IBrowseItem) => {
-    hoveredItemId.value = item.id;
-    // Clear any existing timer
-    if (blurHoverTimer !== null) {
-        clearTimeout(blurHoverTimer);
-        blurHoverTimer = null;
-    }
-    // Start delay before enabling blur
-    blurHoverTimer = window.setTimeout(() => {
-        blurActiveId.value = item.id;
-        blurHoverTimer = null;
-    }, 1500);
+const handlePostBadgeEnter = (item: IBrowseItem) => {
+    blurActiveId.value = item.id;
 };
 
-const handleHoverLeave = () => {
-    // Clear timer and disable blur immediately when leaving
-    if (blurHoverTimer !== null) {
-        clearTimeout(blurHoverTimer);
-        blurHoverTimer = null;
-    }
+const handlePostBadgeLeave = () => {
     blurActiveId.value = null;
-    hoveredItemId.value = null;
 };
 
 const getItemById = (id: number | null): IBrowseItem | null => {
@@ -641,9 +623,8 @@ const getItemById = (id: number | null): IBrowseItem | null => {
 const hasRelatedFor = (item: IBrowseItem | null): boolean => {
     if (!item) return false;
     const postCount = getPostRelatedCount(item);
-    const userCount = getUserRelatedCount(item);
-    // We only blur others if there exists at least one other related item by post OR user
-    return postCount > 1 || userCount > 1;
+    // Only activate on post relationships
+    return postCount > 1;
 };
 
 const isRelatedToActive = (item: IBrowseItem): boolean => {
@@ -651,14 +632,13 @@ const isRelatedToActive = (item: IBrowseItem): boolean => {
     if (!active) return false;
     if (active.id === item.id) return true;
     const samePost = active?.listingMetadata?.postId && active.listingMetadata.postId === item?.listingMetadata?.postId;
-    const sameUser = active?.listingMetadata?.username && active.listingMetadata.username === item?.listingMetadata?.username;
-    return Boolean(samePost || sameUser);
+    return Boolean(samePost);
 };
 
 const shouldBlur = (item: IBrowseItem): boolean => {
     const active = getItemById(blurActiveId.value);
-    if (!active) return false; // not active yet (waiting 1.5s)
-    // Only activate blur mode if the active item has related images
+    if (!active) return false; // not active yet
+    // Only activate blur mode if the active item has related images (by post)
     if (!hasRelatedFor(active)) return false;
     return !isRelatedToActive(item);
 };
@@ -828,10 +808,8 @@ watch(
                     class="h-full"
                 >
                     <template #item="{ item }">
-                        <div
+<div
                             :class="['transition duration-150', shouldBlur(item) ? 'blur-[1px] blur-md' : '']"
-                            @mouseenter="handleHoverEnter(item)"
-                            @mouseleave="handleHoverLeave()"
                         >
                             <BrowseItem
                                 :download-progress="downloadProgress[item.id]"
@@ -850,6 +828,8 @@ watch(
                                 @alt-middle-click="handleAltMiddleClick"
                                 @alt-right-click="handleAltRightClick"
                                 @left-click="handleLeftClick"
+                                @post-badge-enter="handlePostBadgeEnter"
+                                @post-badge-leave="handlePostBadgeLeave"
                             />
                         </div>
                     </template>

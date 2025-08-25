@@ -28,6 +28,8 @@ const emit = defineEmits<{
     altRightClick: [item: BrowseItem];
     leftClick: [item: BrowseItem];
     contextmenu: [event: MouseEvent];
+    postBadgeEnter: [item: BrowseItem];
+    postBadgeLeave: [];
 }>();
 
 const handleLeftClick = () => {
@@ -331,6 +333,8 @@ const handleVideoCompleted = () => {
                 v-if="props.postRelatedCount && props.postRelatedCount > 1"
                 class="rounded bg-black/70 px-1.5 py-0.5 font-bold text-white shadow"
                 title="Other items in same post"
+                @mouseenter="$emit('postBadgeEnter', props.item)"
+                @mouseleave="$emit('postBadgeLeave')"
             >
                 P+{{ props.postRelatedCount }}
             </div>
