@@ -6,7 +6,6 @@ use App\Jobs\FetchPostImages;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
-use App\Support\ContentModerator;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Client\ConnectionException;
@@ -530,10 +529,10 @@ class CivitAIService
 
         $allFiles = File::with('metadata')->whereIn('referrer_url', $referrers)->get();
 
-        // Apply moderation: blacklist offending files in one batch and work only with safe files
-        $safeFiles = $this->moderateAndFilterSafe($allFiles);
+        // Moderation removed — process all files
+        $safeFiles = $allFiles;
 
-        // Dispatch jobs (unchanged) only for safe files
+        // Dispatch jobs (unchanged)
         $delay = 0;
         foreach ($safeFiles as $file) {
             FetchPostImages::dispatch($file)->delay(now()->addSeconds($delay));
@@ -549,71 +548,6 @@ class CivitAIService
                 $file->downloaded === false &&
                 $file->is_blacklisted === false;
         })->values()->all();
-    }
-
-    /**
-     * Using the ContentModerator rules, find files whose prompt should be blocked.
-     * Perform a single batch update to blacklist them, and return only the safe files.
-     *
-     * @param Collection|array $files
-     * @return array Files that passed moderation
-     */
-    private function moderateAndFilterSafe($files): array
-    {
-        $collection = collect($files);
-        if ($collection->isEmpty()) {
-            return [];
-        }
-
-        $moderator = ContentModerator::fromDatabase();
-
-        $toBlacklistIds = [];
-        foreach ($collection as $file) {
-            $prompt = $this->extractPromptFromFile($file);
-            if ($prompt && $moderator->shouldBlock($prompt)) {
-                $toBlacklistIds[] = $file->id;
-            }
-        }
-
-        if (!empty($toBlacklistIds)) {
-            // One batch update
-            File::whereIn('id', $toBlacklistIds)->update([
-                'is_blacklisted' => true,
-                'blacklist_reason' => 'moderation: prompt',
-                'disliked' => true,
-                'disliked_at' => now(),
-            ]);
-
-            // Update Scout index: remove blacklisted items from search results
-            try {
-                $blacklistedModels = File::whereIn('id', $toBlacklistIds)->get();
-                if ($blacklistedModels->isNotEmpty()) {
-                    $blacklistedModels->unsearchable();
-                }
-            } catch (Throwable $e) {
-                Log::warning('Scout unsearchable failed for blacklisted files', [
-                    'error' => $e->getMessage(),
-                    'ids' => $toBlacklistIds,
-                ]);
-            }
-        }
-
-        // Return only safe files (not in the blacklist set)
-        $blacklistSet = array_flip($toBlacklistIds);
-        return $collection->reject(function ($file) use ($blacklistSet) {
-            return isset($blacklistSet[$file->id]);
-        })->values()->all();
-    }
-
-    /**
-     * Extract a prompt string from a File's available metadata sources.
-     */
-private function extractPromptFromFile(File $file): ?string
-    {
-        // listing_metadata is cast to array and prompt is guaranteed at meta.prompt
-        $listing = $file->listing_metadata ?? [];
-        $prompt = $listing['meta']['prompt'] ?? null;
-        return is_string($prompt) && $prompt !== '' ? $prompt : null;
     }
 
     /**
@@ -849,8 +783,8 @@ private function extractPromptFromFile(File $file): ?string
 
         $allFiles = File::with('metadata')->whereIn('referrer_url', $referrers)->get();
 
-        // Apply moderation: blacklist offending files in one batch and work only with safe files
-        $safeFiles = $this->moderateAndFilterSafe($allFiles);
+        // Moderation removed — return all files
+        $safeFiles = $allFiles;
 
         return collect($safeFiles)->filter(function ($file) {
             return $file->seen_preview_at === null &&

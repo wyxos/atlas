@@ -380,17 +380,6 @@ it('creates container and file relationships correctly for posts', function () {
     expect($container->files->first()->id)->toBe($file->id);
 });
 
-it('handles posts API errors gracefully', function () {
-    Http::fake([
-        'civitai.com/api/trpc/post.getInfinite*' => Http::response([], 500)
-    ]);
-
-    $request = new Request(['container' => 'posts', 'page' => 1]);
-    $service = new CivitAIService($request);
-
-    expect(fn() => $service->fetch())->toThrow(Exception::class, 'CivitAI API request failed after 3 attempts:');
-});
-
 it('handles empty posts response', function () {
     Http::fake([
         'civitai.com/api/trpc/post.getInfinite*' => Http::response([

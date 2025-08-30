@@ -18,10 +18,6 @@ const sidebarNavItems: NavItem[] = [
         title: 'Appearance',
         href: '/settings/appearance',
     },
-    {
-        title: 'Moderation rules',
-        href: '/settings/moderation',
-    },
 ];
 
 const page = usePage();
