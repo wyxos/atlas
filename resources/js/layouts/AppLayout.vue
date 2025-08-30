@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { Toaster } from '@/components/ui/toast';
 import useContextMenu from '@/composables/useContextMenu';
 import AppLayout from '@/layouts/app/AppSidebarLayout.vue';
 import type { BreadcrumbItemType } from '@/types';
@@ -7,7 +8,6 @@ import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { MinusIcon, PlusIcon } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
-import { Toaster } from '@/components/ui/toast';
 
 const { show, options, currentContent, loading } = useContextMenu();
 
@@ -169,8 +169,8 @@ function isInPlaylist(playlistId: number): boolean {
                 <context-menu-item label="View Details" />
             </template>
         </context-menu>
+        <Toaster />
     </AppLayout>
-    <Toaster />
 </template>
 
 <style scoped>

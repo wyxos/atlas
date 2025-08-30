@@ -787,8 +787,8 @@ watch(
 <template>
     <Head title="Browse" />
 
-    <AppLayout :breadcrumbs="breadcrumbs">
-        <div>
+    <AppLayout :breadcrumbs="breadcrumbs" class="h-screen">
+        <div class="flex flex-1 flex-col overflow-hidden">
             <!-- Header -->
             <div class="border-b p-4">
                 <div class="flex flex-col items-center gap-4">
