@@ -453,11 +453,24 @@ const handleUndoBlacklist = async () => {
     }
 };
 
-// Global blockers for browser back/forward mouse buttons while fullscreen viewer is open
+// Global blockers for browser back/forward mouse buttons
+// - Always block when Alt + X1/X2 are pressed anywhere (prevents history navigation during our Alt shortcuts)
+// - Additionally block all aux buttons when fullscreen viewer is open
 const globalAuxMouseBlocker = (event: MouseEvent) => {
-    if (!isImageViewerOpen.value) return;
     const btn = (event as any).button;
-    if (btn === 3 || btn === 4) {
+
+    // Always block when Alt is held with back/forward buttons
+    if (event.altKey && (btn === 3 || btn === 4)) {
+        event.preventDefault?.();
+        // Allow our item-level mousedown handlers to run; suppress navigation on mouseup/auxclick
+        if (event.type !== 'mousedown') {
+            event.stopImmediatePropagation?.();
+        }
+        return;
+    }
+
+    // Block aux buttons when fullscreen is open (regardless of Alt)
+    if (isImageViewerOpen.value && (btn === 3 || btn === 4)) {
         event.preventDefault?.();
         event.stopImmediatePropagation?.();
     }
@@ -478,6 +491,9 @@ onBeforeUnmount(() => {
 
 // Handle mouse button navigation in full screen mode
 const handleMouseNavigation = (event: MouseEvent) => {
+    // Only act on initial press; release/auxclick can target a different element
+    if (event.type !== 'mousedown') return;
+
     // Normalize handling for auxiliary buttons to avoid browser navigation
     // Mouse button 3 = back button (previous)
     // Mouse button 4 = forward button (next)
@@ -791,8 +807,6 @@ watch(
                 </div>
             </div>
 
-            <p>{{ masonry?.paginationHistory }}</p>
-
             <!-- Masonry Container -->
             <div class="relative min-h-0 flex-1">
                 <Masonry
@@ -808,9 +822,7 @@ watch(
                     class="h-full"
                 >
                     <template #item="{ item }">
-<div
-                            :class="['transition duration-150', shouldBlur(item) ? 'blur-[1px] blur-md' : '']"
-                        >
+                        <div :class="['transition duration-150', shouldBlur(item) ? 'blur-[1px] blur-md' : '']">
                             <BrowseItem
                                 :download-progress="downloadProgress[item.id]"
                                 :is-downloaded="downloadedItems.has(item.id)"
@@ -860,7 +872,6 @@ watch(
             tabindex="0"
             @click="closeImageViewer"
             @mousedown.prevent.stop="handleMouseNavigation"
-            @mouseup.prevent.stop="handleMouseNavigation"
             @auxclick.prevent.stop="handleMouseNavigation"
             @keydown.escape="closeImageViewer"
             @keydown.left="goToPrevious"
@@ -1008,8 +1019,8 @@ watch(
                 <div class="p-4">
                     <h3 class="mb-3 text-sm font-medium text-white">Metadata</h3>
                     <p>{{ currentImage.id }}</p>
-                    <pre v-if="currentImage.listingMetadata?.data?.meta?.prompt" class="text-xs whitespace-pre-wrap text-gray-300">{{
-                        JSON.stringify(currentImage.listingMetadata.data.meta.prompt, null, 2)
+                    <pre v-if="currentImage.listingMetadata?.meta?.prompt" class="text-xs whitespace-pre-wrap text-gray-300">{{
+                        JSON.stringify(currentImage.listingMetadata.meta.prompt, null, 2)
                     }}</pre>
                     <pre v-else class="text-xs whitespace-pre-wrap text-gray-300">{{
                         JSON.stringify(currentImage.listingMetadata ?? currentImage.metadata, null, 2)

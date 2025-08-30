@@ -102,11 +102,22 @@ const handleFullScreenAltRightClick = () => {
     }
 };
 
-// Prevent browser back/forward when fullscreen viewer is open (like Browse.vue)
+// Prevent browser back/forward:
+// - Always block Alt + X1/X2 globally to reserve for our shortcuts
+// - Also block all aux buttons when fullscreen viewer is open
 const globalAuxMouseBlocker = (event: MouseEvent) => {
-    if (!isImageViewerOpen.value) return;
     const btn = (event as any).button;
-    if (btn === 3 || btn === 4) {
+
+    if (event.altKey && (btn === 3 || btn === 4)) {
+        event.preventDefault?.();
+        // Let mousedown propagate so item-level logic can run; block on mouseup/auxclick
+        if (event.type !== 'mousedown') {
+            event.stopImmediatePropagation?.();
+        }
+        return;
+    }
+
+    if (isImageViewerOpen.value && (btn === 3 || btn === 4)) {
         event.preventDefault?.();
         event.stopImmediatePropagation?.();
     }
@@ -126,6 +137,9 @@ onBeforeUnmount(() => {
 
 // Mouse navigation handler in fullscreen (like Browse.vue)
 const handleMouseNavigation = (event: MouseEvent) => {
+    // Only act on initial press; release/auxclick can target a different element
+    if (event.type !== 'mousedown') return;
+
     const isBackButton = (event as any).button === 3;
     const isForwardButton = (event as any).button === 4;
 
@@ -221,9 +235,8 @@ class="w-full cursor-pointer object-cover block"
             v-if="isImageViewerOpen"
             class="fixed inset-0 z-50 flex bg-black/90"
             tabindex="0"
-            @click="closeImageViewer"
+@click="closeImageViewer"
             @mousedown.prevent.stop="handleMouseNavigation"
-            @mouseup.prevent.stop="handleMouseNavigation"
             @auxclick.prevent.stop="handleMouseNavigation"
             @keydown.escape="closeImageViewer"
             @keydown.left="canGoPrevious && ( $event.preventDefault(), goToPrevious() )"

@@ -111,6 +111,27 @@ test('converts to content moderator format for contains-combo type', function ()
     ]);
 });
 
+test('contains-combo includes match when set (terms match mode)', function () {
+    $rule = ModerationRule::create([
+        'type' => 'contains-combo',
+        'terms' => ['alpha','beta'],
+        'with_terms' => ['x','y'],
+        'match' => 'all',
+        'action' => 'block',
+        'active' => true,
+    ]);
+
+    $format = $rule->toContentModeratorFormat();
+
+    expect($format)->toBe([
+        'type' => 'contains-combo',
+        'terms' => ['alpha','beta'],
+        'action' => 'block',
+        'with' => ['x','y'],
+        'match' => 'all',
+    ]);
+});
+
 test('factory creates valid moderation rules', function () {
     $containsRule = ModerationRule::factory()->containsType()->create();
     $comboRule = ModerationRule::factory()->containsComboType()->create();

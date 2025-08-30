@@ -147,6 +147,14 @@ async function refresh() {
           </div>
 
           <div v-if="form.type === 'contains-combo'" class="grid gap-2">
+            <Label for="combo-match">Terms match</Label>
+            <select id="combo-match" v-model="form.match" class="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <option value="any">any</option>
+              <option value="all">all</option>
+            </select>
+          </div>
+
+          <div v-if="form.type === 'contains-combo'" class="grid gap-2">
             <Label for="with">With terms (comma-separated)</Label>
             <Input id="with" v-model="withCSV" placeholder="term1, term2" />
           </div>
@@ -191,7 +199,7 @@ async function refresh() {
               <div class="mt-2 text-xs text-muted-foreground">
                 <div>Type: {{ rule.type }}</div>
                 <div>Terms: {{ rule.terms?.join(', ') }}</div>
-                <div v-if="rule.type === 'contains'">Match: {{ rule.match }}</div>
+                <div v-if="rule.type === 'contains' || rule.type === 'contains-combo'">Match: {{ rule.match || 'any' }}</div>
                 <div v-if="rule.type === 'contains' && rule.unless?.length">Unless: {{ rule.unless?.join(', ') }}</div>
                 <div v-if="rule.type === 'contains-combo' && rule.with_terms?.length">With: {{ rule.with_terms?.join(', ') }}</div>
                 <div>Action: {{ rule.action }} | Active: {{ rule.active ? 'yes' : 'no' }}</div>

@@ -67,6 +67,9 @@ class ModerationRule extends Model
             if ($this->with_terms && !empty($this->with_terms)) {
                 $rule['with'] = $this->with_terms;
             }
+            if (!empty($this->match)) {
+                $rule['match'] = $this->match;
+            }
         }
 
         return $rule;

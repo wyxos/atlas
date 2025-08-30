@@ -6,14 +6,17 @@ use App\Jobs\FetchPostImages;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
+use App\Support\ContentModerator;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class CivitAIService
 {
@@ -379,6 +382,15 @@ class CivitAIService
                 'updated_at' => $now,
             ];
 
+// Normalize listing metadata to always include meta.prompt
+            $listing = $image;
+            if (!isset($listing['meta']) || !is_array($listing['meta'])) {
+                $listing['meta'] = [];
+            }
+            if (isset($image['prompt']) && is_string($image['prompt'])) {
+                $listing['meta']['prompt'] = $image['prompt'];
+            }
+
             $fileData = [
                 'source' => 'CivitAI',
                 'source_id' => (string)$image['id'],
@@ -391,7 +403,7 @@ class CivitAIService
                 'title' => null,
                 'description' => null,
                 'thumbnail_url' => $thumbnail,
-                'listing_metadata' => json_encode($image),
+'listing_metadata' => json_encode($listing),
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
@@ -518,16 +530,17 @@ class CivitAIService
 
         $allFiles = File::with('metadata')->whereIn('referrer_url', $referrers)->get();
 
-        // Dispatch jobs (unchanged)
+        // Apply moderation: blacklist offending files in one batch and work only with safe files
+        $safeFiles = $this->moderateAndFilterSafe($allFiles);
+
+        // Dispatch jobs (unchanged) only for safe files
         $delay = 0;
-        foreach ($allFiles as $file) {
-            if (!$file->is_blacklisted) {
-                FetchPostImages::dispatch($file)->delay(now()->addSeconds($delay));
-                $delay += 5;
-            }
+        foreach ($safeFiles as $file) {
+            FetchPostImages::dispatch($file)->delay(now()->addSeconds($delay));
+            $delay += 5;
         }
 
-        return $allFiles->filter(function ($file) {
+        return collect($safeFiles)->filter(function ($file) {
             return $file->seen_preview_at === null &&
                 $file->seen_file_at === null &&
                 $file->liked === false &&
@@ -536,6 +549,71 @@ class CivitAIService
                 $file->downloaded === false &&
                 $file->is_blacklisted === false;
         })->values()->all();
+    }
+
+    /**
+     * Using the ContentModerator rules, find files whose prompt should be blocked.
+     * Perform a single batch update to blacklist them, and return only the safe files.
+     *
+     * @param Collection|array $files
+     * @return array Files that passed moderation
+     */
+    private function moderateAndFilterSafe($files): array
+    {
+        $collection = collect($files);
+        if ($collection->isEmpty()) {
+            return [];
+        }
+
+        $moderator = ContentModerator::fromDatabase();
+
+        $toBlacklistIds = [];
+        foreach ($collection as $file) {
+            $prompt = $this->extractPromptFromFile($file);
+            if ($prompt && $moderator->shouldBlock($prompt)) {
+                $toBlacklistIds[] = $file->id;
+            }
+        }
+
+        if (!empty($toBlacklistIds)) {
+            // One batch update
+            File::whereIn('id', $toBlacklistIds)->update([
+                'is_blacklisted' => true,
+                'blacklist_reason' => 'moderation: prompt',
+                'disliked' => true,
+                'disliked_at' => now(),
+            ]);
+
+            // Update Scout index: remove blacklisted items from search results
+            try {
+                $blacklistedModels = File::whereIn('id', $toBlacklistIds)->get();
+                if ($blacklistedModels->isNotEmpty()) {
+                    $blacklistedModels->unsearchable();
+                }
+            } catch (Throwable $e) {
+                Log::warning('Scout unsearchable failed for blacklisted files', [
+                    'error' => $e->getMessage(),
+                    'ids' => $toBlacklistIds,
+                ]);
+            }
+        }
+
+        // Return only safe files (not in the blacklist set)
+        $blacklistSet = array_flip($toBlacklistIds);
+        return $collection->reject(function ($file) use ($blacklistSet) {
+            return isset($blacklistSet[$file->id]);
+        })->values()->all();
+    }
+
+    /**
+     * Extract a prompt string from a File's available metadata sources.
+     */
+private function extractPromptFromFile(File $file): ?string
+    {
+        // listing_metadata is cast to array and prompt is guaranteed at meta.prompt
+        $listing = $file->listing_metadata ?? [];
+        $prompt = $listing['meta']['prompt'] ?? null;
+        return is_string($prompt) && $prompt !== '' ? $prompt : null;
     }
 
     /**
@@ -771,7 +849,10 @@ class CivitAIService
 
         $allFiles = File::with('metadata')->whereIn('referrer_url', $referrers)->get();
 
-        return $allFiles->filter(function ($file) {
+        // Apply moderation: blacklist offending files in one batch and work only with safe files
+        $safeFiles = $this->moderateAndFilterSafe($allFiles);
+
+        return collect($safeFiles)->filter(function ($file) {
             return $file->seen_preview_at === null &&
                 $file->seen_file_at === null &&
                 $file->liked === false &&

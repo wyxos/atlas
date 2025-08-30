@@ -40,3 +40,21 @@ test('blocks if car + any of fuel, fire, or F1 are present', function () {
     expect($this->moderator->shouldBlock('car races in F1'))->toBeTrue();
     expect($this->moderator->shouldBlock('just a car'))->toBeFalse();
 });
+
+// Scenario: (worda and wordb) AND any of (wordx, wordy)
+// Implemented using contains-combo with terms match 'all' and with any
+test('blocks if both alpha and beta are present AND any of x or y', function () {
+    $rules = [
+        ['type' => 'contains-combo', 'terms' => ['alpha', 'beta'], 'match' => 'all', 'with' => ['x', 'y'], 'action' => 'block'],
+    ];
+    $moderator = new \App\Support\ContentModerator($rules);
+
+    expect($moderator->shouldBlock('alpha beta with x'))
+        ->toBeTrue()
+        ->and($moderator->shouldBlock('alpha y'))
+        ->toBeFalse() // missing beta
+        ->and($moderator->shouldBlock('beta something'))
+        ->toBeFalse() // missing alpha and with-term
+        ->and($moderator->shouldBlock('alpha beta none'))
+        ->toBeFalse(); // no with-term present
+});

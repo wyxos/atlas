@@ -3,8 +3,11 @@ import FileReactions from '@/components/audio/FileReactions.vue';
 import { useSeenStatus } from '@/composables/useSeenStatus';
 import type { BrowseItem } from '@/types/browse';
 import axios from 'axios';
-import { RotateCcw, ExternalLink } from 'lucide-vue-next';
+import { RotateCcw, ExternalLink, Info } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import Tooltip from '@/components/ui/tooltip/Tooltip.vue';
+import TooltipTrigger from '@/components/ui/tooltip/TooltipTrigger.vue';
+import TooltipContent from '@/components/ui/tooltip/TooltipContent.vue';
 
 interface Props {
     item: BrowseItem;
@@ -218,8 +221,41 @@ onUnmounted(() => {
     }
 });
 
+// Extract prompt text from listingMetadata/metadata
+const promptText = computed<string | null>(() => {
+    const lm: any = (props.item as any)?.listingMetadata ?? null;
+    let listing: any = lm;
+    if (typeof listing === 'string') {
+        try {
+            listing = JSON.parse(listing);
+        } catch {
+            listing = null;
+        }
+    }
+
+    const tryPaths = (obj: any): string | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        if (obj?.data?.meta?.prompt && typeof obj.data.meta.prompt === 'string') return obj.data.meta.prompt as string;
+        if (obj?.meta?.prompt && typeof obj.meta.prompt === 'string') return obj.meta.prompt as string;
+        if (obj?.prompt && typeof obj.prompt === 'string') return obj.prompt as string;
+        return null;
+    };
+
+    let p = tryPaths(listing);
+    if (!p) {
+        const md: any = (props.item as any)?.metadata ?? null;
+        if (md && typeof md === 'object' && typeof md.prompt === 'string') {
+            p = md.prompt as string;
+        }
+    }
+    return p || null;
+});
+
 // Intercept alt + back/forward mouse buttons to trigger batch actions without browser navigation
 const handleMouseButtons = (event: MouseEvent) => {
+    // Only act on initial press; release/auxclick can target a different element
+    if (event.type !== 'mousedown') return;
+
     const btn = (event as any).button;
     const postId = (props.item as any)?.listingMetadata?.postId;
 
@@ -259,9 +295,8 @@ const handleVideoCompleted = () => {
     <div
         :id="`browse-item-${item.id}`"
         class="relative h-full"
-        @contextmenu="(event) => !event.altKey && $emit('contextmenu', event)"
+@contextmenu="(event) => !event.altKey && $emit('contextmenu', event)"
         @mousedown.capture="handleMouseButtons"
-        @mouseup.capture="handleMouseButtons"
         @auxclick.prevent.stop="handleMouseButtons"
     >
         <!-- Media container with fixed imageHeight -->
@@ -329,6 +364,17 @@ const handleVideoCompleted = () => {
 
         <!-- Status Badge + Separate related badges -->
         <div class="absolute top-2 right-2 z-10 flex items-center gap-1">
+            <!-- Prompt info badge -->
+            <Tooltip v-if="promptText">
+                <TooltipTrigger>
+                    <div class="rounded bg-black/70 p-1 text-white shadow cursor-help hover:bg-black/80" title="View prompt">
+                        <Info :size="14" />
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end" class="max-w-80 whitespace-pre-wrap break-words">
+                    {{ promptText }}
+                </TooltipContent>
+            </Tooltip>
             <div
                 v-if="props.postRelatedCount && props.postRelatedCount > 1"
                 class="rounded bg-black/70 px-1.5 py-0.5 font-bold text-white shadow"

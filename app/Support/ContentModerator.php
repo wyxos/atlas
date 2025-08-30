@@ -48,7 +48,13 @@ class ContentModerator
 
                 case 'contains-combo':
                     $with = $rule['with'] ?? [];
-                    if ($this->containsAny($text, $rule['terms']) && $this->containsAny($text, $with)) {
+                    $termsMatchMode = $rule['match'] ?? 'any';
+                    $withMatchMode = $rule['with_match'] ?? 'any';
+
+                    $termsMatched = $this->matchTerms($text, $rule['terms'], $termsMatchMode);
+                    $withMatched = $this->matchTerms($text, $with, $withMatchMode);
+
+                    if ($termsMatched && $withMatched) {
                         $matches[] = $rule;
                     }
                     break;
