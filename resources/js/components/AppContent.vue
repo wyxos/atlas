@@ -1,7 +1,7 @@
-<script setup lang="ts">
+<script lang="ts" setup>
+import GlobalAudioProvider from '@/components/GlobalAudioProvider.vue';
 import { SidebarInset } from '@/components/ui/sidebar';
 import { computed } from 'vue';
-import GlobalAudioProvider from '@/components/GlobalAudioProvider.vue';
 
 interface Props {
     variant?: 'header' | 'sidebar';
@@ -17,7 +17,7 @@ const className = computed(() => props.class);
         <slot />
         <GlobalAudioProvider />
     </SidebarInset>
-    <main v-else class="mx-auto flex h-full w-full max-w-7xl flex-1 flex-col gap-4 rounded-xl relative" :class="className">
+    <main v-else :class="className" class="relative mx-auto flex h-screen w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden rounded-xl">
         <slot />
         <GlobalAudioProvider />
     </main>
