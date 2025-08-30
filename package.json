@@ -49,6 +49,7 @@
         "eslint": "^9.17.0",
         "eslint-config-prettier": "^10.0.1",
         "eslint-plugin-vue": "^9.32.0",
+        "favicons": "^7.2.0",
         "jsdom": "^26.1.0",
         "laravel-echo": "^2.1.6",
         "lodash": "^4.17.21",
