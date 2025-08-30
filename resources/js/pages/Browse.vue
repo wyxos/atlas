@@ -788,9 +788,9 @@ watch(
     <Head title="Browse" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex flex-1 flex-col overflow-hidden">
+        <div>
             <!-- Header -->
-            <div class="flex-shrink-0 border-b p-4">
+            <div class="border-b p-4">
                 <div class="flex flex-col items-center gap-4">
                     <BrowseFilters
                         :filters="currentFilters"
@@ -808,60 +808,56 @@ watch(
             </div>
 
             <!-- Masonry Container -->
-            <div class="relative min-h-0 flex-1">
-                <Masonry
-                    ref="masonry"
-                    v-model:items="masonryItems"
-                    :get-next-page="getPage"
-                    :layout="{
-                        sizes: { base: 1, sm: 2, md: 3, lg: 3, xl: 5, '2xl': 8 },
-                        footer: 32,
-                    }"
-                    :load-at-page="props.filters.page"
-                    :max-items="150"
-                    class="h-full"
-                >
-                    <template #item="{ item }">
-                        <div :class="['transition duration-150', shouldBlur(item) ? 'blur-[1px] blur-md' : '']">
-                            <BrowseItem
-                                :download-progress="downloadProgress[item.id]"
-                                :is-downloaded="downloadedItems.has(item.id)"
-                                :is-loading="masonry?.isLoading || isAutocycling"
-                                :item="item"
-                                :page-size="currentFilters.limit"
-                                :post-related-count="getPostRelatedCount(item)"
-                                :user-related-count="getUserRelatedCount(item)"
-                                @contextmenu="(event) => handleRightClick(event, item)"
-                                @dislike="handleItemDislike"
-                                @favorite="handleItemFavorite"
-                                @like="handleItemLike"
-                                @laughed-at="handleItemLaughedAt"
-                                @alt-click="handleAltClick"
-                                @alt-middle-click="handleAltMiddleClick"
-                                @alt-right-click="handleAltRightClick"
-                                @left-click="handleLeftClick"
-                                @post-badge-enter="handlePostBadgeEnter"
-                                @post-badge-leave="handlePostBadgeLeave"
-                            />
-                        </div>
-                    </template>
-                </Masonry>
+            <Masonry
+                ref="masonry"
+                v-model:items="masonryItems"
+                :get-next-page="getPage"
+                :layout="{
+                    sizes: { base: 1, sm: 2, md: 3, lg: 3, xl: 5, '2xl': 8 },
+                    footer: 32,
+                }"
+                :load-at-page="props.filters.page"
+                :max-items="150"
+            >
+                <template #item="{ item }">
+                    <BrowseItem
+                        :class="['transition duration-150', shouldBlur(item) ? 'blur-[1px] blur-md' : '']"
+                        :download-progress="downloadProgress[item.id]"
+                        :is-downloaded="downloadedItems.has(item.id)"
+                        :is-loading="masonry?.isLoading || isAutocycling"
+                        :item="item"
+                        :page-size="currentFilters.limit"
+                        :post-related-count="getPostRelatedCount(item)"
+                        :user-related-count="getUserRelatedCount(item)"
+                        @contextmenu="(event) => handleRightClick(event, item)"
+                        @dislike="handleItemDislike"
+                        @favorite="handleItemFavorite"
+                        @like="handleItemLike"
+                        @laughed-at="handleItemLaughedAt"
+                        @alt-click="handleAltClick"
+                        @alt-middle-click="handleAltMiddleClick"
+                        @alt-right-click="handleAltRightClick"
+                        @left-click="handleLeftClick"
+                        @post-badge-enter="handlePostBadgeEnter"
+                        @post-badge-leave="handlePostBadgeLeave"
+                    />
+                </template>
+            </Masonry>
 
-                <!-- Loading Popup (without background mask) -->
-                <div v-if="masonry?.isLoading || isAutocycling" class="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
-                    <div class="flex flex-col items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
-                        <div class="flex items-center gap-3">
-                            <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-500"></div>
-                            <span class="font-medium text-white">
-                                {{ isAutocycling ? 'Finding available items...' : 'Loading more images...' }}
-                            </span>
-                        </div>
-                        <div v-if="isAutocycling" class="text-sm text-gray-200">Attempt {{ autocycleAttempts }} of {{ MAX_AUTOCYCLE_ATTEMPTS }}</div>
+            <!-- Loading Popup (without background mask) -->
+            <div v-if="masonry?.isLoading || isAutocycling" class="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
+                <div class="flex flex-col items-center gap-3 rounded-lg bg-primary p-6 shadow-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-500"></div>
+                        <span class="font-medium text-white">
+                            {{ isAutocycling ? 'Finding available items...' : 'Loading more images...' }}
+                        </span>
                     </div>
+                    <div v-if="isAutocycling" class="text-sm text-gray-200">Attempt {{ autocycleAttempts }} of {{ MAX_AUTOCYCLE_ATTEMPTS }}</div>
                 </div>
-                <div v-if="!masonry?.isLoading && masonryItems.length === 0" class="absolute inset-0 flex items-center justify-center">
-                    <div class="text-gray-500">No images found. Try changing filters or loading more.</div>
-                </div>
+            </div>
+            <div v-if="!masonry?.isLoading && masonryItems.length === 0" class="absolute inset-0 flex items-center justify-center">
+                <div class="text-gray-500">No images found. Try changing filters or loading more.</div>
             </div>
         </div>
 

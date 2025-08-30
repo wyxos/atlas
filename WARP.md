@@ -9,7 +9,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - Install JS deps
   - npm ci
 - Serve app (Laravel Herd usually serves automatically; when manually serving):
-  - php artisan serve --no-interaction
+  - php artisan serve
 - Local dev loop (preferred over running npm run dev directly):
   - composer run dev
     - Runs: PHP server, queue listener, and Vite with auto-refresh
@@ -18,9 +18,9 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - Server-side rendering (SSR) dev:
   - composer run dev:ssr
 - Run queues (if not using the dev script):
-  - php artisan queue:listen --tries=1 --no-interaction
+  - php artisan queue:listen --tries=1
 - Logs stream (Laravel Pail):
-  - php artisan pail --timeout=0 --no-interaction
+  - php artisan pail --timeout=0
 - Lint/format PHP (Laravel Pint):
   - vendor\bin\pint --dirty
   - To fix everything: vendor\bin\pint
@@ -29,10 +29,10 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
   - Single file: php artisan test tests/Feature/SomeTest.php --compact --parallel
   - Filter by name: php artisan test --filter="test name substring" --compact --parallel
 - Database migrations (only after tests pass):
-  - php artisan migrate --graceful --no-interaction
+  - php artisan migrate --graceful
 - Horizon/Reverb (installed; start as needed):
   - Horizon dashboard: php artisan horizon
-  - Reverb: php artisan reverb:start --no-interaction
+  - Reverb: php artisan reverb:start
 
 Notes
 - Do not run npm run dev. Use composer run dev which orchestrates PHP server, queue worker, and Vite.

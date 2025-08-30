@@ -17,7 +17,7 @@ const className = computed(() => props.class);
         <slot />
         <GlobalAudioProvider />
     </SidebarInset>
-    <main v-else :class="className" class="relative mx-auto flex h-screen w-full max-w-7xl flex-1 flex-col gap-4 overflow-hidden rounded-xl">
+    <main v-else :class="className" class="flex flex-col">
         <slot />
         <GlobalAudioProvider />
     </main>
