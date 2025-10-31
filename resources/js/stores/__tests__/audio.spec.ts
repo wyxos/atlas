@@ -318,7 +318,14 @@ const errSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
             expect(audioStore.queue).toHaveLength(1);
         });
         await vi.waitFor(() => {
-            expect(playUri).toHaveBeenCalledWith('spotify:track:402', 0);
+            expect(playUri).toHaveBeenCalledWith(
+                'spotify:track:402',
+                0,
+                expect.objectContaining({
+                    initialVolume: 1,
+                    skipActivation: false,
+                }),
+            );
         });
 
         restoreAudio();
