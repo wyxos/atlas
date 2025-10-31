@@ -1,0 +1,6 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "require": {
+        "vendor/package": "^1.0"
+    }
+}

@@ -1,0 +1,446 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+@import '@wyxos/vibe/vibe.css';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar-background);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
+}
+
+@layer utilities {
+    body,
+    html {
+        --font-sans:
+            'Outfit', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    }
+}
+
+:root {
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 3.9%);
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(0 0% 3.9%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(0 0% 3.9%);
+    --primary: hsl(0 0% 9%);
+    --primary-foreground: hsl(0 0% 98%);
+    --secondary: hsl(0 0% 92.1%);
+    --secondary-foreground: hsl(0 0% 9%);
+    --muted: hsl(0 0% 96.1%);
+    --muted-foreground: hsl(0 0% 45.1%);
+    --accent: hsl(0 0% 96.1%);
+    --accent-foreground: hsl(0 0% 9%);
+    --destructive: hsl(0 84.2% 60.2%);
+    --destructive-foreground: hsl(0 0% 98%);
+    --border: hsl(0 0% 92.8%);
+    --input: hsl(0 0% 89.8%);
+    --ring: hsl(0 0% 3.9%);
+    --chart-1: hsl(12 76% 61%);
+    --chart-2: hsl(173 58% 39%);
+    --chart-3: hsl(197 37% 24%);
+    --chart-4: hsl(43 74% 66%);
+    --chart-5: hsl(27 87% 67%);
+    --radius: 0.5rem;
+    --sidebar-background: hsl(0 0% 98%);
+    --sidebar-foreground: hsl(240 5.3% 26.1%);
+    --sidebar-primary: hsl(0 0% 10%);
+    --sidebar-primary-foreground: hsl(0 0% 98%);
+    --sidebar-accent: hsl(0 0% 94%);
+    --sidebar-accent-foreground: hsl(0 0% 30%);
+    --sidebar-border: hsl(0 0% 91%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+    --sidebar: hsl(0 0% 98%);
+}
+
+.dark {
+    /* Custom Atlas Dark Theme (from backup) */
+    --background: hsl(216 100% 2.5%);
+    --foreground: hsl(0 0% 100%);
+    --card: hsl(214 100% 11.8%);
+    --card-foreground: hsl(0 0% 100%);
+    --popover: hsl(214 100% 11.8%);
+    --popover-foreground: hsl(0 0% 100%);
+    --primary: hsl(207 100% 20%);
+    --primary-foreground: hsl(0 0% 100%);
+    --secondary: hsl(205 43% 49%);
+    --secondary-foreground: hsl(0 0% 100%);
+    --muted: hsl(214 100% 8%);
+    --muted-foreground: hsl(0 0% 70%);
+    --accent: hsl(205 43% 49%);
+    --accent-foreground: hsl(0 0% 100%);
+    --destructive: hsl(349 100% 38%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(214 100% 15%);
+    --input: hsl(214 100% 15%);
+    --ring: hsl(205 43% 49%);
+    --chart-1: hsl(207 100% 20%);
+    --chart-2: hsl(205 43% 49%);
+    --chart-3: hsl(45 100% 50%);
+    --chart-4: hsl(349 100% 38%);
+    --chart-5: hsl(45 100% 47%);
+    --sidebar-background: hsl(216 100% 2.5%);
+    --sidebar-foreground: hsl(0 0% 100%);
+    --sidebar-primary: hsl(207 100% 20%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(214 100% 11.8%);
+    --sidebar-accent-foreground: hsl(0 0% 100%);
+    --sidebar-border: hsl(214 100% 15%);
+    --sidebar-ring: hsl(205 43% 49%);
+    --sidebar: hsl(216 100% 2.5%);
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+
+
+/* Atlas Custom Branding Styles */
+@layer components {
+    /* Oruga theming: set variant colors to match Atlas blue theme */
+    :root {
+        /* Use existing app palette where possible */
+        --oruga-variant-primary: var(--sidebar-ring);
+        --oruga-variant-info: hsl(200 98% 39%);
+        --oruga-variant-success: hsl(142 72% 29%);
+        --oruga-variant-warning: hsl(45 93% 47%);
+        --oruga-variant-danger: hsl(0 72% 50%);
+    }
+
+    .dark {
+        --oruga-variant-primary: var(--sidebar-ring);
+        --oruga-variant-info: hsl(200 98% 55%);
+        --oruga-variant-success: hsl(142 72% 35%);
+        --oruga-variant-warning: hsl(45 93% 55%);
+        --oruga-variant-danger: hsl(0 72% 58%);
+    }
+
+    /* Oruga Table adjustments for light/dark to align with Atlas surfaces */
+    /* Base table surface & borders */
+    .o-table,
+    .o-table table {
+        @apply bg-card text-foreground border border-border rounded-md;
+    }
+
+    /* Header */
+    .o-table thead,
+    .o-table thead tr,
+    .o-table thead th {
+        @apply bg-muted text-foreground border-b border-border;
+    }
+
+    /* Cells */
+    .o-table td,
+    .o-table th {
+        @apply px-4 py-2 border-border;
+    }
+    .o-table tbody tr,
+    .o-table tbody td {
+        @apply bg-card;
+    }
+
+    /* Zebra striping from Oruga's .is-striped */
+    .o-table.is-striped tbody tr:nth-child(even) {
+        @apply bg-muted/30;
+    }
+
+    /* Hover */
+    .o-table tbody tr:hover {
+        @apply bg-accent text-foreground;
+    }
+
+    /* Selected rows */
+    .o-table tbody tr.is-selected,
+    .o-table tbody tr.is-selected td {
+        @apply bg-accent text-foreground;
+    }
+
+    /* Dark mode tweaks */
+    .dark .o-table thead,
+    .dark .o-table thead tr,
+    .dark .o-table thead th {
+        @apply bg-sidebar border-border;
+    }
+    .dark .o-table.is-striped tbody tr:nth-child(even) {
+        @apply bg-muted;
+    }
+    .dark .o-table tbody tr:hover {
+        @apply bg-muted text-foreground;
+    }
+    .dark .o-table tbody tr.is-selected,
+    .dark .o-table tbody tr.is-selected td {
+        @apply bg-muted text-foreground;
+    }
+
+    /* Ensure all borders use app token */
+    .o-table,
+    .o-table table,
+    .o-table thead,
+    .o-table tbody,
+    .o-table tfoot,
+    .o-table tr,
+    .o-table th,
+    .o-table td {
+        border-color: var(--border) !important;
+    }
+
+    /* Normalize text color for readability on dark */
+    .o-table,
+    .o-table table,
+    .o-table td,
+    .o-table th,
+    .o-table__td,
+    .o-table__th,
+    .o-table__th__label,
+    .o-table td span,
+    .o-table th span {
+        color: var(--foreground) !important;
+    }
+
+    /* Fix Oruga sticky header background to respect theme */
+    .o-table__wrapper--sticky-header .o-table__th {
+        background: var(--background) !important;
+    }
+
+    /* Make Oruga table wrapper fill parent when root has h-full */
+    .o-table.h-full .o-table__wrapper {
+        height: 100%;
+        overflow: auto;
+    }
+
+    /* Masonry transition compatibility for Tailwind v4 */
+    .transition-\[top\,left\,opacity\] {
+        transition-property: top, left, opacity;
+    }
+
+    /* Enhanced button styling with Atlas colors */
+    .btn-atlas-primary {
+        @apply bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium transition-colors;
+    }
+
+    .btn-atlas-secondary {
+        @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground px-4 py-2 rounded-md font-medium transition-colors;
+    }
+
+    .btn-atlas-destructive {
+        @apply bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-md font-medium transition-colors;
+    }
+
+    .button {
+        @apply bg-secondary cursor-pointer hover:bg-secondary/90 border-2 border-secondary p-4;
+
+        &.empty {
+            @apply bg-transparent text-secondary hover:bg-secondary hover:text-secondary-foreground border-2 border-secondary;
+        }
+
+        &.active {
+            @apply bg-primary text-primary-foreground hover:bg-primary/90 border-2 border-primary;
+        }
+
+        &.disabled {
+            @apply bg-muted text-muted-foreground cursor-not-allowed opacity-50 border-2 border-muted;
+        }
+
+        &.destructive {
+            @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 border-2 border-destructive;
+        }
+
+        &.circular {
+            @apply rounded-full;
+        }
+
+        &.small {
+            @apply text-xs p-2;
+        }
+    }
+
+    /* Atlas card styling */
+    .card-atlas {
+        @apply bg-card border border-border rounded-lg shadow-sm;
+    }
+
+    /* Atlas navigation styling */
+    .nav-atlas {
+        @apply bg-card border-b border-border;
+    }
+
+    /* Atlas sidebar enhancements */
+    .sidebar-atlas {
+        @apply bg-sidebar border-r border-sidebar-border;
+    }
+
+    /* Atlas form styling */
+    .input-atlas {
+        @apply bg-input border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring;
+    }
+
+    /* Atlas accent gradients */
+    .gradient-atlas-primary {
+        background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+    }
+
+    .gradient-atlas-accent {
+        background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
+    }
+
+    /* Atlas text colors */
+    .text-atlas-primary {
+        @apply text-primary;
+    }
+
+    .text-atlas-secondary {
+        @apply text-secondary;
+    }
+
+    .text-atlas-accent {
+        @apply text-accent;
+    }
+
+    /* Atlas focus styles */
+    .focus-atlas {
+        @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+    }
+
+    /* Virtual scroller styles (shared) */
+    .vue-recycle-scroller {
+        position: relative;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(148, 163, 184, 0.3) rgba(203, 213, 225, 0.2);
+    }
+
+    .vue-recycle-scroller__item-wrapper {
+        overflow: hidden;
+    }
+
+    .vue-recycle-scroller__item-view {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+    }
+
+    /* Custom scrollbar styling (WebKit) */
+    .vue-recycle-scroller::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .vue-recycle-scroller::-webkit-scrollbar-track {
+        background-color: rgba(203, 213, 225, 0.2);
+        border-radius: 9999px;
+    }
+
+    .vue-recycle-scroller::-webkit-scrollbar-thumb {
+        background-color: rgba(148, 163, 184, 0.3);
+        border-radius: 9999px;
+    }
+
+    .vue-recycle-scroller::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(148, 163, 184, 0.5);
+    }
+
+    /* Dark mode scrollbar */
+    .dark .vue-recycle-scroller::-webkit-scrollbar-track {
+        background-color: rgba(51, 65, 85, 0.2);
+    }
+
+    .dark .vue-recycle-scroller::-webkit-scrollbar-thumb {
+        background-color: rgba(148, 163, 184, 0.3);
+    }
+
+    .dark .vue-recycle-scroller::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(148, 163, 184, 0.5);
+    }
+
+    /* Firefox (dark preference) */
+    @media (prefers-color-scheme: dark) {
+        .vue-recycle-scroller {
+            scrollbar-color: rgba(148, 163, 184, 0.3) rgba(51, 65, 85, 0.2);
+        }
+    }
+}
+
+.masonry-item {
+    @apply p-2
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .masonry-container.force-motion .masonry-item,
+    .masonry-container.force-motion .masonry-move {
+        transition-duration: var(--masonry-duration, 450ms) !important;
+    }
+}
