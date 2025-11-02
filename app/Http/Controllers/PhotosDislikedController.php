@@ -196,7 +196,7 @@ class PhotosDislikedController extends Controller
             $query->whereIn('previewed_count', [0]);
         } else {
             // For all other disliked categories, keep items previewed less than 5 times
-            $query->whereIn('previewed_count', [0, 1, 2, 3, 4, 5]);
+            $query->whereIn('previewed_count', [0, 1, 2, 3, 4]);
         }
 
         if ($reasons !== null) {

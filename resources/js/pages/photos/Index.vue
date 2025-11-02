@@ -354,6 +354,9 @@ function onBackfillStop(payload: { fetched?: number; calls?: number }) {
     if (payload.calls != null) backfill.calls = payload.calls;
     backfill.waitRemainingMs = 0;
     backfill.waitTotalMs = 0;
+    try {
+        flushModeration();
+    } catch {}
 }
 function onRetryStart(payload: { attempt: number; max: number; totalMs: number }) {
     backfill.retryActive = true;
