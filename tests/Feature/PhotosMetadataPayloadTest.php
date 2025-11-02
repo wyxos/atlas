@@ -15,7 +15,7 @@ class FakeScoutBuilder extends Builder
 {
     protected array $fakeItems = [];
 
-    protected array $orders = [];
+    public $orders = [];
 
     public function setFakeItems(array $items): self
     {

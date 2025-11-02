@@ -51,8 +51,12 @@ class PhotosReactionsController extends Controller
     {
         $limit = max(1, min(200, (int) request('limit', 40)));
         $page = max(1, (int) request('page', 1));
-        $sort = (string) request('sort', 'newest');
+        $sort = strtolower((string) request('sort', 'newest'));
+        if (! in_array($sort, ['newest', 'oldest', 'random'], true)) {
+            $sort = 'newest';
+        }
         $randSeed = request('rand_seed');
+        $resolvedRandSeed = null;
 
         $userId = optional(request()->user())->id;
         $field = self::KIND_TO_FIELD[$kind];
@@ -72,18 +76,22 @@ class PhotosReactionsController extends Controller
         if ($sort === 'random') {
             if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
                 try {
-                    $randSeed = random_int(1, 2147483646);
+                    $resolvedRandSeed = random_int(1, 2147483646);
                 } catch (\Throwable $e) {
-                    $randSeed = mt_rand(1, 2147483646);
+                    $resolvedRandSeed = mt_rand(1, 2147483646);
                 }
             } else {
-                $randSeed = (int) $randSeed;
+                $resolvedRandSeed = (int) $randSeed;
             }
             if (method_exists($query, 'orderBy')) {
-                $query->orderBy('_rand('.$randSeed.')', 'desc');
+                $query->orderBy('_rand('.$resolvedRandSeed.')', 'desc');
             }
-        } else {
-            $query->orderBy('created_at', 'desc');
+        } elseif (method_exists($query, 'orderBy')) {
+            if ($sort === 'oldest') {
+                $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
+            } else {
+                $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
+            }
         }
 
         $paginator = $query->paginate($limit, 'page', $page);
@@ -167,7 +175,7 @@ class PhotosReactionsController extends Controller
                 'title' => self::KIND_TITLES[$kind] ?? ucfirst($kind),
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
                 'sort' => $sort,
-                'rand_seed' => ($sort === 'newest') ? null : (int) $randSeed,
+                'rand_seed' => $sort === 'random' && $resolvedRandSeed !== null ? (int) $resolvedRandSeed : null,
             ],
         ];
     }
