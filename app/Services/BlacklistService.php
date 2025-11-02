@@ -27,14 +27,33 @@ class BlacklistService
             return ['newly_blacklisted_count' => 0, 'ids' => []];
         }
 
-        // Delete local files when present
-        $withPath = File::query()->whereIn('id', $ids)->whereNotNull('path')->get(['id', 'path']);
+        // Handle files with paths: move local to atlas_bin, delete non-local
+        $withPath = File::query()->whereIn('id', $ids)->whereNotNull('path')->get(['id', 'path', 'source']);
         foreach ($withPath as $f) {
             try {
-                foreach (['atlas_app', 'atlas'] as $diskName) {
-                    $disk = Storage::disk($diskName);
-                    if ($disk->exists($f->path)) {
-                        $disk->delete($f->path);
+                if ($f->source === 'local') {
+                    // Move local files to atlas_bin instead of deleting
+                    $binDisk = Storage::disk('atlas_bin');
+                    $moved = false;
+
+                    foreach (['atlas_app', 'atlas'] as $diskName) {
+                        $disk = Storage::disk($diskName);
+                        if ($disk->exists($f->path)) {
+                            // Move to bin: write then delete from origin
+                            if (! $moved) {
+                                $binDisk->put($f->path, $disk->get($f->path));
+                                $moved = true;
+                            }
+                            $disk->delete($f->path);
+                        }
+                    }
+                } else {
+                    // Delete non-local files from both disks
+                    foreach (['atlas_app', 'atlas'] as $diskName) {
+                        $disk = Storage::disk($diskName);
+                        if ($disk->exists($f->path)) {
+                            $disk->delete($f->path);
+                        }
                     }
                 }
             } catch (\Throwable $e) {

@@ -228,6 +228,7 @@ return [
                         ['name' => 'dislike_user_ids', 'type' => 'string[]', 'optional' => true],
                         ['name' => 'funny_user_ids', 'type' => 'string[]', 'optional' => true],
                         ['name' => 'reacted_user_ids', 'type' => 'string[]', 'optional' => true],
+                        ['name' => 'has_reactions', 'type' => 'bool', 'optional' => true, 'facet' => true],
                         ['name' => 'created_at', 'type' => 'int64'],
                         ['name' => 'updated_at', 'type' => 'int64'],
                     ],

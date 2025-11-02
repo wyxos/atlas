@@ -41,13 +41,33 @@ class PhotosController extends Controller
         $randSeed = request('rand_seed');
         $source = request('source'); // optional source filter
 
-        // Scout-only search (Typesense): images with local path
+        // Scout-only search (Typesense): images
+        // Filter logic: show local files (all) OR non-local files with reactions
         $query = File::search('*')
             ->where('mime_group', 'image');
 
-        // Apply source filter if provided
+        // Apply filtering based on source and reactions
         if ($source && is_string($source) && $source !== '') {
-            $query->where('source', $source);
+            // User requested a specific source filter
+            if ($source === 'local') {
+                // Show all local files
+                $query->where('source', 'local');
+            } else {
+                // Show non-local files that have reactions
+                $query->where('source', $source)
+                    ->where('has_reactions', true);
+            }
+        } else {
+            // No source filter: show local files OR non-local with reactions
+            // For Typesense, use filter_by with OR logic
+            if (config('scout.driver') === 'typesense' && method_exists($query, 'options')) {
+                $query->options([
+                    'filter_by' => "mime_group:='image' && (source:='local' || (source:!='local' && has_reactions:=true))",
+                ]);
+            } else {
+                // Fallback for collection driver in tests: post-filter results
+                // This will be handled after pagination in a callback below
+            }
         }
 
         // Sorting
@@ -78,6 +98,24 @@ class PhotosController extends Controller
         $paginator = $query->paginate($limit, 'page', $page);
 
         $items = collect($paginator->items() ?? [])->values();
+
+        // For collection driver in tests: apply post-filter if no source specified
+        if (config('scout.driver') === 'collection' && (! $source || $source === '')) {
+            $items = $items->filter(function ($f) {
+                $fileSource = $f['source'] ?? $f->source ?? null;
+
+                // Check if file has reactions by querying reactions table
+                $fileId = $f['id'] ?? $f->id ?? null;
+                if ($fileId && $fileSource !== 'local') {
+                    $hasReactions = Reaction::where('file_id', $fileId)->exists();
+
+                    return $hasReactions;
+                }
+
+                // Include if source is local
+                return $fileSource === 'local';
+            })->values();
+        }
         $ids = $items->map(fn ($f) => (int) ($f['id'] ?? $f->id ?? 0))->filter()->values()->all();
 
         // Eager-load full models with metadata in one query

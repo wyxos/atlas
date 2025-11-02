@@ -65,6 +65,15 @@ return [
             'report' => false,
         ],
 
+        // Blacklisted local files are moved here instead of being deleted
+        'atlas_bin' => [
+            'driver' => 'local',
+            'root' => storage_path('app/atlas/.bin'),
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

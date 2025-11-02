@@ -257,6 +257,9 @@ class File extends Model
             if (! empty($reactedIds)) {
                 $array['reacted_user_ids'] = $reactedIds;
             }
+
+            // Add has_reactions boolean for efficient filtering
+            $array['has_reactions'] = ! empty($reactedIds);
         } catch (\Throwable $e) {
             // If reactions table is not ready or any error occurs, skip embedding arrays
         }
