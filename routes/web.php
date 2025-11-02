@@ -53,6 +53,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('photos.unrated');
     Route::get('photos/unrated/data', [App\Http\Controllers\PhotosUnratedController::class, 'data'])
         ->name('photos.unrated.data');
+
+    // Photos > Unpreviewed (previewed_count = 0 and no reactions)
+    Route::get('photos/unpreviewed', [App\Http\Controllers\PhotosUnpreviewedController::class, 'index'])
+        ->name('photos.unpreviewed');
+    Route::get('photos/unpreviewed/data', [App\Http\Controllers\PhotosUnpreviewedController::class, 'data'])
+        ->name('photos.unpreviewed.data');
+
+    // Photos > Unseen (viewed_count = 0)
+    Route::get('photos/unseen', [App\Http\Controllers\PhotosUnseenController::class, 'index'])
+        ->name('photos.unseen');
+    Route::get('photos/unseen/data', [App\Http\Controllers\PhotosUnseenController::class, 'data'])
+        ->name('photos.unseen.data');
     Route::get('reels', [App\Http\Controllers\ReelsController::class, 'index'])->name('reels');
     Route::get('reels/data', [App\Http\Controllers\ReelsController::class, 'data'])->name('reels.data');
 

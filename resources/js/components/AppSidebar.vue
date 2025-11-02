@@ -7,7 +7,7 @@ import { dashboard, users as usersRoute, files as filesRoute, photos as photosRo
 import { type NavItem } from '@/types';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
-import { LayoutGrid, Users, Music, Image, Video, Heart, ThumbsUp, Laugh, ThumbsDown, HelpCircle, ChevronDown, ChevronUp, Shuffle, Play, Search, FileText, Download, CheckCircle, Clock, AlertTriangle, EyeOff, Cog, MinusCircle, Music2 } from 'lucide-vue-next';
+import { LayoutGrid, Users, Music, Image, Video, Heart, ThumbsUp, Laugh, ThumbsDown, HelpCircle, ChevronDown, ChevronUp, Shuffle, Play, Search, FileText, Download, CheckCircle, Clock, AlertTriangle, Eye, EyeOff, Cog, MinusCircle, Music2 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 function isPlaylistActive(id: number): boolean {
@@ -486,6 +486,22 @@ function onLeave(el: HTMLElement) {
                               <Link href="/photos/unrated">
                                 <component :is="HelpCircle" :size="18" />
                                 <span>Unrated</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuButton as-child :tooltip="'Unpreviewed'">
+                              <Link href="/photos/unpreviewed">
+                                <component :is="Eye" :size="18" />
+                                <span>Unpreviewed</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuButton as-child :tooltip="'Unseen'">
+                              <Link href="/photos/unseen">
+                                <component :is="EyeOff" :size="18" />
+                                <span>Unseen</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuSubItem>
