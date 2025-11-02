@@ -3,10 +3,8 @@
 use App\Models\File;
 use App\Models\User;
 
-it('decorates remote wallhaven originals in photos payload', function () {
+it('returns remote wallhaven originals in photos payload', function () {
     useTypesense();
-
-    config()->set('services.wallhaven.key', 'secret-key');
 
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -31,6 +29,6 @@ it('decorates remote wallhaven originals in photos payload', function () {
     $decorated = collect($payload['files'] ?? [])->firstWhere('id', $file->id);
 
     expect($decorated)->not->toBeNull()
-        ->and($decorated['original'] ?? null)->toBe('https://w.wallhaven.cc/full/xx/wallhaven-xx1234.jpg?apikey=secret-key')
+        ->and($decorated['original'] ?? null)->toBe('https://w.wallhaven.cc/full/xx/wallhaven-xx1234.jpg')
         ->and($decorated['preview'] ?? null)->toBe('https://th.wallhaven.cc/orig/xx/wallhaven-xx1234.jpg');
 });

@@ -5,6 +5,7 @@ use App\Jobs\DeleteBlacklistedFileJob;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationRule;
+use App\Services\Plugin\PluginServiceResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Queue;
 
@@ -27,8 +28,13 @@ it('blacklists matched photos and records moderation metadata', function () {
         'payload' => ['prompt' => 'This prompt includes the banned term.'],
     ]);
 
-    $controller = new class extends PhotosUnratedController
+    $controller = new class(app(PluginServiceResolver::class)) extends PhotosUnratedController
     {
+        public function __construct(PluginServiceResolver $resolver)
+        {
+            parent::__construct($resolver);
+        }
+
         public function exposeModerate(Collection $files): array
         {
             return $this->moderateFiles($files);
@@ -69,8 +75,13 @@ it('returns files untouched when no moderation rule matches', function () {
         'payload' => ['prompt' => 'Safe prompt content without matches.'],
     ]);
 
-    $controller = new class extends PhotosUnratedController
+    $controller = new class(app(PluginServiceResolver::class)) extends PhotosUnratedController
     {
+        public function __construct(PluginServiceResolver $resolver)
+        {
+            parent::__construct($resolver);
+        }
+
         public function exposeModerate(Collection $files): array
         {
             return $this->moderateFiles($files);

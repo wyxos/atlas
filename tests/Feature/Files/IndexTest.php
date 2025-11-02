@@ -143,8 +143,8 @@ it('applies filters and limit when listing files', function () {
         ->where('filters.limit', 40)
         ->where('files.per_page', 40)
         ->where('files.total', count($expectedOrder))
-        ->where('files.data', static function (array $items) use ($expectedOrder): bool {
-            $ids = collect($items)->pluck('id')->values()->all();
+        ->where('files.data', static function ($items) use ($expectedOrder): bool {
+            $ids = Collection::wrap($items)->pluck('id')->values()->all();
 
             return $ids === $expectedOrder;
         })

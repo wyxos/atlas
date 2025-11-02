@@ -79,15 +79,11 @@ test('install updates composer.plugins.json and dispatches job', function () {
     $user = User::factory()->create(['is_admin' => true]);
     $package = 'wyxos/atlas-plugin-test';
 
-    $response = $this->actingAs($user)->post(route('plugins.install'), [
+    $response = $this->from(route('plugins.edit'))->actingAs($user)->post(route('plugins.install'), [
         'package' => $package,
     ]);
 
-    $response->assertStatus(200);
-    $response->assertJson([
-        'ok' => true,
-        'message' => 'Installation queued',
-    ]);
+    $response->assertRedirect(route('plugins.edit'));
 
     // Check composer.plugins.json was updated
     $pluginsJsonPath = base_path('composer.plugins.json');
@@ -134,15 +130,11 @@ test('uninstall removes from composer.plugins.json and dispatches job', function
     $data = ['require' => [$package => '*@dev']];
     file_put_contents($pluginsJsonPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
 
-    $response = $this->actingAs($user)->post(route('plugins.uninstall'), [
+    $response = $this->from(route('plugins.edit'))->actingAs($user)->post(route('plugins.uninstall'), [
         'package' => $package,
     ]);
 
-    $response->assertStatus(200);
-    $response->assertJson([
-        'ok' => true,
-        'message' => 'Uninstallation queued',
-    ]);
+    $response->assertRedirect(route('plugins.edit'));
 
     // Check composer.plugins.json was updated
     $data = json_decode(file_get_contents($pluginsJsonPath), true);
@@ -163,14 +155,13 @@ test('concurrent operations are prevented', function () {
     // Set the lock
     cache()->put('composer_op:lock:'.$user->id, true, now()->addMinutes(5));
 
-    $response = $this->actingAs($user)->post(route('plugins.install'), [
+    $response = $this->from(route('plugins.edit'))->actingAs($user)->post(route('plugins.install'), [
         'package' => $package,
     ]);
 
-    $response->assertStatus(409);
-    $response->assertJson([
-        'ok' => false,
-        'message' => 'Another composer operation is in progress. Please wait.',
+    $response->assertRedirect(route('plugins.edit'));
+    $response->assertSessionHasErrors([
+        'package' => 'Another composer operation is in progress. Please wait.',
     ]);
 
     Bus::assertNotDispatched(ComposerInstallJob::class);

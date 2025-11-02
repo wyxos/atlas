@@ -2,13 +2,19 @@
 
 use App\Http\Controllers\PhotosDislikedController;
 use App\Models\User;
+use App\Services\Plugin\PluginServiceResolver;
 
 it('builds Scout query with previewed_count == 0 for auto category', function () {
     $user = User::factory()->create();
     $this->actingAs($user, 'web');
 
-    $controller = new class extends PhotosDislikedController
+    $controller = new class(app(PluginServiceResolver::class)) extends PhotosDislikedController
     {
+        public function __construct(PluginServiceResolver $resolver)
+        {
+            parent::__construct($resolver);
+        }
+
         public function exposeBuild(string $category, string $sort = 'newest', $randSeed = null)
         {
             return $this->buildScoutQuery($category, $sort, $randSeed);
@@ -37,8 +43,13 @@ it('builds Scout query with previewed_count in [0..5] for non-auto disliked cate
     // Sanity: actingAs took effect
     expect((string) (auth()->id() ?? ''))->toBe((string) $user->id);
 
-    $controller = new class extends PhotosDislikedController
+    $controller = new class(app(PluginServiceResolver::class)) extends PhotosDislikedController
     {
+        public function __construct(PluginServiceResolver $resolver)
+        {
+            parent::__construct($resolver);
+        }
+
         public function exposeBuild(string $category, string $sort = 'newest', $randSeed = null)
         {
             return $this->buildScoutQuery($category, $sort, $randSeed);
