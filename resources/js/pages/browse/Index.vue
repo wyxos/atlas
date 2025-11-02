@@ -21,7 +21,7 @@ import type { BrowseItem } from '@/types/browse';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
-import { Check, ChevronsLeft, ChevronsRight, Hash, List as ListIcon, Loader2, Search, X } from 'lucide-vue-next';
+import { Check, ChevronsLeft, ChevronsRight, Hash, List as ListIcon, Loader2, Search, X, RefreshCw } from 'lucide-vue-next';
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, shallowRef, watch } from 'vue';
 import { createBrowseGetPage } from './useBrowsePaging';
 
@@ -175,7 +175,7 @@ function scheduleRemoveItem(file: any) {
                         if (!nextItem) dialogOpen.value = false;
                     }
                 }
-                void ensureNextPageIfEmpty();
+                // Note: Vibe now automatically refreshes current page when all items removed
             }
         } finally {
             removalRafScheduled = false;
@@ -371,15 +371,15 @@ function scheduleMasonryRefresh() {
 }
 provide('browse-schedule-refresh', scheduleMasonryRefresh);
 
-// When the list becomes empty after removals, fetch the next page automatically
-async function ensureNextPageIfEmpty() {
-    if (scroller.value?.isLoading) return;
+// Note: ensureNextPageIfEmpty is no longer needed - Vibe now automatically
+// refreshes the current page when all items are removed via remove() or removeMany()
 
-    await nextTick();
-    const count = Array.isArray(items.value) ? items.value.length : 0;
-    if (count === 0) {
-        try { await scroller.value?.loadNext?.(); } catch {}
-    }
+async function refreshCurrentPage() {
+    try {
+        if (scroller.value?.refreshCurrentPage) {
+            await scroller.value.refreshCurrentPage();
+        }
+    } catch {}
 }
 
 
@@ -876,6 +876,9 @@ defineExpose({
 
                 <Button variant="outline" :disabled="isLoading" @click="() => scroller.loadNext()" class="h-9 w-9 p-0 cursor-pointer" aria-label="Load more">
                     <ChevronsRight :size="18" />
+                </Button>
+                <Button variant="outline" :disabled="isLoading" @click="refreshCurrentPage" class="h-9 w-9 p-0 cursor-pointer" aria-label="Refresh current page" title="Refresh current page">
+                    <RefreshCw :size="18" />
                 </Button>
                 <Button variant="secondary" :disabled="isLoading" @click="resetToFirstPage" class="h-9 w-9 p-0 cursor-pointer" aria-label="First page">
                     <ChevronsLeft :size="18" />

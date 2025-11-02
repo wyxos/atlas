@@ -10,7 +10,7 @@ import { type BreadcrumbItem } from '@/types';
 import type { BrowseItem } from '@/types/browse';
 import { Head, useForm } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
-import { Video as VideoIcon, Hash, ChevronsRight, List as ListIcon, Loader2, Shuffle, ChevronsLeft } from 'lucide-vue-next';
+import { Video as VideoIcon, Hash, ChevronsRight, List as ListIcon, Loader2, Shuffle, ChevronsLeft, X, RefreshCw } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, provide, reactive, ref, watch } from 'vue';
 import { createReelsGetPage } from './useReelsPaging';
 import axios from 'axios';
@@ -147,15 +147,15 @@ function openImage(item: any) {
 // Backfill gating (parity with Browse)
 const backfillEnabled = ref(true);
 
-// Coalesced removals removed; use immediate remove via scroller.remove()
+// Note: ensureNextPageIfEmpty is no longer needed - Vibe now automatically
+// refreshes the current page when all items are removed via remove() or removeMany()
 
-async function ensureNextPageIfEmpty() {
-    if (scroller.value?.isLoading) return;
-    await nextTick();
-    const count = Array.isArray(items.value) ? items.value.length : 0;
-    if (count === 0) {
-        try { await scroller.value?.loadNext?.(); } catch {}
-    }
+async function refreshCurrentPage() {
+    try {
+        if (scroller.value?.refreshCurrentPage) {
+            await scroller.value.refreshCurrentPage();
+        }
+    } catch {}
 }
 
 // Backfill progress state driven by Masonry events
@@ -354,8 +354,8 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
     const removedIndex = items.value.findIndex((candidate) => candidate?.id === fileId);
     const snapshot = { ...file };
 
+    // Remove the item - Vibe now automatically refreshes current page if all items removed
     try { await scroller.value?.remove?.(file); } catch {}
-    void ensureNextPageIfEmpty();
 
     try {
         const action = type === 'dislike'
@@ -507,6 +507,17 @@ v-model.number="(form as any).limit"
                     aria-label="Load more"
                 >
                     <ChevronsRight :size="18" />
+                </Button>
+                <Button
+                    variant="outline"
+                    :disabled="isLoading"
+                    @click="refreshCurrentPage"
+                    class="h-9 w-9 p-0 cursor-pointer"
+                    data-test="reels-refresh"
+                    aria-label="Refresh current page"
+                    title="Refresh current page"
+                >
+                    <RefreshCw :size="18" />
                 </Button>
                 <Button
                     variant="destructive"
