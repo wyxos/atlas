@@ -570,16 +570,33 @@ async function handleFullMediaError() {
 async function navigate(delta: number) {
   fullLoaded.value = false
   if (!dialogItem.value) return
-  const index = items.value.findIndex((item) => item?.id === dialogItem.value?.id)
-  const targetIndex = index < 0 ? (delta > 0 ? 0 : -1) : index + delta
-  if (targetIndex >= items.value.length && delta > 0) {
-    try {
-      if (scroller.value?.loadNext) { await scroller.value.loadNext(); await nextTick() }
-    } catch {}
+  // Use thumbnails array (same as thumbNext/thumbPrev) for consistent navigation
+  const index = thumbnails.value.findIndex((thumb) => thumb.id === dialogItem.value?.id)
+  if (index < 0) return
+  const targetIndex = index + delta
+  if (targetIndex < 0) return
+  if (targetIndex < thumbnails.value.length) {
+    const thumb = thumbnails.value[targetIndex]
+    if (thumb) {
+      fullLoaded.value = false
+      dialogItem.value = thumb.item
+    }
+    return
   }
-  if (targetIndex < 0 || targetIndex >= items.value.length) return
-  const nextItem = items.value[targetIndex]
-  if (nextItem) dialogItem.value = nextItem
+  // Need to load next page
+  if (delta > 0) {
+    try {
+      if (scroller.value?.loadNext) {
+        await scroller.value.loadNext()
+        await nextTick()
+      }
+    } catch {}
+    const thumb = thumbnails.value[targetIndex]
+    if (thumb) {
+      fullLoaded.value = false
+      dialogItem.value = thumb.item
+    }
+  }
 }
 
 function onDialogMouseUp(event: MouseEvent) {
