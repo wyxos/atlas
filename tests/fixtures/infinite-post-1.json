@@ -1,0 +1,37 @@
+{
+    "json": {
+        "browsingLevel": 31,
+        "period": "AllTime",
+        "periodMode": "published",
+        "sort": "Newest",
+        "followed": false,
+        "include": [
+            "cosmetics"
+        ],
+        "excludedTagIds": [
+            415792,
+            426772,
+            5188,
+            5249,
+            130818,
+            130820,
+            133182,
+            5351,
+            306619,
+            154326,
+            161829,
+            163032
+        ],
+        "disablePoi": true,
+        "disableMinor": true,
+        "cursor": null,
+        "authed": true
+    },
+    "meta": {
+        "values": {
+            "cursor": [
+                "undefined"
+            ]
+        }
+    }
+}

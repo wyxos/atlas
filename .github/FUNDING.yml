@@ -1,0 +1,14 @@
+# Configure platforms to show a Sponsor button on GitHub.
+# Update these handles/links to your actual accounts.
+
+# GitHub Sponsors (recommended)
+github: wyxos
+
+# Optional platforms (uncomment and set if you use them)
+# patreon: wyxos
+# open_collective: atlas
+# ko_fi: wyxos
+
+# Custom links (Stripe/PayPal/BuyMeACoffee/etc.)
+custom:
+  - https://wyxos.com/sponsor  # replace or remove if not used

@@ -1,0 +1,71 @@
+- [ ] Re-implement library scan
+  - [ ] Extract metadata from Audio files
+  - [ ] Handle conversion/normalization (unsure if this will be on the fly or in library)
+  - [ ] Convert videos for streaming and extract subtitles
+- [ ] Interface to handle duplicates
+- [ ] Files single view
+  - [ ] Image
+  - [ ] Video
+  - [ ] Audio
+- [ ] Image listing
+- [ ] Browsing Images
+  - [ ] CivitAI - in progress
+    - [x] restore single view
+    - [x] restore auto download
+    - [x] restore reaction behaviors
+    - [x] restore group blacklist
+    - [x] restore previewed at and seen at
+    - [x] implement auto blacklist
+    - [ ] Ability to browse by model/user
+    - [ ] Container subscription
+    - [ ] implement UI blacklist from payload content
+  - [x] Wallhaven
+  - [ ] Read Manga/Comics
+  - [ ] Other extensions
+  - [ ] Feed/Update from containers (users/posts/sites/etc)
+- [ ] Ability to add/edit/delete playlists
+  - [ ] Smart parameters handling
+- [ ] Browse audio
+  - [ ] spotify
+  - [ ] newgrounds
+  - [ ] Other extensions
+- [ ] Video listing
+- [ ] Browse video
+  - [ ] Youtube
+  - [ ] Other extensions
+- [ ] Dashboard statistics
+- [ ] AI features
+- [ ] Auto retrieval of metadata (similar to Plex)
+- [ ] Test docker
+- [ ] Replace into original repository
+- [ ] Resolve internally when loaded from private/home network
+
+
+Priorities
+- library scan and process
+  - scan audio
+    - extract meta
+    - generate artist
+    - generate album
+    - generate album cover
+  - scan video
+    - extract meta
+    - generate optimized video
+    - extract subtitles
+    - generate video cover
+    - generate video preview
+- spotify/khinsider/youtube integration
+- video player
+- docker testing
+- youtube video
+- github update
+- promote app on platforms
+- integrity scan
+
+
+- where we have the scan CTA, we also need a CTA to trigger the scout rebuild and provide progress to the UI
+
+- when in list mode and we click on a video preview, full size opens, but I want the full size to resume where the preview was playing
+- check that under disliked auto, the prompt badge is running against all rules and rendering the first match or whether it is storing the id of the rule that matched it when it was disliked
+- single view to photos list
+- add controls to single view when video

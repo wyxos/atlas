@@ -1,0 +1,51 @@
+{
+  "href": "https://api.spotify.com/v1/me/tracks?offset=0&limit=2",
+  "items": [
+    {
+      "added_at": "2025-10-15T12:00:00Z",
+      "track": {
+        "id": "3n3Ppam7vgaVa1iaRUc9Lp",
+        "name": "Mr. Brightside",
+        "duration_ms": 222075,
+        "explicit": false,
+        "popularity": 85,
+        "preview_url": null,
+        "external_urls": { "spotify": "https://open.spotify.com/track/3n3Ppam7vgaVa1iaRUc9Lp" },
+        "artists": [ { "name": "The Killers" } ],
+        "album": {
+          "id": "5B4PYA7wNN4WdEXdIJu58a",
+          "name": "Hot Fuss",
+          "images": [
+            { "url": "https://i.scdn.co/image/ab67616d0000b2733a5ad4.jpg", "height": 640, "width": 640 }
+          ],
+          "release_date": "2004-06-07"
+        }
+      }
+    },
+    {
+      "added_at": "2025-10-10T10:00:00Z",
+      "track": {
+        "id": "0VjIjW4GlUZAMYd2vXMi3b",
+        "name": "Blinding Lights",
+        "duration_ms": 200040,
+        "explicit": false,
+        "popularity": 90,
+        "preview_url": null,
+        "external_urls": { "spotify": "https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b" },
+        "artists": [ { "name": "The Weeknd" } ],
+        "album": {
+          "id": "4yP0hdKOZPNshxUOjY0cZj",
+          "name": "After Hours",
+          "images": [
+            { "url": "https://i.scdn.co/image/ab67616d0000b273cbbca0.jpg", "height": 640, "width": 640 }
+          ],
+          "release_date": "2020-03-20"
+        }
+      }
+    }
+  ],
+  "limit": 2,
+  "next": null,
+  "offset": 0,
+  "total": 2
+}
