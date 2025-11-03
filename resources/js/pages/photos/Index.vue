@@ -175,7 +175,7 @@ function openImage(item: any) {
 }
 
 // Backfill gating (parity with Browse)
-const backfillEnabled = ref(true);
+const backfillEnabled = ref(false);
 
 // Note: ensureNextPageIfEmpty is no longer needed - Vibe now automatically
 // refreshes the current page when all items are removed via remove() or removeMany()
