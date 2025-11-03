@@ -139,7 +139,11 @@ describe('Browse/Index.vue removal batching', () => {
   afterEach(() => { vi.restoreAllMocks() })
 
   it('coalesces multiple removals per frame via scheduleRemoveItem', async () => {
-    const wrapper = mountBrowse()
+    const wrapper = mountBrowse([
+      { id: 1, type: 'image', title: 'A', preview: 'about:blank', containers: [{ key: 'tag', value: 'x', label: 'x' }] },
+      { id: 2, type: 'image', title: 'B', preview: 'about:blank', containers: [{ key: 'tag', value: 'x', label: 'x' }] },
+      { id: 3, type: 'image', title: 'C', preview: 'about:blank', containers: [{ key: 'tag', value: 'x', label: 'x' }] },
+    ])
     await nextTick(); await nextTick()
 
     const masonry = wrapper.getComponent(MasonryStub)

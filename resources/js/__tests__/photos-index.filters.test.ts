@@ -162,6 +162,7 @@ vi.mock('lucide-vue-next', () => ({
     Loader2: stubComponent('LoaderIcon'),
     Shuffle: stubComponent('ShuffleIcon'),
     ChevronsLeft: stubComponent('ChevronsLeftIcon'),
+    RefreshCw: stubComponent('RefreshIcon'),
     X: stubComponent('XIcon'),
 }));
 

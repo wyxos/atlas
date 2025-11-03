@@ -415,9 +415,18 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
 
     const removedIndex = items.value.findIndex((candidate) => candidate?.id === fileId);
     const snapshot = { ...file };
+    let refreshedAfterRemoval = false;
 
-    // Remove the item - Vibe now automatically refreshes current page if all items removed
+    // Remove the item and refresh the current page if the list becomes empty
     try { await scroller.value?.remove?.(file); } catch {}
+    await nextTick();
+    if ((items.value || []).length === 0 && typeof scroller.value?.refreshCurrentPage === 'function') {
+        try {
+            await scroller.value.refreshCurrentPage();
+            refreshedAfterRemoval = true;
+        } catch {}
+        await nextTick();
+    }
 
     try {
         const action = type === 'dislike'
@@ -428,16 +437,20 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
 
     if (shouldAdvance) {
         await nextTick();
+        let candidateItems = items.value || [];
         const baseIndex = currentIndex < 0 ? 0 : currentIndex;
-        let nextItem: any | null = items.value[baseIndex] ?? items.value[baseIndex + 1] ?? null;
+        let nextItem: any | null = candidateItems[baseIndex] ?? candidateItems[baseIndex + 1] ?? null;
         if (!nextItem) {
-            try {
-                if (scroller.value?.loadNext) {
-                    await scroller.value.loadNext();
-                }
-            } catch {}
-            await nextTick();
-            nextItem = items.value[0] ?? null;
+            if (!refreshedAfterRemoval) {
+                try {
+                    if (scroller.value?.loadNext) {
+                        await scroller.value.loadNext();
+                        await nextTick();
+                    }
+                } catch {}
+            }
+            candidateItems = items.value || [];
+            nextItem = candidateItems[0] ?? null;
         }
         if (nextItem) {
             dialogItem.value = nextItem;
