@@ -15,6 +15,14 @@ configureEcho({
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+import * as Sentry from '@sentry/browser';
+
+Sentry.init({
+    dsn: '___DSN___',
+    integrations: [Sentry.spotlightBrowserIntegration()],
+    // ...other Sentry options
+});
+
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue')),
