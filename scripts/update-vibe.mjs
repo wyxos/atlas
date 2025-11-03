@@ -18,7 +18,7 @@ function run(command, cwd) {
             shell: true 
         });
         return true;
-    } catch (error) {
+    } catch {
         return false;
     }
 }

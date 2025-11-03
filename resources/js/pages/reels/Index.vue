@@ -10,7 +10,7 @@ import { type BreadcrumbItem } from '@/types';
 import type { BrowseItem } from '@/types/browse';
 import { Head, useForm } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
-import { Video as VideoIcon, Hash, ChevronsRight, List as ListIcon, Loader2, Shuffle, ChevronsLeft, X, RefreshCw } from 'lucide-vue-next';
+import { Video as VideoIcon, Hash, ChevronsRight, List as ListIcon, Loader2, Shuffle, ChevronsLeft, RefreshCw } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, provide, reactive, ref, watch } from 'vue';
 import { createReelsGetPage } from './useReelsPaging';
 import axios from 'axios';

@@ -372,11 +372,21 @@ const fullMediaSrc = computed(() => {
 
 // Bottom thumbnail carousel state
 const thumbsVisible = ref(false)
-// All items for navigation (don't filter - we need all items for proper sequential navigation)
-const allThumbnails = computed(() => (items.value || [])
-  .map((item) => ({ id: item?.id, preview: item?.preview || item?.thumbnail_url || null, item })))
+// All items for navigation in insertion order (row-major as thumbnails render)
+const allThumbnails = computed(() => {
+  const mapped = (items.value || [])
+    .map((item, idx) => ({
+      id: item?.id,
+      preview: item?.preview || item?.thumbnail_url || null,
+      item,
+      originalIndex: (item as any)?.originalIndex ?? idx,
+    }))
+  return mapped.sort((a, b) => a.originalIndex - b.originalIndex)
+})
 // Filtered thumbnails for display in carousel (only items with previews)
 const thumbnails = computed(() => allThumbnails.value.filter((thumb) => !!thumb.preview))
+// Navigation must always follow the full, stable insertion order regardless of thumbnail slider visibility
+const navList = computed(() => allThumbnails.value)
 const loadedThumbs = reactive<Record<number, boolean>>({})
 const THUMB_WINDOW = 11
 const thumbStart = ref(0)
@@ -430,18 +440,20 @@ function onThumbClick(item: any) {
 }
 
 function thumbPrev() {
-  // Use ALL items for navigation, not just visible thumbnails
-  const index = activeThumbIndex.value
+  // Use all items for consistent navigation order
+  const id = dialogItem.value?.id
+  const index = navList.value.findIndex((t) => t.id === id)
   if (index <= 0) return
-  const thumb = allThumbnails.value[index - 1]
+  const thumb = navList.value[index - 1]
   if (thumb) onThumbClick(thumb.item)
 }
 async function thumbNext() {
-  // Use ALL items for navigation, not just visible thumbnails
-  const index = activeThumbIndex.value
+  // Use all items for consistent navigation order
+  const id = dialogItem.value?.id
+  const index = navList.value.findIndex((t) => t.id === id)
   if (index < 0) return
-  if (index < allThumbnails.value.length - 1) {
-    const thumb = allThumbnails.value[index + 1]
+  if (index < navList.value.length - 1) {
+    const thumb = navList.value[index + 1]
     if (thumb) onThumbClick(thumb.item)
     return
   }
@@ -451,7 +463,7 @@ async function thumbNext() {
     }
   } catch {}
   const nextIndex = index + 1
-  const thumb = allThumbnails.value[nextIndex] ?? null
+  const thumb = navList.value[nextIndex] ?? null
   if (thumb) onThumbClick(thumb.item)
 }
 
@@ -590,15 +602,29 @@ async function handleFullMediaError() {
 async function navigate(delta: number) {
   fullLoaded.value = false
   if (!dialogItem.value) return
-  // Use ALL thumbnails array for consistent navigation (don't skip items without previews)
-  const index = allThumbnails.value.findIndex((thumb) => thumb.id === dialogItem.value?.id)
-  if (index < 0) return
+  // Always use all items for consistent navigation regardless of slider state
+  const currentId = dialogItem.value?.id
+  const index = navList.value.findIndex((thumb) => thumb.id === currentId)
   const targetIndex = index + delta
+  
+  console.log('[FullSizeViewer] navigate:', {
+    delta,
+    currentId,
+    currentIndex: index,
+    targetIndex,
+    allThumbnailsLength: allThumbnails.value.length,
+    surrounding: allThumbnails.value.slice(Math.max(0, index - 1), Math.min(allThumbnails.value.length, index + 4)).map(t => ({ id: t.id, index: allThumbnails.value.indexOf(t) })),
+    targetItemId: allThumbnails.value[targetIndex]?.id,
+    itemsLength: items.value.length
+  })
+  
+  if (index < 0) return
   if (targetIndex < 0) return
-  if (targetIndex < allThumbnails.value.length) {
-    const thumb = allThumbnails.value[targetIndex]
+  if (targetIndex < navList.value.length) {
+    const thumb = navList.value[targetIndex]
     if (thumb) {
       fullLoaded.value = false
+      console.log('[FullSizeViewer] Setting dialogItem to:', thumb.id)
       dialogItem.value = thumb.item
     }
     return
@@ -611,7 +637,7 @@ async function navigate(delta: number) {
         await nextTick()
       }
     } catch {}
-    const thumb = allThumbnails.value[targetIndex]
+    const thumb = navList.value[targetIndex]
     if (thumb) {
       fullLoaded.value = false
       dialogItem.value = thumb.item
@@ -624,7 +650,7 @@ function onDialogMouseUp(event: MouseEvent) {
   const delta = mouseBackForwardDelta(event)
   if (delta !== 0) {
     if (event.altKey || fullActionOpen.value) { event.preventDefault(); event.stopPropagation(); return }
-    event.preventDefault(); event.stopPropagation(); void navigate(delta); return
+    event.preventDefault(); event.stopPropagation(); withNavLock(() => void navigate(delta)); return
   }
   if (!event.altKey) return
   if (event.button === 0) { event.preventDefault(); event.stopPropagation(); emit('like', dialogItem.value as any, event as any) }
@@ -651,7 +677,26 @@ watch(() => thumbnails.value, () => {
 })
 
 watch(dialogOpen, (isOpen) => { if (isOpen) void nextTick().then(() => { const element = mediaWrapRef.value as HTMLElement | null; if (element) { try { element.focus({ preventScroll: true } as any) } catch { try { element.focus() } catch {} } } }) })
-
+ 
+// Guard against duplicate navigation firing from multiple mouse events (mouseup + auxclick)
+let navLock = false
+function withNavLock(action: () => void | Promise<void>) {
+  if (navLock) return
+  navLock = true
+  const release = () => { navLock = false }
+  const done = () => setTimeout(release, 120)
+  try {
+    const res = action()
+    if (res && typeof (res as any).then === 'function') {
+      ;(res as Promise<void>).finally(done)
+    } else {
+      done()
+    }
+  } catch {
+    done()
+  }
+}
+ 
 onMounted(() => {
   const onOutside = (event: MouseEvent) => {
     if (!fullActionOpen.value) return
@@ -715,7 +760,7 @@ const onMouseUpHandler = (event: MouseEvent) => {
   const delta = mouseBackForwardDelta(event)
   if (delta !== 0) {
     if (event.altKey || fullActionOpen.value) { event.preventDefault(); event.stopPropagation(); return }
-    event.preventDefault(); event.stopPropagation(); void navigate(delta)
+    event.preventDefault(); event.stopPropagation(); withNavLock(() => void navigate(delta))
   }
 }
 const onAuxClickHandler = (event: MouseEvent) => {
@@ -723,7 +768,7 @@ const onAuxClickHandler = (event: MouseEvent) => {
   const delta = mouseBackForwardDelta(event)
   if (delta !== 0) {
     if (event.altKey || fullActionOpen.value) { event.preventDefault(); event.stopPropagation(); return }
-    event.preventDefault(); event.stopPropagation(); void navigate(delta)
+    event.preventDefault(); event.stopPropagation(); withNavLock(() => void navigate(delta))
   }
 }
 
