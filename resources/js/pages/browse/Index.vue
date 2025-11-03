@@ -371,8 +371,9 @@ function scheduleMasonryRefresh() {
 }
 provide('browse-schedule-refresh', scheduleMasonryRefresh);
 
-// Note: ensureNextPageIfEmpty is no longer needed - Vibe now automatically
-// refreshes the current page when all items are removed via remove() or removeMany()
+// Manual refresh function for the refresh button
+// Note: Browse maintains "load next" behavior when all items are removed (default Vibe behavior)
+// For automatic page refresh on empty, see Photos Index which uses refreshOnEmpty=true
 
 async function refreshCurrentPage() {
     try {

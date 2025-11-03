@@ -14,7 +14,8 @@
         "perf:trace": "node scripts/perf/trace-browse.mjs",
         "perf:trace:ui": "playwright show-trace playwright-trace.zip",
         "perf:trace:interact": "node scripts/perf/trace-browse-interact.mjs",
-        "publish:packagist": "node publish-packagist.mjs"
+        "publish:packagist": "node publish-packagist.mjs",
+        "update-vibe": "node scripts/update-vibe.mjs"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",

@@ -474,6 +474,14 @@ function handleBatchBadgeMouseLeave() {
 }
 
 async function handleBatchBadgeMouseDown(scope: { key: string; value: string | number }, e: MouseEvent) {
+    // Prevent browser autoscroll for middle-click (with or without ALT)
+    if (e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Favorite action will be handled on auxclick
+        return;
+    }
+    
     if (!(e.altKey && e.button === 0)) {
         return;
     }

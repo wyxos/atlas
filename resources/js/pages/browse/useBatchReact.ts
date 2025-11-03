@@ -12,8 +12,9 @@ export function createBatchReact(deps: {
   dialogOpen?: Ref<boolean>;
   dialogItem?: Ref<any>;
   scheduleRefresh?: () => void;
+  refreshOnEmpty?: boolean; // If true, refresh current page when all items removed (Photos behavior)
 }) {
-  const { items, scroller, dialogOpen, dialogItem, scheduleRefresh } = deps;
+  const { items, scroller, dialogOpen, dialogItem, scheduleRefresh, refreshOnEmpty = false } = deps;
 
   function pickIdsForScope(scope: BatchScope): number[] {
     const list = items.value || [];
@@ -86,13 +87,26 @@ export function createBatchReact(deps: {
             }
           }
         } else {
-          // No next item in previous list; try to load next page then pick first
-          try {
-            if (scrollerInstance?.loadNext) {
-              await scrollerInstance.loadNext();
-              await nextTick();
-            }
-          } catch {}
+          // No next item in previous list
+          await nextTick();
+          const remainingItems = items.value || [];
+          
+          // If refreshOnEmpty is true (Photos behavior) and all items were removed,
+          // wait for Vibe's automatic refreshCurrentPage to complete
+          if (refreshOnEmpty && remainingItems.length === 0) {
+            // Wait for Vibe's automatic refresh to complete
+            await new Promise(resolve => setTimeout(resolve, 150));
+            await nextTick();
+          } else {
+            // Browse behavior or items still remain: try to load next page
+            try {
+              if (scrollerInstance?.loadNext) {
+                await scrollerInstance.loadNext();
+                await nextTick();
+              }
+            } catch {}
+          }
+          
           const first = (items.value || [])[0] || null;
           if (first) {
             (dialogItem as any).value = first;

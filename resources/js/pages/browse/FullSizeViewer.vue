@@ -12,12 +12,15 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { ringForSlot, badgeClassForSlot } from '@/pages/browse/highlight'
 import { highlightPromptHtml } from '@/utils/moderationHighlight'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   item: any | null
   items: any[]
   scroller: any
-}>()
+  refreshOnEmpty?: boolean
+}>(), {
+  refreshOnEmpty: false
+})
 
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -243,7 +246,13 @@ bus.on('browse:clear-highlight', () => {
 
 // Batch helpers in full menu
 import { createBatchReact, type BatchAction, type BatchScope } from '@/pages/browse/useBatchReact'
-const batchReact = createBatchReact({ items: items as any, scroller: scroller as any, dialogOpen: dialogOpen as any, dialogItem: dialogItem as any })
+const batchReact = createBatchReact({ 
+  items: items as any, 
+  scroller: scroller as any, 
+  dialogOpen: dialogOpen as any, 
+  dialogItem: dialogItem as any,
+  refreshOnEmpty: props.refreshOnEmpty
+})
 
 function containerScopesFor(item: any): { label: string; scope: BatchScope; badge?: { text: string; class: string } }[] {
   const uniqueKeyMap: Record<string, boolean> = {}
@@ -363,14 +372,22 @@ const fullMediaSrc = computed(() => {
 
 // Bottom thumbnail carousel state
 const thumbsVisible = ref(false)
-const thumbnails = computed(() => (items.value || [])
-  .map((item) => ({ id: item?.id, preview: item?.preview || item?.thumbnail_url || null, item }))
-  .filter((thumb) => !!thumb.preview))
+// All items for navigation (don't filter - we need all items for proper sequential navigation)
+const allThumbnails = computed(() => (items.value || [])
+  .map((item) => ({ id: item?.id, preview: item?.preview || item?.thumbnail_url || null, item })))
+// Filtered thumbnails for display in carousel (only items with previews)
+const thumbnails = computed(() => allThumbnails.value.filter((thumb) => !!thumb.preview))
 const loadedThumbs = reactive<Record<number, boolean>>({})
 const THUMB_WINDOW = 11
 const thumbStart = ref(0)
 const visibleThumbs = computed(() => thumbnails.value.slice(thumbStart.value, Math.min(thumbnails.value.length, thumbStart.value + THUMB_WINDOW)))
+// Active index in the ALL items array (for navigation)
 const activeThumbIndex = computed(() => {
+  const id = dialogItem.value?.id
+  return allThumbnails.value.findIndex((thumb) => thumb.id === id)
+})
+// Active index in the VISIBLE thumbnails array (for carousel display)
+const activeVisibleThumbIndex = computed(() => {
   const id = dialogItem.value?.id
   return thumbnails.value.findIndex((thumb) => thumb.id === id)
 })
@@ -383,7 +400,8 @@ function clampStartForIndex(index: number): number {
 }
 
 function ensureActiveThumbInView() {
-  const index = activeThumbIndex.value
+  // Use visible thumb index for carousel positioning
+  const index = activeVisibleThumbIndex.value
   if (index < 0) return
   const endIndex = thumbStart.value + THUMB_WINDOW - 1
   if (index < thumbStart.value || index > endIndex) {
@@ -412,16 +430,18 @@ function onThumbClick(item: any) {
 }
 
 function thumbPrev() {
+  // Use ALL items for navigation, not just visible thumbnails
   const index = activeThumbIndex.value
   if (index <= 0) return
-  const thumb = thumbnails.value[index - 1]
+  const thumb = allThumbnails.value[index - 1]
   if (thumb) onThumbClick(thumb.item)
 }
 async function thumbNext() {
+  // Use ALL items for navigation, not just visible thumbnails
   const index = activeThumbIndex.value
   if (index < 0) return
-  if (index < thumbnails.value.length - 1) {
-    const thumb = thumbnails.value[index + 1]
+  if (index < allThumbnails.value.length - 1) {
+    const thumb = allThumbnails.value[index + 1]
     if (thumb) onThumbClick(thumb.item)
     return
   }
@@ -431,7 +451,7 @@ async function thumbNext() {
     }
   } catch {}
   const nextIndex = index + 1
-  const thumb = thumbnails.value[nextIndex] ?? null
+  const thumb = allThumbnails.value[nextIndex] ?? null
   if (thumb) onThumbClick(thumb.item)
 }
 
@@ -570,13 +590,13 @@ async function handleFullMediaError() {
 async function navigate(delta: number) {
   fullLoaded.value = false
   if (!dialogItem.value) return
-  // Use thumbnails array (same as thumbNext/thumbPrev) for consistent navigation
-  const index = thumbnails.value.findIndex((thumb) => thumb.id === dialogItem.value?.id)
+  // Use ALL thumbnails array for consistent navigation (don't skip items without previews)
+  const index = allThumbnails.value.findIndex((thumb) => thumb.id === dialogItem.value?.id)
   if (index < 0) return
   const targetIndex = index + delta
   if (targetIndex < 0) return
-  if (targetIndex < thumbnails.value.length) {
-    const thumb = thumbnails.value[targetIndex]
+  if (targetIndex < allThumbnails.value.length) {
+    const thumb = allThumbnails.value[targetIndex]
     if (thumb) {
       fullLoaded.value = false
       dialogItem.value = thumb.item
@@ -591,7 +611,7 @@ async function navigate(delta: number) {
         await nextTick()
       }
     } catch {}
-    const thumb = thumbnails.value[targetIndex]
+    const thumb = allThumbnails.value[targetIndex]
     if (thumb) {
       fullLoaded.value = false
       dialogItem.value = thumb.item
