@@ -415,18 +415,10 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
 
     const removedIndex = items.value.findIndex((candidate) => candidate?.id === fileId);
     const snapshot = { ...file };
-    let refreshedAfterRemoval = false;
 
-    // Remove the item and refresh the current page if the list becomes empty
+    // Remove the item; Masonry will refresh the current page when `autoRefreshOnEmpty` is enabled
     try { await scroller.value?.remove?.(file); } catch {}
     await nextTick();
-    if ((items.value || []).length === 0 && typeof scroller.value?.refreshCurrentPage === 'function') {
-        try {
-            await scroller.value.refreshCurrentPage();
-            refreshedAfterRemoval = true;
-        } catch {}
-        await nextTick();
-    }
 
     try {
         const action = type === 'dislike'
@@ -441,14 +433,6 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
         const baseIndex = currentIndex < 0 ? 0 : currentIndex;
         let nextItem: any | null = candidateItems[baseIndex] ?? candidateItems[baseIndex + 1] ?? null;
         if (!nextItem) {
-            if (!refreshedAfterRemoval) {
-                try {
-                    if (scroller.value?.loadNext) {
-                        await scroller.value.loadNext();
-                        await nextTick();
-                    }
-                } catch {}
-            }
             candidateItems = items.value || [];
             nextItem = candidateItems[0] ?? null;
         }
@@ -749,6 +733,7 @@ v-model.number="(form as any).limit"
                     ref="scroller"
 :layout="masonryLayout"
 :backfill-enabled="backfillEnabled"
+                    :auto-refresh-on-empty="true"
                     :backfill-delay-ms="2000"
                     :retry-max-attempts="3"
                     :retry-initial-delay-ms="2000"
