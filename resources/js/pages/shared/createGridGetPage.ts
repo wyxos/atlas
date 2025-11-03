@@ -47,7 +47,9 @@ export function createGridGetPage(
     form.defaults(responseFilter)
     form.reset()
 
-    scheduleReplace({ ...baseParams, page: responseFilter.next ?? '' })
+    const nextPage = responseFilter.next ?? ''
+    const currentPage = page
+    scheduleReplace({ ...baseParams, page: currentPage, next: nextPage })
 
     return { items, nextPage: responseFilter.next ?? null }
   }

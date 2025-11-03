@@ -13,7 +13,7 @@ vi.mock('@inertiajs/vue3', () => inertiaMocks)
 
 vi.mock('@/actions/App/Http/Controllers/PhotosController', () => ({
   default: { data: () => ({ url: '/photos/data' }) },
-}), { virtual: true })
+}))
 
 type FormLike = { data: () => Record<string, any>; defaults: (v: any) => void; reset: () => void }
 
@@ -49,7 +49,7 @@ describe('createPhotosGetPage', () => {
     expect(inertiaMocks.router.replace).toHaveBeenCalledTimes(1)
     const call = inertiaMocks.router.replace.mock.calls[0][0]
     expect(call.url).toContain('?')
-    // we put next into page param in URL
-    expect(String(call.url)).toContain('page=5')
+    expect(String(call.url)).toContain('page=2')
+    expect(String(call.url)).toContain('next=5')
   })
 })
