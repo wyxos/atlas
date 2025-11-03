@@ -505,9 +505,24 @@ async function handleBatchBadgeAuxClick(scope: { key: string; value: string | nu
     }
     e.preventDefault();
     e.stopPropagation();
+    
+    const ids = getIdsForScope(scope);
+    if (!ids.length) {
+        return;
+    }
+
     try {
         await batchReact('favorite', scope);
     } catch {}
+
+    for (const id of ids) {
+        try {
+            const action = (BrowseController as any).reactDownload({ file: id });
+            if (action?.url) {
+                await axios.post(action.url, { type: 'love' });
+            }
+        } catch {}
+    }
 }
 
 async function handleBatchBadgeContextMenu(scope: { key: string; value: string | number }, e: MouseEvent) {
@@ -1112,6 +1127,7 @@ function closeActionPanel(): void {
                 :key="videoSrc"
                 :src="videoSrc"
                 ref="videoEl"
+                referrerpolicy="no-referrer"
                 class="h-full w-full cursor-zoom-in cursor-zoom-custom object-cover transition-opacity duration-300"
                 :class="hasLoaded ? 'opacity-100' : 'opacity-0'"
                 autoplay
@@ -1133,6 +1149,7 @@ function closeActionPanel(): void {
                 :key="imageSrc"
                 :src="imageSrc"
                 alt=""
+                referrerpolicy="no-referrer"
                 class="h-full w-full cursor-zoom-in cursor-zoom-custom object-cover transition-opacity duration-300"
                 :class="hasLoaded ? 'opacity-100' : 'opacity-0'"
                 @load="onPreviewImageLoad"

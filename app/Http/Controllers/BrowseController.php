@@ -484,7 +484,8 @@ class BrowseController extends Controller
 
                 $response = $client->head($candidateUrl);
 
-                if (in_array($response->status(), [403, 405], true) && $this->shouldSendWallhavenHeaders($file)) {
+                // If HEAD is not supported (405) or forbidden (403), try GET instead
+                if (in_array($response->status(), [403, 405], true)) {
                     $response = $client->withOptions(['stream' => true])->get($candidateUrl);
                 }
 

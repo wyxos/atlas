@@ -6,6 +6,7 @@ import SectionHeader from '@/components/audio/SectionHeader.vue';
 import GridItem from '@/components/browse/GridItem.vue';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogDescription, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { type BreadcrumbItem } from '@/types';
 import type { BrowseItem } from '@/types/browse';
@@ -142,6 +143,20 @@ async function refreshCurrentPage() {
         if (scroller.value?.refreshCurrentPage) {
             await scroller.value.refreshCurrentPage();
         }
+    } catch {}
+}
+
+const jumpToPageInput = ref<string>('');
+async function jumpToPage() {
+    const targetPage = parseInt(jumpToPageInput.value);
+    if (!targetPage || targetPage < 1 || isNaN(targetPage)) return;
+    try {
+        form.defaults({ ...form.data(), page: targetPage, next: null });
+        form.reset();
+        if (scroller.value?.reset) scroller.value.reset();
+        if (scroller.value?.loadNext) await scroller.value.loadNext();
+        appliedFilterSnapshot.value = snapshotFilters();
+        jumpToPageInput.value = '';
     } catch {}
 }
 
@@ -664,6 +679,28 @@ v-model.number="(form as any).limit"
                 >
                     <ChevronsLeft :size="18" />
                 </Button>
+
+                <div class="flex items-center gap-2">
+                    <Input
+                        v-model="jumpToPageInput"
+                        type="number"
+                        min="1"
+                        placeholder="Page #"
+                        class="h-9 w-24"
+                        @keyup.enter="jumpToPage"
+                        data-test="photos-jump-input"
+                    />
+                    <Button
+                        variant="outline"
+                        :disabled="isLoading || !jumpToPageInput"
+                        @click="jumpToPage"
+                        class="h-9 px-3 cursor-pointer"
+                        data-test="photos-jump"
+                        title="Go to page"
+                    >
+                        Go
+                    </Button>
+                </div>
 
                 <!-- Cancel Loading CTA -->
                 <Button
