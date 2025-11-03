@@ -33,7 +33,7 @@ class CivitAiImages extends BaseService
 
     public function formatParams(): array
     {
-        $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 40;
+        $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 20;
         $limit = max(0, min(200, $limit));
         $cursor = (isset($this->params['page']) && (int) $this->params['page'] > 1) ? (string) $this->params['page'] : null;
         $sort = $this->params['sort'] ?? 'Newest';
@@ -61,7 +61,7 @@ class CivitAiImages extends BaseService
     {
         return [
             'nsfw' => 0,
-            'limit' => 40,
+            'limit' => 20,
             'sort' => 'Newest',
             // Normalize to UI 'sorting' if consumer needs it; Wallhaven service reads 'sort' and maps to 'sorting'.
         ];

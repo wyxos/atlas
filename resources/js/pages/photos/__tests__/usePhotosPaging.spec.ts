@@ -28,7 +28,7 @@ describe('createPhotosGetPage', () => {
   })
 
   it('uses data_url from form when present, syncs form via defaults/reset, and throttles URL to next', async () => {
-    const formState: any = { data_url: '/custom/photos/data', page: 1, limit: 40, sort: 'random', rand_seed: 123 }
+    const formState: any = { data_url: '/custom/photos/data', page: 1, limit: 20, sort: 'random', rand_seed: 123 }
     const form: FormLike = {
       data: () => ({ ...formState }),
       defaults: (v: any) => Object.assign(formState, v || {}),
@@ -41,7 +41,7 @@ describe('createPhotosGetPage', () => {
     expect(res.nextPage).toBe(5)
 
     // axios.get called with custom URL and params (includes page + form state)
-    expect(axiosMocks.get).toHaveBeenCalledWith('/custom/photos/data', expect.objectContaining({ params: expect.objectContaining({ page: 2, limit: 40, sort: 'random', rand_seed: 123 }) }))
+    expect(axiosMocks.get).toHaveBeenCalledWith('/custom/photos/data', expect.objectContaining({ params: expect.objectContaining({ page: 2, limit: 20, sort: 'random', rand_seed: 123 }) }))
 
     // router.replace is throttled; advance timer
     expect(inertiaMocks.router.replace).not.toHaveBeenCalled()

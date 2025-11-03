@@ -41,7 +41,7 @@ const form = useForm({ ...(props.filter || {}) });
 function snapshotFilters(): string {
     const data = form.data() as Record<string, any>;
     const sort = data.sort ?? 'newest';
-    const limit = Number(data.limit ?? 40) || 40;
+    const limit = Number(data.limit ?? 20) || 20;
     const source = data.source ?? null;
     const randSeed = sort === 'random' ? Number(data.rand_seed ?? 0) || 0 : 0;
     return JSON.stringify({ sort, limit, source, randSeed });
@@ -298,7 +298,7 @@ if (!(form as any).sort) {
     } catch {}
 
     // If initial items are below page size, auto load next
-const pageSize = Number(((form as any)?.limit as any) ?? 40) || 40;
+const pageSize = Number(((form as any)?.limit as any) ?? 20) || 20;
     const count = Array.isArray(items.value) ? items.value.length : 0;
     if (count < pageSize && typeof scroller.value.loadNext === 'function') {
         try {
@@ -309,7 +309,7 @@ const pageSize = Number(((form as any)?.limit as any) ?? 40) || 40;
     }
 });
 
-const limit = computed(() => Number(((form as any)?.limit as any) ?? 40) || 40);
+const limit = computed(() => Number(((form as any)?.limit as any) ?? 20) || 20);
 const masonryLayout = { sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 10 }, header: 40, footer: 40 } as const;
 const getPage = createPhotosGetPage(form as any);
 

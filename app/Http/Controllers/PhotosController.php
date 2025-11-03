@@ -32,7 +32,7 @@ class PhotosController extends Controller
 
     protected function getData(): array
     {
-        $limit = max(1, min(200, (int) request('limit', 40)));
+        $limit = max(1, min(200, (int) request('limit', 20)));
         $page = max(1, (int) request('page', 1));
         $sort = strtolower((string) request('sort', 'newest'));
         if (! in_array($sort, ['newest', 'oldest', 'random'], true)) {
