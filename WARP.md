@@ -158,3 +158,6 @@ Common pitfalls
 - Don’t create ad-hoc echo.ts or window.Pusher hacks. Use configureEcho in resources/js/app.ts and the hooks above.
 
 As a responsible developer, you'll lint after each changes and run tests suite corresponding to the changes made.
+
+Vibe masonry engine alignment
+- The grid/infinite scroll is powered by `@wyxos/vibe` (local workspace path: `..\\..\\vue\\vibe`). When behavior or UX depends on Masonry (e.g., refresh-on-empty vs load-next), prefer adjusting Atlas components via the Masonry public API (`remove`, `removeMany`, `removeAll`, `refreshCurrentPage`, `loadNext`). If changes require updates to the plugin, open the Vibe repo and align docs/examples accordingly.

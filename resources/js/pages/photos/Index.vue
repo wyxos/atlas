@@ -748,7 +748,7 @@ v-model.number="(form as any).limit"
                     @retry:start="onRetryStart"
                     @retry:tick="onRetryTick"
                     @retry:stop="onRetryStop"
-                    @remove-all:complete="() => scroller?.loadNext?.()"
+                    @remove-all:complete="() => scroller?.refreshCurrentPage?.()"
                 >
 <template #item="{ item }">
                         <GridItem

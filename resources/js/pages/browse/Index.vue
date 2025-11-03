@@ -160,9 +160,16 @@ function scheduleRemoveItem(file: any) {
         try {
             // Build batch from current items to maintain snapshot order
             const list = (items.value || []).filter((it: any) => pendingRemovalIds.has(it?.id));
+            const totalBefore = (items.value || []).length;
+            const isAll = list.length > 0 && list.length === totalBefore;
             pendingRemovalIds.clear();
             if (list.length > 0) {
-                try { await scroller.value?.removeMany?.(list); } catch { try { for (const it of list) await scroller.value?.remove?.(it); } catch {} }
+                // If removing all, use removeAll so Masonry does NOT auto-refresh; we'll advance to next page via @remove-all:complete
+                if (isAll) {
+                    try { await scroller.value?.removeAll?.(); } catch {}
+                } else {
+                    try { await scroller.value?.removeMany?.(list); } catch { try { for (const it of list) await scroller.value?.remove?.(it); } catch {} }
+                }
                 await nextTick();
                 // Advance dialog item if open and current removed
                 if (dialogOpen.value) {
@@ -175,7 +182,7 @@ function scheduleRemoveItem(file: any) {
                         if (!nextItem) dialogOpen.value = false;
                     }
                 }
-                // Note: Vibe now automatically refreshes current page when all items removed
+                // Note: When removing all in Browse, next page is loaded (see @remove-all:complete)
             }
         } finally {
             removalRafScheduled = false;

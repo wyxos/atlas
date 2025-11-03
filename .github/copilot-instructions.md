@@ -60,6 +60,11 @@ This application is a Laravel application and its main Laravel ecosystems packag
 ## Documentation Files
 - You must only create documentation files if explicitly requested by the user.
 
+## Vibe Plugin Alignment
+- The masonry/grid engine used by Atlas is `@wyxos/vibe`. When behavior touches infinite scroll, removal, or refresh-on-empty, align changes across repos as needed.
+- Local Vibe workspace path: `..\\..\\vue\\vibe`.
+- Preferred approach: adjust Atlas first using Masonry public API (`remove`, `removeMany`, `removeAll`, `refreshCurrentPage`, `loadNext`). If plugin changes are required, open the Vibe repo and update docs/examples accordingly.
+
 
 === boost rules ===
 
