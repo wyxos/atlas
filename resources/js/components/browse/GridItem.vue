@@ -508,27 +508,36 @@ async function handleBatchBadgeMouseDown(scope: { key: string; value: string | n
 }
 
 async function handleBatchBadgeAuxClick(scope: { key: string; value: string | number }, e: MouseEvent) {
-    if (!(e.altKey && e.button === 1)) {
-        return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const ids = getIdsForScope(scope);
-    if (!ids.length) {
-        return;
-    }
+    if (e.altKey && e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
 
-    try {
-        await batchReact('favorite', scope);
-    } catch {}
+        const ids = getIdsForScope(scope);
+        if (!ids.length) {
+            return;
+        }
 
-    for (const id of ids) {
         try {
-            const action = (BrowseController as any).reactDownload({ file: id });
-            if (action?.url) {
-                await axios.post(action.url, { type: 'love' });
-            }
+            await batchReact('favorite', scope);
+        } catch {}
+
+        for (const id of ids) {
+            try {
+                const action = (BrowseController as any).reactDownload({ file: id });
+                if (action?.url) {
+                    await axios.post(action.url, { type: 'love' });
+                }
+            } catch {}
+        }
+
+        return;
+    }
+
+    if (e.altKey && (e.button === 3 || e.button === 4)) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            await batchReact('dislike', scope);
         } catch {}
     }
 }

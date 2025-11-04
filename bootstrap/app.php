@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\FixCivitaiMediaTypes;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Console\Scheduling\Schedule;
@@ -19,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule) {
         $schedule->command('horizon:snapshot')->everyFiveMinutes();
     })
+    ->withCommands([
+        FixCivitaiMediaTypes::class,
+    ])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 

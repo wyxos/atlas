@@ -13,6 +13,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Symfony\Component\Mime\MimeTypes;
 
 class DownloadFile implements ShouldQueue
 {
@@ -31,7 +33,11 @@ class DownloadFile implements ShouldQueue
     {
         try {
             $fileUrl = (string) $this->file->url;
-            $filePath = 'downloads/'.(string) $this->file->filename;
+
+            $filename = $this->determineInitialFilename($fileUrl);
+            $filePath = 'downloads/'.$filename;
+
+            $resolvedMime = null;
 
             // Initialize progress
             $this->file->update(['download_progress' => 0]);
@@ -78,6 +84,7 @@ class DownloadFile implements ShouldQueue
                     }
                 }
                 if ($head->ok()) {
+                    $resolvedMime = $head->header('Content-Type') ?: $resolvedMime;
                     $acceptRanges = $head->header('Accept-Ranges');
                     $contentLength = (int) $head->header('Content-Length');
                     if ($this->downloadId && $contentLength) {
@@ -107,6 +114,7 @@ class DownloadFile implements ShouldQueue
                     }
                     if ($probe->status() === 206) {
                         $acceptRanges = 'bytes';
+                        $resolvedMime = $probe->header('Content-Type') ?: $resolvedMime;
                         $contentRange = $probe->header('Content-Range'); // e.g., bytes 0-0/12345
                         if ($contentRange && preg_match('/\/(\d+)$/', (string) $contentRange, $m)) {
                             $contentLength = (int) $m[1];
@@ -214,6 +222,7 @@ class DownloadFile implements ShouldQueue
                     }
 
                     $downloadedSoFar += $length;
+                    $resolvedMime = $response->header('Content-Type') ?: $resolvedMime;
                     if ($this->downloadId) {
                         Download::where('id', $this->downloadId)->update([
                             'bytes_downloaded' => $downloadedSoFar,
@@ -263,12 +272,24 @@ class DownloadFile implements ShouldQueue
                 if (! $response->successful()) {
                     throw new \Exception('Failed to download file: HTTP '.$response->status());
                 }
+
+                if ($response->body() && (! file_exists($tempFile) || filesize($tempFile) === 0)) {
+                    file_put_contents($tempFile, $response->body());
+                }
+
+                $resolvedMime = $response->header('Content-Type') ?: $resolvedMime;
             }
 
             // Ensure we have the file
             if (! file_exists($tempFile) || filesize($tempFile) === 0) {
                 throw new \Exception("Downloaded file is empty or doesn't exist");
             }
+
+            if (! $resolvedMime) {
+                $resolvedMime = $this->detectMimeFromFile($tempFile) ?: $this->file->mime_type;
+            }
+
+            [$filename, $filePath] = $this->adjustFilenameForMime($filename, $resolvedMime, $filePath);
 
             // Store the file in the 'atlas' disk under downloads folder
             Storage::disk('atlas_app')->put($filePath, file_get_contents($tempFile));
@@ -293,6 +314,8 @@ class DownloadFile implements ShouldQueue
                 'downloaded' => true,
                 'downloaded_at' => now(),
                 'download_progress' => 100,
+                'filename' => $filename,
+                'mime_type' => $resolvedMime ?: $this->file->mime_type,
             ]);
 
             // Ensure search index reflects local availability immediately
@@ -339,5 +362,74 @@ class DownloadFile implements ShouldQueue
             event(new FileDownloadProgress($this->file->id, -1, null, null, $status === 'canceled' ? 'canceled' : ($status === 'paused' ? 'paused' : 'failed')));
             throw $e; // rethrow for failed job handling
         }
+    }
+
+    protected function determineInitialFilename(string $fileUrl): string
+    {
+        $filename = (string) ($this->file->filename ?? '');
+        if ($filename === '') {
+            $path = parse_url($fileUrl, PHP_URL_PATH) ?: null;
+            $filename = $path ? basename($path) : '';
+        }
+
+        if ($filename === '') {
+            $filename = 'file-'.$this->file->id;
+        }
+
+        return $filename;
+    }
+
+    protected function adjustFilenameForMime(string $filename, ?string $mime, string $currentPath): array
+    {
+        if (! $mime) {
+            return [$filename, $currentPath];
+        }
+
+        $extension = $this->extensionFromMime($mime);
+        if (! $extension) {
+            return [$filename, $currentPath];
+        }
+
+        $currentExtension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+        if ($currentExtension === $extension) {
+            return [$filename, $currentPath];
+        }
+
+        $base = $currentExtension !== ''
+            ? Str::beforeLast($filename, '.'.$currentExtension)
+            : $filename;
+
+        $newFilename = $base.'.'.$extension;
+        $newPath = 'downloads/'.$newFilename;
+
+        return [$newFilename, $newPath];
+    }
+
+    protected function extensionFromMime(string $mime): ?string
+    {
+        $mime = strtolower(trim($mime));
+        $extensions = MimeTypes::getDefault()->getExtensions($mime);
+
+        return $extensions[0] ?? match ($mime) {
+            'image/webp' => 'webp',
+            default => null,
+        };
+    }
+
+    protected function detectMimeFromFile(string $filePath): ?string
+    {
+        if (! is_file($filePath)) {
+            return null;
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) {
+            return null;
+        }
+
+        $mime = finfo_file($finfo, $filePath) ?: null;
+        finfo_close($finfo);
+
+        return $mime ?: null;
     }
 }
