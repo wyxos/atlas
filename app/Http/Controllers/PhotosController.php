@@ -122,6 +122,7 @@ class PhotosController extends Controller
         $serviceCache = [];
 
         $files = collect($idList)->map(function (int $id) use ($models, $reactions, &$serviceCache) {
+            /** @var File $file */
             $file = $models->get($id);
             if (! $file) {
                 return null;
