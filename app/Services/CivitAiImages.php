@@ -6,6 +6,7 @@ use App\Support\FileTypeDetector;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class CivitAiImages extends BaseService
 {
@@ -116,7 +117,7 @@ class CivitAiImages extends BaseService
             'source_id' => $id,
             'url' => $url,
             'referrer_url' => $referrer,
-            'filename' => (basename(parse_url($url, PHP_URL_PATH)) ?: ('civitai_'.$id)),
+            'filename' => Str::random(40),
             'ext' => FileTypeDetector::extensionFromUrl($url),
             'mime_type' => FileTypeDetector::mimeFromUrl($url),
             'hash' => $row['hash'] ?? null,

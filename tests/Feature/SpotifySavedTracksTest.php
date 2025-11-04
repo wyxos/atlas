@@ -14,6 +14,10 @@ test('transforms and persists spotify saved tracks', function () {
     expect($formatted)->toBeArray()->toHaveKeys(['files', 'filter']);
     expect($formatted['files'])->toBeArray()->toHaveCount(2);
 
+    foreach ($formatted['files'] as $item) {
+        expect($item['file']['filename'])->toMatch('/^[A-Za-z0-9]{40}$/');
+    }
+
     $items = $formatted['files'];
     // Persist
     $service->persists($items);

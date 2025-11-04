@@ -4,12 +4,14 @@ use App\Models\File;
 use App\Models\FileMetadata;
 use App\Services\CivitAiImages;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 // Fetch-and-optionally-record tests for other services (kept similar to CivitAI)
 // Plugin-backed services (wallhaven) are tested in their own packages.
 
 test('persists transformed rows (current shape) [service]', function () {
     $now = Carbon::now();
+    $filename = Str::random(40);
 
     $item = [
         'file' => [
@@ -17,7 +19,7 @@ test('persists transformed rows (current shape) [service]', function () {
             'source_id' => '123',
             'url' => 'https://example.com/path/image-123.jpg?width=512',
             'referrer_url' => 'https://civitai.com/images/123',
-            'filename' => 'image-123.jpg',
+            'filename' => $filename,
             'ext' => 'jpg',
             'mime_type' => 'image/jpeg',
             'hash' => null,
@@ -71,6 +73,7 @@ test('format civitai response returns rows and nextPage with file/meta structure
         expect($first['file'])->toHaveKeys([
             'source', 'source_id', 'url', 'referrer_url', 'filename', 'ext', 'mime_type', 'hash', 'title', 'description', 'thumbnail_url', 'listing_metadata', 'created_at', 'updated_at',
         ]);
+        expect($first['file']['filename'])->toMatch('/^[A-Za-z0-9]{40}$/');
         expect($first['metadata'])->toHaveKeys(['file_referrer_url', 'payload', 'created_at', 'updated_at']);
         expect($first['file']['created_at'])->toBeInstanceOf(Carbon::class);
         expect($first['metadata']['created_at'])->toBeInstanceOf(Carbon::class);

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class SpotifySavedTracks extends BaseService
 {
@@ -106,7 +107,7 @@ class SpotifySavedTracks extends BaseService
             'source_id' => $id,
             'url' => $extUrl,
             'referrer_url' => $referrer,
-            'filename' => 'spotify-'.$id.'.json',
+            'filename' => Str::random(40),
             'ext' => 'spotify',
             'mime_type' => 'audio/spotify',
             'hash' => null,

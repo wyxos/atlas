@@ -1117,7 +1117,16 @@ function closeActionPanel(): void {
             </div>
 
             <!-- Missing or error overlay -->
-            <div v-if="showErrorOverlay" class="absolute inset-0 z-[800] grid place-items-center bg-background/60 text-destructive">
+            <div
+                v-if="showErrorOverlay"
+                class="absolute inset-0 z-[800] grid place-items-center bg-background/60 text-destructive"
+                data-testid="grid-item-error-overlay"
+                @click="onCardClick"
+                @mousedown.capture="onCardMouseDown"
+                @mouseup.capture="onCardMouseUp"
+                @auxclick.capture="onCardAuxClick"
+                @contextmenu="onContextMenu"
+            >
                 <div class="flex flex-col items-center text-center">
                     <component :is="overlayIcon" :size="42" />
                     <span class="mt-1 text-xs font-medium">{{ overlayMessage }}</span>
