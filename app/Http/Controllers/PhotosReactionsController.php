@@ -68,7 +68,7 @@ class PhotosReactionsController extends Controller
             ->where('blacklisted', false);
 
         // Filter by the per-user reaction array; use driver-provided whereIn for array fields
-        if ($userId && method_exists($query, 'whereIn')) {
+        if ($userId) {
             $query->whereIn($field, [(string) $userId]);
         }
 
@@ -83,15 +83,11 @@ class PhotosReactionsController extends Controller
             } else {
                 $resolvedRandSeed = (int) $randSeed;
             }
-            if (method_exists($query, 'orderBy')) {
-                $query->orderBy('_rand('.$resolvedRandSeed.')', 'desc');
-            }
-        } elseif (method_exists($query, 'orderBy')) {
-            if ($sort === 'oldest') {
-                $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
-            } else {
-                $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
-            }
+            $query->orderBy('_rand('.$resolvedRandSeed.')', 'desc');
+        } elseif ($sort === 'oldest') {
+            $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
+        } else {
+            $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
         }
 
         $paginator = $query->paginate($limit, 'page', $page);

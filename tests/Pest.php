@@ -46,37 +46,3 @@ function something()
     // ..
 }
 
-// Helper: force Typesense for Scout without queuing
-function useTypesense(): void
-{
-    config()->set('scout.driver', 'typesense');
-    config()->set('scout.queue', false);
-    config()->set('scout.after_commit', false);
-
-    // Isolate Typesense collections per parallel worker to avoid collisions
-    $token = getenv('TEST_TOKEN') ?: '0';
-    config()->set('scout.prefix', 'test_'.$token.'_');
-}
-
-// Helper: drop the current File collection so updated schema (fields) is created
-function resetTypesenseFileCollection(): void
-{
-    if (config('scout.driver') !== 'typesense') {
-        return;
-    }
-
-    try {
-        /** @var \Laravel\Scout\EngineManager $manager */
-        $manager = app(\Laravel\Scout\EngineManager::class);
-        $engine = $manager->engine();
-        // Use the current prefixed index name for File
-        $indexName = (new \App\Models\File)->indexableAs();
-        if (method_exists($engine, 'deleteIndex')) {
-            $engine->deleteIndex($indexName);
-        } else {
-            \Artisan::call('scout:flush', ['model' => \App\Models\File::class]);
-        }
-    } catch (\Throwable $e) {
-        // Ignore if collection doesn't exist yet
-    }
-}

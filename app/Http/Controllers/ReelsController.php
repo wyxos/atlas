@@ -43,25 +43,23 @@ class ReelsController extends Controller
         }
 
         // Sorting
-        if (method_exists($query, 'orderBy')) {
-            if ($sort === 'newest') {
-                // Prefer most recently downloaded, then created
-                $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
-            } else {
-                // Seeded random via Typesense _rand(seed)
-                // If no seed provided, generate a positive int for reproducibility and echo back
-                if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
-                    try {
-                        $randSeed = random_int(1, 2147483646);
-                    } catch (\Throwable $e) {
-                        $randSeed = mt_rand(1, 2147483646);
-                    }
-                } else {
-                    $randSeed = (int) $randSeed;
+        if ($sort === 'newest') {
+            // Prefer most recently downloaded, then created
+            $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
+        } else {
+            // Seeded random via Typesense _rand(seed)
+            // If no seed provided, generate a positive int for reproducibility and echo back
+            if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
+                try {
+                    $randSeed = random_int(1, 2147483646);
+                } catch (\Throwable $e) {
+                    $randSeed = mt_rand(1, 2147483646);
                 }
-                // Apply random sort first; you can chain additional sorts if needed
-                $query->orderBy('_rand('.$randSeed.')', 'desc');
+            } else {
+                $randSeed = (int) $randSeed;
             }
+            // Apply random sort first; you can chain additional sorts if needed
+            $query->orderBy('_rand('.$randSeed.')', 'desc');
         }
 
         $paginator = $query->paginate($limit, 'page', $page);

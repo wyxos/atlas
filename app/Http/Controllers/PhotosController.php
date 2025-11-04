@@ -41,14 +41,24 @@ class PhotosController extends Controller
         $randSeed = request('rand_seed');
         $source = request('source'); // optional source filter
 
+        $user = request()->user();
+        $userId = $user?->id;
+
         // Scout-only search (Typesense): images
         // Filter logic: show local files (all) OR non-local files with reactions
         $query = File::search('*')
             ->where('mime_group', 'image');
 
+        if ($userId) {
+            $query->query(function ($eloquent) use ($userId) {
+                $eloquent->whereDoesntHave('reactions', function ($relation) use ($userId) {
+                    $relation->where('user_id', $userId)->where('type', 'dislike');
+                });
+            });
+        }
+
         // Apply filtering based on source and reactions
         if ($source && is_string($source) && $source !== '') {
-            // User requested a specific source filter
             if ($source === 'local') {
                 // Show all local files
                 $query->where('source', 'local');
@@ -59,85 +69,58 @@ class PhotosController extends Controller
             }
         } else {
             // No source filter: show local files OR non-local with reactions
-            // For Typesense, use filter_by with OR logic
-            if (config('scout.driver') === 'typesense' && method_exists($query, 'options')) {
-                $query->options([
-                    'filter_by' => "mime_group:='image' && (source:='local' || (source:!='local' && has_reactions:=true))",
-                ]);
-            } else {
-                // Fallback for collection driver in tests: post-filter results
-                // This will be handled after pagination in a callback below
-            }
+            $query->options([
+                'filter_by' => "mime_group:='image' && (source:='local' || (source:!='local' && has_reactions:=true))",
+            ]);
         }
 
         // Sorting
-        if (method_exists($query, 'orderBy')) {
-            if ($sort === 'newest') {
-                // Prefer most recently downloaded, then created
-                $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
-            } elseif ($sort === 'oldest') {
-                // Oldest first
-                $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
-            } else {
-                // Seeded random via Typesense _rand(seed)
-                // If no seed provided, generate a positive int for reproducibility and echo back
-                if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
-                    try {
-                        $randSeed = random_int(1, 2147483646);
-                    } catch (\Throwable $e) {
-                        $randSeed = mt_rand(1, 2147483646);
-                    }
-                } else {
-                    $randSeed = (int) $randSeed;
+        if ($sort === 'newest') {
+            $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
+        } elseif ($sort === 'oldest') {
+            $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
+        } else {
+            if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
+                try {
+                    $randSeed = random_int(1, 2147483646);
+                } catch (\Throwable $e) {
+                    $randSeed = mt_rand(1, 2147483646);
                 }
-                // Apply random sort first; you can chain additional sorts if needed
-                $query->orderBy('_rand('.$randSeed.')', 'desc');
+            } else {
+                $randSeed = (int) $randSeed;
             }
+
+            $query->orderBy('_rand('.$randSeed.')', 'desc');
         }
 
         $paginator = $query->paginate($limit, 'page', $page);
 
         $items = collect($paginator->items() ?? [])->values();
 
-        // For collection driver in tests: apply post-filter if no source specified
-        if (config('scout.driver') === 'collection' && (! $source || $source === '')) {
-            $items = $items->filter(function ($f) {
-                $fileSource = $f['source'] ?? $f->source ?? null;
+        $extractId = static fn ($f) => (int) ($f['id'] ?? $f->id ?? 0);
 
-                // Check if file has reactions by querying reactions table
-                $fileId = $f['id'] ?? $f->id ?? null;
-                if ($fileId && $fileSource !== 'local') {
-                    $hasReactions = Reaction::where('file_id', $fileId)->exists();
-
-                    return $hasReactions;
-                }
-
-                // Include if source is local
-                return $fileSource === 'local';
-            })->values();
-        }
-        $ids = $items->map(fn ($f) => (int) ($f['id'] ?? $f->id ?? 0))->filter()->values()->all();
-
-        // Eager-load full models with metadata in one query
-        $models = empty($ids)
-            ? collect([])
-            : File::with('metadata')->whereIn('id', $ids)->get()->keyBy('id');
+        $ids = $items->map($extractId)->filter()->values();
+        $idList = $ids->all();
 
         // Build map of reactions for current user
-        $userId = optional(request()->user())->id;
         $reactions = [];
-        if ($userId && ! empty($ids)) {
+        if ($userId && ! empty($idList)) {
             $reactions = Reaction::query()
-                ->whereIn('file_id', $ids)
+                ->whereIn('file_id', $idList)
                 ->where('user_id', $userId)
                 ->pluck('type', 'file_id')
                 ->toArray();
         }
 
+        // Eager-load full models with metadata in one query
+        $models = empty($idList)
+            ? collect([])
+            : File::with('metadata')->whereIn('id', $idList)->get()->keyBy('id');
+
         // Preserve original order from hits
         $serviceCache = [];
 
-        $files = collect($ids)->map(function (int $id) use ($models, $reactions, &$serviceCache) {
+        $files = collect($idList)->map(function (int $id) use ($models, $reactions, &$serviceCache) {
             $file = $models->get($id);
             if (! $file) {
                 return null;
@@ -221,7 +204,6 @@ class PhotosController extends Controller
                 'next' => $paginator->hasMorePages() ? ($page + 1) : null,
                 'limit' => $limit,
                 'data_url' => route('photos.data'),
-                // include the overall total number of matching files
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
                 'sort' => $sort,
                 'rand_seed' => ($sort === 'random') ? (int) $randSeed : null,

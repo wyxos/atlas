@@ -138,9 +138,7 @@ class AudioFavoritesController extends Controller
                 ->where('blacklisted', false)
                 ->where('not_found', false);
 
-            if (method_exists($builder, 'whereIn')) {
-                $builder->whereIn('love_user_ids', [$userId]);
-            }
+            $builder->whereIn('love_user_ids', [(string) $userId]);
 
             // Paginate this page explicitly
             $paginator = $builder->paginate($perPage, 'page', $page);

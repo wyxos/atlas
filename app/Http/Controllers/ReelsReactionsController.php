@@ -64,7 +64,7 @@ class ReelsReactionsController extends Controller
             ->where('blacklisted', false);
 
         // Filter by the per-user reaction array; use driver-provided whereIn for array fields
-        if ($userId && method_exists($query, 'whereIn')) {
+        if ($userId) {
             $query->whereIn($field, [(string) $userId]);
         }
 
@@ -79,9 +79,7 @@ class ReelsReactionsController extends Controller
             } else {
                 $randSeed = (int) $randSeed;
             }
-            if (method_exists($query, 'orderBy')) {
-                $query->orderBy('_rand('.$randSeed.')', 'desc');
-            }
+            $query->orderBy('_rand('.$randSeed.')', 'desc');
         } else {
             $query->orderBy('created_at', 'desc');
         }

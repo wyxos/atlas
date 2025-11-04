@@ -171,9 +171,7 @@ class AudioReactionsController extends Controller
                 // We need to find files where the user ID is NOT in reacted_user_ids
                 $builder->where('not_found', false);
                 // Use whereNotIn to exclude files where this user has reacted
-                if (method_exists($builder, 'whereNotIn')) {
-                    $builder->whereNotIn('reacted_user_ids', [$userId]);
-                }
+                $builder->whereNotIn('reacted_user_ids', [(string) $userId]);
             } elseif ($type === 'spotify') {
                 // Spotify - files from Spotify source
                 $builder->where('not_found', false)
@@ -182,8 +180,8 @@ class AudioReactionsController extends Controller
                 // Specific reaction type (favorites, liked, funny, disliked)
                 $builder->where('not_found', false);
                 $field = self::REACTION_FIELDS[$type];
-                if ($field && method_exists($builder, 'whereIn')) {
-                    $builder->whereIn($field, [$userId]);
+                if ($field) {
+                    $builder->whereIn($field, [(string) $userId]);
                 }
             }
 

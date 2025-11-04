@@ -131,18 +131,16 @@ class PhotosUnpreviewedController extends Controller
             ->where('blacklisted', false)
             ->where('previewed_count', 0);
 
-        if (method_exists($query, 'orderBy')) {
-            if ($sort === 'random') {
-                $seed = $randSeed ?? 1;
-                $query->orderBy('_rand('.$seed.')', 'desc');
-            } elseif ($sort === 'oldest') {
-                $query->orderBy('created_at', 'asc');
-            } else {
-                $query->orderBy('created_at', 'desc');
-            }
+        if ($sort === 'random') {
+            $seed = $randSeed ?? 1;
+            $query->orderBy('_rand('.$seed.')', 'desc');
+        } elseif ($sort === 'oldest') {
+            $query->orderBy('created_at', 'asc');
+        } else {
+            $query->orderBy('created_at', 'desc');
         }
 
-        if ($userId && method_exists($query, 'whereNotIn')) {
+        if ($userId) {
             $query->whereNotIn('reacted_user_ids', [(string) $userId]);
         }
 

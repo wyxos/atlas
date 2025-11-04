@@ -131,15 +131,13 @@ class PhotosUnseenController extends Controller
             ->where('blacklisted', false)
             ->where('viewed_count', 0);
 
-        if (method_exists($query, 'orderBy')) {
-            if ($sort === 'random') {
-                $seed = $randSeed ?? 1;
-                $query->orderBy('_rand('.$seed.')', 'desc');
-            } elseif ($sort === 'oldest') {
-                $query->orderBy('created_at', 'asc');
-            } else {
-                $query->orderBy('created_at', 'desc');
-            }
+        if ($sort === 'random') {
+            $seed = $randSeed ?? 1;
+            $query->orderBy('_rand('.$seed.')', 'desc');
+        } elseif ($sort === 'oldest') {
+            $query->orderBy('created_at', 'asc');
+        } else {
+            $query->orderBy('created_at', 'desc');
         }
 
         $paginator = $query->paginate($limit, 'page', $page);

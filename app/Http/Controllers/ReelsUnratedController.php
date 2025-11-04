@@ -37,26 +37,24 @@ class ReelsUnratedController extends Controller
             // ->where('has_path', true) // optional for unrated — allow remote-only items if desired
             ->where('blacklisted', false);
 
-        if (method_exists($query, 'orderBy')) {
-            if ($sort === 'random') {
-                if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
-                    try {
-                        $randSeed = random_int(1, 2147483646);
-                    } catch (\Throwable $e) {
-                        $randSeed = mt_rand(1, 2147483646);
-                    }
-                } else {
-                    $randSeed = (int) $randSeed;
+        if ($sort === 'random') {
+            if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
+                try {
+                    $randSeed = random_int(1, 2147483646);
+                } catch (\Throwable $e) {
+                    $randSeed = mt_rand(1, 2147483646);
                 }
-                $query->orderBy('_rand('.$randSeed.')', 'desc');
-            } elseif ($sort === 'oldest') {
-                $query->orderBy('created_at', 'asc');
             } else {
-                $query->orderBy('created_at', 'desc');
+                $randSeed = (int) $randSeed;
             }
+            $query->orderBy('_rand('.$randSeed.')', 'desc');
+        } elseif ($sort === 'oldest') {
+            $query->orderBy('created_at', 'asc');
+        } else {
+            $query->orderBy('created_at', 'desc');
         }
 
-        if ($userId && method_exists($query, 'whereNotIn')) {
+        if ($userId) {
             // Typesense array NOT ANY OF for per-user unrated
             $query->whereNotIn('reacted_user_ids', [(string) $userId]);
         }
