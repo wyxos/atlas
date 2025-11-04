@@ -2,105 +2,54 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\FixCivitaiMediaType;
 use App\Models\File;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Symfony\Component\Mime\MimeTypes;
 
 class FixCivitaiMediaTypes extends Command
 {
-    protected $signature = 'media:fix-civitai-types {--dry-run : Report mismatches without changing files}';
+    protected $signature = 'media:fix-civitai-types {--dry-run : Report mismatches without dispatching jobs}';
 
-    protected $description = 'Correct mislabeled CivetAI media files that are stored locally with incorrect extensions.';
+    protected $description = 'Queue jobs to correct mislabeled CivetAI media files stored locally with incorrect extensions.';
 
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry-run');
-        $disk = Storage::disk('atlas_app');
 
-        $files = File::query()
+        $query = File::query()
             ->where('source', 'CivitAI')
             ->where('url', 'like', '%.mp4%')
             ->whereNotNull('path')
-            ->get();
+            ->select(['id', 'filename']);
 
-        if ($files->isEmpty()) {
+        $found = false;
+        $dispatched = 0;
+
+        $query->chunkById(500, function ($files) use ($dryRun, &$found, &$dispatched) {
+            foreach ($files as $file) {
+                $found = true;
+
+                if ($dryRun) {
+                    $this->line("Would dispatch job for file {$file->id} ({$file->filename})");
+                    continue;
+                }
+
+                FixCivitaiMediaType::dispatch($file->id);
+                $dispatched++;
+            }
+        });
+
+        if (! $found) {
             $this->info('No CivetAI files with mp4 URLs found.');
 
             return self::SUCCESS;
         }
 
-        $finfo = finfo_open(FILEINFO_MIME_TYPE) ?: null;
-        $updated = 0;
-
-        foreach ($files as $file) {
-            if (! $disk->exists($file->path)) {
-                $this->warn("Skipping file {$file->id}: {$file->path} is missing");
-                continue;
-            }
-
-            $contents = $disk->get($file->path);
-            $mime = $finfo ? (finfo_buffer($finfo, $contents) ?: null) : null;
-            $mime ??= $file->mime_type;
-
-            if (! $mime || ! str_starts_with($mime, 'image/')) {
-                continue;
-            }
-
-            $extension = MimeTypes::getDefault()->getExtensions($mime)[0] ?? match ($mime) {
-                'image/webp' => 'webp',
-                default => null,
-            };
-
-            if (! $extension) {
-                continue;
-            }
-
-            $currentExt = strtolower((string) pathinfo($file->filename ?? '', PATHINFO_EXTENSION));
-            if ($currentExt === $extension) {
-                continue;
-            }
-
-            $baseName = $currentExt !== '' && $file->filename
-                ? Str::beforeLast($file->filename, '.'.$currentExt)
-                : ($file->filename ?: pathinfo($file->path, PATHINFO_FILENAME));
-
-            $newFilename = $baseName.'.'.$extension;
-            $newPath = 'downloads/'.$newFilename;
-
-            $this->line("File {$file->id}: {$file->filename} -> {$newFilename}");
-
-            if ($dryRun) {
-                continue;
-            }
-
-            $disk->move($file->path, $newPath);
-
-            $file->forceFill([
-                'filename' => $newFilename,
-                'path' => $newPath,
-                'mime_type' => $mime,
-            ])->saveQuietly();
-
-            try {
-                $file->searchable();
-            } catch (\Throwable $e) {
-                // ignore indexing failures
-            }
-
-            $updated++;
+        if ($dryRun) {
+            $this->info('Dry run complete.');
+        } else {
+            $this->info("Dispatched {$dispatched} job(s).");
         }
-
-        if ($finfo) {
-            finfo_close($finfo);
-        }
-
-        $message = $dryRun
-            ? 'Dry run complete.'
-            : "Updated {$updated} file(s).";
-
-        $this->info($message);
 
         return self::SUCCESS;
     }
