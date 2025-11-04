@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\DecoratesRemoteUrls;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Plugin\PluginServiceResolver;
+use App\Support\FilePreviewUrl;
 use App\Support\PhotoContainers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\URL;
@@ -126,7 +127,7 @@ class PhotosController extends Controller
                 return null;
             }
 
-            $thumbnail = $file->thumbnail_url;
+            $remoteThumbnail = $file->thumbnail_url;
             $mime = (string) ($file->mime_type ?? '');
             $hasPath = (bool) $file->path;
             $original = null;
@@ -135,6 +136,8 @@ class PhotosController extends Controller
             } elseif ($file->url) {
                 $original = $this->decorateRemoteUrl($file, (string) $file->url, $serviceCache);
             }
+            $localPreview = FilePreviewUrl::for($file);
+            $thumbnail = $localPreview ?? $remoteThumbnail;
             $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
 
             $detailMetadata = $file->metadata?->payload ?? [];
@@ -173,7 +176,7 @@ class PhotosController extends Controller
                 'preview' => $thumbnail ?? $original,
                 'original' => $original,
                 'true_original_url' => $file->url ?: null,
-                'true_thumbnail_url' => $thumbnail ?: null,
+                'true_thumbnail_url' => $remoteThumbnail ?: ($localPreview ?? null),
                 'referrer_url' => $file->referrer_url ?: null,
                 'is_local' => $hasPath,
                 'type' => $type,

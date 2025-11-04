@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\File;
+use App\Support\FilePreviewUrl;
 use App\Support\PhotoContainers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\URL;
@@ -78,10 +79,12 @@ class ReelsUnratedController extends Controller
                     return null;
                 }
 
-                $thumbnail = $file->thumbnail_url;
+                $remoteThumbnail = $file->thumbnail_url;
                 $mime = (string) ($file->mime_type ?? '');
                 $hasPath = (bool) $file->path;
                 $original = $hasPath ? (URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id])) : $file->url;
+                $localPreview = FilePreviewUrl::for($file);
+                $thumbnail = $localPreview ?? $remoteThumbnail;
                 $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
 
                 $payload = (array) optional($file->metadata)->payload;

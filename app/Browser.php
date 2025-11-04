@@ -12,6 +12,7 @@ use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
 use App\Services\Moderation\Moderator;
 use App\Services\Plugin\PluginServiceLoader;
+use App\Support\FilePreviewUrl;
 use Atlas\Plugin\Contracts\ServiceRegistry;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Storage;
@@ -281,13 +282,16 @@ class Browser
                 $funny = $type === 'funny';
 
                 $trueOriginal = $file->url ?: null;
-                $trueThumbnail = $file->thumbnail_url ?: null;
+                $remoteThumbnail = $file->thumbnail_url ?: null;
+                $localPreview = FilePreviewUrl::for($file);
+                $preview = $localPreview ?? $remoteThumbnail ?? $original;
+                $trueThumbnail = $remoteThumbnail ?? $localPreview;
                 $referrer = $file->referrer_url ?: null;
                 $isLocal = (bool) $file->path;
 
                 return [
                     'id' => $file->id,
-                    'preview' => $file->thumbnail_url,
+                    'preview' => $preview,
                     'original' => $original,
                     'true_original_url' => $trueOriginal,
                     'true_thumbnail_url' => $trueThumbnail,

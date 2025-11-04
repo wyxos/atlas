@@ -10,6 +10,7 @@ use App\Models\ModerationRule;
 use App\Services\BlacklistService;
 use App\Services\Moderation\Moderator;
 use App\Services\Plugin\PluginServiceResolver;
+use App\Support\FilePreviewUrl;
 use App\Support\PhotoContainers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
@@ -226,7 +227,7 @@ class PhotosUnratedController extends Controller
                 $matchedIds[] = $file->id;
                 $previewBag[] = [
                     'id' => $file->id,
-                    'preview' => $file->thumbnail_url,
+                    'preview' => FilePreviewUrl::for($file) ?? $file->thumbnail_url,
                     'title' => $file->filename ?? null,
                 ];
                 $moderationData[$file->id] = [
@@ -363,7 +364,7 @@ class PhotosUnratedController extends Controller
                     return null;
                 }
 
-                $thumbnail = $file->thumbnail_url;
+                $remoteThumbnail = $file->thumbnail_url;
                 $mime = (string) ($file->mime_type ?? '');
                 $hasPath = (bool) $file->path;
                 $original = null;
@@ -373,6 +374,8 @@ class PhotosUnratedController extends Controller
                 } elseif ($file->url) {
                     $original = $this->decorateRemoteUrl($file, (string) $file->url, $serviceCache);
                 }
+                $localPreview = FilePreviewUrl::for($file);
+                $thumbnail = $localPreview ?? $remoteThumbnail;
                 $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
 
                 $payload = (array) optional($file->metadata)->payload;

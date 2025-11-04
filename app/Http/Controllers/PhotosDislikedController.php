@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\DecoratesRemoteUrls;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Plugin\PluginServiceResolver;
+use App\Support\FilePreviewUrl;
 use App\Support\PhotoContainers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\URL;
@@ -104,7 +105,7 @@ class PhotosDislikedController extends Controller
                 return null;
             }
 
-            $thumbnail = $file->thumbnail_url;
+            $remoteThumbnail = $file->thumbnail_url;
             $mime = (string) ($file->mime_type ?? '');
             $hasPath = (bool) $file->path;
             $original = null;
@@ -113,6 +114,8 @@ class PhotosDislikedController extends Controller
             } elseif ($file->url) {
                 $original = $this->decorateRemoteUrl($file, (string) $file->url, $serviceCache);
             }
+            $localPreview = FilePreviewUrl::for($file);
+            $thumbnail = $localPreview ?? $remoteThumbnail;
             $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
 
             $payload = (array) optional($file->metadata)->payload;
