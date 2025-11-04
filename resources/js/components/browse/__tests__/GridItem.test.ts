@@ -4,6 +4,8 @@ import { defineComponent, h, reactive, ref } from 'vue';
 
 import { bus } from '@/lib/bus';
 
+const lastActionMenuProps = ref<Record<string, any> | null>(null);
+
 vi.stubGlobal(
     'IntersectionObserver',
     class {
@@ -56,12 +58,13 @@ vi.mock('@/components/ui/button', () => ({
         name: 'UIButtonStub',
         inheritAttrs: false,
         emits: ['click'],
-        setup(_props, { slots, emit }) {
+        setup(_props, { slots, emit, attrs }) {
             return () =>
                 h(
                     'button',
                     {
                         type: 'button',
+                        ...attrs,
                         onClick: (event: MouseEvent) => emit('click', event),
                     },
                     slots.default ? slots.default() : [],
@@ -78,9 +81,16 @@ vi.mock('@/components/browse/ActionMenu.vue', () => ({
     default: defineComponent({
         name: 'ActionMenuStub',
         emits: ['close', 'path-change'],
-        props: { open: { type: Boolean, default: false } },
-        setup(_props, { slots }) {
-            return () => h('div', { 'data-test': 'action-menu' }, slots.default ? slots.default() : []);
+        props: {
+            open: { type: Boolean, default: false },
+            options: { type: Array as () => Array<Record<string, any>>, default: () => [] },
+            initialPathLabels: { type: Array as () => string[] | undefined, default: undefined },
+        },
+        setup(props, { slots }) {
+            return () => {
+                lastActionMenuProps.value = { ...props };
+                return h('div', { 'data-test': 'action-menu' }, slots.default ? slots.default() : []);
+            };
         },
     }),
 }));
@@ -168,6 +178,7 @@ function mountGridItem(overrides: { item?: Record<string, any> } = {}) {
 describe('GridItem error overlay interactions', () => {
     beforeEach(() => {
         bus.all.clear();
+        lastActionMenuProps.value = null;
     });
 
     afterEach(() => {
@@ -184,6 +195,47 @@ describe('GridItem error overlay interactions', () => {
         const events = wrapper.emitted('open');
         expect(events).toBeTruthy();
         expect(events?.[0]?.[0]).toMatchObject({ id: 123 });
+    });
+});
+
+describe('GridItem copy menu', () => {
+    beforeEach(() => {
+        lastActionMenuProps.value = null;
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    it('includes remote referrer and true URLs when item is not local', async () => {
+        const remoteItem = {
+            preview: 'https://proxy.example.com/preview.jpg',
+            thumbnail_url: 'https://proxy.example.com/preview.jpg',
+            original: 'https://app.test/files/view/123',
+            true_original_url: 'https://remote.example.com/image/full.jpg',
+            true_thumbnail_url: 'https://remote.example.com/image/thumb.jpg',
+            referrer_url: 'https://remote.example.com/page',
+            is_local: false,
+            not_found: false,
+        };
+
+        const wrapper = mountGridItem({ item: remoteItem });
+        await wrapper.vm.$nextTick();
+
+        const openButton = wrapper.get('[aria-label="More options"]');
+        await openButton.trigger('click');
+        await wrapper.vm.$nextTick();
+
+        const options = (lastActionMenuProps.value?.options ?? []) as Array<{ label: string; children?: Array<{ label: string }> }>;
+        const copySection = options.find((option) => option.label === 'copy url');
+        expect(copySection).toBeTruthy();
+        const labels = (copySection?.children || []).map((child) => child.label);
+
+        expect(labels).toContain('thumbnail url');
+        expect(labels).toContain('original url');
+        expect(labels).toContain('referrer url');
+        expect(labels).toContain('true original url');
+        expect(labels).toContain('true thumbnail url');
     });
 });
 

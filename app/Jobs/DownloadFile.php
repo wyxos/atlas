@@ -285,8 +285,13 @@ class DownloadFile implements ShouldQueue
                 throw new \Exception("Downloaded file is empty or doesn't exist");
             }
 
+            $detectedMime = $this->detectMimeFromFile($tempFile);
+            if ($detectedMime && $this->shouldOverrideMime($resolvedMime, $detectedMime)) {
+                $resolvedMime = $detectedMime;
+            }
+
             if (! $resolvedMime) {
-                $resolvedMime = $this->detectMimeFromFile($tempFile) ?: $this->file->mime_type;
+                $resolvedMime = $this->file->mime_type;
             }
 
             [$filename, $filePath] = $this->adjustFilenameForMime($filename, $resolvedMime, $filePath);
@@ -431,5 +436,25 @@ class DownloadFile implements ShouldQueue
         finfo_close($finfo);
 
         return $mime ?: null;
+    }
+
+    protected function shouldOverrideMime(?string $current, string $detected): bool
+    {
+        $detected = strtolower($detected);
+        $current = $current ? strtolower($current) : null;
+
+        if ($current === null) {
+            return true;
+        }
+
+        if ($detected === 'application/octet-stream') {
+            return false;
+        }
+
+        if ($current === 'application/octet-stream') {
+            return true;
+        }
+
+        return $current !== $detected;
     }
 }

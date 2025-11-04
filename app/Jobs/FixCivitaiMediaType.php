@@ -33,31 +33,41 @@ class FixCivitaiMediaType implements ShouldQueue
             return;
         }
 
-        $disk = Storage::disk('atlas_app');
-
         $path = (string) ($file->path ?? '');
         if ($path === '') {
             return;
         }
 
+        $diskPaths = $this->diskPathMap($path);
+        if ($diskPaths === []) {
+            return;
+        }
+
         $sanitizedPath = $this->sanitizePath($path);
         if ($sanitizedPath !== $path) {
-            if ($disk->exists($path)) {
-                $disk->move($path, $sanitizedPath);
+            foreach ($diskPaths as $disk => $currentPath) {
+                if ($currentPath === $sanitizedPath) {
+                    continue;
+                }
+
+                $this->ensureDirectoryExists($disk, $sanitizedPath);
+                Storage::disk($disk)->move($currentPath, $sanitizedPath);
+                $diskPaths[$disk] = $sanitizedPath;
             }
 
             $file->forceFill(['path' => $sanitizedPath])->saveQuietly();
             $path = $sanitizedPath;
         }
 
-        if (! $disk->exists($path)) {
+        $primaryDisk = array_key_first($diskPaths);
+        if ($primaryDisk === null) {
             return;
         }
 
-        $contents = $disk->get($path);
-        $mime = $this->detectMimeFromContents($contents, (string) $file->mime_type);
+        $primaryPath = $diskPaths[$primaryDisk];
+        $mime = $this->detectMimeFromDisk($primaryDisk, $primaryPath, (string) $file->mime_type);
 
-        if (! $mime || ! str_starts_with($mime, 'image/')) {
+        if (! $mime) {
             return;
         }
 
@@ -78,9 +88,16 @@ class FixCivitaiMediaType implements ShouldQueue
         $newPath = 'downloads/'.$newFilename;
 
         if ($newPath !== $path) {
-            if ($disk->exists($path)) {
-                $disk->move($path, $newPath);
+            foreach ($diskPaths as $disk => $currentPath) {
+                if ($currentPath === $newPath) {
+                    continue;
+                }
+
+                $this->ensureDirectoryExists($disk, $newPath);
+                Storage::disk($disk)->move($currentPath, $newPath);
+                $diskPaths[$disk] = $newPath;
             }
+
             $path = $newPath;
         }
 
@@ -112,14 +129,31 @@ class FixCivitaiMediaType implements ShouldQueue
         return basename($clean);
     }
 
-    protected function detectMimeFromContents(string $contents, ?string $fallback): ?string
+    protected function detectMimeFromDisk(string $diskName, string $path, ?string $fallback): ?string
     {
+        $disk = Storage::disk($diskName);
+
+        $stream = $disk->readStream($path);
+        if (! $stream) {
+            return $fallback;
+        }
+
+        try {
+            $buffer = stream_get_contents($stream, 1024 * 1024);
+        } finally {
+            fclose($stream);
+        }
+
+        if ($buffer === false) {
+            return $fallback;
+        }
+
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         if ($finfo === false) {
             return $fallback;
         }
 
-        $mime = finfo_buffer($finfo, $contents) ?: null;
+        $mime = finfo_buffer($finfo, $buffer) ?: null;
         finfo_close($finfo);
 
         return $mime ?: $fallback;
@@ -135,5 +169,41 @@ class FixCivitaiMediaType implements ShouldQueue
             default => null,
         };
     }
-}
 
+    protected function diskPathMap(string $originalPath): array
+    {
+        $candidates = array_unique([
+            $originalPath,
+            $this->sanitizePath($originalPath),
+        ]);
+
+        $map = [];
+
+        foreach (['atlas_app', 'atlas'] as $disk) {
+            $storage = Storage::disk($disk);
+            foreach ($candidates as $candidate) {
+                if ($storage->exists($candidate)) {
+                    $map[$disk] = $candidate;
+                    break;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    protected function ensureDirectoryExists(string $disk, string $path): void
+    {
+        $directory = Str::contains($path, '/') ? Str::beforeLast($path, '/') : null;
+
+        if (! $directory) {
+            return;
+        }
+
+        $storage = Storage::disk($disk);
+
+        if (! $storage->exists($directory)) {
+            $storage->makeDirectory($directory);
+        }
+    }
+}

@@ -280,10 +280,19 @@ class Browser
                 $disliked = $type === 'dislike';
                 $funny = $type === 'funny';
 
+                $trueOriginal = $file->url ?: null;
+                $trueThumbnail = $file->thumbnail_url ?: null;
+                $referrer = $file->referrer_url ?: null;
+                $isLocal = (bool) $file->path;
+
                 return [
                     'id' => $file->id,
                     'preview' => $file->thumbnail_url,
                     'original' => $original,
+                    'true_original_url' => $trueOriginal,
+                    'true_thumbnail_url' => $trueThumbnail,
+                    'referrer_url' => $referrer,
+                    'is_local' => $isLocal,
                     'type' => (str_starts_with((string) $file->mime_type, 'video/')
                         ? 'video'
                         : (str_starts_with((string) $file->mime_type, 'image/')

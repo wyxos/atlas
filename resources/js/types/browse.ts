@@ -17,4 +17,8 @@ export interface BrowseItem {
   liked?: boolean;
   disliked?: boolean;
   funny?: boolean;
+  referrer_url?: string | null;
+  true_original_url?: string | null;
+  true_thumbnail_url?: string | null;
+  is_local?: boolean;
 }

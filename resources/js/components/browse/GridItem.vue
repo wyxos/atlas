@@ -574,6 +574,17 @@ const menuRoot = computed<ActionOption[]>(() => {
     if (originalUrl.value) {
         copyChildren.push({ label: 'original url', action: () => copyUrl(originalUrl.value) });
     }
+    if (!isLocal.value) {
+        if (referrerUrl.value) {
+            copyChildren.push({ label: 'referrer url', action: () => copyUrl(referrerUrl.value) });
+        }
+        if (trueOriginalUrl.value) {
+            copyChildren.push({ label: 'true original url', action: () => copyUrl(trueOriginalUrl.value) });
+        }
+        if (trueThumbnailUrl.value) {
+            copyChildren.push({ label: 'true thumbnail url', action: () => copyUrl(trueThumbnailUrl.value) });
+        }
+    }
     if (copyChildren.length > 0) {
         base.push({ label: 'copy url', children: copyChildren });
     }
@@ -813,6 +824,35 @@ const originalUrl = computed<string | null>(() => {
     const original = typeof item?.original === 'string' ? item.original.trim() : '';
     return original || null;
 });
+
+const trueOriginalUrl = computed<string | null>(() => {
+    const raw = (props.item as any)?.true_original_url;
+    if (typeof raw !== 'string') {
+        return null;
+    }
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+});
+
+const trueThumbnailUrl = computed<string | null>(() => {
+    const raw = (props.item as any)?.true_thumbnail_url;
+    if (typeof raw !== 'string') {
+        return null;
+    }
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+});
+
+const referrerUrl = computed<string | null>(() => {
+    const raw = (props.item as any)?.referrer_url;
+    if (typeof raw !== 'string') {
+        return null;
+    }
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+});
+
+const isLocal = computed<boolean>(() => (props.item as any)?.is_local === true);
 
 // Context dropdown removed; using ActionMenu component
 
