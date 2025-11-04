@@ -1,6 +1,7 @@
 <?php
 
 use App\Events\DemoPing;
+use Illuminate\Filesystem\ServeFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,16 @@ Route::get('/', function () {
 
     return Inertia::render('Welcome');
 })->name('home');
+
+Route::get('storage/atlas-app/{path}', function (Request $request, string $path) {
+    $config = config('filesystems.disks.atlas_app', []);
+
+    return (new ServeFile(
+        'atlas_app',
+        is_array($config) ? $config : [],
+        app()->isProduction()
+    ))($request, $path);
+})->where('path', '.*')->name('storage.atlas_app');
 
 if (app()->environment('testing')) {
     Route::post('testing/reverb-demo', function () {
