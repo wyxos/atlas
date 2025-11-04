@@ -4,6 +4,7 @@ import ContentLayout from '@/layouts/ContentLayout.vue';
 import ScrollableLayout from '@/layouts/ScrollableLayout.vue';
 import SectionHeader from '@/components/audio/SectionHeader.vue';
 import GridItem from '@/components/browse/GridItem.vue';
+import ModerationRulesManager from '@/components/moderation/ModerationRulesManager.vue';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogDescription, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -108,7 +109,7 @@ async function applyFilters() {
     if (filtersBusy.value) return;
     filtersBusy.value = true;
     // Ensure seeded random has a seed
-if ((form.sort as any ?? 'random') === 'random') {
+    if ((form.sort as any ?? 'random') === 'random') {
         if (!form.rand_seed || Number(form.rand_seed as any) <= 0) {
             (form as any).rand_seed = generateSeed();
         }
@@ -121,7 +122,8 @@ if ((form.sort as any ?? 'random') === 'random') {
     form.reset();
     try {
         if (scroller.value?.reset) scroller.value.reset();
-        if (scroller.value?.loadNext) await scroller.value.loadNext();
+        if (scroller.value?.loadPage) await scroller.value.loadPage(1);
+        else if (scroller.value?.loadNext) await scroller.value.loadNext();
         appliedFilterSnapshot.value = snapshotFilters();
     } finally {
         filtersBusy.value = false;
@@ -130,10 +132,11 @@ if ((form.sort as any ?? 'random') === 'random') {
 
 async function resetToFirstPage() {
     try {
-form.defaults({ ...form.data(), page: 1, next: null });
+        form.defaults({ ...form.data(), page: 1, next: null });
         form.reset();
         if (scroller.value?.reset) scroller.value.reset();
-        if (scroller.value?.loadNext) await scroller.value.loadNext();
+        if (scroller.value?.loadPage) await scroller.value.loadPage(1);
+        else if (scroller.value?.loadNext) await scroller.value.loadNext();
         appliedFilterSnapshot.value = snapshotFilters();
     } catch {}
 }
@@ -154,7 +157,8 @@ async function jumpToPage() {
         form.defaults({ ...form.data(), page: targetPage, next: null });
         form.reset();
         if (scroller.value?.reset) scroller.value.reset();
-        if (scroller.value?.loadNext) await scroller.value.loadNext();
+        if (scroller.value?.loadPage) await scroller.value.loadPage(targetPage);
+        else if (scroller.value?.loadNext) await scroller.value.loadNext();
         appliedFilterSnapshot.value = snapshotFilters();
         jumpToPageInput.value = '';
     } catch {}
@@ -711,6 +715,8 @@ v-model.number="(form as any).limit"
                     <X :size="16" class="mr-1" />
                     Cancel
                 </Button>
+
+                <ModerationRulesManager :disabled="isLoading" button-class="h-9 px-3 cursor-pointer" />
 
                 <!-- Batch Dislike CTA -->
                 <Button

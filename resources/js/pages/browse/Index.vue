@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import * as BrowseController from '@/actions/App/Http/Controllers/BrowseController';
-import ModerationRuleController from '@/actions/App/Http/Controllers/ModerationRuleController';
 import SectionHeader from '@/components/audio/SectionHeader.vue';
 import GridItem from '@/components/browse/GridItem.vue';
-import RuleEditor from '@/components/moderation/RuleEditor.vue';
+import ModerationRulesManager from '@/components/moderation/ModerationRulesManager.vue';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogDescription, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ContentLayout from '@/layouts/ContentLayout.vue';
@@ -196,167 +194,6 @@ function scheduleRemoveItem(file: any) {
 const masonryLayout = { sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 10 }, header: 40, footer: 40 } as const;
 
 // ---------- Moderation rules modal state ----------
-interface RuleNode {
-    op: 'any' | 'all' | 'not_any' | 'at_least' | 'and' | 'or';
-    terms?: string[] | null;
-    min?: number | null;
-    options?: { case_sensitive?: boolean; whole_word?: boolean } | null;
-    children?: RuleNode[] | null;
-}
-interface Rule extends RuleNode {
-    id?: number;
-    name?: string | null;
-    active: boolean;
-    nsfw: boolean;
-    created_at?: string;
-    updated_at?: string;
-}
-
-const rulesModalOpen = ref(false);
-const isAdmin = computed(() => !!(usePage() as any).props?.auth?.user?.is_admin);
-const rulesList = ref<Rule[]>([]);
-const selectedRule = ref<Rule | null>(null);
-const ruleForm = ref<Rule | null>(null);
-const rulesLoading = ref(false);
-const ruleSaving = ref(false);
-const ruleDeleting = ref(false);
-const showOnlyNsfw = ref<boolean>(!!(form.nsfw as any));
-
-function defaultRule(nsfwFlag: boolean): Rule {
-    return {
-        name: '',
-        active: true,
-        nsfw: !!nsfwFlag,
-        op: 'any',
-        terms: [],
-        min: null,
-        options: { case_sensitive: false, whole_word: true },
-        children: null,
-    };
-}
-
-function openRulesModal() {
-    rulesModalOpen.value = true;
-    void fetchRules();
-}
-
-async function fetchRules() {
-    rulesLoading.value = true;
-    try {
-        const params = showOnlyNsfw.value ? { nsfw: 1 } : {};
-        const res = await axios.get(ModerationRuleController.index().url, { params });
-        rulesList.value = Array.isArray(res.data?.rules) ? res.data.rules : [];
-        if (selectedRule.value) {
-            const match = rulesList.value.find((r) => r.id === selectedRule.value?.id) || null;
-            selectedRule.value = match;
-            ruleForm.value = match ? JSON.parse(JSON.stringify(match)) : null;
-        }
-    } catch (e) {
-        console.error('Failed to fetch rules', e);
-    } finally {
-        rulesLoading.value = false;
-    }
-}
-
-function onSelectRule(r: Rule) {
-    selectedRule.value = r;
-    ruleForm.value = JSON.parse(JSON.stringify(r));
-}
-
-function onAddNewRule() {
-    const r = defaultRule(showOnlyNsfw.value);
-    selectedRule.value = { ...r } as Rule;
-    ruleForm.value = JSON.parse(JSON.stringify(r));
-}
-
-function onUpdateRuleNode(v: Rule | RuleNode) {
-    ruleForm.value = v as Rule;
-}
-
-async function onSaveRule() {
-    if (!ruleForm.value) return;
-    ruleSaving.value = true;
-    const payload: any = { ...ruleForm.value };
-    try {
-        if (payload.id) {
-            const url = ModerationRuleController.update({ rule: payload.id }).url;
-            const res = await axios.put(url, payload);
-            const saved: Rule = res.data?.rule || payload;
-            await fetchRules();
-            const match = rulesList.value.find((r) => r.id === saved.id) || null;
-            selectedRule.value = match;
-            ruleForm.value = match ? JSON.parse(JSON.stringify(match)) : null;
-        } else {
-            const url = ModerationRuleController.store().url;
-            const res = await axios.post(url, payload);
-            const created: Rule = res.data?.rule || payload;
-            await fetchRules();
-            const match = rulesList.value.find((r) => r.id === created.id) || null;
-            selectedRule.value = match;
-            ruleForm.value = match ? JSON.parse(JSON.stringify(match)) : null;
-        }
-    } catch (e) {
-        console.error('Failed to save rule', e);
-    } finally {
-        ruleSaving.value = false;
-    }
-}
-
-function summarizeRule(r: Rule | RuleNode, depth = 0): string {
-    const op = (r as any)?.op as string;
-    const terms = ((r as any)?.terms || []) as string[];
-    const min = (r as any)?.min as number | null | undefined;
-    const options = ((r as any)?.options || {}) as { case_sensitive?: boolean; whole_word?: boolean };
-    const children = ((r as any)?.children || []) as RuleNode[];
-
-    const optParts: string[] = [];
-    if (options.case_sensitive) optParts.push('case-sensitive');
-    else optParts.push('case-insensitive');
-    if ((options.whole_word ?? true) === true) optParts.push('whole-word');
-    else optParts.push('substring');
-    const optText = optParts.length ? ` (${optParts.join(', ')})` : '';
-
-    const joinTerms = (arr: string[]) => arr.join(', ');
-
-    switch (op) {
-        case 'any':
-            return `matches any of: ${joinTerms(terms)}${optText}`;
-        case 'all':
-            return `matches all of: ${joinTerms(terms)}${optText}`;
-        case 'not_any':
-            return `matches none of: ${joinTerms(terms)}${optText}`;
-        case 'at_least':
-            return `matches at least ${min ?? 0} of: ${joinTerms(terms)}${optText}`;
-        case 'and': {
-            const parts = (children || []).map((c) => summarizeRule(c, depth + 1));
-            return parts.length ? parts.map((p) => (depth > 0 ? `(${p})` : p)).join(' AND ') : 'AND()';
-        }
-        case 'or': {
-            const parts = (children || []).map((c) => summarizeRule(c, depth + 1));
-            return parts.length ? parts.map((p) => (depth > 0 ? `(${p})` : p)).join(' OR ') : 'OR()';
-        }
-        default:
-            return op || 'unknown';
-    }
-}
-
-async function onDeleteRule() {
-    if (!selectedRule.value?.id) return;
-    if (!confirm('Delete this rule?')) return;
-    ruleDeleting.value = true;
-    try {
-        const url = ModerationRuleController.destroy({ rule: selectedRule.value.id }).url;
-        await axios.delete(url);
-        selectedRule.value = null;
-        ruleForm.value = null;
-        await fetchRules();
-    } catch (e) {
-        console.error('Failed to delete rule', e);
-    } finally {
-        ruleDeleting.value = false;
-    }
-}
-
 // Provide context to children like GridItem for batch operations
 provide('browse-items', items);
 provide('browse-scroller', scroller);
@@ -905,8 +742,11 @@ defineExpose({
                     Cancel
                 </Button>
 
-                <!-- Manage Rules CTA -->
-                <Button v-if="isAdmin" variant="outline" class="h-9 px-3 cursor-pointer" @click="openRulesModal">Manage Rules</Button>
+                <ModerationRulesManager
+                    :disabled="isLoading"
+                    :nsfw="!!(form.nsfw as any)"
+                    button-class="h-9 px-3 cursor-pointer"
+                />
 
                 <!-- Batch Dislike CTA -->
                 <Button
@@ -1024,106 +864,6 @@ defineExpose({
             </div>
         </ContentLayout>
     </AppLayout>
-
-    <!-- Moderation Rules Modal -->
-    <Dialog v-model:open="rulesModalOpen">
-        <DialogScrollContent class="w-[90vw] max-w-[1200px]">
-            <DialogTitle>Moderation Rules</DialogTitle>
-            <DialogDescription>Define and manage text block rules used by the moderator.</DialogDescription>
-            <div class="mt-2 grid gap-3" style="grid-template-columns: minmax(0, 1fr) minmax(280px, 420px)">
-                <!-- Left: form -->
-                <div class="grid gap-3">
-                    <template v-if="ruleForm">
-                        <div class="grid gap-2">
-                            <Label>Name</Label>
-                            <Input v-model="(ruleForm as any).name" placeholder="Untitled rule" />
-                        </div>
-                        <div class="flex items-center gap-6">
-                            <label class="inline-flex items-center gap-2 text-sm">
-                                <input type="checkbox" v-model="(ruleForm as any).active" />
-                                <span>active</span>
-                            </label>
-                            <label class="inline-flex items-center gap-2 text-sm">
-                                <input type="checkbox" v-model="(ruleForm as any).nsfw" />
-                                <span>nsfw</span>
-                            </label>
-                        </div>
-                        <div>
-                            <RuleEditor :modelValue="ruleForm as any" @update:modelValue="onUpdateRuleNode" />
-                        </div>
-                        <div class="flex gap-2">
-                            <Button :disabled="!ruleForm || ruleSaving" @click="onSaveRule">{{ (ruleForm as any)?.id ? 'Save' : 'Create' }}</Button>
-                            <Button
-                                variant="secondary"
-                                @click="
-                                    () => {
-                                        rulesModalOpen = false;
-                                    }
-                                "
-                                >Close</Button
-                            >
-                        </div>
-                    </template>
-                    <template v-else>
-                        <div class="text-sm text-muted-foreground">Select a rule from the list or click "Add New".</div>
-                    </template>
-                </div>
-
-                <!-- Right: list -->
-                <div class="flex h-[70vh] flex-col rounded-md border">
-                    <div class="flex items-center justify-between border-b p-2">
-                        <div class="flex items-center gap-3">
-                            <label class="inline-flex items-center gap-2 text-sm">
-                                <input
-                                    type="checkbox"
-                                    :checked="showOnlyNsfw"
-                                    @change="
-                                        (e: any) => {
-                                            showOnlyNsfw = !!e?.target?.checked;
-                                            void fetchRules();
-                                        }
-                                    "
-                                />
-                                <span>NSFW only</span>
-                            </label>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <Button size="sm" variant="outline" @click="onAddNewRule">Add New</Button>
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                :disabled="!selectedRule || !selectedRule?.id || ruleDeleting"
-                                @click="onDeleteRule"
-                                >Delete</Button
-                            >
-                        </div>
-                    </div>
-                    <div class="flex-1 overflow-y-auto">
-                        <ul>
-                            <li
-                                v-for="r in rulesList"
-                                :key="r.id"
-                                @click="onSelectRule(r)"
-                                class="cursor-pointer border-b p-2 text-sm hover:bg-muted"
-                                :class="[selectedRule?.id === r.id ? 'bg-muted' : '']"
-                            >
-                                <div class="flex items-center justify-between">
-                                    <div class="truncate font-medium">{{ r.name || 'Untitled' }}</div>
-                                    <div class="flex items-center gap-2 text-[11px]">
-                                        <span v-if="r.active" class="rounded bg-emerald-500 px-1.5 py-0.5 text-background">active</span>
-                                        <span v-if="r.nsfw" class="rounded bg-amber-500 px-1.5 py-0.5 text-background">nsfw</span>
-                                    </div>
-                                </div>
-                                <div class="mt-1 text-[11px] break-words text-muted-foreground">
-                                    {{ summarizeRule(r) }}
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </DialogScrollContent>
-    </Dialog>
 
     <!-- Full-size viewer (refactored) -->
     <FullSizeViewer
