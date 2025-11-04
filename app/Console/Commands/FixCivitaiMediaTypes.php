@@ -22,28 +22,34 @@ class FixCivitaiMediaTypes extends Command
             ->whereNotNull('path')
             ->select(['id', 'filename']);
 
-        $found = false;
+        $total = (clone $query)->count();
+        if ($total === 0) {
+            $this->info('No CivetAI files with mp4 URLs found.');
+
+            return self::SUCCESS;
+        }
+
+        $bar = $this->output->createProgressBar($total);
+        $bar->start();
+
         $dispatched = 0;
 
-        $query->chunkById(500, function ($files) use ($dryRun, &$found, &$dispatched) {
+        $query->chunkById(500, function ($files) use ($dryRun, &$dispatched, $bar) {
             foreach ($files as $file) {
-                $found = true;
-
                 if ($dryRun) {
                     $this->line("Would dispatch job for file {$file->id} ({$file->filename})");
+                    $bar->advance();
                     continue;
                 }
 
                 FixCivitaiMediaType::dispatch($file->id);
                 $dispatched++;
+                $bar->advance();
             }
         });
 
-        if (! $found) {
-            $this->info('No CivetAI files with mp4 URLs found.');
-
-            return self::SUCCESS;
-        }
+        $bar->finish();
+        $this->newLine();
 
         if ($dryRun) {
             $this->info('Dry run complete.');
