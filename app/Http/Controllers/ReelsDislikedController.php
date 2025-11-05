@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\File;
-use App\Models\Reaction;
 use App\Support\FilePreviewUrl;
+use App\Support\ListingOptions;
 use App\Support\PhotoContainers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\URL;
@@ -13,6 +14,8 @@ use Laravel\Scout\Builder as ScoutBuilder;
 
 class ReelsDislikedController extends Controller
 {
+    use InteractsWithListings;
+
     public function index(string $category)
     {
         $payload = $this->getData($category);
@@ -32,53 +35,22 @@ class ReelsDislikedController extends Controller
      */
     protected function getData(string $category): array
     {
-        $limit = max(1, min(200, (int) request('limit', 40)));
-        $page = max(1, (int) request('page', 1));
-        $sort = (string) request('sort', 'newest');
-        $randSeed = request('rand_seed');
+        $options = $this->resolveListingOptions([
+            'allowed_sorts' => ['newest', 'random'],
+            'default_sort' => 'newest',
+        ]);
 
-        $reasons = $this->mapReasons($category);
+        $userId = $this->currentUserId();
 
-        // Build Typesense filter_by string (for reference/debug only; actual filters are applied via Scout builder)
-        $filters = [];
-        $filters[] = 'mime_group:=video';
-        $filters[] = 'blacklisted:=true';
-        if ($category === 'auto') {
-            $filters[] = 'previewed_count:=0';
-        } else {
-            $filters[] = 'previewed_count:<5';
-        }
-        if ($reasons !== null && \count($reasons) > 0) {
-            $encoded = implode(',', array_map(fn ($r) => '"'.str_replace('"', '\\"', (string) $r).'"', $reasons));
-            $filters[] = "blacklist_reason:=[{$encoded}]";
-        }
+        $query = $this->buildScoutQuery($category, $options);
 
-        // Execute via Scout builder to keep full Scout pipeline
-        $query = $this->buildScoutQuery($category, $sort, $randSeed);
+        $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 
-        $paginator = $query->paginate($limit, 'page', $page);
+        $ids = $this->extractIdsFromPaginator($paginator);
+        $models = $this->loadFilesByIds($ids);
+        $reactions = $this->reactionsForUser($ids, $userId);
 
-        $items = collect($paginator->items() ?? [])->values();
-        $ids = $items->map(fn ($f) => (int) ($f['id'] ?? $f->id ?? 0))->filter()->values()->all();
-
-        // Eager-load full models with metadata in one query
-        $models = empty($ids)
-            ? collect([])
-            : File::with('metadata')->whereIn('id', $ids)->get()->keyBy('id');
-
-        // Build map of reactions for current user
-        $userId = optional(request()->user())->id;
-        $reactions = [];
-        if ($userId && ! empty($ids)) {
-            $reactions = Reaction::query()
-                ->whereIn('file_id', $ids)
-                ->where('user_id', $userId)
-                ->pluck('type', 'file_id')
-                ->toArray();
-        }
-
-        // Preserve original order from hits
-        $files = collect($ids)->map(function (int $id) use ($models, $reactions) {
+        $files = collect($ids)->map(function (int $id) use ($models, $reactions, $options) {
             $file = $models->get($id);
             if (! $file) {
                 return null;
@@ -87,7 +59,7 @@ class ReelsDislikedController extends Controller
             $remoteThumbnail = $file->thumbnail_url;
             $mime = (string) ($file->mime_type ?? '');
             $hasPath = (bool) $file->path;
-            $original = $hasPath ? (URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id])) : $file->url;
+            $original = $hasPath ? URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id]) : $file->url;
             $localPreview = FilePreviewUrl::for($file);
             $thumbnail = $localPreview ?? $remoteThumbnail;
             $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
@@ -108,9 +80,7 @@ class ReelsDislikedController extends Controller
                 $height = 512;
             }
 
-            $rt = $reactions[$id] ?? null;
-
-            $containers = PhotoContainers::forFile($file);
+            $reaction = $reactions[$id] ?? null;
 
             return [
                 'id' => $id,
@@ -119,35 +89,32 @@ class ReelsDislikedController extends Controller
                 'type' => $type,
                 'width' => $width,
                 'height' => $height,
-                'page' => (int) request('page', 1),
+                'page' => $options->page,
                 'has_path' => $hasPath,
                 'downloaded' => (bool) $file->downloaded,
                 'previewed_count' => (int) ($file->previewed_count ?? 0),
-                'containers' => $containers,
+                'containers' => PhotoContainers::forFile($file),
                 'metadata' => [
                     'prompt' => data_get(optional($file->metadata)->payload ?? [], 'prompt'),
                     'moderation' => data_get(optional($file->metadata)->payload ?? [], 'moderation'),
                 ],
-                'loved' => $rt === 'love',
-                'liked' => $rt === 'like',
-                'disliked' => $rt === 'dislike',
-                'funny' => $rt === 'funny',
+                'loved' => $reaction === 'love',
+                'liked' => $reaction === 'like',
+                'disliked' => $reaction === 'dislike',
+                'funny' => $reaction === 'funny',
             ];
         })->filter()->values()->all();
-
-        $current = (int) $paginator->currentPage();
-        $next = $paginator->hasMorePages() ? ($current + 1) : null;
 
         return [
             'files' => $files,
             'filter' => [
-                'page' => $current,
-                'next' => $next,
-                'limit' => $limit,
+                'page' => $options->page,
+                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
+                'limit' => $options->limit,
                 'data_url' => route('reels.disliked.data', ['category' => $category]),
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $sort,
-                'rand_seed' => ($sort === 'newest') ? null : (int) $randSeed,
+                'sort' => $options->sort,
+                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
             ],
         ];
     }
@@ -155,24 +122,20 @@ class ReelsDislikedController extends Controller
     /**
      * Build the Scout/Typesense query for disliked reels with all constraints.
      */
-    protected function buildScoutQuery(string $category, string $sort = 'newest', $randSeed = null): ScoutBuilder
+    protected function buildScoutQuery(string $category, ListingOptions $options): ScoutBuilder
     {
         $reasons = $this->mapReasons($category);
 
-        // Determine current user id using auth() to support non-HTTP contexts
-        $userId = (string) (auth()->id() ?? '');
+        $userId = (string) ($this->currentUserId() ?? '');
 
         $query = File::search('*')
             ->where('mime_group', 'video')
             ->where('blacklisted', true)
             ->where('not_found', false);
 
-        // previewed_count constraint depends on category
         if ($category === 'auto') {
-            // Only never-previewed items in Auto
             $query->whereIn('previewed_count', [0]);
         } else {
-            // For all other disliked categories, keep items previewed less than 5 times
             $query->whereIn('previewed_count', [0, 1, 2, 3, 4, 5]);
         }
 
@@ -184,18 +147,8 @@ class ReelsDislikedController extends Controller
             $query->whereNotIn('dislike_user_ids', [(string) $userId]);
         }
 
-        // Stable sort to avoid page loops on ties (support seeded random)
-        if ($sort === 'random') {
-            if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
-                try {
-                    $randSeed = random_int(1, 2147483646);
-                } catch (\Throwable $e) {
-                    $randSeed = mt_rand(1, 2147483646);
-                }
-            } else {
-                $randSeed = (int) $randSeed;
-            }
-            $query->orderBy('_rand('.$randSeed.')', 'desc');
+        if ($options->sort === 'random') {
+            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
         } else {
             $query->orderBy('blacklisted_at', 'desc')->orderBy('created_at', 'desc');
         }

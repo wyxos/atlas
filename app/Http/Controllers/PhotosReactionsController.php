@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\File;
-use App\Models\Reaction;
 use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 
 class PhotosReactionsController extends Controller
 {
+    use InteractsWithListings;
+
     protected const KIND_TO_FIELD = [
         'favorites' => 'love_user_ids',
         'liked' => 'like_user_ids',
@@ -48,77 +50,50 @@ class PhotosReactionsController extends Controller
 
     protected function getData(string $kind): array
     {
-        $limit = max(1, min(200, (int) request('limit', 40)));
-        $page = max(1, (int) request('page', 1));
-        $sort = strtolower((string) request('sort', 'newest'));
-        if (! in_array($sort, ['newest', 'oldest', 'random'], true)) {
-            $sort = 'newest';
-        }
-        $randSeed = request('rand_seed');
-        $resolvedRandSeed = null;
+        $options = $this->resolveListingOptions([
+            'allowed_sorts' => ['newest', 'oldest', 'random'],
+            'default_sort' => 'newest',
+        ]);
 
-        $userId = optional(request()->user())->id;
+        $userId = $this->currentUserId();
         $field = self::KIND_TO_FIELD[$kind];
 
-        // Base Scout search: images that exist locally
         $query = File::search('*')
             ->where('mime_group', 'image')
             ->where('has_path', true)
             ->where('blacklisted', false);
 
-        // Filter by the per-user reaction array; use driver-provided whereIn for array fields
         if ($userId) {
             $query->whereIn($field, [(string) $userId]);
         }
 
-        // Sorting (newest by default; support seeded random)
-        if ($sort === 'random') {
-            if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
-                try {
-                    $resolvedRandSeed = random_int(1, 2147483646);
-                } catch (\Throwable $e) {
-                    $resolvedRandSeed = mt_rand(1, 2147483646);
-                }
-            } else {
-                $resolvedRandSeed = (int) $randSeed;
-            }
-            $query->orderBy('_rand('.$resolvedRandSeed.')', 'desc');
-        } elseif ($sort === 'oldest') {
-            $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
-        } else {
-            $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
+        switch ($options->sort) {
+            case 'random':
+                $query->orderBy('_rand('.$options->randSeed.')', 'desc');
+                break;
+            case 'oldest':
+                $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
+                break;
+            default:
+                $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
+                break;
         }
 
-        $paginator = $query->paginate($limit, 'page', $page);
+        $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 
-        $items = collect($paginator->items() ?? [])->values();
-        $ids = $items->map(fn ($f) => (int) ($f['id'] ?? $f->id ?? 0))->filter()->values()->all();
-
-        // Eager-load models + metadata
-        $models = empty($ids)
-            ? collect([])
-            : File::with('metadata')->whereIn('id', $ids)->get()->keyBy('id');
-
-        // Build map of reactions for current user to populate flags
-        $reactions = [];
-        if ($userId && ! empty($ids)) {
-            $reactions = Reaction::query()
-                ->whereIn('file_id', $ids)
-                ->where('user_id', $userId)
-                ->pluck('type', 'file_id')
-                ->toArray();
-        }
+        $ids = $this->extractIdsFromPaginator($paginator);
+        $models = $this->loadFilesByIds($ids);
+        $reactions = $this->reactionsForUser($ids, $userId);
 
         $serviceCache = [];
 
-        // Preserve TS order
-        $files = collect($ids)->map(function (int $id) use ($models, $reactions, $page, &$serviceCache) {
+        $files = collect($ids)->map(function (int $id) use ($models, $reactions, $options, &$serviceCache) {
             $file = $models->get($id);
 
             return PhotoListingFormatter::format(
                 $file,
                 $reactions,
-                $page,
+                $options->page,
                 static fn (File $file, string $url, array &$cache): string => $url,
                 $serviceCache
             );
@@ -127,14 +102,14 @@ class PhotosReactionsController extends Controller
         return [
             'files' => $files,
             'filter' => [
-                'page' => $page,
-                'next' => $paginator->hasMorePages() ? ($page + 1) : null,
-                'limit' => $limit,
+                'page' => $options->page,
+                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
+                'limit' => $options->limit,
                 'data_url' => route('photos.reactions.data', ['kind' => $kind]),
                 'title' => self::KIND_TITLES[$kind] ?? ucfirst($kind),
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $sort,
-                'rand_seed' => $sort === 'random' && $resolvedRandSeed !== null ? (int) $resolvedRandSeed : null,
+                'sort' => $options->sort,
+                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
             ],
         ];
     }

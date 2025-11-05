@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\DecoratesRemoteUrls;
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\File;
-use App\Models\Reaction;
 use App\Services\Plugin\PluginServiceResolver;
+use App\Support\ListingOptions;
 use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
@@ -14,6 +15,7 @@ use Laravel\Scout\Builder as ScoutBuilder;
 class PhotosDislikedController extends Controller
 {
     use DecoratesRemoteUrls;
+    use InteractsWithListings;
 
     public function __construct(private PluginServiceResolver $serviceResolver) {}
 
@@ -36,75 +38,31 @@ class PhotosDislikedController extends Controller
      */
     protected function getData(string $category): array
     {
-        $limit = max(1, min(200, (int) request('limit', 40)));
-        $page = max(1, (int) request('page', 1));
-        $sort = strtolower((string) request('sort', 'newest'));
-        if (! in_array($sort, ['newest', 'oldest', 'random'], true)) {
-            $sort = 'newest';
-        }
-        $randSeed = request('rand_seed');
+        $options = $this->resolveListingOptions([
+            'allowed_sorts' => ['newest', 'oldest', 'random'],
+            'default_sort' => 'newest',
+        ]);
 
-        $reasons = $this->mapReasons($category);
+        $userId = $this->currentUserId();
 
-        // Build Typesense filter_by string (for reference/debug only; actual filters are applied via Scout builder)
-        $filters = [];
-        $filters[] = 'mime_group:=image';
-        $filters[] = 'blacklisted:=true';
-        // previewed_count constraint depends on category
-        //        if ($category === 'auto') {
-        //            $filters[] = 'previewed_count:=0';
-        //        } else {
-        //            $filters[] = 'previewed_count:<5';
-        //        }
+        $query = $this->buildScoutQuery($category, $options);
 
-        if ($reasons !== null && \count($reasons) > 0) {
-            $encoded = implode(',', array_map(fn ($r) => '"'.str_replace('"', '\\"', (string) $r).'"', $reasons));
-            $filters[] = "blacklist_reason:=[{$encoded}]";
-        }
+        $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 
-        // Determine current user id using auth() to support non-HTTP contexts
-        $userId = (string) (auth()->id() ?? '');
-        if ($category === 'not-disliked' && $userId !== '') {
-            // Show blacklisted items that are NOT disliked by the current user (no reaction or other reactions ok)
-            $filters[] = 'dislike_user_ids:!= "'.$userId.'"';
-        }
+        $ids = $this->extractIdsFromPaginator($paginator);
+        $models = $this->loadFilesByIds($ids);
+        $reactions = $this->reactionsForUser($ids, $userId);
 
-        $filterBy = implode(' && ', $filters);
-
-        // Execute via Scout builder to keep full Scout pipeline
-        $query = $this->buildScoutQuery($category, $sort, $randSeed);
-
-        $paginator = $query->paginate($limit, 'page', $page);
-
-        $items = collect($paginator->items() ?? [])->values();
-        $ids = $items->map(fn ($f) => (int) ($f['id'] ?? $f->id ?? 0))->filter()->values()->all();
-
-        // Eager-load full models with metadata in one query
-        $models = empty($ids)
-            ? collect([])
-            : File::with('metadata')->whereIn('id', $ids)->get()->keyBy('id');
-
-        // Build map of reactions for current user
-        $reactions = [];
-        if ($userId && ! empty($ids)) {
-            $reactions = Reaction::query()
-                ->whereIn('file_id', $ids)
-                ->where('user_id', $userId)
-                ->pluck('type', 'file_id')
-                ->toArray();
-        }
-
-        // Preserve original order from hits
         $serviceCache = [];
 
-        $files = collect($ids)->map(function (int $id) use ($models, $reactions, &$serviceCache, $page) {
+        $files = collect($ids)->map(function (int $id) use ($models, $reactions, &$serviceCache, $options) {
             /** @var File|null $file */
             $file = $models->get($id);
 
             $formatted = PhotoListingFormatter::format(
                 $file,
                 $reactions,
-                $page,
+                $options->page,
                 fn (File $file, string $url, array &$cache): string => $this->decorateRemoteUrl($file, $url, $cache),
                 $serviceCache
             );
@@ -113,28 +71,23 @@ class PhotosDislikedController extends Controller
                 return null;
             }
 
-            $hasPath = (bool) $file->path;
-
             return array_merge($formatted, [
-                'has_path' => $hasPath,
+                'has_path' => (bool) $file->path,
                 'downloaded' => (bool) $file->downloaded,
                 'previewed_count' => (int) ($file->previewed_count ?? 0),
             ]);
         })->filter()->values()->all();
 
-        $current = (int) $paginator->currentPage();
-        $next = $paginator->hasMorePages() ? ($current + 1) : null;
-
         return [
             'files' => $files,
             'filter' => [
-                'page' => $current,
-                'next' => $next,
-                'limit' => $limit,
+                'page' => $options->page,
+                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
+                'limit' => $options->limit,
                 'data_url' => route('photos.disliked.data', ['category' => $category]),
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $sort,
-                'rand_seed' => ($sort === 'random') ? (int) $randSeed : null,
+                'sort' => $options->sort,
+                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
             ],
         ];
     }
@@ -142,24 +95,20 @@ class PhotosDislikedController extends Controller
     /**
      * Build the Scout/Typesense query for disliked photos with all constraints.
      */
-    protected function buildScoutQuery(string $category, string $sort = 'newest', $randSeed = null): ScoutBuilder
+    protected function buildScoutQuery(string $category, ListingOptions $options): ScoutBuilder
     {
         $reasons = $this->mapReasons($category);
 
-        // Determine current user id using auth() to support non-HTTP contexts
-        $userId = (string) (auth()->id() ?? '');
+        $userId = (string) ($this->currentUserId() ?? '');
 
         $query = File::search('*')
             ->where('mime_group', 'image')
             ->where('blacklisted', true)
             ->where('not_found', false);
 
-        // previewed_count constraint depends on category
         if ($category === 'auto') {
-            // Only never-previewed items in Auto
             $query->whereIn('previewed_count', [0]);
         } else {
-            // For all other disliked categories, keep items previewed less than 5 times
             $query->whereIn('previewed_count', [0, 1, 2, 3, 4]);
         }
 
@@ -171,18 +120,10 @@ class PhotosDislikedController extends Controller
             $query->whereNotIn('dislike_user_ids', [(string) $userId]);
         }
 
-        // Stable sort to avoid page loops on ties (support seeded random)
+        $sort = $options->sort;
+
         if ($sort === 'random') {
-            if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
-                try {
-                    $randSeed = random_int(1, 2147483646);
-                } catch (\Throwable $e) {
-                    $randSeed = mt_rand(1, 2147483646);
-                }
-            } else {
-                $randSeed = (int) $randSeed;
-            }
-            $query->orderBy('_rand('.$randSeed.')', 'desc');
+            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
         } elseif ($sort === 'oldest') {
             $query->orderBy('blacklisted_at', 'asc')->orderBy('created_at', 'asc');
         } else {

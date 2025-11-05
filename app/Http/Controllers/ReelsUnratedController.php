@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\File;
 use App\Support\FilePreviewUrl;
 use App\Support\PhotoContainers;
@@ -11,6 +12,8 @@ use Inertia\Inertia;
 
 class ReelsUnratedController extends Controller
 {
+    use InteractsWithListings;
+
     public function index()
     {
         $payload = $this->getData();
@@ -25,55 +28,36 @@ class ReelsUnratedController extends Controller
 
     protected function getData(): array
     {
-        $limit = max(1, min(200, (int) request('limit', 40)));
-        $page = max(1, (int) request('page', 1));
-        $sort = (string) request('sort', 'newest');
-        $randSeed = request('rand_seed');
+        $options = $this->resolveListingOptions([
+            'allowed_sorts' => ['newest', 'oldest', 'random'],
+            'default_sort' => 'newest',
+        ]);
 
-        // Scout-only search (Typesense): videos that are not blacklisted
-        $userId = optional(request()->user())->id;
+        $userId = $this->currentUserId();
 
         $query = File::search('*')
             ->where('mime_group', 'video')
-            // ->where('has_path', true) // optional for unrated — allow remote-only items if desired
             ->where('blacklisted', false);
 
-        if ($sort === 'random') {
-            if (! is_numeric($randSeed) || (int) $randSeed <= 0) {
-                try {
-                    $randSeed = random_int(1, 2147483646);
-                } catch (\Throwable $e) {
-                    $randSeed = mt_rand(1, 2147483646);
-                }
-            } else {
-                $randSeed = (int) $randSeed;
-            }
-            $query->orderBy('_rand('.$randSeed.')', 'desc');
-        } elseif ($sort === 'oldest') {
+        if ($options->sort === 'random') {
+            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
+        } elseif ($options->sort === 'oldest') {
             $query->orderBy('created_at', 'asc');
         } else {
             $query->orderBy('created_at', 'desc');
         }
 
         if ($userId) {
-            // Typesense array NOT ANY OF for per-user unrated
             $query->whereNotIn('reacted_user_ids', [(string) $userId]);
         }
 
-        $paginator = $query->paginate($limit, 'page', $page);
+        $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 
-        $items = collect($paginator->items() ?? [])->values();
-        $ids = $items->map(fn ($f) => (int) ($f['id'] ?? $f->id ?? 0))->filter()->values()->all();
+        $ids = $this->extractIdsFromPaginator($paginator);
+        $models = $this->loadFilesByIds($ids);
 
-        // Eager-load full models with metadata in one query
-        $models = empty($ids)
-            ? collect([])
-            : File::with('metadata')->whereIn('id', $ids)->get()->keyBy('id');
-
-        // Preserve original order from hits
         $files = collect($ids)
-            ->map(function (int $id) use ($models) {
-                /** @var File $file */
+            ->map(function (int $id) use ($models, $options) {
                 $file = $models->get($id);
                 if (! $file) {
                     return null;
@@ -82,7 +66,7 @@ class ReelsUnratedController extends Controller
                 $remoteThumbnail = $file->thumbnail_url;
                 $mime = (string) ($file->mime_type ?? '');
                 $hasPath = (bool) $file->path;
-                $original = $hasPath ? (URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id])) : $file->url;
+                $original = $hasPath ? URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id]) : $file->url;
                 $localPreview = FilePreviewUrl::for($file);
                 $thumbnail = $localPreview ?? $remoteThumbnail;
                 $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
@@ -110,9 +94,8 @@ class ReelsUnratedController extends Controller
                     'type' => $type,
                     'width' => $width,
                     'height' => $height,
-                    'page' => (int) request('page', 1),
+                    'page' => $options->page,
                     'containers' => PhotoContainers::forFile($file),
-                    // By definition of unrated, all reaction flags are false
                     'loved' => false,
                     'liked' => false,
                     'disliked' => false,
@@ -126,13 +109,13 @@ class ReelsUnratedController extends Controller
         return [
             'files' => $files,
             'filter' => [
-                'page' => $page,
-                'next' => $paginator->hasMorePages() ? ($page + 1) : null,
-                'limit' => $limit,
+                'page' => $options->page,
+                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
+                'limit' => $options->limit,
                 'data_url' => route('reels.unrated.data'),
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $sort,
-                'rand_seed' => ($sort === 'random') ? (int) $randSeed : null,
+                'sort' => $options->sort,
+                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
             ],
         ];
     }

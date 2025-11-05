@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\DecoratesRemoteUrls;
+use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Jobs\DeleteBlacklistedFileJob;
 use App\Models\File;
 use App\Models\FileMetadata;
@@ -11,6 +12,7 @@ use App\Services\BlacklistService;
 use App\Services\Moderation\Moderator;
 use App\Services\Plugin\PluginServiceResolver;
 use App\Support\FilePreviewUrl;
+use App\Support\ListingOptions;
 use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
@@ -20,6 +22,7 @@ use Inertia\Inertia;
 class PhotosUnratedController extends Controller
 {
     use DecoratesRemoteUrls;
+    use InteractsWithListings;
 
     public function __construct(private PluginServiceResolver $serviceResolver) {}
 
@@ -37,29 +40,12 @@ class PhotosUnratedController extends Controller
 
     protected function getData(): array
     {
-        $limit = max(1, min(200, (int) request('limit', 40)));
-        $page = max(1, (int) request('page', 1));
-        $sort = strtolower((string) request('sort', 'newest'));
-        if (! in_array($sort, ['newest', 'oldest', 'random'], true)) {
-            $sort = 'newest';
-        }
+        $options = $this->resolveListingOptions([
+            'allowed_sorts' => ['newest', 'oldest', 'random'],
+            'default_sort' => 'newest',
+        ]);
 
-        $randSeedInput = request('rand_seed');
-
-        $randSeed = null;
-        if ($sort === 'random') {
-            if (! is_numeric($randSeedInput) || (int) $randSeedInput <= 0) {
-                try {
-                    $randSeed = random_int(1, 2147483646);
-                } catch (\Throwable $e) {
-                    $randSeed = mt_rand(1, 2147483646);
-                }
-            } else {
-                $randSeed = (int) $randSeedInput;
-            }
-        }
-
-        $userId = optional(request()->user())->id;
+        $userId = $this->currentUserId();
 
         $aggregateModeration = [
             'blacklisted_count' => 0,
@@ -68,7 +54,7 @@ class PhotosUnratedController extends Controller
         ];
 
         $maxCycles = 3;
-        $result = $this->performSearch($limit, $page, $sort, $randSeed, $userId);
+        $result = $this->performSearch($options, $userId);
 
         for ($cycle = 0; $cycle < $maxCycles; $cycle++) {
             $moderationResult = $this->moderateFiles($result['models']);
@@ -93,22 +79,22 @@ class PhotosUnratedController extends Controller
                 break;
             }
 
-            $result = $this->performSearch($limit, $page, $sort, $randSeed, $userId);
+            $result = $this->performSearch($options, $userId);
         }
 
-        $files = $this->formatFiles($result['ids'], $result['models'], $page);
+        $files = $this->formatFiles($result['ids'], $result['models'], $options);
         $paginator = $result['paginator'];
 
         return [
             'files' => $files,
             'filter' => [
-                'page' => $page,
-                'next' => $paginator->hasMorePages() ? ($page + 1) : null,
-                'limit' => $limit,
+                'page' => $options->page,
+                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
+                'limit' => $options->limit,
                 'data_url' => route('photos.unrated.data'),
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $sort,
-                'rand_seed' => $sort === 'random' ? $randSeed : null,
+                'sort' => $options->sort,
+                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
             ],
             'moderation' => [
                 'blacklisted_count' => (int) $aggregateModeration['blacklisted_count'],
@@ -123,17 +109,16 @@ class PhotosUnratedController extends Controller
      *
      * @return array{paginator:\Illuminate\Contracts\Pagination\LengthAwarePaginator, ids:array<int>, models:Collection<int, File>}
      */
-    protected function performSearch(int $limit, int $page, string $sort, ?int $randSeed, ?int $userId): array
+    protected function performSearch(ListingOptions $options, ?int $userId): array
     {
         $query = File::search('*')
             ->where('mime_group', 'image')
             ->where('not_found', false)
             ->where('blacklisted', false);
 
-        if ($sort === 'random') {
-            $seed = $randSeed ?? 1;
-            $query->orderBy('_rand('.$seed.')', 'desc');
-        } elseif ($sort === 'oldest') {
+        if ($options->sort === 'random') {
+            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
+        } elseif ($options->sort === 'oldest') {
             $query->orderBy('created_at', 'asc');
         } else {
             $query->orderBy('created_at', 'desc');
@@ -143,23 +128,16 @@ class PhotosUnratedController extends Controller
             $query->whereNotIn('reacted_user_ids', [(string) $userId]);
         }
 
-        $paginator = $query->paginate($limit, 'page', $page);
+        $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 
-        $items = collect($paginator->items() ?? [])->values();
-        $ids = $items->map(fn ($f) => (int) ($f['id'] ?? $f->id ?? 0))->filter()->values()->all();
+        $ids = $this->extractIdsFromPaginator($paginator);
 
-        $modelsById = empty($ids)
-            ? collect([])
-            : File::with('metadata')->whereIn('id', $ids)->get()->keyBy('id');
+        $modelsById = $this->loadFilesByIds($ids);
 
-        $orderedModels = collect();
-        foreach ($ids as $id) {
-            /** @var File|null $model */
-            $model = $modelsById->get($id);
-            if ($model) {
-                $orderedModels->push($model);
-            }
-        }
+        $orderedModels = collect($ids)
+            ->map(static fn (int $id) => $modelsById->get($id))
+            ->filter()
+            ->values();
 
         return [
             'paginator' => $paginator,
@@ -345,7 +323,7 @@ class PhotosUnratedController extends Controller
         return array_values($indexed);
     }
 
-    protected function formatFiles(array $orderedIds, Collection $models, int $page): array
+    protected function formatFiles(array $orderedIds, Collection $models, ListingOptions $options): array
     {
         if (empty($orderedIds)) {
             return [];
@@ -356,14 +334,14 @@ class PhotosUnratedController extends Controller
         $serviceCache = [];
 
         return collect($orderedIds)
-            ->map(function (int $id) use ($modelsById, $page, &$serviceCache) {
+            ->map(function (int $id) use ($modelsById, $options, &$serviceCache) {
                 /** @var File|null $file */
                 $file = $modelsById->get($id);
 
                 return PhotoListingFormatter::format(
                     $file,
                     [],
-                    $page,
+                    $options->page,
                     fn (File $file, string $url, array &$cache): string => $this->decorateRemoteUrl($file, $url, $cache),
                     $serviceCache
                 );

@@ -100,6 +100,15 @@ vi.mock('@inertiajs/vue3', () => {
         Head,
         useForm,
         router,
+        usePage: () => ({
+            props: {
+                auth: {
+                    user: {
+                        is_admin: true,
+                    },
+                },
+            },
+        }),
     };
 });
 
@@ -203,7 +212,7 @@ describe('PhotosIndex manual filter workflow', () => {
         await nextTick();
 
         expect(scrollerSpies.reset).toHaveBeenCalledTimes(1);
-        expect(scrollerSpies.loadNext).toHaveBeenCalledTimes(1);
+        expect(scrollerSpies.loadPage).toHaveBeenCalledTimes(1);
         expect(wrapper.vm.filtersDirty).toBe(false);
         expect(wrapper.vm.filtersBusy).toBe(false);
     });

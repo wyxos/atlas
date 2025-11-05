@@ -7,6 +7,15 @@ import Index from '@/pages/photos/Index.vue';
 vi.mock('@inertiajs/vue3', () => ({
   Head: { name: 'Head', template: '<template><slot /></template>' },
   useForm: (initial: any) => ({ ...initial, data: () => ({ ...initial }), defaults: () => {}, reset: () => {} }) as any,
+  usePage: () => ({
+    props: {
+      auth: {
+        user: {
+          is_admin: true,
+        },
+      },
+    },
+  }),
 }));
 
 // Provide a minimal Masonry stub that supports v-model:items and scroller methods
