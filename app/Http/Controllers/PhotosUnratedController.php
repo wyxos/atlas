@@ -10,6 +10,7 @@ use App\Models\ModerationRule;
 use App\Services\BlacklistService;
 use App\Services\Moderation\Moderator;
 use App\Services\Plugin\PluginServiceResolver;
+use App\Support\FilePreviewUrl;
 use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
