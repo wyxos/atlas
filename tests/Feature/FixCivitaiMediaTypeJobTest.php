@@ -25,7 +25,10 @@ it('detects actual mime type from disk and updates image files', function () {
 
     expect($file->filename)->toBe('sample.webp')
         ->and($file->path)->toBe('downloads/sample.webp')
-        ->and($file->mime_type)->toBe('image/webp');
+        ->and($file->mime_type)->toBe('image/webp')
+        ->and($file->ext)->toBe('webp')
+        ->and($file->not_found)->toBeFalse()
+        ->and($file->size)->toBe(strlen($webpBody));
 });
 
 it('detects video content and preserves mp4 extension', function () {
@@ -49,7 +52,10 @@ it('detects video content and preserves mp4 extension', function () {
 
     expect($file->filename)->toBe('video.mp4')
         ->and($file->path)->toBe('downloads/video.mp4')
-        ->and($file->mime_type)->toBe('video/mp4');
+        ->and($file->mime_type)->toBe('video/mp4')
+        ->and($file->ext)->toBe('mp4')
+        ->and($file->not_found)->toBeFalse()
+        ->and($file->size)->toBe(strlen($mp4Body));
 });
 
 it('updates mp4 labelled downloads that contain png data', function () {
@@ -73,7 +79,10 @@ it('updates mp4 labelled downloads that contain png data', function () {
 
     expect($file->filename)->toBe('sample.png')
         ->and($file->path)->toBe('downloads/sample.png')
-        ->and($file->mime_type)->toBe('image/png');
+        ->and($file->mime_type)->toBe('image/png')
+        ->and($file->ext)->toBe('png')
+        ->and($file->not_found)->toBeFalse()
+        ->and($file->size)->toBe(strlen($pngBody));
 });
 
 it('processes all civitai files when invoked without a specific id', function () {
@@ -109,9 +118,11 @@ it('processes all civitai files when invoked without a specific id', function ()
 
     expect($first->filename)->toBe('a.webp')
         ->and($first->path)->toBe('downloads/a.webp')
-        ->and($first->mime_type)->toBe('image/webp');
+        ->and($first->mime_type)->toBe('image/webp')
+        ->and($first->ext)->toBe('webp');
 
     expect($second->filename)->toBe('b.mp4')
         ->and($second->path)->toBe('downloads/b.mp4')
-        ->and($second->mime_type)->toBe('video/mp4');
+        ->and($second->mime_type)->toBe('video/mp4')
+        ->and($second->ext)->toBe('mp4');
 });

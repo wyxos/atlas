@@ -119,12 +119,24 @@ class FixCivitaiMediaType implements ShouldQueue
             'filename' => $newFilename,
             'path' => $path,
             'mime_type' => $mime,
+            'ext' => $extension,
+            'not_found' => false,
+            'size' => $this->fileSize($primaryDisk, $path),
         ])->saveQuietly();
 
         try {
             $file->searchable();
         } catch (\Throwable $e) {
             // ignore indexing errors
+        }
+    }
+
+    protected function fileSize(string $disk, string $path): ?int
+    {
+        try {
+            return Storage::disk($disk)->size($path);
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 
