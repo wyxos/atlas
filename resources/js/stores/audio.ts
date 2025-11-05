@@ -3,6 +3,7 @@ import { spotifyPlayer } from '@/sdk/spotifyPlayer';
 import axios from 'axios';
 import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
 import * as BrowseController from '@/actions/App/Http/Controllers/BrowseController';
+import { bus } from '@/lib/bus';
 
 // Minimal global audio player store and controls
 // Bare-minimum queue + playback to satisfy: enqueue all items, render current item in global player, and start playing.
@@ -28,6 +29,25 @@ const spotifyLastState = {
   uri: null as string | null,
   endFired: false,
 };
+
+let spotifyStartFallbackId: number | null = null;
+
+const SPOTIFY_AUTH_ERROR_MESSAGE = 'Spotify session expired';
+
+type WakeLockSentinelLike = {
+  released?: boolean;
+  release: () => Promise<void>;
+  addEventListener?: (type: 'release', listener: () => void) => void;
+};
+
+let wakeLockSentinel: WakeLockSentinelLike | null = null;
+let wakeLockPending = false;
+
+let silentAudioUrl: string | null = null;
+let htmlAudioUnlocked = false;
+let htmlAudioUnlocking = false;
+let resumeOnUserGesture = false;
+let unlockAudioElement: HTMLAudioElement | null = null;
 
 type SpotifyPlaybackErrorState = {
   trackId: number | null;
@@ -141,6 +161,7 @@ function skipTrackDueToMissingDuration(trackId: number | null, isSpotify: boolea
     audioStore.isPlaying = false;
     audioStore.currentTime = 0;
     audioStore.duration = 0;
+    void releaseWakeLock();
     return;
   }
   const nextIndex = Math.min(Math.max(0, idx), Math.max(0, (audioStore.queue as any[]).length - 1));
@@ -318,6 +339,7 @@ function confirmSpotifyCompletion(): void {
 }
 
 function applySpotifySnapshot(position: unknown, duration: unknown, pausedValue: unknown, currentUri: string | null, source: SpotifySnapshotSource = 'listener'): void {
+  clearSpotifyStartFallback();
   if (spotifyTargetUri && currentUri && currentUri !== spotifyTargetUri) {
     return;
   }
@@ -395,6 +417,91 @@ async function refreshSpotifySnapshot(): Promise<void> {
   } catch (stateErr) {
     console.warn('Spotify state refresh failed', stateErr);
   }
+}
+
+function clearSpotifyStartFallback(): void {
+  if (typeof window === 'undefined') {
+    spotifyStartFallbackId = null;
+    return;
+  }
+  if (spotifyStartFallbackId != null) {
+    window.clearTimeout(spotifyStartFallbackId);
+    spotifyStartFallbackId = null;
+  }
+}
+
+function scheduleSpotifyStartFallback(expectedTrackId: number | null, expectedUri: string | null): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  clearSpotifyStartFallback();
+  spotifyStartFallbackId = window.setTimeout(async () => {
+    spotifyStartFallbackId = null;
+    const current = audioStore.currentTrack as any;
+    if (!current || (typeof expectedTrackId === 'number' && current?.id !== expectedTrackId)) {
+      return;
+    }
+    if (!audioStore.isPlaying) {
+      return;
+    }
+    if (audioStore.spotifyPlaybackError) {
+      return;
+    }
+
+    const wasAwaiting = spotifyAwaitingFirstState;
+    try {
+      await refreshSpotifySnapshot();
+    } catch (err) {
+      console.warn('Spotify auto-advance fallback snapshot failed', err);
+    }
+
+    const stillCurrent = audioStore.currentTrack && (typeof expectedTrackId !== 'number' || (audioStore.currentTrack as any)?.id === expectedTrackId);
+    if (!stillCurrent) {
+      return;
+    }
+
+    const stillAwaiting = spotifyAwaitingFirstState;
+    const uriMatches = !expectedUri || spotifyLastState.uri === expectedUri;
+    const needsResume = (stillAwaiting && wasAwaiting) || (spotifyLastState.paused && uriMatches);
+    if (!needsResume) {
+      return;
+    }
+
+    try {
+      await spotifyPlayer.resume(audioStore.volume);
+      spotifyAwaitingFirstState = false;
+      spotifyLastState.paused = false;
+      spotifyLastState.reportedAt = Date.now();
+      audioStore.isPlaying = true;
+      startSpotifyTimer();
+      void ensureWakeLock();
+    } catch (resumeErr) {
+      console.warn('Spotify resume after background auto-advance failed', resumeErr);
+      handleSpotifyAuthInvalid('resume_failed');
+    }
+  }, 2000);
+}
+
+function handleSpotifyAuthInvalid(reason: string): void {
+  console.warn('Spotify authentication invalid', reason);
+  clearSpotifyStartFallback();
+  spotifyAwaitingFirstState = false;
+  spotifyTargetUri = null;
+  lastPlaybackTrackId = null;
+  spotifyLastState.paused = true;
+  spotifyLastState.endFired = false;
+  spotifyLastState.uri = null;
+  stopSpotifyTimer();
+  audioStore.isPlaying = false;
+  void releaseWakeLock();
+  try { void spotifyPlayer.pause(); } catch {}
+  try { void spotifyPlayer.destroy(); } catch {}
+  const currentId = (audioStore.currentTrack as any)?.id;
+  audioStore.spotifyPlaybackError = {
+    trackId: typeof currentId === 'number' ? currentId : null,
+    message: SPOTIFY_AUTH_ERROR_MESSAGE,
+    details: 'Reconnect Spotify in Settings to continue playback.',
+  };
 }
 
 // Track IDs we've already reported as missing in this session to avoid duplicate POSTs
@@ -508,6 +615,199 @@ export const audioStore = reactive({
   queuePlaylistId: null as number | null,
   spotifyPlaybackError: null as SpotifyPlaybackErrorState | null,
 });
+
+function hasWakeLockSupport(): boolean {
+  return typeof navigator !== 'undefined' && typeof (navigator as any).wakeLock?.request === 'function';
+}
+
+function isDocumentHidden(): boolean {
+  return typeof document !== 'undefined' && !!document.hidden;
+}
+
+async function ensureWakeLock(): Promise<void> {
+  if (!audioStore.isPlaying) return;
+  if (isDocumentHidden()) return;
+  if (!hasWakeLockSupport()) return;
+  if (wakeLockSentinel || wakeLockPending) return;
+  try {
+    wakeLockPending = true;
+    const sentinel = await (navigator as any).wakeLock.request('screen');
+    wakeLockSentinel = sentinel as WakeLockSentinelLike;
+    wakeLockSentinel.addEventListener?.('release', () => {
+      wakeLockSentinel = null;
+      if (!isDocumentHidden() && audioStore.isPlaying) {
+        void ensureWakeLock();
+      }
+    });
+  } catch (err) {
+    console.debug('Wake lock request failed', err);
+  } finally {
+    wakeLockPending = false;
+  }
+}
+
+async function releaseWakeLock(): Promise<void> {
+  if (!wakeLockSentinel) return;
+  try {
+    await wakeLockSentinel.release();
+  } catch (err) {
+    console.debug('Wake lock release failed', err);
+  } finally {
+    wakeLockSentinel = null;
+  }
+}
+
+function ensureSilentAudioUrl(): string | null {
+  if (silentAudioUrl !== null) {
+    return silentAudioUrl;
+  }
+
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const sampleRate = 44100;
+    const durationSeconds = 0.1;
+    const frameCount = Math.max(1, Math.round(sampleRate * durationSeconds));
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const blockAlign = numChannels * (bitsPerSample / 8);
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = frameCount * blockAlign;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+    let offset = 0;
+    const writeString = (value: string) => {
+      for (let i = 0; i < value.length; i += 1) {
+        view.setUint8(offset, value.charCodeAt(i));
+        offset += 1;
+      }
+    };
+    const writeUint32 = (value: number) => {
+      view.setUint32(offset, value, true);
+      offset += 4;
+    };
+    const writeUint16 = (value: number) => {
+      view.setUint16(offset, value, true);
+      offset += 2;
+    };
+
+    writeString('RIFF');
+    writeUint32(36 + dataSize);
+    writeString('WAVE');
+    writeString('fmt ');
+    writeUint32(16);
+    writeUint16(1);
+    writeUint16(numChannels);
+    writeUint32(sampleRate);
+    writeUint32(byteRate);
+    writeUint16(blockAlign);
+    writeUint16(bitsPerSample);
+    writeString('data');
+    writeUint32(dataSize);
+
+    const bytes = new Uint8Array(buffer);
+
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      silentAudioUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+      return silentAudioUrl;
+    }
+
+    let base64: string | null = null;
+    if (typeof btoa === 'function') {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i] ?? 0);
+      }
+      base64 = btoa(binary);
+    } else if (typeof Buffer !== 'undefined') {
+      base64 = Buffer.from(bytes).toString('base64');
+    }
+
+    if (base64) {
+      silentAudioUrl = `data:audio/wav;base64,${base64}`;
+      return silentAudioUrl;
+    }
+  } catch (err) {
+    console.debug('Failed to prepare silent audio url', err);
+  }
+
+  return null;
+}
+
+function unlockHtmlAudio(): void {
+  if (htmlAudioUnlocked || htmlAudioUnlocking) {
+    return;
+  }
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const url = ensureSilentAudioUrl();
+  if (!url) {
+    return;
+  }
+
+  htmlAudioUnlocking = true;
+
+  if (!unlockAudioElement) {
+    try {
+      unlockAudioElement = document.createElement('audio');
+      unlockAudioElement.setAttribute('data-audio-unlock', 'true');
+      unlockAudioElement.preload = 'auto';
+      unlockAudioElement.loop = false;
+      unlockAudioElement.autoplay = false;
+      unlockAudioElement.muted = true;
+      document.body?.appendChild(unlockAudioElement);
+    } catch (err) {
+      console.debug('Failed to create unlock audio element', err);
+      htmlAudioUnlocking = false;
+      unlockAudioElement = null;
+      return;
+    }
+  }
+
+  const element = unlockAudioElement;
+  if (!element) {
+    htmlAudioUnlocking = false;
+    return;
+  }
+
+  const cleanup = () => {
+    htmlAudioUnlocking = false;
+    try {
+      element.pause();
+    } catch {}
+    element.removeAttribute('src');
+    try {
+      element.load();
+    } catch {}
+  };
+
+  try {
+    element.muted = true;
+    element.src = url;
+    const result = element.play();
+    if (result && typeof result.then === 'function') {
+      result
+        .then(() => {
+          htmlAudioUnlocked = true;
+          cleanup();
+        })
+        .catch(() => {
+          cleanup();
+        });
+    } else {
+      htmlAudioUnlocked = true;
+      cleanup();
+    }
+  } catch (err) {
+    console.debug('Silent audio unlock failed', err);
+    cleanup();
+  }
+}
+
 
 function isSpotifyTrack(track: any | null): boolean {
   if (!track) return false;
@@ -648,6 +948,7 @@ async function playInternal(): Promise<void> {
 
 // Spotify branch
   if (isSpotifyTrack(audioStore.currentTrack)) {
+    const currentId = (audioStore.currentTrack as any)?.id as number | undefined;
     // Ensure we have URI; if not, fetch details again
     let uri = spotifyUriFor(audioStore.currentTrack);
     if (!uri) {
@@ -700,6 +1001,8 @@ async function playInternal(): Promise<void> {
         stopSpotifyTimer();
         await spotifyPlayer.resume(audioStore.volume);
         audioStore.isPlaying = true;
+        void ensureWakeLock();
+        clearSpotifyStartFallback();
         return;
       }
 
@@ -720,9 +1023,12 @@ async function playInternal(): Promise<void> {
       spotifyLastState.uri = uri;
       spotifyLastState.endFired = false;
       audioStore.isPlaying = true;
+      void ensureWakeLock();
       lastPlaybackTrackId = (audioStore.currentTrack as any)?.id ?? null;
+      scheduleSpotifyStartFallback(typeof currentId === 'number' ? currentId : null, uri);
     } catch (err: any) {
       spotifyAwaitingFirstState = false;
+      clearSpotifyStartFallback();
       const status = (err && (err as any).status) || 0;
       if (status === 403) {
         // Try relinking once on 403 before surfacing error
@@ -731,6 +1037,7 @@ async function playInternal(): Promise<void> {
           if (nextUri && nextUri.uri && nextUri.uri !== uri) {
             await spotifyPlayer.playUri(nextUri.uri, 0, { initialVolume: audioStore.volume });
             audioStore.isPlaying = true;
+            void ensureWakeLock();
             return;
           }
         } catch {}
@@ -743,6 +1050,7 @@ async function playInternal(): Promise<void> {
         spotifyLastState.endFired = false;
         pendingSeekMs = null;
         audioStore.isPlaying = false;
+        void releaseWakeLock();
         const { message, details } = parseSpotifyPlaybackError(err);
         console.warn('Spotify 403 during play', { id: curId, message, details });
         audioStore.spotifyPlaybackError = {
@@ -752,9 +1060,15 @@ async function playInternal(): Promise<void> {
         };
         return;
       }
+      if (status === 401) {
+        handleSpotifyAuthInvalid('play_401');
+        return;
+      }
       console.error('Spotify play failed:', err);
       audioStore.isPlaying = false;
       stopSpotifyTimer();
+      void releaseWakeLock();
+      clearSpotifyStartFallback();
       try {
         const curId = (audioStore.currentTrack as any)?.id as number | undefined;
         const { message, details } = parseSpotifyPlaybackError(err);
@@ -773,17 +1087,25 @@ async function playInternal(): Promise<void> {
     try { await spotifyPlayer.pause(); } catch {}
     await audio.play();
     audioStore.isPlaying = true;
+    void ensureWakeLock();
     startHtmlProgress();
   } catch (err: any) {
     const name = String(err?.name || '');
     const message = String(err?.message || '');
-    const text = `${name} ${message}`;
-    if (text.includes('AbortError') || /interrupted by a call to pause/i.test(text)) {
+    const combined = `${name} ${message}`;
+    if (/AbortError/i.test(name) || /interrupted by a call to pause/i.test(combined)) {
       // Ignore transient AbortError caused by quick pause/src change races
       return;
     }
+    if (/NotAllowedError/i.test(name) || /user (gesture|activation)/i.test(combined) || /without user interaction/i.test(combined)) {
+      console.warn('Audio playback blocked by browser policy; awaiting user gesture');
+      audioStore.isPlaying = false;
+      void releaseWakeLock();
+      scheduleResumeAfterUserGesture();
+      return;
+    }
     // If no supported source (often 404 → decode error), auto-skip and flag missing
-    if (/NotSupportedError/i.test(text) || /no supported source/i.test(text) || /Failed to load because no supported source/i.test(text)) {
+    if (/NotSupportedError/i.test(name) || /no supported source/i.test(combined) || /Failed to load because no supported source/i.test(combined)) {
       // For local engine, only flag when we actually attempted a local stream for this id
       try {
         const id = (audioStore.currentTrack as any)?.id as number | undefined;
@@ -796,6 +1118,7 @@ async function playInternal(): Promise<void> {
     }
     console.error('Audio play failed:', err);
     audioStore.isPlaying = false;
+    void releaseWakeLock();
   }
 }
 
@@ -822,6 +1145,7 @@ export const audioActions = {
   },
   setQueueAndPlay(items: any[], startTrackId: number) {
     if (!Array.isArray(items) || items.length === 0) return;
+    unlockHtmlAudio();
     stopSpotifyTimer();
     audioStore.queue = [...items];
     const idx = audioStore.queue.findIndex((x: any) => x && x.id === startTrackId);
@@ -846,6 +1170,7 @@ export const audioActions = {
   },
 
   play() {
+    unlockHtmlAudio();
     if (isSpotifyTrack(audioStore.currentTrack)) {
       // Reset on external track change (id differs from last started)
       try {
@@ -879,12 +1204,16 @@ export const audioActions = {
       spotifyLastState.paused = true;
       stopSpotifyTimer();
       audioStore.isPlaying = false;
+      clearSpotifyStartFallback();
+      void releaseWakeLock();
       return;
     }
     const audio = getAudio();
     audio.pause();
     stopHtmlProgress();
     audioStore.isPlaying = false;
+    clearSpotifyStartFallback();
+    void releaseWakeLock();
   },
 
   toggle() {
@@ -902,8 +1231,10 @@ export const audioActions = {
   next() {
     if (isSpotifyTrack(audioStore.currentTrack)) { /* handled by queue advance below */ }
     stopSpotifyTimer();
+    clearSpotifyStartFallback();
     if (audioStore.queue.length === 0) {
       audioStore.isPlaying = false;
+      void releaseWakeLock();
       return;
     }
     // Reset seekbar immediately
@@ -934,6 +1265,7 @@ export const audioActions = {
         audioStore.currentIndex = Math.min(Math.max(0, audioStore.currentIndex), Math.max(0, audioStore.queue.length - 1));
         audioStore.currentTrack = audioStore.queue[audioStore.currentIndex] || null;
         audioStore.isPlaying = false;
+        void releaseWakeLock();
       }
     }
   },
@@ -941,6 +1273,7 @@ export const audioActions = {
   previous() {
     if (isSpotifyTrack(audioStore.currentTrack)) { /* handled by queue advance below */ }
     stopSpotifyTimer();
+    clearSpotifyStartFallback();
     if (audioStore.queue.length === 0) return;
     // Reset seekbar immediately
     audioStore.currentTime = 0;
@@ -1067,12 +1400,34 @@ export const audioActions = {
       return;
     }
     audioStore.isPlaying = false;
+    void releaseWakeLock();
   },
 
   dismissSpotifyPlaybackError() {
     audioStore.spotifyPlaybackError = null;
   },
 };
+
+function scheduleResumeAfterUserGesture(): void {
+  if (resumeOnUserGesture || typeof window === 'undefined') {
+    return;
+  }
+
+  resumeOnUserGesture = true;
+  const handler = () => {
+    window.removeEventListener('pointerdown', handler, true);
+    window.removeEventListener('keydown', handler, true);
+    resumeOnUserGesture = false;
+    queueMicrotask(() => {
+      if (!audioStore.isPlaying && audioStore.currentTrack && !audioStore.spotifyPlaybackError) {
+        void audioActions.play();
+      }
+    });
+  };
+
+  window.addEventListener('pointerdown', handler, true);
+  window.addEventListener('keydown', handler, true);
+}
 
 onSpotifyTrackComplete = () => {
   audioActions.next();
@@ -1082,6 +1437,11 @@ onSpotifyTrackComplete = () => {
 // This catches track completion that happened while in background
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      void releaseWakeLock();
+    } else if (audioStore.isPlaying) {
+      void ensureWakeLock();
+    }
     if (!document.hidden && isSpotifyTrack(audioStore.currentTrack)) {
       void (async () => {
         try {
@@ -1105,3 +1465,13 @@ if (typeof document !== 'undefined') {
     }
   });
 }
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    void releaseWakeLock();
+  });
+}
+
+bus.on('spotify:auth:invalid', ({ reason }) => {
+  handleSpotifyAuthInvalid(reason ?? 'unknown');
+});

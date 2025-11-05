@@ -4,6 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function overrideAudioWithTracker() {
     const Base: any = (globalThis as any).Audio;
+    const mediaProto = (globalThis as any).HTMLMediaElement?.prototype ?? null;
+    const audioProto = (globalThis as any).HTMLAudioElement?.prototype ?? null;
+    const originalPlay = mediaProto?.play ?? null;
+    const originalPause = mediaProto?.pause ?? null;
+    const originalLoad = mediaProto?.load ?? null;
+    const originalAudioPlay = audioProto?.play ?? null;
+    const originalAudioPause = audioProto?.pause ?? null;
+    const originalAudioLoad = audioProto?.load ?? null;
+    if (mediaProto) {
+        mediaProto.play = vi.fn().mockResolvedValue(undefined);
+        mediaProto.pause = vi.fn().mockImplementation(() => {});
+        mediaProto.load = vi.fn().mockImplementation(() => {});
+    }
+    if (audioProto) {
+        audioProto.play = vi.fn().mockResolvedValue(undefined);
+        audioProto.pause = vi.fn().mockImplementation(() => {});
+        audioProto.load = vi.fn().mockImplementation(() => {});
+    }
     class TrackedAudio extends Base {
         static last: any;
         constructor() {
@@ -14,6 +32,16 @@ function overrideAudioWithTracker() {
     (globalThis as any).Audio = TrackedAudio as any;
     return () => {
         (globalThis as any).Audio = Base;
+        if (mediaProto) {
+            mediaProto.play = originalPlay as any;
+            mediaProto.pause = originalPause as any;
+            mediaProto.load = originalLoad as any;
+        }
+        if (audioProto) {
+            audioProto.play = originalAudioPlay as any;
+            audioProto.pause = originalAudioPause as any;
+            audioProto.load = originalAudioLoad as any;
+        }
     };
 }
 
@@ -356,6 +384,136 @@ describe('audio store', () => {
         expect(String(last.src)).toContain('/audio/stream/2');
         // Playing flag should be true
         expect(audioStore.isPlaying).toBe(true);
+
+        restoreAudio();
+    });
+
+    it('requests and releases a wake lock around playback when supported', async () => {
+        vi.resetModules();
+        const restoreAudio = overrideAudioWithTracker();
+        const originalNavigator = (globalThis as any).navigator;
+        const release = vi.fn().mockResolvedValue(undefined);
+        const request = vi.fn().mockResolvedValue({
+            release,
+            addEventListener: vi.fn(),
+        });
+        (globalThis as any).navigator = {
+            wakeLock: {
+                request,
+            },
+        } as any;
+
+        try {
+            const { audioActions } = await importStore();
+            audioActions.setQueueAndPlay([{ id: 901, duration: 120 }] as any[], 901);
+            await flushMicrotasks();
+            await flushMicrotasks();
+
+            expect(request).toHaveBeenCalledWith('screen');
+
+            audioActions.pause();
+            await flushMicrotasks();
+
+            expect(release).toHaveBeenCalled();
+        } finally {
+            if (originalNavigator === undefined) {
+                delete (globalThis as any).navigator;
+            } else {
+                (globalThis as any).navigator = originalNavigator;
+            }
+            restoreAudio();
+        }
+    });
+
+    it('recovers from autoplay blocking after the next user gesture', async () => {
+        vi.resetModules();
+        const restoreAudio = overrideAudioWithTracker();
+        const mediaPrototype = (globalThis as any).HTMLMediaElement?.prototype;
+        const audioPrototype = (globalThis as any).HTMLAudioElement?.prototype;
+        const originalMediaPlay = mediaPrototype?.play;
+        const originalAudioPlay = audioPrototype?.play;
+        const rejection = Object.assign(new Error('User activation required'), { name: 'NotAllowedError' });
+        const playMock = vi
+            .fn()
+            .mockResolvedValueOnce(undefined) // unlockHtmlAudio() attempt
+            .mockRejectedValueOnce(rejection) // actual playback blocked
+            .mockResolvedValue(undefined); // replay after gesture
+
+        if (mediaPrototype) {
+            mediaPrototype.play = playMock as any;
+        }
+        if (audioPrototype) {
+            audioPrototype.play = playMock as any;
+        }
+
+        try {
+            const { audioActions, audioStore } = await importStore();
+
+            audioActions.setQueueAndPlay([{ id: 777, duration: 200 }] as any[], 777);
+            await flushMicrotasks();
+            await flushMicrotasks();
+
+            const initialCallCount = playMock.mock.calls.length;
+            expect(initialCallCount).toBeGreaterThan(0);
+            expect(audioStore.isPlaying).toBe(false);
+
+            const PointerEvt = (window as any).PointerEvent ?? window.Event;
+            window.dispatchEvent(new PointerEvt('pointerdown'));
+            await flushMicrotasks();
+            await flushMicrotasks();
+
+            expect(playMock.mock.calls.length).toBeGreaterThan(initialCallCount);
+            expect(audioStore.isPlaying).toBe(true);
+        } finally {
+            if (mediaPrototype) {
+                mediaPrototype.play = originalMediaPlay as any;
+            }
+            if (audioPrototype) {
+                audioPrototype.play = originalAudioPlay as any;
+            }
+            restoreAudio();
+        }
+    });
+
+    it('stops playback and surfaces an error when spotify auth becomes invalid', async () => {
+        vi.resetModules();
+        const pauseMock = vi.fn().mockResolvedValue(undefined);
+        const destroyMock = vi.fn().mockResolvedValue(undefined);
+        vi.doMock('@/sdk/spotifyPlayer', () => ({
+            spotifyPlayer: {
+                ensure: vi.fn().mockResolvedValue(undefined),
+                setStateListener: vi.fn().mockImplementation(() => {}),
+                playUri: vi.fn().mockResolvedValue(undefined),
+                pause: pauseMock,
+                resume: vi.fn().mockResolvedValue(undefined),
+                seek: vi.fn().mockResolvedValue(undefined),
+                setVolume: vi.fn().mockResolvedValue(undefined),
+                getCurrentState: vi.fn().mockResolvedValue({ position: 0, duration: 180000, paused: false, track_window: { current_track: { uri: 'spotify:track:123' } } }),
+                destroy: destroyMock,
+                clearStateListener: vi.fn(),
+            },
+        }));
+        const restoreAudio = overrideAudioWithTracker();
+        const { audioActions, audioStore } = await importStore();
+        const { bus } = await import('@/lib/bus');
+
+        audioActions.setQueueAndPlay(
+            [
+                { id: 123, _engine: 'spotify', listing_metadata: { track: { uri: 'spotify:track:123', duration_ms: 180000 } } },
+            ] as any[],
+            123,
+        );
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(audioStore.isPlaying).toBe(true);
+
+        bus.emit('spotify:auth:invalid', { reason: '401' });
+        await flushMicrotasks();
+
+        expect(audioStore.isPlaying).toBe(false);
+        expect(audioStore.spotifyPlaybackError?.message).toBe('Spotify session expired');
+        expect(destroyMock).toHaveBeenCalled();
 
         restoreAudio();
     });

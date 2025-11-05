@@ -18,8 +18,9 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 import * as Sentry from '@sentry/browser';
 
 Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN || undefined,
     integrations: [Sentry.spotlightBrowserIntegration()],
-    // ...other Sentry options
+    enabled: import.meta.env.DEV,
 });
 
 createInertiaApp({

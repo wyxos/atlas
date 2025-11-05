@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { bus } from '@/lib/bus';
 import { audioActions, audioStore } from '@/stores/audio';
 import axios from 'axios';
-import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-vue-next';
+import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Sun, Moon, Volume2, VolumeX } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useEcho } from '@laravel/echo-vue';
 import { usePage } from '@inertiajs/vue3';
@@ -65,6 +65,81 @@ const spotifyErrorDialogOpen = computed({
         }
     },
 });
+
+const wakeLockSupported = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
+const wakeLockEnabled = ref(false);
+let wakeLockSentinel: any | null = null;
+
+async function releaseWakeLock() {
+    if (!wakeLockSupported) return;
+    try {
+        if (wakeLockSentinel) {
+            await wakeLockSentinel.release();
+        }
+    } catch (err) {
+        console.warn('Failed to release wake lock', err);
+    } finally {
+        wakeLockSentinel = null;
+    }
+}
+
+async function acquireWakeLock() {
+    if (!wakeLockSupported || !wakeLockEnabled.value) return;
+    if (wakeLockSentinel || document.hidden || !audioStore.isPlaying) {
+        return;
+    }
+
+    try {
+        wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
+        wakeLockSentinel?.addEventListener?.('release', () => {
+            wakeLockSentinel = null;
+            // Attempt to re-acquire if the user still wants it and playback continues
+            if (wakeLockEnabled.value) {
+                void acquireWakeLock();
+            }
+        });
+    } catch (err) {
+        console.warn('Wake lock request failed', err);
+        wakeLockEnabled.value = false;
+        wakeLockSentinel = null;
+    }
+}
+
+async function toggleWakeLock(): Promise<void> {
+    if (!wakeLockSupported) return;
+    wakeLockEnabled.value = !wakeLockEnabled.value;
+    if (wakeLockEnabled.value) {
+        void acquireWakeLock();
+    } else {
+        await releaseWakeLock();
+    }
+}
+
+watch(
+    () => audioStore.isPlaying,
+    (playing) => {
+        if (!wakeLockSupported) return;
+        if (playing) {
+            if (wakeLockEnabled.value) {
+                void acquireWakeLock();
+            }
+        } else {
+            void releaseWakeLock();
+        }
+    },
+);
+
+watch(
+    wakeLockEnabled,
+    (enabled) => {
+        if (!wakeLockSupported) return;
+        if (enabled) {
+            void acquireWakeLock();
+        } else {
+            void releaseWakeLock();
+        }
+    },
+);
 
 async function handleSpotifyErrorSkip(): Promise<void> {
     await audioActions.resolveSpotifyPlaybackError('skip');
@@ -141,6 +216,7 @@ watch(
 );
 
 const stopMediaSession = ref<null | (() => void)>(null);
+let stopVisibilityListener: (() => void) | null = null;
 
 function handleReactionBroadcast(payload?: { id: number; loved: boolean; liked: boolean; disliked: boolean; funny: boolean }) {
     if (!payload) {
@@ -179,11 +255,26 @@ onMounted(() => {
     // Initialize OS media session + keyboard media keys
     stopMediaSession.value = useMediaSession();
     bus.on('file:reaction', handleReactionBroadcast);
+    if (wakeLockSupported) {
+        const onVisibilityChange = () => {
+            if (document.hidden) {
+                void releaseWakeLock();
+            } else if (wakeLockEnabled.value && audioStore.isPlaying) {
+                void acquireWakeLock();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        stopVisibilityListener = () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }
 });
 
 onUnmounted(() => {
     stopMediaSession.value?.();
     bus.off('file:reaction', handleReactionBroadcast);
+    stopVisibilityListener?.();
+    void releaseWakeLock();
 });
 
 // Listen for membership changes globally to keep queue in sync
@@ -495,6 +586,15 @@ function onPlayerContextMenu(e: MouseEvent): void {
                                     <Repeat1 v-if="repeatMode === 'one'" :size="16" />
                                     <Repeat v-else :size="16" />
                                 </button>
+                                <button
+                                    v-if="wakeLockSupported"
+                                    :class="['button circular small empty', wakeLockEnabled ? 'bg-primary text-primary-foreground' : '']"
+                                    :title="wakeLockEnabled ? 'Screen wake lock enabled' : 'Keep screen awake while playing'"
+                                    @click="toggleWakeLock"
+                                >
+                                    <Sun v-if="wakeLockEnabled" :size="16" />
+                                    <Moon v-else :size="16" />
+                                </button>
                                 <!-- Volume -->
                                 <div class="group ml-4 hidden items-center gap-2 md:flex">
                                     <component :is="volume <= 0 ? VolumeX : Volume2" :size="16" class="text-muted-foreground group-hover:text-primary-foreground" />
@@ -634,6 +734,15 @@ function onPlayerContextMenu(e: MouseEvent): void {
                     >
                         <Repeat1 v-if="repeatMode === 'one'" :size="16" />
                         <Repeat v-else :size="18" />
+                    </button>
+                    <button
+                        v-if="wakeLockSupported"
+                        :class="['button circular small empty', wakeLockEnabled ? 'bg-primary text-primary-foreground' : '']"
+                        :title="wakeLockEnabled ? 'Screen wake lock enabled' : 'Keep screen awake while playing'"
+                        @click="toggleWakeLock"
+                    >
+                        <Sun v-if="wakeLockEnabled" :size="16" />
+                        <Moon v-else :size="16" />
                     </button>
                 </div>
                 <!-- Volume (mobile) -->
