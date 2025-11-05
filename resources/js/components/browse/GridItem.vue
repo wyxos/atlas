@@ -15,6 +15,7 @@ import axios from 'axios';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { IO_VISIBILITY_ROOT_MARGIN, IO_VISIBILITY_THRESHOLD } from '@/lib/visibility';
 import { highlightPromptHtml } from '@/utils/moderationHighlight';
+import { resolveMediaKind } from '@/utils/mediaKind';
 
 const props = defineProps<{
     item: any;
@@ -854,6 +855,30 @@ const referrerUrl = computed<string | null>(() => {
 
 const isLocal = computed<boolean>(() => (props.item as any)?.is_local === true);
 
+const resolvedMediaKind = computed<'video' | 'image'>(() => {
+    if (useImageFallback.value) {
+        return 'image';
+    }
+
+    const fallback = (props.item as any)?.type === 'video' ? 'video' : 'image';
+
+    const detected = resolveMediaKind(
+        [
+            trueOriginalUrl.value,
+            originalUrl.value,
+            trueThumbnailUrl.value,
+            thumbnailUrl.value,
+            videoSrc.value,
+            imageSrc.value,
+        ],
+        fallback,
+    );
+
+    return detected ?? fallback ?? 'image';
+});
+
+const shouldRenderVideo = computed(() => resolvedMediaKind.value === 'video');
+
 // Context dropdown removed; using ActionMenu component
 
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -992,9 +1017,12 @@ async function reportMissingMedia() {
     }
 }
 
-function onPreviewError() {
-    const isVideo = (props.item as any)?.type === 'video';
-    if (isVideo) {
+function onPreviewError(event?: Event) {
+    const target = event?.target as HTMLVideoElement | HTMLImageElement | null;
+    const isVideoElement = target instanceof HTMLVideoElement;
+    const treatAsVideo = isVideoElement || (!target && shouldRenderVideo.value);
+
+    if (treatAsVideo) {
         // Attempt up to 3 retries with cache-busting before giving up on videos
         if (retryCount.value < 3) {
             retryCount.value += 1;
@@ -1010,7 +1038,8 @@ function onPreviewError() {
             return; // let the <img> branch load and report seen on load
         }
     }
-    // Images: mark missing immediately (no retries) to align with UI/tests
+
+    // Images (or videos after exhausting retries and without preview fallback): mark missing immediately
     hasLoaded.value = true;
     void reportMissingMedia();
 }
@@ -1189,7 +1218,7 @@ function closeActionPanel(): void {
             </div>
 
             <video
-                v-if="isVisible && item?.type === 'video' && !useImageFallback"
+                v-if="isVisible && shouldRenderVideo"
                 :key="videoSrc"
                 :src="videoSrc"
                 ref="videoEl"

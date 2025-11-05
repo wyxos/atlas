@@ -18,7 +18,6 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 import * as Sentry from '@sentry/browser';
 
 Sentry.init({
-    dsn: '___DSN___',
     integrations: [Sentry.spotlightBrowserIntegration()],
     // ...other Sentry options
 });

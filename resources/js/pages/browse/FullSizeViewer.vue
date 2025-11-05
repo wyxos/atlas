@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ringForSlot, badgeClassForSlot } from '@/pages/browse/highlight'
 import { highlightPromptHtml } from '@/utils/moderationHighlight'
+import { resolveMediaKind } from '@/utils/mediaKind'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -369,6 +370,31 @@ const fullMediaSrc = computed(() => {
   if (!raw) return ''
   return fullRetryCount.value > 0 ? bustFullUrl(raw, fullRetryCount.value) : raw
 })
+
+const fullResolvedMediaKind = computed<'video' | 'image'>(() => {
+  const item = dialogItem.value as any
+  if (!item) {
+    return 'image'
+  }
+
+  const fallback: 'video' | 'image' = item?.type === 'video' ? 'video' : 'image'
+
+  const detected = resolveMediaKind(
+    [
+      item?.true_original_url,
+      item?.original,
+      item?.true_thumbnail_url,
+      item?.thumbnail_url,
+      item?.preview,
+      fullMediaSrc.value,
+    ],
+    fallback,
+  )
+
+  return detected ?? fallback ?? 'image'
+})
+
+const fullShouldRenderVideo = computed(() => fullResolvedMediaKind.value === 'video')
 
 // Bottom thumbnail carousel state
 const thumbsVisible = ref(false)
@@ -853,7 +879,7 @@ const highlightedPromptHtml = computed(() => {
                 <X :size="18" />
               </button>
 <div ref="mediaWrapRef" tabindex="-1" class="flex h-full flex-1 items-center justify-center focus:outline-none">
-                <template v-if="dialogItem?.type === 'video'">
+                <template v-if="fullShouldRenderVideo">
                   <video v-if="dialogItem?.original || dialogItem?.preview"
                          :key="`${dialogItem?.id || 'video'}:${fullRetryCount}`"
                          :src="fullMediaSrc"

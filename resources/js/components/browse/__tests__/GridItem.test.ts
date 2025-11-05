@@ -239,3 +239,43 @@ describe('GridItem copy menu', () => {
     });
 });
 
+describe('GridItem media kind resolution', () => {
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    it('renders an <img> when metadata says video but URL is clearly image', async () => {
+        const wrapper = mountGridItem({
+            item: {
+                type: 'video',
+                preview: 'https://cdn.example.com/file.jpeg',
+                original: 'https://cdn.example.com/file.jpeg',
+                not_found: false,
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.find('video').exists()).toBe(false);
+        expect(wrapper.find('img').exists()).toBe(true);
+    });
+
+    it('renders a <video> when metadata says image but URL resolves to video', async () => {
+        const wrapper = mountGridItem({
+            item: {
+                type: 'image',
+                preview: 'https://cdn.example.com/file.mp4',
+                original: 'https://cdn.example.com/file.mp4',
+                not_found: false,
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.find('video').exists()).toBe(true);
+        expect(wrapper.find('img').exists()).toBe(false);
+    });
+});
+
