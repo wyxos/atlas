@@ -6,10 +6,8 @@ use App\Http\Controllers\Concerns\DecoratesRemoteUrls;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Plugin\PluginServiceResolver;
-use App\Support\FilePreviewUrl;
-use App\Support\PhotoContainers;
+use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Laravel\Scout\Builder as ScoutBuilder;
 
@@ -99,66 +97,29 @@ class PhotosDislikedController extends Controller
         // Preserve original order from hits
         $serviceCache = [];
 
-        $files = collect($ids)->map(function (int $id) use ($models, $reactions, &$serviceCache) {
+        $files = collect($ids)->map(function (int $id) use ($models, $reactions, &$serviceCache, $page) {
+            /** @var File|null $file */
             $file = $models->get($id);
-            if (! $file) {
+
+            $formatted = PhotoListingFormatter::format(
+                $file,
+                $reactions,
+                $page,
+                fn (File $file, string $url, array &$cache): string => $this->decorateRemoteUrl($file, $url, $cache),
+                $serviceCache
+            );
+
+            if (! $formatted || ! $file) {
                 return null;
             }
 
-            $remoteThumbnail = $file->thumbnail_url;
-            $mime = (string) ($file->mime_type ?? '');
             $hasPath = (bool) $file->path;
-            $original = null;
-            if ($hasPath) {
-                $original = URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id]);
-            } elseif ($file->url) {
-                $original = $this->decorateRemoteUrl($file, (string) $file->url, $serviceCache);
-            }
-            $localPreview = FilePreviewUrl::for($file);
-            $thumbnail = $localPreview ?? $remoteThumbnail;
-            $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
 
-            $payload = (array) optional($file->metadata)->payload;
-            $width = (int) ($payload['width'] ?? 0);
-            $height = (int) ($payload['height'] ?? 0);
-            if ($width <= 0 && $height > 0) {
-                $width = $height;
-            }
-            if ($height <= 0 && $width > 0) {
-                $height = $width;
-            }
-            if ($width <= 0) {
-                $width = 512;
-            }
-            if ($height <= 0) {
-                $height = 512;
-            }
-
-            $rt = $reactions[$id] ?? null;
-
-            $containers = PhotoContainers::forFile($file);
-
-            return [
-                'id' => $id,
-                'preview' => $thumbnail,
-                'original' => $original,
-                'type' => $type,
-                'width' => $width,
-                'height' => $height,
-                'page' => (int) request('page', 1),
+            return array_merge($formatted, [
                 'has_path' => $hasPath,
                 'downloaded' => (bool) $file->downloaded,
                 'previewed_count' => (int) ($file->previewed_count ?? 0),
-                'containers' => $containers,
-                'metadata' => [
-                    'prompt' => data_get(optional($file->metadata)->payload ?? [], 'prompt'),
-                    'moderation' => data_get(optional($file->metadata)->payload ?? [], 'moderation'),
-                ],
-                'loved' => $rt === 'love',
-                'liked' => $rt === 'like',
-                'disliked' => $rt === 'dislike',
-                'funny' => $rt === 'funny',
-            ];
+            ]);
         })->filter()->values()->all();
 
         $current = (int) $paginator->currentPage();

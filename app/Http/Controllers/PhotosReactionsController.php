@@ -4,10 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\File;
 use App\Models\Reaction;
-use App\Support\FilePreviewUrl;
-use App\Support\PhotoContainers;
+use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 
 class PhotosReactionsController extends Controller
@@ -111,57 +109,19 @@ class PhotosReactionsController extends Controller
                 ->toArray();
         }
 
+        $serviceCache = [];
+
         // Preserve TS order
-        $files = collect($ids)->map(function (int $id) use ($models, $reactions) {
+        $files = collect($ids)->map(function (int $id) use ($models, $reactions, $page, &$serviceCache) {
             $file = $models->get($id);
-            if (! $file) {
-                return null;
-            }
 
-            $remoteThumbnail = $file->thumbnail_url;
-            $mime = (string) ($file->mime_type ?? '');
-            $hasPath = (bool) $file->path;
-            $original = $hasPath ? (URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id])) : null;
-            $localPreview = FilePreviewUrl::for($file);
-            $thumbnail = $localPreview ?? $remoteThumbnail;
-            $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
-
-            $payload = (array) optional($file->metadata)->payload;
-            $width = (int) ($payload['width'] ?? 0);
-            $height = (int) ($payload['height'] ?? 0);
-            if ($width <= 0 && $height > 0) {
-                $width = $height;
-            }
-            if ($height <= 0 && $width > 0) {
-                $height = $width;
-            }
-            if ($width <= 0) {
-                $width = 512;
-            }
-            if ($height <= 0) {
-                $height = 512;
-            }
-
-            $rt = $reactions[$id] ?? null;
-
-            return [
-                'id' => $id,
-                'preview' => $original ?? $thumbnail,
-                'original' => $original,
-                'type' => $type,
-                'width' => $width,
-                'height' => $height,
-                'page' => (int) request('page', 1),
-                'containers' => PhotoContainers::forFile($file),
-                'metadata' => [
-                    'prompt' => data_get($payload, 'prompt'),
-                    'moderation' => data_get($payload, 'moderation'),
-                ],
-                'loved' => $rt === 'love',
-                'liked' => $rt === 'like',
-                'disliked' => $rt === 'dislike',
-                'funny' => $rt === 'funny',
-            ];
+            return PhotoListingFormatter::format(
+                $file,
+                $reactions,
+                $page,
+                static fn (File $file, string $url, array &$cache): string => $url,
+                $serviceCache
+            );
         })->filter()->values()->all();
 
         return [

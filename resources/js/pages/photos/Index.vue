@@ -39,11 +39,24 @@ const items = ref<BrowseItem[]>([]);
 const scroller = ref<any>(null);
 const form = useForm({ ...(props.filter || {}) });
 
+if ((form as any).source == null || (form as any).source === 'null' || (form as any).source === 'undefined') {
+    (form as any).source = '';
+}
+
+watch(
+    () => (form as any).source,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).source = '';
+        }
+    }
+);
+
 function snapshotFilters(): string {
     const data = form.data() as Record<string, any>;
     const sort = data.sort ?? 'newest';
     const limit = Number(data.limit ?? 20) || 20;
-    const source = data.source ?? null;
+    const source = data.source ? data.source : null;
     const randSeed = sort === 'random' ? Number(data.rand_seed ?? 0) || 0 : 0;
     return JSON.stringify({ sort, limit, source, randSeed });
 }
@@ -624,7 +637,7 @@ v-model.number="(form as any).limit"
                         v-model="(form as any).source"
                         data-test="photos-source"
                     >
-                        <option :value="undefined">All</option>
+                        <option value="">All</option>
                         <option value="local">Local</option>
                         <option value="spotify">Spotify</option>
                         <option value="youtube">YouTube</option>

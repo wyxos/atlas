@@ -6,10 +6,8 @@ use App\Http\Controllers\Concerns\DecoratesRemoteUrls;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Services\Plugin\PluginServiceResolver;
-use App\Support\FilePreviewUrl;
-use App\Support\PhotoContainers;
+use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 
 class PhotosController extends Controller
@@ -41,6 +39,13 @@ class PhotosController extends Controller
         }
         $randSeed = request('rand_seed');
         $source = request('source'); // optional source filter
+        if (is_string($source)) {
+            $source = trim($source);
+
+            if ($source === '' || $source === 'null' || $source === 'undefined' || $source === 'all') {
+                $source = null;
+            }
+        }
 
         $user = request()->user();
         $userId = $user?->id;
@@ -51,11 +56,12 @@ class PhotosController extends Controller
             ->where('mime_group', 'image');
 
         if ($userId) {
-            $query->query(function ($eloquent) use ($userId) {
-                $eloquent->whereDoesntHave('reactions', function ($relation) use ($userId) {
-                    $relation->where('user_id', $userId)->where('type', 'dislike');
+            $query->whereNotIn('dislike_user_ids', [(string) $userId])
+                ->query(function ($eloquent) use ($userId) {
+                    $eloquent->whereDoesntHave('reactions', function ($relation) use ($userId) {
+                        $relation->where('user_id', $userId)->where('type', 'dislike');
+                    });
                 });
-            });
         }
 
         // Apply filtering based on source and reactions
@@ -70,9 +76,9 @@ class PhotosController extends Controller
             }
         } else {
             // No source filter: show local files OR non-local with reactions
-            $query->options([
-                'filter_by' => "mime_group:='image' && (source:='local' || (source:!='local' && has_reactions:=true))",
-            ]);
+//            $query->options([
+//                'filter_by' => "mime_group:='image' && (source:='local' || (source:!='local' && has_reactions:=true))",
+//            ]);
         }
 
         // Sorting
@@ -93,8 +99,9 @@ class PhotosController extends Controller
 
             $query->orderBy('_rand('.$randSeed.')', 'desc');
         }
-
         $paginator = $query->paginate($limit, 'page', $page);
+
+//        dd($paginator);
 
         $items = collect($paginator->items() ?? [])->values();
 
@@ -121,84 +128,17 @@ class PhotosController extends Controller
         // Preserve original order from hits
         $serviceCache = [];
 
-        $files = collect($idList)->map(function (int $id) use ($models, $reactions, &$serviceCache) {
-            /** @var File $file */
+        $files = collect($idList)->map(function (int $id) use ($models, $reactions, &$serviceCache, $page) {
+            /** @var File|null $file */
             $file = $models->get($id);
-            if (! $file) {
-                return null;
-            }
 
-            $remoteThumbnail = $file->thumbnail_url;
-            $mime = (string) ($file->mime_type ?? '');
-            $hasPath = (bool) $file->path;
-            $original = null;
-            if ($hasPath) {
-                $original = URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id]);
-            } elseif ($file->url) {
-                $original = $this->decorateRemoteUrl($file, (string) $file->url, $serviceCache);
-            }
-            $localPreview = FilePreviewUrl::for($file);
-            $thumbnail = $localPreview ?? $remoteThumbnail;
-            $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
-
-            $detailMetadata = $file->metadata?->payload ?? [];
-            if (! is_array($detailMetadata)) {
-                $detailMetadata = is_string($detailMetadata) ? json_decode($detailMetadata, true) ?: [] : [];
-            }
-
-            $listingMetadata = $file->listing_metadata;
-            if (! is_array($listingMetadata)) {
-                $listingMetadata = is_string($listingMetadata) ? json_decode($listingMetadata, true) ?: [] : [];
-            }
-
-            $width = (int) ($detailMetadata['width'] ?? 0);
-            $height = (int) ($detailMetadata['height'] ?? 0);
-            // Ensure positive dimensions for Masonry layout
-            if ($width <= 0 && $height > 0) {
-                $width = $height;
-            }
-            if ($height <= 0 && $width > 0) {
-                $height = $width;
-            }
-            if ($width <= 0) {
-                $width = 512;
-            }
-            if ($height <= 0) {
-                $height = 512;
-            }
-
-            $rt = $reactions[$id] ?? null;
-
-            $prompt = $detailMetadata['prompt'] ?? data_get($listingMetadata, 'meta.prompt');
-            $moderation = $detailMetadata['moderation'] ?? null;
-
-            return [
-                'id' => $id,
-                'preview' => $thumbnail ?? $original,
-                'original' => $original,
-                'true_original_url' => $file->url ?: null,
-                'true_thumbnail_url' => $remoteThumbnail ?: ($localPreview ?? null),
-                'referrer_url' => $file->referrer_url ?: null,
-                'is_local' => $hasPath,
-                'type' => $type,
-                'width' => $width,
-                'height' => $height,
-                'page' => (int) request('page', 1),
-                'containers' => $this->buildContainers($file),
-                'metadata' => [
-                    'prompt' => is_string($prompt) ? $prompt : null,
-                    'moderation' => is_array($moderation) ? $moderation : null,
-                ],
-                'listing_metadata' => $listingMetadata,
-                'detail_metadata' => $detailMetadata,
-                'previewed_count' => (int) $file->previewed_count,
-                'seen_count' => (int) $file->seen_count,
-                'not_found' => (bool) $file->not_found,
-                'loved' => $rt === 'love',
-                'liked' => $rt === 'like',
-                'disliked' => $rt === 'dislike',
-                'funny' => $rt === 'funny',
-            ];
+            return PhotoListingFormatter::format(
+                $file,
+                $reactions,
+                $page,
+                fn (File $file, string $url, array &$cache): string => $this->decorateRemoteUrl($file, $url, $cache),
+                $serviceCache
+            );
         })->filter()->values()->all();
 
         return [
@@ -216,8 +156,4 @@ class PhotosController extends Controller
         ];
     }
 
-    protected function buildContainers(File $file): array
-    {
-        return PhotoContainers::forFile($file);
-    }
 }

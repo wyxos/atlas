@@ -10,12 +10,10 @@ use App\Models\ModerationRule;
 use App\Services\BlacklistService;
 use App\Services\Moderation\Moderator;
 use App\Services\Plugin\PluginServiceResolver;
-use App\Support\FilePreviewUrl;
-use App\Support\PhotoContainers;
+use App\Support\PhotoListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 
 class PhotosUnratedController extends Controller
@@ -360,66 +358,17 @@ class PhotosUnratedController extends Controller
             ->map(function (int $id) use ($modelsById, $page, &$serviceCache) {
                 /** @var File|null $file */
                 $file = $modelsById->get($id);
-                if (! $file) {
-                    return null;
-                }
 
-                $remoteThumbnail = $file->thumbnail_url;
-                $mime = (string) ($file->mime_type ?? '');
-                $hasPath = (bool) $file->path;
-                $original = null;
-
-                if ($hasPath) {
-                    $original = URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id]);
-                } elseif ($file->url) {
-                    $original = $this->decorateRemoteUrl($file, (string) $file->url, $serviceCache);
-                }
-                $localPreview = FilePreviewUrl::for($file);
-                $thumbnail = $localPreview ?? $remoteThumbnail;
-                $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
-
-                $payload = (array) optional($file->metadata)->payload;
-                $width = (int) ($payload['width'] ?? 0);
-                $height = (int) ($payload['height'] ?? 0);
-                if ($width <= 0 && $height > 0) {
-                    $width = $height;
-                }
-                if ($height <= 0 && $width > 0) {
-                    $height = $width;
-                }
-                if ($width <= 0) {
-                    $width = 512;
-                }
-                if ($height <= 0) {
-                    $height = 512;
-                }
-
-                return [
-                    'id' => $id,
-                    'preview' => $original ?? $thumbnail,
-                    'original' => $original,
-                    'type' => $type,
-                    'width' => $width,
-                    'height' => $height,
-                    'page' => $page,
-                    'containers' => $this->buildContainers($file),
-                    'metadata' => [
-                        'prompt' => data_get($payload, 'prompt'),
-                        'moderation' => data_get($payload, 'moderation'),
-                    ],
-                    'loved' => false,
-                    'liked' => false,
-                    'disliked' => false,
-                    'funny' => false,
-                ];
+                return PhotoListingFormatter::format(
+                    $file,
+                    [],
+                    $page,
+                    fn (File $file, string $url, array &$cache): string => $this->decorateRemoteUrl($file, $url, $cache),
+                    $serviceCache
+                );
             })
             ->filter()
             ->values()
             ->all();
-    }
-
-    protected function buildContainers(File $file): array
-    {
-        return PhotoContainers::forFile($file);
     }
 }

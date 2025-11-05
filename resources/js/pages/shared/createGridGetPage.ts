@@ -38,8 +38,11 @@ export function createGridGetPage(
 
   return async function getPage(page: number) {
     const baseParams = { ...form.data() }
+    const sanitizedBaseParams = Object.fromEntries(
+      Object.entries(baseParams).filter(([, value]) => !(value === '' || value === null || typeof value === 'undefined'))
+    )
     const url = getUrl()
-  const response = await axios.get(url, { params: { ...baseParams, page } })
+    const response = await axios.get(url, { params: { ...sanitizedBaseParams, page } })
   opts?.onResponse?.(response.data)
     const responseFilter = response.data?.filter || {}
     const items = (response.data?.files || []).map(normalize)
@@ -49,7 +52,7 @@ export function createGridGetPage(
 
     const nextPage = responseFilter.next ?? ''
     const currentPage = page
-    scheduleReplace({ ...baseParams, page: currentPage, next: nextPage })
+    scheduleReplace({ ...sanitizedBaseParams, page: currentPage, next: nextPage })
 
     return { items, nextPage: responseFilter.next ?? null }
   }
