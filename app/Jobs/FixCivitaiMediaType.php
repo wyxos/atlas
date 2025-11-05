@@ -16,20 +16,34 @@ class FixCivitaiMediaType implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $fileId) {}
+    public function __construct(public ?int $fileId = null) {}
 
     public function handle(): void
     {
+        if ($this->fileId === null) {
+            File::query()
+                ->where('source', 'CivitAI')
+                ->orderBy('id')
+                ->chunkById(200, function ($files) {
+                    foreach ($files as $file) {
+                        $this->processFile($file);
+                    }
+                });
+
+            return;
+        }
+
         $file = File::find($this->fileId);
         if (! $file) {
             return;
         }
 
-        if (strcasecmp((string) $file->source, 'CivitAI') !== 0) {
-            return;
-        }
+        $this->processFile($file);
+    }
 
-        if (! str_contains((string) $file->url, '.mp4')) {
+    protected function processFile(File $file): void
+    {
+        if (strcasecmp((string) $file->source, 'CivitAI') !== 0) {
             return;
         }
 

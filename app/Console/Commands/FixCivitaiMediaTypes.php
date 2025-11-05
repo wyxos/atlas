@@ -18,13 +18,13 @@ class FixCivitaiMediaTypes extends Command
 
         $query = File::query()
             ->where('source', 'CivitAI')
-            ->where('url', 'like', '%.mp4%')
             ->whereNotNull('path')
+            ->where('path', '!=', '')
             ->select(['id', 'filename']);
 
         $total = (clone $query)->count();
         if ($total === 0) {
-            $this->info('No CivetAI files with mp4 URLs found.');
+            $this->info('No CivitAI files with stored paths found.');
 
             return self::SUCCESS;
         }

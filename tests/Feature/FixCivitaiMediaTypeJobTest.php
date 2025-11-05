@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Storage;
 
 it('detects actual mime type from disk and updates image files', function () {
     Storage::fake('atlas_app');
+    Storage::fake('atlas');
 
     $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
     Storage::disk('atlas_app')->put('downloads/sample.mp4', $webpBody);
@@ -29,6 +30,7 @@ it('detects actual mime type from disk and updates image files', function () {
 
 it('detects video content and preserves mp4 extension', function () {
     Storage::fake('atlas_app');
+    Storage::fake('atlas');
 
     $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
     Storage::disk('atlas_app')->put('downloads/video.mp4', $mp4Body);
@@ -52,6 +54,7 @@ it('detects video content and preserves mp4 extension', function () {
 
 it('updates mp4 labelled downloads that contain png data', function () {
     Storage::fake('atlas_app');
+    Storage::fake('atlas');
 
     $pngBody = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==');
     Storage::disk('atlas_app')->put('downloads/sample.mp4', $pngBody);
@@ -71,4 +74,44 @@ it('updates mp4 labelled downloads that contain png data', function () {
     expect($file->filename)->toBe('sample.png')
         ->and($file->path)->toBe('downloads/sample.png')
         ->and($file->mime_type)->toBe('image/png');
+});
+
+it('processes all civitai files when invoked without a specific id', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    Storage::disk('atlas_app')->put('downloads/a.mp4', $webpBody);
+
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    Storage::disk('atlas_app')->put('downloads/b.jpg', $mp4Body);
+
+    $first = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/a.mp4',
+        'filename' => 'a.mp4',
+        'path' => 'downloads/a.mp4',
+        'mime_type' => 'video/mp4',
+    ]);
+
+    $second = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/b.jpg',
+        'filename' => 'b.jpg',
+        'path' => 'downloads/b.jpg',
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    (new FixCivitaiMediaType())->handle();
+
+    $first->refresh();
+    $second->refresh();
+
+    expect($first->filename)->toBe('a.webp')
+        ->and($first->path)->toBe('downloads/a.webp')
+        ->and($first->mime_type)->toBe('image/webp');
+
+    expect($second->filename)->toBe('b.mp4')
+        ->and($second->path)->toBe('downloads/b.mp4')
+        ->and($second->mime_type)->toBe('video/mp4');
 });

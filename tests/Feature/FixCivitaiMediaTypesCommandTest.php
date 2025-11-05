@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 
 it('dispatches fix jobs and handles filenames with query tokens', function () {
     Storage::fake('atlas_app');
+    Storage::fake('atlas');
 
     $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
     Storage::disk('atlas_app')->put('downloads/sample.mp4', $webpBody);
@@ -41,5 +42,29 @@ it('dispatches fix jobs and handles filenames with query tokens', function () {
     Storage::disk('atlas_app')->assertMissing('downloads/sample.mp4?token=abc');
     Storage::disk('atlas_app')->assertMissing('downloads/sample.mp4');
     Storage::disk('atlas_app')->assertExists('downloads/sample.webp');
+});
+
+it('dispatches fix jobs for civitai files without mp4 urls', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    Storage::disk('atlas_app')->put('downloads/sample.jpg', $mp4Body);
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/foo.jpg',
+        'filename' => 'sample.jpg',
+        'path' => 'downloads/sample.jpg',
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    Bus::fake();
+
+    Artisan::call('media:fix-civitai-types');
+
+    Bus::assertDispatched(FixCivitaiMediaType::class, function ($job) use ($file) {
+        return $job->fileId === $file->id;
+    });
 });
 
