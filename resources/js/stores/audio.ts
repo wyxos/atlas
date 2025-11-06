@@ -228,9 +228,33 @@ class AudioPlayerManager {
       this.audio.volume = this.volume.value;
     }
   }
+
+  cleanup(): void {
+    // Pause and stop playback
+    if (this.audio) {
+      this.audio.pause();
+      this.audio.src = '';
+      this.audio.load();
+    }
+
+    // Clear state
+    this.currentTrack.value = null;
+    this.queue.value = [];
+    this.currentIndex.value = -1;
+    this.isPlaying.value = false;
+    this.currentTime.value = 0;
+    this.duration.value = 0;
+  }
 }
 
 const audioPlayerManager = new AudioPlayerManager();
+
+// Cleanup on page unload (handles browser navigation, refresh, etc.)
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    audioPlayerManager.cleanup();
+  });
+}
 
 export function useAudioPlayer() {
   return {
@@ -255,5 +279,6 @@ export function useAudioPlayer() {
     setQueueAndPlay: (queue: AudioTrack[], startIndex?: number, options?: PlayOptions) =>
       audioPlayerManager.setQueueAndPlay(queue, startIndex, options),
     setVolume: (volume: number) => audioPlayerManager.setVolume(volume),
+    cleanup: () => audioPlayerManager.cleanup(),
   };
 }
