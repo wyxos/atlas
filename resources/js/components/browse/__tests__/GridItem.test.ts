@@ -231,11 +231,11 @@ describe('GridItem copy menu', () => {
         expect(copySection).toBeTruthy();
         const labels = (copySection?.children || []).map((child) => child.label);
 
-        expect(labels).toContain('thumbnail url');
-        expect(labels).toContain('original url');
-        expect(labels).toContain('referrer url');
-        expect(labels).toContain('true original url');
-        expect(labels).toContain('true thumbnail url');
+        expect(labels).toContain('copy referrer url');
+        expect(labels).toContain('copy original url');
+        expect(labels).toContain('copy original preview url');
+        expect(labels).toContain('copy thumbnail url');
+        expect(labels).toContain('copy url');
     });
 });
 

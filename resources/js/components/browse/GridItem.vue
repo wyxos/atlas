@@ -569,25 +569,72 @@ const menuRoot = computed<ActionOption[]>(() => {
     ];
 
     const copyChildren: ActionOption[] = [];
+    
+    // Copy referrer url (always show if available)
+    if (referrerUrl.value) {
+        copyChildren.push({ label: 'copy referrer url', action: () => copyUrl(referrerUrl.value) });
+    }
+    
+    // Copy original url (url column in database = true_original_url)
+    if (trueOriginalUrl.value) {
+        copyChildren.push({ label: 'copy original url', action: () => copyUrl(trueOriginalUrl.value) });
+    }
+    
+    // Copy original preview url (thumbnail_url column in database = true_thumbnail_url)
+    if (trueThumbnailUrl.value) {
+        copyChildren.push({ label: 'copy original preview url', action: () => copyUrl(trueThumbnailUrl.value) });
+    }
+    
+    // Copy thumbnail url (currently used, in case it's pointing to local)
     if (thumbnailUrl.value) {
-        copyChildren.push({ label: 'thumbnail url', action: () => copyUrl(thumbnailUrl.value) });
+        copyChildren.push({ label: 'copy thumbnail url', action: () => copyUrl(thumbnailUrl.value) });
     }
-    if (originalUrl.value) {
-        copyChildren.push({ label: 'original url', action: () => copyUrl(originalUrl.value) });
+    
+    // Copy url (currently used, in case pointing to local)
+    const currentUrl = originalUrl.value || thumbnailUrl.value;
+    if (currentUrl) {
+        copyChildren.push({ label: 'copy url', action: () => copyUrl(currentUrl) });
     }
-    if (!isLocal.value) {
-        if (referrerUrl.value) {
-            copyChildren.push({ label: 'referrer url', action: () => copyUrl(referrerUrl.value) });
-        }
-        if (trueOriginalUrl.value) {
-            copyChildren.push({ label: 'true original url', action: () => copyUrl(trueOriginalUrl.value) });
-        }
-        if (trueThumbnailUrl.value) {
-            copyChildren.push({ label: 'true thumbnail url', action: () => copyUrl(trueThumbnailUrl.value) });
-        }
+    
+    // Copy image (to clipboard)
+    if (shouldRenderVideo.value === false) {
+        copyChildren.push({ label: 'copy image', action: () => copyImageToClipboard() });
     }
+    
     if (copyChildren.length > 0) {
         base.push({ label: 'copy url', children: copyChildren });
+    }
+
+    // Open URL menu items
+    const openChildren: ActionOption[] = [];
+    
+    // Open referrer url in new tab
+    if (referrerUrl.value) {
+        openChildren.push({ label: 'open referrer url', action: () => openUrlInNewTab(referrerUrl.value) });
+    }
+    
+    // Open original url in new tab (url column in database = true_original_url)
+    if (trueOriginalUrl.value) {
+        openChildren.push({ label: 'open original url', action: () => openUrlInNewTab(trueOriginalUrl.value) });
+    }
+    
+    // Open original preview url in new tab (thumbnail_url column in database = true_thumbnail_url)
+    if (trueThumbnailUrl.value) {
+        openChildren.push({ label: 'open original preview url', action: () => openUrlInNewTab(trueThumbnailUrl.value) });
+    }
+    
+    // Open thumbnail url in new tab (currently used, in case it's pointing to local)
+    if (thumbnailUrl.value) {
+        openChildren.push({ label: 'open thumbnail url', action: () => openUrlInNewTab(thumbnailUrl.value) });
+    }
+    
+    // Open url in new tab (currently used, in case pointing to local)
+    if (currentUrl) {
+        openChildren.push({ label: 'open url', action: () => openUrlInNewTab(currentUrl) });
+    }
+    
+    if (openChildren.length > 0) {
+        base.push({ label: 'open url', children: openChildren });
     }
 
     const scopes = containerScopes();
@@ -920,6 +967,48 @@ function copyUrl(url: string | null): void {
     void copyToClipboard(url);
 }
 
+async function copyImageToClipboard(): Promise<void> {
+    try {
+        const imgElement = root.value?.querySelector('img') as HTMLImageElement | null;
+        if (!imgElement || !imgElement.complete) {
+            return;
+        }
+
+        // Create canvas and draw image
+        const canvas = document.createElement('canvas');
+        canvas.width = imgElement.naturalWidth || imgElement.width;
+        canvas.height = imgElement.naturalHeight || imgElement.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return;
+        }
+
+        ctx.drawImage(imgElement, 0, 0);
+
+        // Convert to blob and copy to clipboard
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                return;
+            }
+
+            try {
+                if (navigator.clipboard && navigator.clipboard.write) {
+                    const clipboardItem = new ClipboardItem({ [blob.type]: blob });
+                    await navigator.clipboard.write([clipboardItem]);
+                }
+            } catch (error) {
+                // Fallback: try to copy as data URL if ClipboardItem is not supported
+                try {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    await copyToClipboard(dataUrl);
+                } catch {}
+            }
+        }, 'image/png');
+    } catch {
+        // Silently fail
+    }
+}
+
 async function reportPreviewSeen() {
     if (previewReported.value) return;
     const id = props.item?.id;
@@ -1099,12 +1188,12 @@ function retryLoad(fromUser = false) {
     retryCount.value += 1;
 }
 
-function openUrlInNewTab() {
-    const raw = ((props.item as any)?.original as string | undefined) || ((props.item as any)?.preview as string | undefined) || '';
+function openUrlInNewTab(url?: string | null) {
+    const raw = url || ((props.item as any)?.original as string | undefined) || ((props.item as any)?.preview as string | undefined) || '';
     if (!raw) { return; }
-    const url = retryCount.value > 0 ? bustUrl(raw, retryCount.value) : raw;
+    const finalUrl = retryCount.value > 0 && !url ? bustUrl(raw, retryCount.value) : raw;
     try {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(finalUrl, '_blank', 'noopener,noreferrer');
     } catch {
         // ignore
     }
