@@ -63,12 +63,7 @@ class FixCivitaiMediaType implements ShouldQueue
 
         // This is a video file that was incorrectly stored as a webp poster
         // Fetch the real video URL from the referrer page
-        $referrerUrl = (string) ($file->referrer_url ?? '');
-        if ($referrerUrl === '') {
-            return;
-        }
-
-        $videoUrl = $this->extractVideoUrlFromReferrer($referrerUrl);
+        $videoUrl = $this->extractVideoUrlFromFile($file->id);
         if (! $videoUrl) {
             return;
         }
@@ -149,6 +144,21 @@ class FixCivitaiMediaType implements ShouldQueue
         } finally {
             @unlink($tempFile);
         }
+    }
+
+    protected function extractVideoUrlFromFile(int $fileId): ?string
+    {
+        $file = File::find($fileId);
+        if (! $file) {
+            return null;
+        }
+
+        $referrerUrl = (string) ($file->referrer_url ?? '');
+        if ($referrerUrl === '') {
+            return null;
+        }
+
+        return $this->extractVideoUrlFromReferrer($referrerUrl);
     }
 
     protected function extractVideoUrlFromReferrer(string $referrerUrl): ?string
