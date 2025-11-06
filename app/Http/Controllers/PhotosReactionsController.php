@@ -56,12 +56,17 @@ class PhotosReactionsController extends Controller
         ]);
 
         $userId = $this->currentUserId();
+        $mimeType = request('mime_type');
         $field = self::KIND_TO_FIELD[$kind];
 
         $query = File::search('*')
             ->where('mime_group', 'image')
             ->where('has_path', true)
             ->where('blacklisted', false);
+
+        if ($mimeType && is_string($mimeType) && $mimeType !== '') {
+            $query->where('mime_type', $mimeType);
+        }
 
         if ($userId) {
             $query->whereIn($field, [(string) $userId]);
@@ -110,6 +115,7 @@ class PhotosReactionsController extends Controller
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
                 'sort' => $options->sort,
                 'rand_seed' => $options->isRandom() ? $options->randSeed : null,
+                'mime_type' => $mimeType && is_string($mimeType) && $mimeType !== '' ? $mimeType : null,
             ],
         ];
     }

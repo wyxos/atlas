@@ -4,10 +4,17 @@ import { markRaw } from 'vue'
 
 export type FormLike = { data: () => Record<string, any>; defaults: (v: any) => void; reset: () => void }
 
+type GridGetPageOptions = {
+  throttleMs?: number;
+  normalizeItem?: (rawItem: any) => any;
+  onResponse?: (payload: any) => void;
+  buildParams?: () => Record<string, any>;
+}
+
 export function createGridGetPage(
   form: FormLike,
   getUrl: () => string,
-  opts?: { throttleMs?: number; normalizeItem?: (rawItem: any) => any; onResponse?: (payload: any) => void }
+  opts?: GridGetPageOptions
 ) {
   const throttleMs = opts?.throttleMs ?? 500
   let replaceTimer: any = null
@@ -37,7 +44,8 @@ export function createGridGetPage(
   })
 
   return async function getPage(page: number) {
-    const baseParams = { ...form.data() }
+    const extraParams = opts?.buildParams?.() ?? {}
+    const baseParams = { ...form.data(), ...extraParams }
     const sanitizedBaseParams = Object.fromEntries(
       Object.entries(baseParams).filter(([, value]) => !(value === '' || value === null || typeof value === 'undefined'))
     )

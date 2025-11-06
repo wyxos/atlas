@@ -44,8 +44,9 @@ class PhotosDislikedController extends Controller
         ]);
 
         $userId = $this->currentUserId();
+        $mimeType = request('mime_type');
 
-        $query = $this->buildScoutQuery($category, $options);
+        $query = $this->buildScoutQuery($category, $options, $mimeType);
 
         $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 
@@ -88,6 +89,7 @@ class PhotosDislikedController extends Controller
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
                 'sort' => $options->sort,
                 'rand_seed' => $options->isRandom() ? $options->randSeed : null,
+                'mime_type' => $mimeType && is_string($mimeType) && $mimeType !== '' ? $mimeType : null,
             ],
         ];
     }
@@ -95,7 +97,7 @@ class PhotosDislikedController extends Controller
     /**
      * Build the Scout/Typesense query for disliked photos with all constraints.
      */
-    protected function buildScoutQuery(string $category, ListingOptions $options): ScoutBuilder
+    protected function buildScoutQuery(string $category, ListingOptions $options, ?string $mimeType): ScoutBuilder
     {
         $reasons = $this->mapReasons($category);
 
@@ -105,6 +107,10 @@ class PhotosDislikedController extends Controller
             ->where('mime_group', 'image')
             ->where('blacklisted', true)
             ->where('not_found', false);
+
+        if ($mimeType && $mimeType !== '') {
+            $query->where('mime_type', $mimeType);
+        }
 
         if ($category === 'auto') {
             $query->whereIn('previewed_count', [0]);

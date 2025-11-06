@@ -22,6 +22,7 @@ import { undoManager } from '@/lib/undo';
 import { IO_VISIBILITY_ROOT_MARGIN, IO_VISIBILITY_THRESHOLD } from '@/lib/visibility';
 import FullSizeViewer from '@/pages/browse/FullSizeViewer.vue';
 import { enqueueModeration, flushModeration } from '@/lib/moderation';
+import { useMimeTypes } from '@/composables/useMimeTypes';
 
 const props = defineProps<{
     files?: any[];
@@ -43,6 +44,10 @@ if ((form as any).source == null || (form as any).source === 'null' || (form as 
     (form as any).source = '';
 }
 
+if ((form as any).mime_type == null || (form as any).mime_type === 'null' || (form as any).mime_type === 'undefined') {
+    (form as any).mime_type = '';
+}
+
 watch(
     () => (form as any).source,
     (value) => {
@@ -52,13 +57,26 @@ watch(
     }
 );
 
+watch(
+    () => (form as any).mime_type,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).mime_type = '';
+        }
+    }
+);
+
+// Mime types for filtering
+const { mimeTypes, loading: mimeTypesLoading, fetch: fetchMimeTypes, getGrouped } = useMimeTypes();
+
 function snapshotFilters(): string {
     const data = form.data() as Record<string, any>;
     const sort = data.sort ?? 'newest';
     const limit = Number(data.limit ?? 20) || 20;
     const source = data.source ? data.source : null;
+    const mimeType = data.mime_type ? data.mime_type : null;
     const randSeed = sort === 'random' ? Number(data.rand_seed ?? 0) || 0 : 0;
-    return JSON.stringify({ sort, limit, source, randSeed });
+    return JSON.stringify({ sort, limit, source, mimeType, randSeed });
 }
 
 const appliedFilterSnapshot = ref(snapshotFilters());
@@ -301,6 +319,11 @@ if (!(form as any).sort) {
     if (((form as any).sort ?? 'random') === 'random' && (!(form as any).rand_seed || Number((form as any).rand_seed) <= 0)) {
         (form as any).rand_seed = generateSeed();
     }
+
+    // Fetch mime types for the dropdown
+    try {
+        await fetchMimeTypes();
+    } catch {}
 
     // Seed initial items from server and cursor state
     scroller.value.init(
@@ -642,6 +665,26 @@ v-model.number="(form as any).limit"
                         <option value="spotify">Spotify</option>
                         <option value="youtube">YouTube</option>
                         <option value="booru">Booru</option>
+                    </select>
+                </div>
+                <div class="grid gap-1">
+                    <Label class="text-xs text-muted-foreground">Mime Type</Label>
+                    <select
+                        class="h-9 rounded-md border px-2 text-sm dark:bg-neutral-900"
+                        v-model="(form as any).mime_type"
+                        :disabled="mimeTypesLoading"
+                        data-test="photos-mime-type"
+                    >
+                        <option value="">All</option>
+                        <optgroup v-if="!mimeTypesLoading && getGrouped().image.length > 0" label="Image">
+                            <option
+                                v-for="mime in getGrouped().image"
+                                :key="mime"
+                                :value="mime"
+                            >
+                                {{ mime }}
+                            </option>
+                        </optgroup>
                     </select>
                 </div>
 

@@ -46,6 +46,7 @@ class PhotosUnratedController extends Controller
         ]);
 
         $userId = $this->currentUserId();
+        $mimeType = request('mime_type');
 
         $aggregateModeration = [
             'blacklisted_count' => 0,
@@ -54,7 +55,7 @@ class PhotosUnratedController extends Controller
         ];
 
         $maxCycles = 3;
-        $result = $this->performSearch($options, $userId);
+        $result = $this->performSearch($options, $userId, $mimeType);
 
         for ($cycle = 0; $cycle < $maxCycles; $cycle++) {
             $moderationResult = $this->moderateFiles($result['models']);
@@ -79,7 +80,7 @@ class PhotosUnratedController extends Controller
                 break;
             }
 
-            $result = $this->performSearch($options, $userId);
+            $result = $this->performSearch($options, $userId, $mimeType);
         }
 
         $files = $this->formatFiles($result['ids'], $result['models'], $options);
@@ -95,6 +96,7 @@ class PhotosUnratedController extends Controller
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
                 'sort' => $options->sort,
                 'rand_seed' => $options->isRandom() ? $options->randSeed : null,
+                'mime_type' => $mimeType && is_string($mimeType) && $mimeType !== '' ? $mimeType : null,
             ],
             'moderation' => [
                 'blacklisted_count' => (int) $aggregateModeration['blacklisted_count'],
@@ -109,12 +111,16 @@ class PhotosUnratedController extends Controller
      *
      * @return array{paginator:\Illuminate\Contracts\Pagination\LengthAwarePaginator, ids:array<int>, models:Collection<int, File>}
      */
-    protected function performSearch(ListingOptions $options, ?int $userId): array
+    protected function performSearch(ListingOptions $options, ?int $userId, ?string $mimeType): array
     {
         $query = File::search('*')
             ->where('mime_group', 'image')
             ->where('not_found', false)
             ->where('blacklisted', false);
+
+        if ($mimeType && $mimeType !== '') {
+            $query->where('mime_type', $mimeType);
+        }
 
         if ($options->sort === 'random') {
             $query->orderBy('_rand('.$options->randSeed.')', 'desc');

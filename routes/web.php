@@ -114,6 +114,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Files list (auth users)
     Route::get('files', [App\Http\Controllers\FileController::class, 'index'])
         ->name('files');
+    Route::get('files/mime-types', [App\Http\Controllers\FileController::class, 'mimeTypes'])
+        ->name('files.mime-types');
 
     // Temporary, signed view URL for files (auth + signed)
     Route::get('files/{file}/view', [App\Http\Controllers\FileController::class, 'view'])

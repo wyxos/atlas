@@ -6,6 +6,7 @@ use App\Models\File;
 use App\Services\Plugin\PluginServiceResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
@@ -226,5 +227,50 @@ class FileController extends Controller
             'state' => array_key_exists('state', $validated) ? (bool) $validated['state'] : null,
             'placeholder' => true,
         ]);
+    }
+
+    /**
+     * Get distinct mime types grouped by category.
+     * Returns data suitable for dropdowns, automatically updated when new files are added.
+     */
+    public function mimeTypes(): JsonResponse
+    {
+        return response()->json($this->getMimeTypes());
+    }
+
+    /**
+     * Get distinct mime types grouped by category with caching.
+     */
+    private function getMimeTypes(): array
+    {
+        return Cache::remember('files.mime_types', 300, function () {
+            $mimeTypes = File::query()
+                ->select('mime_type')
+                ->whereNotNull('mime_type')
+                ->distinct()
+                ->orderBy('mime_type')
+                ->pluck('mime_type')
+                ->toArray();
+
+            $grouped = [
+                'audio' => [],
+                'video' => [],
+                'image' => [],
+                'other' => [],
+            ];
+
+            foreach ($mimeTypes as $mimeType) {
+                $group = str_starts_with($mimeType, 'audio/') ? 'audio'
+                    : (str_starts_with($mimeType, 'video/') ? 'video'
+                        : (str_starts_with($mimeType, 'image/') ? 'image' : 'other'));
+
+                $grouped[$group][] = $mimeType;
+            }
+
+            return [
+                'grouped' => $grouped,
+                'all' => $mimeTypes,
+            ];
+        });
     }
 }

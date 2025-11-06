@@ -7,6 +7,9 @@ export function createPhotosGetPage(form: FormLike) {
     const base = form.data() || {}
     return (base.data_url as string) || PhotosController.data().url
   }, {
+    buildParams: () => ({
+      mime_type: (form as any).mime_type,
+    }),
     onResponse(payload) {
       const moderation = payload?.moderation || {}
       const ids = Array.isArray(moderation?.ids) ? moderation.ids : []
