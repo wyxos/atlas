@@ -35,6 +35,9 @@ class ReelsController extends Controller
         ]);
 
         $source = $this->normalizeSource(request('source'));
+        $mimeType = $this->requestedMimeType();
+        $fileId = $this->requestedFileId();
+        $sourceId = $this->requestedSourceId();
         $userId = $this->currentUserId();
 
         $query = File::search('*')
@@ -43,6 +46,18 @@ class ReelsController extends Controller
 
         if ($source) {
             $query->where('source', $source);
+        }
+
+        if ($mimeType) {
+            $query->where('mime_type', $mimeType);
+        }
+
+        if ($fileId) {
+            $query->where('id', (string) $fileId);
+        }
+
+        if ($sourceId) {
+            $query->where('source_id', (string) $sourceId);
         }
 
         $this->applySorting($query, $options);

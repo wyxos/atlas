@@ -5,6 +5,7 @@ import ScrollableLayout from '@/layouts/ScrollableLayout.vue';
 import SectionHeader from '@/components/audio/SectionHeader.vue';
 import GridItem from '@/components/browse/GridItem.vue';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { type BreadcrumbItem } from '@/types';
 import type { BrowseItem } from '@/types/browse';
@@ -18,6 +19,7 @@ import * as BrowseController from '@/actions/App/Http/Controllers/BrowseControll
 import { undoManager } from '@/lib/undo';
 import { IO_VISIBILITY_ROOT_MARGIN, IO_VISIBILITY_THRESHOLD } from '@/lib/visibility';
 import FullSizeViewer from '@/pages/browse/FullSizeViewer.vue';
+import { useMimeTypes } from '@/composables/useMimeTypes';
 
 const props = defineProps<{
     files?: any[];
@@ -30,13 +32,71 @@ const items = ref<BrowseItem[]>([]);
 const scroller = ref<any>(null);
 const form = useForm({ ...(props.filter || {}) });
 
+if ((form as any).source == null || (form as any).source === 'null' || (form as any).source === 'undefined') {
+    (form as any).source = undefined;
+}
+
+if ((form as any).mime_type == null || (form as any).mime_type === 'null' || (form as any).mime_type === 'undefined') {
+    (form as any).mime_type = '';
+}
+
+if ((form as any).file_id == null || (form as any).file_id === 'null' || (form as any).file_id === 'undefined') {
+    (form as any).file_id = '';
+}
+
+if ((form as any).source_id == null || (form as any).source_id === 'null' || (form as any).source_id === 'undefined') {
+    (form as any).source_id = '';
+}
+
+watch(
+    () => (form as any).source,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).source = undefined;
+        }
+    }
+);
+
+watch(
+    () => (form as any).mime_type,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).mime_type = '';
+        }
+    }
+);
+
+watch(
+    () => (form as any).file_id,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).file_id = '';
+        }
+    }
+);
+
+watch(
+    () => (form as any).source_id,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).source_id = '';
+        }
+    }
+);
+
+// Mime types for filtering
+const { loading: mimeTypesLoading, fetch: fetchMimeTypes, getGrouped } = useMimeTypes();
+
 function snapshotFilters(): string {
     const data = form.data() as Record<string, any>;
     const sort = data.sort ?? 'newest';
     const limit = Number(data.limit ?? 40) || 40;
     const source = data.source ?? null;
+    const mimeType = data.mime_type ? data.mime_type : null;
+    const fileId = data.file_id ? Number(data.file_id) : null;
+    const sourceId = data.source_id ? data.source_id : null;
     const randSeed = sort === 'random' ? Number(data.rand_seed ?? 0) || 0 : 0;
-    return JSON.stringify({ sort, limit, source, randSeed });
+    return JSON.stringify({ sort, limit, source, mimeType, fileId, sourceId, randSeed });
 }
 
 const appliedFilterSnapshot = ref(snapshotFilters());
@@ -113,11 +173,27 @@ if ((form.sort as any ?? 'random') === 'random') {
     form.reset();
     try {
         if (scroller.value?.reset) scroller.value.reset();
-        if (scroller.value?.loadNext) await scroller.value.loadNext();
+        if (scroller.value?.loadPage) await scroller.value.loadPage(1);
+        else if (scroller.value?.loadNext) await scroller.value.loadNext();
         appliedFilterSnapshot.value = snapshotFilters();
     } finally {
         filtersBusy.value = false;
     }
+}
+
+const jumpToPageInput = ref<string>('');
+async function jumpToPage() {
+    const targetPage = parseInt(jumpToPageInput.value);
+    if (!targetPage || targetPage < 1 || isNaN(targetPage)) return;
+    try {
+        form.defaults({ ...form.data(), page: targetPage, next: null });
+        form.reset();
+        if (scroller.value?.reset) scroller.value.reset();
+        if (scroller.value?.loadPage) await scroller.value.loadPage(targetPage);
+        else if (scroller.value?.loadNext) await scroller.value.loadNext();
+        appliedFilterSnapshot.value = snapshotFilters();
+        jumpToPageInput.value = '';
+    } catch {}
 }
 
 async function resetToFirstPage() {
@@ -125,7 +201,8 @@ async function resetToFirstPage() {
 form.defaults({ ...form.data(), page: 1, next: null });
         form.reset();
         if (scroller.value?.reset) scroller.value.reset();
-        if (scroller.value?.loadNext) await scroller.value.loadNext();
+        if (scroller.value?.loadPage) await scroller.value.loadPage(1);
+        else if (scroller.value?.loadNext) await scroller.value.loadNext();
         appliedFilterSnapshot.value = snapshotFilters();
     } catch {}
 }
@@ -261,6 +338,11 @@ if (!(form as any).sort) {
     if (((form as any).sort ?? 'random') === 'random' && (!(form as any).rand_seed || Number((form as any).rand_seed) <= 0)) {
         (form as any).rand_seed = generateSeed();
     }
+
+    // Fetch mime types for the dropdown
+    try {
+        await fetchMimeTypes();
+    } catch {}
 
     // Seed initial items from server and cursor state
     scroller.value.init(
@@ -480,6 +562,47 @@ v-model.number="(form as any).limit"
                         <option value="twitter">Twitter</option>
                     </select>
                 </div>
+                <div class="grid gap-1">
+                    <Label class="text-xs text-muted-foreground">Mime Type</Label>
+                    <select
+                        class="h-9 rounded-md border px-2 text-sm dark:bg-neutral-900"
+                        v-model="(form as any).mime_type"
+                        :disabled="mimeTypesLoading"
+                        data-test="reels-mime-type"
+                    >
+                        <option value="">All</option>
+                        <optgroup v-if="!mimeTypesLoading && getGrouped().video.length > 0" label="Video">
+                            <option
+                                v-for="mime in getGrouped().video"
+                                :key="mime"
+                                :value="mime"
+                            >
+                                {{ mime }}
+                            </option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="grid gap-1">
+                    <Label class="text-xs text-muted-foreground">File ID</Label>
+                    <Input
+                        v-model.number="(form as any).file_id"
+                        type="number"
+                        min="1"
+                        placeholder="File ID"
+                        class="h-9 w-32"
+                        data-test="reels-file-id"
+                    />
+                </div>
+                <div class="grid gap-1">
+                    <Label class="text-xs text-muted-foreground">Source ID</Label>
+                    <Input
+                        v-model="(form as any).source_id"
+                        type="text"
+                        placeholder="Source ID"
+                        class="h-9 w-40"
+                        data-test="reels-source-id"
+                    />
+                </div>
 
 <div v-if="(form as any).sort === 'random'" class="flex items-center gap-2">
                     <span class="text-xs text-muted-foreground">Seed</span>
@@ -529,6 +652,28 @@ v-model.number="(form as any).limit"
                 >
                     <ChevronsLeft :size="18" />
                 </Button>
+
+                <div class="flex items-center gap-2">
+                    <Input
+                        v-model="jumpToPageInput"
+                        type="number"
+                        min="1"
+                        placeholder="Page #"
+                        class="h-9 w-24"
+                        @keyup.enter="jumpToPage"
+                        data-test="reels-jump-input"
+                    />
+                    <Button
+                        variant="outline"
+                        :disabled="isLoading || !jumpToPageInput"
+                        @click="jumpToPage"
+                        class="h-9 px-3 cursor-pointer"
+                        data-test="reels-jump"
+                        title="Go to page"
+                    >
+                        Go
+                    </Button>
+                </div>
             </div>
             <ScrollableLayout class="flex flex-col">
                 <Masonry

@@ -119,11 +119,26 @@ class ReelsDislikedController extends Controller
         $reasons = $this->mapReasons($category);
 
         $userId = (string) ($this->currentUserId() ?? '');
+        $mimeType = $this->requestedMimeType();
+        $fileId = $this->requestedFileId();
+        $sourceId = $this->requestedSourceId();
 
         $query = File::search('*')
             ->where('mime_group', 'video')
             ->where('blacklisted', true)
             ->where('not_found', false);
+
+        if ($mimeType) {
+            $query->where('mime_type', $mimeType);
+        }
+
+        if ($fileId) {
+            $query->where('id', (string) $fileId);
+        }
+
+        if ($sourceId) {
+            $query->where('source_id', (string) $sourceId);
+        }
 
         if ($category === 'auto') {
             $query->whereIn('previewed_count', [0]);
