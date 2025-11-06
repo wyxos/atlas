@@ -4,19 +4,22 @@ import { Play, Pause, Music } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import FileReactions from '@/components/audio/FileReactions.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   item: any;
   // 1-based index for display
   index: number;
   // 0-based index for selection/range math
   rowIndex: number;
   loadedFile: any | null;
-  isPlaying: boolean;
-  currentFileId: number | null;
+  isPlaying?: boolean;
+  currentFileId?: number | null;
   highlightId?: number | null;
   // Selection visual state
   isSelected?: boolean;
-}>();
+}>(), {
+  isPlaying: false,
+  currentFileId: null,
+});
 
 const emit = defineEmits<{
   (e: 'play', file: any): void;
