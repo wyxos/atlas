@@ -36,48 +36,81 @@ class CivitaiVideoUrlExtractor
             }
 
             $html = $response->body();
-            $referrerBase = $this->getBaseUrl($referrerUrl);
-
-            // Look for <source> tags with mp4 files
-            // Pattern: <source src="..." ...> or <source ... src="...">
-            if (preg_match_all('/<source[^>]+src=["\']([^"\']+\.mp4[^"\']*)["\'][^>]*>/i', $html, $matches)) {
-                $foundUrls = [];
-                foreach ($matches[1] as $url) {
-                    // Resolve relative URLs
-                    $absoluteUrl = $this->resolveUrl($url, $referrerBase);
-                    $foundUrls[] = $absoluteUrl;
-
-                    // Prefer URLs with transcode parameters (higher quality)
-                    if (str_contains($absoluteUrl, 'transcode=true')) {
-                        return $absoluteUrl;
-                    }
-                }
-
-                // Fall back to first mp4 URL found
-                return $foundUrls[0] ?? null;
+            if (empty($html)) {
+                return null;
             }
 
-            // Also check for video tags with source children
-            if (preg_match_all('/<video[^>]*>(.*?)<\/video>/is', $html, $videoMatches)) {
-                $foundUrls = [];
-                foreach ($videoMatches[1] as $videoContent) {
-                    if (preg_match('/<source[^>]+src=["\']([^"\']+\.mp4[^"\']*)["\'][^>]*>/i', $videoContent, $srcMatches)) {
-                        $absoluteUrl = $this->resolveUrl($srcMatches[1], $referrerBase);
-                        $foundUrls[] = $absoluteUrl;
+            $referrerBase = $this->getBaseUrl($referrerUrl);
+            $foundUrls = [];
 
-                        if (str_contains($absoluteUrl, 'transcode=true')) {
-                            return $absoluteUrl;
+            // Try multiple patterns to find <source> tags with mp4 files
+            // Pattern 1: <source src="..." ...> - src attribute with whitespace before it
+            // Handles both self-closing and non-self-closing tags
+            if (preg_match_all('/<source[^>]*\s+src\s*=\s*["\']([^"\']*\.mp4[^"\']*)["\'][^>]*>/i', $html, $matches)) {
+                foreach ($matches[1] as $url) {
+                    if (empty($url)) {
+                        continue;
+                    }
+                    $absoluteUrl = $this->resolveUrl($url, $referrerBase);
+                    if (! in_array($absoluteUrl, $foundUrls, true)) {
+                        $foundUrls[] = $absoluteUrl;
+                    }
+                }
+            }
+
+            // Pattern 2: <source src="..." ...> - src attribute immediately after tag name
+            if (preg_match_all('/<source\s+src\s*=\s*["\']([^"\']*\.mp4[^"\']*)["\'][^>]*>/i', $html, $matches)) {
+                foreach ($matches[1] as $url) {
+                    if (empty($url)) {
+                        continue;
+                    }
+                    $absoluteUrl = $this->resolveUrl($url, $referrerBase);
+                    if (! in_array($absoluteUrl, $foundUrls, true)) {
+                        $foundUrls[] = $absoluteUrl;
+                    }
+                }
+            }
+
+            // Pattern 3: Check inside <video> tags specifically (more specific context)
+            if (preg_match_all('/<video[^>]*>(.*?)<\/video>/is', $html, $videoMatches)) {
+                foreach ($videoMatches[1] as $videoContent) {
+                    if (preg_match_all('/<source[^>]*\s+src\s*=\s*["\']([^"\']*\.mp4[^"\']*)["\'][^>]*>/i', $videoContent, $srcMatches)) {
+                        foreach ($srcMatches[1] as $url) {
+                            if (empty($url)) {
+                                continue;
+                            }
+                            $absoluteUrl = $this->resolveUrl($url, $referrerBase);
+                            if (! in_array($absoluteUrl, $foundUrls, true)) {
+                                $foundUrls[] = $absoluteUrl;
+                            }
                         }
                     }
                 }
+            }
 
-                // Fall back to first found URL
-                if (! empty($foundUrls)) {
-                    return $foundUrls[0];
+            // Pattern 4: Try to find any URL containing .mp4 in the HTML (fallback for unusual structures)
+            // This is a last resort and less specific
+            if (empty($foundUrls) && preg_match_all('/https?:\/\/[^"\'\s<>]+\.mp4[^"\'\s<>]*/i', $html, $matches)) {
+                foreach ($matches[0] as $url) {
+                    if (str_contains($url, 'image.civitai.com') && ! in_array($url, $foundUrls, true)) {
+                        $foundUrls[] = $url;
+                    }
                 }
             }
 
-            return null;
+            if (empty($foundUrls)) {
+                return null;
+            }
+
+            // Prefer URLs with transcode parameters (higher quality)
+            foreach ($foundUrls as $url) {
+                if (str_contains($url, 'transcode=true')) {
+                    return $url;
+                }
+            }
+
+            // Fall back to first mp4 URL found
+            return $foundUrls[0];
         } catch (\Throwable $e) {
             return null;
         }
