@@ -81,11 +81,7 @@ class PhotosDislikedController extends Controller
 
         return [
             'files' => $files,
-            'filter' => $this->buildListingFilter(
-                $options,
-                $paginator,
-                route('photos.disliked.data', ['category' => $category])
-            ),
+            'filter' => $this->buildListingFilter($options, $paginator),
         ];
     }
 

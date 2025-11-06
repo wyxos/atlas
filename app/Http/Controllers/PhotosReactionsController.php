@@ -109,7 +109,6 @@ class PhotosReactionsController extends Controller
             'filter' => $this->buildListingFilter(
                 $options,
                 $paginator,
-                route('photos.reactions.data', ['kind' => $kind]),
                 [
                     'title' => self::KIND_TITLES[$kind] ?? ucfirst($kind),
                 ]

@@ -104,7 +104,7 @@ class PhotosController extends Controller
 
         return [
             'files' => $files,
-            'filter' => $this->buildListingFilter($options, $paginator, route('photos.data')),
+            'filter' => $this->buildListingFilter($options, $paginator),
         ];
     }
 }

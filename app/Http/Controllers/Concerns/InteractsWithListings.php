@@ -145,17 +145,53 @@ trait InteractsWithListings
     }
 
     /**
+     * Derive the data route URL from the current route context.
+     *
+     * @param  array<string, mixed>  $parameters
+     */
+    protected function deriveDataRouteUrl(array $parameters = []): string
+    {
+        $route = request()->route();
+
+        if (! $route) {
+            throw new \RuntimeException('Unable to determine current route');
+        }
+
+        $routeName = $route->getName();
+
+        if (! $routeName) {
+            throw new \RuntimeException('Current route has no name');
+        }
+
+        // If already ends with .data, use it as-is
+        if (str_ends_with($routeName, '.data')) {
+            $dataRouteName = $routeName;
+        } elseif (str_ends_with($routeName, '.index')) {
+            // Remove .index and append .data
+            $dataRouteName = substr($routeName, 0, -6).'.data';
+        } else {
+            // Append .data
+            $dataRouteName = $routeName.'.data';
+        }
+
+        // Merge route parameters with provided parameters
+        $allParameters = array_merge($route->parameters(), $parameters);
+
+        return route($dataRouteName, $allParameters);
+    }
+
+    /**
      * Build the standard filter payload returned to Inertia responses.
      *
      * @param  array<string, mixed>  $overrides
      */
-    protected function buildListingFilter(ListingOptions $options, ?LengthAwarePaginator $paginator, string $dataUrl, array $overrides = []): array
+    protected function buildListingFilter(ListingOptions $options, ?LengthAwarePaginator $paginator, array $overrides = []): array
     {
         $base = [
             'page' => $options->page,
             'next' => $paginator && $paginator->hasMorePages() ? ($options->page + 1) : null,
             'limit' => $options->limit,
-            'data_url' => $dataUrl,
+            'data_url' => $this->deriveDataRouteUrl(),
             'total' => $paginator && method_exists($paginator, 'total') ? (int) $paginator->total() : null,
             'sort' => $options->sort,
             'rand_seed' => $options->isRandom() ? $options->randSeed : null,

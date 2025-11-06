@@ -88,7 +88,7 @@ class PhotosUnratedController extends Controller
 
         return [
             'files' => $files,
-            'filter' => $this->buildListingFilter($options, $paginator, route('photos.unrated.data')),
+            'filter' => $this->buildListingFilter($options, $paginator),
             'moderation' => [
                 'blacklisted_count' => (int) $aggregateModeration['blacklisted_count'],
                 'previews' => array_slice($aggregateModeration['previews'], 0, 4),
