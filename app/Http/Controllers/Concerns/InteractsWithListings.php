@@ -144,11 +144,40 @@ trait InteractsWithListings
         return $value;
     }
 
+    protected function requestedFileId(): ?int
+    {
+        $value = request('file_id');
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $id = is_numeric($value) ? (int) $value : null;
+
+        return $id && $id > 0 ? $id : null;
+    }
+
+    protected function requestedSourceId(): ?string
+    {
+        $value = request('source_id');
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '' || in_array($value, ['null', 'undefined'], true)) {
+            return null;
+        }
+
+        return $value;
+    }
+
     /**
      * Apply sorting to a Scout query based on ListingOptions.
      *
      * @param  \Laravel\Scout\Builder  $query
-     * @param  \App\Support\ListingOptions  $options
      * @param  string|null  $primaryField  Primary field for newest/oldest sorting (default: 'downloaded_at')
      * @param  string|null  $secondaryField  Secondary field for tie-breaking (default: 'created_at', null to skip)
      */
@@ -224,6 +253,8 @@ trait InteractsWithListings
             'rand_seed' => $options->isRandom() ? $options->randSeed : null,
             'source' => $this->normalizeSource(request('source')),
             'mime_type' => $this->requestedMimeType(),
+            'file_id' => $this->requestedFileId(),
+            'source_id' => $this->requestedSourceId(),
         ];
 
         return array_replace($base, $overrides);

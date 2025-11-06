@@ -48,6 +48,14 @@ if ((form as any).mime_type == null || (form as any).mime_type === 'null' || (fo
     (form as any).mime_type = '';
 }
 
+if ((form as any).file_id == null || (form as any).file_id === 'null' || (form as any).file_id === 'undefined') {
+    (form as any).file_id = '';
+}
+
+if ((form as any).source_id == null || (form as any).source_id === 'null' || (form as any).source_id === 'undefined') {
+    (form as any).source_id = '';
+}
+
 watch(
     () => (form as any).source,
     (value) => {
@@ -66,6 +74,24 @@ watch(
     }
 );
 
+watch(
+    () => (form as any).file_id,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).file_id = '';
+        }
+    }
+);
+
+watch(
+    () => (form as any).source_id,
+    (value) => {
+        if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+            (form as any).source_id = '';
+        }
+    }
+);
+
 // Mime types for filtering
 const { loading: mimeTypesLoading, fetch: fetchMimeTypes, getGrouped } = useMimeTypes();
 
@@ -75,8 +101,10 @@ function snapshotFilters(): string {
     const limit = Number(data.limit ?? 20) || 20;
     const source = data.source ? data.source : null;
     const mimeType = data.mime_type ? data.mime_type : null;
+    const fileId = data.file_id ? Number(data.file_id) : null;
+    const sourceId = data.source_id ? data.source_id : null;
     const randSeed = sort === 'random' ? Number(data.rand_seed ?? 0) || 0 : 0;
-    return JSON.stringify({ sort, limit, source, mimeType, randSeed });
+    return JSON.stringify({ sort, limit, source, mimeType, fileId, sourceId, randSeed });
 }
 
 const appliedFilterSnapshot = ref(snapshotFilters());
@@ -686,6 +714,27 @@ v-model.number="(form as any).limit"
                             </option>
                         </optgroup>
                     </select>
+                </div>
+                <div class="grid gap-1">
+                    <Label class="text-xs text-muted-foreground">File ID</Label>
+                    <Input
+                        v-model.number="(form as any).file_id"
+                        type="number"
+                        min="1"
+                        placeholder="File ID"
+                        class="h-9 w-32"
+                        data-test="photos-file-id"
+                    />
+                </div>
+                <div class="grid gap-1">
+                    <Label class="text-xs text-muted-foreground">Source ID</Label>
+                    <Input
+                        v-model="(form as any).source_id"
+                        type="text"
+                        placeholder="Source ID"
+                        class="h-9 w-40"
+                        data-test="photos-source-id"
+                    />
                 </div>
 
 <div v-if="(form as any).sort === 'random'" class="flex items-center gap-2">

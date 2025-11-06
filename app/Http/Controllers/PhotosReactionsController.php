@@ -57,6 +57,8 @@ class PhotosReactionsController extends Controller
 
         $userId = $this->currentUserId();
         $mimeType = $this->requestedMimeType();
+        $fileId = $this->requestedFileId();
+        $sourceId = $this->requestedSourceId();
         $field = self::KIND_TO_FIELD[$kind];
 
         $query = File::search('*')
@@ -66,6 +68,14 @@ class PhotosReactionsController extends Controller
 
         if ($mimeType) {
             $query->where('mime_type', $mimeType);
+        }
+
+        if ($fileId) {
+            $query->where('id', (string) $fileId);
+        }
+
+        if ($sourceId) {
+            $query->where('source_id', (string) $sourceId);
         }
 
         if ($userId) {

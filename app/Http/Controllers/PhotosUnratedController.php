@@ -104,6 +104,9 @@ class PhotosUnratedController extends Controller
      */
     protected function performSearch(ListingOptions $options, ?int $userId, ?string $mimeType): array
     {
+        $fileId = $this->requestedFileId();
+        $sourceId = $this->requestedSourceId();
+
         $query = File::search('*')
             ->where('mime_group', 'image')
             ->where('not_found', false)
@@ -111,6 +114,14 @@ class PhotosUnratedController extends Controller
 
         if ($mimeType) {
             $query->where('mime_type', $mimeType);
+        }
+
+        if ($fileId) {
+            $query->where('id', (string) $fileId);
+        }
+
+        if ($sourceId) {
+            $query->where('source_id', (string) $sourceId);
         }
 
         $this->applySorting($query, $options, null, 'created_at');
