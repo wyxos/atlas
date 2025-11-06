@@ -80,6 +80,28 @@ class ReelsDislikedController extends Controller
                 $height = 512;
             }
 
+            $listingMetadata = $file->listing_metadata;
+            if (! is_array($listingMetadata)) {
+                $listingMetadata = is_string($listingMetadata) ? json_decode($listingMetadata, true) ?: [] : [];
+            }
+
+            // Calculate absolute disk path
+            $absolutePath = null;
+            if ($hasPath && $file->path) {
+                $path = (string) $file->path;
+                foreach (['atlas_app', 'atlas'] as $diskName) {
+                    $disk = Storage::disk($diskName);
+                    if ($disk->exists($path)) {
+                        try {
+                            $absolutePath = $disk->path($path);
+                            break;
+                        } catch (\Throwable $e) {
+                            // Continue to next disk
+                        }
+                    }
+                }
+            }
+
             $reaction = $reactions[$id] ?? null;
 
             return [
@@ -94,6 +116,8 @@ class ReelsDislikedController extends Controller
                 'downloaded' => (bool) $file->downloaded,
                 'previewed_count' => (int) ($file->previewed_count ?? 0),
                 'containers' => PhotoContainers::forFile($file),
+                'listing_metadata' => $listingMetadata,
+                'absolute_path' => $absolutePath,
                 'metadata' => [
                     'prompt' => data_get(optional($file->metadata)->payload ?? [], 'prompt'),
                     'moderation' => data_get(optional($file->metadata)->payload ?? [], 'moderation'),

@@ -7,6 +7,7 @@ use App\Models\File;
 use App\Support\FilePreviewUrl;
 use App\Support\PhotoContainers;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 
@@ -96,6 +97,28 @@ class ReelsUnratedController extends Controller
                     $height = 512;
                 }
 
+                $listingMetadata = $file->listing_metadata;
+                if (! is_array($listingMetadata)) {
+                    $listingMetadata = is_string($listingMetadata) ? json_decode($listingMetadata, true) ?: [] : [];
+                }
+
+                // Calculate absolute disk path
+                $absolutePath = null;
+                if ($hasPath && $file->path) {
+                    $path = (string) $file->path;
+                    foreach (['atlas_app', 'atlas'] as $diskName) {
+                        $disk = Storage::disk($diskName);
+                        if ($disk->exists($path)) {
+                            try {
+                                $absolutePath = $disk->path($path);
+                                break;
+                            } catch (\Throwable $e) {
+                                // Continue to next disk
+                            }
+                        }
+                    }
+                }
+
                 return [
                     'id' => $id,
                     'preview' => $original ?? $thumbnail,
@@ -105,6 +128,8 @@ class ReelsUnratedController extends Controller
                     'height' => $height,
                     'page' => $options->page,
                     'containers' => PhotoContainers::forFile($file),
+                    'listing_metadata' => $listingMetadata,
+                    'absolute_path' => $absolutePath,
                     'loved' => false,
                     'liked' => false,
                     'disliked' => false,

@@ -1007,6 +1007,23 @@ const highlightedPromptHtml = computed(() => {
               <p class="text-xs leading-relaxed text-muted-foreground">{{ dialogItem?.metadata?.prompt }}</p>
             </div>
 
+            <!-- Listing Metadata -->
+            <div v-if="dialogItem?.listing_metadata && Object.keys(dialogItem.listing_metadata).length > 0" class="mb-4">
+              <h3 class="mb-2 text-sm font-semibold">Listing Metadata</h3>
+              <details>
+                <summary class="cursor-pointer text-xs text-muted-foreground">Show listing metadata</summary>
+                <div class="mt-2 overflow-auto max-h-60 rounded bg-muted/50 p-3">
+                  <pre class="text-xs">{{ JSON.stringify(dialogItem.listing_metadata, null, 2) }}</pre>
+                </div>
+              </details>
+            </div>
+
+            <!-- Disk Absolute Path -->
+            <div v-if="dialogItem?.absolute_path" class="mb-4">
+              <h3 class="mb-2 text-sm font-semibold">Disk Absolute Path</h3>
+              <p class="break-all rounded bg-muted/50 p-2 text-xs font-mono text-muted-foreground">{{ dialogItem.absolute_path }}</p>
+            </div>
+
             <!-- Full Metadata JSON -->
             <details class="mt-4">
               <summary class="cursor-pointer text-sm font-medium">Full Metadata</summary>

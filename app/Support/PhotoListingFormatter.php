@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
 class PhotoListingFormatter
@@ -68,6 +69,24 @@ class PhotoListingFormatter
         $prompt = $detailMetadata['prompt'] ?? data_get($listingMetadata, 'meta.prompt');
         $moderation = $detailMetadata['moderation'] ?? null;
 
+        // Calculate absolute disk path
+        $absolutePath = null;
+        if ($hasPath && $file->path) {
+            $path = (string) $file->path;
+            // Try atlas_app first, then atlas
+            foreach (['atlas_app', 'atlas'] as $diskName) {
+                $disk = Storage::disk($diskName);
+                if ($disk->exists($path)) {
+                    try {
+                        $absolutePath = $disk->path($path);
+                        break;
+                    } catch (\Throwable $e) {
+                        // Continue to next disk
+                    }
+                }
+            }
+        }
+
         return [
             'id' => $id,
             'preview' => $thumbnail ?? $original,
@@ -76,6 +95,7 @@ class PhotoListingFormatter
             'true_thumbnail_url' => $remoteThumbnail ?: ($localPreview ?? null),
             'referrer_url' => $file->referrer_url ?: null,
             'is_local' => $hasPath,
+            'absolute_path' => $absolutePath,
             'type' => $type,
             'width' => $width,
             'height' => $height,
