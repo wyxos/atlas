@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
 import * as AudioReactionsController from '@/actions/App/Http/Controllers/AudioReactionsController';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/vue3';
@@ -9,12 +8,10 @@ import AudioListItem from '@/components/audio/AudioListItem.vue';
 import SectionHeader from '@/components/audio/SectionHeader.vue';
 import SearchBar from '@/components/audio/SearchBar.vue';
 import { Music, Search, Shuffle as ShuffleIcon, Play as PlayIcon } from 'lucide-vue-next';
-import axios from 'axios';
 import { useAudioListPage } from '@/composables/useAudioListPage';
 import { useAudioReactions } from '@/composables/useAudioReactions';
 import { computed, onMounted, ref, watch, onUnmounted } from 'vue';
 import { useEcho } from '@laravel/echo-vue';
-import { audioStore, audioActions } from '@/stores/audio';
 import ContentLayout from '@/layouts/ContentLayout.vue';
 import ScrollableLayout from '@/layouts/ScrollableLayout.vue';
 import { bus } from '@/lib/bus';
@@ -117,25 +114,18 @@ const getSearchAction = (q: string) => {
       ? AudioReactionsController.index(props.reactionType, { query: { query: q } })
       : AudioReactionsController.index(props.reactionType);
   }
-  // Otherwise, use AudioController for regular playlists
-  return q
-    ? AudioController.playlist({ playlist: props.playlistId as any, query: { query: q } })
-    : AudioController.playlist({ playlist: props.playlistId as any });
+  // Placeholder for playlist search - will be implemented with new player
+  return { url: '' };
 };
 
-const hasPhysicalPlaylist = computed(() => typeof props.playlistId === 'number');
 
 const {
   searchQuery,
   isSearching,
   filteredItems,
   loadedFiles,
-  isPlaying,
-  currentFileId,
   recycleScrollerRef,
-  flashItemId,
   updateSearch,
-  playAudio,
   onScrollerUpdate,
 } = useAudioListPage({
   files: () => pageFiles.value,
@@ -143,80 +133,11 @@ const {
   idOrder: () => pageOrder.value,
   initialQuery: props.query,
   getSearchAction,
-  // Fire-and-forget to preserve user gesture for playback
-  beforePlaySelected: async () => {
-    if (!hasPhysicalPlaylist.value || props.playlistId == null) {
-      return;
-    }
-
-    try {
-      const action = AudioController.activatePlaylist();
-      await axios.post(action.url, { playlist_id: props.playlistId });
-    } catch (e) {
-      console.error('Failed to activate playlist', e);
-    }
-  },
-  playlistId: () => props.playlistId,
-  playlistIsSpotify: () => !!props.isSpotifyPlaylist,
   onReactionEvent: handleReactionEvent,
 });
 
 // Active search state: consider a search "active" when query exists and is non-empty
 const isSearchActive = computed(() => !!(props.query && props.query.trim().length > 0));
-
-
-// Playlist-level actions
-function firstId(): number | null {
-  const ids = pageOrder.value || [];
-  return Array.isArray(ids) && ids.length > 0 ? Number(ids[0]) : null;
-}
-
-async function activateThisPlaylist() {
-  if (!hasPhysicalPlaylist.value || props.playlistId == null) {
-    return;
-  }
-
-  try {
-    const action = AudioController.activatePlaylist();
-    await axios.post(action.url, { playlist_id: props.playlistId });
-  } catch (e) {
-    console.error('Failed to activate playlist', e);
-  }
-}
-
-async function handlePlayAll() {
-  const fid = firstId();
-  if (fid == null) return;
-  void activateThisPlaylist();
-  const items = (pageOrder.value || []).map((id) => {
-    const base: any = loadedFiles[id] || { id };
-    return props.isSpotifyPlaylist ? { ...base, _engine: 'spotify' } : base;
-  });
-  audioStore.queuePlaylistId = props.playlistId ?? null;
-  audioActions.setQueueAndPlay(items, fid);
-}
-
-function shuffleLocal<T>(arr: T[]): T[] {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-async function handleShuffleAll() {
-  const ids = pageOrder.value || [];
-  if (!Array.isArray(ids) || ids.length === 0) return;
-  void activateThisPlaylist();
-  const items = ids.map((id) => {
-    const base: any = loadedFiles[id] || { id };
-    return props.isSpotifyPlaylist ? { ...base, _engine: 'spotify' } : base;
-  });
-  const shuffled = shuffleLocal(items);
-  audioStore.queuePlaylistId = props.playlistId ?? null;
-  audioActions.setQueueAndPlay(shuffled, shuffled[0].id);
-}
 
 const { toggleFavorite, likeItem, dislikeItem, laughedAtItem } = useAudioReactions(loadedFiles);
 
@@ -235,17 +156,7 @@ watch(() => props.playlistId, () => {
 });
 
 onMounted(async () => {
-  // Support autoplay and autoshuffle query from sidebar actions
-  try {
-    const url = usePage().url as string;
-    const qs = url.includes('?') ? url.split('?')[1] : '';
-    const params = new URLSearchParams(qs);
-    if (params.has('autoplay')) {
-      void handlePlayAll();
-    } else if (params.has('autoshuffle')) {
-      void handleShuffleAll();
-    }
-  } catch {}
+  // Placeholder for autoplay/autoshuffle logic when player is rebuilt
 });
 
 onUnmounted(() => {});
@@ -326,10 +237,10 @@ if (authUser?.id) {
                 <div v-if="selectedCount > 0" class="text-xs text-muted-foreground">
                     {{ selectedCount }} selected
                 </div>
-                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Play" data-test="playlist-play-all" @click="handlePlayAll">
+                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Play" data-test="playlist-play-all">
                     <PlayIcon :size="40" class="text-muted-foreground group-hover:text-white" />
                 </button>
-                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Shuffle" data-test="playlist-shuffle-all" @click="handleShuffleAll">
+                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Shuffle" data-test="playlist-shuffle-all">
                     <ShuffleIcon :size="40" class="text-muted-foreground group-hover:text-white" />
                 </button>
             </div>
@@ -361,12 +272,8 @@ if (authUser?.id) {
                     :index="(Number(index) || 0) + 1"
                     :row-index="Number(index) || 0"
                     :loaded-file="loadedFiles[item.id]"
-                    :is-playing="isPlaying"
-                    :current-file-id="currentFileId"
-                    :highlight-id="flashItemId"
                     :is-selected="selectedIds.has(item.id)"
                     @rowClick="handleRowClick"
-                    @play="playAudio"
                     @favorite="toggleFavorite"
                     @like="likeItem"
                     @dislike="dislikeItem"

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { RecycleScroller } from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import { X } from 'lucide-vue-next';
-import { audioStore, audioActions } from '@/stores/audio';
 import { useAudioFileLoader } from '@/composables/useAudioFileLoader';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -14,7 +13,7 @@ const scrollerRef = ref<InstanceType<typeof RecycleScroller> | null>(null);
 
 const { loadedFiles, loadBatchFileDetails } = useAudioFileLoader();
 
-const items = computed(() => audioStore.queue || []);
+const items = computed(() => []);
 
 function onScrollerUpdate(
   startIndex: number,
@@ -37,27 +36,6 @@ function onScrollerUpdate(
   }
 }
 
-async function scrollToCurrent() {
-  // Ensure DOM and scroller have rendered and measured
-  await nextTick();
-  await nextTick();
-  if (!props.isOpen || !scrollerRef.value) return;
-  const currentId = audioStore.currentTrack?.id;
-  if (!currentId) return;
-  const index = (items.value as any[]).findIndex((it) => it?.id === currentId);
-  if (index >= 0) {
-    const scroller: any = scrollerRef.value as any;
-    if (typeof scroller.scrollToItem === 'function') scroller.scrollToItem(index);
-    else if (typeof scroller.scrollToIndex === 'function') scroller.scrollToIndex(index);
-  }
-}
-
-// When the panel opens, scroll to current
-watch(() => props.isOpen, (open) => { if (open) void scrollToCurrent(); });
-// If the current track changes while open, keep it in view
-watch(() => audioStore.currentTrack ? (audioStore.currentTrack as any).id : null, (id) => {
-  if (id && props.isOpen) void scrollToCurrent();
-});
 
 function getLoaded(item: any) {
   return loadedFiles[item.id] || null;
@@ -90,17 +68,6 @@ function titleText(file: any): string {
   return file?.metadata?.payload?.title || 'Untitled';
 }
 
-function jumpTo(item: any) {
-  const idx = (items.value as any[]).findIndex((it) => it?.id === item.id);
-  if (idx >= 0) {
-    audioStore.currentIndex = idx;
-    audioStore.currentTrack = getLoaded(item);
-    // Ensure new track starts from 0 regardless of previous position
-    audioStore.currentTime = 0;
-    audioStore.duration = 0;
-    audioActions.play();
-  }
-}
 </script>
 
 <template>
@@ -146,27 +113,14 @@ function jumpTo(item: any) {
           <div
             class="px-3 py-2 flex items-center gap-3 border-b border-border cursor-pointer hover:bg-accent/50 transition-colors"
             :class="{
-              'bg-primary/10 ring-2 ring-emerald-400/60': audioStore.currentTrack?.id === item.id,
               'bg-red-500/10 text-red-300 border-red-500/30': !!(getLoaded(item) && getLoaded(item).not_found === true),
             }"
             :data-id="item.id"
             :data-test="(getLoaded(item) && getLoaded(item).not_found) ? 'queue-row-not-found' : null"
-            @click="jumpTo(item)"
           >
-            <!-- Index / Equalizer -->
+            <!-- Index -->
             <div class="w-6 flex items-center justify-end select-none">
-              <template v-if="audioStore.currentTrack?.id === item.id && audioStore.isPlaying">
-                <div class="boxContainer">
-                  <div class="box box1"></div>
-                  <div class="box box2"></div>
-                  <div class="box box3"></div>
-                  <div class="box box4"></div>
-                  <div class="box box5"></div>
-                </div>
-              </template>
-              <template v-else>
-                <span class="text-xs text-muted-foreground">{{ index + 1 }}</span>
-              </template>
+              <span class="text-xs text-muted-foreground">{{ index + 1 }}</span>
             </div>
 
             <!-- Cover -->

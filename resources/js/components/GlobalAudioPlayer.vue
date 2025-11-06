@@ -8,4 +8,3 @@ import AudioPlayer from '@/components/audio/AudioPlayer.vue';
     <AudioPlayer />
   </div>
 </template>
-
