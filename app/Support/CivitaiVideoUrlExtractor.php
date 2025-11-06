@@ -43,6 +43,27 @@ class CivitaiVideoUrlExtractor
             $referrerBase = $this->getBaseUrl($referrerUrl);
             $foundUrls = [];
 
+            // Try to extract video URL from __NEXT_DATA__ JSON (for React/Next.js apps)
+            if (preg_match('/<script[^>]*id=["\']__NEXT_DATA__["\'][^>]*>(.*?)<\/script>/is', $html, $nextDataMatches)) {
+                $jsonData = json_decode($nextDataMatches[1], true);
+                if ($jsonData && isset($jsonData['props']['pageProps']['trpcState']['json']['queries'])) {
+                    foreach ($jsonData['props']['pageProps']['trpcState']['json']['queries'] as $query) {
+                        if (isset($query['state']['data']['url']) && isset($query['state']['data']['type']) && $query['state']['data']['type'] === 'video') {
+                            $videoUuid = $query['state']['data']['url'];
+                            $videoName = $query['state']['data']['name'] ?? 'video.mp4';
+
+                            // Construct possible video URLs based on CivitAI's URL pattern
+                            // Pattern: https://image.civitai.com/{hash}/{uuid}/transcode=true,original=true,quality=90/{filename}
+                            $transcodedUrl = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{$videoUuid}/transcode=true,original=true,quality=90/{$videoName}";
+                            $originalUrl = "https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/{$videoUuid}/original=true/{$videoName}";
+
+                            $foundUrls[] = $transcodedUrl;
+                            $foundUrls[] = $originalUrl;
+                        }
+                    }
+                }
+            }
+
             // Try multiple patterns to find <source> tags with mp4 files
             // Pattern 1: <source src="..." ...> - src attribute with whitespace before it
             // Handles both self-closing and non-self-closing tags

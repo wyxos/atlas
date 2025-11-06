@@ -22,7 +22,8 @@ class FixCivitaiMediaTypes extends Command
             ->whereNotNull('path')
             ->where('path', '!=', '')
             ->whereNotNull('thumbnail_url')
-            ->where('thumbnail_url', 'like', '%mp4%')
+            ->where(fn($query) => $query->where('thumbnail_url', 'like', '%mp4%')
+            ->orWhere('url', 'like', '%mp4%'))
             ->where('mime_type', 'image/webp')
             ->select(['id', 'filename', 'referrer_url']);
 

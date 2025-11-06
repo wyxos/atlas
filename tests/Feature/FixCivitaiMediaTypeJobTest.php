@@ -203,10 +203,10 @@ it('extracts video URL from real fixture for file ID 1253355', function () {
 
     $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
     $referrerUrl = 'https://civitai.com/images/67559727';
-    $expectedVideoUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/transcode=true,original=true,quality=90/MP4_UPSCALE__00072.mp4';
+    $expectedVideoUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-uuid-1234-5678-90ab-cdef/transcode=true,original=true,quality=90/sample_video.mp4';
 
-    // Load fixture HTML
-    $html = file_get_contents(base_path('tests/Fixtures/civitai-referrer-67559727.html'));
+    // Load real fixture HTML (sanitized)
+    $html = file_get_contents(base_path('tests/Fixtures/civitai-referrer-real.html'));
 
     Http::fake([
         $referrerUrl => Http::response($html, 200),
@@ -217,9 +217,9 @@ it('extracts video URL from real fixture for file ID 1253355', function () {
         'id' => 1253355,
         'source' => 'CivitAI',
         'source_id' => 67559727,
-        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/96b33e41-8a73-4faa-8ba2-02f65e80dc35.mp4',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-uuid-1234-5678-90ab-cdef/original=true/sample_video.mp4',
         'referrer_url' => $referrerUrl,
-        'thumbnail_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/96b33e41-8a73-4faa-8ba2-02f65e80dc35.mp4',
+        'thumbnail_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-uuid-1234-5678-90ab-cdef/original=true/sample_video.mp4',
         'filename' => 'sample.webp',
         'path' => 'downloads/sample.webp',
         'mime_type' => 'image/webp',
@@ -250,10 +250,10 @@ it('extracts video URL from real fixture for file ID 1251390', function () {
 
     $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
     $referrerUrl = 'https://civitai.com/images/101184342';
-    $expectedVideoUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0ff9aff5-56b1-4389-9730-a8e1fa11295f/transcode=true,original=true,quality=90/20250919_1328_video_1_apo8_ahq12.mp4';
+    $expectedVideoUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-uuid-1234-5678-90ab-cdef/transcode=true,original=true,quality=90/sample_video.mp4';
 
-    // Load fixture HTML
-    $html = file_get_contents(base_path('tests/Fixtures/civitai-referrer-101184342.html'));
+    // Load real fixture HTML (sanitized)
+    $html = file_get_contents(base_path('tests/Fixtures/civitai-referrer-real.html'));
 
     Http::fake([
         $referrerUrl => Http::response($html, 200),
@@ -264,9 +264,9 @@ it('extracts video URL from real fixture for file ID 1251390', function () {
         'id' => 1251390,
         'source' => 'CivitAI',
         'source_id' => 101184342,
-        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0ff9aff5-56b1-4389-9730-a8e1fa11295f/original=true/0ff9aff5-56b1-4389-9730-a8e1fa11295f.mp4',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-uuid-1234-5678-90ab-cdef/original=true/sample_video.mp4',
         'referrer_url' => $referrerUrl,
-        'thumbnail_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/0ff9aff5-56b1-4389-9730-a8e1fa11295f/original=true/0ff9aff5-56b1-4389-9730-a8e1fa11295f.mp4',
+        'thumbnail_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/sample-uuid-1234-5678-90ab-cdef/original=true/sample_video.mp4',
         'filename' => 'sample.webp',
         'path' => 'downloads/sample.webp',
         'mime_type' => 'image/webp',
