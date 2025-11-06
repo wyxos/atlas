@@ -127,16 +127,9 @@ class ReelsReactionsController extends Controller
 
         return [
             'files' => $files,
-            'filter' => [
-                'page' => $options->page,
-                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
-                'limit' => $options->limit,
-                'data_url' => route('reels.reactions.data', ['kind' => $kind]),
+            'filter' => $this->buildListingFilter($options, $paginator, [
                 'title' => self::KIND_TITLES[$kind] ?? ucfirst($kind),
-                'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $options->sort,
-                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
-            ],
+            ]),
         ];
     }
 }

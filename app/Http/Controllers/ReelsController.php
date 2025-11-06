@@ -103,17 +103,9 @@ class ReelsController extends Controller
 
         return [
             'files' => $files,
-            'filter' => [
-                'page' => $options->page,
-                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
-                'limit' => $options->limit,
-                'data_url' => route('reels.data'),
-                // include the overall total number of matching files
-                'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $options->sort,
-                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
+            'filter' => $this->buildListingFilter($options, $paginator, [
                 'source' => $source,
-            ],
+            ]),
         ];
     }
 
