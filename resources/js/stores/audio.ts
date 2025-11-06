@@ -1,4 +1,6 @@
 import { ref, computed } from 'vue';
+import axios from 'axios';
+import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
 
 export interface AudioTrack {
   id: number;
@@ -112,6 +114,60 @@ class AudioPlayerManager {
     await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay });
   }
 
+  private async loadTrackDataForContext(): Promise<void> {
+    if (this.currentIndex.value < 0 || this.queue.value.length === 0) return;
+
+    const currentIdx = this.currentIndex.value;
+    const queueLength = this.queue.value.length;
+
+    // Calculate range: current + next 5 + previous 5
+    const startIdx = Math.max(0, currentIdx - 5);
+    const endIdx = Math.min(queueLength - 1, currentIdx + 5);
+
+    // Collect IDs that need loading (don't have full metadata yet)
+    const idsToLoad: number[] = [];
+    for (let i = startIdx; i <= endIdx; i++) {
+      const track = this.queue.value[i];
+      if (track && track.id) {
+        // Check if track already has metadata (artists, metadata.payload, etc.)
+        const hasMetadata = track.artists || track.metadata?.payload;
+        if (!hasMetadata) {
+          idsToLoad.push(track.id);
+        }
+      }
+    }
+
+    if (idsToLoad.length === 0) return;
+
+    try {
+      const action = AudioController.batchDetails();
+      const response = await axios.post(action.url, {
+        file_ids: idsToLoad,
+      });
+
+      // Merge loaded data into queue items
+      const batchData = response.data;
+      for (let i = startIdx; i <= endIdx; i++) {
+        const track = this.queue.value[i];
+        if (track && track.id && batchData[track.id]) {
+          // Merge loaded data into the track, preserving url
+          const url = track.url;
+          Object.assign(track, batchData[track.id]);
+          track.url = url; // Ensure URL is preserved
+        }
+      }
+
+      // If current track was updated, refresh the ref
+      if (this.currentTrack.value && batchData[this.currentTrack.value.id]) {
+        const currentUrl = this.currentTrack.value.url;
+        Object.assign(this.currentTrack.value, batchData[this.currentTrack.value.id]);
+        this.currentTrack.value.url = currentUrl;
+      }
+    } catch (error) {
+      console.error('Error loading track data for context:', error);
+    }
+  }
+
   private async loadTrack(track: AudioTrack): Promise<void> {
     // Only use url, never fall back to path (path is a disk path, not a valid URL)
     const audioUrl = track.url;
@@ -126,6 +182,9 @@ class AudioPlayerManager {
     this.audio.src = audioUrl;
     this.currentTrack.value = track;
     await this.audio.load();
+
+    // Load track data for current + next 5 + previous 5 (fire and forget)
+    void this.loadTrackDataForContext();
   }
 
   async playTrackAtIndex(index: number, options: PlayOptions = {}): Promise<void> {

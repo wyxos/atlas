@@ -90,13 +90,30 @@ afterAll(async () => {
   }
 });
 
-function buildTrack(id: number) {
-  return {
+function buildTrack(id: number, withMetadata = false) {
+  const track: any = {
     id,
     url: `${audioServerUrl}/audio-${id}.mp3`,
-    title: `Track ${id}`,
   };
+  
+  if (withMetadata) {
+    track.artists = [{ name: `Artist ${id}` }];
+    track.metadata = { payload: { title: `Track ${id}` } };
+  }
+  
+  return track;
 }
+
+const axiosPostMock = vi.hoisted(() => vi.fn());
+vi.mock('axios', () => ({
+  default: {
+    post: axiosPostMock,
+  },
+}));
+
+vi.mock('@/actions/App/Http/Controllers/AudioController', () => ({
+  batchDetails: () => ({ url: '/audio/batch-details' }),
+}));
 
 async function importStore() {
   const mod = await import('@/stores/audio');
@@ -116,6 +133,21 @@ function getAudioInstance(): TestAudio {
 describe('audio store', () => {
   beforeEach(() => {
     createdAudios = [];
+    axiosPostMock.mockClear();
+    axiosPostMock.mockImplementation((url: string, data: any) => {
+      if (url === '/audio/batch-details' && data?.file_ids) {
+        const response: Record<number, any> = {};
+        for (const id of data.file_ids) {
+          response[id] = {
+            id,
+            artists: [{ name: `Artist ${id}` }],
+            metadata: { payload: { title: `Track ${id}` } },
+          };
+        }
+        return Promise.resolve({ data: response });
+      }
+      return Promise.reject(new Error(`Unexpected axios.post call: ${url}`));
+    });
 
     const BaseAudio = originalAudio as unknown as { new (): HTMLAudioElement & { _emit(eventName: string): void } };
 
@@ -213,6 +245,153 @@ describe('audio store', () => {
     store.setVolume(2);
     expect(store.volume.value).toBe(1);
     expect(audio.volume).toBe(1);
+  });
+
+  it('loads track metadata for current + next 5 + previous 5 when setting queue', async () => {
+    const store = await importStore();
+    // Create 15 tracks, start at index 7 (middle)
+    // Index 7 = id 8 (0-indexed: index 0 = id 1, index 7 = id 8)
+    const tracks = Array.from({ length: 15 }, (_, i) => buildTrack(i + 1));
+
+    await store.setQueueAndPlay(tracks, 7);
+    await flushPromises();
+    await flushPromises();
+
+    // Should load tracks 3-13 (index 7 ± 5 = indices 2-12, which are ids 3-13)
+    expect(axiosPostMock).toHaveBeenCalledTimes(1);
+    const call = axiosPostMock.mock.calls[0];
+    expect(call[0]).toBe('/audio/batch-details');
+    const fileIds = call[1].file_ids as number[];
+    expect(fileIds.sort((a, b) => a - b)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+
+    // Verify metadata was merged into queue items
+    const queue = store.queue.value;
+    expect(queue[6].artists?.[0]?.name).toBe('Artist 7');
+    expect(queue[6].metadata?.payload?.title).toBe('Track 7');
+    expect(queue[6].url).toBe(`${audioServerUrl}/audio-7.mp3`); // URL preserved
+
+    // Verify current track was updated (index 7 = id 8)
+    expect(store.currentTrack.value?.artists?.[0]?.name).toBe('Artist 8');
+    expect(store.currentTrack.value?.metadata?.payload?.title).toBe('Track 8');
+    expect(store.currentTrack.value?.url).toBe(`${audioServerUrl}/audio-8.mp3`);
+  });
+
+  it('loads new context metadata when navigating next', async () => {
+    const store = await importStore();
+    const tracks = Array.from({ length: 20 }, (_, i) => buildTrack(i + 1));
+
+    // Start at index 5, loads context for indices 0-10 (ids 1-11)
+    await store.setQueueAndPlay(tracks, 5);
+    await flushPromises();
+    await flushPromises();
+
+    axiosPostMock.mockClear();
+
+    // Navigate to index 6 (id 7)
+    // New context: index 6 ± 5 = indices 1-11 = ids 2-12
+    // But ids 2-11 already have metadata from initial load, so only load id 12
+    await store.next();
+    await flushPromises();
+    await flushPromises();
+
+    expect(axiosPostMock).toHaveBeenCalledTimes(1);
+    const call = axiosPostMock.mock.calls[0];
+    const fileIds = call[1].file_ids as number[];
+    expect(fileIds.sort((a, b) => a - b)).toEqual([12]);
+  });
+
+  it('loads new context metadata when navigating previous', async () => {
+    const store = await importStore();
+    const tracks = Array.from({ length: 20 }, (_, i) => buildTrack(i + 1));
+
+    // Start at index 15, loads context for indices 10-19 (ids 11-20)
+    await store.setQueueAndPlay(tracks, 15);
+    await flushPromises();
+    await flushPromises();
+
+    axiosPostMock.mockClear();
+
+    // Navigate to index 14 (id 15)
+    // New context: index 14 ± 5 = indices 9-19 = ids 10-20
+    // But ids 11-20 already have metadata from initial load, so only load id 10
+    await store.previous();
+    await flushPromises();
+    await flushPromises();
+
+    expect(axiosPostMock).toHaveBeenCalledTimes(1);
+    const call = axiosPostMock.mock.calls[0];
+    const fileIds = call[1].file_ids as number[];
+    expect(fileIds.sort((a, b) => a - b)).toEqual([10]);
+  });
+
+  it('loads new context metadata when auto-playing next track', async () => {
+    const store = await importStore();
+    const tracks = Array.from({ length: 15 }, (_, i) => buildTrack(i + 1));
+
+    // Start at index 0, loads context for indices 0-5 (ids 1-6)
+    await store.setQueueAndPlay(tracks, 0);
+    await flushPromises();
+    await flushPromises();
+
+    axiosPostMock.mockClear();
+
+    // Simulate track ending (auto-plays next track at index 1)
+    // New context: index 1 ± 5 = indices 0-6 = ids 1-7
+    // But ids 1-6 already have metadata from initial load, so only load id 7
+    const audio = getAudioInstance();
+    audio.emit('ended');
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+
+    expect(axiosPostMock).toHaveBeenCalledTimes(1);
+    const call = axiosPostMock.mock.calls[0];
+    const fileIds = call[1].file_ids as number[];
+    expect(fileIds.sort((a, b) => a - b)).toEqual([7]);
+  });
+
+  it('only loads tracks that do not already have metadata', async () => {
+    const store = await importStore();
+    // Create tracks where some already have metadata
+    const tracks = [
+      buildTrack(1, true), // Has metadata
+      buildTrack(2), // No metadata
+      buildTrack(3, true), // Has metadata
+      buildTrack(4), // No metadata
+      buildTrack(5), // No metadata
+      buildTrack(6), // No metadata
+      buildTrack(7), // No metadata
+      buildTrack(8), // No metadata
+    ];
+
+    await store.setQueueAndPlay(tracks, 3);
+    await flushPromises();
+    await flushPromises();
+
+    // Should only load tracks 2, 4, 5, 6, 7, 8 (skip 1 and 3 which have metadata)
+    expect(axiosPostMock).toHaveBeenCalledTimes(1);
+    const call = axiosPostMock.mock.calls[0];
+    const fileIds = call[1].file_ids as number[];
+    expect(fileIds.sort((a, b) => a - b)).toEqual([2, 4, 5, 6, 7, 8]);
+  });
+
+  it('preserves URL when merging metadata into queue items', async () => {
+    const store = await importStore();
+    const tracks = [buildTrack(100)];
+
+    await store.setQueueAndPlay(tracks, 0);
+    await flushPromises();
+    await flushPromises();
+
+    // Verify URL is preserved after metadata merge
+    const queue = store.queue.value;
+    expect(queue[0].url).toBe(`${audioServerUrl}/audio-100.mp3`);
+    expect(queue[0].artists?.[0]?.name).toBe('Artist 100');
+    expect(queue[0].metadata?.payload?.title).toBe('Track 100');
+
+    // Verify current track URL is preserved
+    expect(store.currentTrack.value?.url).toBe(`${audioServerUrl}/audio-100.mp3`);
+    expect(store.currentTrack.value?.artists?.[0]?.name).toBe('Artist 100');
   });
 });
 
