@@ -116,7 +116,7 @@ vi.mock('@/pages/browse/useBatchReact', () => ({
 }));
 
 vi.mock('@/utils/moderationHighlight', () => ({
-    highlightPromptHtml: (_prompt: string) => 'highlighted',
+    highlightPromptHtml: () => 'highlighted',
 }));
 
 const GridItem = (await import('@/components/browse/GridItem.vue')).default;

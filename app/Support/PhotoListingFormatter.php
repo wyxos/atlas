@@ -4,8 +4,6 @@ namespace App\Support;
 
 use App\Models\File;
 use Illuminate\Support\Facades\URL;
-use App\Support\FilePreviewUrl;
-use App\Support\PhotoContainers;
 
 class PhotoListingFormatter
 {
@@ -99,4 +97,3 @@ class PhotoListingFormatter
         ];
     }
 }
-

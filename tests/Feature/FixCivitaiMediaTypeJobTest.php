@@ -111,7 +111,7 @@ it('processes all civitai files when invoked without a specific id', function ()
         'mime_type' => 'image/jpeg',
     ]);
 
-    (new FixCivitaiMediaType())->handle();
+    (new FixCivitaiMediaType)->handle();
 
     $first->refresh();
     $second->refresh();

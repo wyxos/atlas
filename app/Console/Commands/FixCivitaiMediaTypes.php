@@ -39,6 +39,7 @@ class FixCivitaiMediaTypes extends Command
                 if ($dryRun) {
                     $this->line("Would dispatch job for file {$file->id} ({$file->filename})");
                     $bar->advance();
+
                     continue;
                 }
 
@@ -60,4 +61,3 @@ class FixCivitaiMediaTypes extends Command
         return self::SUCCESS;
     }
 }
-

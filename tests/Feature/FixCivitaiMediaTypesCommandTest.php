@@ -67,4 +67,3 @@ it('dispatches fix jobs for civitai files without mp4 urls', function () {
         return $job->fileId === $file->id;
     });
 });
-

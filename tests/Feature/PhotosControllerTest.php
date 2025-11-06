@@ -176,7 +176,7 @@ class FakeTypesenseEngine extends Engine
 beforeEach(function () {
     $this->originalScoutDriver = config('scout.driver');
 
-    $this->fakeTypesense = new FakeTypesenseEngine();
+    $this->fakeTypesense = new FakeTypesenseEngine;
 
     resolve(EngineManager::class)->extend('fake-typesense', function () {
         return $this->fakeTypesense;
@@ -337,4 +337,3 @@ it('returns 20 unique random files when sorted by random', function () {
     expect($returnedIds->all())->toEqual($expectedOrder->all());
     expect($payload['filter']['rand_seed'])->toBe($seed);
 });
-

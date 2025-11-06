@@ -67,7 +67,7 @@ watch(
 );
 
 // Mime types for filtering
-const { mimeTypes, loading: mimeTypesLoading, fetch: fetchMimeTypes, getGrouped } = useMimeTypes();
+const { loading: mimeTypesLoading, fetch: fetchMimeTypes, getGrouped } = useMimeTypes();
 
 function snapshotFilters(): string {
     const data = form.data() as Record<string, any>;
