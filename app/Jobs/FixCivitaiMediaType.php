@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Mime\MimeTypes;
@@ -52,25 +53,30 @@ class FixCivitaiMediaType implements ShouldQueue
             return;
         }
 
-        $diskPaths = $this->diskPathMap($path);
-        if ($diskPaths === []) {
+        // Verify this file matches the criteria: thumbnail_url contains mp4 and mime_type is webp
+        $thumbnailUrl = (string) ($file->thumbnail_url ?? '');
+        $mimeType = (string) ($file->mime_type ?? '');
+
+        if (! str_contains($thumbnailUrl, 'mp4') || $mimeType !== 'image/webp') {
             return;
         }
 
-        $sanitizedPath = $this->sanitizePath($path);
-        if ($sanitizedPath !== $path) {
-            foreach ($diskPaths as $disk => $currentPath) {
-                if ($currentPath === $sanitizedPath) {
-                    continue;
-                }
+        // This is a video file that was incorrectly stored as a webp poster
+        // Fetch the real video URL from the referrer page
+        $referrerUrl = (string) ($file->referrer_url ?? '');
+        if ($referrerUrl === '') {
+            return;
+        }
 
-                $this->ensureDirectoryExists($disk, $sanitizedPath);
-                Storage::disk($disk)->move($currentPath, $sanitizedPath);
-                $diskPaths[$disk] = $sanitizedPath;
-            }
+        $videoUrl = $this->extractVideoUrlFromReferrer($referrerUrl);
+        if (! $videoUrl) {
+            return;
+        }
 
-            $file->forceFill(['path' => $sanitizedPath])->saveQuietly();
-            $path = $sanitizedPath;
+        // Download the real video file
+        $diskPaths = $this->diskPathMap($path);
+        if ($diskPaths === []) {
+            return;
         }
 
         $primaryDisk = array_key_first($diskPaths);
@@ -78,57 +84,193 @@ class FixCivitaiMediaType implements ShouldQueue
             return;
         }
 
-        $primaryPath = $diskPaths[$primaryDisk];
-        $mime = $this->detectMimeFromDisk($primaryDisk, $primaryPath, (string) $file->mime_type);
-
-        if (! $mime) {
+        // Download the video to a temporary file
+        $tempFile = tempnam(sys_get_temp_dir(), 'civitai_video_');
+        if ($tempFile === false) {
             return;
         }
-
-        $extension = $this->extensionFromMime($mime);
-        if (! $extension) {
-            return;
-        }
-
-        $filename = $file->filename ? $this->sanitizeFilename($file->filename) : basename($path);
-        if ($filename === '') {
-            $filename = basename($path);
-        }
-
-        $currentExt = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
-        $base = $currentExt !== '' ? Str::beforeLast($filename, '.'.$currentExt) : $filename;
-
-        $newFilename = $currentExt === $extension ? $filename : $base.'.'.$extension;
-        $newPath = 'downloads/'.$newFilename;
-
-        if ($newPath !== $path) {
-            foreach ($diskPaths as $disk => $currentPath) {
-                if ($currentPath === $newPath) {
-                    continue;
-                }
-
-                $this->ensureDirectoryExists($disk, $newPath);
-                Storage::disk($disk)->move($currentPath, $newPath);
-                $diskPaths[$disk] = $newPath;
-            }
-
-            $path = $newPath;
-        }
-
-        $file->forceFill([
-            'filename' => $newFilename,
-            'path' => $path,
-            'mime_type' => $mime,
-            'ext' => $extension,
-            'not_found' => false,
-            'size' => $this->fileSize($primaryDisk, $path),
-        ])->saveQuietly();
 
         try {
-            $file->searchable();
-        } catch (\Throwable $e) {
-            // ignore indexing errors
+            $response = Http::timeout(300)->get($videoUrl);
+            if (! $response->successful()) {
+                return;
+            }
+
+            file_put_contents($tempFile, $response->body());
+
+            // Verify it's actually a video file
+            $detectedMime = $this->detectMimeFromFile($tempFile);
+            if (! $detectedMime || ! str_starts_with($detectedMime, 'video/')) {
+                @unlink($tempFile);
+
+                return;
+            }
+
+            // Determine new filename with .mp4 extension
+            $filename = $file->filename ? $this->sanitizeFilename($file->filename) : basename($path);
+            if ($filename === '') {
+                $filename = basename($path);
+            }
+
+            $currentExt = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+            $base = $currentExt !== '' ? Str::beforeLast($filename, '.'.$currentExt) : $filename;
+            $newFilename = $base.'.mp4';
+            $newPath = 'downloads/'.$newFilename;
+
+            // Delete old file from all disks
+            foreach ($diskPaths as $disk => $currentPath) {
+                try {
+                    Storage::disk($disk)->delete($currentPath);
+                } catch (\Throwable $e) {
+                    // ignore deletion errors
+                }
+            }
+
+            // Store new video file
+            $this->ensureDirectoryExists($primaryDisk, $newPath);
+            Storage::disk($primaryDisk)->put($newPath, file_get_contents($tempFile));
+
+            // Update file record
+            $file->forceFill([
+                'filename' => $newFilename,
+                'path' => $newPath,
+                'mime_type' => 'video/mp4',
+                'ext' => 'mp4',
+                'url' => $videoUrl, // Update URL to the real video URL
+                'not_found' => false,
+                'size' => $this->fileSize($primaryDisk, $newPath),
+            ])->saveQuietly();
+
+            try {
+                $file->searchable();
+            } catch (\Throwable $e) {
+                // ignore indexing errors
+            }
+        } finally {
+            @unlink($tempFile);
         }
+    }
+
+    protected function extractVideoUrlFromReferrer(string $referrerUrl): ?string
+    {
+        try {
+            $response = Http::timeout(30)
+                ->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                ])
+                ->get($referrerUrl);
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $html = $response->body();
+            $referrerBase = $this->getBaseUrl($referrerUrl);
+
+            // Look for <source> tags with mp4 files
+            // Pattern: <source src="..." ...> or <source ... src="...">
+            if (preg_match_all('/<source[^>]+src=["\']([^"\']+\.mp4[^"\']*)["\'][^>]*>/i', $html, $matches)) {
+                $foundUrls = [];
+                foreach ($matches[1] as $url) {
+                    // Resolve relative URLs
+                    $absoluteUrl = $this->resolveUrl($url, $referrerBase);
+                    $foundUrls[] = $absoluteUrl;
+
+                    // Prefer URLs with transcode parameters (higher quality)
+                    if (str_contains($absoluteUrl, 'transcode=true')) {
+                        return $absoluteUrl;
+                    }
+                }
+
+                // Fall back to first mp4 URL found
+                return $foundUrls[0] ?? null;
+            }
+
+            // Also check for video tags with source children
+            if (preg_match_all('/<video[^>]*>(.*?)<\/video>/is', $html, $videoMatches)) {
+                $foundUrls = [];
+                foreach ($videoMatches[1] as $videoContent) {
+                    if (preg_match('/<source[^>]+src=["\']([^"\']+\.mp4[^"\']*)["\'][^>]*>/i', $videoContent, $srcMatches)) {
+                        $absoluteUrl = $this->resolveUrl($srcMatches[1], $referrerBase);
+                        $foundUrls[] = $absoluteUrl;
+
+                        if (str_contains($absoluteUrl, 'transcode=true')) {
+                            return $absoluteUrl;
+                        }
+                    }
+                }
+
+                // Fall back to first found URL
+                if (! empty($foundUrls)) {
+                    return $foundUrls[0];
+                }
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    protected function getBaseUrl(string $url): string
+    {
+        $parsed = parse_url($url);
+        if (! $parsed) {
+            return $url;
+        }
+
+        $scheme = $parsed['scheme'] ?? 'https';
+        $host = $parsed['host'] ?? '';
+
+        return $scheme.'://'.$host;
+    }
+
+    protected function resolveUrl(string $url, string $baseUrl): string
+    {
+        // If already absolute, return as-is
+        if (preg_match('/^https?:\/\//i', $url)) {
+            return $url;
+        }
+
+        // Resolve relative URL
+        $parsedBase = parse_url($baseUrl);
+        if (! $parsedBase) {
+            return $url;
+        }
+
+        $scheme = $parsedBase['scheme'] ?? 'https';
+        $host = $parsedBase['host'] ?? '';
+
+        // If URL starts with /, it's absolute path
+        if (str_starts_with($url, '/')) {
+            return $scheme.'://'.$host.$url;
+        }
+
+        // Relative path - need to resolve against base path
+        $basePath = $parsedBase['path'] ?? '/';
+        $baseDir = dirname($basePath);
+        if ($baseDir === '.') {
+            $baseDir = '/';
+        }
+
+        return $scheme.'://'.$host.rtrim($baseDir, '/').'/'.ltrim($url, '/');
+    }
+
+    protected function detectMimeFromFile(string $filePath): ?string
+    {
+        if (! file_exists($filePath)) {
+            return null;
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) {
+            return null;
+        }
+
+        $mime = finfo_file($finfo, $filePath) ?: null;
+        finfo_close($finfo);
+
+        return $mime;
     }
 
     protected function fileSize(string $disk, string $path): ?int
