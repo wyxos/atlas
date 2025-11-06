@@ -272,6 +272,8 @@ if (authUser?.id) {
                     :index="(Number(index) || 0) + 1"
                     :row-index="Number(index) || 0"
                     :loaded-file="loadedFiles[item.id]"
+                    :is-playing="false"
+                    :current-file-id="null"
                     :is-selected="selectedIds.has(item.id)"
                     @rowClick="handleRowClick"
                     @favorite="toggleFavorite"
