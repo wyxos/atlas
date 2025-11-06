@@ -72,17 +72,7 @@ class PhotosReactionsController extends Controller
             $query->whereIn($field, [(string) $userId]);
         }
 
-        switch ($options->sort) {
-            case 'random':
-                $query->orderBy('_rand('.$options->randSeed.')', 'desc');
-                break;
-            case 'oldest':
-                $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
-                break;
-            default:
-                $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
-                break;
-        }
+        $this->applySorting($query, $options);
 
         $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 

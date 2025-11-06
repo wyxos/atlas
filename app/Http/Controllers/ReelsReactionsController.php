@@ -69,11 +69,7 @@ class ReelsReactionsController extends Controller
             $query->whereIn($field, [(string) $userId]);
         }
 
-        if ($options->sort === 'random') {
-            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
+        $this->applySorting($query, $options, null, 'created_at');
 
         $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 

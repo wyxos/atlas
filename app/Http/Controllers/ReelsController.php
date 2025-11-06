@@ -45,11 +45,7 @@ class ReelsController extends Controller
             $query->where('source', $source);
         }
 
-        if ($options->sort === 'random') {
-            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
-        } else {
-            $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
-        }
+        $this->applySorting($query, $options);
 
         $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 

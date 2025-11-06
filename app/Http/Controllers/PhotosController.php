@@ -68,17 +68,7 @@ class PhotosController extends Controller
             $query->where('mime_type', $mimeType);
         }
 
-        switch ($sort) {
-            case 'newest':
-                $query->orderBy('downloaded_at', 'desc')->orderBy('created_at', 'desc');
-                break;
-            case 'oldest':
-                $query->orderBy('downloaded_at', 'asc')->orderBy('created_at', 'asc');
-                break;
-            case 'random':
-                $query->orderBy('_rand('.$randSeed.')', 'desc');
-                break;
-        }
+        $this->applySorting($query, $options);
 
         $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 

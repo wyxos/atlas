@@ -117,15 +117,7 @@ class PhotosDislikedController extends Controller
             $query->whereNotIn('dislike_user_ids', [(string) $userId]);
         }
 
-        $sort = $options->sort;
-
-        if ($sort === 'random') {
-            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
-        } elseif ($sort === 'oldest') {
-            $query->orderBy('blacklisted_at', 'asc')->orderBy('created_at', 'asc');
-        } else {
-            $query->orderBy('blacklisted_at', 'desc')->orderBy('created_at', 'desc');
-        }
+        $this->applySorting($query, $options, 'blacklisted_at');
 
         return $query;
     }

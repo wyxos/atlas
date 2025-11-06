@@ -115,13 +115,7 @@ class PhotosUnseenController extends Controller
             $query->where('mime_type', $mimeType);
         }
 
-        if ($options->sort === 'random') {
-            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
-        } elseif ($options->sort === 'oldest') {
-            $query->orderBy('created_at', 'asc');
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
+        $this->applySorting($query, $options, null, 'created_at');
 
         $paginator = $query->paginate($options->limit, $options->pageName, $options->page);
 

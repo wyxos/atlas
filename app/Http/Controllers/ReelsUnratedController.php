@@ -39,13 +39,7 @@ class ReelsUnratedController extends Controller
             ->where('mime_group', 'video')
             ->where('blacklisted', false);
 
-        if ($options->sort === 'random') {
-            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
-        } elseif ($options->sort === 'oldest') {
-            $query->orderBy('created_at', 'asc');
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
+        $this->applySorting($query, $options, null, 'created_at');
 
         if ($userId) {
             $query->whereNotIn('reacted_user_ids', [(string) $userId]);

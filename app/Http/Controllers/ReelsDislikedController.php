@@ -147,11 +147,7 @@ class ReelsDislikedController extends Controller
             $query->whereNotIn('dislike_user_ids', [(string) $userId]);
         }
 
-        if ($options->sort === 'random') {
-            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
-        } else {
-            $query->orderBy('blacklisted_at', 'desc')->orderBy('created_at', 'desc');
-        }
+        $this->applySorting($query, $options, 'blacklisted_at');
 
         return $query;
     }

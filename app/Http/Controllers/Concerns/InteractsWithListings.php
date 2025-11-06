@@ -145,6 +145,33 @@ trait InteractsWithListings
     }
 
     /**
+     * Apply sorting to a Scout query based on ListingOptions.
+     *
+     * @param  \Laravel\Scout\Builder  $query
+     * @param  \App\Support\ListingOptions  $options
+     * @param  string|null  $primaryField  Primary field for newest/oldest sorting (default: 'downloaded_at')
+     * @param  string|null  $secondaryField  Secondary field for tie-breaking (default: 'created_at', null to skip)
+     */
+    protected function applySorting($query, ListingOptions $options, ?string $primaryField = 'downloaded_at', ?string $secondaryField = 'created_at'): void
+    {
+        if ($options->sort === 'random') {
+            $query->orderBy('_rand('.$options->randSeed.')', 'desc');
+
+            return;
+        }
+
+        $direction = $options->sort === 'oldest' ? 'asc' : 'desc';
+
+        if ($primaryField) {
+            $query->orderBy($primaryField, $direction);
+        }
+
+        if ($secondaryField) {
+            $query->orderBy($secondaryField, $direction);
+        }
+    }
+
+    /**
      * Derive the data route URL from the current route context.
      *
      * @param  array<string, mixed>  $parameters
