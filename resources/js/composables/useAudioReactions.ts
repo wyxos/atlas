@@ -1,6 +1,5 @@
 import axios from 'axios';
 import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
-import { audioStore } from '@/stores/audio';
 import { bus } from '@/lib/bus';
 
 export type ReactionType = 'love' | 'like' | 'dislike' | 'funny';
@@ -44,17 +43,6 @@ export function useAudioReactions(loadedFiles: Record<string | number, any>) {
         loadedFiles[id].liked = !!data.liked;
         loadedFiles[id].disliked = !!data.disliked;
         loadedFiles[id].funny = !!data.funny;
-      }
-
-      // If the currently playing track matches, update it as well
-      if (audioStore.currentTrack && audioStore.currentTrack.id === id) {
-        audioStore.currentTrack = {
-          ...audioStore.currentTrack,
-          loved: !!data.loved,
-          liked: !!data.liked,
-          disliked: !!data.disliked,
-          funny: !!data.funny,
-        } as any;
       }
 
       // Broadcast reaction so other parts of the app can sync
