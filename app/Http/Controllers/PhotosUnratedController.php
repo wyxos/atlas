@@ -46,7 +46,7 @@ class PhotosUnratedController extends Controller
         ]);
 
         $userId = $this->currentUserId();
-        $mimeType = request('mime_type');
+        $mimeType = $this->requestedMimeType();
 
         $aggregateModeration = [
             'blacklisted_count' => 0,
@@ -96,7 +96,7 @@ class PhotosUnratedController extends Controller
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
                 'sort' => $options->sort,
                 'rand_seed' => $options->isRandom() ? $options->randSeed : null,
-                'mime_type' => $mimeType && is_string($mimeType) && $mimeType !== '' ? $mimeType : null,
+                'mime_type' => $mimeType,
             ],
             'moderation' => [
                 'blacklisted_count' => (int) $aggregateModeration['blacklisted_count'],
@@ -118,7 +118,7 @@ class PhotosUnratedController extends Controller
             ->where('not_found', false)
             ->where('blacklisted', false);
 
-        if ($mimeType && $mimeType !== '') {
+        if ($mimeType) {
             $query->where('mime_type', $mimeType);
         }
 

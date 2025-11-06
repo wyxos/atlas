@@ -126,4 +126,21 @@ trait InteractsWithListings
 
         return $source;
     }
+
+    protected function requestedMimeType(): ?string
+    {
+        $value = request('mime_type');
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '' || in_array($value, ['null', 'undefined'], true)) {
+            return null;
+        }
+
+        return $value;
+    }
 }

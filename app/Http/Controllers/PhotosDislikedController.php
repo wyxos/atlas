@@ -44,7 +44,7 @@ class PhotosDislikedController extends Controller
         ]);
 
         $userId = $this->currentUserId();
-        $mimeType = request('mime_type');
+        $mimeType = $this->requestedMimeType();
 
         $query = $this->buildScoutQuery($category, $options, $mimeType);
 
@@ -89,7 +89,7 @@ class PhotosDislikedController extends Controller
                 'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
                 'sort' => $options->sort,
                 'rand_seed' => $options->isRandom() ? $options->randSeed : null,
-                'mime_type' => $mimeType && is_string($mimeType) && $mimeType !== '' ? $mimeType : null,
+                'mime_type' => $mimeType,
             ],
         ];
     }
@@ -108,7 +108,7 @@ class PhotosDislikedController extends Controller
             ->where('blacklisted', true)
             ->where('not_found', false);
 
-        if ($mimeType && $mimeType !== '') {
+        if ($mimeType) {
             $query->where('mime_type', $mimeType);
         }
 

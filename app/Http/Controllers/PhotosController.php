@@ -40,7 +40,7 @@ class PhotosController extends Controller
         $sort = $options->sort;
         $randSeed = $options->randSeed;
         $source = $this->normalizeSource(request('source'));
-        $mimeType = request('mime_type');
+        $mimeType = $this->requestedMimeType();
         $userId = $this->currentUserId();
 
         $query = File::search('*')
@@ -64,7 +64,7 @@ class PhotosController extends Controller
             }
         }
 
-        if ($mimeType && is_string($mimeType) && $mimeType !== '') {
+        if ($mimeType) {
             $query->where('mime_type', $mimeType);
         }
 
@@ -113,7 +113,7 @@ class PhotosController extends Controller
                 'sort' => $sort,
                 'rand_seed' => $options->isRandom() ? $options->randSeed : null,
                 'source' => $source,
-                'mime_type' => $mimeType && is_string($mimeType) && $mimeType !== '' ? $mimeType : null,
+                'mime_type' => $mimeType,
             ],
         ];
     }
