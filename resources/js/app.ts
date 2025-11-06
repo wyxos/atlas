@@ -23,9 +23,12 @@ Sentry.init({
     enabled: import.meta.env.DEV,
 });
 
+// Store the glob result - Vite will handle HMR updates automatically
+const pages = import.meta.glob<DefineComponent>('./pages/**/*.vue');
+
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
-    resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, import.meta.glob<DefineComponent>('./pages/**/*.vue')),
+    resolve: (name) => resolvePageComponent(`./pages/${name}.vue`, pages),
     setup({ el, App, props, plugin }) {
         createApp({ render: () => h(App, props) })
             .use(plugin)

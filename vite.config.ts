@@ -24,4 +24,7 @@ export default defineConfig({
             },
         }),
     ],
+    optimizeDeps: {
+        include: ['@inertiajs/vue3'],
+    },
 });
