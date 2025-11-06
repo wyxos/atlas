@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
-import axios from 'axios'
 import GridItem from '@/components/browse/GridItem.vue'
+
+const axiosMocks = vi.hoisted(() => ({
+  post: vi.fn<
+    (url: string, body?: any) => Promise<any>
+  >(() => Promise.resolve({ data: {} })),
+}))
+
+vi.mock('axios', () => ({
+  default: {
+    post: axiosMocks.post,
+  },
+}))
 
 type ReactionType = 'favorite' | 'like' | 'funny' | 'dislike'
 
@@ -23,6 +34,8 @@ describe('GridItem interactions', () => {
   beforeEach(() => {
     batchReactMock.mockReset()
     batchReactMock.mockResolvedValue(undefined)
+    axiosMocks.post.mockClear()
+    axiosMocks.post.mockResolvedValue({ data: {} })
   })
 
   afterEach(() => {
@@ -169,7 +182,7 @@ describe('GridItem interactions', () => {
       containerCounts,
     })
 
-    const postSpy = vi.spyOn(axios, 'post').mockResolvedValue({ data: {} } as any)
+    axiosMocks.post.mockResolvedValue({ data: {} })
 
     const card = wrapper.find('.grid-item')
     await card.trigger('mouseenter')
@@ -182,9 +195,7 @@ describe('GridItem interactions', () => {
     await nextTick()
 
     expect(batchReactMock).toHaveBeenCalledWith('like', { key: 'gallery', value: 'abc' })
-    expect(postSpy).toHaveBeenCalledWith(expect.stringContaining('/react-download'), { type: 'like' })
-
-    postSpy.mockRestore()
+    expect(axiosMocks.post).toHaveBeenCalledWith(expect.stringContaining('/react-download'), { type: 'like' })
     wrapper.unmount()
   })
 

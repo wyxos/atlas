@@ -1,129 +1,115 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { useAudioListPage } from '@/composables/useAudioListPage'
-import { audioActions, audioStore } from '@/stores/audio'
+import { mount, VueWrapper } from '@vue/test-utils'
+import { useAudioListPage, type UseAudioListPageOptions } from '@/composables/useAudioListPage'
 import { bus } from '@/lib/bus'
 import { flushMicrotasks } from '@/test/utils'
+import { router } from '@inertiajs/vue3'
 
-// Mock Inertia router
 vi.mock('@inertiajs/vue3', () => ({
   router: { get: vi.fn(), replace: vi.fn() },
 }))
 
-// Mock useAudioFileLoader to control loadedFiles and batch loader
 const loaderMocks = vi.hoisted(() => {
   const loadedFiles: Record<number, any> = {
-    1: { id: 1, title: 'A' },
-    2: { id: 2, title: 'B' },
-    3: { id: 3, title: 'C' },
+    1: { id: 1, title: 'Track A' },
+    2: { id: 2, title: 'Track B' },
+    3: { id: 3, title: 'Track C' },
   }
   const loadBatchFileDetails = vi.fn()
   return { loadedFiles, loadBatchFileDetails }
 })
+
 vi.mock('@/composables/useAudioFileLoader', () => ({
   useAudioFileLoader: () => loaderMocks,
 }))
 
-function mountUseAudioListPage(overrides: Partial<Parameters<typeof useAudioListPage>[0]> = {}) {
-  const options = {
-    files: () => [{ id: 1 }, { id: 2 }, { id: 3 }],
+const mountedWrappers: VueWrapper[] = []
+
+function mountUseAudioListPage(overrides: Partial<UseAudioListPageOptions> = {}) {
+  const options: UseAudioListPageOptions = {
+    files: () => [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
     search: () => [],
-    idOrder: () => [2, 1, 3],
+    idOrder: () => [1, 2, 3, 4],
     initialQuery: '',
-    getSearchAction: () => ({ url: '/search' }),
-    beforePlaySelected: vi.fn(async () => {}),
-    playlistId: () => 7,
+    getSearchAction: (query: string) => ({ url: '/search', query }),
     ...overrides,
   }
+
   let page!: ReturnType<typeof useAudioListPage>
-  const C = { setup: () => { page = useAudioListPage(options); return () => null } }
-  mount(C)
-  return page
+  const wrapper = mount({
+    setup() {
+      page = useAudioListPage(options)
+      return () => null
+    },
+  })
+
+  mountedWrappers.push(wrapper)
+  return { page, wrapper }
 }
 
 describe('useAudioListPage', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    // reset audio store
-    audioStore.queue = []
-    audioStore.currentIndex = -1
-    audioStore.currentTrack = null
-    audioStore.isPlaying = false
-    audioStore.queuePlaylistId = null
+    loaderMocks.loadBatchFileDetails.mockClear()
+    loaderMocks.loadedFiles[1] = { id: 1, title: 'Track A' }
+    loaderMocks.loadedFiles[2] = { id: 2, title: 'Track B' }
+    loaderMocks.loadedFiles[3] = { id: 3, title: 'Track C' }
+    delete loaderMocks.loadedFiles[4]
+    router.get.mockClear()
   })
+
   afterEach(() => {
+    mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount())
     vi.useRealTimers()
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
   })
 
   it('debounces search and calls router.get with trimmed query', async () => {
-    const page = mountUseAudioListPage()
+    const { page } = mountUseAudioListPage()
     const { router } = await import('@inertiajs/vue3') as any
 
     page.updateSearch('  hello  ')
-    vi.advanceTimersByTime(300)
+    expect(router.get).not.toHaveBeenCalled()
 
-    expect(router.get).toHaveBeenCalledWith('/search', { query: 'hello' }, expect.objectContaining({ preserveState: true, only: ['search', 'query'], replace: true }))
+    vi.advanceTimersByTime(299)
+    expect(router.get).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
+
+    expect(router.get).toHaveBeenCalledWith('/search', { query: 'hello' }, expect.objectContaining({
+      preserveState: true,
+      only: ['search', 'query'],
+      replace: true,
+    }))
   })
 
-  it('scroll-to-current via bus triggers scroller and flash clears', async () => {
-    // Mount a component to allow onMounted hook registration
-    const options = {
-      files: () => [{ id: 1 }, { id: 2 }, { id: 3 }],
-      // ensure filteredItems includes id when search is non-empty
-      search: () => [{ id: 1 }, { id: 2 }, { id: 3 }],
-      idOrder: () => [2, 1, 3],
-      initialQuery: '',
-      getSearchAction: () => ({ url: '/search' }),
-      beforePlaySelected: vi.fn(async () => {}),
-      playlistId: () => 7,
-    }
-    let page: ReturnType<typeof useAudioListPage> | null = null
-    const C = { setup: () => { page = useAudioListPage(options); return () => null } }
-    mount(C)
+  it('queues visible range for detail loading when scroller updates', async () => {
+    delete loaderMocks.loadedFiles[2]
+    delete loaderMocks.loadedFiles[3]
 
-    const scroller = { scrollToItem: vi.fn() }
-    ;(page as any).recycleScrollerRef.value = scroller as any
+    const { page } = mountUseAudioListPage({
+      files: () => [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }],
+    })
 
-    // Item id 2 exists in files()
-    bus.emit('player:scroll-to-current', { id: 2 } as any)
-    await flushMicrotasks()
-    await flushMicrotasks()
-    expect(scroller.scrollToItem).toHaveBeenCalled()
+    page.onScrollerUpdate(0, 2, 0, 2)
+    expect(loaderMocks.loadBatchFileDetails).not.toHaveBeenCalled()
 
-    // flashItemId clears after 1500ms
-    expect((page as any).flashItemId.value).toBe(2)
-    vi.advanceTimersByTime(1600)
-    expect((page as any).flashItemId.value).toBeNull()
+    vi.advanceTimersByTime(500)
+
+    expect(loaderMocks.loadBatchFileDetails).toHaveBeenCalledTimes(1)
+    const [ids] = loaderMocks.loadBatchFileDetails.mock.calls[0]
+    expect(ids).toEqual([2, 3])
   })
 
-  it('playAudio toggles when same id, and sets queue when new id', async () => {
-    const playSpy = vi.spyOn(audioActions, 'play').mockImplementation(() => undefined as any)
-    const pauseSpy = vi.spyOn(audioActions, 'pause').mockImplementation(() => undefined as any)
-    const setQueueAndPlaySpy = vi.spyOn(audioActions, 'setQueueAndPlay').mockImplementation(() => undefined as any)
+  it('updates loaded files when reaction events arrive', async () => {
+    loaderMocks.loadedFiles[2] = { id: 2, loved: false, liked: false, disliked: false, funny: false }
+    const onReactionEvent = vi.fn()
+    mountUseAudioListPage({ onReactionEvent })
 
-    const page = mountUseAudioListPage()
+    bus.emit('file:reaction', { id: 2, loved: true, liked: false, disliked: false, funny: true })
+    await flushMicrotasks()
 
-    // Toggle path
-    audioStore.currentTrack = { id: 1 } as any
-    audioStore.isPlaying = false
-    await page.playAudio({ id: 1 })
-    expect(playSpy).toHaveBeenCalled()
-
-    audioStore.isPlaying = true
-    await page.playAudio({ id: 1 })
-    expect(pauseSpy).toHaveBeenCalled()
-
-    // New id path
-    audioStore.currentTrack = { id: 2 } as any
-    audioStore.isPlaying = false
-    await page.playAudio({ id: 1 })
-    expect(setQueueAndPlaySpy).toHaveBeenCalled()
-    // queuePlaylistId should be set from playlistId()
-    expect(audioStore.queuePlaylistId).toBe(7)
-    const [playlistArg, startId] = setQueueAndPlaySpy.mock.calls.at(-1) as any
-    expect(startId).toBe(1)
-    // playlist constructed from idOrder [2,1,3] mapped via loadedFiles from loaderMocks
-    expect(playlistArg.map((x: any) => x.id)).toEqual([2, 1, 3])
+    expect(loaderMocks.loadedFiles[2]).toMatchObject({ loved: true, funny: true })
+    expect(onReactionEvent).toHaveBeenCalledWith({ id: 2, loved: true, liked: false, disliked: false, funny: true })
   })
 })

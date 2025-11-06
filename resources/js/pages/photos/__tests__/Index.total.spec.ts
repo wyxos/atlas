@@ -3,6 +3,22 @@ import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import Index from '@/pages/photos/Index.vue';
 
+const axiosMocks = vi.hoisted(() => ({
+  get: vi.fn(() =>
+    Promise.resolve({
+      data: {
+        grouped: { audio: [], video: [], image: [], other: [] },
+        all: [],
+      },
+    }),
+  ),
+  post: vi.fn(() => Promise.resolve({ data: {} })),
+}));
+
+vi.mock('axios', () => ({
+  default: axiosMocks,
+}));
+
 // Mock Inertia's Head
 vi.mock('@inertiajs/vue3', () => ({
   Head: { name: 'Head', template: '<template><slot /></template>' },

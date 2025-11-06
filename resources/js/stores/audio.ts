@@ -7,6 +7,10 @@ export interface AudioTrack {
   [key: string]: any;
 }
 
+interface PlayOptions {
+  autoPlay?: boolean;
+}
+
 class AudioPlayerManager {
   private audio: HTMLAudioElement | null = null;
   private currentTrack = ref<AudioTrack | null>(null);
@@ -55,7 +59,7 @@ class AudioPlayerManager {
     });
 
     this.audio.addEventListener('ended', () => {
-      this.next();
+      this.next({ autoPlay: true });
     });
 
     return this.audio;
@@ -86,29 +90,35 @@ class AudioPlayerManager {
     }
   }
 
-  async previous(): Promise<void> {
+  async previous(options: PlayOptions = {}): Promise<void> {
     if (this.queue.value.length === 0) return;
 
     const newIndex = this.currentIndex.value > 0
       ? this.currentIndex.value - 1
       : this.queue.value.length - 1;
 
-    await this.playTrackAtIndex(newIndex);
+    const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
+    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay });
   }
 
-  async next(): Promise<void> {
+  async next(options: PlayOptions = {}): Promise<void> {
     if (this.queue.value.length === 0) return;
 
     const newIndex = this.currentIndex.value < this.queue.value.length - 1
       ? this.currentIndex.value + 1
       : 0;
 
-    await this.playTrackAtIndex(newIndex);
+    const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
+    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay });
   }
 
   private async loadTrack(track: AudioTrack): Promise<void> {
-    const audioUrl = track.url || track.path;
-    if (!audioUrl) return;
+    // Only use url, never fall back to path (path is a disk path, not a valid URL)
+    const audioUrl = track.url;
+    if (!audioUrl) {
+      console.error('Audio track missing URL:', track);
+      return;
+    }
 
     this.initAudio();
     if (!this.audio) return;
@@ -118,31 +128,31 @@ class AudioPlayerManager {
     await this.audio.load();
   }
 
-  async playTrackAtIndex(index: number): Promise<void> {
+  async playTrackAtIndex(index: number, options: PlayOptions = {}): Promise<void> {
     if (index < 0 || index >= this.queue.value.length) return;
 
-    const wasPlaying = this.isPlaying.value;
+    const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
     this.pause();
 
     this.currentIndex.value = index;
     await this.loadTrack(this.queue.value[index]);
 
-    if (wasPlaying) {
+    if (shouldAutoPlay) {
       await this.play();
     }
   }
 
-  async setQueueAndPlay(queue: AudioTrack[], startIndex: number = 0): Promise<void> {
+  async setQueueAndPlay(queue: AudioTrack[], startIndex: number = 0, options: PlayOptions = {}): Promise<void> {
     if (queue.length === 0) return;
 
-    const wasPlaying = this.isPlaying.value;
+    const shouldAutoPlay = options.autoPlay ?? true;
     this.pause();
 
     this.queue.value = [...queue];
     this.currentIndex.value = startIndex;
     await this.loadTrack(this.queue.value[startIndex]);
 
-    if (wasPlaying) {
+    if (shouldAutoPlay) {
       await this.play();
     }
   }
@@ -178,12 +188,13 @@ export function useAudioPlayer() {
     play: () => audioPlayerManager.play(),
     pause: () => audioPlayerManager.pause(),
     togglePlay: () => audioPlayerManager.togglePlay(),
-    previous: () => audioPlayerManager.previous(),
-    next: () => audioPlayerManager.next(),
+    previous: (options?: PlayOptions) => audioPlayerManager.previous(options),
+    next: (options?: PlayOptions) => audioPlayerManager.next(options),
     seekTo: (time: number) => audioPlayerManager.seekTo(time),
-    playTrackAtIndex: (index: number) => audioPlayerManager.playTrackAtIndex(index),
-    setQueueAndPlay: (queue: AudioTrack[], startIndex?: number) =>
-      audioPlayerManager.setQueueAndPlay(queue, startIndex),
+    playTrackAtIndex: (index: number, options?: PlayOptions) =>
+      audioPlayerManager.playTrackAtIndex(index, options),
+    setQueueAndPlay: (queue: AudioTrack[], startIndex?: number, options?: PlayOptions) =>
+      audioPlayerManager.setQueueAndPlay(queue, startIndex, options),
     setVolume: (volume: number) => audioPlayerManager.setVolume(volume),
   };
 }

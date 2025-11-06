@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useAudioReactions } from '@/composables/useAudioReactions'
-import { audioStore } from '@/stores/audio'
 import { bus } from '@/lib/bus'
 
 vi.mock('@/actions/App/Http/Controllers/AudioController', () => ({
@@ -23,24 +22,22 @@ vi.mock('axios', () => ({ default: { post: axiosMocks.post } }))
 describe('useAudioReactions', () => {
   beforeEach(() => {
     axiosMocks.post.mockClear()
-    audioStore.currentTrack = null
   })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('optimistically toggles and reconciles, updates current track, emits bus', async () => {
+  it('optimistically toggles, reconciles with server response, and emits bus event', async () => {
     const loaded: Record<number, any> = { 1: { id: 1, loved: false, liked: false, disliked: false, funny: false } }
     const { setReaction } = useAudioReactions(loaded)
     const busEmit = vi.spyOn(bus, 'emit')
 
-    audioStore.currentTrack = { id: 1, loved: false, liked: false, disliked: false, funny: false } as any
+    const target = { id: 1, loved: false, liked: false, disliked: false, funny: false }
 
-    await setReaction({ id: 1, loved: false, liked: false, disliked: false, funny: false }, 'love')
+    await setReaction(target, 'love')
 
     expect(axiosMocks.post).toHaveBeenCalledWith('/audio/react/1', { type: 'love' })
     expect(loaded[1]).toMatchObject({ loved: true, liked: false, disliked: false, funny: false })
-    expect(audioStore.currentTrack).toMatchObject({ id: 1, loved: true })
     expect(busEmit).toHaveBeenCalledWith('file:reaction', expect.objectContaining({ id: 1, loved: true }))
   })
 

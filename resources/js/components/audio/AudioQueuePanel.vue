@@ -4,6 +4,7 @@ import { RecycleScroller } from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import { X } from 'lucide-vue-next';
 import { useAudioFileLoader } from '@/composables/useAudioFileLoader';
+import { useAudioPlayer } from '@/stores/audio';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const props = defineProps<{ isOpen: boolean }>();
@@ -12,8 +13,9 @@ defineEmits<{ (e: 'close'): void }>();
 const scrollerRef = ref<InstanceType<typeof RecycleScroller> | null>(null);
 
 const { loadedFiles, loadBatchFileDetails } = useAudioFileLoader();
+const { queue, currentTrack, currentIndex, playTrackAtIndex } = useAudioPlayer();
 
-const items = computed(() => []);
+const items = computed(() => queue.value);
 
 function onScrollerUpdate(
   startIndex: number,
@@ -38,9 +40,17 @@ function onScrollerUpdate(
 
 
 function getLoaded(item: any) {
-  return loadedFiles[item.id] || null;
+  // Queue items may already have file data spread into them
+  if (item.metadata || item.artists || item.covers) {
+    return item;
+  }
+  return loadedFiles[item.id] || item;
 }
 function isLoaded(item: any): boolean {
+  // Check if item already has metadata (was spread when queued)
+  if (item.metadata || item.artists || item.covers) {
+    return true;
+  }
   return !!loadedFiles[item.id];
 }
 
@@ -113,10 +123,12 @@ function titleText(file: any): string {
           <div
             class="px-3 py-2 flex items-center gap-3 border-b border-border cursor-pointer hover:bg-accent/50 transition-colors"
             :class="{
+              'bg-primary/10 ring-2 ring-emerald-400/60': currentTrack?.id === item.id,
               'bg-red-500/10 text-red-300 border-red-500/30': !!(getLoaded(item) && getLoaded(item).not_found === true),
             }"
             :data-id="item.id"
             :data-test="(getLoaded(item) && getLoaded(item).not_found) ? 'queue-row-not-found' : null"
+            @click="playTrackAtIndex(index, { autoPlay: true })"
           >
             <!-- Index -->
             <div class="w-6 flex items-center justify-end select-none">

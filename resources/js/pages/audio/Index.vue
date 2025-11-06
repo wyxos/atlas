@@ -10,6 +10,8 @@ import SearchBar from '@/components/audio/SearchBar.vue';
 import { Music, Search, Shuffle as ShuffleIcon, Play as PlayIcon } from 'lucide-vue-next';
 import { useAudioListPage } from '@/composables/useAudioListPage';
 import { useAudioReactions } from '@/composables/useAudioReactions';
+import { useAudioPlayer, type AudioTrack } from '@/stores/audio';
+import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
 import { computed, onMounted, ref, watch, onUnmounted } from 'vue';
 import { useEcho } from '@laravel/echo-vue';
 import ContentLayout from '@/layouts/ContentLayout.vue';
@@ -140,6 +142,54 @@ const {
 const isSearchActive = computed(() => !!(props.query && props.query.trim().length > 0));
 
 const { toggleFavorite, likeItem, dislikeItem, laughedAtItem } = useAudioReactions(loadedFiles);
+
+// Audio player
+const {
+  currentTrack,
+  queue,
+  currentIndex,
+  isPlaying,
+  currentTime,
+  duration,
+  volume,
+  setQueueAndPlay,
+  setVolume,
+} = useAudioPlayer();
+
+// Handle play from AudioListItem
+async function handlePlay(track: any): Promise<void> {
+  // Build queue from all filtered items
+  const queueItems: AudioTrack[] = filteredItems.value.map((item) => {
+    const file = loadedFiles[item.id];
+    const streamUrl = AudioController.stream({ file: item.id }).url;
+    
+    // Debug: log the generated URL
+    if (item.id === track.id) {
+      console.log('Stream URL for track:', streamUrl, 'File ID:', item.id);
+    }
+    
+    // Ensure url is set correctly - it must be the stream URL, not the file path
+    const queueItem: AudioTrack = {
+      ...(file || {}),
+      id: item.id,
+      url: streamUrl, // Set url last to ensure it's not overridden
+    };
+    
+    // Debug: verify url is set correctly
+    if (item.id === track.id) {
+      console.log('Queue item URL:', queueItem.url, 'Queue item path:', queueItem.path);
+    }
+    
+    return queueItem;
+  });
+
+  // Find the index of the clicked track
+  const startIndex = queueItems.findIndex((item) => item.id === track.id);
+  
+  if (startIndex >= 0) {
+    await setQueueAndPlay(queueItems, startIndex, { autoPlay: true });
+  }
+}
 
 // Selection state
 const selectedIds = ref<Set<number>>(new Set());
@@ -272,10 +322,11 @@ if (authUser?.id) {
                     :index="(Number(index) || 0) + 1"
                     :row-index="Number(index) || 0"
                     :loaded-file="loadedFiles[item.id]"
-                    :is-playing="false"
-                    :current-file-id="null"
+                    :is-playing="isPlaying && currentTrack?.id === item.id"
+                    :current-file-id="currentTrack?.id ?? null"
                     :is-selected="selectedIds.has(item.id)"
                     @rowClick="handleRowClick"
+                    @play="handlePlay"
                     @favorite="toggleFavorite"
                     @like="likeItem"
                     @dislike="dislikeItem"

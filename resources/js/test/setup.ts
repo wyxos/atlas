@@ -112,3 +112,26 @@ try {
     get length() { return store.size },
   }
 }
+
+// Instrument XMLHttpRequest to surface failing URLs during tests
+const OriginalXHR = (globalThis as any).XMLHttpRequest as typeof XMLHttpRequest | undefined
+if (OriginalXHR) {
+  class InstrumentedXHR extends OriginalXHR {
+    private __url: string | null = null
+
+    open(method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null): void {
+      this.__url = typeof url === 'string' ? url : url.toString()
+      super.open(method, url as any, async ?? true, username ?? null, password ?? null)
+    }
+
+    send(body?: Document | XMLHttpRequestBodyInit | null): void {
+      this.addEventListener('error', () => {
+        const label = this.__url ?? '<unknown>'
+        console.error('[vitest][xhr-error]', label)
+      }, { once: true })
+      super.send(body as any)
+    }
+  }
+
+  ;(globalThis as any).XMLHttpRequest = InstrumentedXHR as any
+}
