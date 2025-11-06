@@ -55,10 +55,23 @@ class FixCivitaiMediaType implements ShouldQueue
         }
 
         // Verify this file matches the criteria: thumbnail_url contains mp4 and mime_type is webp
+        // OR: if mime_type is already video/mp4 but path still has .webp extension, we need to fix it
         $thumbnailUrl = (string) ($file->thumbnail_url ?? '');
         $mimeType = (string) ($file->mime_type ?? '');
+        $currentExt = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
 
-        if (! str_contains($thumbnailUrl, 'mp4') || $mimeType !== 'image/webp') {
+        // Check if this needs fixing:
+        // 1. thumbnail_url contains mp4 AND mime_type is webp (original problematic case)
+        // 2. OR mime_type is video/mp4 but path extension is still .webp (partially fixed case)
+        $needsFix = false;
+        if (str_contains($thumbnailUrl, 'mp4') && $mimeType === 'image/webp') {
+            $needsFix = true;
+        } elseif ($mimeType === 'video/mp4' && $currentExt === 'webp') {
+            // Already partially fixed (mime_type updated) but path wasn't
+            $needsFix = true;
+        }
+
+        if (! $needsFix) {
             return;
         }
 
@@ -96,21 +109,37 @@ class FixCivitaiMediaType implements ShouldQueue
             file_put_contents($tempFile, $response->body());
 
             // Verify it's actually a video file
+            // Since we know these files are problematic, we can be less strict about MIME detection
+            // but still check to avoid downloading obvious non-video files
             $detectedMime = $this->detectMimeFromFile($tempFile);
-            if (! $detectedMime || ! str_starts_with($detectedMime, 'video/')) {
-                @unlink($tempFile);
+            if ($detectedMime) {
+                // If MIME detection says it's an image/webp, this is definitely wrong (poster, not video)
+                if ($detectedMime === 'image/webp') {
+                    @unlink($tempFile);
 
-                return;
+                    return;
+                }
+                // If it's not a video and not webp, still reject (might be HTML error page, etc.)
+                if (! str_starts_with($detectedMime, 'video/')) {
+                    @unlink($tempFile);
+
+                    return;
+                }
             }
+            // If MIME detection fails but we have content, proceed (trust the URL extraction)
 
             // Determine new filename with .mp4 extension
-            $filename = $file->filename ? $this->sanitizeFilename($file->filename) : basename($path);
-            if ($filename === '') {
-                $filename = basename($path);
+            // Use the existing path's basename but change extension to .mp4
+            $pathBasename = basename($path);
+            $pathExt = strtolower((string) pathinfo($pathBasename, PATHINFO_EXTENSION));
+
+            // Remove current extension and add .mp4
+            if ($pathExt !== '' && $pathExt !== 'mp4') {
+                $base = Str::beforeLast($pathBasename, '.'.$pathExt);
+            } else {
+                $base = $pathExt === 'mp4' ? Str::beforeLast($pathBasename, '.mp4') : $pathBasename;
             }
 
-            $currentExt = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
-            $base = $currentExt !== '' ? Str::beforeLast($filename, '.'.$currentExt) : $filename;
             $newFilename = $base.'.mp4';
             $newPath = 'downloads/'.$newFilename;
 

@@ -111,9 +111,14 @@ class CivitaiVideoUrlExtractor
 
             // Pattern 4: Try to find any URL containing .mp4 in the HTML (fallback for unusual structures)
             // This is a last resort and less specific
+            // BUT: Exclude URLs with only "original=true" as these are often posters, not actual videos
             if (empty($foundUrls) && preg_match_all('/https?:\/\/[^"\'\s<>]+\.mp4[^"\'\s<>]*/i', $html, $matches)) {
                 foreach ($matches[0] as $url) {
                     if (str_contains($url, 'image.civitai.com') && ! in_array($url, $foundUrls, true)) {
+                        // Skip URLs that only have "original=true" without "transcode" - these are likely posters
+                        if (str_contains($url, 'original=true') && ! str_contains($url, 'transcode')) {
+                            continue;
+                        }
                         $foundUrls[] = $url;
                     }
                 }
@@ -123,14 +128,22 @@ class CivitaiVideoUrlExtractor
                 return null;
             }
 
-            // Prefer URLs with transcode parameters (higher quality)
+            // Prefer URLs with transcode parameters (higher quality, actual video)
             foreach ($foundUrls as $url) {
                 if (str_contains($url, 'transcode=true')) {
                     return $url;
                 }
             }
 
-            // Fall back to first mp4 URL found
+            // Avoid URLs with only "original=true" (these are often posters)
+            // Only use them if no transcoded URLs are available
+            foreach ($foundUrls as $url) {
+                if (! str_contains($url, 'original=true') || str_contains($url, 'transcode')) {
+                    return $url;
+                }
+            }
+
+            // Last resort: fall back to first mp4 URL found (even if it might be a poster)
             return $foundUrls[0];
         } catch (\Throwable $e) {
             return null;
