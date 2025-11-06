@@ -45,3 +45,6 @@ playwright-trace.zip
 /perf-metrics.json
 /plugins
 /app/Console/Commands/Personal
+
+# Requirements draft
+requirements.md
