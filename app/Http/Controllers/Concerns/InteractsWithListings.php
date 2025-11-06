@@ -143,4 +143,26 @@ trait InteractsWithListings
 
         return $value;
     }
+
+    /**
+     * Build the standard filter payload returned to Inertia responses.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    protected function buildListingFilter(ListingOptions $options, ?LengthAwarePaginator $paginator, string $dataUrl, array $overrides = []): array
+    {
+        $base = [
+            'page' => $options->page,
+            'next' => $paginator && $paginator->hasMorePages() ? ($options->page + 1) : null,
+            'limit' => $options->limit,
+            'data_url' => $dataUrl,
+            'total' => $paginator && method_exists($paginator, 'total') ? (int) $paginator->total() : null,
+            'sort' => $options->sort,
+            'rand_seed' => $options->isRandom() ? $options->randSeed : null,
+            'source' => $this->normalizeSource(request('source')),
+            'mime_type' => $this->requestedMimeType(),
+        ];
+
+        return array_replace($base, $overrides);
+    }
 }

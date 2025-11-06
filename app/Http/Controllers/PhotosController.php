@@ -104,17 +104,7 @@ class PhotosController extends Controller
 
         return [
             'files' => $files,
-            'filter' => [
-                'page' => $options->page,
-                'next' => $paginator->hasMorePages() ? ($options->page + 1) : null,
-                'limit' => $options->limit,
-                'data_url' => route('photos.data'),
-                'total' => method_exists($paginator, 'total') ? (int) $paginator->total() : null,
-                'sort' => $sort,
-                'rand_seed' => $options->isRandom() ? $options->randSeed : null,
-                'source' => $source,
-                'mime_type' => $mimeType,
-            ],
+            'filter' => $this->buildListingFilter($options, $paginator, route('photos.data')),
         ];
     }
 }
