@@ -2,127 +2,194 @@
 
 use App\Jobs\FixCivitaiMediaType;
 use App\Models\File;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
-it('detects actual mime type from disk and updates image files', function () {
+it('extracts video URL from referrer page and replaces webp poster with video', function () {
     Storage::fake('atlas_app');
     Storage::fake('atlas');
 
     $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
-    Storage::disk('atlas_app')->put('downloads/sample.mp4', $webpBody);
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
+
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    $referrerUrl = 'https://civitai.com/images/67559727';
+    $videoUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/transcode=true,original=true,quality=90/MP4_UPSCALE__00072.mp4';
+
+    $html = "<!DOCTYPE html><html><body><video><source src=\"{$videoUrl}\" type=\"video/mp4\"></source></video></body></html>";
+
+    Http::fake([
+        $referrerUrl => Http::response($html, 200),
+        $videoUrl => Http::response($mp4Body, 200, ['Content-Type' => 'video/mp4']),
+    ]);
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/96b33e41-8a73-4faa-8ba2-02f65e80dc35.mp4',
+        'referrer_url' => $referrerUrl,
+        'thumbnail_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/96b33e41-8a73-4faa-8ba2-02f65e80dc35.mp4',
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
+        'mime_type' => 'image/webp',
+        'ext' => 'webp',
+    ]);
+
+    (new FixCivitaiMediaType($file->id))->handle();
+
+    $file->refresh();
+
+    expect($file->filename)->toBe('sample.mp4')
+        ->and($file->path)->toBe('downloads/sample.mp4')
+        ->and($file->mime_type)->toBe('video/mp4')
+        ->and($file->ext)->toBe('mp4')
+        ->and($file->url)->toBe($videoUrl)
+        ->and($file->not_found)->toBeFalse()
+        ->and($file->size)->toBe(strlen($mp4Body));
+
+    Storage::disk('atlas_app')->assertMissing('downloads/sample.webp');
+    Storage::disk('atlas_app')->assertExists('downloads/sample.mp4');
+
+    Http::assertSent(function (Request $request) use ($referrerUrl, $videoUrl) {
+        return $request->url() === $referrerUrl || $request->url() === $videoUrl;
+    });
+});
+
+it('prefers transcoded video URL when multiple sources are available', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
+
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    $referrerUrl = 'https://civitai.com/images/67559727';
+    $transcodedUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/transcode=true,original=true,quality=90/MP4_UPSCALE__00072.mp4';
+    $regularUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/96b33e41-8a73-4faa-8ba2-02f65e80dc35.mp4';
+
+    $html = "<!DOCTYPE html><html><body><video>
+        <source src=\"{$regularUrl}\" type=\"video/mp4\"></source>
+        <source src=\"{$transcodedUrl}\" type=\"video/mp4\"></source>
+    </video></body></html>";
+
+    Http::fake([
+        $referrerUrl => Http::response($html, 200),
+        $transcodedUrl => Http::response($mp4Body, 200, ['Content-Type' => 'video/mp4']),
+    ]);
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => $regularUrl,
+        'referrer_url' => $referrerUrl,
+        'thumbnail_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/96b33e41-8a73-4faa-8ba2-02f65e80dc35.mp4',
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
+        'mime_type' => 'image/webp',
+        'ext' => 'webp',
+    ]);
+
+    (new FixCivitaiMediaType($file->id))->handle();
+
+    $file->refresh();
+
+    expect($file->url)->toBe($transcodedUrl)
+        ->and($file->mime_type)->toBe('video/mp4');
+});
+
+it('skips files that do not match criteria', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => 'https://image.civitai.com/foo.jpg',
+        'referrer_url' => 'https://civitai.com/images/123',
+        'thumbnail_url' => 'https://image.civitai.com/thumb.jpg',
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
+        'mime_type' => 'image/webp',
+        'ext' => 'webp',
+    ]);
+
+    Http::fake();
+
+    (new FixCivitaiMediaType($file->id))->handle();
+
+    $file->refresh();
+
+    // File should remain unchanged
+    expect($file->filename)->toBe('sample.webp')
+        ->and($file->path)->toBe('downloads/sample.webp')
+        ->and($file->mime_type)->toBe('image/webp');
+
+    // No HTTP requests should be made
+    Http::assertNothingSent();
+});
+
+it('skips files without referrer URL', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
 
     $file = File::factory()->create([
         'source' => 'CivitAI',
         'url' => 'https://image.civitai.com/foo.mp4',
-        'filename' => 'sample.mp4',
-        'path' => 'downloads/sample.mp4',
-        'mime_type' => 'video/mp4',
-    ]);
-
-    (new FixCivitaiMediaType($file->id))->handle();
-
-    $file->refresh();
-
-    expect($file->filename)->toBe('sample.webp')
-        ->and($file->path)->toBe('downloads/sample.webp')
-        ->and($file->mime_type)->toBe('image/webp')
-        ->and($file->ext)->toBe('webp')
-        ->and($file->not_found)->toBeFalse()
-        ->and($file->size)->toBe(strlen($webpBody));
-});
-
-it('detects video content and preserves mp4 extension', function () {
-    Storage::fake('atlas_app');
-    Storage::fake('atlas');
-
-    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
-    Storage::disk('atlas_app')->put('downloads/video.mp4', $mp4Body);
-
-    $file = File::factory()->create([
-        'source' => 'CivitAI',
-        'url' => 'https://image.civitai.com/video.mp4',
-        'filename' => 'video.mp4',
-        'path' => 'downloads/video.mp4',
+        'referrer_url' => null,
+        'thumbnail_url' => 'https://image.civitai.com/thumb.mp4',
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
         'mime_type' => 'image/webp',
+        'ext' => 'webp',
     ]);
+
+    Http::fake();
 
     (new FixCivitaiMediaType($file->id))->handle();
 
     $file->refresh();
 
-    expect($file->filename)->toBe('video.mp4')
-        ->and($file->path)->toBe('downloads/video.mp4')
-        ->and($file->mime_type)->toBe('video/mp4')
-        ->and($file->ext)->toBe('mp4')
-        ->and($file->not_found)->toBeFalse()
-        ->and($file->size)->toBe(strlen($mp4Body));
+    // File should remain unchanged
+    expect($file->filename)->toBe('sample.webp')
+        ->and($file->mime_type)->toBe('image/webp');
+
+    Http::assertNothingSent();
 });
 
-it('updates mp4 labelled downloads that contain png data', function () {
-    Storage::fake('atlas_app');
-    Storage::fake('atlas');
-
-    $pngBody = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==');
-    Storage::disk('atlas_app')->put('downloads/sample.mp4', $pngBody);
-
-    $file = File::factory()->create([
-        'source' => 'CivitAI',
-        'url' => 'https://image.civitai.com/sample.mp4',
-        'filename' => 'sample.mp4?token=png',
-        'path' => 'downloads/sample.mp4?token=png',
-        'mime_type' => 'video/mp4',
-    ]);
-
-    (new FixCivitaiMediaType($file->id))->handle();
-
-    $file->refresh();
-
-    expect($file->filename)->toBe('sample.png')
-        ->and($file->path)->toBe('downloads/sample.png')
-        ->and($file->mime_type)->toBe('image/png')
-        ->and($file->ext)->toBe('png')
-        ->and($file->not_found)->toBeFalse()
-        ->and($file->size)->toBe(strlen($pngBody));
-});
-
-it('processes all civitai files when invoked without a specific id', function () {
+it('skips files when video URL cannot be extracted', function () {
     Storage::fake('atlas_app');
     Storage::fake('atlas');
 
     $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
-    Storage::disk('atlas_app')->put('downloads/a.mp4', $webpBody);
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
 
-    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
-    Storage::disk('atlas_app')->put('downloads/b.jpg', $mp4Body);
+    $referrerUrl = 'https://civitai.com/images/67559727';
+    $html = '<!DOCTYPE html><html><body><p>No video here</p></body></html>';
 
-    $first = File::factory()->create([
-        'source' => 'CivitAI',
-        'url' => 'https://image.civitai.com/a.mp4',
-        'filename' => 'a.mp4',
-        'path' => 'downloads/a.mp4',
-        'mime_type' => 'video/mp4',
+    Http::fake([
+        $referrerUrl => Http::response($html, 200),
     ]);
 
-    $second = File::factory()->create([
+    $file = File::factory()->create([
         'source' => 'CivitAI',
-        'url' => 'https://image.civitai.com/b.jpg',
-        'filename' => 'b.jpg',
-        'path' => 'downloads/b.jpg',
-        'mime_type' => 'image/jpeg',
+        'url' => 'https://image.civitai.com/foo.mp4',
+        'referrer_url' => $referrerUrl,
+        'thumbnail_url' => 'https://image.civitai.com/thumb.mp4',
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
+        'mime_type' => 'image/webp',
+        'ext' => 'webp',
     ]);
 
-    (new FixCivitaiMediaType)->handle();
+    (new FixCivitaiMediaType($file->id))->handle();
 
-    $first->refresh();
-    $second->refresh();
+    $file->refresh();
 
-    expect($first->filename)->toBe('a.webp')
-        ->and($first->path)->toBe('downloads/a.webp')
-        ->and($first->mime_type)->toBe('image/webp')
-        ->and($first->ext)->toBe('webp');
-
-    expect($second->filename)->toBe('b.mp4')
-        ->and($second->path)->toBe('downloads/b.mp4')
-        ->and($second->mime_type)->toBe('video/mp4')
-        ->and($second->ext)->toBe('mp4');
+    // File should remain unchanged
+    expect($file->filename)->toBe('sample.webp')
+        ->and($file->mime_type)->toBe('image/webp');
 });
