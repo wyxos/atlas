@@ -727,6 +727,66 @@ describe('audio store', () => {
       // Should advance to next track
       expect(store.currentTrack.value?.id).toBe(2);
     });
+
+    it('continues autoplay when moving from Spotify to local tracks via next', async () => {
+      const store = await importStore();
+      const tracks = [
+        buildSpotifyTrack(1, true),
+        buildSpotifyTrack(2, true),
+        buildTrack(3, true),
+        buildTrack(4, true),
+      ];
+
+      await store.setQueueAndPlay(tracks, 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+
+      const stateCallbacks = spotifyListeners['player_state_changed'] || [];
+      stateCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 1000,
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+
+      await store.next();
+      await flushPromises();
+      await flushPromises();
+
+      stateCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 2000,
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+
+      await store.setQueueAndPlay(tracks, 2);
+      await flushPromises();
+      await flushPromises();
+
+      const audio = getAudioInstance();
+      audio.emit('play');
+
+      expect(store.currentTrack.value?.id).toBe(3);
+      expect(store.isPlaying.value).toBe(true);
+
+      const playSpy = vi.spyOn(audio, 'play');
+      playSpy.mockClear();
+
+      await store.next();
+      await flushPromises();
+      await flushPromises();
+
+      expect(store.currentTrack.value?.id).toBe(4);
+      expect(playSpy).toHaveBeenCalled();
+    });
   });
 });
 

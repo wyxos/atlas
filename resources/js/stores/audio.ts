@@ -36,6 +36,7 @@ class AudioPlayerManager {
     private currentTime = ref<number>(0);
     private duration = ref<number>(0);
     private volume = ref<number>(1);
+    private userPaused = false;
 
     // Reactive refs
     readonly currentTrackRef = computed(() => this.currentTrack.value);
@@ -330,6 +331,8 @@ class AudioPlayerManager {
         const currentTrack = this.currentTrack.value || this.queue.value[this.currentIndex.value] || this.queue.value[0];
         if (!currentTrack) return;
 
+        this.userPaused = false;
+
         if (this.isSpotifyTrack(currentTrack)) {
             // For Spotify tracks, always use playSpotifyTrack() to ensure the correct track is loaded
             // Using resume() can resume the wrong track if we just switched tracks
@@ -347,7 +350,10 @@ class AudioPlayerManager {
         }
     }
 
-    async pause(): Promise<void> {
+    async pause(options: { userInitiated?: boolean } = {}): Promise<void> {
+        const { userInitiated = true } = options;
+        this.userPaused = userInitiated;
+        this.isPlaying.value = false;
         const currentTrack = this.currentTrack.value;
         console.log('Pausing playback', currentTrack);
         if (currentTrack && this.isSpotifyTrack(currentTrack)) {
@@ -369,7 +375,7 @@ class AudioPlayerManager {
 
     async togglePlay(): Promise<void> {
         if (this.isPlaying.value) {
-            await this.pause();
+            await this.pause({ userInitiated: true });
         } else {
             await this.play();
         }
@@ -380,7 +386,7 @@ class AudioPlayerManager {
 
         const newIndex = this.currentIndex.value > 0 ? this.currentIndex.value - 1 : this.queue.value.length - 1;
 
-        const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
+        const shouldAutoPlay = options.autoPlay ?? !this.userPaused;
         await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
     }
 
@@ -389,7 +395,7 @@ class AudioPlayerManager {
 
         const newIndex = this.currentIndex.value < this.queue.value.length - 1 ? this.currentIndex.value + 1 : 0;
 
-        const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
+        const shouldAutoPlay = options.autoPlay ?? !this.userPaused;
         await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
     }
 
@@ -537,12 +543,14 @@ class AudioPlayerManager {
     async playTrackAtIndex(index: number, options: PlayOptions = {}): Promise<void> {
         if (index < 0 || index >= this.queue.value.length) return;
 
-        const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
+        const shouldAutoPlay = options.autoPlay ?? !this.userPaused;
         // Wait for pause to complete before loading new track
-        await this.pause();
+        await this.pause({ userInitiated: false });
 
         this.currentIndex.value = index;
         await this.loadTrack(this.queue.value[index]);
+
+        this.userPaused = !shouldAutoPlay;
 
         if (shouldAutoPlay) {
             await this.play();
@@ -553,11 +561,13 @@ class AudioPlayerManager {
         if (queue.length === 0) return;
 
         const shouldAutoPlay = options.autoPlay ?? true;
-        await this.pause();
+        await this.pause({ userInitiated: false });
 
         this.queue.value = [...queue];
         this.currentIndex.value = startIndex;
         await this.loadTrack(this.queue.value[startIndex]);
+
+        this.userPaused = !shouldAutoPlay;
 
         if (shouldAutoPlay) {
             await this.play();
@@ -630,6 +640,7 @@ class AudioPlayerManager {
         this.currentTime.value = 0;
         this.duration.value = 0;
         this.spotifyAccessToken = null;
+        this.userPaused = false;
     }
 
     private async handleSpotifyTrackEnd(): Promise<void> {
