@@ -31,11 +31,6 @@ class CivitaiVideoUrlExtractor
                 ])
                 ->get($referrerUrl);
 
-            if ($response->status() === 404) {
-                // Return special marker to indicate 404
-                return '404_NOT_FOUND';
-            }
-
             if (! $response->successful()) {
                 return null;
             }
