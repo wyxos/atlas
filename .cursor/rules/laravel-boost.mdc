@@ -255,6 +255,7 @@ Route::get('/users', function () {
 ## Pest
 
 ### Testing
+- **MANDATORY: After making any code changes, you must write or update tests.** This is not optional - tests must be created or updated for every change.
 - If you need to verify a feature is working, write or update a Unit / Feature test.
 
 ### Pest Tests
@@ -469,6 +470,12 @@ $pages->assertNoJavascriptErrors()->assertNoConsoleLogs();
 
 ## Test Enforcement
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test` with a specific filename or filter.
+- **CRITICAL: Every code change must be programmatically tested.** After making any code changes (new features, bug fixes, refactoring), you MUST:
+  1. Write a new test or update an existing test to cover the change
+  2. Run the affected tests to ensure they pass
+  3. Verify that existing tests still pass (no regressions)
+- For frontend/JavaScript changes, write or update corresponding tests (e.g., Vitest tests for Vue components, TypeScript stores, etc.)
+- For backend/PHP changes, write or update Pest tests
+- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test` with a specific filename or filter, or `npx vitest run` for frontend tests.
+- If you add new functionality without tests, you have not completed the task. Tests are not optional - they are required for every change.
 </laravel-boost-guidelines>
