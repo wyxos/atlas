@@ -31,6 +31,11 @@ class CivitaiVideoUrlExtractor
                 ])
                 ->get($referrerUrl);
 
+            if ($response->status() === 404) {
+                // Return special marker to indicate 404
+                return '404_NOT_FOUND';
+            }
+
             if (! $response->successful()) {
                 return null;
             }
@@ -38,6 +43,17 @@ class CivitaiVideoUrlExtractor
             $html = $response->body();
             if (empty($html)) {
                 return null;
+            }
+
+            // CivitAI sometimes returns 200 with "404" in the page content instead of actual 404 status
+            // Check if the page content indicates a 404 error
+            $htmlLower = strtolower($html);
+            if (str_contains($htmlLower, '404') ||
+                str_contains($htmlLower, 'not found') ||
+                str_contains($htmlLower, 'page not found') ||
+                str_contains($htmlLower, 'this page doesn\'t exist') ||
+                str_contains($htmlLower, 'this page does not exist')) {
+                return '404_NOT_FOUND';
             }
 
             $referrerBase = $this->getBaseUrl($referrerUrl);

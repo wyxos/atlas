@@ -241,6 +241,207 @@ it('extracts video URL from real fixture for file ID 1253355', function () {
     Storage::disk('atlas_app')->assertExists('downloads/sample.mp4');
 });
 
+it('sniffs original URL when referrer returns 404 and uses it if video', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
+
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    $referrerUrl = 'https://civitai.com/images/123456';
+    $originalUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/video.mp4';
+
+    Http::fake(function (Request $request) use ($mp4Body, $referrerUrl, $originalUrl) {
+        $url = $request->url();
+        $method = $request->method();
+
+        // Match referrer URL exactly
+        if ($url === $referrerUrl) {
+            return Http::response('Not Found', 404);
+        }
+
+        // Match original URL - check if URL starts with the base URL
+        $originalBase = strtok($originalUrl, '?');
+        if (str_starts_with($url, $originalBase)) {
+            // Check for Range header
+            $hasRange = $request->hasHeader('Range');
+            if ($hasRange) {
+                // Return first 1MB for sniffing
+                $rangeBody = substr($mp4Body, 0, min(1048576, strlen($mp4Body)));
+
+                return Http::response($rangeBody, 206, [
+                    'Content-Type' => 'video/mp4',
+                    'Content-Range' => 'bytes 0-'.(strlen($rangeBody) - 1).'/'.strlen($mp4Body),
+                ]);
+            }
+
+            // Full request
+            return Http::response($mp4Body, 200, [
+                'Content-Type' => 'video/mp4',
+                'Content-Length' => strlen($mp4Body),
+            ]);
+        }
+
+        return Http::response('', 404);
+    });
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => $originalUrl,
+        'referrer_url' => $referrerUrl,
+        'thumbnail_url' => 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/thumb.jpeg',
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
+        'mime_type' => 'image/webp',
+        'ext' => 'webp',
+    ]);
+
+    (new FixCivitaiMediaType($file->id))->handle();
+
+    $file->refresh();
+
+    expect($file->filename)->toBe('sample.mp4')
+        ->and($file->path)->toBe('downloads/sample.mp4')
+        ->and($file->mime_type)->toBe('video/mp4')
+        ->and($file->ext)->toBe('mp4')
+        ->and($file->url)->toBe($originalUrl)
+        ->and($file->not_found)->toBeFalse()
+        ->and($file->size)->toBe(strlen($mp4Body));
+
+    Storage::disk('atlas_app')->assertMissing('downloads/sample.webp');
+    Storage::disk('atlas_app')->assertExists('downloads/sample.mp4');
+});
+
+it('sniffs thumbnail_url when referrer returns 404 and original URL is not video', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
+
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    $referrerUrl = 'https://civitai.com/images/123456';
+    $originalUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/poster.webp';
+    $thumbnailUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/video.mp4';
+
+    Http::fake(function (Request $request) use ($webpBody, $mp4Body, $referrerUrl, $originalUrl, $thumbnailUrl) {
+        if ($request->url() === $referrerUrl) {
+            return Http::response('Not Found', 404);
+        }
+
+        if ($request->url() === $originalUrl) {
+            if ($request->hasHeader('Range')) {
+                return Http::response(substr($webpBody, 0, min(1048576, strlen($webpBody))), 206, [
+                    'Content-Type' => 'image/webp',
+                    'Content-Range' => 'bytes 0-'.(min(1048576, strlen($webpBody)) - 1).'/'.strlen($webpBody),
+                ]);
+            }
+
+            return Http::response($webpBody, 200, [
+                'Content-Type' => 'image/webp',
+                'Content-Length' => strlen($webpBody),
+            ]);
+        }
+
+        if ($request->url() === $thumbnailUrl) {
+            if ($request->hasHeader('Range')) {
+                return Http::response(substr($mp4Body, 0, min(1048576, strlen($mp4Body))), 206, [
+                    'Content-Type' => 'video/mp4',
+                    'Content-Range' => 'bytes 0-'.(min(1048576, strlen($mp4Body)) - 1).'/'.strlen($mp4Body),
+                ]);
+            }
+
+            return Http::response($mp4Body, 200, [
+                'Content-Type' => 'video/mp4',
+                'Content-Length' => strlen($mp4Body),
+            ]);
+        }
+
+        return Http::response('', 404);
+    });
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => $originalUrl,
+        'referrer_url' => $referrerUrl,
+        'thumbnail_url' => $thumbnailUrl,
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
+        'mime_type' => 'image/webp',
+        'ext' => 'webp',
+    ]);
+
+    (new FixCivitaiMediaType($file->id))->handle();
+
+    $file->refresh();
+
+    expect($file->filename)->toBe('sample.mp4')
+        ->and($file->path)->toBe('downloads/sample.mp4')
+        ->and($file->mime_type)->toBe('video/mp4')
+        ->and($file->ext)->toBe('mp4')
+        ->and($file->url)->toBe($thumbnailUrl)
+        ->and($file->not_found)->toBeFalse()
+        ->and($file->size)->toBe(strlen($mp4Body));
+
+    Storage::disk('atlas_app')->assertMissing('downloads/sample.webp');
+    Storage::disk('atlas_app')->assertExists('downloads/sample.mp4');
+});
+
+it('leaves file unchanged when referrer returns 404 and neither URL is a video', function () {
+    Storage::fake('atlas_app');
+    Storage::fake('atlas');
+
+    $webpBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    Storage::disk('atlas_app')->put('downloads/sample.webp', $webpBody);
+
+    $referrerUrl = 'https://civitai.com/images/123456';
+    $originalUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/poster.webp';
+    $thumbnailUrl = 'https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/96b33e41-8a73-4faa-8ba2-02f65e80dc35/original=true/thumb.webp';
+
+    Http::fake(function (Request $request) use ($webpBody, $referrerUrl, $originalUrl, $thumbnailUrl) {
+        if ($request->url() === $referrerUrl) {
+            return Http::response('Not Found', 404);
+        }
+
+        if ($request->url() === $originalUrl || $request->url() === $thumbnailUrl) {
+            if ($request->hasHeader('Range')) {
+                return Http::response(substr($webpBody, 0, min(1048576, strlen($webpBody))), 206, [
+                    'Content-Type' => 'image/webp',
+                    'Content-Range' => 'bytes 0-'.(min(1048576, strlen($webpBody)) - 1).'/'.strlen($webpBody),
+                ]);
+            }
+
+            return Http::response($webpBody, 200, [
+                'Content-Type' => 'image/webp',
+                'Content-Length' => strlen($webpBody),
+            ]);
+        }
+
+        return Http::response('', 404);
+    });
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'url' => $originalUrl,
+        'referrer_url' => $referrerUrl,
+        'thumbnail_url' => $thumbnailUrl,
+        'filename' => 'sample.webp',
+        'path' => 'downloads/sample.webp',
+        'mime_type' => 'image/webp',
+        'ext' => 'webp',
+    ]);
+
+    (new FixCivitaiMediaType($file->id))->handle();
+
+    $file->refresh();
+
+    // File should remain unchanged (it's a static webp)
+    expect($file->filename)->toBe('sample.webp')
+        ->and($file->path)->toBe('downloads/sample.webp')
+        ->and($file->mime_type)->toBe('image/webp');
+});
+
 it('extracts video URL from real fixture for file ID 1251390', function () {
     Storage::fake('atlas_app');
     Storage::fake('atlas');

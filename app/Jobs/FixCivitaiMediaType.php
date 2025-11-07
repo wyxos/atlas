@@ -82,13 +82,44 @@ class FixCivitaiMediaType implements ShouldQueue
         // Fetch the real video URL from the referrer page
         $extractor = new CivitaiVideoUrlExtractor;
         $videoUrl = $extractor->extractFromFileId($file->id);
-        if (! $videoUrl) {
+
+        // If referrer URL returns 404, sniff bytes from original URL and thumbnail_url
+        $shouldReDownload = false;
+        if ($videoUrl === '404_NOT_FOUND') {
+            $currentUrl = (string) ($file->url ?? '');
+            $thumbnailUrl = (string) ($file->thumbnail_url ?? '');
+
+            // Try original URL first
+            $originalIsVideo = false;
+            if ($currentUrl !== '') {
+                $detectedMime = $this->sniffUrlMimeType($currentUrl);
+                if ($detectedMime && str_starts_with($detectedMime, 'video/')) {
+                    $videoUrl = $currentUrl;
+                    $shouldReDownload = true; // Need to re-download to fix mime type
+                    $originalIsVideo = true;
+                }
+            }
+
+            // If original URL is not a video (even if it's an image), try thumbnail_url
+            if (! $originalIsVideo && $thumbnailUrl !== '') {
+                $detectedMime = $this->sniffUrlMimeType($thumbnailUrl);
+                if ($detectedMime && str_starts_with($detectedMime, 'video/')) {
+                    $videoUrl = $thumbnailUrl;
+                    $shouldReDownload = true; // Need to re-download to fix mime type
+                }
+            }
+
+            // If neither is a video, leave as is (it's a static image)
+            if ($videoUrl === '404_NOT_FOUND') {
+                return;
+            }
+        } elseif (! $videoUrl) {
             return;
         }
 
-        // If the extracted URL is the same as the current URL, no need to re-download
+        // If the extracted URL is the same as the current URL and we don't need to re-download, skip
         $currentUrl = (string) ($file->url ?? '');
-        if ($videoUrl === $currentUrl) {
+        if ($videoUrl === $currentUrl && ! $shouldReDownload) {
             return;
         }
 
@@ -199,6 +230,76 @@ class FixCivitaiMediaType implements ShouldQueue
             'image/webp' => 'webp',
             default => null,
         };
+    }
+
+    protected function sniffUrlMimeType(string $url): ?string
+    {
+        try {
+            $tempFile = tempnam(sys_get_temp_dir(), 'sniff_');
+            if ($tempFile === false) {
+                return null;
+            }
+
+            try {
+                // Try Range request first (more efficient)
+                $response = Http::timeout(30)
+                    ->withHeaders(['Range' => 'bytes=0-1048575'])
+                    ->get($url);
+
+                if ($response->status() === 404) {
+                    return null;
+                }
+
+                // If Range not supported, try full request
+                if ($response->status() === 200 || $response->status() === 206) {
+                    $body = $response->body();
+                    if (empty($body)) {
+                        return null;
+                    }
+
+                    file_put_contents($tempFile, $body);
+
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    if ($finfo === false) {
+                        return null;
+                    }
+
+                    $mime = finfo_file($finfo, $tempFile) ?: null;
+                    finfo_close($finfo);
+
+                    return $mime;
+                }
+
+                // If Range request failed, try without Range
+                $response = Http::timeout(30)->get($url);
+                if ($response->status() === 404 || ! $response->successful()) {
+                    return null;
+                }
+
+                $body = $response->body();
+                if (empty($body)) {
+                    return null;
+                }
+
+                // Limit to first 1MB for sniffing
+                $sniffBody = substr($body, 0, 1048576);
+                file_put_contents($tempFile, $sniffBody);
+
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo === false) {
+                    return null;
+                }
+
+                $mime = finfo_file($finfo, $tempFile) ?: null;
+                finfo_close($finfo);
+
+                return $mime;
+            } finally {
+                @unlink($tempFile);
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     protected function diskPathMap(string $originalPath): array
