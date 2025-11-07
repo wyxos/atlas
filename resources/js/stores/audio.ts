@@ -835,6 +835,12 @@ class AudioPlayerManager {
     }
 
     cleanup(): void {
+        // Stop polling
+        if (this.spotifyPollInterval !== null) {
+            clearInterval(this.spotifyPollInterval);
+            this.spotifyPollInterval = null;
+        }
+
         // Pause and stop HTML Audio playback
         if (this.audio) {
             this.audio.pause();
