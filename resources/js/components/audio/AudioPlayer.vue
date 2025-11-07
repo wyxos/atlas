@@ -83,6 +83,15 @@ function handleSeek(event: MouseEvent): void {
   const newTime = percent * duration.value;
   seekTo(newTime);
 }
+
+// Handle volume seek
+function handleVolumeSeek(event: MouseEvent): void {
+  const target = event.currentTarget as HTMLElement;
+  const rect = target.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const percent = Math.max(0, Math.min(1, x / rect.width));
+  setVolume(percent);
+}
 </script>
 
 <template>
@@ -240,16 +249,24 @@ function handleSeek(event: MouseEvent): void {
                                 <!-- Volume -->
                                 <div class="group ml-4 hidden items-center gap-2 md:flex">
                                     <Volume2 :size="16" class="text-muted-foreground group-hover:text-primary-foreground" />
-                                    <input
-                                        aria-label="Volume"
-                                        class="h-1 w-28 cursor-pointer appearance-none rounded-full"
-                                        max="1"
-                                        min="0"
-                                        step="0.01"
-                                        type="range"
-                                        :value="volume"
-                                        @input="(e) => setVolume(parseFloat((e.target as HTMLInputElement).value))"
-                                    />
+                                    <div class="relative w-28">
+                                        <div class="h-2 w-full cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="handleVolumeSeek">
+                                            <div
+                                                class="h-full rounded-full bg-primary transition-all"
+                                                :style="{ width: `${volume * 100}%` }"
+                                            ></div>
+                                        </div>
+                                        <input
+                                            aria-label="Volume"
+                                            class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                            max="1"
+                                            min="0"
+                                            step="0.01"
+                                            type="range"
+                                            :value="volume"
+                                            @input="(e) => setVolume(parseFloat((e.target as HTMLInputElement).value))"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -368,14 +385,24 @@ function handleSeek(event: MouseEvent): void {
                 <!-- Volume (mobile) -->
                 <div class="mb-4 flex items-center justify-center gap-2 md:hidden">
                     <Volume2 :size="16" />
-                    <input
-                        aria-label="Volume"
-                        class="h-1 w-40 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
-                        max="1"
-                        min="0"
-                        step="0.01"
-                        type="range"
-                    />
+                    <div class="relative w-40">
+                        <div class="h-2 w-full cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="handleVolumeSeek">
+                            <div
+                                class="h-full rounded-full bg-primary transition-all"
+                                :style="{ width: `${volume * 100}%` }"
+                            ></div>
+                        </div>
+                        <input
+                            aria-label="Volume"
+                            class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                            max="1"
+                            min="0"
+                            step="0.01"
+                            type="range"
+                            :value="volume"
+                            @input="(e) => setVolume(parseFloat((e.target as HTMLInputElement).value))"
+                        />
+                    </div>
                 </div>
             </template>
         </div>

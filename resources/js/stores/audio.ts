@@ -30,6 +30,7 @@ class AudioPlayerManager {
     private spotifyTrackEndHandled = false;
     private spotifyLastPosition = 0;
     private spotifyPausedPosition = 0;
+    private spotifyPollInterval: number | null = null;
     private currentTrack = ref<AudioTrack | null>(null);
     private queue = ref<AudioTrack[]>([]);
     private currentIndex = ref<number>(-1);
@@ -182,13 +183,15 @@ class AudioPlayerManager {
                 // Track previous playing state before updating
                 const wasPlaying = this.isPlaying.value;
                 this.isPlaying.value = !state.paused;
-                this.currentTime.value = state.position / 1000; // Convert ms to seconds
-                this.duration.value = state.duration / 1000; // Convert ms to seconds
+                this.updateSpotifyTime(state);
                 
                 // Update paused position when playing (so we can resume from current position)
                 if (!state.paused && state.position > 0) {
                     this.spotifyPausedPosition = state.position;
                 }
+
+                // Start/stop polling for more frequent updates
+                this.updateSpotifyPolling(!state.paused);
 
                 // Handle track end - detect when track has finished
                 if (state.duration > 0 && this.currentTrack.value) {
@@ -232,6 +235,45 @@ class AudioPlayerManager {
         } catch (error) {
             console.error('Failed to initialize Spotify player:', error);
             return false;
+        }
+    }
+
+    private updateSpotifyTime(state: Spotify.PlaybackState): void {
+        if (state.position !== null) {
+            this.currentTime.value = state.position / 1000; // Convert ms to seconds
+        }
+        if (state.duration !== null) {
+            this.duration.value = state.duration / 1000; // Convert ms to seconds
+        }
+    }
+
+    private updateSpotifyPolling(isPlaying: boolean): void {
+        // Clear existing interval
+        if (this.spotifyPollInterval !== null) {
+            clearInterval(this.spotifyPollInterval);
+            this.spotifyPollInterval = null;
+        }
+
+        // Start polling if playing
+        if (isPlaying && this.spotifyPlayer && this.currentTrack.value && this.isSpotifyTrack(this.currentTrack.value)) {
+            // Poll every 250ms for smooth progress updates
+            this.spotifyPollInterval = window.setInterval(async () => {
+                if (!this.spotifyPlayer) return;
+                
+                try {
+                    const state = await this.spotifyPlayer.getCurrentState();
+                    if (state && !state.paused) {
+                        this.updateSpotifyTime(state);
+                        // Update paused position for resume
+                        if (state.position !== null && state.position > 0) {
+                            this.spotifyPausedPosition = state.position;
+                        }
+                    }
+                } catch (error) {
+                    // Silently handle errors (player might be disconnected)
+                    console.debug('Error polling Spotify state:', error);
+                }
+            }, 250);
         }
     }
 
@@ -618,6 +660,8 @@ class AudioPlayerManager {
             // Set current track but defer playback to the caller
             this.currentTrack.value = track;
             this.isPlaying.value = false;
+            // Stop polling when loading a new track
+            this.updateSpotifyPolling(false);
             // Load track data for current + next 5 + previous 5 (fire and forget)
             void this.loadTrackDataForContext();
             return;
