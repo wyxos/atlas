@@ -29,6 +29,7 @@ class AudioPlayerManager {
     private spotifyPlayerReady = ref<boolean>(false);
     private spotifyTrackEndHandled = false;
     private spotifyLastPosition = 0;
+    private spotifyPausedPosition = 0;
     private currentTrack = ref<AudioTrack | null>(null);
     private queue = ref<AudioTrack[]>([]);
     private currentIndex = ref<number>(-1);
@@ -183,6 +184,11 @@ class AudioPlayerManager {
                 this.isPlaying.value = !state.paused;
                 this.currentTime.value = state.position / 1000; // Convert ms to seconds
                 this.duration.value = state.duration / 1000; // Convert ms to seconds
+                
+                // Update paused position when playing (so we can resume from current position)
+                if (!state.paused && state.position > 0) {
+                    this.spotifyPausedPosition = state.position;
+                }
 
                 // Handle track end - detect when track has finished
                 if (state.duration > 0 && this.currentTrack.value) {
@@ -239,6 +245,7 @@ class AudioPlayerManager {
         // Reset track end flag and position tracking for new track
         this.spotifyTrackEndHandled = false;
         this.spotifyLastPosition = 0;
+        this.spotifyPausedPosition = 0;
 
         const initialized = await this.initSpotifyPlayer();
         if (!initialized || !this.spotifyPlayer) {
@@ -288,8 +295,77 @@ class AudioPlayerManager {
             );
 
             this.currentTrack.value = track;
+            // Reset paused position when starting a new track
+            this.spotifyPausedPosition = 0;
         } catch (error) {
             console.error('Failed to play Spotify track:', error);
+            throw error;
+        }
+    }
+
+    private async resumeSpotifyTrack(positionMs: number): Promise<void> {
+        const currentTrack = this.currentTrack.value;
+        if (!currentTrack) {
+            console.error('No current track to resume');
+            return;
+        }
+
+        const uri = this.getSpotifyTrackUri(currentTrack);
+        if (!uri) {
+            console.error('Invalid Spotify track URI:', currentTrack);
+            return;
+        }
+
+        const initialized = await this.initSpotifyPlayer();
+        if (!initialized || !this.spotifyPlayer) {
+            console.error('Spotify player not initialized');
+            return;
+        }
+
+        // Wait for device ID if not ready yet
+        if (!this.spotifyDeviceId) {
+            let attempts = 0;
+            while (!this.spotifyDeviceId && attempts < 50) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            if (!this.spotifyDeviceId) {
+                console.error('Spotify device ID not available');
+                return;
+            }
+        }
+
+        if (!this.spotifyPlayerReady.value || !this.spotifyDeviceId) {
+            console.warn('Spotify player not ready or device missing; skipping resume');
+            return;
+        }
+
+        try {
+            const token = await this.getSpotifyAccessToken();
+            if (!token) {
+                console.error('No Spotify access token');
+                return;
+            }
+
+            // Use Spotify Web API to resume playback from saved position
+            // Include both URI and position_ms to ensure the correct track resumes from the correct position
+            await axios.put(
+                `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
+                {
+                    uris: [uri],
+                    position_ms: positionMs,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                },
+            );
+
+            this.isPlaying.value = true;
+        } catch (error) {
+            console.error('Failed to resume Spotify track:', error);
             throw error;
         }
     }
@@ -338,9 +414,16 @@ class AudioPlayerManager {
         this.userPaused = false;
 
         if (this.isSpotifyTrack(currentTrack)) {
-            // For Spotify tracks, always use playSpotifyTrack() to ensure the correct track is loaded
-            // Using resume() can resume the wrong track if we just switched tracks
-            await this.playSpotifyTrack(currentTrack);
+            // Check if we're resuming the same track that was paused
+            const isResumingSameTrack = this.currentTrack.value?.id === currentTrack.id && this.spotifyPausedPosition > 0;
+            
+            if (isResumingSameTrack) {
+                // Resume from saved position
+                await this.resumeSpotifyTrack(this.spotifyPausedPosition);
+            } else {
+                // For new tracks or first play, use playSpotifyTrack() to ensure the correct track is loaded
+                await this.playSpotifyTrack(currentTrack);
+            }
         } else {
             // Use HTML Audio API
             if (!this.audio && this.queue.value.length > 0) {
@@ -361,6 +444,9 @@ class AudioPlayerManager {
         const currentTrack = this.currentTrack.value;
         console.log('Pausing playback', currentTrack);
         if (currentTrack && this.isSpotifyTrack(currentTrack)) {
+            // Save current position before pausing
+            this.spotifyPausedPosition = this.currentTime.value * 1000; // Convert to ms
+            
             // Use Spotify SDK pause
             if (this.spotifyPlayer) {
                 try {
@@ -550,6 +636,9 @@ class AudioPlayerManager {
         const shouldAutoPlay = options.autoPlay ?? !this.userPaused;
         // Wait for pause to complete before loading new track
         await this.pause({ userInitiated: false });
+        
+        // Reset paused position when switching tracks
+        this.spotifyPausedPosition = 0;
 
         this.currentIndex.value = index;
         await this.loadTrack(this.queue.value[index]);
@@ -566,6 +655,9 @@ class AudioPlayerManager {
 
         const shouldAutoPlay = options.autoPlay ?? true;
         await this.pause({ userInitiated: false });
+        
+        // Reset paused position when setting new queue
+        this.spotifyPausedPosition = 0;
 
         this.queue.value = [...queue];
         this.originalQueue = [...queue];
