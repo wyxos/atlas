@@ -82,7 +82,17 @@ class FixCivitaiMediaType implements ShouldQueue
         // Fetch the real video URL from the referrer page
         $extractor = new CivitaiVideoUrlExtractor;
         $videoUrl = $extractor->extractFromFileId($file->id);
-        if (! $videoUrl) {
+
+        // If referrer URL returns 404, check if thumbnail_url has .mp4 extension as fallback
+        if ($videoUrl === '404_NOT_FOUND') {
+            $thumbnailUrl = (string) ($file->thumbnail_url ?? '');
+            $thumbnailExt = strtolower((string) pathinfo(parse_url($thumbnailUrl, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
+            if ($thumbnailExt === 'mp4') {
+                $videoUrl = $thumbnailUrl;
+            } else {
+                return;
+            }
+        } elseif (! $videoUrl) {
             return;
         }
 

@@ -461,6 +461,18 @@ class DownloadFile implements ShouldQueue
         if (str_contains($contentType, 'image/webp')) {
             $extractor = new CivitaiVideoUrlExtractor;
             $videoUrl = $extractor->extractFromFileId($this->file->id);
+
+            // If referrer URL returns 404, check if thumbnail_url has .mp4 extension as fallback
+            if ($videoUrl === '404_NOT_FOUND') {
+                $thumbnailUrl = (string) ($this->file->thumbnail_url ?? '');
+                $thumbnailExt = strtolower((string) pathinfo(parse_url($thumbnailUrl, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
+                if ($thumbnailExt === 'mp4') {
+                    $videoUrl = $thumbnailUrl;
+                } else {
+                    return $fileUrl;
+                }
+            }
+
             if ($videoUrl) {
                 // Update the file's URL to the real video URL
                 $this->file->update(['url' => $videoUrl]);
