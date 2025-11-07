@@ -661,11 +661,22 @@ describe('audio store', () => {
       // Clear mocks before pause
       axiosPutMock.mockClear();
       mockSpotifyPlayer.pause.mockClear();
+      mockSpotifyPlayer.getCurrentState.mockClear();
+
+      // Mock getCurrentState to return the current playing state
+      mockSpotifyPlayer.getCurrentState.mockResolvedValue({
+        paused: false,
+        position: 45000,
+        duration: 300000,
+        track_window: { current_track: null },
+      });
 
       // Pause the track
       await store.pause();
       await flushPromises();
 
+      // Should have called getCurrentState to get accurate position
+      expect(mockSpotifyPlayer.getCurrentState).toHaveBeenCalled();
       // Should have called SDK pause method
       expect(mockSpotifyPlayer.pause).toHaveBeenCalled();
       expect(store.isPlaying.value).toBe(false);

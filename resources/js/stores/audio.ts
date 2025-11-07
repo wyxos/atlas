@@ -444,16 +444,28 @@ class AudioPlayerManager {
         const currentTrack = this.currentTrack.value;
         console.log('Pausing playback', currentTrack);
         if (currentTrack && this.isSpotifyTrack(currentTrack)) {
-            // Save current position before pausing
-            this.spotifyPausedPosition = this.currentTime.value * 1000; // Convert to ms
-            
-            // Use Spotify SDK pause
+            // Get the most up-to-date position directly from Spotify player state
             if (this.spotifyPlayer) {
                 try {
+                    // Get current state to capture the exact position at pause time
+                    const state = await this.spotifyPlayer.getCurrentState();
+                    if (state && !state.paused && state.position !== null) {
+                        // Use the position from the player state (most accurate)
+                        this.spotifyPausedPosition = state.position;
+                    } else {
+                        // Fallback to stored currentTime if state is not available
+                        this.spotifyPausedPosition = this.currentTime.value * 1000;
+                    }
+                    
                     await this.spotifyPlayer.pause();
                 } catch (error) {
                     console.debug('Could not pause Spotify track:', error);
+                    // Fallback to stored currentTime if getCurrentState fails
+                    this.spotifyPausedPosition = this.currentTime.value * 1000;
                 }
+            } else {
+                // Fallback if player is not available
+                this.spotifyPausedPosition = this.currentTime.value * 1000;
             }
         } else {
             // Use HTML Audio API
