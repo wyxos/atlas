@@ -771,6 +771,84 @@ describe('audio store', () => {
       expect(mockSpotifyPlayer.getCurrentState.mock.calls.length).toBeLessThanOrEqual(callCountBeforePause + 1);
     });
 
+    it('reconnects Spotify player when device disconnects (404 error)', async () => {
+      const store = await importStore();
+      const track = buildSpotifyTrack(1);
+
+      await store.setQueueAndPlay([track], 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      // Simulate track playing at position 45000ms
+      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 45000,
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+
+      // Mock getCurrentState for pause
+      mockSpotifyPlayer.getCurrentState.mockResolvedValue({
+        paused: false,
+        position: 45000,
+        duration: 300000,
+        track_window: { current_track: null },
+      });
+
+      // Pause the track
+      await store.pause();
+      await flushPromises();
+
+      // Clear mocks
+      axiosPutMock.mockClear();
+      mockSpotifyPlayer.disconnect.mockClear();
+      mockSpotifyPlayer.connect.mockClear();
+
+      // Simulate 404 error on first resume attempt (device disconnected)
+      axiosPutMock.mockRejectedValueOnce({
+        response: { status: 404 },
+        code: 'ERR_BAD_REQUEST',
+        message: 'Request failed with status code 404',
+      });
+
+      // Mock successful reconnection
+      mockSpotifyPlayer.connect.mockResolvedValueOnce(true);
+      setTimeout(() => {
+        const readyCallbacks = spotifyListeners['ready'] || [];
+        readyCallbacks.forEach((cb) => cb({ device_id: 'new_device_id' }));
+      }, 10);
+
+      // Mock successful resume after reconnect
+      axiosPutMock.mockResolvedValueOnce({ status: 204 });
+
+      // Try to resume - should handle 404 and reconnect
+      await store.play();
+      await flushPromises();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 50)); // Wait for reconnection
+      await flushPromises();
+
+      // Should have attempted disconnect and reconnect
+      expect(mockSpotifyPlayer.disconnect).toHaveBeenCalled();
+      expect(mockSpotifyPlayer.connect).toHaveBeenCalled();
+
+      // Should have retried resume after reconnect
+      expect(axiosPutMock).toHaveBeenCalledTimes(2); // First attempt (404) + retry (success)
+      const resumeCall = axiosPutMock.mock.calls[1];
+      expect(resumeCall[0]).toContain('/v1/me/player/play');
+      expect(resumeCall[1]).toEqual(
+        expect.objectContaining({
+          uris: [`spotify:track:spotify_track_1`],
+          position_ms: 45000,
+        }),
+      );
+    });
+
     it('detects when Spotify track ends and advances to next', async () => {
       const store = await importStore();
       const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2)];

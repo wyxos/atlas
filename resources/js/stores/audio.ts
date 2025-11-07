@@ -358,6 +358,23 @@ class AudioPlayerManager {
             return;
         }
 
+        // Force reconnection if player is not ready or device is missing
+        if (!this.spotifyPlayerReady.value || !this.spotifyDeviceId) {
+            // Clear cached device ID and force reconnection
+            this.spotifyDeviceId = null;
+            this.spotifyPlayerReady.value = false;
+            
+            // Disconnect existing player if it exists
+            if (this.spotifyPlayer) {
+                try {
+                    await this.spotifyPlayer.disconnect();
+                } catch (error) {
+                    console.debug('Error disconnecting Spotify player:', error);
+                }
+                this.spotifyPlayer = null;
+            }
+        }
+
         const initialized = await this.initSpotifyPlayer();
         if (!initialized || !this.spotifyPlayer) {
             console.error('Spotify player not initialized');
@@ -384,6 +401,8 @@ class AudioPlayerManager {
         }
 
         try {
+            // Force token refresh to ensure we have a valid token
+            this.spotifyAccessToken = null;
             const token = await this.getSpotifyAccessToken();
             if (!token) {
                 console.error('No Spotify access token');
@@ -406,9 +425,75 @@ class AudioPlayerManager {
             );
 
             this.isPlaying.value = true;
-        } catch (error) {
-            console.error('Failed to resume Spotify track:', error);
-            throw error;
+        } catch (error: any) {
+            // Handle 404 or other errors - device might have disconnected
+            if (error?.response?.status === 404 || error?.code === 'ERR_BAD_REQUEST') {
+                console.warn('Spotify device not found, reconnecting...');
+                
+                // Clear device state and force reconnection
+                this.spotifyDeviceId = null;
+                this.spotifyPlayerReady.value = false;
+                
+                // Disconnect and reconnect
+                if (this.spotifyPlayer) {
+                    try {
+                        await this.spotifyPlayer.disconnect();
+                    } catch (disconnectError) {
+                        console.debug('Error disconnecting during reconnect:', disconnectError);
+                    }
+                    this.spotifyPlayer = null;
+                }
+                
+                // Retry with fresh connection
+                const reinitialized = await this.initSpotifyPlayer();
+                if (!reinitialized || !this.spotifyPlayer) {
+                    console.error('Failed to reconnect Spotify player');
+                    return;
+                }
+                
+                // Wait for new device ID
+                let attempts = 0;
+                while (!this.spotifyDeviceId && attempts < 50) {
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!this.spotifyDeviceId || !this.spotifyPlayerReady.value) {
+                    console.error('Spotify device ID not available after reconnect');
+                    return;
+                }
+                
+                // Retry resume with fresh token and device
+                this.spotifyAccessToken = null;
+                const freshToken = await this.getSpotifyAccessToken();
+                if (!freshToken) {
+                    console.error('No Spotify access token after reconnect');
+                    return;
+                }
+                
+                try {
+                    await axios.put(
+                        `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
+                        {
+                            uris: [uri],
+                            position_ms: positionMs,
+                        },
+                        {
+                            headers: {
+                                Authorization: `Bearer ${freshToken}`,
+                            },
+                        },
+                    );
+                    
+                    this.isPlaying.value = true;
+                } catch (retryError) {
+                    console.error('Failed to resume Spotify track after reconnect:', retryError);
+                    throw retryError;
+                }
+            } else {
+                console.error('Failed to resume Spotify track:', error);
+                throw error;
+            }
         }
     }
 
