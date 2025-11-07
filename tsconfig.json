@@ -41,6 +41,7 @@
         "types": [
             "vite/client",
             "vitest",
+            "spotify-web-playback-sdk",
             "./resources/js/types"
         ] /* Specify type package names to be included without being referenced in a source file. */,
         // "allowUmdGlobalAccess": true,                     /* Allow accessing UMD globals from modules. */

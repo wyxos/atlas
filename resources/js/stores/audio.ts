@@ -1,6 +1,9 @@
+/// <reference types="spotify-web-playback-sdk" />
+
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
+
 
 export interface AudioTrack {
   id: number;
@@ -14,43 +17,10 @@ export interface AudioTrack {
 
 interface PlayOptions {
   autoPlay?: boolean;
+  skipPause?: boolean;
 }
 
-interface SpotifyPlayer {
-  connect(): Promise<boolean>;
-  disconnect(): void;
-  getCurrentState(): Promise<SpotifyPlaybackState | null>;
-  addListener(event: 'ready' | 'not_ready', callback: (data: { device_id: string }) => void): void;
-  addListener(event: 'player_state_changed', callback: (state: SpotifyPlaybackState) => void): void;
-  addListener(event: 'initialization_error' | 'authentication_error' | 'account_error' | 'playback_error', callback: (data: { message: string }) => void): void;
-  addListener(event: string, callback: (...args: any[]) => void): void;
-  removeListener(event: string, callback: (...args: any[]) => void): void;
-  pause(): Promise<void>;
-  resume(): Promise<void>;
-  togglePlay(): Promise<void>;
-  seek(positionMs: number): Promise<void>;
-  setVolume(volume: number): Promise<void>;
-  getVolume(): Promise<number>;
-}
-
-interface SpotifyPlaybackState {
-  paused: boolean;
-  position: number;
-  duration: number;
-  track_window: {
-    current_track: {
-      uri: string;
-      id: string;
-      name: string;
-      album: {
-        uri: string;
-        name: string;
-        images: Array<{ url: string }>;
-      };
-      artists: Array<{ uri: string; name: string }>;
-    } | null;
-  };
-}
+type SpotifyPlayer = Spotify.Player;
 
 class AudioPlayerManager {
   private audio: HTMLAudioElement | null = null;
@@ -59,6 +29,7 @@ class AudioPlayerManager {
   private spotifyDeviceId: string | null = null;
   private spotifyPlayerReady = ref<boolean>(false);
   private spotifyTrackEndHandled = false;
+  private spotifyLastPosition = 0;
   private currentTrack = ref<AudioTrack | null>(null);
   private queue = ref<AudioTrack[]>([]);
   private currentIndex = ref<number>(-1);
@@ -106,7 +77,7 @@ class AudioPlayerManager {
 
     // Check if SDK is already loaded
     if ((window as any).Spotify) {
-      return;
+    return;
     }
 
     return new Promise((resolve, reject) => {
@@ -152,13 +123,13 @@ class AudioPlayerManager {
         return false;
       }
 
-      const Spotify = (window as any).Spotify;
-      if (!Spotify) {
+      const spotifySDK = (window as any).Spotify;
+      if (!spotifySDK) {
         console.error('Spotify SDK not available');
-        return false;
-      }
+  return false;
+}
 
-      this.spotifyPlayer = new Spotify.Player({
+      this.spotifyPlayer = new spotifySDK.Player({
         name: 'Atlas Audio Player',
         getOAuthToken: (cb: (token: string) => void) => {
           cb(token);
@@ -200,25 +171,43 @@ class AudioPlayerManager {
         console.error('Spotify playback error:', message);
       });
 
-      this.spotifyPlayer.addListener('player_state_changed', (state: SpotifyPlaybackState) => {
+      this.spotifyPlayer.addListener('player_state_changed', (state) => {
         if (!state) return;
 
+        // Track previous playing state before updating
+        const wasPlaying = this.isPlaying.value;
         this.isPlaying.value = !state.paused;
         this.currentTime.value = state.position / 1000; // Convert ms to seconds
         this.duration.value = state.duration / 1000; // Convert ms to seconds
 
         // Handle track end - detect when track has finished
-        if (state.duration > 0) {
+        if (state.duration > 0 && this.currentTrack.value) {
           const remaining = state.duration - state.position;
-          // Track ended if remaining time is very small (less than 500ms) and we haven't handled it yet
-          if (remaining < 500 && !this.spotifyTrackEndHandled && this.currentTrack.value) {
+          const position = state.position;
+
+          // Detect if track has looped (position jumped back to near start after being near end)
+          const wasNearEnd = this.spotifyLastPosition > state.duration - 1000;
+          const hasLooped = position < 1000 && wasNearEnd && !state.paused;
+
+          // Detect when track is very close to the end (within 500ms) and still playing
+          const isAtEnd = remaining < 500 && remaining > 0 && !state.paused;
+          // Detect when track has ended and reset (paused at very start after playing)
+          const hasEndedAndReset = state.paused && position < 500 && wasPlaying;
+
+          if ((isAtEnd || hasEndedAndReset || hasLooped) && !this.spotifyTrackEndHandled) {
             this.spotifyTrackEndHandled = true;
-            // Advance to next track in queue
-            void this.next({ autoPlay: true });
-          } else if (remaining >= 500) {
-            // Reset the flag when we're not near the end
+            this.spotifyLastPosition = position;
+            void this.handleSpotifyTrackEnd();
+            return;
+          }
+
+          if (!state.paused && remaining >= 1000) {
+            // Reset the flag when we're well away from the end and playing normally
             this.spotifyTrackEndHandled = false;
           }
+
+          // Track last position for loop detection
+          this.spotifyLastPosition = position;
         }
       });
 
@@ -240,16 +229,27 @@ class AudioPlayerManager {
     const uri = this.getSpotifyTrackUri(track);
     if (!uri) {
       console.error('Invalid Spotify track URI:', track);
-      return;
+    return;
     }
 
-    // Reset track end flag for new track
+    // Reset track end flag and position tracking for new track
     this.spotifyTrackEndHandled = false;
+    this.spotifyLastPosition = 0;
 
     const initialized = await this.initSpotifyPlayer();
     if (!initialized || !this.spotifyPlayer) {
       console.error('Spotify player not initialized');
       return;
+    }
+
+    // Pause current playback if there's a track loaded
+    if (this.spotifyPlayer && this.currentTrack.value) {
+      try {
+        await this.spotifyPlayer.pause();
+      } catch (error) {
+        // Ignore errors if nothing is playing or no track loaded
+        console.debug('Could not pause Spotify track:', error);
+      }
     }
 
     // Wait for device ID if not ready yet
@@ -263,11 +263,26 @@ class AudioPlayerManager {
 
       if (!this.spotifyDeviceId) {
         console.error('Spotify device ID not available');
-        return;
-      }
+      return;
+    }
+    }
+
+    if (!this.spotifyPlayerReady.value || !this.spotifyDeviceId) {
+      console.warn('Spotify player not ready or device missing; skipping play');
+      return;
     }
 
     try {
+      // Pause current playback if there's a track loaded
+      if (this.spotifyPlayer && this.currentTrack.value) {
+        try {
+          await this.spotifyPlayer.pause();
+        } catch (error) {
+          // Ignore errors if nothing is playing
+          console.debug('Could not pause Spotify track:', error);
+        }
+      }
+
       // Transfer playback to our device and play the track
       const token = await this.getSpotifyAccessToken();
       if (!token) {
@@ -337,13 +352,9 @@ class AudioPlayerManager {
     if (!currentTrack) return;
 
     if (this.isSpotifyTrack(currentTrack)) {
-      // Use Spotify player
-      if (!this.spotifyPlayer || !this.spotifyPlayerReady.value) {
-        await this.initSpotifyPlayer();
-      }
-      if (this.spotifyPlayer) {
-        await this.spotifyPlayer.resume();
-      }
+      // For Spotify tracks, always use playSpotifyTrack() to ensure the correct track is loaded
+      // Using resume() can resume the wrong track if we just switched tracks
+      await this.playSpotifyTrack(currentTrack);
     } else {
       // Use HTML Audio API
       if (!this.audio && this.queue.value.length > 0) {
@@ -357,12 +368,16 @@ class AudioPlayerManager {
     }
   }
 
-  pause(): void {
+  async pause(): Promise<void> {
     const currentTrack = this.currentTrack.value;
     if (currentTrack && this.isSpotifyTrack(currentTrack)) {
-      // Use Spotify player
+      // Use Spotify SDK pause
       if (this.spotifyPlayer) {
-        void this.spotifyPlayer.pause();
+        try {
+          await this.spotifyPlayer.pause();
+        } catch (error) {
+          console.debug('Could not pause Spotify track:', error);
+        }
       }
     } else {
       // Use HTML Audio API
@@ -374,7 +389,7 @@ class AudioPlayerManager {
 
   async togglePlay(): Promise<void> {
     if (this.isPlaying.value) {
-      this.pause();
+      await this.pause();
     } else {
       await this.play();
     }
@@ -388,7 +403,8 @@ class AudioPlayerManager {
       : this.queue.value.length - 1;
 
     const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
-    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay });
+    const skipPause = options.skipPause ?? false;
+    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay, skipPause });
   }
 
   async next(options: PlayOptions = {}): Promise<void> {
@@ -399,7 +415,8 @@ class AudioPlayerManager {
       : 0;
 
     const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
-    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay });
+    const skipPause = options.skipPause ?? false;
+    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay, skipPause });
   }
 
   private async loadTrackDataForContext(): Promise<void> {
@@ -457,19 +474,24 @@ class AudioPlayerManager {
   }
 
   private async loadTrack(track: AudioTrack): Promise<void> {
-    // Pause the previous player if switching between Spotify and non-Spotify
+    // Pause the previous player when switching tracks
     const previousTrack = this.currentTrack.value;
     if (previousTrack) {
       const wasSpotify = this.isSpotifyTrack(previousTrack);
       const isSpotify = this.isSpotifyTrack(track);
 
-      if (wasSpotify && !isSpotify) {
-        // Switching from Spotify to non-Spotify - pause Spotify
+      if (wasSpotify) {
+        // Switching from Spotify - pause SDK player
         if (this.spotifyPlayer) {
-          await this.spotifyPlayer.pause();
+          try {
+            await this.spotifyPlayer.pause();
+          } catch (error) {
+            // Ignore errors if nothing is playing
+            console.debug('Could not pause Spotify track:', error);
+          }
         }
-      } else if (!wasSpotify && isSpotify) {
-        // Switching from non-Spotify to Spotify - pause HTML audio
+      } else {
+        // Switching from non-Spotify - pause HTML audio
         if (this.audio) {
           this.audio.pause();
         }
@@ -481,7 +503,7 @@ class AudioPlayerManager {
       await this.playSpotifyTrack(track);
       // Load track data for current + next 5 + previous 5 (fire and forget)
       void this.loadTrackDataForContext();
-      return;
+          return;
     }
 
     // Use HTML Audio API for non-Spotify tracks
@@ -489,8 +511,8 @@ class AudioPlayerManager {
     const audioUrl = track.url;
     if (!audioUrl) {
       console.error('Audio track missing URL:', track);
-      return;
-    }
+        return;
+      }
 
     this.initAudio();
     if (!this.audio) return;
@@ -507,7 +529,11 @@ class AudioPlayerManager {
     if (index < 0 || index >= this.queue.value.length) return;
 
     const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
-    this.pause();
+    const skipPause = options.skipPause ?? false;
+    // Wait for pause to complete before loading new track unless skipping
+    if (!skipPause) {
+      await this.pause();
+    }
 
     this.currentIndex.value = index;
     await this.loadTrack(this.queue.value[index]);
@@ -521,7 +547,10 @@ class AudioPlayerManager {
     if (queue.length === 0) return;
 
     const shouldAutoPlay = options.autoPlay ?? true;
-    this.pause();
+    const skipPause = options.skipPause ?? false;
+    if (!skipPause) {
+      await this.pause();
+    }
 
     this.queue.value = [...queue];
     this.currentIndex.value = startIndex;
@@ -537,9 +566,14 @@ class AudioPlayerManager {
     if (currentTrack && this.isSpotifyTrack(currentTrack)) {
       // Use Spotify player (time is in seconds, Spotify expects milliseconds)
       if (this.spotifyPlayer) {
-        void this.spotifyPlayer.seek(time * 1000);
+        try {
+          void this.spotifyPlayer.seek(time * 1000);
+        } catch (error) {
+          // SDK seek() requires a track to be loaded first
+          console.debug('Could not seek Spotify track:', error);
+        }
       }
-    } else {
+      } else {
       // Use HTML Audio API
       if (this.audio) {
         this.audio.currentTime = time;
@@ -554,9 +588,14 @@ class AudioPlayerManager {
     if (currentTrack && this.isSpotifyTrack(currentTrack)) {
       // Use Spotify player
       if (this.spotifyPlayer) {
-        void this.spotifyPlayer.setVolume(this.volume.value);
+        try {
+          void this.spotifyPlayer.setVolume(this.volume.value);
+        } catch (error) {
+          // SDK setVolume() might fail if player isn't ready
+          console.debug('Could not set Spotify volume:', error);
+        }
       }
-    } else {
+      } else {
       // Use HTML Audio API
       if (this.audio) {
         this.audio.volume = this.volume.value;
@@ -589,6 +628,18 @@ class AudioPlayerManager {
     this.duration.value = 0;
     this.spotifyAccessToken = null;
   }
+
+  private async handleSpotifyTrackEnd(): Promise<void> {
+    // Pause current track before advancing
+    if (this.spotifyPlayer) {
+      try {
+        await this.spotifyPlayer.pause();
+      } catch (error) {
+        console.debug('Could not pause Spotify track:', error);
+      }
+    }
+    await this.next({ autoPlay: true, skipPause: true });
+  }
 }
 
 const audioPlayerManager = new AudioPlayerManager();
@@ -596,6 +647,12 @@ const audioPlayerManager = new AudioPlayerManager();
 // Cleanup on page unload (handles browser navigation, refresh, etc.)
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
+    audioPlayerManager.cleanup();
+  });
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
     audioPlayerManager.cleanup();
   });
 }

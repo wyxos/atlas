@@ -72,7 +72,7 @@ beforeAll(async () => {
         (this as any).readyState = 4;
         (this as any).response = AUDIO_BUFFER.buffer.slice(0);
         this.onreadystatechange?.(new Event('readystatechange'));
-        this.onload?.(new Event('load'));
+        this.onload?.(new ProgressEvent('load') as any);
       }, 5);
     }
   }
@@ -104,10 +104,29 @@ function buildTrack(id: number, withMetadata = false) {
   return track;
 }
 
+function buildSpotifyTrack(id: number, withMetadata = false) {
+  const track: any = {
+    id,
+    source: 'spotify',
+    source_id: `spotify_track_${id}`,
+  };
+  
+  if (withMetadata) {
+    track.artists = [{ name: `Artist ${id}` }];
+    track.metadata = { payload: { title: `Track ${id}` } };
+  }
+  
+  return track;
+}
+
 const axiosPostMock = vi.hoisted(() => vi.fn());
+const axiosGetMock = vi.hoisted(() => vi.fn());
+const axiosPutMock = vi.hoisted(() => vi.fn());
 vi.mock('axios', () => ({
   default: {
     post: axiosPostMock,
+    get: axiosGetMock,
+    put: axiosPutMock,
   },
 }));
 
@@ -392,6 +411,215 @@ describe('audio store', () => {
     // Verify current track URL is preserved
     expect(store.currentTrack.value?.url).toBe(`${audioServerUrl}/audio-100.mp3`);
     expect(store.currentTrack.value?.artists?.[0]?.name).toBe('Artist 100');
+  });
+
+  describe('Spotify tracks', () => {
+    let mockSpotifyPlayer: any;
+    let mockSpotifySDK: any;
+    let spotifyListeners: Record<string, Array<(data: any) => void>>;
+
+    beforeEach(() => {
+      spotifyListeners = {};
+      mockSpotifyPlayer = {
+        connect: vi.fn().mockImplementation(async () => {
+          // Automatically trigger ready event after connect
+          setTimeout(() => {
+            const readyCallbacks = spotifyListeners['ready'] || [];
+            readyCallbacks.forEach((cb) => cb({ device_id: 'test_device_id' }));
+          }, 10);
+          return true;
+        }),
+        disconnect: vi.fn(),
+        pause: vi.fn().mockResolvedValue(undefined),
+        resume: vi.fn().mockResolvedValue(undefined),
+        togglePlay: vi.fn().mockResolvedValue(undefined),
+        seek: vi.fn().mockResolvedValue(undefined),
+        setVolume: vi.fn().mockResolvedValue(undefined),
+        getVolume: vi.fn().mockResolvedValue(1),
+        getCurrentState: vi.fn().mockResolvedValue(null),
+        addListener: vi.fn((event: string, callback: (data: any) => void) => {
+          if (!spotifyListeners[event]) {
+            spotifyListeners[event] = [];
+          }
+          spotifyListeners[event].push(callback);
+        }),
+        removeListener: vi.fn(),
+      };
+
+      mockSpotifySDK = {
+        Player: vi.fn().mockImplementation(() => mockSpotifyPlayer),
+      };
+
+      // Set Spotify SDK before any store operations
+      (globalThis as any).Spotify = mockSpotifySDK;
+      (globalThis as any).onSpotifyWebPlaybackSDKReady = undefined;
+
+      axiosGetMock.mockResolvedValue({
+        data: { access_token: 'test_token' },
+      });
+
+      axiosPutMock.mockResolvedValue({ status: 204 });
+    });
+
+    afterEach(() => {
+      delete (globalThis as any).Spotify;
+      delete (globalThis as any).onSpotifyWebPlaybackSDKReady;
+      axiosGetMock.mockClear();
+      axiosPutMock.mockClear();
+    });
+
+    it('detects Spotify tracks and uses Spotify SDK', async () => {
+      const store = await importStore();
+      const track = buildSpotifyTrack(1);
+
+      await store.setQueueAndPlay([track], 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      // Should have called Spotify Player constructor
+      expect(mockSpotifySDK.Player).toHaveBeenCalled();
+      // Should have connected
+      expect(mockSpotifyPlayer.connect).toHaveBeenCalled();
+
+      const calls = axiosPutMock.mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(2);
+
+      const pauseCall = calls[0];
+      expect(pauseCall[0]).toContain('/v1/me/player/pause');
+
+      const playCall = calls.at(-1)!;
+      expect(playCall[0]).toContain('/v1/me/player/play');
+      expect(playCall[1]).toEqual(
+        expect.objectContaining({
+          uris: [`spotify:track:spotify_track_1`],
+        }),
+      );
+    });
+
+    it('pauses current Spotify track before switching to next', async () => {
+      const store = await importStore();
+      const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2)];
+
+      await store.setQueueAndPlay(tracks, 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      axiosPutMock.mockClear();
+
+      // Switch to next track
+      await store.next();
+      await flushPromises();
+      await flushPromises();
+
+      expect(axiosPutMock).toHaveBeenCalledTimes(2);
+      const pauseCall = axiosPutMock.mock.calls[0];
+      const playCall = axiosPutMock.mock.calls[1];
+
+      expect(pauseCall[0]).toContain('/v1/me/player/pause');
+      expect(playCall[0]).toContain('/v1/me/player/play');
+      expect(playCall[1]).toEqual(
+        expect.objectContaining({
+          uris: [`spotify:track:spotify_track_2`],
+        }),
+      );
+    });
+
+    it('detects when Spotify track ends and advances to next', async () => {
+      const store = await importStore();
+      const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2)];
+
+      await store.setQueueAndPlay(tracks, 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      expect(store.currentTrack.value?.id).toBe(1);
+
+      // Verify listeners are set up
+      expect(spotifyListeners['player_state_changed']?.length).toBeGreaterThan(0);
+
+      // First set playing state (well away from end to reset flag)
+      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 100000, // Playing normally, well away from end
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 50)); // Ensure state is processed
+
+      // Now simulate track ending - position near duration (within 500ms)
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 299600, // 299.6 seconds (400ms remaining, which is < 500ms)
+          duration: 300000, // 300 seconds
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 400)); // Wait for next() to complete
+      await flushPromises();
+
+      // Should advance to next track
+      expect(store.currentTrack.value?.id).toBe(2);
+    });
+
+    it('handles track end when paused at start after playing', async () => {
+      const store = await importStore();
+      const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2)];
+
+      await store.setQueueAndPlay(tracks, 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      expect(store.currentTrack.value?.id).toBe(1);
+
+      // First simulate playing state (well away from end to reset flag)
+      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 100000, // Playing normally, well away from end
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 50)); // Ensure state is processed
+
+      expect(store.isPlaying.value).toBe(true);
+
+      // Verify device ID is set (needed for next() to work)
+      expect(spotifyListeners['ready']?.length).toBeGreaterThan(0);
+
+      // Now simulate track ending - paused at start (was playing, now paused at position 0)
+      // Position must be < 500ms for the condition to match
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: true,
+          position: 100, // Reset to start (100ms, which is < 500ms)
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 400)); // Wait for next() to complete
+      await flushPromises();
+
+      // Should advance to next track
+      expect(store.currentTrack.value?.id).toBe(2);
+    });
   });
 });
 

@@ -24,6 +24,7 @@
         "@sentry/browser": "^10.22.0",
         "@tailwindcss/vite": "^4.1.11",
         "@types/node": "^22.13.5",
+        "@types/spotify-web-playback-sdk": "^0.1.19",
         "@vitejs/plugin-vue": "^6.0.1",
         "@vitest/coverage-v8": "^2.0.0",
         "@vue/eslint-config-typescript": "^14.3.0",
