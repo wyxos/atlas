@@ -707,6 +707,70 @@ describe('audio store', () => {
       expect(resumeCall[1].position_ms).toBe(45000);
     });
 
+    it('polls Spotify state for smooth progress updates', async () => {
+      const store = await importStore();
+      const track = buildSpotifyTrack(1);
+
+      await store.setQueueAndPlay([track], 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      // Mock getCurrentState to return progressive positions
+      let currentPosition = 45000;
+      mockSpotifyPlayer.getCurrentState.mockImplementation(async () => ({
+        paused: false,
+        position: currentPosition,
+        duration: 300000,
+        track_window: { current_track: null },
+      }));
+
+      // Simulate track playing to start polling
+      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 45000,
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+
+      // Verify initial state
+      expect(store.currentTime.value).toBe(45);
+      mockSpotifyPlayer.getCurrentState.mockClear();
+
+      // Wait for first poll (250ms)
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await flushPromises();
+
+      // Should have polled at least once
+      expect(mockSpotifyPlayer.getCurrentState).toHaveBeenCalled();
+      const firstCallCount = mockSpotifyPlayer.getCurrentState.mock.calls.length;
+
+      // Update position and wait for next poll
+      currentPosition = 47500; // 47.5 seconds
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await flushPromises();
+
+      // Should have polled again and updated time
+      expect(mockSpotifyPlayer.getCurrentState.mock.calls.length).toBeGreaterThan(firstCallCount);
+      expect(store.currentTime.value).toBe(47.5);
+
+      // Pause the track
+      await store.pause();
+      await flushPromises();
+
+      // Wait a bit - polling should have stopped
+      const callCountBeforePause = mockSpotifyPlayer.getCurrentState.mock.calls.length;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await flushPromises();
+
+      // Should not have polled again after pause (or at most one more time during pause transition)
+      expect(mockSpotifyPlayer.getCurrentState.mock.calls.length).toBeLessThanOrEqual(callCountBeforePause + 1);
+    });
+
     it('detects when Spotify track ends and advances to next', async () => {
       const store = await importStore();
       const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2)];
