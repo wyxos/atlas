@@ -447,6 +447,38 @@ class AudioPlayerManager {
         }
     }
 
+    private async ensureTrackMetadata(track: AudioTrack): Promise<void> {
+        if (!track || typeof track.id !== 'number') {
+            return;
+        }
+
+        const hasSourceInformation = Boolean(
+            (track.source && track.source.toString().trim().length > 0) ||
+                (track.mime_type && track.mime_type.toString().trim().length > 0) ||
+                track.listing_metadata?.source ||
+                track.metadata?.payload?.source,
+        );
+
+        if (hasSourceInformation) {
+            return;
+        }
+
+        try {
+            const action = AudioController.details({ file: track.id });
+            const response = await axios.get(action.url);
+            const payload = response.data;
+            const existingUrl = track.url;
+
+            Object.assign(track, payload);
+
+            if (existingUrl) {
+                track.url = existingUrl;
+            }
+        } catch (error) {
+            console.error('Failed to load track metadata before playback:', error);
+        }
+    }
+
     private async loadTrack(track: AudioTrack): Promise<void> {
         // Pause the previous player when switching tracks
         const previousTrack = this.currentTrack.value;
@@ -472,9 +504,12 @@ class AudioPlayerManager {
             }
         }
 
+        await this.ensureTrackMetadata(track);
+
         if (this.isSpotifyTrack(track)) {
-            // Use Spotify player
-            await this.playSpotifyTrack(track);
+            // Set current track but defer playback to the caller
+            this.currentTrack.value = track;
+            this.isPlaying.value = false;
             // Load track data for current + next 5 + previous 5 (fire and forget)
             void this.loadTrackDataForContext();
             return;

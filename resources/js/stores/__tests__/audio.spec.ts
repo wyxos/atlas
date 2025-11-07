@@ -11,6 +11,7 @@ const originalXmlHttpRequest = globalThis.XMLHttpRequest;
 let createdAudios: TestAudio[] = [];
 let audioServer: Server | null = null;
 let audioServerUrl = '';
+const spotifyTrackIds = new Set<number>();
 
 const AUDIO_BUFFER = Buffer.from(
   '4944330300000000000F544954320000000C005465737420547261636B0000000000000000000000000000030000000000',
@@ -105,6 +106,7 @@ function buildTrack(id: number, withMetadata = false) {
 }
 
 function buildSpotifyTrack(id: number, withMetadata = false) {
+  spotifyTrackIds.add(id);
   const track: any = {
     id,
     source: 'spotify',
@@ -117,6 +119,27 @@ function buildSpotifyTrack(id: number, withMetadata = false) {
   }
   
   return track;
+}
+
+function buildDetailsResponse(id: number) {
+  const isSpotify = spotifyTrackIds.has(id);
+
+  return {
+    data: {
+      id,
+      ...(isSpotify
+        ? {
+            source: 'spotify',
+            source_id: `spotify_track_${id}`,
+            mime_type: 'audio/spotify',
+          }
+        : {
+            mime_type: 'audio/mpeg',
+          }),
+      metadata: { payload: { title: `Track ${id}` } },
+      artists: [{ name: `Artist ${id}` }],
+    },
+  };
 }
 
 const axiosPostMock = vi.hoisted(() => vi.fn());
@@ -132,6 +155,20 @@ vi.mock('axios', () => ({
 
 vi.mock('@/actions/App/Http/Controllers/AudioController', () => ({
   batchDetails: () => ({ url: '/audio/batch-details' }),
+  details: (args: { file: number } | [number] | number) => {
+    let id: number;
+    if (typeof args === 'number') {
+      id = args;
+    } else if (Array.isArray(args)) {
+      id = Number(args[0]);
+    } else if (typeof args === 'object' && args !== null) {
+      id = Number(args.file);
+    } else {
+      throw new Error('Invalid arguments for details route');
+    }
+
+    return { url: `/audio/${id}/details` };
+  },
 }));
 
 async function importStore() {
@@ -152,6 +189,7 @@ function getAudioInstance(): TestAudio {
 describe('audio store', () => {
   beforeEach(() => {
     createdAudios = [];
+    spotifyTrackIds.clear();
     axiosPostMock.mockClear();
     axiosPostMock.mockImplementation((url: string, data: any) => {
       if (url === '/audio/batch-details' && data?.file_ids) {
@@ -166,6 +204,17 @@ describe('audio store', () => {
         return Promise.resolve({ data: response });
       }
       return Promise.reject(new Error(`Unexpected axios.post call: ${url}`));
+    });
+
+    axiosGetMock.mockReset();
+    axiosGetMock.mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.startsWith('/audio/') && url.endsWith('/details')) {
+        const parts = url.split('/');
+        const id = Number(parts[2]);
+        return Promise.resolve(buildDetailsResponse(id));
+      }
+
+      return Promise.reject(new Error(`Unexpected axios.get call: ${url}`));
     });
 
     const BaseAudio = originalAudio as unknown as { new (): HTMLAudioElement & { _emit(eventName: string): void } };
@@ -281,7 +330,7 @@ describe('audio store', () => {
     const call = axiosPostMock.mock.calls[0];
     expect(call[0]).toBe('/audio/batch-details');
     const fileIds = call[1].file_ids as number[];
-    expect(fileIds.sort((a, b) => a - b)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    expect(fileIds.sort((a, b) => a - b)).toEqual([3, 4, 5, 6, 7, 9, 10, 11, 12, 13]);
 
     // Verify metadata was merged into queue items
     const queue = store.queue.value;
@@ -391,7 +440,7 @@ describe('audio store', () => {
     expect(axiosPostMock).toHaveBeenCalledTimes(1);
     const call = axiosPostMock.mock.calls[0];
     const fileIds = call[1].file_ids as number[];
-    expect(fileIds.sort((a, b) => a - b)).toEqual([2, 4, 5, 6, 7, 8]);
+    expect(fileIds.sort((a, b) => a - b)).toEqual([2, 5, 6, 7, 8]);
   });
 
   it('preserves URL when merging metadata into queue items', async () => {
@@ -454,8 +503,19 @@ describe('audio store', () => {
       (globalThis as any).Spotify = mockSpotifySDK;
       (globalThis as any).onSpotifyWebPlaybackSDKReady = undefined;
 
-      axiosGetMock.mockResolvedValue({
-        data: { access_token: 'test_token' },
+      axiosGetMock.mockReset();
+      axiosGetMock.mockImplementation((url: string) => {
+        if (url === '/spotify/token') {
+          return Promise.resolve({ data: { access_token: 'test_token' } });
+        }
+
+        if (typeof url === 'string' && url.startsWith('/audio/') && url.endsWith('/details')) {
+          const parts = url.split('/');
+          const id = Number(parts[2]);
+          return Promise.resolve(buildDetailsResponse(id));
+        }
+
+        return Promise.reject(new Error(`Unexpected axios.get call: ${url}`));
       });
 
       axiosPutMock.mockResolvedValue({ status: 204 });
@@ -482,20 +542,51 @@ describe('audio store', () => {
       // Should have connected
       expect(mockSpotifyPlayer.connect).toHaveBeenCalled();
 
-      // Should have called SDK pause method (not Web API)
-      expect(mockSpotifyPlayer.pause).toHaveBeenCalled();
+      // Should have called Web API to play exactly once
+      expect(axiosPutMock).toHaveBeenCalledTimes(1);
 
-      // Should have called Web API to play
-      const calls = axiosPutMock.mock.calls;
-      expect(calls.length).toBeGreaterThanOrEqual(1);
-
-      const playCall = calls.at(-1)!;
+      const playCall = axiosPutMock.mock.calls.at(-1)!;
       expect(playCall[0]).toContain('/v1/me/player/play');
       expect(playCall[1]).toEqual(
         expect.objectContaining({
           uris: [`spotify:track:spotify_track_1`],
         }),
       );
+    });
+
+    it('fetches metadata before playing when Spotify details are missing', async () => {
+      const store = await importStore();
+      const spotifyTrack = buildSpotifyTrack(2);
+
+      delete spotifyTrack.source;
+      delete spotifyTrack.mime_type;
+      delete spotifyTrack.metadata;
+      delete spotifyTrack.artists;
+      spotifyTrack.url = `${audioServerUrl}/audio-2.mp3`;
+
+      const tracks = [buildTrack(1), spotifyTrack];
+
+      await store.setQueueAndPlay(tracks, 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+
+      axiosGetMock.mockClear();
+      axiosPutMock.mockClear();
+
+      await store.playTrackAtIndex(1);
+      await flushPromises();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await flushPromises();
+
+      const getCalls = axiosGetMock.mock.calls.map((call) => call[0]);
+      expect(getCalls).toContain('/audio/2/details');
+      expect(getCalls).toContain('/spotify/token');
+
+      expect(store.currentTrack.value?.id).toBe(2);
+      expect(store.currentTrack.value?.source).toBe('spotify');
+      expect(axiosPutMock).toHaveBeenCalled();
     });
 
     it('pauses current Spotify track before switching to next', async () => {
@@ -506,6 +597,18 @@ describe('audio store', () => {
       await flushPromises();
       await flushPromises();
       await flushPromises(); // Wait for device ID to be set
+
+      const playingCallbacks = spotifyListeners['player_state_changed'] || [];
+      playingCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 1000,
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       axiosPutMock.mockClear();
       mockSpotifyPlayer.pause.mockClear();
