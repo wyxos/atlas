@@ -37,6 +37,9 @@ class AudioPlayerManager {
     private duration = ref<number>(0);
     private volume = ref<number>(1);
     private userPaused = false;
+    private isShuffled = ref<boolean>(false);
+    private originalQueue: AudioTrack[] = [];
+    private originalCurrentTrackId: number | null = null;
 
     // Reactive refs
     readonly currentTrackRef = computed(() => this.currentTrack.value);
@@ -47,6 +50,7 @@ class AudioPlayerManager {
     readonly durationRef = computed(() => this.duration.value);
     readonly volumeRef = computed(() => this.volume.value);
     readonly spotifyPlayerReadyRef = computed(() => this.spotifyPlayerReady.value);
+    readonly isShuffledRef = computed(() => this.isShuffled.value);
 
     private isSpotifyTrack(track: AudioTrack): boolean {
         const source = (track.source || '').toString().trim().toLowerCase();
@@ -564,12 +568,78 @@ class AudioPlayerManager {
         await this.pause({ userInitiated: false });
 
         this.queue.value = [...queue];
+        this.originalQueue = [...queue];
+        this.isShuffled.value = false;
+        this.originalCurrentTrackId = null;
         this.currentIndex.value = startIndex;
         await this.loadTrack(this.queue.value[startIndex]);
 
         this.userPaused = !shouldAutoPlay;
 
         if (shouldAutoPlay) {
+            await this.play();
+        }
+    }
+
+    private shuffleArray<T>(array: T[]): T[] {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    async toggleShuffle(): Promise<void> {
+        if (this.queue.value.length === 0) return;
+
+        if (this.isShuffled.value) {
+            // Unshuffle: restore original order and keep playing current track
+            const currentTrackId = this.currentTrack.value?.id;
+            
+            // Restore original queue
+            this.queue.value = [...this.originalQueue];
+            this.isShuffled.value = false;
+            this.originalCurrentTrackId = null;
+
+            if (!currentTrackId) {
+                this.currentIndex.value = 0;
+                return;
+            }
+
+            // Find currently playing track in original queue
+            const originalIndex = this.originalQueue.findIndex((track) => track.id === currentTrackId);
+            if (originalIndex === -1) {
+                // Track not in original queue, just update index to 0
+                this.currentIndex.value = 0;
+                return;
+            }
+
+            // Set index to current track's position in original queue
+            // Don't reload - keep playing whatever is currently playing
+            this.currentIndex.value = originalIndex;
+        } else {
+            // Shuffle: save original order and current track before shuffling
+            this.originalQueue = [...this.queue.value];
+            this.originalCurrentTrackId = this.currentTrack.value?.id ?? null;
+
+            // Shuffle the queue
+            const shuffled = this.shuffleArray(this.queue.value);
+
+            // Ensure original current track is not first (if it exists and queue has more than 1 item)
+            if (this.originalCurrentTrackId && shuffled[0]?.id === this.originalCurrentTrackId && shuffled.length > 1) {
+                // Swap first with another random position
+                const swapIndex = Math.floor(Math.random() * (shuffled.length - 1)) + 1;
+                [shuffled[0], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[0]];
+            }
+
+            this.queue.value = shuffled;
+            this.isShuffled.value = true;
+            this.currentIndex.value = 0;
+
+            // Load and play the first track
+            await this.loadTrack(this.queue.value[0]);
+            this.userPaused = false;
             await this.play();
         }
     }
@@ -641,6 +711,9 @@ class AudioPlayerManager {
         this.duration.value = 0;
         this.spotifyAccessToken = null;
         this.userPaused = false;
+        this.isShuffled.value = false;
+        this.originalQueue = [];
+        this.originalCurrentTrackId = null;
     }
 
     private async handleSpotifyTrackEnd(): Promise<void> {
@@ -682,6 +755,7 @@ export function useAudioPlayer() {
         duration: audioPlayerManager.durationRef,
         volume: audioPlayerManager.volumeRef,
         spotifyPlayerReady: audioPlayerManager.spotifyPlayerReadyRef,
+        isShuffled: audioPlayerManager.isShuffledRef,
 
         // Actions
         play: () => audioPlayerManager.play(),
@@ -694,6 +768,7 @@ export function useAudioPlayer() {
         setQueueAndPlay: (queue: AudioTrack[], startIndex?: number, options?: PlayOptions) =>
             audioPlayerManager.setQueueAndPlay(queue, startIndex, options),
         setVolume: (volume: number) => audioPlayerManager.setVolume(volume),
+        toggleShuffle: () => audioPlayerManager.toggleShuffle(),
         cleanup: () => audioPlayerManager.cleanup(),
     };
 }

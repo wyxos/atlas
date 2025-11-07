@@ -11,11 +11,13 @@ const {
   currentTime,
   duration,
   volume,
+  isShuffled,
   togglePlay,
   previous,
   next,
   seekTo,
   setVolume,
+  toggleShuffle,
 } = useAudioPlayer();
 
 const isQueueOpen = ref(false);
@@ -199,7 +201,12 @@ function handleSeek(event: MouseEvent): void {
 
                         <div class="mt-2 flex items-center justify-center gap-4">
                             <div class="flex items-center gap-4">
-                                <button class="button circular small empty" title="Shuffle">
+                                <button
+                                    class="button circular small empty"
+                                    :class="{ 'bg-primary text-primary-foreground': isShuffled }"
+                                    title="Shuffle"
+                                    @click="toggleShuffle"
+                                >
                                     <Shuffle :size="16" />
                                 </button>
                                 <button class="button circular small empty" title="Previous" @click="previous">
@@ -323,7 +330,12 @@ function handleSeek(event: MouseEvent): void {
                 </div>
 
                 <div class="mb-4 flex items-center justify-center gap-6">
-                    <button class="button circular small empty" title="Shuffle">
+                    <button
+                        class="button circular small empty"
+                        :class="{ 'bg-primary text-primary-foreground': isShuffled }"
+                        title="Shuffle"
+                        @click="toggleShuffle"
+                    >
                         <Shuffle :size="18" />
                     </button>
                     <button class="button circular small empty" title="Previous">

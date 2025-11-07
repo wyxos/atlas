@@ -154,34 +154,26 @@ const {
   volume,
   setQueueAndPlay,
   setVolume,
+  toggleShuffle,
 } = useAudioPlayer();
 
-// Handle play from AudioListItem
-async function handlePlay(track: any): Promise<void> {
-  // Build queue from all filtered items
-  const queueItems: AudioTrack[] = filteredItems.value.map((item) => {
+// Build queue items from filtered items
+function buildQueueItems(): AudioTrack[] {
+  return filteredItems.value.map((item) => {
     const file = loadedFiles[item.id];
     const streamUrl = AudioController.stream({ file: item.id }).url;
     
-    // Debug: log the generated URL
-    if (item.id === track.id) {
-      console.log('Stream URL for track:', streamUrl, 'File ID:', item.id);
-    }
-    
-    // Ensure url is set correctly - it must be the stream URL, not the file path
-    const queueItem: AudioTrack = {
+    return {
       ...(file || {}),
       id: item.id,
-      url: streamUrl, // Set url last to ensure it's not overridden
+      url: streamUrl,
     };
-    
-    // Debug: verify url is set correctly
-    if (item.id === track.id) {
-      console.log('Queue item URL:', queueItem.url, 'Queue item path:', queueItem.path);
-    }
-    
-    return queueItem;
   });
+}
+
+// Handle play from AudioListItem
+async function handlePlay(track: any): Promise<void> {
+  const queueItems = buildQueueItems();
 
   // Find the index of the clicked track
   const startIndex = queueItems.findIndex((item) => item.id === track.id);
@@ -189,6 +181,19 @@ async function handlePlay(track: any): Promise<void> {
   if (startIndex >= 0) {
     await setQueueAndPlay(queueItems, startIndex, { autoPlay: true });
   }
+}
+
+// Handle shuffle all button
+async function handleShuffleAll(): Promise<void> {
+  if (pageOrder.value.length === 0) return;
+
+  const queueItems = buildQueueItems();
+  
+  if (queueItems.length === 0) return;
+
+  // Set queue and shuffle
+  await setQueueAndPlay(queueItems, 0, { autoPlay: false });
+  await toggleShuffle();
 }
 
 // Selection state
@@ -290,7 +295,7 @@ if (authUser?.id) {
                 <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Play" data-test="playlist-play-all">
                     <PlayIcon :size="40" class="text-muted-foreground group-hover:text-white" />
                 </button>
-                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Shuffle" data-test="playlist-shuffle-all">
+                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Shuffle" data-test="playlist-shuffle-all" @click="handleShuffleAll">
                     <ShuffleIcon :size="40" class="text-muted-foreground group-hover:text-white" />
                 </button>
             </div>
