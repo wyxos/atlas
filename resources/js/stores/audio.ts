@@ -17,7 +17,6 @@ export interface AudioTrack {
 
 interface PlayOptions {
   autoPlay?: boolean;
-  skipPause?: boolean;
 }
 
 type SpotifyPlayer = Spotify.Player;
@@ -290,7 +289,7 @@ class AudioPlayerManager {
         return;
       }
 
-      // Use Spotify Web API to start playback
+      // Use Spotify Web API to start playback (we only use this for playback control, not metadata)
       await axios.put(
         `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
         {
@@ -403,8 +402,7 @@ class AudioPlayerManager {
       : this.queue.value.length - 1;
 
     const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
-    const skipPause = options.skipPause ?? false;
-    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay, skipPause });
+    await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
   }
 
   async next(options: PlayOptions = {}): Promise<void> {
@@ -415,8 +413,7 @@ class AudioPlayerManager {
       : 0;
 
     const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
-    const skipPause = options.skipPause ?? false;
-    await this.playTrackAtIndex(newIndex, { autoPlay: shouldAutoPlay, skipPause });
+    await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
   }
 
   private async loadTrackDataForContext(): Promise<void> {
@@ -529,11 +526,8 @@ class AudioPlayerManager {
     if (index < 0 || index >= this.queue.value.length) return;
 
     const shouldAutoPlay = options.autoPlay ?? this.isPlaying.value;
-    const skipPause = options.skipPause ?? false;
-    // Wait for pause to complete before loading new track unless skipping
-    if (!skipPause) {
-      await this.pause();
-    }
+    // Wait for pause to complete before loading new track
+    await this.pause();
 
     this.currentIndex.value = index;
     await this.loadTrack(this.queue.value[index]);
@@ -547,10 +541,7 @@ class AudioPlayerManager {
     if (queue.length === 0) return;
 
     const shouldAutoPlay = options.autoPlay ?? true;
-    const skipPause = options.skipPause ?? false;
-    if (!skipPause) {
-      await this.pause();
-    }
+    await this.pause();
 
     this.queue.value = [...queue];
     this.currentIndex.value = startIndex;
@@ -638,7 +629,7 @@ class AudioPlayerManager {
         console.debug('Could not pause Spotify track:', error);
       }
     }
-    await this.next({ autoPlay: true, skipPause: true });
+    await this.next({ autoPlay: true });
   }
 }
 

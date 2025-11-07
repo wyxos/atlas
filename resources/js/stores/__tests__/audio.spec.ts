@@ -482,11 +482,12 @@ describe('audio store', () => {
       // Should have connected
       expect(mockSpotifyPlayer.connect).toHaveBeenCalled();
 
-      const calls = axiosPutMock.mock.calls;
-      expect(calls.length).toBeGreaterThanOrEqual(2);
+      // Should have called SDK pause method (not Web API)
+      expect(mockSpotifyPlayer.pause).toHaveBeenCalled();
 
-      const pauseCall = calls[0];
-      expect(pauseCall[0]).toContain('/v1/me/player/pause');
+      // Should have called Web API to play
+      const calls = axiosPutMock.mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(1);
 
       const playCall = calls.at(-1)!;
       expect(playCall[0]).toContain('/v1/me/player/play');
@@ -507,17 +508,20 @@ describe('audio store', () => {
       await flushPromises(); // Wait for device ID to be set
 
       axiosPutMock.mockClear();
+      mockSpotifyPlayer.pause.mockClear();
 
       // Switch to next track
       await store.next();
       await flushPromises();
       await flushPromises();
 
-      expect(axiosPutMock).toHaveBeenCalledTimes(2);
-      const pauseCall = axiosPutMock.mock.calls[0];
-      const playCall = axiosPutMock.mock.calls[1];
+      // Should have called SDK pause method (not Web API)
+      expect(mockSpotifyPlayer.pause).toHaveBeenCalled();
 
-      expect(pauseCall[0]).toContain('/v1/me/player/pause');
+      // Should have called Web API to play
+      expect(axiosPutMock).toHaveBeenCalledTimes(1);
+      const playCall = axiosPutMock.mock.calls[0];
+
       expect(playCall[0]).toContain('/v1/me/player/play');
       expect(playCall[1]).toEqual(
         expect.objectContaining({
