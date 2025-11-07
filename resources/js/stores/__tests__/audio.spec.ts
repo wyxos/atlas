@@ -633,6 +633,69 @@ describe('audio store', () => {
       );
     });
 
+    it('resumes Spotify track from paused position instead of restarting', async () => {
+      const store = await importStore();
+      const track = buildSpotifyTrack(1);
+
+      await store.setQueueAndPlay([track], 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      // Simulate track playing at position 45000ms (45 seconds)
+      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 45000, // 45 seconds in
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Verify current time is updated
+      expect(store.currentTime.value).toBe(45);
+
+      // Clear mocks before pause
+      axiosPutMock.mockClear();
+      mockSpotifyPlayer.pause.mockClear();
+
+      // Pause the track
+      await store.pause();
+      await flushPromises();
+
+      // Should have called SDK pause method
+      expect(mockSpotifyPlayer.pause).toHaveBeenCalled();
+      expect(store.isPlaying.value).toBe(false);
+
+      // Clear mocks before resume
+      axiosPutMock.mockClear();
+      mockSpotifyPlayer.pause.mockClear();
+
+      // Resume the track
+      await store.play();
+      await flushPromises();
+      await flushPromises();
+
+      // Should have called Web API to resume with position_ms
+      expect(axiosPutMock).toHaveBeenCalledTimes(1);
+      const resumeCall = axiosPutMock.mock.calls[0];
+
+      expect(resumeCall[0]).toContain('/v1/me/player/play');
+      expect(resumeCall[1]).toEqual(
+        expect.objectContaining({
+          uris: [`spotify:track:spotify_track_1`],
+          position_ms: 45000, // Should resume from saved position
+        }),
+      );
+
+      // Should not have called playSpotifyTrack (which would restart from beginning)
+      // We verify this by checking that position_ms is included in the resume call
+      expect(resumeCall[1].position_ms).toBe(45000);
+    });
+
     it('detects when Spotify track ends and advances to next', async () => {
       const store = await importStore();
       const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2)];
