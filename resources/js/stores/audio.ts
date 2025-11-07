@@ -324,10 +324,12 @@ class AudioPlayerManager {
             }
 
             // Use Spotify Web API to start playback (we only use this for playback control, not metadata)
+            // Always start from the beginning (position_ms: 0) when playing a new track
             await axios.put(
                 `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
                 {
                     uris: [uri],
+                    position_ms: 0,
                 },
                 {
                     headers: {
@@ -869,6 +871,9 @@ class AudioPlayerManager {
             this.queue.value = shuffled;
             this.isShuffled.value = true;
             this.currentIndex.value = 0;
+
+            // Reset paused position when shuffling to ensure we start from beginning
+            this.spotifyPausedPosition = 0;
 
             // Load and play the first track
             await this.loadTrack(this.queue.value[0]);
