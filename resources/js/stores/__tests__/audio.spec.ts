@@ -213,6 +213,10 @@ describe('audio store', () => {
         const id = Number(parts[2]);
         return Promise.resolve(buildDetailsResponse(id));
       }
+      
+      if (typeof url === 'string' && url === '/spotify/token') {
+        return Promise.resolve({ data: { access_token: 'test_spotify_token' } });
+      }
 
       return Promise.reject(new Error(`Unexpected axios.get call: ${url}`));
     });
@@ -1034,6 +1038,48 @@ describe('audio store', () => {
       expect(store.currentIndex.value).toBe(0);
       expect(store.currentTrack.value?.id).toBe(store.queue.value[0].id);
       expect(playSpy).toHaveBeenCalled();
+    });
+
+    it('starts Spotify tracks from beginning when shuffling', async () => {
+      const store = await importStore();
+      const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2), buildSpotifyTrack(3)];
+
+      await store.setQueueAndPlay(tracks, 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // Wait for device ID to be set
+
+      // Simulate track playing at position 30000ms (30 seconds)
+      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
+      stateChangedCallbacks.forEach((cb) =>
+        cb({
+          paused: false,
+          position: 30000,
+          duration: 300000,
+          track_window: { current_track: null },
+        }),
+      );
+      await flushPromises();
+
+      // Clear mocks and ensure axios.put is mocked to resolve
+      axiosPutMock.mockClear();
+      axiosPutMock.mockResolvedValue({ status: 204 });
+
+      // Shuffle - should start from 0:00
+      await store.toggleShuffle();
+      await flushPromises();
+      await flushPromises();
+
+      // Should have called Web API to play from beginning
+      expect(axiosPutMock).toHaveBeenCalledTimes(1);
+      const shuffleCall = axiosPutMock.mock.calls[0];
+      expect(shuffleCall[0]).toContain('/v1/me/player/play');
+      expect(shuffleCall[1]).toEqual(
+        expect.objectContaining({
+          uris: expect.any(Array),
+          position_ms: 0, // Should always start from beginning when shuffling
+        }),
+      );
     });
 
     it('shuffles queue order', async () => {
