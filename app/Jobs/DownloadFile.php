@@ -6,6 +6,7 @@ use App\Events\DownloadCreated;
 use App\Events\FileDownloadProgress;
 use App\Models\Download;
 use App\Models\File;
+use App\Support\CivitaiVideoUrlExtractor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -70,6 +71,9 @@ class DownloadFile implements ShouldQueue
             $acceptRanges = null;
             $contentLength = null;
 
+            // Check for CivitAI video mislabeling issue before downloading
+            $fileUrl = $this->checkCivitaiVideoUrl($fileUrl);
+
             try {
                 $head = Http::timeout(15)->head($fileUrl);
                 if ($head->status() === 404) {
@@ -114,7 +118,14 @@ class DownloadFile implements ShouldQueue
                     }
                     if ($probe->status() === 206) {
                         $acceptRanges = 'bytes';
-                        $resolvedMime = $probe->header('Content-Type') ?: $resolvedMime;
+                        $probeMime = $probe->header('Content-Type');
+                        $resolvedMime = $probeMime ?: $resolvedMime;
+
+                        // Check for CivitAI video mislabeling issue if HEAD didn't catch it
+                        if ($probeMime) {
+                            $fileUrl = $this->checkCivitaiVideoUrlFromMime($fileUrl, strtolower((string) $probeMime));
+                        }
+
                         $contentRange = $probe->header('Content-Range'); // e.g., bytes 0-0/12345
                         if ($contentRange && preg_match('/\/(\d+)$/', (string) $contentRange, $m)) {
                             $contentLength = (int) $m[1];
@@ -285,11 +296,6 @@ class DownloadFile implements ShouldQueue
                 throw new \Exception("Downloaded file is empty or doesn't exist");
             }
 
-            $detectedMime = $this->detectMimeFromFile($tempFile);
-            if ($detectedMime && $this->shouldOverrideMime($resolvedMime, $detectedMime)) {
-                $resolvedMime = $detectedMime;
-            }
-
             if (! $resolvedMime) {
                 $resolvedMime = $this->file->mime_type;
             }
@@ -421,40 +427,48 @@ class DownloadFile implements ShouldQueue
         };
     }
 
-    protected function detectMimeFromFile(string $filePath): ?string
+    protected function checkCivitaiVideoUrl(string $fileUrl): string
     {
-        if (! is_file($filePath)) {
-            return null;
+        // Check if this is a CivitAI file that might be mislabeled
+        if (strcasecmp((string) $this->file->source, 'CivitAI') !== 0) {
+            return $fileUrl;
         }
 
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        if ($finfo === false) {
-            return null;
+        $thumbnailUrl = (string) ($this->file->thumbnail_url ?? '');
+        $urlContainsMp4 = str_contains(strtolower($fileUrl), 'mp4');
+        $thumbnailContainsMp4 = str_contains(strtolower($thumbnailUrl), 'mp4');
+
+        // If URL or thumbnail suggests it's a video, check if server is returning webp
+        if ($urlContainsMp4 || $thumbnailContainsMp4) {
+            try {
+                $head = Http::timeout(15)->head($fileUrl);
+                if ($head->ok()) {
+                    $contentType = strtolower((string) ($head->header('Content-Type') ?? ''));
+
+                    return $this->checkCivitaiVideoUrlFromMime($fileUrl, $contentType);
+                }
+            } catch (\Throwable $e) {
+                // If HEAD fails, continue with original URL
+            }
         }
 
-        $mime = finfo_file($finfo, $filePath) ?: null;
-        finfo_close($finfo);
-
-        return $mime ?: null;
+        return $fileUrl;
     }
 
-    protected function shouldOverrideMime(?string $current, string $detected): bool
+    protected function checkCivitaiVideoUrlFromMime(string $fileUrl, string $contentType): string
     {
-        $detected = strtolower($detected);
-        $current = $current ? strtolower($current) : null;
+        // If server is returning image/webp but we expect a video, extract real video URL
+        if (str_contains($contentType, 'image/webp')) {
+            $extractor = new CivitaiVideoUrlExtractor;
+            $videoUrl = $extractor->extractFromFileId($this->file->id);
+            if ($videoUrl) {
+                // Update the file's URL to the real video URL
+                $this->file->update(['url' => $videoUrl]);
 
-        if ($current === null) {
-            return true;
+                return $videoUrl;
+            }
         }
 
-        if ($detected === 'application/octet-stream') {
-            return false;
-        }
-
-        if ($current === 'application/octet-stream') {
-            return true;
-        }
-
-        return $current !== $detected;
+        return $fileUrl;
     }
 }

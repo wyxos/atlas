@@ -54,17 +54,20 @@ class FixCivitaiMediaType implements ShouldQueue
             return;
         }
 
-        // Verify this file matches the criteria: thumbnail_url contains mp4 and mime_type is webp
+        // Verify this file matches the criteria: url or thumbnail_url contains mp4 and mime_type is webp
         // OR: if mime_type is already video/mp4 but path still has .webp extension, we need to fix it
         $thumbnailUrl = (string) ($file->thumbnail_url ?? '');
+        $url = (string) ($file->url ?? '');
         $mimeType = (string) ($file->mime_type ?? '');
         $currentExt = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
 
         // Check if this needs fixing:
-        // 1. thumbnail_url contains mp4 AND mime_type is webp (original problematic case)
+        // 1. (url OR thumbnail_url) contains mp4 AND mime_type is webp (original problematic case)
         // 2. OR mime_type is video/mp4 but path extension is still .webp (partially fixed case)
         $needsFix = false;
-        if (str_contains($thumbnailUrl, 'mp4') && $mimeType === 'image/webp') {
+        $urlContainsMp4 = str_contains(strtolower($url), 'mp4');
+        $thumbnailContainsMp4 = str_contains(strtolower($thumbnailUrl), 'mp4');
+        if (($urlContainsMp4 || $thumbnailContainsMp4) && $mimeType === 'image/webp') {
             $needsFix = true;
         } elseif ($mimeType === 'video/mp4' && $currentExt === 'webp') {
             // Already partially fixed (mime_type updated) but path wasn't
@@ -80,6 +83,12 @@ class FixCivitaiMediaType implements ShouldQueue
         $extractor = new CivitaiVideoUrlExtractor;
         $videoUrl = $extractor->extractFromFileId($file->id);
         if (! $videoUrl) {
+            return;
+        }
+
+        // If the extracted URL is the same as the current URL, no need to re-download
+        $currentUrl = (string) ($file->url ?? '');
+        if ($videoUrl === $currentUrl) {
             return;
         }
 
@@ -107,26 +116,6 @@ class FixCivitaiMediaType implements ShouldQueue
             }
 
             file_put_contents($tempFile, $response->body());
-
-            // Verify it's actually a video file
-            // Since we know these files are problematic, we can be less strict about MIME detection
-            // but still check to avoid downloading obvious non-video files
-            $detectedMime = $this->detectMimeFromFile($tempFile);
-            if ($detectedMime) {
-                // If MIME detection says it's an image/webp, this is definitely wrong (poster, not video)
-                if ($detectedMime === 'image/webp') {
-                    @unlink($tempFile);
-
-                    return;
-                }
-                // If it's not a video and not webp, still reject (might be HTML error page, etc.)
-                if (! str_starts_with($detectedMime, 'video/')) {
-                    @unlink($tempFile);
-
-                    return;
-                }
-            }
-            // If MIME detection fails but we have content, proceed (trust the URL extraction)
 
             // Determine new filename with .mp4 extension
             // Use the existing path's basename but change extension to .mp4
@@ -177,23 +166,6 @@ class FixCivitaiMediaType implements ShouldQueue
         }
     }
 
-    protected function detectMimeFromFile(string $filePath): ?string
-    {
-        if (! file_exists($filePath)) {
-            return null;
-        }
-
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        if ($finfo === false) {
-            return null;
-        }
-
-        $mime = finfo_file($finfo, $filePath) ?: null;
-        finfo_close($finfo);
-
-        return $mime;
-    }
-
     protected function fileSize(string $disk, string $path): ?int
     {
         try {
@@ -216,36 +188,6 @@ class FixCivitaiMediaType implements ShouldQueue
         $clean = Str::before($filename, '?');
 
         return basename($clean);
-    }
-
-    protected function detectMimeFromDisk(string $diskName, string $path, ?string $fallback): ?string
-    {
-        $disk = Storage::disk($diskName);
-
-        $stream = $disk->readStream($path);
-        if (! $stream) {
-            return $fallback;
-        }
-
-        try {
-            $buffer = stream_get_contents($stream, 1024 * 1024);
-        } finally {
-            fclose($stream);
-        }
-
-        if ($buffer === false) {
-            return $fallback;
-        }
-
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        if ($finfo === false) {
-            return $fallback;
-        }
-
-        $mime = finfo_buffer($finfo, $buffer) ?: null;
-        finfo_close($finfo);
-
-        return $mime ?: $fallback;
     }
 
     protected function extensionFromMime(string $mime): ?string
