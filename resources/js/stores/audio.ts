@@ -32,6 +32,7 @@ class AudioPlayerManager {
     private spotifyPausedPosition = 0;
     private spotifyPollInterval: number | null = null;
     private isLoadingTrack = false;
+    private isNavigating = false; // Flag to prevent concurrent navigation
     private isActive = ref<boolean>(false);
     private currentTrack = ref<AudioTrack | null>(null);
     private queue = ref<AudioTrack[]>([]);
@@ -693,20 +694,40 @@ class AudioPlayerManager {
 
     async previous(options: PlayOptions = {}): Promise<void> {
         if (this.queue.value.length === 0) return;
+        
+        // Prevent concurrent navigation
+        if (this.isNavigating) {
+            return;
+        }
 
         const newIndex = this.currentIndex.value > 0 ? this.currentIndex.value - 1 : this.queue.value.length - 1;
 
         const shouldAutoPlay = options.autoPlay ?? !this.userPaused;
-        await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
+        this.isNavigating = true;
+        try {
+            await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
+        } finally {
+            this.isNavigating = false;
+        }
     }
 
     async next(options: PlayOptions = {}): Promise<void> {
         if (this.queue.value.length === 0) return;
+        
+        // Prevent concurrent navigation
+        if (this.isNavigating) {
+            return;
+        }
 
         const newIndex = this.currentIndex.value < this.queue.value.length - 1 ? this.currentIndex.value + 1 : 0;
 
         const shouldAutoPlay = options.autoPlay ?? !this.userPaused;
-        await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
+        this.isNavigating = true;
+        try {
+            await this.playTrackAtIndex(newIndex, { ...options, autoPlay: shouldAutoPlay });
+        } finally {
+            this.isNavigating = false;
+        }
     }
 
     private async loadTrackDataForContext(): Promise<void> {

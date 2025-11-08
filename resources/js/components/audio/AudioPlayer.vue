@@ -143,9 +143,9 @@ function handleVolumeSeek(event: MouseEvent): void {
                         </div>
 
                         <!-- Basic playback controls -->
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-6">
                             <button class="button circular small empty" title="Previous" @click="previous">
-                                <SkipBack :size="16" />
+                                <SkipBack :size="20" />
                                 <span class="sr-only">Previous</span>
                             </button>
                             <button class="button circular empty" title="Play/Pause" @click="togglePlay">
@@ -153,7 +153,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                                 <Pause v-else :size="20" />
                             </button>
                             <button class="button circular small empty" title="Next" @click="next">
-                                <SkipForward :size="16" />
+                                <SkipForward :size="20" />
                                 <span class="sr-only">Next</span>
                             </button>
                         </div>
@@ -296,7 +296,7 @@ function handleVolumeSeek(event: MouseEvent): void {
 
             <div class="flex w-100 justify-end gap-2">
                 <button class="button circular small empty" :title="isMinimized ? 'Expand Player' : 'Minimize Player'" @click="isMinimized = !isMinimized">
-                    <ChevronDown v-if="isMinimized" :size="16" />
+                    <ChevronDown v-if="!isMinimized" :size="16" />
                     <ChevronUp v-else :size="16" />
                 </button>
                 <button class="button circular small empty" title="Show Queue" @click="isQueueOpen = !isQueueOpen">

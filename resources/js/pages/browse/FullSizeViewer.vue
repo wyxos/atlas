@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ringForSlot, badgeClassForSlot } from '@/pages/browse/highlight'
 import { highlightPromptHtml } from '@/utils/moderationHighlight'
-import { resolveMediaKind } from '@/utils/mediaKind'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -365,21 +364,7 @@ const fullResolvedMediaKind = computed<'video' | 'image'>(() => {
     return 'image'
   }
 
-  const fallback: 'video' | 'image' = item?.type === 'video' ? 'video' : 'image'
-
-  const detected = resolveMediaKind(
-    [
-      item?.true_original_url,
-      item?.original,
-      item?.true_thumbnail_url,
-      item?.thumbnail_url,
-      item?.preview,
-      fullMediaSrc.value,
-    ],
-    fallback,
-  )
-
-  return detected ?? fallback ?? 'image'
+  return item?.type === 'video' ? 'video' : 'image'
 })
 
 const fullShouldRenderVideo = computed(() => fullResolvedMediaKind.value === 'video')

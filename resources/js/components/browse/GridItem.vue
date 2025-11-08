@@ -15,7 +15,6 @@ import axios from 'axios';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { IO_VISIBILITY_ROOT_MARGIN, IO_VISIBILITY_THRESHOLD } from '@/lib/visibility';
 import { highlightPromptHtml } from '@/utils/moderationHighlight';
-import { resolveMediaKind } from '@/utils/mediaKind';
 
 const props = defineProps<{
     item: any;
@@ -895,21 +894,7 @@ const resolvedMediaKind = computed<'video' | 'image'>(() => {
         return 'image';
     }
 
-    const fallback = (props.item as any)?.type === 'video' ? 'video' : 'image';
-
-    const detected = resolveMediaKind(
-        [
-            trueOriginalUrl.value,
-            originalUrl.value,
-            trueThumbnailUrl.value,
-            thumbnailUrl.value,
-            videoSrc.value,
-            imageSrc.value,
-        ],
-        fallback,
-    );
-
-    return detected ?? fallback ?? 'image';
+    return (props.item as any)?.type === 'video' ? 'video' : 'image';
 });
 
 const shouldRenderVideo = computed(() => resolvedMediaKind.value === 'video');
