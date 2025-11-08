@@ -31,6 +31,7 @@ class AudioPlayerManager {
     private spotifyLastPosition = 0;
     private spotifyPausedPosition = 0;
     private spotifyPollInterval: number | null = null;
+    private isLoadingTrack = false;
     private currentTrack = ref<AudioTrack | null>(null);
     private queue = ref<AudioTrack[]>([]);
     private currentIndex = ref<number>(-1);
@@ -189,6 +190,9 @@ class AudioPlayerManager {
 
             this.spotifyPlayer.addListener('player_state_changed', (state) => {
                 if (!state) return;
+
+                // Ignore state updates during track loading to prevent old track's state from updating UI
+                if (this.isLoadingTrack) return;
 
                 // Track previous playing state before updating
                 const wasPlaying = this.isPlaying.value;
@@ -790,6 +794,9 @@ class AudioPlayerManager {
     }
 
     private async loadTrack(track: AudioTrack): Promise<void> {
+        // Set flag to ignore state updates during track loading
+        this.isLoadingTrack = true;
+        
         // Pause the previous player when switching tracks
         const previousTrack = this.currentTrack.value;
         if (previousTrack) {
@@ -824,6 +831,11 @@ class AudioPlayerManager {
             this.updateSpotifyPolling(false);
             // Load track data for current + next 5 + previous 5 (fire and forget)
             void this.loadTrackDataForContext();
+            
+            // Clear loading flag after a short delay to allow new track to start
+            setTimeout(() => {
+                this.isLoadingTrack = false;
+            }, 500);
             return;
         }
 
@@ -844,6 +856,11 @@ class AudioPlayerManager {
 
         // Load track data for current + next 5 + previous 5 (fire and forget)
         void this.loadTrackDataForContext();
+        
+        // Clear loading flag after a short delay to allow new track to start
+        setTimeout(() => {
+            this.isLoadingTrack = false;
+        }, 500);
     }
 
     async playTrackAtIndex(index: number, options: PlayOptions = {}): Promise<void> {
@@ -853,8 +870,10 @@ class AudioPlayerManager {
         // Wait for pause to complete before loading new track
         await this.pause({ userInitiated: false });
         
-        // Reset paused position when switching tracks
+        // Reset paused position, current time, and duration when switching tracks
         this.spotifyPausedPosition = 0;
+        this.currentTime.value = 0;
+        this.duration.value = 0;
 
         this.currentIndex.value = index;
         await this.loadTrack(this.queue.value[index]);
@@ -872,8 +891,10 @@ class AudioPlayerManager {
         const shouldAutoPlay = options.autoPlay ?? true;
         await this.pause({ userInitiated: false });
         
-        // Reset paused position when setting new queue
+        // Reset paused position, current time, and duration when setting new queue
         this.spotifyPausedPosition = 0;
+        this.currentTime.value = 0;
+        this.duration.value = 0;
 
         this.queue.value = [...queue];
         this.originalQueue = [...queue];
@@ -902,8 +923,10 @@ class AudioPlayerManager {
         const previousTrackId = this.currentTrack.value?.id;
         this.currentTrack.value = null;
 
-        // Reset paused position when setting new queue
+        // Reset paused position, current time, and duration when setting new queue
         this.spotifyPausedPosition = 0;
+        this.currentTime.value = 0;
+        this.duration.value = 0;
 
         this.queue.value = [...shuffledQueue];
         this.originalQueue = [...originalQueue];

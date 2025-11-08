@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Sun, Moon, Volume2, VolumeX } from 'lucide-vue-next';
 import { useAudioPlayer } from '@/stores/audio';
 import FileReactions from '@/components/audio/FileReactions.vue';
@@ -70,11 +70,23 @@ const title = computed(() => {
   return track.metadata?.payload?.title || track.title || 'Untitled';
 });
 
+// Track previous progress to detect forward vs backward movement
+const previousProgress = ref(0);
+const shouldAnimateProgress = ref(true);
+
 // Progress percentage
 const progressPercent = computed(() => {
   if (!duration.value || duration.value === 0) return 0;
   return (currentTime.value / duration.value) * 100;
 });
+
+// Watch progress to determine if we should animate (only when moving forward)
+watch(progressPercent, (newVal, oldVal) => {
+  // Only animate if the progress is increasing (forward movement)
+  // This prevents the "going back down" animation when resetting to 0
+  shouldAnimateProgress.value = newVal >= oldVal;
+  previousProgress.value = newVal;
+}, { immediate: true });
 
 // Handle seek
 function handleSeek(event: MouseEvent): void {
@@ -158,6 +170,8 @@ function handleVolumeSeek(event: MouseEvent): void {
                             <div class="h-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" data-test="audio-player-progress">
                                 <div
                                     class="h-full rounded-full bg-primary"
+                                    :class="{ 'transition-all': shouldAnimateProgress }"
+                                    :style="{ width: `${progressPercent}%` }"
                                 ></div>
                             </div>
                         </div>
@@ -203,7 +217,8 @@ function handleVolumeSeek(event: MouseEvent): void {
                             <span>{{ formatTime(currentTime) }}</span>
                             <div class="h-2 flex-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" data-test="audio-player-progress" @click="handleSeek">
                                 <div
-                                    class="h-full rounded-full bg-primary transition-all"
+                                    class="h-full rounded-full bg-primary"
+                                    :class="{ 'transition-all': shouldAnimateProgress }"
                                     :style="{ width: `${progressPercent}%` }"
                                 ></div>
                             </div>
