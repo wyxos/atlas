@@ -1242,6 +1242,69 @@ describe('audio store', () => {
       expect(store.queue.value.length).toBe(originalQueueLength);
       expect(store.currentTrack.value).not.toBeNull();
     });
+
+    it('setQueueAndShuffle sets queue as already shuffled with correct first track', async () => {
+      const store = await importStore();
+      const originalTracks = [buildTrack(1), buildTrack(2), buildTrack(3), buildTrack(4), buildTrack(5)];
+      
+      // Create a shuffled version (manually shuffle for test determinism)
+      const shuffledTracks = [buildTrack(3), buildTrack(1), buildTrack(5), buildTrack(2), buildTrack(4)];
+
+      await store.setQueueAndShuffle(shuffledTracks, originalTracks, { autoPlay: false });
+      await flushPromises();
+      await flushPromises();
+
+      // Should be marked as shuffled
+      expect(store.isShuffled.value).toBe(true);
+      
+      // First track should be the shuffled first track (track 3), not the original first track (track 1)
+      expect(store.currentTrack.value?.id).toBe(3);
+      expect(store.currentIndex.value).toBe(0);
+      
+      // Queue should match the shuffled order
+      expect(store.queue.value.map((t) => t.id)).toEqual([3, 1, 5, 2, 4]);
+    });
+
+    it('setQueueAndShuffle preserves original queue for unshuffle', async () => {
+      const store = await importStore();
+      const originalTracks = [buildTrack(1), buildTrack(2), buildTrack(3)];
+      const shuffledTracks = [buildTrack(3), buildTrack(1), buildTrack(2)];
+
+      await store.setQueueAndShuffle(shuffledTracks, originalTracks);
+      await flushPromises();
+      await flushPromises();
+
+      expect(store.isShuffled.value).toBe(true);
+      expect(store.queue.value.map((t) => t.id)).toEqual([3, 1, 2]);
+
+      // Unshuffle should restore original order
+      await store.toggleShuffle();
+      await flushPromises();
+      await flushPromises();
+
+      expect(store.isShuffled.value).toBe(false);
+      expect(store.queue.value.map((t) => t.id)).toEqual([1, 2, 3]);
+    });
+
+    it('setQueueAndShuffle respects autoPlay option', async () => {
+      const store = await importStore();
+      const originalTracks = [buildTrack(1), buildTrack(2), buildTrack(3)];
+      const shuffledTracks = [buildTrack(2), buildTrack(3), buildTrack(1)];
+
+      // With autoPlay: false
+      await store.setQueueAndShuffle(shuffledTracks, originalTracks, { autoPlay: false });
+      await flushPromises();
+      await flushPromises();
+
+      expect(store.isPlaying.value).toBe(false);
+
+      // With autoPlay: true (default)
+      await store.setQueueAndShuffle(shuffledTracks, originalTracks, { autoPlay: true });
+      await flushPromises();
+      await flushPromises();
+
+      expect(store.isPlaying.value).toBe(true);
+    });
   });
 });
 
