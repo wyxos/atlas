@@ -139,8 +139,16 @@ class AudioPlayerManager {
 
             this.spotifyPlayer = new spotifySDK.Player({
                 name: 'Atlas Audio Player',
-                getOAuthToken: (cb: (token: string) => void) => {
-                    cb(token);
+                getOAuthToken: async (cb: (token: string) => void) => {
+                    // Always fetch a fresh token when the SDK requests it
+                    // This prevents "Token provider returned the same token twice" errors
+                    this.spotifyAccessToken = null; // Clear cache to force refresh
+                    const freshToken = await this.getSpotifyAccessToken();
+                    if (freshToken) {
+                        cb(freshToken);
+                    } else {
+                        console.error('Failed to get fresh Spotify token for SDK');
+                    }
                 },
                 volume: this.volume.value,
             });
@@ -327,18 +335,45 @@ class AudioPlayerManager {
 
             // Use Spotify Web API to start playback (we only use this for playback control, not metadata)
             // Always start from the beginning (position_ms: 0) when playing a new track
-            await axios.put(
-                `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
-                {
-                    uris: [uri],
-                    position_ms: 0,
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
+            try {
+                await axios.put(
+                    `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
+                    {
+                        uris: [uri],
+                        position_ms: 0,
                     },
-                },
-            );
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    },
+                );
+            } catch (error: any) {
+                // If we get a 401, the token expired - clear cache and retry once
+                if (error?.response?.status === 401) {
+                    console.warn('Spotify token expired, refreshing...');
+                    this.spotifyAccessToken = null;
+                    const freshToken = await this.getSpotifyAccessToken();
+                    if (freshToken) {
+                        await axios.put(
+                            `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
+                            {
+                                uris: [uri],
+                                position_ms: 0,
+                            },
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${freshToken}`,
+                                },
+                            },
+                        );
+                    } else {
+                        throw error;
+                    }
+                } else {
+                    throw error;
+                }
+            }
 
             this.currentTrack.value = track;
             // Reset paused position when starting a new track
@@ -430,6 +465,34 @@ class AudioPlayerManager {
 
             this.isPlaying.value = true;
         } catch (error: any) {
+            // Handle 401 - token expired, refresh and retry
+            if (error?.response?.status === 401) {
+                console.warn('Spotify token expired during resume, refreshing...');
+                this.spotifyAccessToken = null;
+                const freshToken = await this.getSpotifyAccessToken();
+                if (freshToken) {
+                    try {
+                        await axios.put(
+                            `https://api.spotify.com/v1/me/player/play?device_id=${this.spotifyDeviceId}`,
+                            {
+                                uris: [uri],
+                                position_ms: positionMs,
+                            },
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${freshToken}`,
+                                },
+                            },
+                        );
+                        this.isPlaying.value = true;
+                        return; // Success, exit early
+                    } catch (retryError) {
+                        console.error('Failed to resume after token refresh:', retryError);
+                        // Fall through to 404/ERR_BAD_REQUEST handling
+                    }
+                }
+            }
+            
             // Handle 404 or other errors - device might have disconnected
             if (error?.response?.status === 404 || error?.code === 'ERR_BAD_REQUEST') {
                 console.warn('Spotify device not found, reconnecting...');
@@ -579,7 +642,9 @@ class AudioPlayerManager {
         this.userPaused = userInitiated;
         this.isPlaying.value = false;
         const currentTrack = this.currentTrack.value;
-        console.log('Pausing playback', currentTrack);
+        if (currentTrack) {
+            console.log('Pausing playback', currentTrack);
+        }
         if (currentTrack && this.isSpotifyTrack(currentTrack)) {
             // Get the most up-to-date position directly from Spotify player state
             if (this.spotifyPlayer) {
@@ -1019,10 +1084,21 @@ class AudioPlayerManager {
         if (this.repeatMode.value === 'one') {
             // Repeat single track - restart current track
             if (this.currentTrack.value) {
-                await this.pause({ userInitiated: false });
+                // Don't call pause() - just reset position and play
+                // pause() is already called by handleSpotifyTrackEnd() or the ended event
                 this.currentTime.value = 0;
                 if (this.isSpotifyTrack(this.currentTrack.value)) {
                     this.spotifyPausedPosition = 0;
+                    // For Spotify, we need to stop current playback first
+                    if (this.spotifyPlayer) {
+                        try {
+                            await this.spotifyPlayer.pause();
+                        } catch (error) {
+                            console.debug('Could not pause Spotify track for repeat:', error);
+                        }
+                    }
+                } else if (this.audio) {
+                    this.audio.pause();
                 }
                 await this.play();
             }
