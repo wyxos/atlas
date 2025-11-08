@@ -43,11 +43,11 @@ class FileController extends Controller
         $builder->orderBy('created_at', $sort === 'latest' ? 'desc' : 'asc');
 
         $files = $builder->paginate($perPage)->withQueryString();
-        // Attach derived url (prefer signed route for private path; fallback to model url)
+        // Attach derived url (prefer route for local path; fallback to model url)
         $files->setCollection(
             $files->getCollection()->map(function (File $file) {
                 $derivedUrl = $file->path
-                    ? URL::temporarySignedRoute('files.view', now()->addMinutes(5), ['file' => $file->id])
+                    ? route('files.view', ['file' => $file->id])
                     : ($file->url ?: null);
 
                 return [
@@ -93,7 +93,6 @@ class FileController extends Controller
 
     public function view(Request $request, File $file): SymfonyResponse
     {
-        // The 'signed' middleware already validates the signature.
         $path = $file->path;
         abort_unless($path, 404);
 

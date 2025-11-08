@@ -1,7 +1,6 @@
 <?php
 
 use App\Events\DemoPing;
-use Illuminate\Filesystem\ServeFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -16,16 +15,6 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 })->name('home');
 
-Route::get('storage/atlas-app/{path}', function (Request $request, string $path) {
-    $config = config('filesystems.disks.atlas_app', []);
-
-    return (new ServeFile(
-        'atlas_app',
-        is_array($config) ? $config : [],
-        app()->isProduction()
-    ))($request, $path);
-})->where('path', '.*')->name('storage.atlas_app');
-
 if (app()->environment('testing')) {
     Route::post('testing/reverb-demo', function () {
         DemoPing::broadcast('Realtime test ping');
@@ -35,6 +24,25 @@ if (app()->environment('testing')) {
 }
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('storage/atlas-app/{path}', function (Request $request, string $path) {
+        $normalized = ltrim($path, '/');
+        $disk = \Illuminate\Support\Facades\Storage::disk('atlas_app');
+
+        if (! $disk->exists($normalized)) {
+            abort(404);
+        }
+
+        $absolute = $disk->path($normalized);
+        if (! is_file($absolute)) {
+            abort(404);
+        }
+
+        $mimeType = \Illuminate\Support\Facades\File::mimeType($absolute) ?: 'application/octet-stream';
+
+        return response()->file($absolute, [
+            'Content-Type' => $mimeType,
+        ]);
+    })->where('path', '.*')->name('storage.atlas_app');
     Route::get('dashboard', function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
@@ -117,9 +125,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('files/mime-types', [App\Http\Controllers\FileController::class, 'mimeTypes'])
         ->name('files.mime-types');
 
-    // Temporary, signed view URL for files (auth + signed)
+    // View URL for files (auth required)
     Route::get('files/{file}/view', [App\Http\Controllers\FileController::class, 'view'])
-        ->middleware('signed')
         ->name('files.view');
 
     // Proxy originals for hotlink-protected sources (host whitelist inside controller)

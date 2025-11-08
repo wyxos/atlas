@@ -236,15 +236,11 @@ class Browser
 
         return [
             'files' => collect($persisted)->map(function (File $file) use ($hotlinkSources, $reactions, $service) {
-                // Prefer local signed route; else, for flagged sources, use proxy; else direct URL
+                // Prefer local route; else, for flagged sources, use proxy; else direct URL
                 $original = null;
                 $needsProxy = false;
                 if ($file->path) {
-                    try {
-                        $original = \URL::temporarySignedRoute('files.view', now()->addMinutes(5), ['file' => $file->id]);
-                    } catch (\Throwable $e) {
-                        $original = null;
-                    }
+                    $original = route('files.view', ['file' => $file->id]);
                 }
                 if (! $original) {
                     $needsProxy = in_array((string) $file->source, $hotlinkSources, true);

@@ -86,32 +86,20 @@ const retryCount = ref(0);
 const useImageFallback = ref(false);
 const videoEl = ref<HTMLVideoElement | null>(null);
 
-function bustUrl(u: string, n: number): string {
-    try {
-        const url = new URL(u, window.location.origin);
-        url.searchParams.set('retry', String(n));
-        url.searchParams.set('ts', String(Date.now()));
-        return url.toString();
-    } catch {
-        const sep = u.includes('?') ? '&' : '?';
-        return `${u}${sep}retry=${n}&ts=${Date.now()}`;
-    }
-}
-
 const imageSrc = computed(() => {
     const p = (props.item as any)?.preview as string | undefined;
     if (!p) { return ''; }
-    return retryCount.value > 0 ? bustUrl(p, retryCount.value) : p;
+    return p;
 });
 
 const videoSrc = computed(() => {
     const src = ((props.item as any)?.original as string | undefined) || ((props.item as any)?.preview as string | undefined);
     if (!src) { return ''; }
-    return retryCount.value > 0 ? bustUrl(src, retryCount.value) : src;
+    return src;
 });
 
-// Force the video element to reload when src changes
-watch(videoSrc, () => {
+// Force the video element to reload when retryCount changes (programmatic cache busting)
+watch(retryCount, () => {
     if (videoEl.value) {
         try { videoEl.value.load(); } catch {}
     }
@@ -1191,9 +1179,8 @@ function retryLoad(fromUser = false) {
 function openUrlInNewTab(url?: string | null) {
     const raw = url || ((props.item as any)?.original as string | undefined) || ((props.item as any)?.preview as string | undefined) || '';
     if (!raw) { return; }
-    const finalUrl = retryCount.value > 0 && !url ? bustUrl(raw, retryCount.value) : raw;
     try {
-        window.open(finalUrl, '_blank', 'noopener,noreferrer');
+        window.open(raw, '_blank', 'noopener,noreferrer');
     } catch {
         // ignore
     }

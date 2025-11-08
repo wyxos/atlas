@@ -17,7 +17,6 @@ use App\Support\PhotoContainers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 
 class PhotosUnseenController extends Controller
@@ -348,7 +347,7 @@ class PhotosUnseenController extends Controller
                 $original = null;
 
                 if ($hasPath) {
-                    $original = URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id]);
+                    $original = route('files.view', ['file' => $id]);
                 } elseif ($file->url) {
                     $original = $this->decorateRemoteUrl($file, (string) $file->url, $serviceCache);
                 }

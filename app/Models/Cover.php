@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Support\Facades\Storage;
 
 class Cover extends Model
 {
@@ -22,7 +21,7 @@ class Cover extends Model
     protected $appends = ['url'];
 
     /**
-     * Get the temporary URL for the cover image.
+     * Get the URL for the cover image.
      */
     protected function url(): Attribute
     {
@@ -32,8 +31,9 @@ class Cover extends Model
                     return null;
                 }
 
-                // Prefer atlas_app disk (new location under .app).
-                return Storage::disk('atlas_app')->temporaryUrl($this->path, now()->addHours(1));
+                $normalized = ltrim($this->path, '/');
+
+                return route('storage.atlas_app', ['path' => $normalized]);
             }
         );
     }

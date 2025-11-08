@@ -351,24 +351,12 @@ function onFullMediaAuxClick(event: MouseEvent) {
   }
 }
 
-function bustFullUrl(raw: string, attempt: number): string {
-  try {
-    const url = new URL(raw, window.location.origin)
-    url.searchParams.set('retry', String(attempt))
-    url.searchParams.set('ts', String(Date.now()))
-    return url.toString()
-  } catch {
-    const sep = raw.includes('?') ? '&' : '?'
-    return `${raw}${sep}retry=${attempt}&ts=${Date.now()}`
-  }
-}
-
 const fullMediaSrc = computed(() => {
   const item = dialogItem.value
   if (!item) return ''
   const raw = (item?.original as string | undefined) || (item?.preview as string | undefined) || ''
   if (!raw) return ''
-  return fullRetryCount.value > 0 ? bustFullUrl(raw, fullRetryCount.value) : raw
+  return raw
 })
 
 const fullResolvedMediaKind = computed<'video' | 'image'>(() => {
@@ -553,9 +541,8 @@ function retryFullMedia(fromUser = false) {
 function openFullMediaInNewTab() {
   const base = (dialogItem.value?.original as string | undefined) || (dialogItem.value?.preview as string | undefined) || ''
   if (!base) return
-  const target = fullRetryCount.value > 0 ? bustFullUrl(base, fullRetryCount.value) : base
   try {
-    window.open(target, '_blank', 'noopener,noreferrer')
+    window.open(base, '_blank', 'noopener,noreferrer')
   } catch {
     // ignore inability to open new tab
   }

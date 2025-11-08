@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\File;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 
 class PhotoListingFormatter
 {
@@ -27,7 +26,7 @@ class PhotoListingFormatter
         $original = null;
 
         if ($hasPath) {
-            $original = URL::temporarySignedRoute('files.view', now()->addMinutes(30), ['file' => $id]);
+            $original = route('files.view', ['file' => $id]);
         } elseif ($file->url) {
             $original = $remoteUrlDecorator($file, (string) $file->url, $serviceCache);
         }
