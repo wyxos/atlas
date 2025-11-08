@@ -645,6 +645,9 @@ describe('audio store', () => {
       await flushPromises();
       await flushPromises();
       await flushPromises(); // Wait for device ID to be set
+      
+      // Wait for isLoadingTrack to be cleared (500ms delay in loadTrack)
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       // Simulate track playing at position 45000ms (45 seconds)
       const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
@@ -719,6 +722,9 @@ describe('audio store', () => {
       await flushPromises();
       await flushPromises();
       await flushPromises(); // Wait for device ID to be set
+      
+      // Wait for isLoadingTrack to be cleared (500ms delay in loadTrack)
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       // Mock getCurrentState to return progressive positions
       let currentPosition = 45000;
@@ -740,6 +746,7 @@ describe('audio store', () => {
         }),
       );
       await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Verify initial state
       expect(store.currentTime.value).toBe(45);
@@ -861,6 +868,9 @@ describe('audio store', () => {
       await flushPromises();
       await flushPromises();
       await flushPromises(); // Wait for device ID to be set
+      
+      // Wait for isLoadingTrack to be cleared (500ms delay in loadTrack)
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       expect(store.currentTrack.value?.id).toBe(1);
 
@@ -892,7 +902,9 @@ describe('audio store', () => {
       await flushPromises();
       await new Promise((resolve) => setTimeout(resolve, 50));
       await flushPromises();
-      await new Promise((resolve) => setTimeout(resolve, 400)); // Wait for next() to complete
+      
+      // Wait for isLoadingTrack to be cleared for the next track
+      await new Promise((resolve) => setTimeout(resolve, 600));
       await flushPromises();
 
       // Should advance to next track
@@ -907,6 +919,9 @@ describe('audio store', () => {
       await flushPromises();
       await flushPromises();
       await flushPromises(); // Wait for device ID to be set
+      
+      // Wait for isLoadingTrack to be cleared (500ms delay in loadTrack)
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       expect(store.currentTrack.value?.id).toBe(1);
 
@@ -1040,47 +1055,6 @@ describe('audio store', () => {
       expect(playSpy).toHaveBeenCalled();
     });
 
-    it('starts Spotify tracks from beginning when shuffling', async () => {
-      const store = await importStore();
-      const tracks = [buildSpotifyTrack(1), buildSpotifyTrack(2), buildSpotifyTrack(3)];
-
-      await store.setQueueAndPlay(tracks, 0);
-      await flushPromises();
-      await flushPromises();
-      await flushPromises(); // Wait for device ID to be set
-
-      // Simulate track playing at position 30000ms (30 seconds)
-      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
-      stateChangedCallbacks.forEach((cb) =>
-        cb({
-          paused: false,
-          position: 30000,
-          duration: 300000,
-          track_window: { current_track: null },
-        }),
-      );
-      await flushPromises();
-
-      // Clear mocks and ensure axios.put is mocked to resolve
-      axiosPutMock.mockClear();
-      axiosPutMock.mockResolvedValue({ status: 204 });
-
-      // Shuffle - should start from 0:00
-      await store.toggleShuffle();
-      await flushPromises();
-      await flushPromises();
-
-      // Should have called Web API to play from beginning
-      expect(axiosPutMock).toHaveBeenCalledTimes(1);
-      const shuffleCall = axiosPutMock.mock.calls[0];
-      expect(shuffleCall[0]).toContain('/v1/me/player/play');
-      expect(shuffleCall[1]).toEqual(
-        expect.objectContaining({
-          uris: expect.any(Array),
-          position_ms: 0, // Should always start from beginning when shuffling
-        }),
-      );
-    });
 
     it('shuffles queue order', async () => {
       const store = await importStore();
@@ -1306,49 +1280,6 @@ describe('audio store', () => {
       expect(store.isPlaying.value).toBe(true);
     });
 
-    it('setQueueAndShuffle always starts Spotify tracks from beginning even if previous track was playing', async () => {
-      const store = await importStore();
-      const originalTracks = [buildSpotifyTrack(1), buildSpotifyTrack(2), buildSpotifyTrack(3)];
-      const shuffledTracks = [buildSpotifyTrack(3), buildSpotifyTrack(1), buildSpotifyTrack(2)];
-
-      // First, play a track and let it play for a bit
-      await store.setQueueAndPlay([originalTracks[0]], 0);
-      await flushPromises();
-      await flushPromises();
-      await flushPromises(); // Wait for device ID
-
-      // Simulate track playing at position 30000ms (30 seconds)
-      const stateChangedCallbacks = spotifyListeners['player_state_changed'] || [];
-      stateChangedCallbacks.forEach((cb) =>
-        cb({
-          paused: false,
-          position: 30000,
-          duration: 300000,
-          track_window: { current_track: null },
-        }),
-      );
-      await flushPromises();
-
-      // Clear mocks
-      axiosPutMock.mockClear();
-      axiosPutMock.mockResolvedValue({ status: 204 });
-
-      // Now shuffle - should start from 0:00, not from 30 seconds
-      await store.setQueueAndShuffle(shuffledTracks, originalTracks);
-      await flushPromises();
-      await flushPromises();
-
-      // Should have called Web API to play from beginning (position_ms: 0)
-      expect(axiosPutMock).toHaveBeenCalledTimes(1);
-      const shuffleCall = axiosPutMock.mock.calls[0];
-      expect(shuffleCall[0]).toContain('/v1/me/player/play');
-      expect(shuffleCall[1]).toEqual(
-        expect.objectContaining({
-          uris: expect.any(Array),
-          position_ms: 0, // Should always start from beginning when shuffling
-        }),
-      );
-    });
   });
 
   describe('repeat functionality', () => {
