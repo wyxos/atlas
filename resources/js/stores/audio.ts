@@ -824,7 +824,6 @@ class AudioPlayerManager {
         const previousTrack = this.currentTrack.value;
         if (previousTrack) {
             const wasSpotify = this.isSpotifyTrack(previousTrack);
-            const isSpotify = this.isSpotifyTrack(track);
 
             if (wasSpotify) {
                 // Switching from Spotify - pause SDK player
@@ -949,7 +948,6 @@ class AudioPlayerManager {
         this.updateSpotifyPolling(false);
         
         // Clear current track to ensure we're starting fresh
-        const previousTrackId = this.currentTrack.value?.id;
         this.currentTrack.value = null;
 
         // Reset paused position, current time, and duration when setting new queue

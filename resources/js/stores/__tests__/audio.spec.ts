@@ -1086,15 +1086,12 @@ describe('audio store', () => {
       await flushPromises();
 
       const originalOrder = store.queue.value.map((t) => t.id);
-      const originalCurrentId = store.currentTrack.value?.id;
-      const originalIndex = 2;
 
       await store.toggleShuffle();
       await flushPromises();
       await flushPromises();
 
       expect(store.isShuffled.value).toBe(true);
-      const shuffledOrder = store.queue.value.map((t) => t.id);
       const shuffledCurrentId = store.currentTrack.value?.id;
 
       // Now unshuffle - should keep playing current track without reloading

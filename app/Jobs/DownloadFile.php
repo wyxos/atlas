@@ -362,6 +362,7 @@ class DownloadFile implements ShouldQueue
                 'download_progress' => 100,
                 'filename' => $filename,
                 'mime_type' => $resolvedMime ?: $this->file->mime_type,
+                'not_found' => false, // Clear not_found flag on successful download
             ]);
 
             // Ensure search index reflects local availability immediately
@@ -473,18 +474,46 @@ class DownloadFile implements ShouldQueue
         $urlContainsMp4 = str_contains(strtolower($fileUrl), 'mp4');
         $thumbnailContainsMp4 = str_contains(strtolower($thumbnailUrl), 'mp4');
 
-        // If URL or thumbnail suggests it's a video, check if server is returning webp
-        if ($urlContainsMp4 || $thumbnailContainsMp4) {
-            try {
-                $head = Http::timeout(15)->head($fileUrl);
-                if ($head->ok()) {
-                    $contentType = strtolower((string) ($head->header('Content-Type') ?? ''));
+        // Always check the actual content type of the URL, not just the extension
+        try {
+            $head = Http::timeout(15)->head($fileUrl);
+            if ($head->ok()) {
+                $contentType = strtolower((string) ($head->header('Content-Type') ?? ''));
 
-                    return $this->checkCivitaiVideoUrlFromMime($fileUrl, $contentType);
+                // If URL is an image (webp, jpeg, etc.) but we expect a video, check alternatives
+                if (str_contains($contentType, 'image/')) {
+                    // Check if thumbnail_url is actually a video (even if it has jpeg extension)
+                    if ($thumbnailUrl !== '') {
+                        try {
+                            $thumbHead = Http::timeout(15)->head($thumbnailUrl);
+                            if ($thumbHead->ok()) {
+                                $thumbContentType = strtolower((string) ($thumbHead->header('Content-Type') ?? ''));
+                                if (str_starts_with($thumbContentType, 'video/')) {
+                                    // Thumbnail is actually the video, use it instead
+                                    $this->file->update([
+                                        'url' => $thumbnailUrl,
+                                        'not_found' => false,
+                                    ]);
+
+                                    return $thumbnailUrl;
+                                }
+                            }
+                        } catch (\Throwable $e) {
+                            // If thumbnail HEAD fails, continue with other checks
+                        }
+                    }
+
+                    // If URL or thumbnail suggests it's a video (by extension), try to extract real video URL
+                    if ($urlContainsMp4 || $thumbnailContainsMp4) {
+                        return $this->checkCivitaiVideoUrlFromMime($fileUrl, $contentType);
+                    }
+                } else {
+                    // URL is already a video, return as-is
+                    return $fileUrl;
                 }
-            } catch (\Throwable $e) {
-                // If HEAD fails, continue with original URL
             }
+        } catch (\Throwable $e) {
+            // If HEAD fails, continue with original URL
         }
 
         return $fileUrl;

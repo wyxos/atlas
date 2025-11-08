@@ -887,7 +887,6 @@ const referrerUrl = computed<string | null>(() => {
     return trimmed.length > 0 ? trimmed : null;
 });
 
-const isLocal = computed<boolean>(() => (props.item as any)?.is_local === true);
 
 const resolvedMediaKind = computed<'video' | 'image'>(() => {
     if (useImageFallback.value) {
@@ -969,7 +968,7 @@ async function copyImageToClipboard(): Promise<void> {
                     const clipboardItem = new ClipboardItem({ [blob.type]: blob });
                     await navigator.clipboard.write([clipboardItem]);
                 }
-            } catch (error) {
+            } catch {
                 // Fallback: try to copy as data URL if ClipboardItem is not supported
                 try {
                     const dataUrl = canvas.toDataURL('image/png');

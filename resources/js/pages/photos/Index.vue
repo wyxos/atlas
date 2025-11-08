@@ -11,11 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { type BreadcrumbItem } from '@/types';
 import type { BrowseItem } from '@/types/browse';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
 import { Image, Hash, ChevronsRight, List as ListIcon, Loader2, Shuffle, ChevronsLeft, X, RefreshCw } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, provide, reactive, ref, watch } from 'vue';
 import { createPhotosGetPage } from './usePhotosPaging';
+import PhotosNotFoundController from '@/actions/App/Http/Controllers/PhotosNotFoundController';
+import { createGridGetPage } from '@/pages/shared/createGridGetPage';
 import axios from 'axios';
 import * as BrowseController from '@/actions/App/Http/Controllers/BrowseController';
 import { undoManager } from '@/lib/undo';
@@ -393,7 +395,24 @@ if (!(form as any).sort) {
 
 const limit = computed(() => Number(((form as any)?.limit as any) ?? 20) || 20);
 const masonryLayout = { sizes: { base: 1, sm: 2, md: 3, lg: 4, xl: 5, '2xl': 10 }, header: 40, footer: 40 } as const;
-const getPage = createPhotosGetPage(form as any);
+// Use NotFound endpoint if we're on the not-found route, otherwise use regular paging
+const page = usePage();
+const isNotFoundRoute = computed(() => (page.url as string).includes('/photos/not-found'));
+const getPage = computed(() => {
+    if (isNotFoundRoute.value) {
+        // Use NotFound endpoint directly
+        return createGridGetPage(form as any, () => {
+            const base = form.data() || {};
+            return (base.data_url as string) || PhotosNotFoundController.data().url;
+        }, {
+            buildParams: () => ({
+                mime_type: (form as any).mime_type,
+            }),
+        });
+    }
+    // Use regular photos paging (includes moderation handling)
+    return createPhotosGetPage(form as any);
+});
 
 function processModerationPayload(payload: any) {
     const moderation = payload || {};

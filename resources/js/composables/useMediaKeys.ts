@@ -10,7 +10,7 @@ import { useAudioPlayer } from '@/stores/audio';
  * - Triple press: Previous track
  */
 export function useMediaKeys() {
-    const { togglePlay, next, previous, isActive, currentTrack, isPlaying } = useAudioPlayer();
+    const { togglePlay, next, previous, isActive, currentTrack } = useAudioPlayer();
 
     let pressTimeout: number | null = null;
     let pressCount = 0;
@@ -111,7 +111,7 @@ export function useMediaKeys() {
         if (!track || !isActive.value) {
             try {
                 mediaSession.metadata = null;
-            } catch (error) {
+            } catch {
                 // Ignore errors when clearing metadata
             }
             return;

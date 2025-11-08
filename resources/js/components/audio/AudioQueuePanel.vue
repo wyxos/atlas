@@ -7,13 +7,13 @@ import { useAudioFileLoader } from '@/composables/useAudioFileLoader';
 import { useAudioPlayer } from '@/stores/audio';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const props = defineProps<{ isOpen: boolean }>();
+defineProps<{ isOpen: boolean }>();
 defineEmits<{ (e: 'close'): void }>();
 
 const scrollerRef = ref<InstanceType<typeof RecycleScroller> | null>(null);
 
 const { loadedFiles, loadBatchFileDetails } = useAudioFileLoader();
-const { queue, currentTrack, currentIndex, playTrackAtIndex } = useAudioPlayer();
+const { queue, currentTrack, playTrackAtIndex } = useAudioPlayer();
 
 const items = computed(() => queue.value);
 

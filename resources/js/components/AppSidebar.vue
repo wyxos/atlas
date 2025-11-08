@@ -571,6 +571,14 @@ function onLeave(el: HTMLElement) {
                             </SidebarMenuButton>
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem>
+                            <SidebarMenuButton as-child :tooltip="'Not found'">
+                              <Link href="/photos/not-found">
+                                <component :is="AlertTriangle" :size="18" />
+                                <span>Not found</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'Manga'">
                               <Link href="#">
                                 <component :is="HelpCircle" :size="18" />
@@ -710,6 +718,14 @@ function onLeave(el: HTMLElement) {
                               <Link href="/reels/unrated">
                                 <component :is="HelpCircle" :size="18" />
                                 <span>Unrated</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuSubItem>
+                          <SidebarMenuSubItem>
+                            <SidebarMenuButton as-child :tooltip="'Not found'">
+                              <Link href="/reels/not-found">
+                                <component :is="AlertTriangle" :size="18" />
+                                <span>Not found</span>
                               </Link>
                             </SidebarMenuButton>
                           </SidebarMenuSubItem>

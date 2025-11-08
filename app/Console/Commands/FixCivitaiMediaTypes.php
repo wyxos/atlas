@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\FixCivitaiMediaType;
+use App\Jobs\DownloadFile;
 use App\Models\File;
 use Illuminate\Console\Command;
 
@@ -10,26 +10,23 @@ class FixCivitaiMediaTypes extends Command
 {
     protected $signature = 'media:fix-civitai-types {--dry-run : Report mismatches without dispatching jobs}';
 
-    protected $description = 'Queue jobs to correct mislabeled CivetAI media files stored locally with incorrect extensions.';
+    protected $description = 'Re-trigger downloads for CivitAI files stored as webp to ensure correct video files are downloaded.';
 
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry-run');
 
-        // Target files where thumbnail_url contains mp4 and mime_type is webp
+        // Target all downloaded CivitAI files that are webp
         $query = File::query()
             ->where('source', 'CivitAI')
             ->whereNotNull('path')
             ->where('path', '!=', '')
-            ->whereNotNull('thumbnail_url')
-            ->where(fn($query) => $query->where('thumbnail_url', 'like', '%mp4%')
-            ->orWhere('url', 'like', '%mp4%'))
             ->where('mime_type', 'image/webp')
-            ->select(['id', 'filename', 'referrer_url']);
+            ->select(['id', 'filename', 'referrer_url', 'url', 'thumbnail_url']);
 
         $total = (clone $query)->count();
         if ($total === 0) {
-            $this->info('No CivitAI files matching criteria found (thumbnail_url contains mp4, mime_type is webp).');
+            $this->info('No CivitAI files matching criteria found (downloaded files with webp mime type).');
 
             return self::SUCCESS;
         }
@@ -42,13 +39,13 @@ class FixCivitaiMediaTypes extends Command
         $query->chunkById(500, function ($files) use ($dryRun, &$dispatched, $bar) {
             foreach ($files as $file) {
                 if ($dryRun) {
-                    $this->line("Would dispatch job for file {$file->id} ({$file->filename}) - referrer: {$file->referrer_url}");
+                    $this->line("Would re-trigger download for file {$file->id} ({$file->filename}) - referrer: {$file->referrer_url}");
                     $bar->advance();
 
                     continue;
                 }
 
-                FixCivitaiMediaType::dispatch($file->id);
+                DownloadFile::dispatch($file);
                 $dispatched++;
                 $bar->advance();
             }
@@ -60,7 +57,7 @@ class FixCivitaiMediaTypes extends Command
         if ($dryRun) {
             $this->info('Dry run complete.');
         } else {
-            $this->info("Dispatched {$dispatched} job(s).");
+            $this->info("Dispatched {$dispatched} download job(s).");
         }
 
         return self::SUCCESS;

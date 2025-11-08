@@ -146,16 +146,8 @@ const { toggleFavorite, likeItem, dislikeItem, laughedAtItem } = useAudioReactio
 // Audio player
 const {
   currentTrack,
-  queue,
-  currentIndex,
-  isPlaying,
-  currentTime,
-  duration,
-  volume,
   setQueueAndPlay,
   setQueueAndShuffle,
-  setVolume,
-  toggleShuffle,
   play,
 } = useAudioPlayer();
 

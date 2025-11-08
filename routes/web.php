@@ -84,6 +84,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('photos.unseen');
     Route::get('photos/unseen/data', [App\Http\Controllers\PhotosUnseenController::class, 'data'])
         ->name('photos.unseen.data');
+
+    // Photos > Not Found
+    Route::get('photos/not-found', [App\Http\Controllers\PhotosNotFoundController::class, 'index'])
+        ->name('photos.not-found');
+    Route::get('photos/not-found/data', [App\Http\Controllers\PhotosNotFoundController::class, 'data'])
+        ->name('photos.not-found.data');
+
     Route::get('reels', [App\Http\Controllers\ReelsController::class, 'index'])->name('reels');
     Route::get('reels/data', [App\Http\Controllers\ReelsController::class, 'data'])->name('reels.data');
 
@@ -108,6 +115,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('reels/disliked/{category}/data', [App\Http\Controllers\ReelsDislikedController::class, 'data'])
         ->whereIn('category', ['all', 'manual', 'ignored', 'auto', 'not-disliked'])
         ->name('reels.disliked.data');
+
+    // Reels > Not Found
+    Route::get('reels/not-found', [App\Http\Controllers\ReelsNotFoundController::class, 'index'])
+        ->name('reels.not-found');
+    Route::get('reels/not-found/data', [App\Http\Controllers\ReelsNotFoundController::class, 'data'])
+        ->name('reels.not-found.data');
 
     // Browse page
     Route::get('browse', [App\Http\Controllers\BrowseController::class, 'index'])
