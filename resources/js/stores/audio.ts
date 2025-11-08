@@ -544,13 +544,19 @@ class AudioPlayerManager {
 
         if (this.isSpotifyTrack(currentTrack)) {
             // Check if we're resuming the same track that was paused
-            const isResumingSameTrack = this.currentTrack.value?.id === currentTrack.id && this.spotifyPausedPosition > 0;
+            // Only resume if: same track ID, position > 0, AND currentTrack is already set (not null)
+            const isResumingSameTrack = 
+                this.currentTrack.value?.id === currentTrack.id && 
+                this.spotifyPausedPosition > 0 &&
+                this.currentTrack.value !== null;
             
             if (isResumingSameTrack) {
                 // Resume from saved position
                 await this.resumeSpotifyTrack(this.spotifyPausedPosition);
             } else {
                 // For new tracks or first play, use playSpotifyTrack() to ensure the correct track is loaded
+                // Reset position to ensure we start from beginning
+                this.spotifyPausedPosition = 0;
                 await this.playSpotifyTrack(currentTrack);
             }
         } else {
@@ -822,6 +828,13 @@ class AudioPlayerManager {
         const shouldAutoPlay = options.autoPlay ?? true;
         await this.pause({ userInitiated: false });
         
+        // Stop polling to prevent async updates to spotifyPausedPosition
+        this.updateSpotifyPolling(false);
+        
+        // Clear current track to ensure we're starting fresh
+        const previousTrackId = this.currentTrack.value?.id;
+        this.currentTrack.value = null;
+
         // Reset paused position when setting new queue
         this.spotifyPausedPosition = 0;
 
@@ -831,6 +844,10 @@ class AudioPlayerManager {
         this.originalCurrentTrackId = null;
         this.currentIndex.value = 0;
         await this.loadTrack(this.queue.value[0]);
+
+        // Reset paused position again right before play to ensure it's 0
+        // (in case any async listeners updated it)
+        this.spotifyPausedPosition = 0;
 
         this.userPaused = !shouldAutoPlay;
 
