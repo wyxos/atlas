@@ -37,6 +37,21 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
 - Check for existing components to reuse before writing a new one.
 
+## Testing Requirements (CRITICAL)
+- **MANDATORY: For every task that involves code changes, you MUST write or update tests.** This is not optional.
+- Tests must be written BEFORE or IMMEDIATELY AFTER making code changes - never skip this step.
+- If a task involves:
+  - Adding new functionality → Write tests for the new functionality
+  - Fixing a bug → Write tests that verify the bug is fixed
+  - Refactoring code → Update existing tests or add new ones if needed
+  - Adding a new method/function → Write tests for that method/function
+  - Modifying existing behavior → Update tests to reflect the new behavior
+- For frontend/JavaScript changes: Write Vitest tests (e.g., for Vue components, TypeScript stores, utilities)
+- For backend/PHP changes: Write Pest tests (feature or unit tests)
+- If you're unsure whether tests are applicable, err on the side of writing tests
+- Only skip tests if the change is purely cosmetic (e.g., text changes, styling that doesn't affect functionality)
+- When asked "can this be tested?", the answer should almost always be "yes" - write the tests
+
 ## Git Commit Messages
 - Commit messages must follow the conventional commit format: `type: description` (e.g., `feat(auth): add login functionality`). Keep messages short, concise, and on one line.
 
@@ -475,8 +490,16 @@ $pages->assertNoJavascriptErrors()->assertNoConsoleLogs();
   1. Write a new test or update an existing test to cover the change
   2. Run the affected tests to ensure they pass
   3. Verify that existing tests still pass (no regressions)
-- For frontend/JavaScript changes, write or update corresponding tests (e.g., Vitest tests for Vue components, TypeScript stores, etc.)
-- For backend/PHP changes, write or update Pest tests
+- **For every task you complete, ask yourself: "Does this need tests?" The answer is almost always "yes".**
+- Tests are part of the task completion - a feature is not complete until it has tests
+- When implementing a feature:
+  1. Write the code
+  2. Write the tests (or update existing tests)
+  3. Run the tests to verify they pass
+  4. Only then consider the task complete
+- For frontend/JavaScript changes, write or update corresponding tests (e.g., Vitest tests for Vue components, TypeScript stores, utilities, etc.)
+- For backend/PHP changes, write or update Pest tests (feature tests for most cases, unit tests for isolated logic)
 - Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test` with a specific filename or filter, or `npx vitest run` for frontend tests.
 - If you add new functionality without tests, you have not completed the task. Tests are not optional - they are required for every change.
+- When a user asks "can this be tested?" or "is this tested?", always write the tests if they don't exist yet.
 </laravel-boost-guidelines>
