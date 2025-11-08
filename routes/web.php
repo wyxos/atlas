@@ -188,6 +188,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Report missing/404 media
     Route::post('browse/files/{file}/report-missing', [App\Http\Controllers\BrowseController::class, 'reportMissing'])
         ->name('browse.files.report-missing');
+    Route::post('browse/files/{file}/clear-not-found', [App\Http\Controllers\BrowseController::class, 'clearNotFound'])
+        ->name('browse.files.clear-not-found');
 
     // Audio endpoints (non-page)
     Route::get('audio/{file}/details', [App\Http\Controllers\AudioController::class, 'details'])

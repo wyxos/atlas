@@ -75,6 +75,7 @@ function setFullErrorState(
 }
 
 const fullIsNotFoundError = computed(() => (dialogItem.value as any)?.not_found === true || fullErrorKind.value === 'not-found')
+const isFileMarkedNotFound = computed(() => (dialogItem.value as any)?.not_found === true)
 const showFullErrorOverlay = computed(() => fullIsNotFoundError.value || fullErrorKind.value === 'unavailable')
 const fullOverlayIcon = computed(() => (fullIsNotFoundError.value ? ImageOff : AlertTriangle))
 const fullOverlayMessage = computed(() => (fullIsNotFoundError.value ? 'Not found' : 'Unable to load media'))
@@ -246,10 +247,10 @@ bus.on('browse:clear-highlight', () => {
 
 // Batch helpers in full menu
 import { createBatchReact, type BatchAction, type BatchScope } from '@/pages/browse/useBatchReact'
-const batchReact = createBatchReact({ 
-  items: items as any, 
-  scroller: scroller as any, 
-  dialogOpen: dialogOpen as any, 
+const batchReact = createBatchReact({
+  items: items as any,
+  scroller: scroller as any,
+  dialogOpen: dialogOpen as any,
   dialogItem: dialogItem as any,
   refreshOnEmpty: props.refreshOnEmpty
 })
@@ -271,6 +272,113 @@ function containerScopesFor(item: any): { label: string; scope: BatchScope; badg
     })
 }
 
+// URL computed properties (matching GridItem)
+const thumbnailUrl = computed<string | null>(() => {
+  const item = dialogItem.value as any
+  if (!item) return null
+  const preview = typeof item?.preview === 'string' ? item.preview.trim() : ''
+  if (preview) return preview
+  const fallback = typeof item?.thumbnail_url === 'string' ? item.thumbnail_url.trim() : ''
+  return fallback || null
+})
+
+const originalUrl = computed<string | null>(() => {
+  const item = dialogItem.value as any
+  if (!item) return null
+  const original = typeof item?.original === 'string' ? item.original.trim() : ''
+  return original || null
+})
+
+const trueOriginalUrl = computed<string | null>(() => {
+  const raw = (dialogItem.value as any)?.true_original_url
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : null
+})
+
+const trueThumbnailUrl = computed<string | null>(() => {
+  const raw = (dialogItem.value as any)?.true_thumbnail_url
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : null
+})
+
+const referrerUrl = computed<string | null>(() => {
+  const raw = (dialogItem.value as any)?.referrer_url
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : null
+})
+
+// Copy and open URL functions (matching GridItem)
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (!text) return false
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {}
+  if (typeof document === 'undefined') return false
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', 'true')
+    textarea.style.position = 'absolute'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return ok
+  } catch {}
+  return false
+}
+
+function copyUrl(url: string | null): void {
+  if (!url) return
+  void copyToClipboard(url)
+}
+
+async function copyImageToClipboard(): Promise<void> {
+  try {
+    const imgElement = mediaWrapRef.value?.querySelector('img') as HTMLImageElement | null
+    if (!imgElement || !imgElement.complete) return
+    const canvas = document.createElement('canvas')
+    canvas.width = imgElement.naturalWidth || imgElement.width
+    canvas.height = imgElement.naturalHeight || imgElement.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(imgElement, 0, 0)
+    canvas.toBlob(async (blob) => {
+      if (!blob) return
+      try {
+        if (navigator.clipboard && navigator.clipboard.write) {
+          const clipboardItem = new ClipboardItem({ [blob.type]: blob })
+          await navigator.clipboard.write([clipboardItem])
+        }
+      } catch {
+        try {
+          const dataUrl = canvas.toDataURL('image/png')
+          await copyToClipboard(dataUrl)
+        } catch {}
+      }
+    }, 'image/png')
+  } catch {
+    // Silently fail
+  }
+}
+
+function openUrlInNewTab(url?: string | null): void {
+  const raw = url || originalUrl.value || thumbnailUrl.value || ''
+  if (!raw) return
+  try {
+    window.open(raw, '_blank', 'noopener,noreferrer')
+  } catch {
+    // ignore
+  }
+}
+
 const fullMenuOptions = computed<ActionOption[]>(() => {
   const file = dialogItem.value as any
   const base: ActionOption[] = [
@@ -284,6 +392,54 @@ const fullMenuOptions = computed<ActionOption[]>(() => {
       ],
     },
   ]
+
+  // Copy URL menu items (matching GridItem)
+  const copyChildren: ActionOption[] = []
+  if (referrerUrl.value) {
+    copyChildren.push({ label: 'copy referrer url', action: () => copyUrl(referrerUrl.value) })
+  }
+  if (trueOriginalUrl.value) {
+    copyChildren.push({ label: 'copy original url', action: () => copyUrl(trueOriginalUrl.value) })
+  }
+  if (trueThumbnailUrl.value) {
+    copyChildren.push({ label: 'copy original preview url', action: () => copyUrl(trueThumbnailUrl.value) })
+  }
+  if (thumbnailUrl.value) {
+    copyChildren.push({ label: 'copy thumbnail url', action: () => copyUrl(thumbnailUrl.value) })
+  }
+  const currentUrl = originalUrl.value || thumbnailUrl.value
+  if (currentUrl) {
+    copyChildren.push({ label: 'copy url', action: () => copyUrl(currentUrl) })
+  }
+  if (fullShouldRenderVideo.value === false) {
+    copyChildren.push({ label: 'copy image', action: () => copyImageToClipboard() })
+  }
+  if (copyChildren.length > 0) {
+    base.push({ label: 'copy url', children: copyChildren })
+  }
+
+  // Open URL menu items (matching GridItem)
+  const openChildren: ActionOption[] = []
+  if (referrerUrl.value) {
+    openChildren.push({ label: 'open referrer url', action: () => openUrlInNewTab(referrerUrl.value) })
+  }
+  if (trueOriginalUrl.value) {
+    openChildren.push({ label: 'open original url', action: () => openUrlInNewTab(trueOriginalUrl.value) })
+  }
+  if (trueThumbnailUrl.value) {
+    openChildren.push({ label: 'open original preview url', action: () => openUrlInNewTab(trueThumbnailUrl.value) })
+  }
+  if (thumbnailUrl.value) {
+    openChildren.push({ label: 'open thumbnail url', action: () => openUrlInNewTab(thumbnailUrl.value) })
+  }
+  if (currentUrl) {
+    openChildren.push({ label: 'open url', action: () => openUrlInNewTab(currentUrl) })
+  }
+  if (openChildren.length > 0) {
+    base.push({ label: 'open url', children: openChildren })
+  }
+
+  // Batch menu items
   if (file) {
     const scopes = containerScopesFor(file)
     if (scopes.length > 0) {
@@ -524,12 +680,26 @@ function retryFullMedia(fromUser = false) {
 }
 
 function openFullMediaInNewTab() {
-  const base = (dialogItem.value?.original as string | undefined) || (dialogItem.value?.preview as string | undefined) || ''
-  if (!base) return
+  openUrlInNewTab()
+}
+
+async function clearNotFoundFlag() {
+  const id = dialogItem.value?.id as number | undefined
+  if (!id) return
+
   try {
-    window.open(base, '_blank', 'noopener,noreferrer')
-  } catch {
-    // ignore inability to open new tab
+    const action = (BrowseController as any).clearNotFound({ file: id })
+    if (!action?.url) return
+
+    await axios.post(action.url)
+
+    // Update local state
+    if (dialogItem.value) {
+      (dialogItem.value as any).not_found = false
+      setFullErrorState('none', null, null, false)
+    }
+  } catch (error) {
+    // Silently fail
   }
 }
 
@@ -604,7 +774,7 @@ async function navigate(delta: number) {
   const currentId = dialogItem.value?.id
   const index = navList.value.findIndex((thumb) => thumb.id === currentId)
   const targetIndex = index + delta
-  
+
   console.log('[FullSizeViewer] navigate:', {
     delta,
     currentId,
@@ -615,7 +785,7 @@ async function navigate(delta: number) {
     targetItemId: allThumbnails.value[targetIndex]?.id,
     itemsLength: items.value.length
   })
-  
+
   if (index < 0) return
   if (targetIndex < 0) return
   if (targetIndex < navList.value.length) {
@@ -675,7 +845,7 @@ watch(() => thumbnails.value, () => {
 })
 
 watch(dialogOpen, (isOpen) => { if (isOpen) void nextTick().then(() => { const element = mediaWrapRef.value as HTMLElement | null; if (element) { try { element.focus({ preventScroll: true } as any) } catch { try { element.focus() } catch {} } } }) })
- 
+
 // Guard against duplicate navigation firing from multiple mouse events (mouseup + auxclick)
 let navLock = false
 function withNavLock(action: () => void | Promise<void>) {
@@ -694,7 +864,7 @@ function withNavLock(action: () => void | Promise<void>) {
     done()
   }
 }
- 
+
 onMounted(() => {
   const onOutside = (event: MouseEvent) => {
     if (!fullActionOpen.value) return
@@ -841,6 +1011,7 @@ const highlightedPromptHtml = computed(() => {
                   <div class="flex gap-2">
                     <Button variant="outline" class="h-8 px-3 text-xs" @click.stop="retryFullMedia(true)">Retry</Button>
                     <Button variant="outline" class="h-8 px-3 text-xs" @click.stop="openFullMediaInNewTab">Open</Button>
+                    <Button v-if="isFileMarkedNotFound" variant="default" class="h-8 px-3 text-xs" @click.stop="clearNotFoundFlag">Clear Not Found</Button>
                   </div>
                 </div>
               </div>
@@ -1013,6 +1184,7 @@ const highlightedPromptHtml = computed(() => {
                          @laughed-at="(emittedFile, emittedEvent) => emit('laughed-at', dialogItem, emittedEvent)" />
           <Button variant="outline" :disabled="!dialogItem" @click="openFullMediaInNewTab">Open</Button>
           <Button v-if="showFullErrorOverlay" variant="outline" :disabled="!dialogItem" @click="retryFullMedia(true)">Retry</Button>
+          <Button v-if="isFileMarkedNotFound" variant="default" :disabled="!dialogItem" @click="clearNotFoundFlag">Clear Not Found</Button>
           <div v-if="(dialogItem?.seen_count ?? 0) > 0" class="flex items-center gap-1 text-xs text-muted-foreground">
             <Eye :size="14" />
             <span>{{ dialogItem?.seen_count ?? 0 }}</span>

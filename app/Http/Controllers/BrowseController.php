@@ -206,6 +206,40 @@ class BrowseController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function clearNotFound(File $file): JsonResponse
+    {
+        $file->forceFill(['not_found' => false])->saveQuietly();
+
+        // Ensure search index reflects new flags immediately
+        try {
+            $file->searchable();
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        // Remove from per-user "Not Found" playlist if present
+        try {
+            $userId = optional(request()->user())->id;
+            if ($userId) {
+                $playlist = Playlist::query()
+                    ->where('user_id', $userId)
+                    ->where('name', 'Not Found')
+                    ->first();
+
+                if ($playlist) {
+                    $playlist->files()->detach([$file->id]);
+                    // Update index with playlist_ids for this file
+                    $file->loadMissing('playlists');
+                    $file->searchable();
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        return response()->json(['ok' => true, 'not_found' => false]);
+    }
+
     public function batchUnblacklist(Request $request): JsonResponse
     {
         $data = $request->validate([
