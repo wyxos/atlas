@@ -53,22 +53,6 @@ class BrowseController extends Controller
             } catch (\Throwable $e) {
                 // ignore indexing errors
             }
-            // Attach to per-user "Not Found" playlist
-            try {
-                $userId = optional($request->user())->id;
-                if ($userId) {
-                    $playlist = Playlist::firstOrCreate(
-                        ['user_id' => $userId, 'name' => 'Not Found'],
-                        ['is_smart' => true, 'is_system' => true, 'smart_parameters' => ['status' => 'not_found']]
-                    );
-                    $playlist->files()->syncWithoutDetaching([$file->id]);
-                    // Update index with playlist_ids for this file
-                    $file->loadMissing('playlists');
-                    $file->searchable();
-                }
-            } catch (\Throwable $e) {
-                // ignore
-            }
         }
 
         return response()->json([

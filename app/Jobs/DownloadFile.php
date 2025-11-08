@@ -6,7 +6,6 @@ use App\Events\DownloadCreated;
 use App\Events\FileDownloadProgress;
 use App\Models\Download;
 use App\Models\File;
-use App\Support\CivitaiVideoUrlExtractor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -95,8 +94,8 @@ class DownloadFile implements ShouldQueue
             $acceptRanges = null;
             $contentLength = null;
 
-            // Check for CivitAI video mislabeling issue before downloading
-            $fileUrl = $this->checkCivitaiVideoUrl($fileUrl);
+            // Note: CivitAI video URL resolution is handled by GridItem when items are viewed,
+            // so file->url should already be correct by the time DownloadFile runs
 
             try {
                 $head = Http::timeout(15)->head($fileUrl);
@@ -144,11 +143,6 @@ class DownloadFile implements ShouldQueue
                         $acceptRanges = 'bytes';
                         $probeMime = $probe->header('Content-Type');
                         $resolvedMime = $probeMime ?: $resolvedMime;
-
-                        // Check for CivitAI video mislabeling issue if HEAD didn't catch it
-                        if ($probeMime) {
-                            $fileUrl = $this->checkCivitaiVideoUrlFromMime($fileUrl, strtolower((string) $probeMime));
-                        }
 
                         $contentRange = $probe->header('Content-Range'); // e.g., bytes 0-0/12345
                         if ($contentRange && preg_match('/\/(\d+)$/', (string) $contentRange, $m)) {
@@ -202,18 +196,13 @@ class DownloadFile implements ShouldQueue
                     $end = min($start + $chunkSize - 1, $total - 1);
                     $length = ($end - $start + 1);
 
-                    // Move pointer to correct offset before writing this chunk
-                    if (fseek($fp, $start) !== 0) {
-                        fclose($fp);
-                        throw new \Exception('Failed to seek in temp file');
-                    }
-
                     $lastReportedProgress = (int) ($this->file->download_progress ?? 0);
 
+                    // Download chunk to memory first, then write to file at correct position
+                    // This avoids issues with passing file pointer resources to Guzzle
                     $response = Http::withHeaders([
                         'Range' => "bytes={$start}-{$end}",
                     ])->withOptions([
-                        'sink' => $fp,
                         'progress' => function ($chunkTotal, $downloadedBytes) use (&$downloadedSoFar, $total, $lastReportedProgress) {
                             $currentOverall = $downloadedSoFar + (int) $downloadedBytes;
                             if ($total > 0) {
@@ -237,6 +226,20 @@ class DownloadFile implements ShouldQueue
                             }
                         },
                     ])->timeout(300)->get($fileUrl);
+
+                    // Write chunk to file at correct position
+                    if ($response->successful() && $response->status() === 206) {
+                        $chunkData = $response->body();
+                        if (fseek($fp, $start) !== 0) {
+                            fclose($fp);
+                            throw new \Exception('Failed to seek in temp file');
+                        }
+                        $written = fwrite($fp, $chunkData);
+                        if ($written === false || $written !== strlen($chunkData)) {
+                            fclose($fp);
+                            throw new \Exception('Failed to write chunk to temp file');
+                        }
+                    }
 
                     if ($response->status() === 404) {
                         fclose($fp);
@@ -463,162 +466,6 @@ class DownloadFile implements ShouldQueue
         };
     }
 
-    protected function checkCivitaiVideoUrl(string $fileUrl): string
-    {
-        // Check if this is a CivitAI file that might be mislabeled
-        if (strcasecmp((string) $this->file->source, 'CivitAI') !== 0) {
-            return $fileUrl;
-        }
-
-        $thumbnailUrl = (string) ($this->file->thumbnail_url ?? '');
-        $urlContainsMp4 = str_contains(strtolower($fileUrl), 'mp4');
-        $thumbnailContainsMp4 = str_contains(strtolower($thumbnailUrl), 'mp4');
-
-        // Always check the actual content type of the URL, not just the extension
-        try {
-            $head = Http::timeout(15)->head($fileUrl);
-            if ($head->ok()) {
-                $contentType = strtolower((string) ($head->header('Content-Type') ?? ''));
-
-                // If URL is an image (webp, jpeg, etc.) but we expect a video, check alternatives
-                if (str_contains($contentType, 'image/')) {
-                    // Check if thumbnail_url is actually a video (even if it has jpeg extension)
-                    if ($thumbnailUrl !== '') {
-                        try {
-                            $thumbHead = Http::timeout(15)->head($thumbnailUrl);
-                            if ($thumbHead->ok()) {
-                                $thumbContentType = strtolower((string) ($thumbHead->header('Content-Type') ?? ''));
-                                if (str_starts_with($thumbContentType, 'video/')) {
-                                    // Thumbnail is actually the video, use it instead
-                                    $this->file->update([
-                                        'url' => $thumbnailUrl,
-                                        'not_found' => false,
-                                    ]);
-
-                                    return $thumbnailUrl;
-                                }
-                            }
-                        } catch (\Throwable $e) {
-                            // If thumbnail HEAD fails, continue with other checks
-                        }
-                    }
-
-                    // If URL or thumbnail suggests it's a video (by extension), try to extract real video URL
-                    if ($urlContainsMp4 || $thumbnailContainsMp4) {
-                        return $this->checkCivitaiVideoUrlFromMime($fileUrl, $contentType);
-                    }
-                } else {
-                    // URL is already a video, return as-is
-                    return $fileUrl;
-                }
-            }
-        } catch (\Throwable $e) {
-            // If HEAD fails, continue with original URL
-        }
-
-        return $fileUrl;
-    }
-
-    protected function checkCivitaiVideoUrlFromMime(string $fileUrl, string $contentType): string
-    {
-        // If server is returning image/webp but we expect a video, extract real video URL
-        if (str_contains($contentType, 'image/webp')) {
-            $extractor = new CivitaiVideoUrlExtractor;
-            $videoUrl = $extractor->extractFromFileId($this->file->id);
-            if ($videoUrl === '404_NOT_FOUND') {
-                $fallbackUrl = $this->resolveVideoUrlFromMetadata();
-                if ($fallbackUrl) {
-                    $this->file->update([
-                        'url' => $fallbackUrl,
-                        'not_found' => false,
-                    ]);
-
-                    return $fallbackUrl;
-                }
-
-                return $fileUrl;
-            }
-            if (is_string($videoUrl) && filter_var($videoUrl, FILTER_VALIDATE_URL)) {
-                // Update the file's URL to the real video URL
-                $this->file->update([
-                    'url' => $videoUrl,
-                    'not_found' => false,
-                ]);
-
-                return $videoUrl;
-            }
-
-            $fallbackUrl = $this->resolveVideoUrlFromMetadata();
-            if ($fallbackUrl) {
-                $this->file->update([
-                    'url' => $fallbackUrl,
-                    'not_found' => false,
-                ]);
-
-                return $fallbackUrl;
-            }
-        }
-
-        return $fileUrl;
-    }
-
-    protected function resolveVideoUrlFromMetadata(): ?string
-    {
-        $candidates = [
-            (string) $this->file->thumbnail_url,
-            (string) data_get($this->file->listing_metadata, 'url', ''),
-            (string) data_get($this->file->detail_metadata, 'url', ''),
-            (string) data_get($this->file->detail_metadata, 'downloadUrl', ''),
-        ];
-
-        $seen = [];
-
-        foreach ($candidates as $candidate) {
-            if ($candidate === '' || ! filter_var($candidate, FILTER_VALIDATE_URL)) {
-                continue;
-            }
-
-            if (isset($seen[$candidate])) {
-                continue;
-            }
-
-            $seen[$candidate] = true;
-
-            try {
-                $head = Http::timeout(20)->head($candidate);
-            } catch (\Throwable $e) {
-                continue;
-            }
-
-            if (! $head->ok()) {
-                continue;
-            }
-
-            $contentType = strtolower((string) ($head->header('Content-Type') ?? ''));
-            if ($contentType !== '' && str_starts_with($contentType, 'video/')) {
-                return $candidate;
-            }
-
-            if ($head->status() === 405 || $contentType === '') {
-                try {
-                    $probe = Http::timeout(30)
-                        ->withHeaders(['Range' => 'bytes=0-0'])
-                        ->get($candidate);
-
-                    if ($probe->status() === 206 || $probe->status() === 200) {
-                        $probeType = strtolower((string) ($probe->header('Content-Type') ?? ''));
-                        if ($probeType !== '' && str_starts_with($probeType, 'video/')) {
-                            return $candidate;
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    // ignore probe failures
-                }
-            }
-        }
-
-        return null;
-    }
 
     protected function detectMimeFromFile(string $path): ?string
     {

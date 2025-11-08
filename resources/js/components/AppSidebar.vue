@@ -616,7 +616,7 @@ function onLeave(el: HTMLElement) {
                           <!-- All videos -->
                           <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'All videos'">
-                              <Link :href="reelsRoute()" preserve-scroll>
+                              <Link :href="reelsRoute()">
                                 <component :is="Video" :size="18" />
                                 <span>All videos</span>
                               </Link>
@@ -625,7 +625,7 @@ function onLeave(el: HTMLElement) {
 
                           <!-- Disliked group with sub-items (blacklisted) -->
                           <SidebarMenuSubItem>
-                            <SidebarMenuButton class="flex items-center justify-between" :tooltip="'Disliked'" @click="() => { if (isVideosDislikedOpen) { isVideosDislikedOpen = false; } else { isVideosDislikedOpen = true; router.visit('/reels/disliked/all', { preserveScroll: true }); } }">
+                            <SidebarMenuButton class="flex items-center justify-between" :tooltip="'Disliked'" @click="() => { if (isVideosDislikedOpen) { isVideosDislikedOpen = false; } else { isVideosDislikedOpen = true; router.visit('/reels/disliked/all'); } }">
                               <div class="flex items-center gap-2">
                                 <component :is="ThumbsDown" :size="18" />
                                 <span>Disliked</span>
@@ -638,7 +638,7 @@ function onLeave(el: HTMLElement) {
                               <SidebarMenuSub class="ml-6">
                                 <SidebarMenuSubItem>
                                   <SidebarMenuButton as-child :tooltip="'All'">
-                                    <Link href="/reels/disliked/all" preserve-scroll>
+                                    <Link href="/reels/disliked/all">
                                       <component :is="ThumbsDown" :size="18" />
                                       <span>all</span>
                                     </Link>
@@ -646,7 +646,7 @@ function onLeave(el: HTMLElement) {
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
                                   <SidebarMenuButton as-child :tooltip="'Manual'">
-                                    <Link href="/reels/disliked/manual" preserve-scroll>
+                                    <Link href="/reels/disliked/manual">
                                       <component :is="ThumbsDown" :size="18" />
                                       <span>manual</span>
                                     </Link>
@@ -654,7 +654,7 @@ function onLeave(el: HTMLElement) {
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
                                   <SidebarMenuButton as-child :tooltip="'Ignored'">
-                                    <Link href="/reels/disliked/ignored" preserve-scroll>
+                                    <Link href="/reels/disliked/ignored">
                                       <component :is="EyeOff" :size="18" />
                                       <span>ignored</span>
                                     </Link>
@@ -662,7 +662,7 @@ function onLeave(el: HTMLElement) {
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
                                   <SidebarMenuButton as-child :tooltip="'Auto'">
-                                    <Link href="/reels/disliked/auto" preserve-scroll>
+                                    <Link href="/reels/disliked/auto">
                                       <component :is="Cog" :size="18" />
                                       <span>auto</span>
                                     </Link>
@@ -670,7 +670,7 @@ function onLeave(el: HTMLElement) {
                                 </SidebarMenuSubItem>
                                 <SidebarMenuSubItem>
                                   <SidebarMenuButton as-child :tooltip="'Not disliked'">
-                                    <Link href="/reels/disliked/not-disliked" preserve-scroll>
+                                    <Link href="/reels/disliked/not-disliked">
                                       <component :is="AlertTriangle" :size="18" />
                                       <span>not disliked</span>
                                     </Link>
@@ -683,7 +683,7 @@ function onLeave(el: HTMLElement) {
                           <!-- Reaction feeds -->
                           <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'Favorites'">
-                              <Link href="/reels/reactions/favorites" preserve-scroll>
+                              <Link href="/reels/reactions/favorites">
                                 <component :is="Heart" :size="18" />
                                 <span>Favorites</span>
                               </Link>
@@ -691,7 +691,7 @@ function onLeave(el: HTMLElement) {
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'Liked'">
-                              <Link href="/reels/reactions/liked" preserve-scroll>
+                              <Link href="/reels/reactions/liked">
                                 <component :is="ThumbsUp" :size="18" />
                                 <span>Liked</span>
                               </Link>
@@ -699,7 +699,7 @@ function onLeave(el: HTMLElement) {
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'Funny'">
-                              <Link href="/reels/reactions/funny" preserve-scroll>
+                              <Link href="/reels/reactions/funny">
                                 <component :is="Laugh" :size="18" />
                                 <span>Funny</span>
                               </Link>
@@ -707,7 +707,7 @@ function onLeave(el: HTMLElement) {
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'Disliked (mine)'">
-                              <Link href="/reels/reactions/disliked" preserve-scroll>
+                              <Link href="/reels/reactions/disliked">
                                 <component :is="ThumbsDown" :size="18" />
                                 <span>Disliked</span>
                               </Link>
@@ -715,7 +715,7 @@ function onLeave(el: HTMLElement) {
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'Unrated'">
-                              <Link href="/reels/unrated" preserve-scroll>
+                              <Link href="/reels/unrated">
                                 <component :is="HelpCircle" :size="18" />
                                 <span>Unrated</span>
                               </Link>
@@ -723,7 +723,7 @@ function onLeave(el: HTMLElement) {
                           </SidebarMenuSubItem>
                           <SidebarMenuSubItem>
                             <SidebarMenuButton as-child :tooltip="'Not found'">
-                              <Link href="/reels/not-found" preserve-scroll>
+                              <Link href="/reels/not-found">
                                 <component :is="AlertTriangle" :size="18" />
                                 <span>Not found</span>
                               </Link>

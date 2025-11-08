@@ -3,7 +3,7 @@ import FileReactions from '@/components/audio/FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import LoaderOverlay from '@/components/ui/LoaderOverlay.vue';
 import { Eye, ZoomIn, MoreHorizontal, User, Newspaper, Book, BookOpen, Palette, Tag, Info, ImageOff, AlertTriangle } from 'lucide-vue-next';
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 
 import ActionMenu, { type ActionOption } from '@/components/browse/ActionMenu.vue';
 import ContainerBadge from '@/components/browse/ContainerBadge.vue';
@@ -84,6 +84,8 @@ const retryCount = ref(0);
 // When video keeps failing, fall back to the preview image (if any)
 const useImageFallback = ref(false);
 const videoEl = ref<HTMLVideoElement | null>(null);
+const resolutionAttempted = ref(false);
+const resolvingRemoteMedia = ref(false);
 
 const imageSrc = computed(() => {
     const p = (props.item as any)?.preview as string | undefined;
@@ -112,6 +114,8 @@ watch(() => (props.item as any)?.id, () => {
     missingReported.value = false;
     useImageFallback.value = false;
     errorMessage.value = null;
+    resolutionAttempted.value = false;
+    resolvingRemoteMedia.value = false;
 });
 
 // Inject shared intersection observer registry from parent (one per grid)
@@ -887,16 +891,178 @@ const referrerUrl = computed<string | null>(() => {
     return trimmed.length > 0 ? trimmed : null;
 });
 
+const needsCivitaiResolution = computed(() => {
+    const item = props.item as any;
+    if (!item) {
+        return false;
+    }
+
+    if (item.is_local === true) {
+        return false;
+    }
+
+    // Don't check if file is already downloaded (has path)
+    if (item.path) {
+        return false;
+    }
+
+    // Don't check if file is marked as not found
+    if (item.not_found === true) {
+        return false;
+    }
+
+    const referrer = referrerUrl.value ?? '';
+    const original = String(trueOriginalUrl.value ?? item.original ?? '');
+    const thumbnail = String(trueThumbnailUrl.value ?? item.preview ?? item.thumbnail_url ?? '');
+    const type = (item.type ?? '').toString().toLowerCase();
+    const mime = (item.mime_type ?? '').toString().toLowerCase();
+
+    // Don't check if url and thumbnail_url are already the same (no ambiguity to resolve)
+    if (original && thumbnail && original === thumbnail) {
+        return false;
+    }
+
+    const isCivitai =
+        referrer.includes('civitai.com') ||
+        original.includes('civitai.com') ||
+        thumbnail.includes('civitai.com');
+
+    if (!isCivitai) {
+        return false;
+    }
+
+    const typeLooksImage = type === 'image' || (!type && mime.startsWith('image/'));
+    const typeIsVideo = type === 'video' || mime.startsWith('video/');
+    const originalLooksVideo = /\/[^/]+\.mp4(?:\?|$)/i.test(original);
+    const thumbnailLooksVideo =
+        /\.(jpe?g|png|webp)$/i.test(thumbnail) &&
+        /image\.civitai\.com/i.test(thumbnail) &&
+        /optimized=true/i.test(thumbnail);
+    
+    // Check if both thumbnail and original have mp4 extension
+    const thumbnailHasMp4 = /\/[^/]+\.mp4(?:\?|$)/i.test(thumbnail);
+    const bothHaveMp4 = originalLooksVideo && thumbnailHasMp4;
+    
+    // Check if one is jpeg and one is mp4 (either way)
+    const originalIsJpeg = /\.(jpe?g)(?:\?|$)/i.test(original);
+    const thumbnailIsJpeg = /\.(jpe?g)(?:\?|$)/i.test(thumbnail);
+    const oneJpegOneMp4 = (originalIsJpeg && thumbnailHasMp4) || (thumbnailIsJpeg && originalLooksVideo);
+
+    // For video type: trigger resolution if both are mp4 OR one is jpeg and one is mp4
+    // This will try to get the real video from referrer, and if referrer is 404,
+    // fall back to identifying which URL is actually a video
+    if (typeIsVideo && referrer && (bothHaveMp4 || oneJpegOneMp4)) {
+        return true;
+    }
+
+    // For image type: existing logic for mislabeled videos
+    return typeLooksImage && (originalLooksVideo || thumbnailLooksVideo);
+});
+
+watchEffect(() => {
+    if (!needsCivitaiResolution.value) {
+        return;
+    }
+
+    if (!isVisible.value) {
+        return;
+    }
+
+    if (resolutionAttempted.value || resolvingRemoteMedia.value) {
+        return;
+    }
+
+    // Don't trigger resolution if video has already started loading successfully
+    if (shouldRenderVideo.value && hasLoaded.value) {
+        return;
+    }
+
+    void ensureCivitaiResolution();
+});
+
 
 const resolvedMediaKind = computed<'video' | 'image'>(() => {
     if (useImageFallback.value) {
         return 'image';
     }
 
-    return (props.item as any)?.type === 'video' ? 'video' : 'image';
+    const item = props.item as any;
+    const type = (item?.type ?? '').toString().toLowerCase();
+    const mime = (item?.mime_type ?? '').toString().toLowerCase();
+    
+    // Check both type property and mime_type to determine if it's a video
+    if (type === 'video' || mime.startsWith('video/')) {
+        return 'video';
+    }
+
+    return 'image';
 });
 
 const shouldRenderVideo = computed(() => resolvedMediaKind.value === 'video');
+
+async function ensureCivitaiResolution(): Promise<void> {
+    const itemId = (props.item as any)?.id;
+
+    if (!itemId || resolutionAttempted.value || resolvingRemoteMedia.value || !needsCivitaiResolution.value) {
+        return;
+    }
+
+    resolutionAttempted.value = true;
+    resolvingRemoteMedia.value = true;
+
+    try {
+        const response = await axios.post(`/browse/files/${itemId}/resolve-media`);
+        const data = response?.data ?? {};
+
+        if (data?.resolved) {
+            const target = props.item as any;
+
+            if (typeof data.original === 'string') {
+                target.original = data.original;
+            }
+            if (typeof data.true_original_url === 'string') {
+                target.true_original_url = data.true_original_url;
+            } else if (typeof data.original === 'string') {
+                target.true_original_url = data.original;
+            }
+
+            if (typeof data.preview === 'string') {
+                target.preview = data.preview;
+            }
+
+            if (typeof data.thumbnail_url === 'string') {
+                target.thumbnail_url = data.thumbnail_url;
+            }
+            if (typeof data.true_thumbnail_url === 'string') {
+                target.true_thumbnail_url = data.true_thumbnail_url;
+            } else if (typeof data.thumbnail_url === 'string') {
+                target.true_thumbnail_url = data.thumbnail_url;
+            }
+
+            if (typeof data.mime_type === 'string') {
+                target.mime_type = data.mime_type;
+            }
+
+            if (typeof data.type === 'string') {
+                target.type = data.type;
+            } else if (typeof target.mime_type === 'string' && target.mime_type.startsWith('video/')) {
+                target.type = 'video';
+            }
+
+            target.not_found = false;
+            setErrorState('none');
+            useImageFallback.value = false;
+            retryCount.value = 0;
+            hasLoaded.value = false;
+        } else if (data?.not_found === true) {
+            setErrorState('not-found', 404, null);
+        }
+    } catch (error) {
+        resolutionAttempted.value = false;
+    } finally {
+        resolvingRemoteMedia.value = false;
+    }
+}
 
 // Context dropdown removed; using ActionMenu component
 
@@ -1150,6 +1316,8 @@ function onOverlayAuxClick(e: MouseEvent) {
 function retryLoad(fromUser = false) {
     if (fromUser) {
         verifiedAvailableOnce.value = false;
+        resolutionAttempted.value = false;
+        resolvingRemoteMedia.value = false;
     }
     // Clear flags and bump retry counter to bust the cache and force reload
     hasLoaded.value = false;

@@ -1174,6 +1174,16 @@ const highlightedPromptHtml = computed(() => {
                 <pre class="text-xs">{{ dialogItem?.metadata ? JSON.stringify(dialogItem.metadata, null, 2) : '' }}</pre>
               </div>
             </details>
+
+              <p>{{ item.type }}</p>
+              <p>{{ item.mime_type }}</p>
+              <div class="flex gap-2 flex-col">
+                  <a :href="item.referrer_url" target="_blank">{{ item.referrer_url }}</a>
+                  <a :href="item.preview" target="_blank">{{ item.preview }}</a>
+                  <a :href="item.original" target="_blank">{{ item.original }}</a>
+              </div>
+              <pre>{{ item }}</pre>
+              <p>{{ item.downlaoded_at }}</p>
           </div>
         </div>
         <div class="flex items-center justify-center gap-3 border-t p-3">

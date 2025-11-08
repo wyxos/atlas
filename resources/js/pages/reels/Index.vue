@@ -108,6 +108,19 @@ const filtersDirty = computed(() => snapshotFilters() !== appliedFilterSnapshot.
 const containerCounts = reactive(new Map<string, Map<string | number, number>>());
 provide('browse-container-counts', containerCounts as unknown as Map<string, Map<string | number, number>>);
 
+function hasNextCursor(value: unknown): boolean {
+    if (value === null || typeof value === 'undefined') {
+        return false;
+    }
+    if (typeof value === 'string') {
+        const normalized = value.trim();
+        if (!normalized || normalized === 'null' || normalized === 'undefined') {
+            return false;
+        }
+    }
+    return true;
+}
+
 function recomputeContainerCounts(list: any[]) {
     const counts = new Map<string, Map<string | number, number>>();
     for (const entry of Array.isArray(list) ? list : []) {
@@ -355,9 +368,10 @@ if (!(form as any).sort) {
     await nextTick();
 
     // If initial items are below page size, auto load next
-const pageSize = Number(((form as any)?.limit as any) ?? 40) || 40;
+    const pageSize = Number(((form as any)?.limit as any) ?? 40) || 40;
     const count = Array.isArray(items.value) ? items.value.length : 0;
-    if (count < pageSize && typeof scroller.value.loadNext === 'function') {
+    const initialNext = (props.filter?.next as any) ?? ((form as any)?.next as any) ?? null;
+    if (count < pageSize && hasNextCursor(initialNext) && typeof scroller.value.loadNext === 'function') {
         try {
             await scroller.value.loadNext();
         } catch {

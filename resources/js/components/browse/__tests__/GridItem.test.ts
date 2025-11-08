@@ -120,6 +120,8 @@ vi.mock('@/utils/moderationHighlight', () => ({
 }));
 
 const GridItem = (await import('@/components/browse/GridItem.vue')).default;
+const axiosModule = await import('axios');
+const axiosMock = axiosModule.default as any;
 
 function mountGridItem(overrides: { item?: Record<string, any> } = {}) {
     const item = reactive({
@@ -174,6 +176,11 @@ function mountGridItem(overrides: { item?: Record<string, any> } = {}) {
         attachTo: document.body,
     });
 }
+
+beforeEach(() => {
+    axiosMock.post.mockReset();
+    axiosMock.post.mockResolvedValue({ data: {} });
+});
 
 describe('GridItem error overlay interactions', () => {
     beforeEach(() => {
@@ -236,6 +243,51 @@ describe('GridItem copy menu', () => {
         expect(labels).toContain('copy original preview url');
         expect(labels).toContain('copy thumbnail url');
         expect(labels).toContain('copy url');
+    });
+});
+
+describe('GridItem civitai resolution', () => {
+    beforeEach(() => {
+        axiosMock.post.mockReset();
+        axiosMock.post.mockResolvedValue({ data: {} });
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    it('requests backend resolution when civitai poster mismatch is detected', async () => {
+        axiosMock.post.mockResolvedValue({
+            data: {
+                resolved: true,
+                original: 'https://image.civitai.com/thumbs/video.mp4',
+                preview: 'https://image.civitai.com/thumbs/video.mp4',
+                true_original_url: 'https://image.civitai.com/thumbs/video.mp4',
+                true_thumbnail_url: 'https://image.civitai.com/thumbs/video.mp4',
+                mime_type: 'video/mp4',
+                type: 'video',
+            },
+        });
+
+        const wrapper = mountGridItem({
+            item: {
+                id: 789,
+                type: 'image',
+                mime_type: 'image/webp',
+                original: 'https://image.civitai.com/posters/video.mp4',
+                true_original_url: 'https://image.civitai.com/posters/video.mp4',
+                true_thumbnail_url: 'https://image.civitai.com/thumbs/video.jpeg',
+                preview: 'https://image.civitai.com/thumbs/video.jpeg',
+                referrer_url: 'https://civitai.com/images/789',
+            },
+        });
+
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(axiosMock.post).toHaveBeenCalledWith('/browse/files/789/resolve-media');
+        expect((wrapper.props('item') as any).type).toBe('video');
+        expect((wrapper.props('item') as any).not_found).toBe(false);
     });
 });
 
