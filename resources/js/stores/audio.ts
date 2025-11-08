@@ -32,6 +32,7 @@ class AudioPlayerManager {
     private spotifyPausedPosition = 0;
     private spotifyPollInterval: number | null = null;
     private isLoadingTrack = false;
+    private isActive = ref<boolean>(false);
     private currentTrack = ref<AudioTrack | null>(null);
     private queue = ref<AudioTrack[]>([]);
     private currentIndex = ref<number>(-1);
@@ -56,6 +57,7 @@ class AudioPlayerManager {
     readonly spotifyPlayerReadyRef = computed(() => this.spotifyPlayerReady.value);
     readonly isShuffledRef = computed(() => this.isShuffled.value);
     readonly repeatModeRef = computed(() => this.repeatMode.value);
+    readonly isActiveRef = computed(() => this.isActive.value);
 
     private isSpotifyTrack(track: AudioTrack): boolean {
         const source = (track.source || '').toString().trim().toLowerCase();
@@ -888,6 +890,9 @@ class AudioPlayerManager {
     async setQueueAndPlay(queue: AudioTrack[], startIndex: number = 0, options: PlayOptions = {}): Promise<void> {
         if (queue.length === 0) return;
 
+        // Activate player when queue is set
+        this.isActive.value = true;
+
         const shouldAutoPlay = options.autoPlay ?? true;
         await this.pause({ userInitiated: false });
         
@@ -912,6 +917,9 @@ class AudioPlayerManager {
 
     async setQueueAndShuffle(shuffledQueue: AudioTrack[], originalQueue: AudioTrack[], options: PlayOptions = {}): Promise<void> {
         if (shuffledQueue.length === 0) return;
+
+        // Activate player when queue is set
+        this.isActive.value = true;
 
         const shouldAutoPlay = options.autoPlay ?? true;
         await this.pause({ userInitiated: false });
@@ -1179,6 +1187,7 @@ export function useAudioPlayer() {
         spotifyPlayerReady: audioPlayerManager.spotifyPlayerReadyRef,
         isShuffled: audioPlayerManager.isShuffledRef,
         repeatMode: audioPlayerManager.repeatModeRef,
+        isActive: audioPlayerManager.isActiveRef,
 
         // Actions
         play: () => audioPlayerManager.play(),

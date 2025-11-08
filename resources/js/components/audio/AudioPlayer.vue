@@ -1,25 +1,27 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Sun, Moon, Volume2, VolumeX } from 'lucide-vue-next';
-import { useAudioPlayer } from '@/stores/audio';
-import FileReactions from '@/components/audio/FileReactions.vue';
 import AudioQueuePanel from '@/components/audio/AudioQueuePanel.vue';
+import FileReactions from '@/components/audio/FileReactions.vue';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAudioPlayer } from '@/stores/audio';
+import { ChevronUp, Menu, Moon, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2 } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
 const {
-  currentTrack,
-  isPlaying,
-  currentTime,
-  duration,
-  volume,
-  isShuffled,
-  repeatMode,
-  togglePlay,
-  previous,
-  next,
-  seekTo,
-  setVolume,
-  toggleShuffle,
-  toggleRepeat,
+    currentTrack,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isShuffled,
+    repeatMode,
+    isActive,
+    togglePlay,
+    previous,
+    next,
+    seekTo,
+    setVolume,
+    toggleShuffle,
+    toggleRepeat,
 } = useAudioPlayer();
 
 const isQueueOpen = ref(false);
@@ -27,47 +29,47 @@ const isMinimized = ref(false);
 
 // Format time helper
 function formatTime(seconds: number): string {
-  if (!seconds || isNaN(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
 // Cover image
 const coverImage = computed(() => {
-  if (!currentTrack.value) return null;
-  const track = currentTrack.value as any;
-  
-  // Check album covers first
-  if (track.albums && track.albums.length > 0) {
-    for (const album of track.albums) {
-      if (album.covers && album.covers.length > 0) {
-        return album.covers[0].url || album.covers[0].path;
-      }
+    if (!currentTrack.value) return null;
+    const track = currentTrack.value as any;
+
+    // Check album covers first
+    if (track.albums && track.albums.length > 0) {
+        for (const album of track.albums) {
+            if (album.covers && album.covers.length > 0) {
+                return album.covers[0].url || album.covers[0].path;
+            }
+        }
     }
-  }
-  
-  // Fall back to file covers
-  if (track.covers && track.covers.length > 0) {
-    return track.covers[0].url || track.covers[0].path;
-  }
-  
-  return null;
+
+    // Fall back to file covers
+    if (track.covers && track.covers.length > 0) {
+        return track.covers[0].url || track.covers[0].path;
+    }
+
+    return null;
 });
 
 // Artist name
 const artistName = computed(() => {
-  if (!currentTrack.value) return 'Unknown Artist';
-  const track = currentTrack.value as any;
-  const artists = track.artists;
-  return artists && artists.length ? artists[0]?.name || 'Unknown Artist' : 'Unknown Artist';
+    if (!currentTrack.value) return 'Unknown Artist';
+    const track = currentTrack.value as any;
+    const artists = track.artists;
+    return artists && artists.length ? artists[0]?.name || 'Unknown Artist' : 'Unknown Artist';
 });
 
 // Title
 const title = computed(() => {
-  if (!currentTrack.value) return 'No track';
-  const track = currentTrack.value as any;
-  return track.metadata?.payload?.title || track.title || 'Untitled';
+    if (!currentTrack.value) return 'No track';
+    const track = currentTrack.value as any;
+    return track.metadata?.payload?.title || track.title || 'Untitled';
 });
 
 // Track previous progress to detect forward vs backward movement
@@ -76,35 +78,39 @@ const shouldAnimateProgress = ref(true);
 
 // Progress percentage
 const progressPercent = computed(() => {
-  if (!duration.value || duration.value === 0) return 0;
-  return (currentTime.value / duration.value) * 100;
+    if (!duration.value || duration.value === 0) return 0;
+    return (currentTime.value / duration.value) * 100;
 });
 
 // Watch progress to determine if we should animate (only when moving forward)
-watch(progressPercent, (newVal, oldVal) => {
-  // Only animate if the progress is increasing (forward movement)
-  // This prevents the "going back down" animation when resetting to 0
-  shouldAnimateProgress.value = newVal >= oldVal;
-  previousProgress.value = newVal;
-}, { immediate: true });
+watch(
+    progressPercent,
+    (newVal, oldVal) => {
+        // Only animate if the progress is increasing (forward movement)
+        // This prevents the "going back down" animation when resetting to 0
+        shouldAnimateProgress.value = newVal >= oldVal;
+        previousProgress.value = newVal;
+    },
+    { immediate: true },
+);
 
 // Handle seek
 function handleSeek(event: MouseEvent): void {
-  const target = event.currentTarget as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const percent = x / rect.width;
-  const newTime = percent * duration.value;
-  seekTo(newTime);
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const percent = x / rect.width;
+    const newTime = percent * duration.value;
+    seekTo(newTime);
 }
 
 // Handle volume seek
 function handleVolumeSeek(event: MouseEvent): void {
-  const target = event.currentTarget as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const percent = Math.max(0, Math.min(1, x / rect.width));
-  setVolume(percent);
+    const target = event.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, x / rect.width));
+    setVolume(percent);
 }
 </script>
 
@@ -119,9 +125,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                     <div class="relative flex h-12 w-12 items-center justify-center">
                         <div class="h-full w-full rounded bg-muted"></div>
                     </div>
-                    <div
-                        class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted"
-                    >
+                    <div class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
                         <template>
                             <img src="" alt="Cover" class="h-full w-full object-contain" />
                         </template>
@@ -138,11 +142,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                     <div class="flex flex-1 items-center gap-4">
                         <div class="flex min-w-0 flex-col">
                             <div class="font-medium text-foreground">
-                                <span
-                                    class="truncate text-sm font-semibold"
-                                    data-test="audio-player-title"
-                                >Title</span
-                                >
+                                <span class="truncate text-sm font-semibold" data-test="audio-player-title">Title</span>
                                 <span class="block truncate text-xs text-muted-foreground" data-test="audio-player-artist">Artist</span>
                             </div>
                         </div>
@@ -153,10 +153,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                                 <SkipBack :size="16" />
                                 <span class="sr-only">Previous</span>
                             </button>
-                            <button
-                                class="button circular empty"
-                                title="Play/Pause"
-                            >
+                            <button class="button circular empty" title="Play/Pause">
                                 <Play :size="20" />
                             </button>
                             <button class="button circular small empty" title="Next">
@@ -167,7 +164,10 @@ function handleVolumeSeek(event: MouseEvent): void {
 
                         <!-- Compact progress bar -->
                         <div class="mx-4 min-w-0 flex-1">
-                            <div class="h-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" data-test="audio-player-progress">
+                            <div
+                                class="h-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80"
+                                data-test="audio-player-progress"
+                            >
                                 <div
                                     class="h-full rounded-full bg-primary"
                                     :class="{ 'transition-all': shouldAnimateProgress }"
@@ -180,12 +180,13 @@ function handleVolumeSeek(event: MouseEvent): void {
             </template>
 
             <!-- Full View -->
-            <template v-if="currentTrack">
+            <template v-if="isActive">
                 <div class="flex w-100 items-center gap-4">
                     <div
                         class="relative flex h-18 w-18 shrink-0 items-center justify-center overflow-hidden bg-muted transition-all duration-300 md:h-32 md:w-32"
                     >
-                        <img v-if="coverImage" :src="coverImage" alt="Cover" class="h-full w-full object-contain" />
+                        <Skeleton v-if="!currentTrack" class="h-full w-full" />
+                        <img v-else-if="coverImage" :src="coverImage" alt="Cover" class="h-full w-full object-contain" />
                         <div v-else class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
                             <span class="text-xs">No Cover</span>
                         </div>
@@ -196,17 +197,23 @@ function handleVolumeSeek(event: MouseEvent): void {
 
                     <div class="flex flex-col gap-2 truncate">
                         <div class="mb-2 flex flex-col gap-1 font-medium text-foreground">
-                            <span class="truncate text-xs font-semibold text-muted-foreground" data-test="audio-player-artist">{{ artistName }}</span>
-                            <span
-                                class="truncate font-semibold text-foreground"
-                                data-test="audio-player-title"
-                            >{{ title }}</span
-                            >
+                            <Skeleton v-if="!currentTrack" class="h-3 w-24" />
+                            <span v-else class="truncate text-xs font-semibold text-muted-foreground" data-test="audio-player-artist">{{
+                                artistName
+                            }}</span>
+                            <Skeleton v-if="!currentTrack" class="mt-1 h-4 w-32" />
+                            <span v-else class="truncate font-semibold text-foreground" data-test="audio-player-title">{{ title }}</span>
                         </div>
 
                         <!-- Reactions -->
                         <div class="flex flex-1 items-center">
-                            <FileReactions :file="currentTrack" :size="20" />
+                            <FileReactions v-if="currentTrack" :file="currentTrack" :size="20" />
+                            <div v-else class="flex items-center gap-2">
+                                <Skeleton class="h-5 w-5 rounded-md" />
+                                <Skeleton class="h-5 w-5 rounded-md" />
+                                <Skeleton class="h-5 w-5 rounded-md" />
+                                <Skeleton class="h-5 w-5 rounded-md" />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -214,15 +221,21 @@ function handleVolumeSeek(event: MouseEvent): void {
                 <div class="flex-1">
                     <div class="mb-2">
                         <div class="mb-2 flex items-center gap-4 text-xs text-muted-foreground">
-                            <span>{{ formatTime(currentTime) }}</span>
-                            <div class="h-2 flex-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" data-test="audio-player-progress" @click="handleSeek">
+                            <Skeleton v-if="!currentTrack" class="h-3 w-10" />
+                            <span v-else>{{ formatTime(currentTime) }}</span>
+                            <div
+                                class="h-2 flex-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80"
+                                data-test="audio-player-progress"
+                                @click="handleSeek"
+                            >
                                 <div
                                     class="h-full rounded-full bg-primary"
                                     :class="{ 'transition-all': shouldAnimateProgress }"
                                     :style="{ width: `${progressPercent}%` }"
                                 ></div>
                             </div>
-                            <span>{{ formatTime(duration) }}</span>
+                            <Skeleton v-if="!currentTrack" class="h-3 w-10" />
+                            <span v-else>{{ formatTime(duration) }}</span>
                         </div>
 
                         <div class="mt-2 flex items-center justify-center gap-4">
@@ -239,11 +252,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                                     <SkipBack :size="20" />
                                     <span class="sr-only">Previous</span>
                                 </button>
-                                <button
-                                    class="button circular empty"
-                                    title="Play/Pause"
-                                    @click="togglePlay"
-                                >
+                                <button class="button circular empty" title="Play/Pause" @click="togglePlay">
                                     <Play v-if="!isPlaying" :size="24" />
                                     <Pause v-else :size="24" />
                                 </button>
@@ -260,21 +269,18 @@ function handleVolumeSeek(event: MouseEvent): void {
                                     <Repeat1 v-if="repeatMode === 'one'" :size="16" />
                                     <Repeat v-else :size="16" />
                                 </button>
-                                <button
-                                    class="button circular small empty"
-                                    title="Keep screen awake while playing"
-                                >
+                                <button class="button circular small empty" title="Keep screen awake while playing">
                                     <Moon :size="16" />
                                 </button>
                                 <!-- Volume -->
                                 <div class="group ml-4 hidden items-center gap-2 md:flex">
                                     <Volume2 :size="16" class="text-muted-foreground group-hover:text-primary-foreground" />
                                     <div class="relative w-28">
-                                        <div class="h-2 w-full cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="handleVolumeSeek">
-                                            <div
-                                                class="h-full rounded-full bg-primary transition-all"
-                                                :style="{ width: `${volume * 100}%` }"
-                                            ></div>
+                                        <div
+                                            class="h-2 w-full cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80"
+                                            @click="handleVolumeSeek"
+                                        >
+                                            <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${volume * 100}%` }"></div>
                                         </div>
                                         <input
                                             aria-label="Volume"
@@ -295,17 +301,10 @@ function handleVolumeSeek(event: MouseEvent): void {
             </template>
 
             <div class="flex w-100 justify-end gap-2">
-                <button
-                    class="button circular small empty"
-                    title="Minimize Player"
-                >
+                <button class="button circular small empty" title="Minimize Player">
                     <ChevronUp :size="16" />
                 </button>
-                <button
-                    class="button circular small empty"
-                    title="Show Queue"
-                    @click="isQueueOpen = !isQueueOpen"
-                >
+                <button class="button circular small empty" title="Show Queue" @click="isQueueOpen = !isQueueOpen">
                     <Menu :size="16" />
                 </button>
             </div>
@@ -315,54 +314,53 @@ function handleVolumeSeek(event: MouseEvent): void {
         <AudioQueuePanel :is-open="isQueueOpen" @close="isQueueOpen = false" />
 
         <!-- Mobile -->
-        <div class="md:hidden">
-            <div class="mb-4 flex items-center gap-2">
-                <div class="relative flex h-16 w-16 items-center justify-center">
-                    <div class="h-full w-full rounded bg-muted"></div>
-                </div>
-                <div
-                    class="relative flex h-16 w-16 items-center justify-center overflow-hidden bg-muted transition-all duration-300"
-                >
-                    <template>
-                        <img src="" alt="Cover" class="h-full w-full object-contain" />
-                    </template>
-                    <template>
-                        <div class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
-                            <span class="text-xs">No Cover</span>
+        <template v-if="isActive">
+            <div class="md:hidden">
+                <div class="mb-4 flex items-center gap-2">
+                    <div class="relative flex h-16 w-16 items-center justify-center">
+                        <Skeleton v-if="!currentTrack" class="h-full w-full rounded" />
+                        <div v-else class="relative flex h-16 w-16 items-center justify-center overflow-hidden bg-muted transition-all duration-300">
+                            <img v-if="coverImage" :src="coverImage" alt="Cover" class="h-full w-full object-contain" />
+                            <div v-else class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
+                                <span class="text-xs">No Cover</span>
+                            </div>
+                            <button type="button" class="absolute inset-0" aria-label="Show current in list">
+                                <span class="sr-only">Show current in list</span>
+                            </button>
                         </div>
-                    </template>
-                    <button type="button" class="absolute inset-0" aria-label="Show current in list">
-                        <span class="sr-only">Show current in list</span>
+                    </div>
+
+                    <div class="flex flex-1 flex-col gap-1 truncate font-medium text-foreground">
+                        <Skeleton v-if="!currentTrack" class="h-3 w-24" />
+                        <span v-else class="truncate text-xs font-semibold text-muted-foreground" data-test="audio-player-artist">{{
+                            artistName
+                        }}</span>
+                        <Skeleton v-if="!currentTrack" class="mt-1 h-4 w-32" />
+                        <span v-else class="truncate font-semibold text-foreground" data-test="audio-player-title">{{ title }}</span>
+                    </div>
+
+                    <button class="button circular small empty" title="Minimize Player">
+                        <ChevronUp :size="16" />
                     </button>
                 </div>
 
-                <div class="flex flex-1 flex-col gap-1 truncate font-medium text-foreground">
-                    <span class="truncate text-xs font-semibold text-muted-foreground" data-test="audio-player-artist">Artist</span>
-                    <span
-                        class="truncate font-semibold text-foreground"
-                        data-test="audio-player-title"
-                    >Title</span
-                    >
-                </div>
-
-                <button
-                    class="button circular small empty"
-                    title="Minimize Player"
-                >
-                    <ChevronUp :size="16" />
-                </button>
-            </div>
-
-            <template>
                 <div class="mb-2">
-                    <div class="mb-2 h-2 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" data-test="audio-player-progress">
+                    <div
+                        class="mb-2 h-2 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80"
+                        data-test="audio-player-progress"
+                        @click="handleSeek"
+                    >
                         <div
                             class="h-full rounded-full bg-primary"
+                            :class="{ 'transition-all': shouldAnimateProgress }"
+                            :style="{ width: `${progressPercent}%` }"
                         ></div>
                     </div>
                     <div class="mb-2 flex justify-between text-sm text-muted-foreground">
-                        <span>00:00</span>
-                        <span>00:00</span>
+                        <Skeleton v-if="!currentTrack" class="h-3 w-10" />
+                        <span v-else>{{ formatTime(currentTime) }}</span>
+                        <Skeleton v-if="!currentTrack" class="h-3 w-10" />
+                        <span v-else>{{ formatTime(duration) }}</span>
                     </div>
                 </div>
 
@@ -375,17 +373,15 @@ function handleVolumeSeek(event: MouseEvent): void {
                     >
                         <Shuffle :size="18" />
                     </button>
-                    <button class="button circular small empty" title="Previous">
+                    <button class="button circular small empty" title="Previous" @click="previous">
                         <SkipBack :size="26" />
                         <span class="sr-only">Previous</span>
                     </button>
-                    <button
-                        class="button circular empty"
-                        title="Play/Pause"
-                    >
-                        <Play :size="32" />
+                    <button class="button circular empty" title="Play/Pause" @click="togglePlay">
+                        <Play v-if="!isPlaying" :size="32" />
+                        <Pause v-else :size="32" />
                     </button>
-                    <button class="button circular small empty" title="Next">
+                    <button class="button circular small empty" title="Next" @click="next">
                         <SkipForward :size="26" />
                         <span class="sr-only">Next</span>
                     </button>
@@ -398,10 +394,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                         <Repeat1 v-if="repeatMode === 'one'" :size="18" />
                         <Repeat v-else :size="18" />
                     </button>
-                    <button
-                        class="button circular small empty"
-                        title="Keep screen awake while playing"
-                    >
+                    <button class="button circular small empty" title="Keep screen awake while playing">
                         <Moon :size="16" />
                     </button>
                 </div>
@@ -410,10 +403,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                     <Volume2 :size="16" />
                     <div class="relative w-40">
                         <div class="h-2 w-full cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="handleVolumeSeek">
-                            <div
-                                class="h-full rounded-full bg-primary transition-all"
-                                :style="{ width: `${volume * 100}%` }"
-                            ></div>
+                            <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${volume * 100}%` }"></div>
                         </div>
                         <input
                             aria-label="Volume"
@@ -427,7 +417,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                         />
                     </div>
                 </div>
-            </template>
-        </div>
+            </div>
+        </template>
     </div>
 </template>
