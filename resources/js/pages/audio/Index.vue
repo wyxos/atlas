@@ -185,6 +185,17 @@ async function handlePlay(track: any): Promise<void> {
   }
 }
 
+// Handle play all button
+async function handlePlayAll(): Promise<void> {
+  if (pageOrder.value.length === 0) return;
+
+  const queueItems = buildQueueItems();
+  
+  if (queueItems.length === 0) return;
+
+  await setQueueAndPlay(queueItems, 0, { autoPlay: true });
+}
+
 // Handle shuffle all button
 async function handleShuffleAll(): Promise<void> {
   if (pageOrder.value.length === 0) return;
@@ -220,7 +231,22 @@ watch(() => props.playlistId, () => {
 });
 
 onMounted(async () => {
-  // Placeholder for autoplay/autoshuffle logic when player is rebuilt
+  // Handle autoplay/autoshuffle query parameters from sidebar CTAs
+  const urlParams = new URLSearchParams(window.location.search);
+  const autoplay = urlParams.get('autoplay');
+  const autoshuffle = urlParams.get('autoshuffle');
+
+  if (autoshuffle === '1') {
+    await handleShuffleAll();
+    // Remove query parameter from URL without reload
+    const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString().replace(/autoshuffle=1&?/, '').replace(/&autoshuffle=1/, '')}` : '');
+    window.history.replaceState({}, '', newUrl);
+  } else if (autoplay === '1') {
+    await handlePlayAll();
+    // Remove query parameter from URL without reload
+    const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString().replace(/autoplay=1&?/, '').replace(/&autoplay=1/, '')}` : '');
+    window.history.replaceState({}, '', newUrl);
+  }
 });
 
 onUnmounted(() => {});
@@ -301,7 +327,7 @@ if (authUser?.id) {
                 <div v-if="selectedCount > 0" class="text-xs text-muted-foreground">
                     {{ selectedCount }} selected
                 </div>
-                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Play" data-test="playlist-play-all">
+                <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Play" data-test="playlist-play-all" @click="handlePlayAll">
                     <PlayIcon :size="40" class="text-muted-foreground group-hover:text-white" />
                 </button>
                 <button class="group p-2 rounded-md hover:bg-primary disabled:opacity-50 border border-white" :disabled="pageOrder.length === 0" title="Shuffle" data-test="playlist-shuffle-all" @click="handleShuffleAll">

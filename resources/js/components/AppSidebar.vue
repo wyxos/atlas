@@ -9,6 +9,10 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import { LayoutGrid, Users, Music, Image, Video, Heart, ThumbsUp, Laugh, ThumbsDown, HelpCircle, ChevronDown, ChevronUp, Shuffle, Play, Search, FileText, Download, CheckCircle, Clock, AlertTriangle, Eye, EyeOff, Cog, MinusCircle, Music2 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
+import { useAudioPlayer, type AudioTrack } from '@/stores/audio';
+import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
+import * as AudioReactionsController from '@/actions/App/Http/Controllers/AudioReactionsController';
+import axios from 'axios';
 
 function isPlaylistActive(id: number): boolean {
   const url = page.url as string;
@@ -96,23 +100,88 @@ function visit(url: string) {
   router.visit(url);
 }
 
+const { setQueueAndPlay, setQueueAndShuffle, play } = useAudioPlayer();
+
 async function queuePlaylist(id: number, opts: { shuffle?: boolean } = {}) {
-  // Navigate to playlist page and let it handle autoplay/autoshuffle for consistent behavior (Spotify + local)
   try {
-    const query = opts.shuffle ? '?autoshuffle=1' : '?autoplay=1';
-    router.visit(playlistHref(id) + query);
+    // Fetch playlist files
+    const response = await axios.get(`/playlists/${id}`);
+    const files = response.data.files || [];
+    const playlistFileIds = response.data.playlist_file_ids || [];
+
+    if (files.length === 0) return;
+
+    // Build queue items
+    const queueItems: AudioTrack[] = playlistFileIds.map((fileId: number) => {
+      const file = files.find((f: any) => f.id === fileId);
+      if (!file) return null;
+      
+      const streamUrl = AudioController.stream({ file: fileId }).url;
+      return {
+        ...file,
+        id: fileId,
+        url: streamUrl,
+      };
+    }).filter((item: AudioTrack | null): item is AudioTrack => item !== null);
+
+    if (queueItems.length === 0) return;
+
+    if (opts.shuffle) {
+      // Shuffle the queue before setting it
+      const shuffled = [...queueItems];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      await setQueueAndShuffle(shuffled, queueItems, { autoPlay: false });
+      await play();
+    } else {
+      await setQueueAndPlay(queueItems, 0, { autoPlay: true });
+    }
   } catch (e) {
-    console.error('Failed to visit playlist', e);
+    console.error('Failed to queue playlist', e);
   }
 }
 
 async function queueAudioReaction(type: string, opts: { shuffle?: boolean } = {}) {
-  // Navigate to audio reaction page and let it handle autoplay/autoshuffle
   try {
-    const query = opts.shuffle ? '?autoshuffle=1' : '?autoplay=1';
-    router.visit(`/audio/${type}` + query);
+    // Fetch audio reaction files
+    const action = AudioReactionsController.index(type);
+    const response = await axios.get(action.url);
+    const files = response.data.files || [];
+    const playlistFileIds = response.data.playlist_file_ids || [];
+
+    if (files.length === 0) return;
+
+    // Build queue items in the order of playlistFileIds
+    const queueItems: AudioTrack[] = playlistFileIds.map((fileId: number) => {
+      const file = files.find((f: any) => f.id === fileId);
+      if (!file) return null;
+      
+      const streamUrl = AudioController.stream({ file: fileId }).url;
+      return {
+        ...file,
+        id: fileId,
+        url: streamUrl,
+      };
+    }).filter((item: AudioTrack | null): item is AudioTrack => item !== null);
+
+    if (queueItems.length === 0) return;
+
+    if (opts.shuffle) {
+      // Shuffle the queue before setting it
+      const shuffled = [...queueItems];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      await setQueueAndShuffle(shuffled, queueItems, { autoPlay: false });
+      await play();
+    } else {
+      await setQueueAndPlay(queueItems, 0, { autoPlay: true });
+    }
   } catch (e) {
-    console.error(`Failed to visit audio ${type}`, e);
+    console.error(`Failed to queue audio ${type}`, e);
   }
 }
 
