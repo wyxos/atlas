@@ -35,6 +35,30 @@ class DownloadFile implements ShouldQueue
         try {
             $fileUrl = (string) $this->file->url;
 
+            if ($fileUrl === '' || ! filter_var($fileUrl, FILTER_VALIDATE_URL)) {
+                $candidateUrls = [
+                    data_get($this->file->listing_metadata, 'url'),
+                    data_get($this->file->detail_metadata, 'url'),
+                    data_get($this->file->detail_metadata, 'downloadUrl'),
+                ];
+
+                foreach ($candidateUrls as $candidate) {
+                    if (is_string($candidate) && filter_var($candidate, FILTER_VALIDATE_URL)) {
+                        $fileUrl = $candidate;
+                        $this->file->update([
+                            'url' => $candidate,
+                            'not_found' => false,
+                        ]);
+
+                        break;
+                    }
+                }
+            }
+
+            if (! filter_var($fileUrl, FILTER_VALIDATE_URL)) {
+                throw new \RuntimeException('File URL is invalid and no fallback could be determined');
+            }
+
             $filename = $this->determineInitialFilename($fileUrl);
             $filePath = 'downloads/'.$filename;
 
@@ -296,6 +320,17 @@ class DownloadFile implements ShouldQueue
                 throw new \Exception("Downloaded file is empty or doesn't exist");
             }
 
+            $sniffedMime = $this->detectMimeFromFile($tempFile);
+            if (! $resolvedMime && $sniffedMime) {
+                $resolvedMime = $sniffedMime;
+            }
+
+            if (strcasecmp((string) $this->file->source, 'CivitAI') === 0 && $sniffedMime) {
+                if ($resolvedMime && str_contains((string) $resolvedMime, 'image/webp') && str_starts_with($sniffedMime, 'video/')) {
+                    $resolvedMime = $sniffedMime;
+                }
+            }
+
             if (! $resolvedMime) {
                 $resolvedMime = $this->file->mime_type;
             }
@@ -461,14 +496,40 @@ class DownloadFile implements ShouldQueue
         if (str_contains($contentType, 'image/webp')) {
             $extractor = new CivitaiVideoUrlExtractor;
             $videoUrl = $extractor->extractFromFileId($this->file->id);
-            if ($videoUrl) {
+            if ($videoUrl === '404_NOT_FOUND') {
+                return $fileUrl;
+            }
+            if (is_string($videoUrl) && filter_var($videoUrl, FILTER_VALIDATE_URL)) {
                 // Update the file's URL to the real video URL
-                $this->file->update(['url' => $videoUrl]);
+                $this->file->update([
+                    'url' => $videoUrl,
+                    'not_found' => false,
+                ]);
 
                 return $videoUrl;
             }
         }
 
         return $fileUrl;
+    }
+
+    protected function detectMimeFromFile(string $path): ?string
+    {
+        if (! is_file($path) || ! function_exists('finfo_open')) {
+            return null;
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) {
+            return null;
+        }
+
+        try {
+            $mime = finfo_file($finfo, $path) ?: null;
+        } finally {
+            finfo_close($finfo);
+        }
+
+        return is_string($mime) ? strtolower(trim($mime)) : null;
     }
 }

@@ -52,6 +52,49 @@ it('corrects civitai media type when downloading mislabeled content', function (
         ->and($download->status)->toBe('completed');
 });
 
+it('stores civitai video as mp4 when server reports image webp', function () {
+    Storage::fake('atlas_app');
+
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+
+    Http::fake(function (Request $request) use ($mp4Body) {
+        if ($request->method() === 'HEAD') {
+            return Http::response('', 200, [
+                'Content-Type' => 'image/webp',
+                'Accept-Ranges' => 'none',
+                'Content-Length' => strlen($mp4Body),
+            ]);
+        }
+
+        return Http::response($mp4Body, 200, [
+            'Content-Type' => 'image/webp',
+            'Content-Length' => strlen($mp4Body),
+        ]);
+    });
+
+    $file = File::factory()->create([
+        'url' => 'https://image.civitai.com/fizz.mp4',
+        'filename' => 'fizz.mp4',
+        'source' => 'CivitAI',
+        'mime_type' => 'video/mp4',
+        'downloaded' => false,
+        'download_progress' => 0,
+    ]);
+
+    (new DownloadFile($file))->handle();
+
+    $file->refresh();
+
+    expect($file->filename)->toBe('fizz.mp4')
+        ->and($file->mime_type)->toBe('video/mp4')
+        ->and($file->path)->toBe('downloads/fizz.mp4');
+
+    Storage::disk('atlas_app')->assertExists('downloads/fizz.mp4');
+    $download = Download::where('file_id', $file->id)->latest()->first();
+    expect($download)->not->toBeNull()
+        ->and($download->status)->toBe('completed');
+});
+
 it('trusts headers when content sniffing is disabled', function () {
     Storage::fake('atlas_app');
 
@@ -130,4 +173,108 @@ it('trusts headers when content sniffing is disabled for image extension', funct
         ->and($file->path)->toBe('downloads/baz.jpg');
 
     Storage::disk('atlas_app')->assertExists('downloads/baz.jpg');
+});
+
+it('leaves url unchanged when civitai extractor reports missing media', function () {
+    Storage::fake('atlas_app');
+
+    $videoBody = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    $url = 'https://image.civitai.com/example/video.mp4';
+    $referrerUrl = 'https://civitai.com/images/123';
+
+    Http::fake(function (Request $request) use ($videoBody, $url, $referrerUrl) {
+        if ($request->url() === $referrerUrl) {
+            return Http::response('', 404);
+        }
+
+        if ($request->method() === 'HEAD' && $request->url() === $url) {
+            return Http::response('', 200, [
+                'Content-Type' => 'image/webp',
+                'Accept-Ranges' => 'none',
+            ]);
+        }
+
+        if ($request->url() === $url) {
+            return Http::response($videoBody, 200, [
+                'Content-Type' => 'video/mp4',
+                'Content-Length' => strlen($videoBody),
+            ]);
+        }
+
+        return Http::response('', 404);
+    });
+
+    $file = File::factory()->create([
+        'url' => $url,
+        'filename' => 'example.mp4',
+        'source' => 'CivitAI',
+        'mime_type' => 'video/mp4',
+        'downloaded' => false,
+        'download_progress' => 0,
+        'listing_metadata' => ['url' => $url],
+        'referrer_url' => $referrerUrl,
+    ]);
+
+    (new DownloadFile($file))->handle();
+
+    $file->refresh();
+
+    expect($file->url)->toBe($url)
+        ->and($file->downloaded)->toBeTrue()
+        ->and($file->not_found)->toBeFalse();
+
+    Storage::disk('atlas_app')->assertExists('downloads/example.mp4');
+    $download = Download::where('file_id', $file->id)->latest()->first();
+    expect($download)->not->toBeNull()
+        ->and($download->status)->toBe('completed');
+});
+
+it('recovers when file url sentinel is stored', function () {
+    Storage::fake('atlas_app');
+
+    $videoBody = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+    $url = 'https://image.civitai.com/example/recovered.mp4';
+
+    Http::fake(function (Request $request) use ($videoBody, $url) {
+        if ($request->method() === 'HEAD' && $request->url() === $url) {
+            return Http::response('', 200, [
+                'Content-Type' => 'video/mp4',
+                'Accept-Ranges' => 'none',
+                'Content-Length' => strlen($videoBody),
+            ]);
+        }
+
+        if ($request->url() === $url) {
+            return Http::response($videoBody, 200, [
+                'Content-Type' => 'video/mp4',
+                'Content-Length' => strlen($videoBody),
+            ]);
+        }
+
+        return Http::response('', 404);
+    });
+
+    $file = File::factory()->create([
+        'url' => '404_NOT_FOUND',
+        'filename' => 'recovered.mp4',
+        'source' => 'CivitAI',
+        'mime_type' => 'video/mp4',
+        'downloaded' => false,
+        'download_progress' => 0,
+        'not_found' => true,
+        'listing_metadata' => ['url' => $url],
+    ]);
+
+    (new DownloadFile($file))->handle();
+
+    $file->refresh();
+
+    expect($file->url)->toBe($url)
+        ->and($file->downloaded)->toBeTrue()
+        ->and($file->not_found)->toBeFalse();
+
+    Storage::disk('atlas_app')->assertExists('downloads/recovered.mp4');
+    $download = Download::where('file_id', $file->id)->latest()->first();
+    expect($download)->not->toBeNull()
+        ->and($download->status)->toBe('completed');
 });

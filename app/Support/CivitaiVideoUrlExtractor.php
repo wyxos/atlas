@@ -45,15 +45,22 @@ class CivitaiVideoUrlExtractor
                 return null;
             }
 
-            // CivitAI sometimes returns 200 with "404" in the page content instead of actual 404 status
-            // Check if the page content indicates a 404 error
+            // CivitAI sometimes returns 200 with a rendered 404 page. Detect explicit 404 indicators.
             $htmlLower = strtolower($html);
-            if (str_contains($htmlLower, '404') ||
-                str_contains($htmlLower, 'not found') ||
-                str_contains($htmlLower, 'page not found') ||
-                str_contains($htmlLower, 'this page doesn\'t exist') ||
-                str_contains($htmlLower, 'this page does not exist')) {
-                return '404_NOT_FOUND';
+            $notFoundPhrases = [
+                '404 not found',
+                '404 - not found',
+                'page not found',
+                'this page doesn\'t exist',
+                'this page does not exist',
+                'we couldn\'t find the page you were looking for',
+                'we couldn’t find the page you were looking for',
+            ];
+
+            foreach ($notFoundPhrases as $phrase) {
+                if (str_contains($htmlLower, $phrase)) {
+                    return '404_NOT_FOUND';
+                }
             }
 
             $referrerBase = $this->getBaseUrl($referrerUrl);
