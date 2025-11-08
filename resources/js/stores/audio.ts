@@ -40,6 +40,7 @@ class AudioPlayerManager {
     private volume = ref<number>(1);
     private userPaused = false;
     private isShuffled = ref<boolean>(false);
+    private repeatMode = ref<'off' | 'all' | 'one'>('off');
     private originalQueue: AudioTrack[] = [];
     private originalCurrentTrackId: number | null = null;
 
@@ -53,6 +54,7 @@ class AudioPlayerManager {
     readonly volumeRef = computed(() => this.volume.value);
     readonly spotifyPlayerReadyRef = computed(() => this.spotifyPlayerReady.value);
     readonly isShuffledRef = computed(() => this.isShuffled.value);
+    readonly repeatModeRef = computed(() => this.repeatMode.value);
 
     private isSpotifyTrack(track: AudioTrack): boolean {
         const source = (track.source || '').toString().trim().toLowerCase();
@@ -528,7 +530,7 @@ class AudioPlayerManager {
         });
 
         this.audio.addEventListener('ended', () => {
-            this.next({ autoPlay: true });
+            void this.handleTrackEnd();
         });
 
         return this.audio;
@@ -996,6 +998,7 @@ class AudioPlayerManager {
         this.spotifyAccessToken = null;
         this.userPaused = false;
         this.isShuffled.value = false;
+        this.repeatMode.value = 'off';
         this.originalQueue = [];
         this.originalCurrentTrackId = null;
     }
@@ -1009,7 +1012,43 @@ class AudioPlayerManager {
                 console.debug('Could not pause Spotify track:', error);
             }
         }
-        await this.next({ autoPlay: true });
+        await this.handleTrackEnd();
+    }
+
+    private async handleTrackEnd(): Promise<void> {
+        if (this.repeatMode.value === 'one') {
+            // Repeat single track - restart current track
+            if (this.currentTrack.value) {
+                await this.pause({ userInitiated: false });
+                this.currentTime.value = 0;
+                if (this.isSpotifyTrack(this.currentTrack.value)) {
+                    this.spotifyPausedPosition = 0;
+                }
+                await this.play();
+            }
+        } else if (this.repeatMode.value === 'all') {
+            // Repeat all - if at end, go to first track, otherwise next
+            if (this.currentIndex.value >= this.queue.value.length - 1) {
+                // At end of queue, go to first track
+                await this.playTrackAtIndex(0, { autoPlay: true });
+            } else {
+                // Not at end, go to next
+                await this.next({ autoPlay: true });
+            }
+        } else {
+            // Repeat off - go to next track (or stop if at end)
+            await this.next({ autoPlay: true });
+        }
+    }
+
+    toggleRepeat(): void {
+        if (this.repeatMode.value === 'off') {
+            this.repeatMode.value = 'all';
+        } else if (this.repeatMode.value === 'all') {
+            this.repeatMode.value = 'one';
+        } else {
+            this.repeatMode.value = 'off';
+        }
     }
 }
 
@@ -1040,6 +1079,7 @@ export function useAudioPlayer() {
         volume: audioPlayerManager.volumeRef,
         spotifyPlayerReady: audioPlayerManager.spotifyPlayerReadyRef,
         isShuffled: audioPlayerManager.isShuffledRef,
+        repeatMode: audioPlayerManager.repeatModeRef,
 
         // Actions
         play: () => audioPlayerManager.play(),
@@ -1055,6 +1095,7 @@ export function useAudioPlayer() {
             audioPlayerManager.setQueueAndShuffle(shuffledQueue, originalQueue, options),
         setVolume: (volume: number) => audioPlayerManager.setVolume(volume),
         toggleShuffle: () => audioPlayerManager.toggleShuffle(),
+        toggleRepeat: () => audioPlayerManager.toggleRepeat(),
         cleanup: () => audioPlayerManager.cleanup(),
     };
 }

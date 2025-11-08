@@ -1350,5 +1350,127 @@ describe('audio store', () => {
       );
     });
   });
+
+  describe('repeat functionality', () => {
+    it('initial repeat state is off', async () => {
+      const store = await importStore();
+      expect(store.repeatMode.value).toBe('off');
+    });
+
+    it('toggleRepeat cycles through states: off -> all -> one -> off', async () => {
+      const store = await importStore();
+      
+      expect(store.repeatMode.value).toBe('off');
+      
+      store.toggleRepeat();
+      expect(store.repeatMode.value).toBe('all');
+      
+      store.toggleRepeat();
+      expect(store.repeatMode.value).toBe('one');
+      
+      store.toggleRepeat();
+      expect(store.repeatMode.value).toBe('off');
+    });
+
+    it('repeat off: track ends, goes to next track', async () => {
+      const store = await importStore();
+      const tracks = [buildTrack(1), buildTrack(2), buildTrack(3)];
+      
+      await store.setQueueAndPlay(tracks, 0);
+      expect(store.currentTrack.value?.id).toBe(1);
+      expect(store.currentIndex.value).toBe(0);
+      
+      // Simulate track end
+      const audio = getAudioInstance();
+      audio.emit('ended');
+      await flushPromises();
+      await flushPromises();
+      
+      // Should advance to next track
+      expect(store.currentTrack.value?.id).toBe(2);
+      expect(store.currentIndex.value).toBe(1);
+    });
+
+    it('repeat all: track ends at end of queue, goes to first track', async () => {
+      const store = await importStore();
+      const tracks = [buildTrack(1), buildTrack(2), buildTrack(3)];
+      
+      await store.setQueueAndPlay(tracks, 2); // Start at last track
+      expect(store.currentTrack.value?.id).toBe(3);
+      expect(store.currentIndex.value).toBe(2);
+      
+      store.toggleRepeat(); // Set to 'all'
+      expect(store.repeatMode.value).toBe('all');
+      
+      // Simulate track end
+      const audio = getAudioInstance();
+      audio.emit('ended');
+      await flushPromises();
+      await flushPromises();
+      
+      // Should loop back to first track
+      expect(store.currentTrack.value?.id).toBe(1);
+      expect(store.currentIndex.value).toBe(0);
+    });
+
+    it('repeat all: track ends in middle, goes to next track', async () => {
+      const store = await importStore();
+      const tracks = [buildTrack(1), buildTrack(2), buildTrack(3)];
+      
+      await store.setQueueAndPlay(tracks, 0);
+      expect(store.currentTrack.value?.id).toBe(1);
+      
+      store.toggleRepeat(); // Set to 'all'
+      expect(store.repeatMode.value).toBe('all');
+      
+      // Simulate track end
+      const audio = getAudioInstance();
+      audio.emit('ended');
+      await flushPromises();
+      await flushPromises();
+      
+      // Should go to next track (not loop)
+      expect(store.currentTrack.value?.id).toBe(2);
+      expect(store.currentIndex.value).toBe(1);
+    });
+
+    it('repeat one: track ends, restarts same track', async () => {
+      const store = await importStore();
+      const tracks = [buildTrack(1), buildTrack(2)];
+      
+      await store.setQueueAndPlay(tracks, 0);
+      expect(store.currentTrack.value?.id).toBe(1);
+      expect(store.currentIndex.value).toBe(0);
+      
+      // Set to repeat one
+      store.toggleRepeat(); // off -> all
+      store.toggleRepeat(); // all -> one
+      expect(store.repeatMode.value).toBe('one');
+      
+      // Simulate track end
+      const audio = getAudioInstance();
+      audio.emit('ended');
+      await flushPromises();
+      await flushPromises();
+      
+      // Should restart same track
+      expect(store.currentTrack.value?.id).toBe(1);
+      expect(store.currentIndex.value).toBe(0);
+      expect(store.currentTime.value).toBe(0);
+    });
+
+    it('repeat state resets on cleanup', async () => {
+      const store = await importStore();
+      
+      store.toggleRepeat(); // off -> all
+      store.toggleRepeat(); // all -> one
+      expect(store.repeatMode.value).toBe('one');
+      
+      store.cleanup();
+      
+      expect(store.repeatMode.value).toBe('off');
+    });
+
+  });
 });
 

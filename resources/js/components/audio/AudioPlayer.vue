@@ -12,12 +12,14 @@ const {
   duration,
   volume,
   isShuffled,
+  repeatMode,
   togglePlay,
   previous,
   next,
   seekTo,
   setVolume,
   toggleShuffle,
+  toggleRepeat,
 } = useAudioPlayer();
 
 const isQueueOpen = ref(false);
@@ -236,9 +238,12 @@ function handleVolumeSeek(event: MouseEvent): void {
                                 </button>
                                 <button
                                     class="button circular small empty"
-                                    title="Repeat"
+                                    :class="{ 'bg-primary text-primary-foreground': repeatMode !== 'off' }"
+                                    :title="repeatMode === 'off' ? 'Repeat Off' : repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+                                    @click="toggleRepeat"
                                 >
-                                    <Repeat :size="16" />
+                                    <Repeat1 v-if="repeatMode === 'one'" :size="16" />
+                                    <Repeat v-else :size="16" />
                                 </button>
                                 <button
                                     class="button circular small empty"
@@ -371,9 +376,12 @@ function handleVolumeSeek(event: MouseEvent): void {
                     </button>
                     <button
                         class="button circular small empty"
-                        title="Repeat"
+                        :class="{ 'bg-primary text-primary-foreground': repeatMode !== 'off' }"
+                        :title="repeatMode === 'off' ? 'Repeat Off' : repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+                        @click="toggleRepeat"
                     >
-                        <Repeat :size="18" />
+                        <Repeat1 v-if="repeatMode === 'one'" :size="18" />
+                        <Repeat v-else :size="18" />
                     </button>
                     <button
                         class="button circular small empty"
