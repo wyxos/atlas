@@ -278,3 +278,89 @@ it('recovers when file url sentinel is stored', function () {
     expect($download)->not->toBeNull()
         ->and($download->status)->toBe('completed');
 });
+
+it('falls back to thumbnail metadata when referrer video cannot be resolved', function () {
+    Storage::fake('atlas_app');
+
+    $posterUrl = 'https://image.civitai.com/poster/original.mp4';
+    $videoUrl = 'https://image.civitai.com/thumb/optimized/104874970.jpeg';
+    $referrerUrl = 'https://civitai.com/images/104874970';
+    $posterBody = base64_decode('UklGRiQAAABXRUJQVlA4ICQAAAAQAAAAHAAAAABwAQCdASoIAAgAAkA4JaQAA3AA/vuUAAA=');
+    $mp4Body = hex2bin('000000186674797069736f6d0000020069736f6d6d7034310000000866726565');
+
+    Http::fake(function (Request $request) use ($posterUrl, $videoUrl, $referrerUrl, $posterBody, $mp4Body) {
+        $url = $request->url();
+        $method = $request->method();
+
+        if ($url === $referrerUrl) {
+            return Http::response('', 404);
+        }
+
+        if ($url === $posterUrl) {
+            if ($method === 'HEAD') {
+                return Http::response('', 200, [
+                    'Content-Type' => 'image/webp',
+                    'Accept-Ranges' => 'none',
+                    'Content-Length' => strlen($posterBody),
+                ]);
+            }
+
+            return Http::response($posterBody, 200, [
+                'Content-Type' => 'image/webp',
+                'Content-Length' => strlen($posterBody),
+            ]);
+        }
+
+        if ($url === $videoUrl) {
+            if ($method === 'HEAD') {
+                return Http::response('', 200, [
+                    'Content-Type' => 'video/mp4',
+                    'Accept-Ranges' => 'bytes',
+                    'Content-Length' => strlen($mp4Body),
+                ]);
+            }
+
+            return Http::response($mp4Body, 200, [
+                'Content-Type' => 'video/mp4',
+                'Content-Length' => strlen($mp4Body),
+            ]);
+        }
+
+        if ($method === 'GET' && str_contains($url, 'Range')) {
+            return Http::response($mp4Body, 200, ['Content-Type' => 'video/mp4']);
+        }
+
+        return Http::response('', 404);
+    });
+
+    $file = File::factory()->create([
+        'url' => $posterUrl,
+        'filename' => 'fallback.webp',
+        'source' => 'CivitAI',
+        'mime_type' => 'image/webp',
+        'downloaded' => false,
+        'download_progress' => 0,
+        'thumbnail_url' => $videoUrl,
+        'referrer_url' => $referrerUrl,
+        'listing_metadata' => [
+            'url' => $posterUrl,
+        ],
+    ]);
+
+    (new DownloadFile($file))->handle();
+
+    $file->refresh();
+
+    expect($file->url)->toBe($videoUrl)
+        ->and($file->downloaded)->toBeTrue()
+        ->and($file->mime_type)->toBe('video/mp4')
+        ->and($file->not_found)->toBeFalse()
+        ->and($file->path)->toEndWith('.mp4');
+
+    Storage::disk('atlas_app')->assertExists($file->path);
+
+    $download = Download::where('file_id', $file->id)->latest()->first();
+    expect($download)->not->toBeNull()
+        ->and($download->status)->toBe('completed')
+        ->and($download->bytes_total)->toBe(strlen($mp4Body));
+});

@@ -3,7 +3,7 @@ import AudioQueuePanel from '@/components/audio/AudioQueuePanel.vue';
 import FileReactions from '@/components/audio/FileReactions.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAudioPlayer } from '@/stores/audio';
-import { ChevronUp, Menu, Moon, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2 } from 'lucide-vue-next';
+import { ChevronDown, ChevronUp, Menu, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 const {
@@ -119,21 +119,15 @@ function handleVolumeSeek(event: MouseEvent): void {
         <!-- Desktop -->
         <div class="hidden items-center gap-4 md:flex">
             <!-- Minimized -->
-            <template v-if="false">
+            <template v-if="isMinimized && isActive">
                 <div class="flex flex-1 items-center gap-4">
                     <!-- Small cover -->
-                    <div class="relative flex h-12 w-12 items-center justify-center">
-                        <div class="h-full w-full rounded bg-muted"></div>
-                    </div>
                     <div class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                        <template>
-                            <img src="" alt="Cover" class="h-full w-full object-contain" />
-                        </template>
-                        <template>
-                            <div class="flex h-full w-full items-center justify-center rounded bg-muted text-muted-foreground">
-                                <span class="text-xs">♪</span>
-                            </div>
-                        </template>
+                        <Skeleton v-if="!currentTrack" class="h-full w-full" />
+                        <img v-else-if="coverImage" :src="coverImage" alt="Cover" class="h-full w-full object-contain" />
+                        <div v-else class="flex h-full w-full items-center justify-center rounded bg-muted text-muted-foreground">
+                            <span class="text-xs">♪</span>
+                        </div>
                         <button type="button" class="absolute inset-0" aria-label="Show current in list">
                             <span class="sr-only">Show current in list</span>
                         </button>
@@ -141,22 +135,24 @@ function handleVolumeSeek(event: MouseEvent): void {
 
                     <div class="flex flex-1 items-center gap-4">
                         <div class="flex min-w-0 flex-col">
-                            <div class="font-medium text-foreground">
-                                <span class="truncate text-sm font-semibold" data-test="audio-player-title">Title</span>
-                                <span class="block truncate text-xs text-muted-foreground" data-test="audio-player-artist">Artist</span>
+                            <Skeleton v-if="!currentTrack" class="h-3 w-24" />
+                            <div v-else class="font-medium text-foreground">
+                                <span class="truncate text-sm font-semibold" data-test="audio-player-title">{{ title }}</span>
+                                <span class="block truncate text-xs text-muted-foreground" data-test="audio-player-artist">{{ artistName }}</span>
                             </div>
                         </div>
 
                         <!-- Basic playback controls -->
                         <div class="flex items-center gap-2">
-                            <button class="button circular small empty" title="Previous">
+                            <button class="button circular small empty" title="Previous" @click="previous">
                                 <SkipBack :size="16" />
                                 <span class="sr-only">Previous</span>
                             </button>
-                            <button class="button circular empty" title="Play/Pause">
-                                <Play :size="20" />
+                            <button class="button circular empty" title="Play/Pause" @click="togglePlay">
+                                <Play v-if="!isPlaying" :size="20" />
+                                <Pause v-else :size="20" />
                             </button>
-                            <button class="button circular small empty" title="Next">
+                            <button class="button circular small empty" title="Next" @click="next">
                                 <SkipForward :size="16" />
                                 <span class="sr-only">Next</span>
                             </button>
@@ -167,6 +163,7 @@ function handleVolumeSeek(event: MouseEvent): void {
                             <div
                                 class="h-1 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80"
                                 data-test="audio-player-progress"
+                                @click="handleSeek"
                             >
                                 <div
                                     class="h-full rounded-full bg-primary"
@@ -180,7 +177,7 @@ function handleVolumeSeek(event: MouseEvent): void {
             </template>
 
             <!-- Full View -->
-            <template v-if="isActive">
+            <template v-if="isActive && !isMinimized">
                 <div class="flex w-100 items-center gap-4">
                     <div
                         class="relative flex h-18 w-18 shrink-0 items-center justify-center overflow-hidden bg-muted transition-all duration-300 md:h-32 md:w-32"
@@ -269,9 +266,6 @@ function handleVolumeSeek(event: MouseEvent): void {
                                     <Repeat1 v-if="repeatMode === 'one'" :size="16" />
                                     <Repeat v-else :size="16" />
                                 </button>
-                                <button class="button circular small empty" title="Keep screen awake while playing">
-                                    <Moon :size="16" />
-                                </button>
                                 <!-- Volume -->
                                 <div class="group ml-4 hidden items-center gap-2 md:flex">
                                     <Volume2 :size="16" class="text-muted-foreground group-hover:text-primary-foreground" />
@@ -301,8 +295,9 @@ function handleVolumeSeek(event: MouseEvent): void {
             </template>
 
             <div class="flex w-100 justify-end gap-2">
-                <button class="button circular small empty" title="Minimize Player">
-                    <ChevronUp :size="16" />
+                <button class="button circular small empty" :title="isMinimized ? 'Expand Player' : 'Minimize Player'" @click="isMinimized = !isMinimized">
+                    <ChevronDown v-if="isMinimized" :size="16" />
+                    <ChevronUp v-else :size="16" />
                 </button>
                 <button class="button circular small empty" title="Show Queue" @click="isQueueOpen = !isQueueOpen">
                     <Menu :size="16" />
@@ -316,107 +311,148 @@ function handleVolumeSeek(event: MouseEvent): void {
         <!-- Mobile -->
         <template v-if="isActive">
             <div class="md:hidden">
-                <div class="mb-4 flex items-center gap-2">
-                    <div class="relative flex h-16 w-16 items-center justify-center">
-                        <Skeleton v-if="!currentTrack" class="h-full w-full rounded" />
-                        <div v-else class="relative flex h-16 w-16 items-center justify-center overflow-hidden bg-muted transition-all duration-300">
-                            <img v-if="coverImage" :src="coverImage" alt="Cover" class="h-full w-full object-contain" />
-                            <div v-else class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
-                                <span class="text-xs">No Cover</span>
+                <!-- Mobile Minimized -->
+                <template v-if="isMinimized">
+                    <div class="flex items-center gap-3">
+                        <div class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                            <Skeleton v-if="!currentTrack" class="h-full w-full rounded" />
+                            <img v-else-if="coverImage" :src="coverImage" alt="Cover" class="h-full w-full object-contain" />
+                            <div v-else class="flex h-full w-full items-center justify-center rounded bg-muted text-muted-foreground">
+                                <span class="text-xs">♪</span>
                             </div>
-                            <button type="button" class="absolute inset-0" aria-label="Show current in list">
-                                <span class="sr-only">Show current in list</span>
+                        </div>
+                        <div class="flex flex-1 items-center gap-3">
+                            <div class="flex min-w-0 flex-1 flex-col">
+                                <Skeleton v-if="!currentTrack" class="h-3 w-24" />
+                                <span v-else class="truncate text-xs font-semibold text-muted-foreground" data-test="audio-player-artist">{{
+                                    artistName
+                                }}</span>
+                                <Skeleton v-if="!currentTrack" class="mt-1 h-3 w-32" />
+                                <span v-else class="truncate text-sm font-semibold text-foreground" data-test="audio-player-title">{{ title }}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button class="button circular small empty" title="Previous" @click="previous">
+                                    <SkipBack :size="18" />
+                                    <span class="sr-only">Previous</span>
+                                </button>
+                                <button class="button circular empty" title="Play/Pause" @click="togglePlay">
+                                    <Play v-if="!isPlaying" :size="20" />
+                                    <Pause v-else :size="20" />
+                                </button>
+                                <button class="button circular small empty" title="Next" @click="next">
+                                    <SkipForward :size="18" />
+                                    <span class="sr-only">Next</span>
+                                </button>
+                            </div>
+                            <button class="button circular small empty" :title="isMinimized ? 'Expand Player' : 'Minimize Player'" @click="isMinimized = !isMinimized">
+                                <ChevronDown v-if="isMinimized" :size="16" />
+                                <ChevronUp v-else :size="16" />
                             </button>
                         </div>
                     </div>
-
-                    <div class="flex flex-1 flex-col gap-1 truncate font-medium text-foreground">
-                        <Skeleton v-if="!currentTrack" class="h-3 w-24" />
-                        <span v-else class="truncate text-xs font-semibold text-muted-foreground" data-test="audio-player-artist">{{
-                            artistName
-                        }}</span>
-                        <Skeleton v-if="!currentTrack" class="mt-1 h-4 w-32" />
-                        <span v-else class="truncate font-semibold text-foreground" data-test="audio-player-title">{{ title }}</span>
-                    </div>
-
-                    <button class="button circular small empty" title="Minimize Player">
-                        <ChevronUp :size="16" />
-                    </button>
-                </div>
-
-                <div class="mb-2">
-                    <div
-                        class="mb-2 h-2 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80"
-                        data-test="audio-player-progress"
-                        @click="handleSeek"
-                    >
-                        <div
-                            class="h-full rounded-full bg-primary"
-                            :class="{ 'transition-all': shouldAnimateProgress }"
-                            :style="{ width: `${progressPercent}%` }"
-                        ></div>
-                    </div>
-                    <div class="mb-2 flex justify-between text-sm text-muted-foreground">
-                        <Skeleton v-if="!currentTrack" class="h-3 w-10" />
-                        <span v-else>{{ formatTime(currentTime) }}</span>
-                        <Skeleton v-if="!currentTrack" class="h-3 w-10" />
-                        <span v-else>{{ formatTime(duration) }}</span>
-                    </div>
-                </div>
-
-                <div class="mb-4 flex items-center justify-center gap-6">
-                    <button
-                        class="button circular small empty"
-                        :class="{ 'bg-primary text-primary-foreground': isShuffled }"
-                        title="Shuffle"
-                        @click="toggleShuffle"
-                    >
-                        <Shuffle :size="18" />
-                    </button>
-                    <button class="button circular small empty" title="Previous" @click="previous">
-                        <SkipBack :size="26" />
-                        <span class="sr-only">Previous</span>
-                    </button>
-                    <button class="button circular empty" title="Play/Pause" @click="togglePlay">
-                        <Play v-if="!isPlaying" :size="32" />
-                        <Pause v-else :size="32" />
-                    </button>
-                    <button class="button circular small empty" title="Next" @click="next">
-                        <SkipForward :size="26" />
-                        <span class="sr-only">Next</span>
-                    </button>
-                    <button
-                        class="button circular small empty"
-                        :class="{ 'bg-primary text-primary-foreground': repeatMode !== 'off' }"
-                        :title="repeatMode === 'off' ? 'Repeat Off' : repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
-                        @click="toggleRepeat"
-                    >
-                        <Repeat1 v-if="repeatMode === 'one'" :size="18" />
-                        <Repeat v-else :size="18" />
-                    </button>
-                    <button class="button circular small empty" title="Keep screen awake while playing">
-                        <Moon :size="16" />
-                    </button>
-                </div>
-                <!-- Volume (mobile) -->
-                <div class="mb-4 flex items-center justify-center gap-2 md:hidden">
-                    <Volume2 :size="16" />
-                    <div class="relative w-40">
-                        <div class="h-2 w-full cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="handleVolumeSeek">
-                            <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${volume * 100}%` }"></div>
+                </template>
+                <!-- Mobile Full View -->
+                <template v-else>
+                    <div class="mb-4 flex items-center gap-2">
+                        <div class="relative flex h-16 w-16 items-center justify-center">
+                            <Skeleton v-if="!currentTrack" class="h-full w-full rounded" />
+                            <div v-else class="relative flex h-16 w-16 items-center justify-center overflow-hidden bg-muted transition-all duration-300">
+                                <img v-if="coverImage" :src="coverImage" alt="Cover" class="h-full w-full object-contain" />
+                                <div v-else class="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
+                                    <span class="text-xs">No Cover</span>
+                                </div>
+                                <button type="button" class="absolute inset-0" aria-label="Show current in list">
+                                    <span class="sr-only">Show current in list</span>
+                                </button>
+                            </div>
                         </div>
-                        <input
-                            aria-label="Volume"
-                            class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                            max="1"
-                            min="0"
-                            step="0.01"
-                            type="range"
-                            :value="volume"
-                            @input="(e) => setVolume(parseFloat((e.target as HTMLInputElement).value))"
-                        />
+
+                        <div class="flex flex-1 flex-col gap-1 truncate font-medium text-foreground">
+                            <Skeleton v-if="!currentTrack" class="h-3 w-24" />
+                            <span v-else class="truncate text-xs font-semibold text-muted-foreground" data-test="audio-player-artist">{{
+                                artistName
+                            }}</span>
+                            <Skeleton v-if="!currentTrack" class="mt-1 h-4 w-32" />
+                            <span v-else class="truncate font-semibold text-foreground" data-test="audio-player-title">{{ title }}</span>
+                        </div>
+
+                        <button class="button circular small empty" :title="isMinimized ? 'Expand Player' : 'Minimize Player'" @click="isMinimized = !isMinimized">
+                            <ChevronDown v-if="isMinimized" :size="16" />
+                            <ChevronUp v-else :size="16" />
+                        </button>
                     </div>
-                </div>
+
+                    <div class="mb-2">
+                        <div
+                            class="mb-2 h-2 cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80"
+                            data-test="audio-player-progress"
+                            @click="handleSeek"
+                        >
+                            <div
+                                class="h-full rounded-full bg-primary"
+                                :class="{ 'transition-all': shouldAnimateProgress }"
+                                :style="{ width: `${progressPercent}%` }"
+                            ></div>
+                        </div>
+                        <div class="mb-2 flex justify-between text-sm text-muted-foreground">
+                            <Skeleton v-if="!currentTrack" class="h-3 w-10" />
+                            <span v-else>{{ formatTime(currentTime) }}</span>
+                            <Skeleton v-if="!currentTrack" class="h-3 w-10" />
+                            <span v-else>{{ formatTime(duration) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 flex items-center justify-center gap-6">
+                        <button
+                            class="button circular small empty"
+                            :class="{ 'bg-primary text-primary-foreground': isShuffled }"
+                            title="Shuffle"
+                            @click="toggleShuffle"
+                        >
+                            <Shuffle :size="18" />
+                        </button>
+                        <button class="button circular small empty" title="Previous" @click="previous">
+                            <SkipBack :size="26" />
+                            <span class="sr-only">Previous</span>
+                        </button>
+                        <button class="button circular empty" title="Play/Pause" @click="togglePlay">
+                            <Play v-if="!isPlaying" :size="32" />
+                            <Pause v-else :size="32" />
+                        </button>
+                        <button class="button circular small empty" title="Next" @click="next">
+                            <SkipForward :size="26" />
+                            <span class="sr-only">Next</span>
+                        </button>
+                        <button
+                            class="button circular small empty"
+                            :class="{ 'bg-primary text-primary-foreground': repeatMode !== 'off' }"
+                            :title="repeatMode === 'off' ? 'Repeat Off' : repeatMode === 'all' ? 'Repeat All' : 'Repeat One'"
+                            @click="toggleRepeat"
+                        >
+                            <Repeat1 v-if="repeatMode === 'one'" :size="18" />
+                            <Repeat v-else :size="18" />
+                        </button>
+                    </div>
+                    <!-- Volume (mobile) -->
+                    <div class="mb-4 flex items-center justify-center gap-2 md:hidden">
+                        <Volume2 :size="16" />
+                        <div class="relative w-40">
+                            <div class="h-2 w-full cursor-pointer rounded-full bg-muted transition-colors hover:bg-muted/80" @click="handleVolumeSeek">
+                                <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${volume * 100}%` }"></div>
+                            </div>
+                            <input
+                                aria-label="Volume"
+                                class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                max="1"
+                                min="0"
+                                step="0.01"
+                                type="range"
+                                :value="volume"
+                                @input="(e) => setVolume(parseFloat((e.target as HTMLInputElement).value))"
+                            />
+                        </div>
+                    </div>
+                </template>
             </div>
         </template>
     </div>

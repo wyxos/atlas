@@ -497,6 +497,16 @@ class DownloadFile implements ShouldQueue
             $extractor = new CivitaiVideoUrlExtractor;
             $videoUrl = $extractor->extractFromFileId($this->file->id);
             if ($videoUrl === '404_NOT_FOUND') {
+                $fallbackUrl = $this->resolveVideoUrlFromMetadata();
+                if ($fallbackUrl) {
+                    $this->file->update([
+                        'url' => $fallbackUrl,
+                        'not_found' => false,
+                    ]);
+
+                    return $fallbackUrl;
+                }
+
                 return $fileUrl;
             }
             if (is_string($videoUrl) && filter_var($videoUrl, FILTER_VALIDATE_URL)) {
@@ -508,9 +518,77 @@ class DownloadFile implements ShouldQueue
 
                 return $videoUrl;
             }
+
+            $fallbackUrl = $this->resolveVideoUrlFromMetadata();
+            if ($fallbackUrl) {
+                $this->file->update([
+                    'url' => $fallbackUrl,
+                    'not_found' => false,
+                ]);
+
+                return $fallbackUrl;
+            }
         }
 
         return $fileUrl;
+    }
+
+    protected function resolveVideoUrlFromMetadata(): ?string
+    {
+        $candidates = [
+            (string) $this->file->thumbnail_url,
+            (string) data_get($this->file->listing_metadata, 'url', ''),
+            (string) data_get($this->file->detail_metadata, 'url', ''),
+            (string) data_get($this->file->detail_metadata, 'downloadUrl', ''),
+        ];
+
+        $seen = [];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === '' || ! filter_var($candidate, FILTER_VALIDATE_URL)) {
+                continue;
+            }
+
+            if (isset($seen[$candidate])) {
+                continue;
+            }
+
+            $seen[$candidate] = true;
+
+            try {
+                $head = Http::timeout(20)->head($candidate);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if (! $head->ok()) {
+                continue;
+            }
+
+            $contentType = strtolower((string) ($head->header('Content-Type') ?? ''));
+            if ($contentType !== '' && str_starts_with($contentType, 'video/')) {
+                return $candidate;
+            }
+
+            if ($head->status() === 405 || $contentType === '') {
+                try {
+                    $probe = Http::timeout(30)
+                        ->withHeaders(['Range' => 'bytes=0-0'])
+                        ->get($candidate);
+
+                    if ($probe->status() === 206 || $probe->status() === 200) {
+                        $probeType = strtolower((string) ($probe->header('Content-Type') ?? ''));
+                        if ($probeType !== '' && str_starts_with($probeType, 'video/')) {
+                            return $candidate;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // ignore probe failures
+                }
+            }
+        }
+
+        return null;
     }
 
     protected function detectMimeFromFile(string $path): ?string
