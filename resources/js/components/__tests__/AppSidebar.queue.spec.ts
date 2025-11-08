@@ -17,6 +17,7 @@ vi.mock('@/actions/App/Http/Controllers/AudioController', () => ({
 
 vi.mock('@/actions/App/Http/Controllers/AudioReactionsController', () => ({
   index: vi.fn(),
+  data: vi.fn(),
 }));
 
 describe('AppSidebar queue functionality', () => {
@@ -50,23 +51,18 @@ describe('AppSidebar queue functionality', () => {
     
     queuePlaylist = async (id: number, opts: { shuffle?: boolean } = {}) => {
       try {
-        const response = await axios.get(`/playlists/${id}`);
-        const files = response.data.files || [];
-        const playlistFileIds = response.data.playlist_file_ids || [];
+        const idsResponse = await axios.get(`/playlists/${id}/ids`);
+        const playlistFileIds = idsResponse.data.ids || [];
 
-        if (files.length === 0) return;
+        if (playlistFileIds.length === 0) return;
 
         const queueItems: any[] = playlistFileIds.map((fileId: number) => {
-          const file = files.find((f: any) => f.id === fileId);
-          if (!file) return null;
-          
           const streamUrl = AudioController.stream({ file: fileId }).url;
           return {
-            ...file,
             id: fileId,
             url: streamUrl,
           };
-        }).filter((item: any) => item !== null);
+        });
 
         if (queueItems.length === 0) return;
 
@@ -88,24 +84,19 @@ describe('AppSidebar queue functionality', () => {
 
     queueAudioReaction = async (type: string, opts: { shuffle?: boolean } = {}) => {
       try {
-        const action = AudioReactionsController.index(type);
+        const action = AudioReactionsController.data(type);
         const response = await axios.get(action.url);
-        const files = response.data.files || [];
-        const playlistFileIds = response.data.playlist_file_ids || [];
+        const playlistFileIds = response.data.playlistFileIds || [];
 
-        if (files.length === 0) return;
+        if (playlistFileIds.length === 0) return;
 
         const queueItems: any[] = playlistFileIds.map((fileId: number) => {
-          const file = files.find((f: any) => f.id === fileId);
-          if (!file) return null;
-          
           const streamUrl = AudioController.stream({ file: fileId }).url;
           return {
-            ...file,
             id: fileId,
             url: streamUrl,
           };
-        }).filter((item: any) => item !== null);
+        });
 
         if (queueItems.length === 0) return;
 
@@ -128,24 +119,19 @@ describe('AppSidebar queue functionality', () => {
 
   describe('queueAudioReaction', () => {
     it('queues and plays audio reaction files without shuffle', async () => {
-      const files = [
-        { id: 1, title: 'Track 1' },
-        { id: 2, title: 'Track 2' },
-        { id: 3, title: 'Track 3' },
-      ];
       const playlistFileIds = [1, 2, 3];
 
-      (AudioReactionsController.index as any).mockReturnValue({
-        url: '/audio/favorites',
+      (AudioReactionsController.data as any).mockReturnValue({
+        url: '/audio/favorites/data',
       });
 
       (axios.get as any).mockResolvedValue({
-        data: { files, playlist_file_ids: playlistFileIds },
+        data: { playlistFileIds: playlistFileIds },
       });
 
       await queueAudioReaction('favorites');
 
-      expect(axios.get).toHaveBeenCalledWith('/audio/favorites');
+      expect(axios.get).toHaveBeenCalledWith('/audio/favorites/data');
       expect(mockSetQueueAndPlay).toHaveBeenCalledTimes(1);
       expect(mockSetQueueAndPlay).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -161,24 +147,19 @@ describe('AppSidebar queue functionality', () => {
     });
 
     it('queues and shuffles audio reaction files', async () => {
-      const files = [
-        { id: 1, title: 'Track 1' },
-        { id: 2, title: 'Track 2' },
-        { id: 3, title: 'Track 3' },
-      ];
       const playlistFileIds = [1, 2, 3];
 
-      (AudioReactionsController.index as any).mockReturnValue({
-        url: '/audio/favorites',
+      (AudioReactionsController.data as any).mockReturnValue({
+        url: '/audio/favorites/data',
       });
 
       (axios.get as any).mockResolvedValue({
-        data: { files, playlist_file_ids: playlistFileIds },
+        data: { playlistFileIds: playlistFileIds },
       });
 
       await queueAudioReaction('favorites', { shuffle: true });
 
-      expect(axios.get).toHaveBeenCalledWith('/audio/favorites');
+      expect(axios.get).toHaveBeenCalledWith('/audio/favorites/data');
       expect(mockSetQueueAndShuffle).toHaveBeenCalledTimes(1);
       expect(mockSetQueueAndShuffle).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -196,12 +177,12 @@ describe('AppSidebar queue functionality', () => {
     });
 
     it('handles empty files gracefully', async () => {
-      (AudioReactionsController.index as any).mockReturnValue({
-        url: '/audio/favorites',
+      (AudioReactionsController.data as any).mockReturnValue({
+        url: '/audio/favorites/data',
       });
 
       (axios.get as any).mockResolvedValue({
-        data: { files: [], playlist_file_ids: [] },
+        data: { playlist_file_ids: [] },
       });
 
       await queueAudioReaction('favorites');
@@ -211,8 +192,8 @@ describe('AppSidebar queue functionality', () => {
     });
 
     it('handles API errors gracefully', async () => {
-      (AudioReactionsController.index as any).mockReturnValue({
-        url: '/audio/favorites',
+      (AudioReactionsController.data as any).mockReturnValue({
+        url: '/audio/favorites/data',
       });
 
       (axios.get as any).mockRejectedValue(new Error('API Error'));
@@ -230,19 +211,15 @@ describe('AppSidebar queue functionality', () => {
 
   describe('queuePlaylist', () => {
     it('queues and plays playlist files without shuffle', async () => {
-      const files = [
-        { id: 1, title: 'Track 1' },
-        { id: 2, title: 'Track 2' },
-      ];
       const playlistFileIds = [1, 2];
 
       (axios.get as any).mockResolvedValue({
-        data: { files, playlist_file_ids: playlistFileIds },
+        data: { ids: playlistFileIds },
       });
 
       await queuePlaylist(1);
 
-      expect(axios.get).toHaveBeenCalledWith('/playlists/1');
+      expect(axios.get).toHaveBeenCalledWith('/playlists/1/ids');
       expect(mockSetQueueAndPlay).toHaveBeenCalledTimes(1);
       expect(mockSetQueueAndPlay).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -256,20 +233,15 @@ describe('AppSidebar queue functionality', () => {
     });
 
     it('queues and shuffles playlist files', async () => {
-      const files = [
-        { id: 1, title: 'Track 1' },
-        { id: 2, title: 'Track 2' },
-        { id: 3, title: 'Track 3' },
-      ];
       const playlistFileIds = [1, 2, 3];
 
       (axios.get as any).mockResolvedValue({
-        data: { files, playlist_file_ids: playlistFileIds },
+        data: { ids: playlistFileIds },
       });
 
       await queuePlaylist(1, { shuffle: true });
 
-      expect(axios.get).toHaveBeenCalledWith('/playlists/1');
+      expect(axios.get).toHaveBeenCalledWith('/playlists/1/ids');
       expect(mockSetQueueAndShuffle).toHaveBeenCalledTimes(1);
       expect(mockSetQueueAndShuffle).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -285,15 +257,11 @@ describe('AppSidebar queue functionality', () => {
       expect(mockPlay).toHaveBeenCalledTimes(1);
     });
 
-    it('filters out null items when building queue', async () => {
-      const files = [
-        { id: 1, title: 'Track 1' },
-        { id: 3, title: 'Track 3' },
-      ];
-      const playlistFileIds = [1, 2, 3]; // ID 2 is missing from files
+    it('builds queue items from all playlist file IDs', async () => {
+      const playlistFileIds = [1, 2, 3];
 
       (axios.get as any).mockResolvedValue({
-        data: { files, playlist_file_ids: playlistFileIds },
+        data: { ids: playlistFileIds },
       });
 
       await queuePlaylist(1);
@@ -301,15 +269,14 @@ describe('AppSidebar queue functionality', () => {
       expect(mockSetQueueAndPlay).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ id: 1 }),
+          expect.objectContaining({ id: 2 }),
           expect.objectContaining({ id: 3 }),
         ]),
         0,
         { autoPlay: true },
       );
-      // Should not include ID 2 since it's not in files
-      expect(mockSetQueueAndPlay.mock.calls[0][0]).not.toContainEqual(
-        expect.objectContaining({ id: 2 }),
-      );
+      // Should include all IDs from the playlist
+      expect(mockSetQueueAndPlay.mock.calls[0][0]).toHaveLength(3);
     });
   });
 });

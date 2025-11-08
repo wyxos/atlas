@@ -104,25 +104,23 @@ const { setQueueAndPlay, setQueueAndShuffle, play } = useAudioPlayer();
 
 async function queuePlaylist(id: number, opts: { shuffle?: boolean } = {}) {
   try {
-    // Fetch playlist files
-    const response = await axios.get(`/playlists/${id}`);
-    const files = response.data.files || [];
-    const playlistFileIds = response.data.playlist_file_ids || [];
+    // Fetch playlist file IDs using the ids endpoint (returns JSON)
+    const idsResponse = await axios.get(`/playlists/${id}/ids`);
+    const playlistFileIds = idsResponse.data.ids || [];
 
-    if (files.length === 0) return;
+    if (playlistFileIds.length === 0) {
+      console.warn(`No files found for playlist ID: ${id}`);
+      return;
+    }
 
-    // Build queue items
+    // Build queue items - we only need id and url, metadata will be loaded lazily
     const queueItems: AudioTrack[] = playlistFileIds.map((fileId: number) => {
-      const file = files.find((f: any) => f.id === fileId);
-      if (!file) return null;
-      
       const streamUrl = AudioController.stream({ file: fileId }).url;
       return {
-        ...file,
         id: fileId,
         url: streamUrl,
       };
-    }).filter((item: AudioTrack | null): item is AudioTrack => item !== null);
+    });
 
     if (queueItems.length === 0) return;
 
@@ -145,26 +143,24 @@ async function queuePlaylist(id: number, opts: { shuffle?: boolean } = {}) {
 
 async function queueAudioReaction(type: string, opts: { shuffle?: boolean } = {}) {
   try {
-    // Fetch audio reaction files
-    const action = AudioReactionsController.index(type);
+    // Fetch audio reaction files using the data endpoint (returns JSON)
+    const action = AudioReactionsController.data(type);
     const response = await axios.get(action.url);
-    const files = response.data.files || [];
-    const playlistFileIds = response.data.playlist_file_ids || [];
+    const playlistFileIds = response.data.playlistFileIds || [];
 
-    if (files.length === 0) return;
+    if (playlistFileIds.length === 0) {
+      console.warn(`No files found for audio reaction type: ${type}`);
+      return;
+    }
 
-    // Build queue items in the order of playlistFileIds
+    // Build queue items - we only need id and url, metadata will be loaded lazily
     const queueItems: AudioTrack[] = playlistFileIds.map((fileId: number) => {
-      const file = files.find((f: any) => f.id === fileId);
-      if (!file) return null;
-      
       const streamUrl = AudioController.stream({ file: fileId }).url;
       return {
-        ...file,
         id: fileId,
         url: streamUrl,
       };
-    }).filter((item: AudioTrack | null): item is AudioTrack => item !== null);
+    });
 
     if (queueItems.length === 0) return;
 
