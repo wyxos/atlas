@@ -816,6 +816,29 @@ class AudioPlayerManager {
         }
     }
 
+    async setQueueAndShuffle(shuffledQueue: AudioTrack[], originalQueue: AudioTrack[], options: PlayOptions = {}): Promise<void> {
+        if (shuffledQueue.length === 0) return;
+
+        const shouldAutoPlay = options.autoPlay ?? true;
+        await this.pause({ userInitiated: false });
+        
+        // Reset paused position when setting new queue
+        this.spotifyPausedPosition = 0;
+
+        this.queue.value = [...shuffledQueue];
+        this.originalQueue = [...originalQueue];
+        this.isShuffled.value = true;
+        this.originalCurrentTrackId = null;
+        this.currentIndex.value = 0;
+        await this.loadTrack(this.queue.value[0]);
+
+        this.userPaused = !shouldAutoPlay;
+
+        if (shouldAutoPlay) {
+            await this.play();
+        }
+    }
+
     private shuffleArray<T>(array: T[]): T[] {
         const shuffled = [...array];
         for (let i = shuffled.length - 1; i > 0; i--) {
@@ -1011,6 +1034,8 @@ export function useAudioPlayer() {
         playTrackAtIndex: (index: number, options?: PlayOptions) => audioPlayerManager.playTrackAtIndex(index, options),
         setQueueAndPlay: (queue: AudioTrack[], startIndex?: number, options?: PlayOptions) =>
             audioPlayerManager.setQueueAndPlay(queue, startIndex, options),
+        setQueueAndShuffle: (shuffledQueue: AudioTrack[], originalQueue: AudioTrack[], options?: PlayOptions) =>
+            audioPlayerManager.setQueueAndShuffle(shuffledQueue, originalQueue, options),
         setVolume: (volume: number) => audioPlayerManager.setVolume(volume),
         toggleShuffle: () => audioPlayerManager.toggleShuffle(),
         cleanup: () => audioPlayerManager.cleanup(),

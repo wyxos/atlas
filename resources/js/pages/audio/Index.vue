@@ -153,8 +153,10 @@ const {
   duration,
   volume,
   setQueueAndPlay,
+  setQueueAndShuffle,
   setVolume,
   toggleShuffle,
+  play,
 } = useAudioPlayer();
 
 // Build queue items from filtered items
@@ -191,9 +193,16 @@ async function handleShuffleAll(): Promise<void> {
   
   if (queueItems.length === 0) return;
 
-  // Set queue and shuffle
-  await setQueueAndPlay(queueItems, 0, { autoPlay: false });
-  await toggleShuffle();
+  // Shuffle the queue before setting it, so the first track displayed is already the shuffled first track
+  const shuffled = [...queueItems];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Set the shuffled queue with the original queue saved for unshuffle
+  await setQueueAndShuffle(shuffled, queueItems, { autoPlay: false });
+  await play();
 }
 
 // Selection state
