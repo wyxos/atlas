@@ -101,6 +101,7 @@ vi.mock('@inertiajs/vue3', () => {
         useForm,
         router,
         usePage: () => ({
+            url: '/photos',
             props: {
                 auth: {
                     user: {

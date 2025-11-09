@@ -648,6 +648,7 @@ class AudioPlayerManager {
         const { userInitiated = true } = options;
         this.userPaused = userInitiated;
         this.isPlaying.value = false;
+        this.updateSpotifyPolling(false);
         const currentTrack = this.currentTrack.value;
         if (currentTrack) {
             console.log('Pausing playback', currentTrack);

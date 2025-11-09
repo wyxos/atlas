@@ -24,6 +24,7 @@ vi.mock('@inertiajs/vue3', () => ({
   Head: { name: 'Head', template: '<template><slot /></template>' },
   useForm: (initial: any) => ({ ...initial, data: () => ({ ...initial }), defaults: () => {}, reset: () => {} }) as any,
   usePage: () => ({
+    url: '/photos',
     props: {
       auth: {
         user: {
