@@ -55,4 +55,34 @@ describe('createBrowseGetPage', () => {
     const calls = spy.mock.calls.filter(([e]) => e === 'moderation:notify')
     expect(calls.length).toBe(1)
   })
+
+  it('omits null parameters like type when fetching pages', async () => {
+    const formState: any = { source: 'x', page: 1, type: null }
+    const form = {
+      data: () => ({ ...formState }),
+      defaults: vi.fn((v: any) => Object.assign(formState, v || {})),
+      reset: vi.fn(() => {}),
+    }
+    const getPage = createBrowseGetPage(form as any)
+    await getPage(2)
+    const params = axiosMocks.get.mock.calls.at(-1)?.[1]?.params ?? {}
+    expect('type' in params).toBe(false)
+  })
+
+  it('includes type parameter when provided and syncs it to the URL', async () => {
+    const formState: any = { source: 'x', page: 1, type: 'image' }
+    const form = {
+      data: () => ({ ...formState }),
+      defaults: vi.fn((v: any) => Object.assign(formState, v || {})),
+      reset: vi.fn(() => {}),
+    }
+    const getPage = createBrowseGetPage(form as any)
+    await getPage(2)
+    const params = axiosMocks.get.mock.calls.at(-1)?.[1]?.params ?? {}
+    expect(params.type).toBe('image')
+
+    vi.advanceTimersByTime(500)
+    const routerCall = inertiaMocks.router.replace.mock.calls.at(-1)?.[0]
+    expect(String(routerCall?.url ?? '')).toContain('type=image')
+  })
 })

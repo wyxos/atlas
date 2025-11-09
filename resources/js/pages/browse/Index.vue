@@ -73,7 +73,7 @@ function recomputeContainerCounts(list: any[]) {
 // current/next live on the form (filter); do not duplicate state here.
 
 // useForm to keep filters consistent with backend (mirror server filter)
-const form = useForm({ ...(props.filter || {}) });
+const form = useForm({ type: null, ...(props.filter || {}) });
 
 const serviceList = computed(() => {
     const arr = (props as any).services || [];
@@ -94,6 +94,13 @@ const serviceDefaultsMap = computed<Record<string, any>>(() => {
 
 const currentSource = ref<any>(form.source as any);
 
+const selectedType = computed({
+    get: () => ((form.type as any) === 'image' || (form.type as any) === 'video') ? (form.type as any) : 'all',
+    set: (value: string) => {
+        form.type = value === 'image' || value === 'video' ? (value as any) : null;
+    },
+});
+
 function snapshotFilters(): string {
     const data = form.data() as Record<string, any>;
     return JSON.stringify({
@@ -101,6 +108,7 @@ function snapshotFilters(): string {
         nsfw: Number(data.nsfw ?? 0) === 1 ? 1 : 0,
         sort: data.sort ?? null,
         limit: Number(data.limit ?? 20) || 20,
+        type: (data.type === 'image' || data.type === 'video') ? data.type : null,
     });
 }
 
@@ -681,6 +689,45 @@ defineExpose({
                             v-model="form.nsfw as any"
                             class="h-4 w-4 rounded border dark:bg-neutral-900"
                         />
+                    </div>
+                </div>
+
+                <div class="grid gap-1">
+                    <Label class="text-xs text-muted-foreground">Type</Label>
+                    <div class="flex h-9 items-center gap-4">
+                        <label class="flex items-center gap-2 text-sm font-medium text-foreground cursor-pointer">
+                            <input
+                                type="radio"
+                                name="browse-type"
+                                value="all"
+                                v-model="selectedType"
+                                class="h-4 w-4 border dark:bg-neutral-900"
+                                data-testid="type-option-all"
+                            />
+                            <span>All</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm font-medium text-foreground cursor-pointer">
+                            <input
+                                type="radio"
+                                name="browse-type"
+                                value="image"
+                                v-model="selectedType"
+                                class="h-4 w-4 border dark:bg-neutral-900"
+                                data-testid="type-option-image"
+                            />
+                            <span>Image</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm font-medium text-foreground cursor-pointer">
+                            <input
+                                type="radio"
+                                name="browse-type"
+                                value="video"
+                                v-model="selectedType"
+                                class="h-4 w-4 border dark:bg-neutral-900"
+                                data-testid="type-option-video"
+                            />
+                            <span>Video</span>
+                        </label>
                     </div>
                 </div>
 

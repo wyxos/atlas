@@ -81,3 +81,27 @@ test('format civitai response returns rows and nextPage with file/meta structure
 });
 
 // Plugin-backed services (wallhaven/civit-ai-posts) are tested in their own packages.
+
+test('formatParams adds type only when valid', function () {
+    $imageParams = (new CivitAiImages(['type' => 'image']))->formatParams();
+    expect($imageParams)->toHaveKey('type', 'image');
+
+    $videoParams = (new CivitAiImages(['type' => 'video']))->formatParams();
+    expect($videoParams)->toHaveKey('type', 'video');
+
+    $noneParams = (new CivitAiImages(['type' => 'all']))->formatParams();
+    expect($noneParams)->not->toHaveKey('type');
+});
+
+test('transform normalizes invalid type back to null in filter', function () {
+    $service = new CivitAiImages(['type' => 'all']);
+    $service->formatParams();
+
+    $payload = $service->transform([
+        'items' => [],
+        'metadata' => ['nextCursor' => null],
+    ]);
+
+    expect($payload['filter'])->toHaveKey('type');
+    expect($payload['filter']['type'])->toBeNull();
+});

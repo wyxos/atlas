@@ -39,6 +39,7 @@ class CivitAiImages extends BaseService
         $cursor = (isset($this->params['page']) && (int) $this->params['page'] > 1) ? (string) $this->params['page'] : null;
         $sort = $this->params['sort'] ?? 'Newest';
         $nsfw = $this->params['nsfw'] ?? null; // boolean or enum: None|Soft|Mature|X
+        $type = $this->resolveType($this->params['type'] ?? null);
 
         $query = [
             'limit' => $limit,
@@ -54,6 +55,12 @@ class CivitAiImages extends BaseService
             // Pass through as-is; API accepts boolean or string levels depending on endpoint
             $query['nsfw'] = $nsfw;
         }
+
+        if ($type !== null) {
+            $query['type'] = $type;
+        }
+
+        $this->params['type'] = $type;
 
         return $query;
     }
@@ -167,5 +174,16 @@ class CivitAiImages extends BaseService
             ['label' => 'user',  'key' => 'username',  'value' => $username],
             ['label' => 'model', 'key' => 'baseModel', 'value' => $baseModel],
         ];
+    }
+
+    protected function resolveType(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+
+        return in_array($normalized, ['image', 'video'], true) ? $normalized : null;
     }
 }

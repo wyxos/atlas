@@ -26,6 +26,9 @@ export function createBrowseGetPage(form: { data: () => Record<string, any>; def
     }
     return async function getPage(page: any) {
         const baseParams = { ...form.data() } as Record<string, any>;
+        if (baseParams.type === null || baseParams.type === undefined || baseParams.type === '' || baseParams.type === 'all') {
+            delete baseParams.type;
+        }
 
         try {
             const res = await axios.get(BrowseController.data().url, { params: { ...baseParams, page } });

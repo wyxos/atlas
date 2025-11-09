@@ -5,13 +5,14 @@ import Index from '@/pages/browse/Index.vue';
 
 // Mock Inertia's useForm and Head
 vi.mock('@inertiajs/vue3', () => {
-  const state: any = {
+  const defaultState = {
     source: 'test-source',
     nsfw: 0,
     sort: 'Newest',
     limit: 20,
     page: 1,
     next: null,
+    type: null,
   };
   return {
     Head: {
@@ -19,13 +20,57 @@ vi.mock('@inertiajs/vue3', () => {
       template: '<template><slot /></template>',
     },
     useForm: (initial: any) => {
-      Object.assign(state, initial || {})
-      return {
-        ...state,
+      const state: Record<string, any> = { ...defaultState, ...(initial || {}) };
+      if (!('type' in state)) {
+        state.type = null;
+      }
+      const helpers: Record<string, any> = {
         data: () => ({ ...state }),
-        defaults: (v: any) => Object.assign(state, v || {}),
+        defaults: (value: any) => {
+          if (value && typeof value === 'object') {
+            Object.assign(state, value);
+          }
+        },
         reset: () => void 0,
-      } as any;
+      };
+      return new Proxy(helpers, {
+        get(target, prop) {
+          if (prop in target) {
+            return Reflect.get(target, prop);
+          }
+          return state[prop as keyof typeof state];
+        },
+        set(_, prop, value) {
+          state[prop as string] = value;
+          return true;
+        },
+        has(_, prop) {
+          return prop in helpers || prop in state;
+        },
+        ownKeys() {
+          return Array.from(new Set([...Object.keys(state), ...Object.keys(helpers)]));
+        },
+        getOwnPropertyDescriptor(_, prop) {
+          if (prop in helpers) {
+            return {
+              configurable: true,
+              enumerable: false,
+              value: helpers[prop as string],
+              writable: true,
+            };
+          }
+          return {
+            configurable: true,
+            enumerable: true,
+            get() {
+              return state[prop as string];
+            },
+            set(value) {
+              state[prop as string] = value;
+            },
+          };
+        },
+      }) as any;
     },
     usePage: () => ({ props: { auth: { user: { is_admin: false } } } }),
   };
@@ -130,6 +175,7 @@ function mountBrowse(overrides: Record<string, any> = {}) {
         Label: true,
         ActionMenu: true,
         FileReactions: true,
+        ModerationRulesManager: true,
       },
     },
     attachTo: document.body, // teleports and focus
@@ -158,5 +204,21 @@ describe('Browse/Index.vue', () => {
     const dialogRoot = wrapper.get('[data-test="dialog-root"]');
 // Relaxed: confirm dialog root exists after click
     expect(dialogRoot.exists()).toBe(true);
+  });
+
+  it('updates type filter when radio inputs change', async () => {
+    const wrapper = mountBrowse();
+    await nextTick();
+    await nextTick();
+
+    const imageRadio = wrapper.get('[data-testid="type-option-image"]');
+    await imageRadio.setValue('image');
+    await nextTick();
+    expect(((wrapper.vm as any).form.type)).toBe('image');
+
+    const allRadio = wrapper.get('[data-testid="type-option-all"]');
+    await allRadio.setValue('all');
+    await nextTick();
+    expect(((wrapper.vm as any).form.type)).toBeNull();
   });
 });
