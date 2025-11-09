@@ -22,7 +22,9 @@
         "typesense/typesense-php": "5.1",
         "wikimedia/composer-merge-plugin": "^2.0",
         "wyxos/atlas-plugin-contracts": "^0.1",
-        "wyxos/atlas-plugin-wallhaven": "^0.1"
+        "wyxos/atlas-plugin-wallhaven": "^0.1",
+        "ext-dom": "*",
+        "ext-libxml": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

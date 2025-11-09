@@ -1179,8 +1179,8 @@ const highlightedPromptHtml = computed(() => {
               <p>{{ item.mime_type }}</p>
               <div class="flex gap-2 flex-col">
                   <a :href="item.referrer_url" target="_blank">Referrer <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
-                  <a :href="item.preview" target="_blank">Remote preview <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
-                  <a :href="item.original" target="_blank">Remote file <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
+                  <a :href="item.true_thumbnail_url" target="_blank">Remote preview <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
+                  <a :href="item.true_original_url" target="_blank">Remote file <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
               </div>
               <pre>{{ item }}</pre>
               <p>{{ item.downlaoded_at }}</p>
