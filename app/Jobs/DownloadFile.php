@@ -34,31 +34,18 @@ class DownloadFile implements ShouldQueue
         try {
             $fileUrl = (string) $this->file->url;
 
-            if ($fileUrl === '' || ! filter_var($fileUrl, FILTER_VALIDATE_URL)) {
-                $candidateUrls = [
-                    data_get($this->file->listing_metadata, 'url'),
-                    data_get($this->file->detail_metadata, 'url'),
-                    data_get($this->file->detail_metadata, 'downloadUrl'),
-                ];
-
-                foreach ($candidateUrls as $candidate) {
-                    if (is_string($candidate) && filter_var($candidate, FILTER_VALIDATE_URL)) {
-                        $fileUrl = $candidate;
-                        $this->file->update([
-                            'url' => $candidate,
-                            'not_found' => false,
-                        ]);
-
-                        break;
-                    }
-                }
+            if ($fileUrl === '') {
+                throw new \RuntimeException('File URL is empty');
             }
 
             if (! filter_var($fileUrl, FILTER_VALIDATE_URL)) {
-                throw new \RuntimeException('File URL is invalid and no fallback could be determined');
+                throw new \RuntimeException('File URL is invalid');
             }
 
-            $filename = $this->determineInitialFilename($fileUrl);
+            $filename = (string) ($this->file->filename ?? '');
+            if ($filename === '') {
+                $filename = Str::random(40);
+            }
             $filePath = 'downloads/'.$filename;
 
             $resolvedMime = null;
@@ -412,33 +399,6 @@ class DownloadFile implements ShouldQueue
             event(new FileDownloadProgress($this->file->id, -1, null, null, $status === 'canceled' ? 'canceled' : ($status === 'paused' ? 'paused' : 'failed')));
             throw $e; // rethrow for failed job handling
         }
-    }
-
-    protected function determineInitialFilename(string $fileUrl): string
-    {
-        $filename = (string) ($this->file->filename ?? '');
-
-        // Strip query parameters or fragments from existing filename values
-        if ($filename !== '') {
-            $filename = Str::before($filename, '?');
-            $filename = Str::before($filename, '#');
-        }
-
-        if ($filename === '') {
-            $path = parse_url($fileUrl, PHP_URL_PATH) ?: null;
-            $filename = $path ? basename($path) : '';
-        }
-
-        if ($filename !== '') {
-            $filename = Str::before($filename, '?');
-            $filename = Str::before($filename, '#');
-        }
-
-        if ($filename === '') {
-            $filename = 'file-'.$this->file->id;
-        }
-
-        return $filename;
     }
 
     protected function adjustFilenameForMime(string $filename, ?string $mime, string $currentPath): array

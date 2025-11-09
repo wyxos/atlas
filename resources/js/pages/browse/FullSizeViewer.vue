@@ -6,7 +6,7 @@ import ActionMenu, { type ActionOption } from '@/components/browse/ActionMenu.vu
 import { bus } from '@/lib/bus'
 import axios from 'axios'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { ChevronsLeft, ChevronsRight, Eye, X, AlertTriangle, ImageOff } from 'lucide-vue-next'
+import { ChevronsLeft, ChevronsRight, Eye, X, AlertTriangle, ImageOff, SquareArrowOutUpRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ringForSlot, badgeClassForSlot } from '@/pages/browse/highlight'
@@ -1178,9 +1178,9 @@ const highlightedPromptHtml = computed(() => {
               <p>{{ item.type }}</p>
               <p>{{ item.mime_type }}</p>
               <div class="flex gap-2 flex-col">
-                  <a :href="item.referrer_url" target="_blank">{{ item.referrer_url }}</a>
-                  <a :href="item.preview" target="_blank">{{ item.preview }}</a>
-                  <a :href="item.original" target="_blank">{{ item.original }}</a>
+                  <a :href="item.referrer_url" target="_blank">Referrer <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
+                  <a :href="item.preview" target="_blank">Remote preview <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
+                  <a :href="item.original" target="_blank">Remote file <SquareArrowOutUpRight></SquareArrowOutUpRight></a>
               </div>
               <pre>{{ item }}</pre>
               <p>{{ item.downlaoded_at }}</p>

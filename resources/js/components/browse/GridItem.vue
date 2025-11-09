@@ -892,7 +892,13 @@ const referrerUrl = computed<string | null>(() => {
     return trimmed.length > 0 ? trimmed : null;
 });
 
+const civitaiResolutionEnabled = false;
+
 const needsCivitaiResolution = computed(() => {
+    if (!civitaiResolutionEnabled) {
+        return false;
+    }
+
     const item = props.item as any;
     if (!item) {
         return false;
@@ -908,7 +914,12 @@ const needsCivitaiResolution = computed(() => {
     }
 
     // Don't check if file is marked as not found
-    const notFoundFlag = item.not_found === true || item.not_found === 1 || item.not_found === '1';
+    const notFoundValue = item.not_found;
+    const notFoundFlag =
+        notFoundValue === true ||
+        notFoundValue === 1 ||
+        notFoundValue === '1' ||
+        (typeof notFoundValue === 'string' && notFoundValue.toLowerCase() === 'true');
 
     if (notFoundFlag) {
         return false;
@@ -928,11 +939,6 @@ const needsCivitaiResolution = computed(() => {
 
     const typeIsVideo = type === 'video' || mime.startsWith('video/');
     const hasRemote = Boolean(original || thumbnail);
-
-    // Skip resolution if thumbnail is a static JPEG variant marked with anim=false (known-good)
-    if (thumbnail && /anim=false/i.test(thumbnail)) {
-        return false;
-    }
     const looksLikeVideo =
         /\/[^/]+\.mp4(?:\?|$)/i.test(original) ||
         /\/[^/]+\.mp4(?:\?|$)/i.test(thumbnail);
