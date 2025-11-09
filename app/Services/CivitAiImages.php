@@ -112,6 +112,10 @@ class CivitAiImages extends BaseService
         $guid = $m[2];
         $thumbnail = "https://image.civitai.com/{$token}/{$guid}/anim=false,width=450,optimized=true/{$id}.jpeg";
 
+        if (($row['type']) === 'Video') {
+            $thumbnail = "https://image.civitai.com/{$token}/{$guid}/transcode=true,width=450,optimized=true/{$id}.mp4";
+        }
+
         $file = [
             'source' => 'CivitAI',
             'source_id' => $id,

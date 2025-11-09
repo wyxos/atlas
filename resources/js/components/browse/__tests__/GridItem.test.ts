@@ -179,6 +179,24 @@ describe('GridItem error overlay interactions', () => {
         document.body.innerHTML = '';
     });
 
+    it('shows resolving overlay when resolution is required', async () => {
+        const wrapper = mountGridItem({
+            item: {
+                type: 'video',
+                original: 'https://media.example.test/video.mp4',
+                preview: 'https://media.example.test/thumb.jpg',
+                resolutionRequired: true,
+                not_found: false,
+            },
+        });
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.find('[data-testid="grid-item-resolving-overlay"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="loader-overlay"]').exists()).toBe(true);
+        expect(wrapper.find('video').exists()).toBe(false);
+        expect(wrapper.find('img').exists()).toBe(false);
+    });
+
     it('does not render loader or media when item is pre-flagged as not found', async () => {
         const wrapper = mountGridItem({
             item: {

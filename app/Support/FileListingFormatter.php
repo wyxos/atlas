@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\File;
+use App\Services\CivitAiImages;
 use Illuminate\Support\Facades\Storage;
 
 class FileListingFormatter
@@ -90,9 +91,11 @@ class FileListingFormatter
             }
         }
 
+        $previewUrl = $thumbnail ?? $original;
+
         return [
             'id' => $id,
-            'preview' => $thumbnail ?? $original,
+            'preview' => $previewUrl,
             'original' => $original,
             'true_original_url' => $file->url ?: null,
             'true_thumbnail_url' => $remoteThumbnail ?: ($localPreview ?? null),
@@ -116,10 +119,42 @@ class FileListingFormatter
             'previewed_count' => (int) $file->previewed_count,
             'seen_count' => (int) $file->seen_count,
             'not_found' => (bool) $file->not_found,
+            'resolutionRequired' => self::resolutionRequired($file),
             'loved' => $reactionType === 'love',
             'liked' => $reactionType === 'like',
             'disliked' => $reactionType === 'dislike',
             'funny' => $reactionType === 'funny',
         ];
+    }
+
+    /**
+     * Determine if the file should be re-resolved before attempting to display.
+     */
+    protected static function resolutionRequired(File $file): bool
+    {
+        if($file->not_found){
+            return false;
+        }
+
+        $remoteUrl = (string) ($file->url ?? '');
+        $thumbnailUrl = (string) ($file->thumbnail_url ?? '');
+        $source = (string) ($file->source ?? '');
+
+        if ($remoteUrl === '' || $thumbnailUrl === '') {
+            return false;
+        }
+
+        if (strcasecmp($source, CivitAiImages::SOURCE) !== 0) {
+            return false;
+        }
+
+        $originalExt = FileTypeDetector::extensionFromUrl($remoteUrl);
+        $thumbnailExt = FileTypeDetector::extensionFromUrl($thumbnailUrl);
+
+        if (! $originalExt || ! $thumbnailExt) {
+            return false;
+        }
+
+        return ($thumbnailExt === 'mp4' && in_array($originalExt, ['jpeg', 'jpg'], true));
     }
 }

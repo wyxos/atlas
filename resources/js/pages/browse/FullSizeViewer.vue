@@ -74,9 +74,15 @@ function setFullErrorState(
   }
 }
 
+function clearFullErrorState(): void {
+  setFullErrorState('none', null, null, false)
+}
+
 const fullIsNotFoundError = computed(() => (dialogItem.value as any)?.not_found === true || fullErrorKind.value === 'not-found')
 const isFileMarkedNotFound = computed(() => (dialogItem.value as any)?.not_found === true)
-const showFullErrorOverlay = computed(() => fullIsNotFoundError.value || fullErrorKind.value === 'unavailable')
+const showFullErrorOverlay = computed(
+  () => fullLoaded.value && (fullIsNotFoundError.value || fullErrorKind.value === 'unavailable'),
+)
 const fullOverlayIcon = computed(() => (fullIsNotFoundError.value ? ImageOff : AlertTriangle))
 const fullOverlayMessage = computed(() => (fullIsNotFoundError.value ? 'Not found' : 'Unable to load media'))
 const fullOverlayDetails = computed(() => {
@@ -609,6 +615,7 @@ function onMediaClick(event: MouseEvent) {
 function onThumbClick(item: any) {
   if (!item) return
   fullLoaded.value = false
+  clearFullErrorState()
   dialogItem.value = item
   void nextTick().then(() => ensureActiveThumbInView())
 }
@@ -812,6 +819,7 @@ async function navigate(delta: number) {
     const thumb = navList.value[targetIndex]
     if (thumb) {
       fullLoaded.value = false
+      clearFullErrorState()
       console.log('[FullSizeViewer] Setting dialogItem to:', thumb.id)
       dialogItem.value = thumb.item
     }
@@ -828,6 +836,7 @@ async function navigate(delta: number) {
     const thumb = navList.value[targetIndex]
     if (thumb) {
       fullLoaded.value = false
+      clearFullErrorState()
       dialogItem.value = thumb.item
     }
   }
@@ -1033,7 +1042,11 @@ const highlightedPromptHtml = computed(() => {
               <div class="absolute inset-0 z-10 grid place-items-center transition-opacity duration-300" :class="fullLoaded ? 'pointer-events-none opacity-0' : 'opacity-100'">
                 <LoaderOverlay />
               </div>
-              <div v-if="showFullErrorOverlay" class="absolute inset-0 z-20 grid place-items-center bg-background/70 p-6 text-center">
+              <div
+                v-if="showFullErrorOverlay"
+                class="absolute inset-0 z-20 grid place-items-center bg-background/70 p-6 text-center"
+                data-testid="fullsize-error-overlay"
+              >
                 <div class="flex flex-col items-center gap-3">
                   <component :is="fullOverlayIcon" :size="44" class="text-destructive" />
                   <div class="flex flex-col items-center gap-1">

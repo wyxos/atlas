@@ -828,6 +828,7 @@ function setErrorState(kind: 'none' | 'not-found' | 'unavailable', status: numbe
 }
 
 const isBackendFlaggedNotFound = computed(() => (props.item as any)?.not_found === true && errorKind.value === 'none');
+const isResolutionRequired = computed(() => (props.item as any)?.resolutionRequired === true);
 const isNotFoundError = computed(() => ((props.item as any)?.not_found === true) || errorKind.value === 'not-found');
 const showErrorOverlay = computed(() => isNotFoundError.value || errorKind.value === 'unavailable');
 const overlayIcon = computed(() => (isNotFoundError.value ? ImageOff : AlertTriangle));
@@ -845,13 +846,24 @@ const overlayDetails = computed(() => {
     return null;
 });
 
-const shouldAttemptMediaLoad = computed(() => !isBackendFlaggedNotFound.value);
+const shouldAttemptMediaLoad = computed(() => !isBackendFlaggedNotFound.value && !isResolutionRequired.value);
 
 watch(
     isBackendFlaggedNotFound,
     (flagged) => {
         if (flagged) {
             hasLoaded.value = true;
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    isResolutionRequired,
+    (required) => {
+        if (required) {
+            hasLoaded.value = true;
+            setErrorState('none');
         }
     },
     { immediate: true },
@@ -1258,6 +1270,17 @@ function closeActionPanel(): void {
 
         <!-- Media wrapper to scope loaders and highlights to the preview area -->
         <div class="relative flex-1 overflow-hidden cursor-zoom-in cursor-zoom-custom" @contextmenu="onContextMenu">
+            <div
+                v-if="isResolutionRequired"
+                class="absolute inset-0 z-[805] grid place-items-center bg-background/65 text-muted-foreground"
+                data-testid="grid-item-resolving-overlay"
+            >
+                <div class="flex flex-col items-center gap-2 text-xs font-medium">
+                    <LoaderOverlay />
+                    <span>Resolving…</span>
+                </div>
+            </div>
+
             <!-- Loader overlay while waiting for visibility or until media is ready; fades out -->
             <div
                 v-if="isVisible && !hasLoaded && shouldAttemptMediaLoad"
