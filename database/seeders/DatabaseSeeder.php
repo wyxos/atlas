@@ -17,8 +17,11 @@ class DatabaseSeeder extends Seeder
 
         // if production
         if (app()->environment('production')) {
-
             return;
+        }
+
+        if (app()->environment('local')) {
+            $this->call(LocalDemoUserSeeder::class);
         }
 
         User::factory()->create([

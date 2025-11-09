@@ -524,6 +524,25 @@ const fullResolvedMediaKind = computed<'video' | 'image'>(() => {
 })
 
 const fullShouldRenderVideo = computed(() => fullResolvedMediaKind.value === 'video')
+const fullVideoRef = ref<HTMLVideoElement | null>(null)
+
+function enableFullVideoAudio(): void {
+  if (!dialogOpen.value) return
+  if (!fullShouldRenderVideo.value) return
+  const videoElement = fullVideoRef.value
+  if (!videoElement) return
+  try {
+    if (videoElement.muted) {
+      videoElement.muted = false
+    }
+    if (videoElement.paused) {
+      const maybePromise = videoElement.play()
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        maybePromise.catch(() => {})
+      }
+    }
+  } catch {}
+}
 
 // Bottom thumbnail carousel state
 const thumbsVisible = ref(false)
@@ -651,6 +670,7 @@ function onFullVideoCanPlay() {
   fullLoaded.value = true
   fullVerifiedAvailableOnce.value = false
   setFullErrorState('none', null, null, false)
+  enableFullVideoAudio()
 }
 function onFullVideoTimeUpdate(event: Event) {
   const videoElement = event?.target as HTMLVideoElement | null
@@ -956,6 +976,18 @@ watch(dialogOpen, (isOpen) => {
 watch(thumbsVisible, (visible) => { if (visible) void nextTick().then(() => ensureActiveThumbInView()) })
 const mediaWrapRef = ref<HTMLElement | null>(null)
 
+watch(dialogOpen, (isOpen) => {
+  if (!isOpen) return
+  if (!fullShouldRenderVideo.value) return
+  void nextTick().then(() => enableFullVideoAudio())
+})
+
+watch([dialogItem, fullShouldRenderVideo], ([item, isVideo]) => {
+  if (!dialogOpen.value) return
+  if (!item || !isVideo) return
+  void nextTick().then(() => enableFullVideoAudio())
+})
+
 // Compute moderation info and highlighted prompt for debugging
 const moderationInfo = computed(() => {
   const meta = (dialogItem.value as any)?.metadata ?? {}
@@ -1026,10 +1058,11 @@ const highlightedPromptHtml = computed(() => {
                   <video v-if="dialogItem?.original || dialogItem?.preview"
                          :key="`${dialogItem?.id || 'video'}:${fullRetryCount}`"
                          :src="fullMediaSrc"
+                         ref="fullVideoRef"
                          referrerpolicy="no-referrer"
                          class="max-h-full max-w-full object-contain transition-opacity duration-300 select-none"
                          :class="[fullLoaded ? 'opacity-100' : 'opacity-0']"
-                         autoplay loop muted playsinline preload="metadata"
+                         autoplay loop playsinline preload="metadata" controls
                          @click="onMediaClick" @canplay="onFullVideoCanPlay" @timeupdate="onFullVideoTimeUpdate" @error="onFullVideoError"
                          @mousedown.capture="onFullMediaMouseDown" @mouseup.capture="onFullMediaMouseUp" @auxclick.capture="onFullMediaAuxClick"
                          @contextmenu="onFullMediaContextMenu"></video>
