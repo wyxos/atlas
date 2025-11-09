@@ -27,7 +27,7 @@ it('resolves the original mp4 source from the referrer page', function () {
 
     $resolved = $resolver->resolve();
 
-    expect($resolved)->toBe('https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/d98899f5-b9e8-44b8-9df2-2ee685de18cd/transcode=true,original=true,quality=90/2025-06-08T12.59.42_1.mp4');
+    expect($resolved)->toBe('https://media.example.test/civitai/81113576/transcode=true,original=true,quality=90/falsified-video.mp4');
 
     Http::assertSent(fn ($request) => $request->url() === 'https://civitai.com/images/81113576');
 });
