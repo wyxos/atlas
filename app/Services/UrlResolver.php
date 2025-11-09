@@ -5,9 +5,9 @@ namespace App\Services;
 use App\Models\File;
 use DOMDocument;
 use DOMXPath;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
 
 class UrlResolver
 {
@@ -15,46 +15,59 @@ class UrlResolver
 
     /**
      * Resolve the original media URL by scraping the file's referrer page.
-     *
-     * @throws RequestException|\Illuminate\Http\Client\ConnectionException
      */
-    public function resolve(): string
+    public function resolve(): ?string
     {
-        $file = File::query()->findOrFail($this->fileId);
+        $file = File::query()->find($this->fileId);
+
+        if (! $file) {
+            return null;
+        }
 
         $referrer = (string) $file->referrer_url;
 
         if ($referrer === '') {
-            throw new RuntimeException("File {$file->id} does not have a referrer URL to resolve against.");
+            return null;
         }
 
-        $response = Http::get($referrer);
+        try {
+            $response = Http::get($referrer);
+        } catch (ConnectionException|RequestException) {
+            return null;
+        }
 
-        $response->throw();
-
-        $html = $response->body();
+        if ($response->failed()) {
+            return null;
+        }
 
         $document = new DOMDocument;
         $previous = libxml_use_internal_errors(true);
 
+        $html = $response->body();
+        $loaded = false;
+
         try {
-            $document->loadHTML($html);
+            $loaded = $document->loadHTML($html);
         } finally {
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
+        }
+
+        if (! $loaded) {
+            return null;
         }
 
         $xpath = new DOMXPath($document);
         $nodes = $xpath->query('//video//source[@type="video/mp4"][@src]');
 
         if ($nodes === false || $nodes->length === 0) {
-            throw new RuntimeException("Unable to locate MP4 source for file {$file->id} at {$referrer}.");
+            return null;
         }
 
         $source = trim((string) $nodes->item(0)?->getAttribute('src'));
 
         if ($source === '' || ! str_contains($source, '.mp4')) {
-            throw new RuntimeException("Resolved MP4 source was empty for file {$file->id} at {$referrer}.");
+            return null;
         }
 
         return $source;
