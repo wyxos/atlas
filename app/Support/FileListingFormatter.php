@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\File;
-use App\Services\CivitAiImages;
 use Illuminate\Support\Facades\Storage;
 
 class FileListingFormatter
@@ -132,29 +131,6 @@ class FileListingFormatter
      */
     protected static function resolutionRequired(File $file): bool
     {
-        if($file->not_found){
-            return false;
-        }
-
-        $remoteUrl = (string) ($file->url ?? '');
-        $thumbnailUrl = (string) ($file->thumbnail_url ?? '');
-        $source = (string) ($file->source ?? '');
-
-        if ($remoteUrl === '' || $thumbnailUrl === '') {
-            return false;
-        }
-
-        if (strcasecmp($source, CivitAiImages::SOURCE) !== 0) {
-            return false;
-        }
-
-        $originalExt = FileTypeDetector::extensionFromUrl($remoteUrl);
-        $thumbnailExt = FileTypeDetector::extensionFromUrl($thumbnailUrl);
-
-        if (! $originalExt || ! $thumbnailExt) {
-            return false;
-        }
-
-        return ($thumbnailExt === 'mp4' && in_array($originalExt, ['jpeg', 'jpg'], true));
+        return false;
     }
 }
