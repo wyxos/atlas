@@ -6,6 +6,7 @@ use App\Models\File;
 use App\Services\CivitAiImages;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\URL;
 
 class ReconstructCivitAiThumbnails extends Command
 {
@@ -63,13 +64,97 @@ class ReconstructCivitAiThumbnails extends Command
             $progressBar,
             &$updated,
             &$unchanged,
-            &$skipped,
-            &$issues
+            &$skipped
         ) {
             foreach ($files as $file) {
+                // check if there's listing metadata
+                $metadata = $file->listing_metadata;
 
+                // if no listing metadata, scenario 1
+                if (empty($metadata) || !is_array($metadata)) {
+                    // we assume $file->url is valid and attempt to retrieve the guid from it
 
-                $progressBar->advance();
+                    $path = (string) parse_url($file->url, PHP_URL_PATH);
+
+                    preg_match('#^/([^/]+)/([^/]+)/#', $path, $m);
+
+                    $token = self::CivitAiToken;
+                    $guid = $m[2];
+
+                    // if we got a guid, reconstruct the thumbnail URL and url
+                    // url pattern https://image.civitai.com/token/guid/transcode=true,original=true,quality=90/id.mp4
+                    // thumbnail pattern https://image.civitai.com/token/guid/transcode=true,width=450,optimized=true/id.mp4
+
+                    $url = "https://image.civitai.com/{$token}/{$guid}/transcode=true,original=true,quality=90/{$file->source_id}.mp4";
+                    $thumbnail = "https://image.civitai.com/{$token}/{$guid}/transcode=true,width=450,optimized=true/{$file->source_id}.mp4";
+
+                    // save and advance
+                    if ($file->thumbnail_url !== $thumbnail || $file->url !== $url) {
+                        if (! $dryRun) {
+                            $file->thumbnail_url = $thumbnail;
+                            $file->url = $url;
+                            $file->save();
+                        }
+                        $updated++;
+                    } else {
+                        $unchanged++;
+                    }
+
+                    continue;
+                }
+
+                // if listing metadata and listing metadata url != file url, we verify if listing metadata url is valid
+                $listingUrl = $metadata['url'] ?? null;
+
+                // if url is invalid, scenario 2
+                // we perform a check to see if the listing metadata url is a valid well formed url
+                $validUrl = filter_var($listingUrl, FILTER_VALIDATE_URL) !== false;
+                if (!$validUrl) {
+                    // in this scenario, the listing metadata url is likely the guid, so we reconstruct from there
+                    $token = self::CivitAiToken;
+                    $guid = $metadata['url'];
+
+                    $url = "https://image.civitai.com/{$token}/{$guid}/transcode=true,original=true,quality=90/{$file->source_id}.mp4";
+                    $thumbnail = "https://image.civitai.com/{$token}/{$guid}/transcode=true,width=450,optimized=true/{$file->source_id}.mp4";
+
+                    // save and advance
+                    if ($file->thumbnail_url !== $thumbnail || $file->url !== $url) {
+                        if (! $dryRun) {
+                            $file->thumbnail_url = $thumbnail;
+                            $file->url = $url;
+                            $file->save();
+                        }
+                        $updated++;
+                    } else {
+                        $unchanged++;
+                    }
+
+                    continue;
+                }
+
+                // we extract the guid from the listing metadata url
+                $path = (string) parse_url($listingUrl, PHP_URL_PATH);
+
+                preg_match('#^/([^/]+)/([^/]+)/#', $path, $m);
+
+                $token = self::CivitAiToken;
+                $guid = $m[2];
+
+                // reconstruct the thumbnail and url
+                $url = "https://image.civitai.com/{$token}/{$guid}/transcode=true,original=true,quality=90/{$file->source_id}.mp4";
+                $thumbnail = "https://image.civitai.com/{$token}/{$guid}/transcode=true,width=450,optimized=true/{$file->source_id}.mp4";
+                // save and advance
+                if ($file->thumbnail_url !== $thumbnail || $file->url !== $url)
+                {
+                    if (! $dryRun) {
+                        $file->thumbnail_url = $thumbnail;
+                        $file->url = $url;
+                        $file->save();
+                    }
+                    $updated++;
+                } else {
+                    $unchanged++;
+                }
             }
         });
 
