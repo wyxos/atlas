@@ -417,9 +417,21 @@ class DownloadFile implements ShouldQueue
     protected function determineInitialFilename(string $fileUrl): string
     {
         $filename = (string) ($this->file->filename ?? '');
+
+        // Strip query parameters or fragments from existing filename values
+        if ($filename !== '') {
+            $filename = Str::before($filename, '?');
+            $filename = Str::before($filename, '#');
+        }
+
         if ($filename === '') {
             $path = parse_url($fileUrl, PHP_URL_PATH) ?: null;
             $filename = $path ? basename($path) : '';
+        }
+
+        if ($filename !== '') {
+            $filename = Str::before($filename, '?');
+            $filename = Str::before($filename, '#');
         }
 
         if ($filename === '') {
@@ -465,7 +477,6 @@ class DownloadFile implements ShouldQueue
             default => null,
         };
     }
-
 
     protected function detectMimeFromFile(string $path): ?string
     {

@@ -115,11 +115,11 @@ function handleVolumeSeek(event: MouseEvent): void {
 </script>
 
 <template>
-    <div class="sticky bottom-0 left-0 w-full border-t border-border bg-card px-4 py-2 md:p-4">
+    <div class="sticky bottom-0 left-0 w-full border-t border-border bg-card px-4 py-2 md:p-4" v-if="isActive">
         <!-- Desktop -->
         <div class="hidden items-center gap-4 md:flex">
             <!-- Minimized -->
-            <template v-if="isMinimized && isActive">
+            <template v-if="isMinimized">
                 <div class="flex flex-1 items-center gap-4">
                     <!-- Small cover -->
                     <div class="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
@@ -177,7 +177,7 @@ function handleVolumeSeek(event: MouseEvent): void {
             </template>
 
             <!-- Full View -->
-            <template v-if="isActive && !isMinimized">
+            <template v-if="!isMinimized">
                 <div class="flex w-100 items-center gap-4">
                     <div
                         class="relative flex h-18 w-18 shrink-0 items-center justify-center overflow-hidden bg-muted transition-all duration-300 md:h-32 md:w-32"
@@ -309,7 +309,7 @@ function handleVolumeSeek(event: MouseEvent): void {
         <AudioQueuePanel :is-open="isQueueOpen" @close="isQueueOpen = false" />
 
         <!-- Mobile -->
-        <template v-if="isActive">
+        <template>
             <div class="md:hidden">
                 <!-- Mobile Minimized -->
                 <template v-if="isMinimized">

@@ -97,6 +97,9 @@ class FileListingFormatter
             'true_original_url' => $file->url ?: null,
             'true_thumbnail_url' => $remoteThumbnail ?: ($localPreview ?? null),
             'referrer_url' => $file->referrer_url ?: null,
+            'source' => $file->source ?: null,
+            'source_id' => $file->source_id ?: null,
+            'mime_type' => $file->mime_type ?: null,
             'is_local' => $hasPath,
             'absolute_path' => $absolutePath,
             'type' => $type,
@@ -120,4 +123,3 @@ class FileListingFormatter
         ];
     }
 }
-

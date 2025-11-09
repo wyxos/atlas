@@ -459,6 +459,18 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
     const fileId = file?.id as number | undefined;
     if (!fileId) return;
 
+    if (type === 'love') {
+        const absolutePath = (file?.absolute_path as string | undefined) ?? null;
+        if (absolutePath) {
+            const confirmed = window.confirm(
+                `This file is already stored locally at:\n\n${absolutePath}\n\nRe-downloading will remove the existing file before saving the new copy. Do you want to continue?`
+            );
+            if (!confirmed) {
+                return;
+            }
+        }
+    }
+
     const currentIndex = items.value.findIndex((candidate) => candidate?.id === fileId);
     const shouldAdvance = dialogOpen.value && dialogItem.value?.id === fileId;
 
@@ -713,6 +725,7 @@ v-model.number="(form as any).limit"
                     ref="scroller"
 :layout="masonryLayout"
 :backfill-enabled="backfillEnabled"
+                    :auto-refresh-on-empty="true"
                     :backfill-delay-ms="2000"
                     :retry-max-attempts="3"
                     :retry-initial-delay-ms="2000"
@@ -725,6 +738,7 @@ v-model.number="(form as any).limit"
                     @retry:start="onRetryStart"
                     @retry:tick="onRetryTick"
                     @retry:stop="onRetryStop"
+                    @remove-all:complete="() => scroller?.refreshCurrentPage?.()"
                 >
 <template #item="{ item }">
                         <GridItem
@@ -813,6 +827,7 @@ v-model.number="(form as any).limit"
         v-model:item="dialogItem"
         :items="items"
         :scroller="scroller"
+        :refresh-on-empty="true"
         @favorite="onFavorite"
         @like="onLike"
         @dislike="onDislike"

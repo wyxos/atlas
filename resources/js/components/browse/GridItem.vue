@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import LoaderOverlay from '@/components/ui/LoaderOverlay.vue';
 import { Eye, ZoomIn, MoreHorizontal, User, Newspaper, Book, BookOpen, Palette, Tag, Info, ImageOff, AlertTriangle } from 'lucide-vue-next';
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
+import { useEchoPublic } from '@laravel/echo-vue';
 
 import ActionMenu, { type ActionOption } from '@/components/browse/ActionMenu.vue';
 import ContainerBadge from '@/components/browse/ContainerBadge.vue';
@@ -907,7 +908,9 @@ const needsCivitaiResolution = computed(() => {
     }
 
     // Don't check if file is marked as not found
-    if (item.not_found === true) {
+    const notFoundFlag = item.not_found === true || item.not_found === 1 || item.not_found === '1';
+
+    if (notFoundFlag) {
         return false;
     }
 
@@ -916,47 +919,34 @@ const needsCivitaiResolution = computed(() => {
     const thumbnail = String(trueThumbnailUrl.value ?? item.preview ?? item.thumbnail_url ?? '');
     const type = (item.type ?? '').toString().toLowerCase();
     const mime = (item.mime_type ?? '').toString().toLowerCase();
+    const source = (item.source ?? '').toString().toLowerCase();
 
-    // Don't check if url and thumbnail_url are already the same (no ambiguity to resolve)
-    if (original && thumbnail && original === thumbnail) {
+    // Only check CivitAI files
+    if (source !== 'civitai') {
         return false;
     }
 
-    const isCivitai =
-        referrer.includes('civitai.com') ||
-        original.includes('civitai.com') ||
-        thumbnail.includes('civitai.com');
-
-    if (!isCivitai) {
-        return false;
-    }
-
-    const typeLooksImage = type === 'image' || (!type && mime.startsWith('image/'));
     const typeIsVideo = type === 'video' || mime.startsWith('video/');
-    const originalLooksVideo = /\/[^/]+\.mp4(?:\?|$)/i.test(original);
-    const thumbnailLooksVideo =
-        /\.(jpe?g|png|webp)$/i.test(thumbnail) &&
-        /image\.civitai\.com/i.test(thumbnail) &&
-        /optimized=true/i.test(thumbnail);
-    
-    // Check if both thumbnail and original have mp4 extension
-    const thumbnailHasMp4 = /\/[^/]+\.mp4(?:\?|$)/i.test(thumbnail);
-    const bothHaveMp4 = originalLooksVideo && thumbnailHasMp4;
-    
-    // Check if one is jpeg and one is mp4 (either way)
-    const originalIsJpeg = /\.(jpe?g)(?:\?|$)/i.test(original);
-    const thumbnailIsJpeg = /\.(jpe?g)(?:\?|$)/i.test(thumbnail);
-    const oneJpegOneMp4 = (originalIsJpeg && thumbnailHasMp4) || (thumbnailIsJpeg && originalLooksVideo);
+    const hasRemote = Boolean(original || thumbnail);
 
-    // For video type: trigger resolution if both are mp4 OR one is jpeg and one is mp4
-    // This will try to get the real video from referrer, and if referrer is 404,
-    // fall back to identifying which URL is actually a video
-    if (typeIsVideo && referrer && (bothHaveMp4 || oneJpegOneMp4)) {
+    // Skip resolution if thumbnail is a static JPEG variant marked with anim=false (known-good)
+    if (thumbnail && /anim=false/i.test(thumbnail)) {
+        return false;
+    }
+    const looksLikeVideo =
+        /\/[^/]+\.mp4(?:\?|$)/i.test(original) ||
+        /\/[^/]+\.mp4(?:\?|$)/i.test(thumbnail);
+
+    if (!hasRemote) {
+        return false;
+    }
+
+    // Trigger resolution for videos or when URLs look like mislabeled videos
+    if (typeIsVideo || looksLikeVideo) {
         return true;
     }
 
-    // For image type: existing logic for mislabeled videos
-    return typeLooksImage && (originalLooksVideo || thumbnailLooksVideo);
+    return false;
 });
 
 watchEffect(() => {
@@ -1000,10 +990,13 @@ const resolvedMediaKind = computed<'video' | 'image'>(() => {
 
 const shouldRenderVideo = computed(() => resolvedMediaKind.value === 'video');
 
-async function ensureCivitaiResolution(): Promise<void> {
-    const itemId = (props.item as any)?.id;
+// Track item ID for event filtering
+const itemId = computed(() => (props.item as any)?.id);
 
-    if (!itemId || resolutionAttempted.value || resolvingRemoteMedia.value || !needsCivitaiResolution.value) {
+async function ensureCivitaiResolution(): Promise<void> {
+    const id = itemId.value;
+
+    if (!id || resolutionAttempted.value || resolvingRemoteMedia.value || !needsCivitaiResolution.value) {
         return;
     }
 
@@ -1011,58 +1004,85 @@ async function ensureCivitaiResolution(): Promise<void> {
     resolvingRemoteMedia.value = true;
 
     try {
-        const response = await axios.post(`/browse/files/${itemId}/resolve-media`);
-        const data = response?.data ?? {};
-
-        if (data?.resolved) {
-            const target = props.item as any;
-
-            if (typeof data.original === 'string') {
-                target.original = data.original;
-            }
-            if (typeof data.true_original_url === 'string') {
-                target.true_original_url = data.true_original_url;
-            } else if (typeof data.original === 'string') {
-                target.true_original_url = data.original;
-            }
-
-            if (typeof data.preview === 'string') {
-                target.preview = data.preview;
-            }
-
-            if (typeof data.thumbnail_url === 'string') {
-                target.thumbnail_url = data.thumbnail_url;
-            }
-            if (typeof data.true_thumbnail_url === 'string') {
-                target.true_thumbnail_url = data.true_thumbnail_url;
-            } else if (typeof data.thumbnail_url === 'string') {
-                target.true_thumbnail_url = data.thumbnail_url;
-            }
-
-            if (typeof data.mime_type === 'string') {
-                target.mime_type = data.mime_type;
-            }
-
-            if (typeof data.type === 'string') {
-                target.type = data.type;
-            } else if (typeof target.mime_type === 'string' && target.mime_type.startsWith('video/')) {
-                target.type = 'video';
-            }
-
-            target.not_found = false;
-            setErrorState('none');
-            useImageFallback.value = false;
-            retryCount.value = 0;
-            hasLoaded.value = false;
-        } else if (data?.not_found === true) {
-            setErrorState('not-found', 404, null);
-        }
+        // Dispatch job - resolution will happen in background and broadcast event when complete
+        await axios.post(`/browse/files/${id}/resolve-media`);
+        // Job dispatched successfully - keep resolvingRemoteMedia.value = true until event is received
     } catch (error) {
+        // If dispatch fails, reset state
         resolutionAttempted.value = false;
-    } finally {
         resolvingRemoteMedia.value = false;
     }
 }
+
+// Listen for resolution completion event
+useEchoPublic('civitai-media-resolved', '.civitai.media.resolved', (data: {
+    id: number;
+    resolved: boolean;
+    not_found: boolean;
+    updated: boolean;
+    message?: string | null;
+    preview?: string | null;
+    original?: string | null;
+    thumbnail_url?: string | null;
+    true_original_url?: string | null;
+    true_thumbnail_url?: string | null;
+    mime_type?: string | null;
+    type?: string | null;
+}) => {
+    // Only process events for this specific item
+    if (data.id !== itemId.value) {
+        return;
+    }
+
+    // Update item with resolved data
+    const target = props.item as any;
+
+    if (data.resolved) {
+        if (typeof data.original === 'string') {
+            target.original = data.original;
+        }
+        if (typeof data.true_original_url === 'string') {
+            target.true_original_url = data.true_original_url;
+        } else if (typeof data.original === 'string') {
+            target.true_original_url = data.original;
+        }
+
+        if (typeof data.preview === 'string') {
+            target.preview = data.preview;
+        }
+
+        if (typeof data.thumbnail_url === 'string') {
+            target.thumbnail_url = data.thumbnail_url;
+        }
+        if (typeof data.true_thumbnail_url === 'string') {
+            target.true_thumbnail_url = data.true_thumbnail_url;
+        } else if (typeof data.thumbnail_url === 'string') {
+            target.true_thumbnail_url = data.thumbnail_url;
+        }
+
+        if (typeof data.mime_type === 'string') {
+            target.mime_type = data.mime_type;
+        }
+
+        if (typeof data.type === 'string') {
+            target.type = data.type;
+        } else if (typeof target.mime_type === 'string' && target.mime_type.startsWith('video/')) {
+            target.type = 'video';
+        }
+
+        target.not_found = false;
+        setErrorState('none');
+        useImageFallback.value = false;
+        retryCount.value = 0;
+        hasLoaded.value = false;
+    } else if (data.not_found === true) {
+        setErrorState('not-found', 404, null);
+    }
+
+    // Reset resolution state
+    resolutionAttempted.value = data.resolved || data.not_found;
+    resolvingRemoteMedia.value = false;
+});
 
 // Context dropdown removed; using ActionMenu component
 
@@ -1411,6 +1431,18 @@ function closeActionPanel(): void {
                 class="pointer-events-none absolute inset-0 grid place-items-center"
             >
                 <LoaderOverlay />
+            </div>
+
+            <!-- Resolving overlay -->
+            <div
+                v-if="resolvingRemoteMedia"
+                class="absolute inset-0 z-[850] grid place-items-center bg-background/80 backdrop-blur-sm"
+                data-testid="grid-item-resolving-overlay"
+            >
+                <div class="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Loader2 class="h-6 w-6 animate-spin" />
+                    <span class="text-xs font-medium">Resolving media…</span>
+                </div>
             </div>
 
             <!-- Missing or error overlay -->
