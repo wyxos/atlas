@@ -97,7 +97,7 @@ class FileListingFormatter
             'preview' => $previewUrl,
             'original' => $original,
             'true_original_url' => $file->url ?: null,
-            'true_thumbnail_url' => $remoteThumbnail ?: ($localPreview ?? null),
+            'true_thumbnail_url' => $remoteThumbnail ?: null,
             'referrer_url' => $file->referrer_url ?: null,
             'source' => $file->source ?: null,
             'source_id' => $file->source_id ?: null,
