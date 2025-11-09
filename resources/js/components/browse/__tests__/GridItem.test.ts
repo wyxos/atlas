@@ -179,6 +179,22 @@ describe('GridItem error overlay interactions', () => {
         document.body.innerHTML = '';
     });
 
+    it('does not render loader or media when item is pre-flagged as not found', async () => {
+        const wrapper = mountGridItem({
+            item: {
+                preview: 'https://media.example.test/thumb.jpg',
+                original: 'https://media.example.test/video.mp4',
+                not_found: true,
+            },
+        });
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.find('[data-test="loader-overlay"]').exists()).toBe(false);
+        expect(wrapper.find('video').exists()).toBe(false);
+        expect(wrapper.find('img').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="grid-item-error-overlay"]').exists()).toBe(true);
+    });
+
     it('emits open when the error overlay is clicked', async () => {
         const wrapper = mountGridItem();
         await wrapper.vm.$nextTick();

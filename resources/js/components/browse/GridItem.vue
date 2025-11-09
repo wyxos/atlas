@@ -827,6 +827,7 @@ function setErrorState(kind: 'none' | 'not-found' | 'unavailable', status: numbe
     }
 }
 
+const isBackendFlaggedNotFound = computed(() => (props.item as any)?.not_found === true && errorKind.value === 'none');
 const isNotFoundError = computed(() => ((props.item as any)?.not_found === true) || errorKind.value === 'not-found');
 const showErrorOverlay = computed(() => isNotFoundError.value || errorKind.value === 'unavailable');
 const overlayIcon = computed(() => (isNotFoundError.value ? ImageOff : AlertTriangle));
@@ -843,6 +844,18 @@ const overlayDetails = computed(() => {
     }
     return null;
 });
+
+const shouldAttemptMediaLoad = computed(() => !isBackendFlaggedNotFound.value);
+
+watch(
+    isBackendFlaggedNotFound,
+    (flagged) => {
+        if (flagged) {
+            hasLoaded.value = true;
+        }
+    },
+    { immediate: true },
+);
 
 const thumbnailUrl = computed<string | null>(() => {
     const item = props.item as any;
@@ -1247,7 +1260,7 @@ function closeActionPanel(): void {
         <div class="relative flex-1 overflow-hidden cursor-zoom-in cursor-zoom-custom" @contextmenu="onContextMenu">
             <!-- Loader overlay while waiting for visibility or until media is ready; fades out -->
             <div
-                v-if="isVisible && !hasLoaded"
+                v-if="isVisible && !hasLoaded && shouldAttemptMediaLoad"
                 class="pointer-events-none absolute inset-0 grid place-items-center"
             >
                 <LoaderOverlay />
@@ -1286,7 +1299,7 @@ function closeActionPanel(): void {
             </div>
 
             <video
-                v-if="isVisible && shouldRenderVideo"
+                v-if="isVisible && shouldAttemptMediaLoad && shouldRenderVideo"
                 :key="videoSrc"
                 :src="videoSrc"
                 ref="videoEl"
@@ -1308,7 +1321,7 @@ function closeActionPanel(): void {
                 @contextmenu="onContextMenu"
             ></video>
             <img
-                v-else-if="isVisible"
+                v-else-if="isVisible && shouldAttemptMediaLoad"
                 :key="imageSrc"
                 :src="imageSrc"
                 alt=""
