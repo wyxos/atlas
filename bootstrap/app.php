@@ -19,9 +19,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule) {
         $schedule->command('horizon:snapshot')->everyFiveMinutes();
     })
-    ->withCommands([
-        \App\Console\Commands\FixCivitaiMediaTypes::class,
-    ])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 

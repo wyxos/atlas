@@ -3,8 +3,7 @@ import FileReactions from '@/components/audio/FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import LoaderOverlay from '@/components/ui/LoaderOverlay.vue';
 import { Eye, ZoomIn, MoreHorizontal, User, Newspaper, Book, BookOpen, Palette, Tag, Info, ImageOff, AlertTriangle } from 'lucide-vue-next';
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
-import { useEchoPublic } from '@laravel/echo-vue';
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import ActionMenu, { type ActionOption } from '@/components/browse/ActionMenu.vue';
 import ContainerBadge from '@/components/browse/ContainerBadge.vue';
@@ -85,8 +84,6 @@ const retryCount = ref(0);
 // When video keeps failing, fall back to the preview image (if any)
 const useImageFallback = ref(false);
 const videoEl = ref<HTMLVideoElement | null>(null);
-const resolutionAttempted = ref(false);
-const resolvingRemoteMedia = ref(false);
 
 const imageSrc = computed(() => {
     const p = (props.item as any)?.preview as string | undefined;
@@ -115,8 +112,6 @@ watch(() => (props.item as any)?.id, () => {
     missingReported.value = false;
     useImageFallback.value = false;
     errorMessage.value = null;
-    resolutionAttempted.value = false;
-    resolvingRemoteMedia.value = false;
 });
 
 // Inject shared intersection observer registry from parent (one per grid)
@@ -892,91 +887,6 @@ const referrerUrl = computed<string | null>(() => {
     return trimmed.length > 0 ? trimmed : null;
 });
 
-const civitaiResolutionEnabled = false;
-
-const needsCivitaiResolution = computed(() => {
-    if (!civitaiResolutionEnabled) {
-        return false;
-    }
-
-    const item = props.item as any;
-    if (!item) {
-        return false;
-    }
-
-    if (item.is_local === true) {
-        return false;
-    }
-
-    // Don't check if file is already downloaded (has path)
-    if (item.path) {
-        return false;
-    }
-
-    // Don't check if file is marked as not found
-    const notFoundValue = item.not_found;
-    const notFoundFlag =
-        notFoundValue === true ||
-        notFoundValue === 1 ||
-        notFoundValue === '1' ||
-        (typeof notFoundValue === 'string' && notFoundValue.toLowerCase() === 'true');
-
-    if (notFoundFlag) {
-        return false;
-    }
-
-    const referrer = referrerUrl.value ?? '';
-    const original = String(trueOriginalUrl.value ?? item.original ?? '');
-    const thumbnail = String(trueThumbnailUrl.value ?? item.preview ?? item.thumbnail_url ?? '');
-    const type = (item.type ?? '').toString().toLowerCase();
-    const mime = (item.mime_type ?? '').toString().toLowerCase();
-    const source = (item.source ?? '').toString().toLowerCase();
-
-    // Only check CivitAI files
-    if (source !== 'civitai') {
-        return false;
-    }
-
-    const typeIsVideo = type === 'video' || mime.startsWith('video/');
-    const hasRemote = Boolean(original || thumbnail);
-    const looksLikeVideo =
-        /\/[^/]+\.mp4(?:\?|$)/i.test(original) ||
-        /\/[^/]+\.mp4(?:\?|$)/i.test(thumbnail);
-
-    if (!hasRemote) {
-        return false;
-    }
-
-    // Trigger resolution for videos or when URLs look like mislabeled videos
-    if (typeIsVideo || looksLikeVideo) {
-        return true;
-    }
-
-    return false;
-});
-
-watchEffect(() => {
-    if (!needsCivitaiResolution.value) {
-        return;
-    }
-
-    if (!isVisible.value) {
-        return;
-    }
-
-    if (resolutionAttempted.value || resolvingRemoteMedia.value) {
-        return;
-    }
-
-    // Don't trigger resolution if video has already started loading successfully
-    if (shouldRenderVideo.value && hasLoaded.value) {
-        return;
-    }
-
-    void ensureCivitaiResolution();
-});
-
-
 const resolvedMediaKind = computed<'video' | 'image'>(() => {
     if (useImageFallback.value) {
         return 'image';
@@ -995,100 +905,6 @@ const resolvedMediaKind = computed<'video' | 'image'>(() => {
 });
 
 const shouldRenderVideo = computed(() => resolvedMediaKind.value === 'video');
-
-// Track item ID for event filtering
-const itemId = computed(() => (props.item as any)?.id);
-
-async function ensureCivitaiResolution(): Promise<void> {
-    const id = itemId.value;
-
-    if (!id || resolutionAttempted.value || resolvingRemoteMedia.value || !needsCivitaiResolution.value) {
-        return;
-    }
-
-    resolutionAttempted.value = true;
-    resolvingRemoteMedia.value = true;
-
-    try {
-        // Dispatch job - resolution will happen in background and broadcast event when complete
-        await axios.post(`/browse/files/${id}/resolve-media`);
-        // Job dispatched successfully - keep resolvingRemoteMedia.value = true until event is received
-    } catch (error) {
-        // If dispatch fails, reset state
-        resolutionAttempted.value = false;
-        resolvingRemoteMedia.value = false;
-    }
-}
-
-// Listen for resolution completion event
-useEchoPublic('civitai-media-resolved', '.civitai.media.resolved', (data: {
-    id: number;
-    resolved: boolean;
-    not_found: boolean;
-    updated: boolean;
-    message?: string | null;
-    preview?: string | null;
-    original?: string | null;
-    thumbnail_url?: string | null;
-    true_original_url?: string | null;
-    true_thumbnail_url?: string | null;
-    mime_type?: string | null;
-    type?: string | null;
-}) => {
-    // Only process events for this specific item
-    if (data.id !== itemId.value) {
-        return;
-    }
-
-    // Update item with resolved data
-    const target = props.item as any;
-
-    if (data.resolved) {
-        if (typeof data.original === 'string') {
-            target.original = data.original;
-        }
-        if (typeof data.true_original_url === 'string') {
-            target.true_original_url = data.true_original_url;
-        } else if (typeof data.original === 'string') {
-            target.true_original_url = data.original;
-        }
-
-        if (typeof data.preview === 'string') {
-            target.preview = data.preview;
-        }
-
-        if (typeof data.thumbnail_url === 'string') {
-            target.thumbnail_url = data.thumbnail_url;
-        }
-        if (typeof data.true_thumbnail_url === 'string') {
-            target.true_thumbnail_url = data.true_thumbnail_url;
-        } else if (typeof data.thumbnail_url === 'string') {
-            target.true_thumbnail_url = data.thumbnail_url;
-        }
-
-        if (typeof data.mime_type === 'string') {
-            target.mime_type = data.mime_type;
-        }
-
-        if (typeof data.type === 'string') {
-            target.type = data.type;
-        } else if (typeof target.mime_type === 'string' && target.mime_type.startsWith('video/')) {
-            target.type = 'video';
-        }
-
-        target.not_found = false;
-        setErrorState('none');
-        useImageFallback.value = false;
-        retryCount.value = 0;
-        hasLoaded.value = false;
-    } else if (data.not_found === true) {
-        setErrorState('not-found', 404, null);
-    }
-
-    // Reset resolution state
-    resolutionAttempted.value = data.resolved || data.not_found;
-    resolvingRemoteMedia.value = false;
-});
 
 // Context dropdown removed; using ActionMenu component
 
@@ -1342,8 +1158,6 @@ function onOverlayAuxClick(e: MouseEvent) {
 function retryLoad(fromUser = false) {
     if (fromUser) {
         verifiedAvailableOnce.value = false;
-        resolutionAttempted.value = false;
-        resolvingRemoteMedia.value = false;
     }
     // Clear flags and bump retry counter to bust the cache and force reload
     hasLoaded.value = false;
@@ -1437,18 +1251,6 @@ function closeActionPanel(): void {
                 class="pointer-events-none absolute inset-0 grid place-items-center"
             >
                 <LoaderOverlay />
-            </div>
-
-            <!-- Resolving overlay -->
-            <div
-                v-if="resolvingRemoteMedia"
-                class="absolute inset-0 z-[850] grid place-items-center bg-background/80 backdrop-blur-sm"
-                data-testid="grid-item-resolving-overlay"
-            >
-                <div class="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Loader2 class="h-6 w-6 animate-spin" />
-                    <span class="text-xs font-medium">Resolving media…</span>
-                </div>
             </div>
 
             <!-- Missing or error overlay -->

@@ -186,8 +186,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('browse/files/{file}/file-seen', [App\Http\Controllers\BrowseController::class, 'fileSeen'])
         ->name('browse.files.file-seen');
     // Report missing/404 media
-    Route::post('browse/files/{file}/resolve-media', \App\Http\Controllers\ResolveCivitaiMediaController::class)
-        ->name('browse.files.resolve-media');
     Route::post('browse/files/{file}/report-missing', [App\Http\Controllers\BrowseController::class, 'reportMissing'])
         ->name('browse.files.report-missing');
     Route::post('browse/files/{file}/clear-not-found', [App\Http\Controllers\BrowseController::class, 'clearNotFound'])
