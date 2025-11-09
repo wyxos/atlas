@@ -146,29 +146,17 @@ class ReconstructCivitAiThumbnails extends Command
             return null;
         }
 
-        $type = $listing['type'] ?? null;
-        $isVideo = is_string($type) && strcasecmp($type, 'Video') === 0;
-
-        if (! $isVideo && is_string($file->mime_type) && str_starts_with(strtolower($file->mime_type), 'video/')) {
-            $isVideo = true;
-        }
-
-        if (! $isVideo) {
+        if (! $this->isVideoFile($file, $listing)) {
             return null;
         }
 
-        [$token, $guid] = $this->extractTokenAndGuid($file);
+        $guid = $listing['guid'] ?? $this->extractGuidFromUrl($listing['url'] ?? $file->url ?? null);
 
-        if (! $token || ! $guid) {
+        if (! $guid) {
             return null;
         }
 
-        return sprintf(
-            'https://image.civitai.com/%s/%s/transcode=true,width=450,optimized=true/%s.mp4',
-            $token,
-            $guid,
-            $id
-        );
+        return $this->buildCanonicalThumbnailUrl($guid, $id);
     }
 
     /**
@@ -178,14 +166,14 @@ class ReconstructCivitAiThumbnails extends Command
     {
         $listing = $file->listing_metadata;
 
-        if (! is_array($listing)) {
-            return false;
+        if (! is_array($listing) || empty($listing)) {
+            return $this->reconstructListingFromFileUrl($file, $dryRun);
         }
 
         $currentUrl = $listing['url'] ?? null;
 
-        if ($currentUrl && filter_var($currentUrl, FILTER_VALIDATE_URL)) {
-            return true;
+        if ($currentUrl && !filter_var($currentUrl, FILTER_VALIDATE_URL)) {
+            return false;
         }
 
         $guid = null;
@@ -219,62 +207,92 @@ class ReconstructCivitAiThumbnails extends Command
             return true;
         }
 
+        $file->save();
+
         return true;
     }
+
     /**
-     * Extract token and guid from available metadata and URLs.
-     *
-     * @return array{0:?string,1:?string}
+     * Rebuild listing information when metadata is missing but the file URL is available.
      */
-    protected function extractTokenAndGuid(File $file): array
+    protected function reconstructListingFromFileUrl(File $file, bool $dryRun): bool
     {
-        $listing = $file->listing_metadata;
+        $remoteUrl = $file->url;
 
-        $guid = is_array($listing) && isset($listing['guid']) && is_string($listing['guid'])
-            ? $listing['guid']
-            : null;
-
-        $token = is_array($listing) && isset($listing['token']) && is_string($listing['token'])
-            ? $listing['token']
-            : null;
-
-        $sources = [
-            is_array($listing) ? ($listing['url'] ?? null) : null,
-            $file->thumbnail_url,
-            $file->url,
-        ];
-
-        foreach ($sources as $source) {
-            $extracted = $this->extractTokenGuidFromUrl($source);
-
-            if (! $extracted) {
-                continue;
-            }
-
-            [$parsedToken, $parsedGuid] = $extracted;
-
-            if (! $token && $parsedToken) {
-                $token = $parsedToken;
-            }
-
-            if (! $guid && $parsedGuid) {
-                $guid = $parsedGuid;
-            }
-
-            if ($token && $guid) {
-                break;
-            }
+        if (! is_string($remoteUrl) || ! filter_var($remoteUrl, FILTER_VALIDATE_URL)) {
+            return false;
         }
 
-        return [$token, $guid];
+        $guid = $this->extractGuidFromUrl($remoteUrl);
+
+        if (! $guid) {
+            return false;
+        }
+
+        $id = $file->source_id ?? $file->id;
+
+        if (! $id) {
+            return false;
+        }
+
+        $listing = [
+            'id' => $id,
+            'guid' => $guid,
+            'url' => $this->buildCanonicalMediaUrl($guid, $id),
+        ];
+
+        $this->ensureListingType($file, $listing);
+
+        $file->setAttribute('listing_metadata', $listing);
+        $file->setAttribute('url', $listing['url']);
+        $file->setAttribute('thumbnail_url', $this->buildCanonicalThumbnailUrl($guid, $id));
+
+        if (! $dryRun) {
+            $file->save();
+        }
+
+        return true;
     }
 
-    /**
-     * Extract token and guid from a single URL.
-     *
-     * @return array{0:string,1:string}|null
-     */
-    protected function extractTokenGuidFromUrl(?string $url): ?array
+    protected function ensureListingType(File $file, array &$listing): void
+    {
+        if (! isset($listing['type']) && $this->isVideoFile($file, $listing)) {
+            $listing['type'] = 'Video';
+        }
+    }
+
+    protected function isVideoFile(File $file, array $listing = []): bool
+    {
+        if (isset($listing['type']) && is_string($listing['type'])) {
+            return strcasecmp($listing['type'], 'Video') === 0;
+        }
+
+        $mime = strtolower((string) ($file->mime_type ?? ''));
+
+        return str_starts_with($mime, 'video/');
+    }
+
+    protected function buildCanonicalMediaUrl(string $guid, int $id): string
+    {
+        return sprintf(
+            'https://image.civitai.com/%s/%s/transcode=true,original=true,quality=90/%s.mp4',
+            self::CivitAiToken,
+            $guid,
+            $id
+        );
+    }
+
+    protected function buildCanonicalThumbnailUrl(string $guid, int $id): string
+    {
+        return sprintf(
+            'https://image.civitai.com/%s/%s/transcode=true,width=450,optimized=true/%s.mp4',
+            self::CivitAiToken,
+            $guid,
+            $id
+        );
+    }
+
+    protected function extractGuidFromUrl(?string $url): ?string
     {
         if (! is_string($url) || $url === '') {
             return null;
@@ -292,17 +310,10 @@ class ReconstructCivitAiThumbnails extends Command
 
         $segments = array_values(array_filter(explode('/', $path)));
 
-        if (count($segments) < 3) {
+        if (count($segments) < 2) {
             return null;
         }
 
-        $token = $segments[0] ?? null;
-        $guid = $segments[1] ?? null;
-
-        if (! $token || ! $guid) {
-            return null;
-        }
-
-        return [$token, $guid];
+        return $segments[1] ?? null;
     }
 }

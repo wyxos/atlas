@@ -94,3 +94,25 @@ it('reconstructs guid-based listing metadata', function () {
         ->and($file->thumbnail_url)->toBe($meta['expected_thumb_mp4']);
 });
 
+it('rebuilds listing metadata when missing but file url is available', function () {
+    $meta = civitaiMeta();
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'source_id' => $meta['id'],
+        'mime_type' => 'video/mp4',
+        'url' => $meta['remote_url'],
+        'thumbnail_url' => 'https://invalid.local/placeholder.mp4',
+        'listing_metadata' => null,
+    ]);
+
+    Artisan::call('civitai:reconstruct-thumbnails', ['--chunk' => 1]);
+
+    $file->refresh();
+
+    expect($file->listing_metadata)->toBeArray()
+        ->and($file->listing_metadata['guid'])->toBe($meta['guid'])
+        ->and($file->url)->toBe($meta['expected_remote_url'])
+        ->and($file->thumbnail_url)->toBe($meta['expected_thumb_mp4']);
+});
+
