@@ -3,11 +3,11 @@ import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarGroup, SidebarGroupLabel, SidebarMenuSub, SidebarMenuSubItem } from '@/components/ui/sidebar';
-import { dashboard, users as usersRoute, files as filesRoute, photos as photosRoute, reels as reelsRoute, downloads as downloadsRoute } from '@/routes';
+import { dashboard, users as usersRoute, files as filesRoute, photos as photosRoute, reels as reelsRoute } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
-import { LayoutGrid, Users, Music, Image, Video, Heart, ThumbsUp, Laugh, ThumbsDown, HelpCircle, ChevronDown, ChevronUp, Shuffle, Play, Search, FileText, Download, CheckCircle, Clock, AlertTriangle, Eye, EyeOff, Cog, MinusCircle, Music2 } from 'lucide-vue-next';
+import { LayoutGrid, Users, Music, Image, Video, Heart, ThumbsUp, Laugh, ThumbsDown, HelpCircle, ChevronDown, ChevronUp, Shuffle, Play, Search, FileText, AlertTriangle, Eye, EyeOff, Cog, MinusCircle, Music2 } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 import { useAudioPlayer, type AudioTrack } from '@/stores/audio';
 import * as AudioController from '@/actions/App/Http/Controllers/AudioController';
@@ -42,7 +42,7 @@ const mainNavItems: NavItem[] = [
     ] : []),
 ];
 
-function initialOpen(section: 'audio' | 'images' | 'videos' | 'files' | 'downloads' | 'disliked' | 'videosDisliked'): boolean {
+function initialOpen(section: 'audio' | 'images' | 'videos' | 'files' | 'disliked' | 'videosDisliked'): boolean {
   try {
     const raw = localStorage.getItem(openStateKey);
     const st = raw ? JSON.parse(raw) : {};
@@ -53,7 +53,6 @@ function initialOpen(section: 'audio' | 'images' | 'videos' | 'files' | 'downloa
   if (section === 'images') return url.startsWith('/photos');
   if (section === 'videos') return url.startsWith('/reels');
   if (section === 'files') return url.startsWith('/files');
-  if (section === 'downloads') return url.startsWith('/downloads');
   if (section === 'disliked') return url.startsWith('/photos/disliked');
   if (section === 'videosDisliked') return url.startsWith('/reels/disliked');
   return false;
@@ -63,7 +62,6 @@ const isFilesOpen = ref(initialOpen('files'));
 const isImagesOpen = ref(initialOpen('images'));
 const isVideosOpen = ref(initialOpen('videos'));
 const isAudioOpen = ref(initialOpen('audio'));
-const isDownloadsOpen = ref(initialOpen('downloads'));
 const isDislikedOpen = ref(initialOpen('disliked'));
 const isVideosDislikedOpen = ref(initialOpen('videosDisliked'));
 
@@ -77,14 +75,13 @@ function saveOpenState() {
       images: isImagesOpen.value,
       videos: isVideosOpen.value,
       files: isFilesOpen.value,
-      downloads: isDownloadsOpen.value,
       disliked: isDislikedOpen.value,
       videosDisliked: isVideosDislikedOpen.value,
     };
     localStorage.setItem(openStateKey, JSON.stringify(st));
   } catch {}
 }
-watch([isAudioOpen, isImagesOpen, isVideosOpen, isFilesOpen, isDownloadsOpen, isDislikedOpen, isVideosDislikedOpen], saveOpenState);
+watch([isAudioOpen, isImagesOpen, isVideosOpen, isFilesOpen, isDislikedOpen, isVideosDislikedOpen], saveOpenState);
 
 function visit(url: string) {
   if (!url || url === '#') return;
@@ -134,7 +131,7 @@ async function queueAudioReaction(type: string, opts: { shuffle?: boolean } = {}
 }
 
 
-function openAndVisit(section: 'audio' | 'images' | 'videos' | 'files' | 'downloads') {
+function openAndVisit(section: 'audio' | 'images' | 'videos' | 'files') {
   if (section === 'audio') {
     if (isAudioOpen.value) { isAudioOpen.value = false; return; }
     isAudioOpen.value = true;
@@ -143,10 +140,6 @@ function openAndVisit(section: 'audio' | 'images' | 'videos' | 'files' | 'downlo
     if (isFilesOpen.value) { isFilesOpen.value = false; return; }
     isFilesOpen.value = true;
     visit(filesRoute());
-  } else if (section === 'downloads') {
-    if (isDownloadsOpen.value) { isDownloadsOpen.value = false; return; }
-    isDownloadsOpen.value = true;
-    visit(downloadsRoute());
   } else if (section === 'images') {
     if (isImagesOpen.value) { isImagesOpen.value = false; return; }
     isImagesOpen.value = true;

@@ -6,7 +6,7 @@ use App\Models\Reaction;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('dashboard returns inertia component with fileStats', function () {
+\test('dashboard returns inertia component with fileStats', function () {
     $user = User::factory()->create();
 
     // Seed a small set of files across types
@@ -36,11 +36,11 @@ test('dashboard returns inertia component with fileStats', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard')
             ->has('fileStats')
-            ->where('fileStats', fn ($stats) => is_array($stats)) // initial render is deferred
+            ->where('fileStats', fn ($stats) => $stats instanceof \Illuminate\Support\Collection)
         );
 });
 
-test('dashboard stats json returns expected keys', function () {
+\test('dashboard stats json returns expected keys', function () {
     $user = User::factory()->create();
 
     // Minimal seed to exercise endpoint

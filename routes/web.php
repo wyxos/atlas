@@ -193,21 +193,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('audio/{file}/details', [App\Http\Controllers\AudioController::class, 'details'])
         ->name('audio.details');
 
-    // Downloads
-    Route::get('downloads', [App\Http\Controllers\DownloadsController::class, 'index'])
-        ->name('downloads');
-    Route::post('downloads/{download}/pause', [App\Http\Controllers\DownloadsController::class, 'pause'])
-        ->name('downloads.pause');
-    Route::post('downloads/{download}/resume', [App\Http\Controllers\DownloadsController::class, 'resume'])
-        ->name('downloads.resume');
-    Route::post('downloads/{download}/cancel', [App\Http\Controllers\DownloadsController::class, 'cancel'])
-        ->name('downloads.cancel');
-    Route::post('downloads/{download}/retry', [App\Http\Controllers\DownloadsController::class, 'retry'])
-        ->name('downloads.retry');
-    Route::delete('downloads/{download}', [App\Http\Controllers\DownloadsController::class, 'destroy'])
-        ->name('downloads.destroy');
-    Route::delete('downloads/{download}/with-file', [App\Http\Controllers\DownloadsController::class, 'destroyWithFile'])
-        ->name('downloads.destroy-with-file');
     Route::post('audio/batch-details', [App\Http\Controllers\AudioController::class, 'batchDetails'])
         ->name('audio.batch-details');
     Route::get('audio/stream/{file}', [App\Http\Controllers\AudioController::class, 'stream'])
