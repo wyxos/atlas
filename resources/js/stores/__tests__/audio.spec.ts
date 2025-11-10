@@ -558,6 +558,40 @@ describe('audio store', () => {
       );
     });
 
+    it('keeps volume consistent when switching between local and Spotify tracks', async () => {
+      const store = await importStore();
+
+      // Start with a local track and set a custom volume
+      const local = buildTrack(200);
+      await store.setQueueAndPlay([local], 0);
+      const audio = getAudioInstance();
+
+      store.setVolume(0.35);
+      expect(store.volume.value).toBeCloseTo(0.35);
+      expect(audio.volume).toBeCloseTo(0.35);
+
+      // Switch to a Spotify track; player should receive the same volume
+      const spotify = buildSpotifyTrack(201);
+      await store.setQueueAndPlay([spotify], 0);
+      await flushPromises();
+      await flushPromises();
+      await flushPromises(); // wait for device
+
+      expect(mockSpotifyPlayer.setVolume).toHaveBeenCalled();
+      const lastSetVolumeArg = mockSpotifyPlayer.setVolume.mock.calls.at(-1)?.[0];
+      expect(lastSetVolumeArg).toBeCloseTo(0.35);
+
+      // Change volume while on Spotify; HTML audio should also reflect when returning to local
+      mockSpotifyPlayer.setVolume.mockClear();
+      store.setVolume(0.6);
+      expect(mockSpotifyPlayer.setVolume).toHaveBeenCalledWith(0.6);
+
+      // Return to local track and ensure audio element volume matches
+      await store.setQueueAndPlay([local], 0);
+      await flushPromises();
+      expect(audio.volume).toBeCloseTo(0.6);
+    });
+
     it('fetches metadata before playing when Spotify details are missing', async () => {
       const store = await importStore();
       const spotifyTrack = buildSpotifyTrack(2);

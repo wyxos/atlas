@@ -859,6 +859,14 @@ class AudioPlayerManager {
             setTimeout(() => {
                 this.isLoadingTrack = false;
             }, 500);
+            // Ensure Spotify player volume matches store volume if player exists
+            if (this.spotifyPlayer) {
+                try {
+                    void this.spotifyPlayer.setVolume(this.volume.value);
+                } catch (error) {
+                    console.debug('Could not apply volume to Spotify player:', error);
+                }
+            }
             return;
         }
 
@@ -874,6 +882,8 @@ class AudioPlayerManager {
         if (!this.audio) return;
 
         this.audio.src = audioUrl;
+        // Re-apply volume on each non-Spotify track load to keep parity with store volume
+        this.audio.volume = this.volume.value;
         this.currentTrack.value = track;
         await this.audio.load();
 
@@ -1063,21 +1073,16 @@ class AudioPlayerManager {
     setVolume(volume: number): void {
         this.volume.value = Math.max(0, Math.min(1, volume));
 
-        const currentTrack = this.currentTrack.value;
-        if (currentTrack && this.isSpotifyTrack(currentTrack)) {
-            // Use Spotify player
-            if (this.spotifyPlayer) {
-                try {
-                    void this.spotifyPlayer.setVolume(this.volume.value);
-                } catch (error) {
-                    // SDK setVolume() might fail if player isn't ready
-                    console.debug('Could not set Spotify volume:', error);
-                }
-            }
-        } else {
-            // Use HTML Audio API
-            if (this.audio) {
-                this.audio.volume = this.volume.value;
+        // Always attempt to set volume on both backends to keep them in sync
+        if (this.audio) {
+            this.audio.volume = this.volume.value;
+        }
+        if (this.spotifyPlayer) {
+            try {
+                void this.spotifyPlayer.setVolume(this.volume.value);
+            } catch (error) {
+                // SDK setVolume() might fail if player isn't ready
+                console.debug('Could not set Spotify volume:', error);
             }
         }
     }

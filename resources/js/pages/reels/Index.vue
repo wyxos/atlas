@@ -5,6 +5,7 @@ import ScrollableLayout from '@/layouts/ScrollableLayout.vue';
 import SectionHeader from '@/components/audio/SectionHeader.vue';
 import GridItem from '@/components/browse/GridItem.vue';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogDescription, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { type BreadcrumbItem } from '@/types';
@@ -462,12 +463,10 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
     if (type === 'love') {
         const absolutePath = (file?.absolute_path as string | undefined) ?? null;
         if (absolutePath) {
-            const confirmed = window.confirm(
-                `This file is already stored locally at:\n\n${absolutePath}\n\nRe-downloading will remove the existing file before saving the new copy. Do you want to continue?`
-            );
-            if (!confirmed) {
-                return;
-            }
+            loveConfirmFile.value = file;
+            loveConfirmPath.value = absolutePath;
+            loveConfirmOpen.value = true;
+            return;
         }
     }
 
@@ -555,6 +554,81 @@ defineExpose({
     filtersBusy,
     form,
 });
+
+// ----- Love confirmation (for locally stored files) -----
+const loveConfirmOpen = ref(false);
+const loveConfirmFile = ref<any | null>(null);
+const loveConfirmPath = ref<string | null>(null);
+
+async function proceedLove(redownload: boolean) {
+    const file = loveConfirmFile.value;
+    loveConfirmOpen.value = false;
+    loveConfirmFile.value = null;
+    loveConfirmPath.value = null;
+    if (!file) return;
+
+    const fileId = file?.id as number | undefined;
+    if (!fileId) return;
+
+    const currentIndex = items.value.findIndex((candidate) => candidate?.id === fileId);
+    const shouldAdvance = dialogOpen.value && dialogItem.value?.id === fileId;
+    const removedIndex = items.value.findIndex((candidate) => candidate?.id === fileId);
+    const snapshot = { ...file };
+
+    try { await scroller.value?.remove?.(file); } catch {}
+
+    try {
+        const action = redownload
+            ? (BrowseController as any).reactDownload({ file: fileId })
+            : (BrowseController as any).react({ file: fileId });
+        await axios.post(action.url, redownload ? { type: 'love' } : { type: 'love', state: true });
+    } catch {}
+
+    if (shouldAdvance) {
+        await nextTick();
+        const baseIndex = currentIndex < 0 ? 0 : currentIndex;
+        let nextItem: any | null = items.value[baseIndex] ?? items.value[baseIndex + 1] ?? null;
+        if (!nextItem) {
+            try {
+                if (scroller.value?.loadNext) {
+                    await scroller.value.loadNext();
+                }
+            } catch {}
+            await nextTick();
+            nextItem = items.value[0] ?? null;
+        }
+        if (nextItem) {
+            dialogItem.value = nextItem;
+        } else {
+            dialogOpen.value = false;
+            dialogItem.value = null;
+        }
+    }
+
+    const previousType = computePrevType(file);
+    undoManager.push({
+        label: `Love 1 item`,
+        previews: [snapshot?.preview || snapshot?.thumbnail_url || ''].filter(Boolean) as string[],
+        previewTitles: [snapshot?.title || ''].filter(Boolean) as string[],
+        applyUI: () => {},
+        revertUI: () => {
+            const index = Math.max(0, Math.min(removedIndex, items.value.length));
+            items.value.splice(index, 0, snapshot);
+            void nextTick().then(() => scroller.value?.refreshLayout?.(items.value));
+        },
+        do: async () => Promise.resolve(),
+        undo: async () => {
+            try {
+                const react = (BrowseController as any).react({ file: file.id });
+                if (previousType === null) {
+                    await axios.post(react.url, { type: 'love', state: false });
+                } else {
+                    await axios.post(react.url, { type: previousType, state: true });
+                }
+            } catch {}
+        },
+    });
+}
 </script>
 
 <template>
@@ -833,5 +907,21 @@ v-model.number="(form as any).limit"
         @dislike="onDislike"
         @laughed-at="onFunny"
     />
+
+    <!-- Love confirmation dialog for locally stored files -->
+    <Dialog v-model:open="loveConfirmOpen">
+        <DialogScrollContent class="max-w-[560px]">
+            <DialogTitle>Re-download and love?</DialogTitle>
+            <DialogDescription>
+                This file is already stored locally at:
+                <div class="mt-2 rounded bg-muted p-2 font-mono text-xs text-foreground break-all">{{ loveConfirmPath }}</div>
+                Re-downloading will remove the existing file before saving the new copy.
+            </DialogDescription>
+            <div class="mt-4 flex gap-2 justify-end">
+                <Button variant="secondary" @click="() => proceedLove(false)">Love only</Button>
+                <Button :disabled="isLoading" @click="() => proceedLove(true)">Re-download and love</Button>
+            </div>
+        </DialogScrollContent>
+    </Dialog>
 </template>
 
