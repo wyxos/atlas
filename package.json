@@ -51,7 +51,7 @@
         "@oruga-ui/theme-oruga": "^0.7.1",
         "@types/lodash": "^4.17.20",
         "@vueuse/core": "^12.8.2",
-        "@wyxos/vibe": "file:../../vue/vibe",
+        "@wyxos/vibe": "^1.6.1",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "laravel-vite-plugin": "^2.0.0",
