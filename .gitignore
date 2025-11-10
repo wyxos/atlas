@@ -43,7 +43,6 @@ playwright-trace.zip
 /cdp-*.json
 /after-*.png
 /perf-metrics.json
-/plugins
 /app/Console/Commands/Personal
 
 # Requirements draft
