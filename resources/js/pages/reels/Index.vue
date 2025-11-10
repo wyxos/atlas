@@ -462,7 +462,10 @@ async function handleReactFlow(file: any, type: Exclude<ReactionKind, null>, eve
 
     if (type === 'love') {
         const absolutePath = (file?.absolute_path as string | undefined) ?? null;
-        if (absolutePath) {
+        const hasUrl = typeof (file as any)?.url === 'string'
+            ? (file as any).url.trim().length > 0
+            : !!(file as any)?.url;
+        if (absolutePath && hasUrl) {
             loveConfirmFile.value = file;
             loveConfirmPath.value = absolutePath;
             loveConfirmOpen.value = true;

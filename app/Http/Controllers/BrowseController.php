@@ -390,7 +390,10 @@ class BrowseController extends Controller
 
         // Trigger download pipeline similar to atlas-backup
         try {
-            DownloadFile::dispatch($file);
+            // Only enqueue download when a non-empty URL exists
+            if (filled($file->url)) {
+                DownloadFile::dispatch($file);
+            }
         } catch (\Throwable $e) {
             // ignore dispatch errors; client will still get ack
         }
@@ -452,6 +455,8 @@ class BrowseController extends Controller
         if ($type !== 'dislike') {
             $toDownload = File::query()
                 ->whereIn('id', $ids)
+                ->whereNotNull('url')
+                ->where('url', '<>', '')
                 ->where(function ($q) {
                     $q->where('downloaded', false)
                         ->orWhereNull('downloaded')

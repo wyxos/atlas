@@ -31,7 +31,6 @@ ATLAS is under active development. Features ship incrementally and may change. F
 - **Photo Management**: Browse, curate, and react to images with favorites, likes, and blacklisting
 - **Reel/Video Support**: Short-form video viewing with reactions and moderation
 - **Smart Search**: Full-text search across your library when Typesense is enabled
-- **Download Manager**: Track and manage content downloads with pause/resume
 - **Content Curation**: Blacklist and moderation rules to filter unwanted content
 
 ### User Experience
@@ -69,7 +68,7 @@ ATLAS is under active development. Features ship incrementally and may change. F
 4. **Admin Features**
    - Manage user accounts and permissions
    - Configure storage paths and scanning
-   - View download queue and system health
+   - View system health
    - Monitor library statistics on the dashboard
 
 ## Roadmap
