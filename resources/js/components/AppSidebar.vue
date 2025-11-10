@@ -686,57 +686,6 @@ function onLeave(el: HTMLElement) {
                       </div>
                     </Transition>
                 </SidebarMenu>
-
-                <!-- Downloads (Top-level) -->
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton class="flex items-center justify-between" :tooltip="'Downloads'" @click="openAndVisit('downloads')">
-                      <div class="flex items-center gap-2">
-                        <component :is="Download" :size="18" />
-                        <span>Downloads</span>
-                      </div>
-                      <component :is="isDownloadsOpen ? ChevronUp : ChevronDown" :size="16" />
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <Transition @enter="onEnter" @after-enter="onAfterEnter" @leave="onLeave">
-                    <div v-show="isDownloadsOpen">
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuButton as-child :tooltip="'All'">
-                            <Link :href="downloadsRoute()">
-                              <component :is="Download" :size="18" />
-                              <span>All</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuButton as-child :tooltip="'Completed'">
-                            <Link :href="downloadsRoute({ query: { status: 'completed' } })">
-                              <component :is="CheckCircle" :size="18" />
-                              <span>Completed</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuButton as-child :tooltip="'Pending'">
-                            <Link :href="downloadsRoute({ query: { status: 'pending' } })">
-                              <component :is="Clock" :size="18" />
-                              <span>Pending</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuButton as-child :tooltip="'Failed'">
-                            <Link :href="downloadsRoute({ query: { status: 'failed' } })">
-                              <component :is="AlertTriangle" :size="18" />
-                              <span>Failed</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </div>
-                  </Transition>
-                </SidebarMenu>
             </SidebarGroup>
         </SidebarContent>
 
