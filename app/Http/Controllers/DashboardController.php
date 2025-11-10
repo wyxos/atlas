@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\File;
+use App\Models\Reaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -15,8 +16,9 @@ class DashboardController extends Controller
      */
     public function index(): Response
     {
+        // Do not compute heavy stats during initial render; the client fetches them asynchronously.
         return Inertia::render('Dashboard', [
-            'fileStats' => $this->getFileStats(),
+            'fileStats' => [],
         ]);
     }
 
@@ -53,169 +55,75 @@ class DashboardController extends Controller
      */
     private function calculateFileStats(): array
     {
-        // Audio-specific statistics with a single optimized query
-        $audioStats = File::selectRaw('
-            COUNT(*) as audio_files_count,
-            COUNT(CASE WHEN not_found = true THEN 1 END) as audio_not_found,
-            COALESCE(SUM(size), 0) as audio_size,
-            COUNT(CASE WHEN liked = true THEN 1 END) as audio_liked,
-            COUNT(CASE WHEN loved = true THEN 1 END) as audio_loved,
-            COUNT(CASE WHEN disliked = true THEN 1 END) as audio_disliked,
-            COUNT(CASE WHEN funny = true THEN 1 END) as audio_laughed_at,
-            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as audio_no_rating
-        ')
-            ->where('mime_type', 'like', 'audio/%')
-            ->first();
-
-        // Audio metadata statistics with a single query
-        $audioMetadataStats = File::selectRaw('
-            COUNT(*) as total_audio,
-            COUNT(CASE WHEN file_metadata.id IS NOT NULL THEN 1 END) as audio_with_metadata,
-            COUNT(CASE WHEN file_metadata.id IS NULL THEN 1 END) as audio_without_metadata,
-            COUNT(CASE WHEN file_metadata.is_review_required = true THEN 1 END) as audio_metadata_review_required,
-            COUNT(CASE WHEN file_metadata.is_review_required = false AND file_metadata.id IS NOT NULL THEN 1 END) as audio_metadata_review_not_required
-        ')
-            ->where('mime_type', 'like', 'audio/%')
-            ->leftJoin('file_metadata', 'files.id', '=', 'file_metadata.file_id')
-            ->first();
-
-        // Global ratings statistics (all files)
-        $globalRatings = File::selectRaw('
-            COUNT(CASE WHEN liked = true THEN 1 END) as global_liked,
-            COUNT(CASE WHEN loved = true THEN 1 END) as global_loved,
-            COUNT(CASE WHEN disliked = true THEN 1 END) as global_disliked,
-            COUNT(CASE WHEN funny = true THEN 1 END) as global_laughed_at,
-            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as global_no_rating
-        ')
-            ->first();
-
-        // Video statistics with count, size, and not found
-        $videoStats = File::selectRaw('
-            COUNT(*) as video_files_count,
-            COUNT(CASE WHEN not_found = true THEN 1 END) as video_not_found,
-            COALESCE(SUM(size), 0) as video_size,
-            COUNT(CASE WHEN liked = true THEN 1 END) as video_liked,
-            COUNT(CASE WHEN loved = true THEN 1 END) as video_loved,
-            COUNT(CASE WHEN disliked = true THEN 1 END) as video_disliked,
-            COUNT(CASE WHEN funny = true THEN 1 END) as video_laughed_at,
-            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as video_no_rating
-        ')
-            ->where('mime_type', 'like', 'video/%')
-            ->first();
-
-        // Image statistics with count, size, and not found
-        $imageStats = File::selectRaw('
-            COUNT(*) as image_files_count,
-            COUNT(CASE WHEN not_found = true THEN 1 END) as image_not_found,
-            COALESCE(SUM(size), 0) as image_size,
-            COUNT(CASE WHEN liked = true THEN 1 END) as image_liked,
-            COUNT(CASE WHEN loved = true THEN 1 END) as image_loved,
-            COUNT(CASE WHEN disliked = true THEN 1 END) as image_disliked,
-            COUNT(CASE WHEN funny = true THEN 1 END) as image_laughed_at,
-            COUNT(CASE WHEN liked = false AND loved = false AND disliked = false AND funny = false THEN 1 END) as image_no_rating
-        ')
-            ->where('mime_type', 'like', 'image/%')
-            ->first();
-
-        // Total files not found across all types
-        $totalNotFound = File::where('not_found', true)->count();
-
-        // Global metadata statistics (all files)
-        $globalMetadataStats = File::selectRaw('
+        // Single-table aggregates only (fast path). Avoid joins on large tables.
+        $totals = File::selectRaw("
             COUNT(*) as total_files,
-            COUNT(CASE WHEN file_metadata.id IS NOT NULL THEN 1 END) as global_with_metadata,
-            COUNT(CASE WHEN file_metadata.id IS NULL THEN 1 END) as global_without_metadata,
-            COUNT(CASE WHEN file_metadata.is_review_required = true THEN 1 END) as global_metadata_review_required,
-            COUNT(CASE WHEN file_metadata.is_review_required = false AND file_metadata.id IS NOT NULL THEN 1 END) as global_metadata_review_not_required
-        ')
-            ->leftJoin('file_metadata', 'files.id', '=', 'file_metadata.file_id')
-            ->first();
-
-        // Get overall file type distribution for the pie chart
-        $fileTypeStats = File::selectRaw("
-            COUNT(CASE WHEN mime_type LIKE 'audio/%' THEN 1 END) as audio_files,
-            COUNT(CASE WHEN mime_type LIKE 'video/%' THEN 1 END) as video_files,
-            COUNT(CASE WHEN mime_type LIKE 'image/%' THEN 1 END) as image_files,
+            COUNT(CASE WHEN mime_type LIKE 'audio/%' THEN 1 END) as audio_files_count,
+            COUNT(CASE WHEN mime_type LIKE 'video/%' THEN 1 END) as video_files_count,
+            COUNT(CASE WHEN mime_type LIKE 'image/%' THEN 1 END) as image_files_count,
+            COUNT(CASE WHEN not_found = 1 THEN 1 END) as total_not_found,
+            COUNT(CASE WHEN not_found = 1 AND mime_type LIKE 'audio/%' THEN 1 END) as audio_not_found,
+            COUNT(CASE WHEN not_found = 1 AND mime_type LIKE 'video/%' THEN 1 END) as video_not_found,
+            COUNT(CASE WHEN not_found = 1 AND mime_type LIKE 'image/%' THEN 1 END) as image_not_found,
             COALESCE(SUM(CASE WHEN mime_type LIKE 'audio/%' THEN size END), 0) as audio_size,
             COALESCE(SUM(CASE WHEN mime_type LIKE 'video/%' THEN size END), 0) as video_size,
             COALESCE(SUM(CASE WHEN mime_type LIKE 'image/%' THEN size END), 0) as image_size,
             COALESCE(SUM(CASE WHEN mime_type NOT LIKE 'audio/%' AND mime_type NOT LIKE 'video/%' AND mime_type NOT LIKE 'image/%' THEN size END), 0) as other_size
         ")->first();
 
-        $totalFiles = $fileTypeStats->audio_files + $fileTypeStats->video_files + $fileTypeStats->image_files;
-        $otherFiles = File::count() - $totalFiles;
+        $totalFiles = (int) ($totals->total_files ?? 0);
+        $audioFilesCount = (int) ($totals->audio_files_count ?? 0);
+        $videoFilesCount = (int) ($totals->video_files_count ?? 0);
+        $imageFilesCount = (int) ($totals->image_files_count ?? 0);
+        $otherFiles = max(0, $totalFiles - ($audioFilesCount + $videoFilesCount + $imageFilesCount));
 
-        // Get disk space information
+        // Lightweight global reaction counts (no joins)
+        $globalLoved = Reaction::where('type', 'love')->count();
+        $globalLiked = Reaction::where('type', 'like')->count();
+        $globalDisliked = Reaction::where('type', 'dislike')->count();
+        $globalLaughedAt = Reaction::where('type', 'funny')->count();
+        // "No rating" approximated as files without any reaction (anti-join via distinct reaction file ids)
+        $reactedDistinctFiles = \DB::table('reactions')->distinct()->count('file_id');
+        $globalNoRating = max(0, $totalFiles - (int) $reactedDistinctFiles);
+
+        // Disk space information (fast)
         $diskSpaceInfo = $this->getDiskSpaceInfo();
 
         return [
             // Audio Count & Space Usage
-            'audioFilesCount' => (int) $audioStats->audio_files_count,
-            'audioSpaceUsed' => (int) $audioStats->audio_size,
-            'audioNotFound' => (int) $audioStats->audio_not_found,
+            'audioFilesCount' => $audioFilesCount,
+            'audioSpaceUsed' => (int) ($totals->audio_size ?? 0),
+            'audioNotFound' => (int) ($totals->audio_not_found ?? 0),
 
             // Video Count & Space Usage
-            'videoFilesCount' => (int) $videoStats->video_files_count,
-            'videoSpaceUsed' => (int) $videoStats->video_size,
-            'videoNotFound' => (int) $videoStats->video_not_found,
+            'videoFilesCount' => $videoFilesCount,
+            'videoSpaceUsed' => (int) ($totals->video_size ?? 0),
+            'videoNotFound' => (int) ($totals->video_not_found ?? 0),
 
             // Image Count & Space Usage
-            'imageFilesCount' => (int) $imageStats->image_files_count,
-            'imageSpaceUsed' => (int) $imageStats->image_size,
-            'imageNotFound' => (int) $imageStats->image_not_found,
+            'imageFilesCount' => $imageFilesCount,
+            'imageSpaceUsed' => (int) ($totals->image_size ?? 0),
+            'imageNotFound' => (int) ($totals->image_not_found ?? 0),
 
             // Total Files Not Found
-            'totalFilesNotFound' => (int) $totalNotFound,
+            'totalFilesNotFound' => (int) ($totals->total_not_found ?? 0),
 
-            // Audio Metadata Stats
-            'audioWithMetadata' => (int) $audioMetadataStats->audio_with_metadata,
-            'audioWithoutMetadata' => (int) $audioMetadataStats->audio_without_metadata,
-            'audioMetadataReviewRequired' => (int) $audioMetadataStats->audio_metadata_review_required,
-            'audioMetadataReviewNotRequired' => (int) $audioMetadataStats->audio_metadata_review_not_required,
-
-            // Global Metadata Stats
-            'globalWithMetadata' => (int) $globalMetadataStats->global_with_metadata,
-            'globalWithoutMetadata' => (int) $globalMetadataStats->global_without_metadata,
-            'globalMetadataReviewRequired' => (int) $globalMetadataStats->global_metadata_review_required,
-            'globalMetadataReviewNotRequired' => (int) $globalMetadataStats->global_metadata_review_not_required,
-
-            // Audio Rating Stats
-            'audioLoved' => (int) $audioStats->audio_loved,
-            'audioLiked' => (int) $audioStats->audio_liked,
-            'audioDisliked' => (int) $audioStats->audio_disliked,
-            'audioLaughedAt' => (int) $audioStats->audio_laughed_at,
-            'audioNoRating' => (int) $audioStats->audio_no_rating,
-
-            // Global Rating Stats
-            'globalLoved' => (int) $globalRatings->global_loved,
-            'globalLiked' => (int) $globalRatings->global_liked,
-            'globalDisliked' => (int) $globalRatings->global_disliked,
-            'globalLaughedAt' => (int) $globalRatings->global_laughed_at,
-            'globalNoRating' => (int) $globalRatings->global_no_rating,
-
-            // Video Rating Stats
-            'videoLoved' => (int) $videoStats->video_loved,
-            'videoLiked' => (int) $videoStats->video_liked,
-            'videoDisliked' => (int) $videoStats->video_disliked,
-            'videoLaughedAt' => (int) $videoStats->video_laughed_at,
-            'videoNoRating' => (int) $videoStats->video_no_rating,
-
-            // Image Rating Stats
-            'imageLoved' => (int) $imageStats->image_loved,
-            'imageLiked' => (int) $imageStats->image_liked,
-            'imageDisliked' => (int) $imageStats->image_disliked,
-            'imageLaughedAt' => (int) $imageStats->image_laughed_at,
-            'imageNoRating' => (int) $imageStats->image_no_rating,
-
-            // File Type Distribution (for pie chart)
-            'audioFiles' => (int) $fileTypeStats->audio_files,
-            'videoFiles' => (int) $fileTypeStats->video_files,
-            'imageFiles' => (int) $fileTypeStats->image_files,
+            // File Type Distribution (for charts)
+            'audioFiles' => $audioFilesCount,
+            'videoFiles' => $videoFilesCount,
+            'imageFiles' => $imageFilesCount,
             'otherFiles' => (int) $otherFiles,
-            'audioSize' => (int) $fileTypeStats->audio_size,
-            'videoSize' => (int) $fileTypeStats->video_size,
-            'imageSize' => (int) $fileTypeStats->image_size,
-            'otherSize' => (int) $fileTypeStats->other_size,
+            'audioSize' => (int) ($totals->audio_size ?? 0),
+            'videoSize' => (int) ($totals->video_size ?? 0),
+            'imageSize' => (int) ($totals->image_size ?? 0),
+            'otherSize' => (int) ($totals->other_size ?? 0),
+
+            // Global Reaction Stats (lightweight)
+            'globalLoved' => (int) $globalLoved,
+            'globalLiked' => (int) $globalLiked,
+            'globalDisliked' => (int) $globalDisliked,
+            'globalLaughedAt' => (int) $globalLaughedAt,
+            'globalNoRating' => (int) $globalNoRating,
 
             // Disk Space Information
             'diskSpaceTotal' => $diskSpaceInfo['total'],

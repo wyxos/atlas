@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\File;
-use App\Models\Playlist;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -40,48 +39,9 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
-        $playlists = null;
         $hasSpotifyFiles = false;
         if ($user = $request->user()) {
             $userId = $user->id;
-            $rows = Playlist::query()
-                ->where('user_id', $userId)
-                ->orderBy('is_smart')
-                ->orderBy('name')
-                ->get(['id', 'name', 'is_smart', 'is_system', 'smart_parameters']);
-
-            $playlists = [
-                'allSongsId' => Playlist::query()->where('user_id', $userId)->where('name', 'All songs')->value('id'),
-                'likedId' => Playlist::query()->where('user_id', $userId)->where('name', 'Liked')->value('id'),
-                'favoritesId' => Playlist::query()->where('user_id', $userId)->where('name', 'Favorites')->value('id'),
-                'dislikedId' => Playlist::query()->where('user_id', $userId)->where('name', 'Disliked')->value('id'),
-                'funnyId' => Playlist::query()->where('user_id', $userId)->where('name', 'Funny')->value('id'),
-                'unratedId' => Playlist::query()->where('user_id', $userId)->where('name', 'Unrated')->value('id'),
-                'list' => $rows->map(function ($p) {
-                    $reaction = null;
-                    $params = $p->smart_parameters;
-                    if (is_string($params)) {
-                        $decoded = json_decode($params, true);
-                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                            $params = $decoded;
-                        } else {
-                            $params = [];
-                        }
-                    }
-                    if (is_array($params) && array_key_exists('reaction', $params)) {
-                        $reaction = $params['reaction'];
-                    }
-
-                    return [
-                        'id' => (int) $p->id,
-                        'name' => (string) $p->name,
-                        'is_smart' => (bool) $p->is_smart,
-                        'is_system' => (bool) $p->is_system,
-                        'reaction' => $reaction,
-                    ];
-                })->values()->all(),
-            ];
-
             // Check if there are any Spotify files (cached for performance on large tables)
             $hasSpotifyFiles = \Illuminate\Support\Facades\Cache::remember(
                 "has_spotify_files:{$userId}",
@@ -104,7 +64,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => session('error'),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            'playlists' => $playlists,
+            'playlists' => null,
             'hasSpotifyFiles' => $hasSpotifyFiles,
         ];
     }

@@ -43,9 +43,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'Content-Type' => $mimeType,
         ]);
     })->where('path', '.*')->name('storage.atlas_app');
-    Route::get('dashboard', function () {
-        return Inertia::render('Dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
     // Photos (all local images)
     Route::get('photos', [App\Http\Controllers\PhotosController::class, 'index'])->name('photos');

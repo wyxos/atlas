@@ -14,7 +14,7 @@ import { useAppearance } from '@/composables/useAppearance';
 import { dashboard, files as filesRoute } from '@/routes';
 import type { BreadcrumbItem, NavItem } from '@/types';
 import { InertiaLinkProps, Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Menu, Monitor, Moon, Search, Sun, Music, ThumbsUp, FileText, Heart, ThumbsDown, Laugh, HelpCircle } from 'lucide-vue-next';
+import { BookOpen, Folder, LayoutGrid, Menu, Monitor, Moon, Search, Sun, FileText } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Props {
@@ -35,31 +35,12 @@ const activeItemStyles = computed(
         isCurrentRoute.value(typeof url === 'string' ? url : url.url) ? 'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' : '',
 );
 
-const playlists = (usePage().props as any).playlists as any;
-const p = (id?: number | null) => (id ? `/playlists/${id}` : '#');
-
-function iconForReaction(r?: string | null) {
-    switch (r) {
-        case 'love': return Heart;
-        case 'like': return ThumbsUp;
-        case 'dislike': return ThumbsDown;
-        case 'funny': return Laugh;
-        case 'unrated': return HelpCircle;
-        default: return Music;
-    }
-}
-
-const dynamicPlaylistItems: NavItem[] = Array.isArray(playlists?.list)
-    ? playlists.list.map((pl: any) => ({ title: pl.name, href: p(pl.id), icon: iconForReaction(pl.reaction) }))
-    : [];
-
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
     },
-    ...dynamicPlaylistItems,
     {
         title: 'Files',
         href: filesRoute(),

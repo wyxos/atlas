@@ -14,12 +14,6 @@ import * as AudioController from '@/actions/App/Http/Controllers/AudioController
 import * as AudioReactionsController from '@/actions/App/Http/Controllers/AudioReactionsController';
 import axios from 'axios';
 
-function isPlaylistActive(id: number): boolean {
-  const url = page.url as string;
-  // Active state reflects the current route only to avoid double-highlighting
-  return url.startsWith(`/playlists/${id}`);
-}
-
 function isAudioReactionActive(type: string): boolean {
   const url = page.url as string;
   return url.startsWith(`/audio/${type}`);
@@ -48,17 +42,14 @@ const mainNavItems: NavItem[] = [
     ] : []),
 ];
 
-const playlists = page.props.playlists as any;
-const playlistHref = (id?: number | null) => (id ? `/playlists/${id}` : '#');
-
-function initialOpen(section: 'playlists' | 'images' | 'videos' | 'files' | 'downloads' | 'disliked' | 'videosDisliked'): boolean {
+function initialOpen(section: 'audio' | 'images' | 'videos' | 'files' | 'downloads' | 'disliked' | 'videosDisliked'): boolean {
   try {
     const raw = localStorage.getItem(openStateKey);
     const st = raw ? JSON.parse(raw) : {};
     if (typeof st[section] === 'boolean') return !!st[section];
   } catch {}
   const url = page.url as string;
-  if (section === 'playlists') return url.startsWith('/playlists');
+  if (section === 'audio') return url.startsWith('/audio/');
   if (section === 'images') return url.startsWith('/photos');
   if (section === 'videos') return url.startsWith('/reels');
   if (section === 'files') return url.startsWith('/files');
@@ -71,7 +62,7 @@ function initialOpen(section: 'playlists' | 'images' | 'videos' | 'files' | 'dow
 const isFilesOpen = ref(initialOpen('files'));
 const isImagesOpen = ref(initialOpen('images'));
 const isVideosOpen = ref(initialOpen('videos'));
-const isPlaylistsOpen = ref(initialOpen('playlists'));
+const isAudioOpen = ref(initialOpen('audio'));
 const isDownloadsOpen = ref(initialOpen('downloads'));
 const isDislikedOpen = ref(initialOpen('disliked'));
 const isVideosDislikedOpen = ref(initialOpen('videosDisliked'));
@@ -82,7 +73,7 @@ const openStateKey = 'atlas:sidebar-open';
 function saveOpenState() {
   try {
     const st = {
-      playlists: isPlaylistsOpen.value,
+      audio: isAudioOpen.value,
       images: isImagesOpen.value,
       videos: isVideosOpen.value,
       files: isFilesOpen.value,
@@ -93,7 +84,7 @@ function saveOpenState() {
     localStorage.setItem(openStateKey, JSON.stringify(st));
   } catch {}
 }
-watch([isPlaylistsOpen, isImagesOpen, isVideosOpen, isFilesOpen, isDownloadsOpen, isDislikedOpen, isVideosDislikedOpen], saveOpenState);
+watch([isAudioOpen, isImagesOpen, isVideosOpen, isFilesOpen, isDownloadsOpen, isDislikedOpen, isVideosDislikedOpen], saveOpenState);
 
 function visit(url: string) {
   if (!url || url === '#') return;
@@ -101,45 +92,6 @@ function visit(url: string) {
 }
 
 const { setQueueAndPlay, setQueueAndShuffle, play } = useAudioPlayer();
-
-async function queuePlaylist(id: number, opts: { shuffle?: boolean } = {}) {
-  try {
-    // Fetch playlist file IDs using the ids endpoint (returns JSON)
-    const idsResponse = await axios.get(`/playlists/${id}/ids`);
-    const playlistFileIds = idsResponse.data.ids || [];
-
-    if (playlistFileIds.length === 0) {
-      console.warn(`No files found for playlist ID: ${id}`);
-      return;
-    }
-
-    // Build queue items - we only need id and url, metadata will be loaded lazily
-    const queueItems: AudioTrack[] = playlistFileIds.map((fileId: number) => {
-      const streamUrl = AudioController.stream({ file: fileId }).url;
-      return {
-        id: fileId,
-        url: streamUrl,
-      };
-    });
-
-    if (queueItems.length === 0) return;
-
-    if (opts.shuffle) {
-      // Shuffle the queue before setting it
-      const shuffled = [...queueItems];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      await setQueueAndShuffle(shuffled, queueItems, { autoPlay: false });
-      await play();
-    } else {
-      await setQueueAndPlay(queueItems, 0, { autoPlay: true });
-    }
-  } catch (e) {
-    console.error('Failed to queue playlist', e);
-  }
-}
 
 async function queueAudioReaction(type: string, opts: { shuffle?: boolean } = {}) {
   try {
@@ -182,12 +134,11 @@ async function queueAudioReaction(type: string, opts: { shuffle?: boolean } = {}
 }
 
 
-function openAndVisit(section: 'playlists' | 'images' | 'videos' | 'files' | 'downloads') {
-  if (section === 'playlists') {
-    if (isPlaylistsOpen.value) { isPlaylistsOpen.value = false; return; }
-    isPlaylistsOpen.value = true;
-    const first = (playlists?.list || [])[0];
-    if (first?.id) visit(playlistHref(first.id));
+function openAndVisit(section: 'audio' | 'images' | 'videos' | 'files' | 'downloads') {
+  if (section === 'audio') {
+    if (isAudioOpen.value) { isAudioOpen.value = false; return; }
+    isAudioOpen.value = true;
+    visit('/audio/all');
   } else if (section === 'files') {
     if (isFilesOpen.value) { isFilesOpen.value = false; return; }
     isFilesOpen.value = true;
@@ -256,19 +207,19 @@ function onLeave(el: HTMLElement) {
             <SidebarGroup class="px-2 py-0">
                 <SidebarGroupLabel>Library</SidebarGroupLabel>
 
-                <!-- Playlists -->
+                <!-- Audio (on-the-fly by reactions) -->
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton class="flex items-center justify-between" :tooltip="'Playlists'" @click="openAndVisit('playlists')">
+                        <SidebarMenuButton class="flex items-center justify-between" :tooltip="'Audio'" @click="openAndVisit('audio')">
                             <div class="flex items-center gap-2">
                                 <component :is="Music" :size="18" />
-                                <span>Playlists</span>
+                                <span>Audio</span>
                             </div>
-                            <component :is="isPlaylistsOpen ? ChevronUp : ChevronDown" :size="16" />
+                            <component :is="isAudioOpen ? ChevronUp : ChevronDown" :size="16" />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                     <Transition @enter="onEnter" @after-enter="onAfterEnter" @leave="onLeave">
-                      <div v-show="isPlaylistsOpen">
+                      <div v-show="isAudioOpen">
                         <SidebarMenuSub>
                           <!-- Static audio reaction filters -->
                           <SidebarMenuSubItem>
@@ -416,25 +367,7 @@ function onLeave(el: HTMLElement) {
                               </div>
                           </SidebarMenuSubItem>
 
-                          <!-- User-created playlists -->
-                          <SidebarMenuSubItem v-for="pl in (playlists?.list || []).filter((p:any)=>!p.is_system)" :key="`user-${pl.id}`">
-                              <div class="group/row flex items-center justify-between">
-                                <SidebarMenuButton as-child :tooltip="pl.name" class="flex-1">
-                                  <Link :href="playlistHref(pl.id)" :class="isPlaylistActive(pl.id) ? 'bg-accent/40 rounded-md' : ''">
-                                      <component :is="Music" :size="18" />
-                                      <span>{{ pl.name }}</span>
-                                  </Link>
-                                </SidebarMenuButton>
-                                <div class="ml-2 hidden items-center gap-1 pr-2 group-hover/row:flex">
-                                  <button class="group/button p-1 rounded-md hover:bg-primary" title="Play" data-test="sidebar-playlist-play" @click.stop="queuePlaylist(pl.id)">
-                                    <Play :size="14" class="text-muted-foreground group-hover/button:text-white" />
-                                  </button>
-                                  <button class="group/button p-1 rounded-md hover:bg-primary" title="Shuffle" data-test="sidebar-playlist-shuffle" @click.stop="queuePlaylist(pl.id, { shuffle: true })">
-                                    <Shuffle :size="14" class="text-muted-foreground group-hover/button:text-white" />
-                                  </button>
-                                </div>
-                              </div>
-                          </SidebarMenuSubItem>
+                          <!-- (No user-created playlists surfaced) -->
                         </SidebarMenuSub>
                       </div>
                     </Transition>

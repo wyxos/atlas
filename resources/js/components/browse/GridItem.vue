@@ -92,7 +92,7 @@ const imageSrc = computed(() => {
 });
 
 const videoSrc = computed(() => {
-    const src = ((props.item as any)?.original as string | undefined) || ((props.item as any)?.preview as string | undefined);
+    const src = (props.item as any)?.preview as string | undefined;
     if (!src) { return ''; }
     return src;
 });
@@ -469,7 +469,7 @@ async function handleBatchBadgeMouseDown(scope: { key: string; value: string | n
         // Favorite action will be handled on auxclick
         return;
     }
-    
+
     if (!(e.altKey && e.button === 0)) {
         return;
     }
@@ -556,70 +556,70 @@ const menuRoot = computed<ActionOption[]>(() => {
     ];
 
     const copyChildren: ActionOption[] = [];
-    
+
     // Copy referrer url (always show if available)
     if (referrerUrl.value) {
         copyChildren.push({ label: 'copy referrer url', action: () => copyUrl(referrerUrl.value) });
     }
-    
+
     // Copy original url (url column in database = true_original_url)
     if (trueOriginalUrl.value) {
         copyChildren.push({ label: 'copy original url', action: () => copyUrl(trueOriginalUrl.value) });
     }
-    
+
     // Copy original preview url (thumbnail_url column in database = true_thumbnail_url)
     if (trueThumbnailUrl.value) {
         copyChildren.push({ label: 'copy original preview url', action: () => copyUrl(trueThumbnailUrl.value) });
     }
-    
+
     // Copy thumbnail url (currently used, in case it's pointing to local)
     if (thumbnailUrl.value) {
         copyChildren.push({ label: 'copy thumbnail url', action: () => copyUrl(thumbnailUrl.value) });
     }
-    
+
     // Copy url (currently used, in case pointing to local)
     const currentUrl = originalUrl.value || thumbnailUrl.value;
     if (currentUrl) {
         copyChildren.push({ label: 'copy url', action: () => copyUrl(currentUrl) });
     }
-    
+
     // Copy image (to clipboard)
     if (shouldRenderVideo.value === false) {
         copyChildren.push({ label: 'copy image', action: () => copyImageToClipboard() });
     }
-    
+
     if (copyChildren.length > 0) {
         base.push({ label: 'copy url', children: copyChildren });
     }
 
     // Open URL menu items
     const openChildren: ActionOption[] = [];
-    
+
     // Open referrer url in new tab
     if (referrerUrl.value) {
         openChildren.push({ label: 'open referrer url', action: () => openUrlInNewTab(referrerUrl.value) });
     }
-    
+
     // Open original url in new tab (url column in database = true_original_url)
     if (trueOriginalUrl.value) {
         openChildren.push({ label: 'open original url', action: () => openUrlInNewTab(trueOriginalUrl.value) });
     }
-    
+
     // Open original preview url in new tab (thumbnail_url column in database = true_thumbnail_url)
     if (trueThumbnailUrl.value) {
         openChildren.push({ label: 'open original preview url', action: () => openUrlInNewTab(trueThumbnailUrl.value) });
     }
-    
+
     // Open thumbnail url in new tab (currently used, in case it's pointing to local)
     if (thumbnailUrl.value) {
         openChildren.push({ label: 'open thumbnail url', action: () => openUrlInNewTab(thumbnailUrl.value) });
     }
-    
+
     // Open url in new tab (currently used, in case pointing to local)
     if (currentUrl) {
         openChildren.push({ label: 'open url', action: () => openUrlInNewTab(currentUrl) });
     }
-    
+
     if (openChildren.length > 0) {
         base.push({ label: 'open url', children: openChildren });
     }
@@ -920,7 +920,7 @@ const resolvedMediaKind = computed<'video' | 'image'>(() => {
     const item = props.item as any;
     const type = (item?.type ?? '').toString().toLowerCase();
     const mime = (item?.mime_type ?? '').toString().toLowerCase();
-    
+
     // Check both type property and mime_type to determine if it's a video
     if (type === 'video' || mime.startsWith('video/')) {
         return 'video';
