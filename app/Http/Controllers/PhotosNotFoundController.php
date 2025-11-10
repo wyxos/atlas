@@ -6,7 +6,7 @@ use App\Http\Controllers\Concerns\DecoratesRemoteUrls;
 use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\File;
 use App\Services\Plugin\PluginServiceResolver;
-use App\Support\PhotoListingFormatter;
+use App\Support\FileListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 
@@ -93,7 +93,7 @@ class PhotosNotFoundController extends Controller
             /** @var File|null $file */
             $file = $models->get($id);
 
-            return PhotoListingFormatter::format(
+            return FileListingFormatter::format(
                 $file,
                 $reactions,
                 $options->page,

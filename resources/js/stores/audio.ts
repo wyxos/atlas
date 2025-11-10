@@ -651,7 +651,7 @@ class AudioPlayerManager {
         this.updateSpotifyPolling(false);
         const currentTrack = this.currentTrack.value;
         if (currentTrack) {
-            console.log('Pausing playback', currentTrack);
+            // Intentionally avoid noisy console logs during tests and runtime
         }
         if (currentTrack && this.isSpotifyTrack(currentTrack)) {
             // Get the most up-to-date position directly from Spotify player state

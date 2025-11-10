@@ -13,7 +13,7 @@ use App\Services\Moderation\Moderator;
 use App\Services\Plugin\PluginServiceResolver;
 use App\Support\FilePreviewUrl;
 use App\Support\ListingOptions;
-use App\Support\PhotoListingFormatter;
+use App\Support\FileListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -340,7 +340,7 @@ class PhotosUnratedController extends Controller
                 /** @var File|null $file */
                 $file = $modelsById->get($id);
 
-                return PhotoListingFormatter::format(
+                return FileListingFormatter::format(
                     $file,
                     [],
                     $options->page,

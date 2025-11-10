@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\File;
-use App\Support\PhotoListingFormatter;
+use App\Support\FileListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 
@@ -95,7 +95,7 @@ class PhotosReactionsController extends Controller
         $files = collect($ids)->map(function (int $id) use ($models, $reactions, $options, &$serviceCache) {
             $file = $models->get($id);
 
-            return PhotoListingFormatter::format(
+            return FileListingFormatter::format(
                 $file,
                 $reactions,
                 $options->page,

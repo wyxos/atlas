@@ -7,7 +7,7 @@ use App\Http\Controllers\Concerns\InteractsWithListings;
 use App\Models\File;
 use App\Services\Plugin\PluginServiceResolver;
 use App\Support\ListingOptions;
-use App\Support\PhotoListingFormatter;
+use App\Support\FileListingFormatter;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
 use Laravel\Scout\Builder as ScoutBuilder;
@@ -60,7 +60,7 @@ class PhotosDislikedController extends Controller
             /** @var File|null $file */
             $file = $models->get($id);
 
-            $formatted = PhotoListingFormatter::format(
+            $formatted = FileListingFormatter::format(
                 $file,
                 $reactions,
                 $options->page,
