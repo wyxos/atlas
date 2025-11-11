@@ -11,6 +11,7 @@ use App\Services\Plugin\PluginServiceLoader;
 use App\Services\Plugin\PluginServiceResolver;
 use App\Services\Plugin\ServiceRegistry as LocalServiceRegistry;
 use Atlas\Plugin\Contracts\ServiceRegistry;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Testing\ParallelTesting;
 
@@ -43,6 +44,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Force HTTPS in production
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
         // Register observers
         File::observe(FileObserver::class);
         Reaction::observe(ReactionObserver::class);
