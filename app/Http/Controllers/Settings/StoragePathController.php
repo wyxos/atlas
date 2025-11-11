@@ -94,6 +94,13 @@ class StoragePathController extends Controller
         // Apply immediately for this request
         config(['filesystems.disks.atlas.root' => $path]);
 
-        return redirect()->back()->with('status', 'Storage path updated.');
+        // For PUT requests (axios), return JSON to avoid redirect loops
+        // redirect()->back() can cause ERR_TOO_MANY_REDIRECTS with proxies/load balancers
+        if ($request->isMethod('PUT') || $request->wantsJson() || $request->expectsJson()) {
+            return response()->json(['status' => 'Storage path updated.']);
+        }
+
+        // Fallback for regular form submissions (shouldn't happen with current UI)
+        return redirect()->route('library.edit')->with('status', 'Storage path updated.');
     }
 }

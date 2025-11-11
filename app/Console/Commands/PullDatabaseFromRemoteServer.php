@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Symfony\Component\Process\Process;
 
 class PullDatabaseFromRemoteServer extends Command
 {
@@ -38,8 +39,10 @@ class PullDatabaseFromRemoteServer extends Command
 
         // Commands to execute
         $localBackupCommand = 'php artisan db:backup --connection='.escapeshellarg($connection);
+        // Remove verbose flag to reduce SSH debug noise
         $remoteBackupCommand = 'ssh '.escapeshellarg($host).' "php artisan db:backup --connection='.escapeshellarg($remoteConnection).'"';
-        $copyCommand = 'scp '.escapeshellarg($host).':~/storage/backups/*.sql storage/backups/';
+        // Use rsync with progress if available, fallback to scp
+        $copyCommand = $this->buildCopyCommand($host);
         $importCommand = 'php artisan db:import --connection='.escapeshellarg($connection).($force ? ' --force' : '');
 
         if ($isDryRun) {
@@ -108,48 +111,48 @@ class PullDatabaseFromRemoteServer extends Command
     }
 
     /**
+     * Build the copy command, preferring rsync with progress if available.
+     */
+    private function buildCopyCommand(string $host): string
+    {
+        if ($this->isRsyncAvailable()) {
+            return 'rsync --progress '.escapeshellarg($host).':~/storage/backups/*.sql storage/backups/';
+        }
+
+        return 'scp '.escapeshellarg($host).':~/storage/backups/*.sql storage/backups/';
+    }
+
+    /**
+     * Check if rsync is available on the system.
+     */
+    private function isRsyncAvailable(): bool
+    {
+        $process = Process::fromShellCommandline('rsync --version', base_path(), null, null, 5);
+        $process->run();
+
+        return $process->isSuccessful();
+    }
+
+    /**
      * Execute a shell command and return the exit code.
      */
     private function executeCommand(string $command): int
     {
         $this->line("Executing: {$command}");
 
-        $process = proc_open(
-            $command,
-            [
-                0 => ['pipe', 'r'],  // stdin
-                1 => ['pipe', 'w'],  // stdout
-                2 => ['pipe', 'w'],  // stderr
-            ],
-            $pipes
-        );
+        $process = Process::fromShellCommandline($command, base_path(), null, null, null);
 
-        if (! is_resource($process)) {
-            $this->error('Failed to start process');
+        try {
+            $process->run(function ($type, $buffer) {
+                // Stream both STDOUT and STDERR directly so progress bars and verbose output show up live
+                $this->output->write($buffer);
+            });
+        } catch (\Throwable $e) {
+            $this->error('Failed to start or run process: '.$e->getMessage());
 
             return 1;
         }
 
-        // Close stdin
-        fclose($pipes[0]);
-
-        // Read stdout and stderr
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        $exitCode = proc_close($process);
-
-        if (! empty($stdout)) {
-            $this->line($stdout);
-        }
-
-        if (! empty($stderr)) {
-            $this->error($stderr);
-        }
-
-        return $exitCode;
+        return $process->getExitCode() ?? 1;
     }
 }
