@@ -78,7 +78,7 @@ class ModerationRuleController extends Controller
             'nsfw' => ['required', 'boolean'],
             'op' => ['required', 'string', 'in:any,all,not_any,at_least,and,or'],
             'terms' => ['nullable', 'array'],
-            'terms.*' => ['string'],
+            'terms.*' => ['nullable'], // Can be string or array with 'term' and 'allow_digit_prefix'
             'min' => ['nullable', 'integer', 'min:1'],
             'options' => ['nullable', 'array'],
             'options.case_sensitive' => ['nullable', 'boolean'],

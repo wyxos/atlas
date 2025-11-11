@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button'
  
 defineOptions({ name: 'RuleEditor' })
 
+export type TermEntry = string | { term: string; allow_digit_prefix?: boolean }
+
 export type RuleNode = {
   op: 'any' | 'all' | 'not_any' | 'at_least' | 'and' | 'or'
-  terms?: string[] | null
+  terms?: TermEntry[] | null
   min?: number | null
   options?: { case_sensitive?: boolean; whole_word?: boolean } | null
   children?: RuleNode[] | null
@@ -33,6 +35,22 @@ function update<K extends keyof RuleNode>(key: K, value: RuleNode[K]) {
   emit('update:modelValue', { ...node.value, [key]: value })
 }
 
+// Normalize term entry to object format for internal handling
+function normalizeTerm(term: TermEntry): { term: string; allow_digit_prefix: boolean } {
+  if (typeof term === 'string') {
+    return { term, allow_digit_prefix: false }
+  }
+  return { term: term.term, allow_digit_prefix: term.allow_digit_prefix ?? false }
+}
+
+// Convert term object back to the format needed (string or object)
+function denormalizeTerm(term: { term: string; allow_digit_prefix: boolean }): TermEntry {
+  if (term.allow_digit_prefix) {
+    return { term: term.term, allow_digit_prefix: true }
+  }
+  return term.term
+}
+
 function addTerm() {
   const list = Array.isArray(node.value.terms) ? [...node.value.terms] : []
   list.push('')
@@ -41,7 +59,15 @@ function addTerm() {
 
 function updateTerm(idx: number, value: string) {
   const list = Array.isArray(node.value.terms) ? [...node.value.terms] : []
-  list[idx] = value
+  const current = normalizeTerm(list[idx] || '')
+  list[idx] = denormalizeTerm({ ...current, term: value })
+  update('terms', list)
+}
+
+function toggleTermDigitPrefix(idx: number, checked: boolean) {
+  const list = Array.isArray(node.value.terms) ? [...node.value.terms] : []
+  const current = normalizeTerm(list[idx] || '')
+  list[idx] = denormalizeTerm({ ...current, allow_digit_prefix: checked })
   update('terms', list)
 }
 
@@ -110,8 +136,13 @@ function removeChild(idx: number) {
       </div>
       <div class="grid gap-2">
         <div v-for="(t, idx) in (node.terms || [])" :key="idx" class="flex items-center gap-2">
-          <Input class="flex-1" :modelValue="t" placeholder="term"
+          <Input class="flex-1" :modelValue="typeof t === 'string' ? t : t.term" placeholder="term"
                  @update:modelValue="(val: any) => updateTerm(idx, String(val ?? ''))" />
+          <label class="inline-flex items-center gap-1 text-xs whitespace-nowrap" :title="'Allow digit prefix (e.g., 2cars, 3cars)'">
+            <input type="checkbox" :checked="typeof t === 'object' && t.allow_digit_prefix === true"
+                   @change="(e: any) => toggleTermDigitPrefix(idx, !!e?.target?.checked)" />
+            <span class="text-muted-foreground">#</span>
+          </label>
           <Button variant="secondary" size="sm" @click="() => removeTerm(idx)">Remove</Button>
         </div>
       </div>

@@ -114,9 +114,10 @@ final class Moderator
                 }
                 $options = $this->extractOptions($node);
                 $hits = [];
-                foreach ($terms as $term) {
-                    if ($this->termMatches($text, $term, $options)) {
-                        $hits[] = $term;
+                foreach ($terms as $termData) {
+                    $termOptions = array_merge($options, ['allow_digit_prefix' => $termData['allow_digit_prefix']]);
+                    if ($this->termMatches($text, $termData['term'], $termOptions)) {
+                        $hits[] = $termData['term'];
                     }
                 }
 
@@ -152,8 +153,9 @@ final class Moderator
 
         $options = $this->extractOptions($node);
 
-        foreach ($terms as $term) {
-            if ($this->termMatches($text, $term, $options)) {
+        foreach ($terms as $termData) {
+            $termOptions = array_merge($options, ['allow_digit_prefix' => $termData['allow_digit_prefix']]);
+            if ($this->termMatches($text, $termData['term'], $termOptions)) {
                 return true;
             }
         }
@@ -170,8 +172,9 @@ final class Moderator
 
         $options = $this->extractOptions($node);
 
-        foreach ($terms as $term) {
-            if (! $this->termMatches($text, $term, $options)) {
+        foreach ($terms as $termData) {
+            $termOptions = array_merge($options, ['allow_digit_prefix' => $termData['allow_digit_prefix']]);
+            if (! $this->termMatches($text, $termData['term'], $termOptions)) {
                 return false;
             }
         }
@@ -189,8 +192,9 @@ final class Moderator
 
         $options = $this->extractOptions($node);
 
-        foreach ($terms as $term) {
-            if ($this->termMatches($text, $term, $options)) {
+        foreach ($terms as $termData) {
+            $termOptions = array_merge($options, ['allow_digit_prefix' => $termData['allow_digit_prefix']]);
+            if ($this->termMatches($text, $termData['term'], $termOptions)) {
                 return false;
             }
         }
@@ -210,8 +214,9 @@ final class Moderator
         $options = $this->extractOptions($node);
 
         $count = 0;
-        foreach ($terms as $term) {
-            if ($this->termMatches($text, $term, $options)) {
+        foreach ($terms as $termData) {
+            $termOptions = array_merge($options, ['allow_digit_prefix' => $termData['allow_digit_prefix']]);
+            if ($this->termMatches($text, $termData['term'], $termOptions)) {
                 $count++;
                 if ($count >= $min) {
                     return true;
@@ -261,10 +266,11 @@ final class Moderator
     }
 
     /**
-     * Clean and normalize the list of terms, dropping empties and non-strings.
+     * Clean and normalize the list of terms, dropping empties.
+     * Terms can be strings or objects with 'term' and optional 'allow_digit_prefix' flag.
      *
      * @param  array<int, mixed>  $terms
-     * @return array<int, string>
+     * @return array<int, array{term: string, allow_digit_prefix: bool}>
      */
     private function sanitizeTerms(array $terms): array
     {
@@ -273,7 +279,15 @@ final class Moderator
             if (is_string($t)) {
                 $trimmed = trim($t);
                 if ($trimmed !== '') {
-                    $clean[] = $trimmed;
+                    $clean[] = ['term' => $trimmed, 'allow_digit_prefix' => false];
+                }
+            } elseif (is_array($t) && isset($t['term']) && is_string($t['term'])) {
+                $trimmed = trim($t['term']);
+                if ($trimmed !== '') {
+                    $clean[] = [
+                        'term' => $trimmed,
+                        'allow_digit_prefix' => (bool) ($t['allow_digit_prefix'] ?? false),
+                    ];
                 }
             }
         }
@@ -284,7 +298,7 @@ final class Moderator
     /**
      * Extract matching options with sensible defaults.
      *
-     * @return array{case_sensitive: bool, whole_word: bool}
+     * @return array{case_sensitive: bool, whole_word: bool, allow_digit_prefix: bool}
      */
     private function extractOptions(array $node): array
     {
@@ -293,6 +307,7 @@ final class Moderator
         return [
             'case_sensitive' => (bool) ($opts['case_sensitive'] ?? false),
             'whole_word' => (bool) ($opts['whole_word'] ?? true),
+            'allow_digit_prefix' => (bool) ($opts['allow_digit_prefix'] ?? false),
         ];
     }
 
@@ -303,6 +318,7 @@ final class Moderator
     {
         $caseSensitive = (bool) ($options['case_sensitive'] ?? false);
         $wholeWord = (bool) ($options['whole_word'] ?? true);
+        $allowDigitPrefix = (bool) ($options['allow_digit_prefix'] ?? false);
 
         $patternBody = preg_quote($term, '/');
         $flags = $caseSensitive ? 'u' : 'iu';
@@ -313,8 +329,18 @@ final class Moderator
             $patternInner = preg_replace('/(?:\s|_)+/u', '(?:\\s|_)+', $patternBody);
 
             // Require non-letter/digit boundaries around the entire term/phrase.
+            // If allow_digit_prefix is true, allow digits before the term (e.g., "2cars", "3cars").
+            // Also allow a single 's' after the term when allow_digit_prefix is true (for plurals).
             // Underscore should be treated as a separator (i.e., a boundary), not a word character.
-            $pattern = '/(?:^|[^\p{L}\p{N}])'.$patternInner.'(?:$|[^\p{L}\p{N}])/'.$flags;
+            if ($allowDigitPrefix) {
+                // Before: start of string, non-letter/non-digit, OR a digit
+                // After: end of string, non-letter/non-digit, OR a single 's' followed by non-letter/non-digit or end
+                $pattern = '/(?:^|[^\p{L}\p{N}]|\p{N})'.$patternInner.'(?:s(?:$|[^\p{L}\p{N}])|$|[^\p{L}\p{N}])/'.$flags;
+            } else {
+                // Before: start of string or non-letter/non-digit
+                // After: end of string or non-letter/non-digit
+                $pattern = '/(?:^|[^\p{L}\p{N}])'.$patternInner.'(?:$|[^\p{L}\p{N}])/'.$flags;
+            }
         } else {
             $pattern = '/'.$patternBody.'/'.$flags;
         }

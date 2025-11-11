@@ -11,9 +11,11 @@ import { computed, ref, watch } from 'vue';
 
 type RuleOperator = 'any' | 'all' | 'not_any' | 'at_least' | 'and' | 'or';
 
+type TermEntry = string | { term: string; allow_digit_prefix?: boolean };
+
 interface RuleNode {
     op: RuleOperator;
-    terms?: string[] | null;
+    terms?: TermEntry[] | null;
     min?: number | null;
     options?: { case_sensitive?: boolean; whole_word?: boolean } | null;
     children?: RuleNode[] | null;

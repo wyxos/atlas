@@ -413,3 +413,37 @@ it('collects matched terms in hits array', function () {
     expect($hits)->toContain('red');
     expect($hits)->toContain('beard');
 });
+
+it('collects matched terms with double parentheses in prompt', function () {
+    $rule = ModerationRule::factory()->create([
+        'active' => true,
+        'op' => 'any',
+        'terms' => ['word1', 'word2', 'word3'],
+        'options' => ['whole_word' => true, 'case_sensitive' => false],
+    ]);
+
+    $file = File::factory()->create([
+        'source' => 'test',
+        'listing_metadata' => ['meta' => ['prompt' => 'Text with ((word1)) in it']],
+    ]);
+
+    FileMetadata::factory()->for($file)->create(['payload' => []]);
+
+    ($this->mockBrowseService)([$file]);
+
+    Browser::handle();
+
+    $file->refresh();
+    $hits = $file->metadata->payload['moderation']['hits'];
+
+    expect($hits)->toBeArray();
+    expect($hits)->toContain('word1');
+    expect($hits)->not->toContain('word2');
+    expect($hits)->not->toContain('word3');
+    
+    // Verify the moderation metadata structure
+    $moderation = $file->metadata->payload['moderation'];
+    expect($moderation['reason'])->toBe('moderation:rule');
+    expect($moderation['rule_id'])->toBe($rule->id);
+    expect($moderation['options'])->toBe(['whole_word' => true, 'case_sensitive' => false]);
+});

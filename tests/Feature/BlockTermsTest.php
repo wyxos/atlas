@@ -206,6 +206,102 @@ dataset('block_rule_cases', [
         'node' => ['op' => 'any', 'terms' => ['car'], 'options' => ['whole_word' => false]],
         'expected' => true,
     ],
+    // New: explicitly show that '3cars' would match when whole_word=false
+    'substring allowed when whole_word false (3cars)' => [
+        'text' => 'I have 3cars in my garage',
+        'node' => ['op' => 'any', 'terms' => ['car'], 'options' => ['whole_word' => false]],
+        'expected' => true,
+    ],
+    // Verify that '3cars' does NOT match with whole_word=true (default)
+    'substring not allowed when whole_word true (3cars)' => [
+        'text' => 'I have 3cars in my garage',
+        'node' => ['op' => 'any', 'terms' => ['car'], 'options' => ['whole_word' => true]],
+        'expected' => false,
+    ],
+
+    // Per-term allow_digit_prefix option
+    'per-term allow_digit_prefix - car allows digits, red does not' => [
+        'text' => '3cars were blue',
+        'node' => [
+            'op' => 'any',
+            'terms' => [
+                ['term' => 'car', 'allow_digit_prefix' => true],
+                'red',
+            ],
+            'options' => ['whole_word' => true, 'case_sensitive' => false],
+        ],
+        'expected' => true,
+    ],
+    'per-term allow_digit_prefix - car allows digits, matches 2cars' => [
+        'text' => 'I have 2cars in my garage',
+        'node' => [
+            'op' => 'any',
+            'terms' => [
+                ['term' => 'car', 'allow_digit_prefix' => true],
+            ],
+            'options' => ['whole_word' => true, 'case_sensitive' => false],
+        ],
+        'expected' => true,
+    ],
+    'per-term allow_digit_prefix - car allows digits, still blocks carpet' => [
+        'text' => 'The carpet is soft',
+        'node' => [
+            'op' => 'any',
+            'terms' => [
+                ['term' => 'car', 'allow_digit_prefix' => true],
+            ],
+            'options' => ['whole_word' => true, 'case_sensitive' => false],
+        ],
+        'expected' => false,
+    ],
+    'per-term allow_digit_prefix - mixed terms, car matches 3cars, red matches normally' => [
+        'text' => '3cars were red',
+        'node' => [
+            'op' => 'any',
+            'terms' => [
+                ['term' => 'car', 'allow_digit_prefix' => true],
+                'red',
+            ],
+            'options' => ['whole_word' => true, 'case_sensitive' => false],
+        ],
+        'expected' => true,
+    ],
+    'per-term allow_digit_prefix - red does not match 3reds (not configured)' => [
+        'text' => 'I have 3reds here',
+        'node' => [
+            'op' => 'any',
+            'terms' => [
+                ['term' => 'car', 'allow_digit_prefix' => true],
+                'red',
+            ],
+            'options' => ['whole_word' => true, 'case_sensitive' => false],
+        ],
+        'expected' => false,
+    ],
+    'per-term allow_digit_prefix - user scenario: 3cars were blue matches car' => [
+        'text' => '3cars were blue',
+        'node' => [
+            'op' => 'any',
+            'terms' => [
+                ['term' => 'car', 'allow_digit_prefix' => true],
+                'red',
+            ],
+            'options' => ['whole_word' => true, 'case_sensitive' => false],
+        ],
+        'expected' => true,
+    ],
+    'per-term allow_digit_prefix - user scenario: the sun was red matches red' => [
+        'text' => 'the sun was red',
+        'node' => [
+            'op' => 'any',
+            'terms' => [
+                ['term' => 'car', 'allow_digit_prefix' => true],
+                'red',
+            ],
+            'options' => ['whole_word' => true, 'case_sensitive' => false],
+        ],
+        'expected' => true,
+    ],
 
     // 1) negative for simple contains word
     'does not contain car' => [

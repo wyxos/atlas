@@ -328,6 +328,69 @@ describe('GridItem moderation highlighting', () => {
       wrapper.unmount()
     })
 
+    it('double parenthesized whole word - ((word1)) matches', () => {
+      const item = {
+        id: 1,
+        metadata: {
+          prompt: 'Text with ((word1)) in it',
+          moderation: createModerationMeta({
+            hits: ['word1'],
+            options: { whole_word: true, case_sensitive: false },
+          }),
+        },
+        containers: [],
+      }
+
+      const wrapper = mountGridItem(item)
+      const html = getTooltipHtml(wrapper)
+      
+      expect(countMarks(html)).toBe(1)
+      expectHighlighted(html, ['word1'])
+      wrapper.unmount()
+    })
+
+    it('multiple terms with double parentheses - ((word1)), word2, word3', () => {
+      const item = {
+        id: 1,
+        metadata: {
+          prompt: 'Text with ((word1)) and word2 and word3 here',
+          moderation: createModerationMeta({
+            hits: ['word1', 'word2', 'word3'],
+            options: { whole_word: true, case_sensitive: false },
+          }),
+        },
+        containers: [],
+      }
+
+      const wrapper = mountGridItem(item)
+      const html = getTooltipHtml(wrapper)
+      
+      expect(countMarks(html)).toBe(3)
+      expectHighlighted(html, ['word1', 'word2', 'word3'])
+      wrapper.unmount()
+    })
+
+    it('multiple terms all with double parentheses', () => {
+      const item = {
+        id: 1,
+        metadata: {
+          prompt: 'Text with ((word1)) and ((word2)) and ((word3)) here',
+          moderation: createModerationMeta({
+            hits: ['word1', 'word2', 'word3'],
+            options: { whole_word: true, case_sensitive: false },
+          }),
+        },
+        containers: [],
+      }
+
+      const wrapper = mountGridItem(item)
+      const html = getTooltipHtml(wrapper)
+      
+      expect(countMarks(html)).toBe(3)
+      expectHighlighted(html, ['word1', 'word2', 'word3'])
+      wrapper.unmount()
+    })
+
     it('underscore separator - red_car contains car as whole word', () => {
       const item = {
         id: 1,
