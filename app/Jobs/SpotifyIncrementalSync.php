@@ -16,6 +16,8 @@ class SpotifyIncrementalSync implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public string $queue = 'spotify';
+
     public function handle(): void
     {
         $tokens = SpotifyToken::query()->get();

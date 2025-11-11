@@ -80,8 +80,8 @@ class PluginsController extends Controller
         // Update composer.plugins.json
         $this->addToComposerPluginsJson($package);
 
-        // Dispatch job
-        ComposerInstallJob::dispatch($user->id, $package)->onQueue('processing');
+        // Dispatch job (defaults to 'composer' queue)
+        ComposerInstallJob::dispatch($user->id, $package);
 
         return back();
     }
@@ -115,8 +115,8 @@ class PluginsController extends Controller
         // Update composer.plugins.json
         $this->removeFromComposerPluginsJson($package);
 
-        // Dispatch job
-        ComposerUninstallJob::dispatch($user->id, $package, $previousConstraint)->onQueue('processing');
+        // Dispatch job (defaults to 'composer' queue)
+        ComposerUninstallJob::dispatch($user->id, $package, $previousConstraint);
 
         return back();
     }

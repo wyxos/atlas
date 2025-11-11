@@ -85,6 +85,10 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis:processing' => 120,
+        'redis:downloads' => 300,
+        'redis:composer' => 600,
+        'redis:spotify' => 180,
     ],
 
     /*
@@ -197,6 +201,57 @@ return [
             'timeout' => 60,
             'nice' => 0,
         ],
+        'supervisor-processing' => [
+            'connection' => 'redis',
+            'queue' => ['processing'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
+        'supervisor-downloads' => [
+            'connection' => 'redis',
+            'queue' => ['downloads'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 2,
+            'timeout' => 600,
+            'nice' => 0,
+        ],
+        'supervisor-composer' => [
+            'connection' => 'redis',
+            'queue' => ['composer'],
+            'balance' => 'simple',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 512,
+            'tries' => 1,
+            'timeout' => 600,
+            'nice' => 0,
+        ],
+        'supervisor-spotify' => [
+            'connection' => 'redis',
+            'queue' => ['spotify'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 2,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -206,11 +261,70 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'supervisor-processing' => [
+                'maxProcesses' => 8,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 3,
+            ],
+            'supervisor-downloads' => [
+                'maxProcesses' => 4,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
+            ],
+            'supervisor-composer' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-spotify' => [
+                'maxProcesses' => 2,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
+            ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
+            ],
+            'supervisor-processing' => [
+                'maxProcesses' => 2,
+            ],
+            'supervisor-downloads' => [
+                'maxProcesses' => 2,
+            ],
+            'supervisor-composer' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-spotify' => [
+                'maxProcesses' => 1,
+            ],
+        ],
+
+        'pi5' => [
+            'supervisor-1' => [
+                'maxProcesses' => 2,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 96,
+            ],
+            'supervisor-processing' => [
+                'maxProcesses' => 1,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 192,
+            ],
+            'supervisor-downloads' => [
+                'maxProcesses' => 1,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 192,
+            ],
+            'supervisor-composer' => [
+                'maxProcesses' => 1,
+                'memory' => 384,
+            ],
+            'supervisor-spotify' => [
+                'maxProcesses' => 1,
+                'memory' => 96,
             ],
         ],
     ],
