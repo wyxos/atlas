@@ -20,8 +20,6 @@ class DownloadFile implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $queue = 'downloads';
-
     public File $file;
 
     public ?int $downloadId = null;

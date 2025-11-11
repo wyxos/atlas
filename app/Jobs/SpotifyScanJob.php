@@ -17,9 +17,12 @@ class SpotifyScanJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $queue = 'spotify';
-
     public function __construct(public int $userId) {}
+
+    public function queue(): string
+    {
+        return 'spotify';
+    }
 
     public function handle(): void
     {

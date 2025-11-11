@@ -16,7 +16,10 @@ class SpotifyIncrementalSync implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $queue = 'spotify';
+    public function queue(): string
+    {
+        return 'spotify';
+    }
 
     public function handle(): void
     {

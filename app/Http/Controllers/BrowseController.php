@@ -392,10 +392,20 @@ class BrowseController extends Controller
         try {
             // Only enqueue download when a non-empty URL exists
             if (filled($file->url)) {
-                DownloadFile::dispatch($file);
+                \Log::info('Dispatching DownloadFile job', [
+                    'file_id' => $file->id,
+                    'url' => $file->url,
+                    'queue' => 'downloads',
+                ]);
+                DownloadFile::dispatch($file)->onQueue('downloads');
+            } else {
+                \Log::debug('Skipping DownloadFile dispatch - no URL', ['file_id' => $file->id]);
             }
         } catch (\Throwable $e) {
-            // ignore dispatch errors; client will still get ack
+            \Log::error('Failed to dispatch DownloadFile job', [
+                'file_id' => $file->id,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return response()->json([
@@ -469,9 +479,17 @@ class BrowseController extends Controller
 
             foreach ($toDownload as $file) {
                 try {
-                    \App\Jobs\DownloadFile::dispatch($file);
+                    \Log::info('Dispatching DownloadFile job (batch)', [
+                        'file_id' => $file->id,
+                        'url' => $file->url,
+                        'queue' => 'downloads',
+                    ]);
+                    \App\Jobs\DownloadFile::dispatch($file)->onQueue('downloads');
                 } catch (\Throwable $e) {
-                    // ignore dispatch errors; continue with others
+                    \Log::error('Failed to dispatch DownloadFile job (batch)', [
+                        'file_id' => $file->id,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             }
         }

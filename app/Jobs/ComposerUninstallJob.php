@@ -15,13 +15,16 @@ class ComposerUninstallJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $queue = 'composer';
-
     public function __construct(
         public int $userId,
         public string $packageName,
         public ?string $previousConstraint = null
     ) {}
+
+    public function queue(): string
+    {
+        return 'composer';
+    }
 
     public function handle(): void
     {

@@ -4,6 +4,7 @@ use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Queue;
 
 it('does not dispatch download job when file url is empty on react-download', function () {
     Bus::fake();
@@ -68,6 +69,59 @@ it('batch react only dispatches download jobs for files with non-empty url', fun
     Bus::assertDispatched(DownloadFile::class, function (DownloadFile $job) use ($withUrl) {
         return (int) $job->file->id === (int) $withUrl->id;
     });
+});
+
+it('dispatches download file job to downloads queue on react-download', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/file.jpg',
+        'path' => null,
+        'downloaded' => false,
+        'not_found' => false,
+    ]);
+
+    $response = $this->postJson(route('browse.files.react-download', ['file' => $file->id]), ['type' => 'love']);
+
+    $response->assertOk();
+
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
+        return (int) $job->file->id === (int) $file->id;
+    });
+
+    Queue::assertPushedOn('downloads', DownloadFile::class);
+});
+
+it('dispatches download file job to downloads queue on batch react', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/file.jpg',
+        'path' => null,
+        'downloaded' => false,
+        'not_found' => false,
+    ]);
+
+    $payload = [
+        'ids' => [$file->id],
+        'type' => 'love',
+    ];
+
+    $response = $this->postJson(route('browse.files.batch-react'), $payload);
+
+    $response->assertOk();
+
+    Queue::assertPushed(DownloadFile::class, function ($job) use ($file) {
+        return (int) $job->file->id === (int) $file->id;
+    });
+
+    Queue::assertPushedOn('downloads', DownloadFile::class);
 });
 
 

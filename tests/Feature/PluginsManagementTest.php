@@ -100,6 +100,23 @@ test('install updates composer.plugins.json and dispatches job', function () {
     });
 });
 
+test('install dispatches job to composer queue', function () {
+    Bus::fake();
+
+    $user = User::factory()->create(['is_admin' => true]);
+    $package = 'wyxos/atlas-plugin-test';
+
+    $this->from(route('plugins.edit'))->actingAs($user)->post(route('plugins.install'), [
+        'package' => $package,
+    ]);
+
+    Bus::assertDispatched(ComposerInstallJob::class, function ($job) use ($user, $package) {
+        return $job->userId === $user->id
+            && $job->packageName === $package
+            && $job->queue() === 'composer';
+    });
+});
+
 test('uninstall requires admin', function () {
     $user = User::factory()->create(['is_admin' => false]);
 
@@ -145,6 +162,29 @@ test('uninstall removes from composer.plugins.json and dispatches job', function
         return $job->userId === $user->id
             && $job->packageName === $package
             && $job->previousConstraint === '*@dev';
+    });
+});
+
+test('uninstall dispatches job to composer queue', function () {
+    Bus::fake();
+
+    $user = User::factory()->create(['is_admin' => true]);
+    $package = 'wyxos/atlas-plugin-test';
+
+    // Setup: add package to composer.plugins.json
+    $pluginsJsonPath = base_path('composer.plugins.json');
+    $data = ['require' => [$package => '*@dev']];
+    file_put_contents($pluginsJsonPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+
+    $this->from(route('plugins.edit'))->actingAs($user)->post(route('plugins.uninstall'), [
+        'package' => $package,
+    ]);
+
+    Bus::assertDispatched(ComposerUninstallJob::class, function ($job) use ($user, $package) {
+        return $job->userId === $user->id
+            && $job->packageName === $package
+            && $job->previousConstraint === '*@dev'
+            && $job->queue() === 'composer';
     });
 });
 
