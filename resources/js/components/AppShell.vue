@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { usePage } from '@inertiajs/vue3';
+import EnvironmentBadge from '@/components/EnvironmentBadge.vue';
 
 interface Props {
     variant?: 'header' | 'sidebar';
@@ -12,6 +13,7 @@ const isOpen = usePage().props.sidebarOpen;
 </script>
 
 <template>
+    <EnvironmentBadge />
     <div v-if="variant === 'header'" class="flex min-h-screen w-full flex-col">
         <slot />
     </div>
