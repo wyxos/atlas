@@ -37,6 +37,10 @@ const sidebarNavItems: NavItem[] = [
                     title: 'Plugins',
                     href: '/settings/plugins',
                 } as NavItem,
+                {
+                    title: 'Test Moderation Rules',
+                    href: '/moderation/test',
+                } as NavItem,
             ]
             : []
     ),

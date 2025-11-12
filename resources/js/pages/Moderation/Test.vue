@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ContentLayout from '@/layouts/ContentLayout.vue';
+import ScrollableLayout from '@/layouts/ScrollableLayout.vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Check, X, AlertCircle } from 'lucide-vue-next';
@@ -196,7 +197,8 @@ const matchStatus = computed(() => {
     <Head title="Test Moderation Rules" />
     <AppLayout :breadcrumbs="breadcrumbs">
         <ContentLayout>
-            <div class="grid gap-6 lg:grid-cols-2">
+            <ScrollableLayout class="flex flex-col">
+                <div class="grid gap-6 lg:grid-cols-2">
                 <!-- Left Column: Input and Rule Selection -->
                 <div class="grid gap-4">
                     <div class="grid gap-2">
@@ -319,7 +321,8 @@ const matchStatus = computed(() => {
                         Select a rule to edit
                     </div>
                 </div>
-            </div>
+                </div>
+            </ScrollableLayout>
         </ContentLayout>
     </AppLayout>
 </template>
