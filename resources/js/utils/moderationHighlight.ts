@@ -108,14 +108,80 @@ export function buildTermRegex(term: string, options: ModerationOptions = {}): R
 }
 
 /**
+ * Extract all terms with their per-term options from a rule node (recursively)
+ */
+export type TermEntry = string | { term: string; allow_digit_prefix?: boolean }
+export type RuleNode = {
+  op: 'any' | 'all' | 'not_any' | 'at_least' | 'and' | 'or'
+  terms?: TermEntry[] | null
+  options?: { case_sensitive?: boolean; whole_word?: boolean } | null
+  children?: RuleNode[] | null
+}
+
+function extractTermsWithOptions(node: RuleNode | null | undefined): Map<string, ModerationOptions> {
+  const termMap = new Map<string, ModerationOptions>()
+  
+  if (!node) return termMap
+  
+  const globalOptions: ModerationOptions = {
+    case_sensitive: node.options?.case_sensitive ?? false,
+    whole_word: node.options?.whole_word ?? true,
+  }
+  
+  // Extract terms from this node
+  if (node.terms && Array.isArray(node.terms)) {
+    for (const termEntry of node.terms) {
+      if (typeof termEntry === 'string') {
+        const term = termEntry.trim()
+        if (term && !termMap.has(term.toLowerCase())) {
+          termMap.set(term.toLowerCase(), { ...globalOptions })
+        }
+      } else if (termEntry && typeof termEntry === 'object' && 'term' in termEntry) {
+        const term = String(termEntry.term).trim()
+        if (term && !termMap.has(term.toLowerCase())) {
+          termMap.set(term.toLowerCase(), {
+            ...globalOptions,
+            allow_digit_prefix: termEntry.allow_digit_prefix ?? false,
+          })
+        }
+      }
+    }
+  }
+  
+  // Recursively extract from children
+  if (node.children && Array.isArray(node.children)) {
+    for (const child of node.children) {
+      const childTerms = extractTermsWithOptions(child)
+      for (const [term, options] of childTerms) {
+        // Prefer existing options if term already exists (first encountered wins)
+        if (!termMap.has(term)) {
+          termMap.set(term, options)
+        }
+      }
+    }
+  }
+  
+  return termMap
+}
+
+/**
  * Find all match ranges for the given terms in the prompt
+ * Can accept either a simple terms array with global options, or a rule node for per-term options
  */
 export function findMatchRanges(
   prompt: string,
   terms: string[],
-  options: ModerationOptions = {}
+  optionsOrRule: ModerationOptions | RuleNode = {}
 ): MatchRange[] {
   const ranges: MatchRange[] = []
+  
+  // Determine if we have a rule node or just options
+  const isRuleNode = optionsOrRule && typeof optionsOrRule === 'object' && 'op' in optionsOrRule
+  const ruleNode = isRuleNode ? (optionsOrRule as RuleNode) : null
+  const globalOptions = isRuleNode ? {} : (optionsOrRule as ModerationOptions)
+  
+  // Build term-to-options map
+  const termOptionsMap = ruleNode ? extractTermsWithOptions(ruleNode) : new Map<string, ModerationOptions>()
   
   // Deduplicate terms (case-insensitively) to avoid redundant processing
   const seenLower = new Set<string>()
@@ -133,7 +199,13 @@ export function findMatchRanges(
   for (const term of uniqueTerms) {
     if (!term || term.trim().length === 0) continue
     
-    const regex = buildTermRegex(term, options)
+    // Get per-term options if available, otherwise use global options
+    const termLower = term.toLowerCase()
+    const termSpecificOptions = termOptionsMap.has(termLower) 
+      ? termOptionsMap.get(termLower)! 
+      : globalOptions
+    
+    const regex = buildTermRegex(term, termSpecificOptions)
     let match: RegExpExecArray | null
     
     while ((match = regex.exec(prompt)) !== null) {
@@ -192,19 +264,19 @@ export function mergeRanges(ranges: MatchRange[]): MatchRange[] {
  * 
  * @param prompt The raw prompt text
  * @param terms The list of matched terms from moderation hits
- * @param options Moderation rule options (case_sensitive, whole_word)
+ * @param optionsOrRule Moderation rule options (case_sensitive, whole_word) OR a rule node for per-term options
  * @returns HTML string with highlighted terms
  */
 export function highlightPromptHtml(
   prompt: string,
   terms: string[],
-  options: ModerationOptions = {}
+  optionsOrRule: ModerationOptions | RuleNode = {}
 ): string {
   if (!prompt) return ''
   if (!terms || terms.length === 0) return escapeHtml(prompt)
   
-  // Find all match ranges
-  const ranges = findMatchRanges(prompt, terms, options)
+  // Find all match ranges (will handle per-term options if rule node is provided)
+  const ranges = findMatchRanges(prompt, terms, optionsOrRule)
   if (ranges.length === 0) return escapeHtml(prompt)
   
   // Merge overlapping ranges

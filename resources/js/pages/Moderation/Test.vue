@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ModerationRuleController from '@/actions/App/Http/Controllers/ModerationRuleController';
-import RuleEditor, { type RuleNode, type TermEntry } from '@/components/moderation/RuleEditor.vue';
+import RuleEditor, { type RuleNode } from '@/components/moderation/RuleEditor.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,13 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/AppLayout.vue';
 import ContentLayout from '@/layouts/ContentLayout.vue';
 import ScrollableLayout from '@/layouts/ScrollableLayout.vue';
-import { Head, usePage } from '@inertiajs/vue3';
-import axios from 'axios';
-import { Check, X, AlertCircle } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
-import { highlightPromptHtml } from '@/utils/moderationHighlight';
 import type { BreadcrumbItem } from '@/types';
+import { highlightPromptHtml } from '@/utils/moderationHighlight';
+import { Head, usePage } from '@inertiajs/vue3';
 import { useDebounceFn } from '@vueuse/core';
+import axios from 'axios';
+import { AlertCircle, Check, X } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
 type RuleOperator = 'any' | 'all' | 'not_any' | 'at_least' | 'and' | 'or';
 
@@ -152,11 +152,11 @@ async function onSaveRule(): Promise<void> {
 
         // Update the rule in the form
         ruleForm.value = JSON.parse(JSON.stringify(saved));
-        
+
         // Refresh the rules list from server
         const rulesResponse = await axios.get(ModerationRuleController.index().url);
         const updatedRules = Array.isArray(rulesResponse.data?.rules) ? rulesResponse.data.rules : [];
-        
+
         // Update the selected rule if it still exists
         if (selectedRuleId.value) {
             const updatedRule = updatedRules.find((r: Rule) => r.id === selectedRuleId.value);
@@ -164,7 +164,7 @@ async function onSaveRule(): Promise<void> {
                 ruleForm.value = JSON.parse(JSON.stringify(updatedRule));
             }
         }
-        
+
         // Re-run test with updated rule
         if (testText.value.trim()) {
             await runTest();
@@ -180,11 +180,8 @@ const highlightedText = computed(() => {
     if (!testResult.value.hits || testResult.value.hits.length === 0) return testText.value;
 
     const rule = testResult.value.rule;
-    const options = rule?.options || {};
-    return highlightPromptHtml(testText.value, testResult.value.hits, {
-        whole_word: options.whole_word ?? true,
-        case_sensitive: options.case_sensitive ?? false,
-    });
+    // Pass the rule node so highlighting can extract per-term options (like allow_digit_prefix)
+    return highlightPromptHtml(testText.value, testResult.value.hits, rule);
 });
 
 const matchStatus = computed(() => {
@@ -198,132 +195,143 @@ const matchStatus = computed(() => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <ContentLayout>
             <ScrollableLayout class="flex flex-col">
-                <div class="grid gap-6 lg:grid-cols-2">
-                <!-- Left Column: Input and Rule Selection -->
-                <div class="grid gap-4">
-                    <div class="grid gap-2">
-                        <Label for="rule-select">Select Rule</Label>
-                        <select
-                            id="rule-select"
-                            v-model="selectedRuleId"
-                            class="h-9 rounded-md border px-2 text-sm dark:bg-neutral-900"
-                        >
-                            <option :value="null">-- Select a rule --</option>
-                            <option v-for="rule in rules" :key="rule.id" :value="rule.id">
-                                {{ rule.name || 'Untitled' }} ({{ rule.active ? 'active' : 'inactive' }})
-                            </option>
-                        </select>
-                    </div>
+                <div class="grid gap-6 lg:grid-cols-2 overflow-auto">
+                    <!-- Left Column: Input and Rule Selection -->
+                    <div class="grid gap-4">
+                        <div>
+                            <div class="grid gap-2">
+                                <Label for="rule-select">Select Rule</Label>
+                                <select id="rule-select" v-model="selectedRuleId" class="h-9 rounded-md border px-2 text-sm dark:bg-neutral-900">
+                                    <option :value="null">-- Select a rule --</option>
+                                    <option v-for="rule in rules" :key="rule.id" :value="rule.id">
+                                        {{ rule.name || 'Untitled' }} ({{ rule.active ? 'active' : 'inactive' }})
+                                    </option>
+                                </select>
+                            </div>
 
-                    <div class="grid gap-2">
-                        <Label for="test-text">Test Text</Label>
-                        <Textarea
-                            id="test-text"
-                            v-model="testText"
-                            placeholder="Paste text here to test against the selected rule..."
-                            class="min-h-[200px] font-mono text-sm"
-                        />
-                    </div>
-
-                    <div v-if="testError" class="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
-                        <div class="flex items-center gap-2">
-                            <AlertCircle :size="16" />
-                            <span>{{ testError }}</span>
-                        </div>
-                    </div>
-
-                    <!-- Test Results -->
-                    <div v-if="testResult" class="grid gap-3 rounded-md border p-4">
-                        <div class="flex items-center justify-between">
-                            <Label class="text-base font-semibold">Test Results</Label>
-                            <div class="flex items-center gap-2">
-                                <component
-                                    :is="matchStatus ? Check : X"
-                                    :size="20"
-                                    :class="matchStatus ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                            <div class="grid gap-2">
+                                <Label for="test-text">Test Text</Label>
+                                <Textarea
+                                    id="test-text"
+                                    v-model="testText"
+                                    placeholder="Paste text here to test against the selected rule..."
+                                    class="min-h-[200px] font-mono text-sm"
                                 />
-                                <span
-                                    :class="matchStatus ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'"
-                                >
-                                    {{ matchStatus ? 'MATCHES' : 'NO MATCH' }}
-                                </span>
+                            </div>
+
+                            <div v-if="testError" class="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+                                <div class="flex items-center gap-2">
+                                    <AlertCircle :size="16" />
+                                    <span>{{ testError }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Test Results -->
+                            <div v-if="testResult" class="grid gap-3 rounded-md border p-4">
+                                <div class="flex items-center justify-between">
+                                    <Label class="text-base font-semibold">Test Results</Label>
+                                    <div class="flex items-center gap-2">
+                                        <component
+                                            :is="matchStatus ? Check : X"
+                                            :size="20"
+                                            :class="matchStatus ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                                        />
+                                        <span
+                                            :class="
+                                            matchStatus
+                                                ? 'font-semibold text-green-600 dark:text-green-400'
+                                                : 'font-semibold text-red-600 dark:text-red-400'
+                                        "
+                                        >
+                                        {{ matchStatus ? 'MATCHES' : 'NO MATCH' }}
+                                    </span>
+                                    </div>
+                                </div>
+
+                                <div v-if="testResult.hits && testResult.hits.length > 0" class="grid gap-2">
+                                    <Label class="text-sm text-muted-foreground">Matched Terms:</Label>
+                                    <div class="flex flex-wrap gap-2">
+                                    <span
+                                        v-for="hit in testResult.hits"
+                                        :key="hit"
+                                        class="rounded bg-amber-300/60 px-2 py-1 text-sm dark:bg-amber-400/30"
+                                    >
+                                        {{ hit }}
+                                    </span>
+                                    </div>
+                                </div>
+                                <div v-else class="text-sm text-muted-foreground">No terms matched.</div>
+
+                                <div class="grid gap-2">
+                                    <Label class="text-sm text-muted-foreground">Highlighted Text:</Label>
+                                    <div
+                                        class="min-h-[100px] rounded-md border bg-muted/30 p-3 font-mono text-sm leading-relaxed"
+                                        v-html="highlightedText"
+                                    />
+                                </div>
+                            </div>
+
+                            <div v-else-if="isTesting" class="flex items-center justify-center rounded-md border p-8">
+                                <div class="text-muted-foreground">Testing...</div>
                             </div>
                         </div>
+                    </div>
 
-                        <div v-if="testResult.hits && testResult.hits.length > 0" class="grid gap-2">
-                            <Label class="text-sm text-muted-foreground">Matched Terms:</Label>
-                            <div class="flex flex-wrap gap-2">
-                                <span
-                                    v-for="hit in testResult.hits"
-                                    :key="hit"
-                                    class="rounded bg-amber-300/60 px-2 py-1 text-sm dark:bg-amber-400/30"
-                                >
-                                    {{ hit }}
-                                </span>
+                    <!-- Right Column: Rule Editor -->
+                    <div class="grid gap-4">
+                        <div v-if="selectedRule" class="grid gap-4 rounded-md border p-4">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-lg font-semibold">Edit Rule</h2>
+                                <Button v-if="ruleForm?.id" @click="onSaveRule" size="sm">Save Changes</Button>
                             </div>
-                        </div>
-                        <div v-else class="text-sm text-muted-foreground">No terms matched.</div>
 
-                        <div class="grid gap-2">
-                            <Label class="text-sm text-muted-foreground">Highlighted Text:</Label>
-                            <div
-                                class="min-h-[100px] rounded-md border bg-muted/30 p-3 font-mono text-sm leading-relaxed"
-                                v-html="highlightedText"
-                            />
-                        </div>
-                    </div>
-
-                    <div v-else-if="isTesting" class="flex items-center justify-center rounded-md border p-8">
-                        <div class="text-muted-foreground">Testing...</div>
-                    </div>
-                </div>
-
-                <!-- Right Column: Rule Editor -->
-                <div class="grid gap-4">
-                    <div v-if="selectedRule" class="grid gap-4 rounded-md border p-4">
-                        <div class="flex items-center justify-between">
-                            <h2 class="text-lg font-semibold">Edit Rule</h2>
-                            <Button v-if="ruleForm?.id" @click="onSaveRule" size="sm">Save Changes</Button>
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label>Rule Name</Label>
-                            <Input 
-                                :modelValue="ruleForm?.name || ''" 
-                                @update:modelValue="(val: string) => { if (ruleForm) ruleForm.name = val; }" 
-                                placeholder="Untitled rule" 
-                            />
-                        </div>
-
-                        <div class="flex items-center gap-6">
-                            <label class="inline-flex items-center gap-2 text-sm">
-                                <input 
-                                    type="checkbox" 
-                                    :checked="ruleForm?.active ?? false"
-                                    @change="(e: any) => { if (ruleForm) ruleForm.active = !!e?.target?.checked; }"
+                            <div class="grid gap-2">
+                                <Label>Rule Name</Label>
+                                <Input
+                                    :modelValue="ruleForm?.name || ''"
+                                    @update:modelValue="
+                                        (val: string | number) => {
+                                            if (ruleForm) ruleForm.name = String(val);
+                                        }
+                                    "
+                                    placeholder="Untitled rule"
                                 />
-                                <span>active</span>
-                            </label>
-                            <label class="inline-flex items-center gap-2 text-sm">
-                                <input 
-                                    type="checkbox" 
-                                    :checked="ruleForm?.nsfw ?? false"
-                                    @change="(e: any) => { if (ruleForm) ruleForm.nsfw = !!e?.target?.checked; }"
-                                />
-                                <span>nsfw</span>
-                            </label>
+                            </div>
+
+                            <div class="flex items-center gap-6">
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        :checked="ruleForm?.active ?? false"
+                                        @change="
+                                            (e: any) => {
+                                                if (ruleForm) ruleForm.active = !!e?.target?.checked;
+                                            }
+                                        "
+                                    />
+                                    <span>active</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        :checked="ruleForm?.nsfw ?? false"
+                                        @change="
+                                            (e: any) => {
+                                                if (ruleForm) ruleForm.nsfw = !!e?.target?.checked;
+                                            }
+                                        "
+                                    />
+                                    <span>nsfw</span>
+                                </label>
+                            </div>
+
+                            <RuleEditor v-if="ruleForm" :modelValue="ruleForm as any" @update:modelValue="onUpdateRuleNode" />
                         </div>
 
-                        <RuleEditor v-if="ruleForm" :modelValue="ruleForm as any" @update:modelValue="onUpdateRuleNode" />
+                        <div v-else class="flex items-center justify-center rounded-md border p-8 text-muted-foreground">Select a rule to edit</div>
                     </div>
-
-                    <div v-else class="flex items-center justify-center rounded-md border p-8 text-muted-foreground">
-                        Select a rule to edit
-                    </div>
-                </div>
                 </div>
             </ScrollableLayout>
         </ContentLayout>
     </AppLayout>
 </template>
-
