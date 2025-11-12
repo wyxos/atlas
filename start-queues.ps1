@@ -28,12 +28,32 @@ function Start-QueueWorker {
     Start-Process -FilePath $shellExecutable -ArgumentList '-NoExit', '-Command', $command -WorkingDirectory $projectPath -WindowStyle Normal
 }
 
-for ($i = 1; $i -le 4; $i++) {
+# Default queue - quick operations (metadata, renames, deletions, covers, enrichment, Scout indexing)
+for ($i = 1; $i -le 3; $i++) {
     Start-QueueWorker "default" $i @('--queue=default', '--tries=3')
 }
 
-for ($i = 1; $i -le 4; $i++) {
-    Start-QueueWorker "processing" $i @('--queue=processing')
+# Processing queue - CPU/memory-intensive media processing (images, audio, video)
+for ($i = 1; $i -le 2; $i++) {
+    Start-QueueWorker "processing" $i @('--queue=processing', '--tries=3', '--timeout=300')
 }
 
-Write-Host "Started 8 queue workers successfully!"
+# Downloads queue - long-running file downloads
+for ($i = 1; $i -le 2; $i++) {
+    Start-QueueWorker "downloads" $i @('--queue=downloads', '--tries=2', '--timeout=600')
+}
+
+# Composer queue - system-level composer operations (single worker to prevent conflicts)
+Start-QueueWorker "composer" 1 @('--queue=composer', '--tries=1', '--timeout=600')
+
+# Spotify queue - API-bound Spotify operations
+Start-QueueWorker "spotify" 1 @('--queue=spotify', '--tries=2', '--timeout=300')
+
+Write-Host "Started 9 queue workers successfully!"
+Write-Host "  - 3x default queue workers"
+Write-Host "  - 2x processing queue workers"
+Write-Host "  - 2x downloads queue workers"
+Write-Host "  - 1x composer queue worker"
+Write-Host "  - 1x spotify queue worker"
+Write-Host ""
+Write-Host "Note: For production, use Horizon instead: php artisan horizon"

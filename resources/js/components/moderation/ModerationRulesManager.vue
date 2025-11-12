@@ -55,7 +55,16 @@ const ruleDeleting = ref(false);
 const showOnlyNsfw = ref<boolean>(!!props.nsfw);
 
 const page = usePage();
-const isAdmin = computed(() => !!(page as any)?.props?.auth?.user?.is_admin);
+const isAdmin = computed(() => {
+    try {
+        const user = (page as any)?.props?.auth?.user;
+        const admin = !!(user?.is_admin);
+        return admin;
+    } catch (error) {
+        console.error('Error checking admin status:', error);
+        return false;
+    }
+});
 
 watch(
     () => props.nsfw,
@@ -146,38 +155,54 @@ async function onSaveRule(): Promise<void> {
 }
 
 function summarizeRule(rule: Rule | RuleNode, depth = 0): string {
-    const op = (rule as any)?.op as RuleOperator;
-    const terms = ((rule as any)?.terms || []) as string[];
-    const min = (rule as any)?.min as number | null | undefined;
-    const options = ((rule as any)?.options || {}) as { case_sensitive?: boolean; whole_word?: boolean };
-    const children = ((rule as any)?.children || []) as RuleNode[];
+    try {
+        const op = (rule as any)?.op as RuleOperator;
+        const terms = ((rule as any)?.terms || []) as TermEntry[];
+        const min = (rule as any)?.min as number | null | undefined;
+        const options = ((rule as any)?.options || {}) as { case_sensitive?: boolean; whole_word?: boolean };
+        const children = ((rule as any)?.children || []) as RuleNode[];
 
-    const optionSummaries: string[] = [];
-    optionSummaries.push(options.case_sensitive ? 'case-sensitive' : 'case-insensitive');
-    optionSummaries.push((options.whole_word ?? true) ? 'whole-word' : 'substring');
-    const optionSuffix = optionSummaries.length ? ` (${optionSummaries.join(', ')})` : '';
+        const optionSummaries: string[] = [];
+        optionSummaries.push(options.case_sensitive ? 'case-sensitive' : 'case-insensitive');
+        optionSummaries.push((options.whole_word ?? true) ? 'whole-word' : 'substring');
+        const optionSuffix = optionSummaries.length ? ` (${optionSummaries.join(', ')})` : '';
 
-    const joinTerms = (list: string[]) => list.join(', ');
+        const joinTerms = (list: TermEntry[]) => {
+            if (!Array.isArray(list) || list.length === 0) return '';
+            return list.map((t) => {
+                if (typeof t === 'string') return t;
+                if (typeof t === 'object' && t && 'term' in t) {
+                    const term = String(t.term || '');
+                    const prefix = t.allow_digit_prefix ? '#' : '';
+                    return prefix ? `${prefix}${term}` : term;
+                }
+                return String(t || '');
+            }).filter(Boolean).join(', ');
+        };
 
-    switch (op) {
-        case 'any':
-            return `matches any of: ${joinTerms(terms)}${optionSuffix}`;
-        case 'all':
-            return `matches all of: ${joinTerms(terms)}${optionSuffix}`;
-        case 'not_any':
-            return `matches none of: ${joinTerms(terms)}${optionSuffix}`;
-        case 'at_least':
-            return `matches at least ${min ?? 0} of: ${joinTerms(terms)}${optionSuffix}`;
-        case 'and': {
-            const parts = (children || []).map((child) => summarizeRule(child, depth + 1));
-            return parts.length ? parts.map((part) => (depth > 0 ? `(${part})` : part)).join(' AND ') : 'AND()';
+        switch (op) {
+            case 'any':
+                return `matches any of: ${joinTerms(terms)}${optionSuffix}`;
+            case 'all':
+                return `matches all of: ${joinTerms(terms)}${optionSuffix}`;
+            case 'not_any':
+                return `matches none of: ${joinTerms(terms)}${optionSuffix}`;
+            case 'at_least':
+                return `matches at least ${min ?? 0} of: ${joinTerms(terms)}${optionSuffix}`;
+            case 'and': {
+                const parts = (children || []).map((child) => summarizeRule(child, depth + 1));
+                return parts.length ? parts.map((part) => (depth > 0 ? `(${part})` : part)).join(' AND ') : 'AND()';
+            }
+            case 'or': {
+                const parts = (children || []).map((child) => summarizeRule(child, depth + 1));
+                return parts.length ? parts.map((part) => (depth > 0 ? `(${part})` : part)).join(' OR ') : 'OR()';
+            }
+            default:
+                return op || 'unknown';
         }
-        case 'or': {
-            const parts = (children || []).map((child) => summarizeRule(child, depth + 1));
-            return parts.length ? parts.map((part) => (depth > 0 ? `(${part})` : part)).join(' OR ') : 'OR()';
-        }
-        default:
-            return op || 'unknown';
+    } catch (error) {
+        console.error('Error summarizing rule:', error, rule);
+        return 'error';
     }
 }
 
@@ -207,9 +232,12 @@ async function onDeleteRule(): Promise<void> {
             :disabled="disabled"
             :class="buttonClass"
             @click="openRulesModal"
+            data-testid="manage-rules-button"
         >
             Manage Rules
         </Button>
+        <!-- Temporary debug - remove after fixing -->
+        <!-- <div class="text-xs">Admin: {{ isAdmin }}, User: {{ (page as any)?.props?.auth?.user?.is_admin }}</div> -->
 
         <Dialog v-model:open="rulesModalOpen">
             <DialogScrollContent class="w-[90vw] max-w-[1200px]">
