@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogDescription, DialogScrollContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref, watch } from 'vue';
 
@@ -241,8 +241,20 @@ async function onDeleteRule(): Promise<void> {
 
         <Dialog v-model:open="rulesModalOpen">
             <DialogScrollContent class="w-[90vw] max-w-[1200px]">
-                <DialogTitle>Moderation Rules</DialogTitle>
-                <DialogDescription>Define and manage text block rules used by the moderator.</DialogDescription>
+                <div class="flex items-start justify-between gap-4 mb-2">
+                    <div>
+                        <DialogTitle>Moderation Rules</DialogTitle>
+                        <DialogDescription>Define and manage text block rules used by the moderator.</DialogDescription>
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        @click="() => { rulesModalOpen = false; router.visit('/moderation/test'); }"
+                        class="h-9 px-3 whitespace-nowrap"
+                    >
+                        Test Rules
+                    </Button>
+                </div>
                 <div class="mt-2 grid gap-3" style="grid-template-columns: minmax(0, 1fr) minmax(280px, 420px)">
                     <div class="grid gap-3">
                         <template v-if="ruleForm">

@@ -16,7 +16,7 @@
     "perf:trace:interact": "node scripts/perf/trace-browse-interact.mjs",
     "publish:packagist": "node publish-packagist.mjs",
     "update-vibe": "node scripts/update-vibe.mjs",
-    "release": "npx @wyxos/zephyr@release"
+    "release": "npx @wyxos/zephyr@latest"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",

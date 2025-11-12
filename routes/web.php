@@ -168,6 +168,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('moderation/rules', [App\Http\Controllers\ModerationRuleController::class, 'store'])->name('moderation.rules.store');
     Route::put('moderation/rules/{rule}', [App\Http\Controllers\ModerationRuleController::class, 'update'])->name('moderation.rules.update');
     Route::delete('moderation/rules/{rule}', [App\Http\Controllers\ModerationRuleController::class, 'destroy'])->name('moderation.rules.destroy');
+    
+    // Moderation rule testing page
+    Route::get('moderation/test', [App\Http\Controllers\ModerationRuleController::class, 'test'])->name('moderation.test');
+    Route::post('moderation/rules/test', [App\Http\Controllers\ModerationRuleController::class, 'testRule'])->name('moderation.rules.test');
 
     Route::post('browse/files/{file}/react-download', [App\Http\Controllers\BrowseController::class, 'reactDownload'])
         ->name('browse.files.react-download');

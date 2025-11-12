@@ -9,6 +9,7 @@
 export interface ModerationOptions {
   case_sensitive?: boolean
   whole_word?: boolean
+  allow_digit_prefix?: boolean
 }
 
 export interface MatchRange {
@@ -66,14 +67,24 @@ export function buildTermRegex(term: string, options: ModerationOptions = {}): R
   const patternBody = escapedTokens.join(separatorPattern)
 
   if (wholeWord) {
+    const allowDigitPrefix = options.allow_digit_prefix ?? false
+    
     // Require non-letter/digit boundaries around the entire term/phrase
     // Underscores are treated as boundaries, not word characters
     // PHP uses: (?:^|[^\p{L}\p{N}]) ... (?:$|[^\p{L}\p{N}])
     // In JS, we use: (?:^|[^A-Za-z0-9]) ... (?:$|[^A-Za-z0-9])
     
     // Use lookaheads/lookbehinds for non-capturing boundary checks
-    const boundaryStart = '(?:^|(?<=[^A-Za-z0-9]))'
-    const boundaryEnd = '(?:$|(?=[^A-Za-z0-9]))'
+    let boundaryStart = '(?:^|(?<=[^A-Za-z0-9]))'
+    if (allowDigitPrefix) {
+      // Allow digits before the term
+      boundaryStart = '(?:^|(?<=[^A-Za-z0-9])|(?<=[0-9]))'
+    }
+    
+    // Allow a trailing 's' for plurals when allowDigitPrefix is true
+    const boundaryEnd = allowDigitPrefix 
+      ? '(?:s(?=$|[^A-Za-z0-9])|$|(?=[^A-Za-z0-9]))'
+      : '(?:$|(?=[^A-Za-z0-9]))'
     
     const pattern = `${boundaryStart}${patternBody}${boundaryEnd}`
     
@@ -81,8 +92,13 @@ export function buildTermRegex(term: string, options: ModerationOptions = {}): R
       return new RegExp(pattern, flags)
     } catch {
       // Fallback for environments without lookbehind support
-      // Capture boundary character if present, adjust match indices later
-      const fallbackPattern = `(?:^|([^A-Za-z0-9]))${patternBody}(?:$|(?=[^A-Za-z0-9]))`
+      const fallbackBoundaryStart = allowDigitPrefix 
+        ? '(?:^|([^A-Za-z0-9])|[0-9])'
+        : '(?:^|([^A-Za-z0-9]))'
+      const fallbackBoundaryEnd = allowDigitPrefix
+        ? '(?:s(?=$|[^A-Za-z0-9])|$|(?=[^A-Za-z0-9]))'
+        : '(?:$|(?=[^A-Za-z0-9]))'
+      const fallbackPattern = `${fallbackBoundaryStart}${patternBody}${fallbackBoundaryEnd}`
       return new RegExp(fallbackPattern, flags)
     }
   } else {

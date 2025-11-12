@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\ModerationRule;
+use App\Services\Moderation\Moderator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class ModerationRuleController extends Controller
 {
@@ -65,6 +68,61 @@ class ModerationRuleController extends Controller
         $rule->delete();
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Show the rule testing page.
+     */
+    public function test(Request $request): Response
+    {
+        $this->ensureAdmin($request);
+
+        $rules = ModerationRule::query()->orderByDesc('id')->get();
+
+        return Inertia::render('Moderation/Test', [
+            'rules' => $rules,
+        ]);
+    }
+
+    /**
+     * Test text against a rule and return match results.
+     * Accepts either rule_id (to test existing rule) or rule object (to test edited rule).
+     */
+    public function testRule(Request $request): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $request->validate([
+            'text' => ['required', 'string'],
+            'rule_id' => ['nullable', 'integer', 'exists:moderation_rules,id'],
+            'rule' => ['nullable', 'array'],
+        ]);
+
+        $text = $request->string('text')->toString();
+        $moderator = new Moderator;
+
+        // If rule object is provided, create a temporary rule model for testing
+        if ($request->has('rule') && is_array($request->input('rule'))) {
+            $ruleData = $request->input('rule');
+            // Create a temporary rule model (not saved to database)
+            $rule = new ModerationRule($ruleData);
+            $rule->id = $ruleData['id'] ?? null; // Preserve ID if present
+            $moderator->loadRule($rule);
+        } elseif ($request->has('rule_id')) {
+            $rule = ModerationRule::findOrFail($request->integer('rule_id'));
+            $moderator->loadRule($rule);
+        } else {
+            return response()->json(['error' => 'Either rule_id or rule object is required'], 400);
+        }
+
+        $matches = $moderator->check($text);
+        $hits = $moderator->collectMatches($text);
+
+        return response()->json([
+            'matches' => $matches,
+            'hits' => $hits,
+            'rule' => $rule,
+        ]);
     }
 
     /**
