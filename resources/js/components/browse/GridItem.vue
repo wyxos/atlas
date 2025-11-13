@@ -2,7 +2,7 @@
 import FileReactions from '@/components/audio/FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import LoaderOverlay from '@/components/ui/LoaderOverlay.vue';
-import { Eye, ZoomIn, MoreHorizontal, User, Newspaper, Book, BookOpen, Palette, Tag, Info, ImageOff, AlertTriangle } from 'lucide-vue-next';
+import { Eye, ZoomIn, MoreHorizontal, User, Newspaper, Book, BookOpen, Palette, Tag, Info, ImageOff, AlertTriangle, Copy } from 'lucide-vue-next';
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import ActionMenu, { type ActionOption } from '@/components/browse/ActionMenu.vue';
@@ -1242,12 +1242,26 @@ function closeActionPanel(): void {
                         </TooltipTrigger>
                         <TooltipContent>
                             <div class="max-w-[520px] whitespace-pre-wrap break-words text-sm space-y-2">
-                                <div v-if="moderationInfo" class="text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                                    Auto-blacklisted by {{ moderationRuleLabel }}
-                                </div>
-                                <div v-if="highlightedPromptHtml" class="leading-relaxed" v-html="highlightedPromptHtml"></div>
-                                <div v-if="moderationHits.length" class="flex flex-wrap gap-1 pt-1">
-                                    <span v-for="t in moderationHits" :key="t" class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{{ t }}</span>
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="flex-1 space-y-2">
+                                        <div v-if="moderationInfo" class="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                            Auto-blacklisted by {{ moderationRuleLabel }}
+                                        </div>
+                                        <div v-if="highlightedPromptHtml" class="leading-relaxed" v-html="highlightedPromptHtml"></div>
+                                        <div v-if="moderationHits.length" class="flex flex-wrap gap-1 pt-1">
+                                            <span v-for="t in moderationHits" :key="t" class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{{ t }}</span>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        v-if="item?.metadata?.prompt"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="h-6 w-6 shrink-0 p-0"
+                                        aria-label="Copy prompt"
+                                        @click.stop="() => copyToClipboard(String(item?.metadata?.prompt || ''))"
+                                    >
+                                        <Copy :size="14" />
+                                    </Button>
                                 </div>
                             </div>
                         </TooltipContent>
