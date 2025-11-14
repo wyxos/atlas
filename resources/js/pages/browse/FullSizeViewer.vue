@@ -975,6 +975,24 @@ watch(dialogItem, () => {
   if (dialogOpen.value && thumbsVisible.value) void nextTick().then(() => ensureActiveThumbInView())
 })
 
+// Sync dialogItem with items array when items update (e.g., during backfill/pagination)
+// This prevents stale object references when items are replaced with new objects
+watch(
+  () => items.value,
+  () => {
+    if (!dialogOpen.value || !dialogItem.value) return
+    const currentId = dialogItem.value?.id
+    if (!currentId) return
+    // Find the item with the same ID in the updated items array
+    const updatedItem = items.value.find((item: any) => item?.id === currentId)
+    if (updatedItem && updatedItem !== dialogItem.value) {
+      // Update to the new object reference to prevent showing wrong image
+      dialogItem.value = updatedItem
+    }
+  },
+  { deep: false }
+)
+
 watch(dialogOpen, (isOpen) => {
   if (isOpen) {
     fullLoaded.value = false
