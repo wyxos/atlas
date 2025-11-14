@@ -19,7 +19,7 @@ import type { BrowseItem } from '@/types/browse';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { Masonry } from '@wyxos/vibe';
 import axios from 'axios';
-import { Check, ChevronsLeft, ChevronsRight, Hash, List as ListIcon, Loader2, Search, X, RefreshCw } from 'lucide-vue-next';
+import { AlertTriangle, Check, ChevronsLeft, ChevronsRight, Hash, List as ListIcon, Loader2, Search, X, RefreshCw } from 'lucide-vue-next';
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, shallowRef, watch } from 'vue';
 import { createBrowseGetPage } from './useBrowsePaging';
 
@@ -36,6 +36,11 @@ const props = defineProps({
         type: Array as () => Array<{ key: string; label: string; defaults?: Record<string, any> }>,
         required: false,
         default: () => [],
+    },
+    error: {
+        type: Object as () => { message?: string; status?: number | null; exception?: string } | null,
+        required: false,
+        default: null,
     },
 });
 
@@ -670,6 +675,17 @@ defineExpose({
     <AppLayout :breadcrumbs="breadcrumbs">
         <ContentLayout>
             <SectionHeader title="Browse" :icon="Search" />
+            <div v-if="props.error" class="mb-3 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+                <div class="flex items-start gap-2">
+                    <AlertTriangle class="mt-0.5 h-4 w-4 text-destructive flex-shrink-0" />
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-destructive">Service Error</p>
+                        <p class="text-xs text-muted-foreground mt-1">{{ props.error.message || 'The service is currently unavailable' }}</p>
+                        <p v-if="props.error.status" class="text-xs text-muted-foreground mt-0.5">HTTP {{ props.error.status }}</p>
+                        <p class="text-xs text-muted-foreground mt-2">Try selecting a different service from the dropdown below.</p>
+                    </div>
+                </div>
+            </div>
             <div class="mb-3 flex flex-wrap items-end gap-3">
                 <div class="grid gap-1">
                     <Label class="text-xs text-muted-foreground">Source</Label>

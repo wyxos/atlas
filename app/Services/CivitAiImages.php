@@ -27,9 +27,33 @@ class CivitAiImages extends BaseService
 
         $base = 'https://civitai.com/api/v1/images';
 
-        return Http::acceptJson()
-            ->get($base, $this->formatParams())
-            ->json();
+        $response = Http::acceptJson()
+            ->get($base, $this->formatParams());
+
+        // Handle HTTP errors
+        if ($response->failed()) {
+            // Return empty structure that transform() can handle
+            return [
+                'items' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                ],
+            ];
+        }
+
+        $json = $response->json();
+
+        // Handle null or invalid JSON responses
+        if (! is_array($json)) {
+            return [
+                'items' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                ],
+            ];
+        }
+
+        return $json;
     }
 
     public function formatParams(): array

@@ -74,13 +74,69 @@ class Browser
             $service->setParams($params);
         }
 
-        $response = $service->fetch($params);
+        $serviceError = null;
+        $response = null;
+
+        try {
+            $response = $service->fetch($params);
+
+            // Check if response is empty or invalid (service might be down)
+            if (! is_array($response) || empty($response)) {
+                $serviceError = [
+                    'message' => 'Service returned an empty response',
+                    'status' => null,
+                ];
+                $response = [
+                    'items' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                    ],
+                ];
+            }
+        } catch (ConnectionException $e) {
+            $serviceError = [
+                'message' => 'Unable to connect to service',
+                'status' => null,
+                'exception' => $e->getMessage(),
+            ];
+            $response = [
+                'items' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                ],
+            ];
+        } catch (\Throwable $e) {
+            $serviceError = [
+                'message' => 'Service error: '.$e->getMessage(),
+                'status' => method_exists($e, 'getCode') ? $e->getCode() : null,
+                'exception' => get_class($e),
+            ];
+            $response = [
+                'items' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                ],
+            ];
+        }
 
         Storage::disk('local')->put('temp/'.time().'-response.json', json_encode($response, JSON_PRETTY_PRINT));
 
-        $transformed = $service->transform($response, $params);
-        $filesPayload = $transformed['files'] ?? [];
-        $filter = $transformed['filter'] ?? [];
+        try {
+            $transformed = $service->transform($response, $params);
+            $filesPayload = $transformed['files'] ?? [];
+            $filter = $transformed['filter'] ?? [];
+        } catch (\Throwable $e) {
+            // If transform fails, use empty arrays
+            $filesPayload = [];
+            $filter = $this->params;
+            if (! $serviceError) {
+                $serviceError = [
+                    'message' => 'Failed to process service response: '.$e->getMessage(),
+                    'status' => null,
+                    'exception' => get_class($e),
+                ];
+            }
+        }
 
         $persisted = app(BrowsePersister::class)->persist($filesPayload);
 
@@ -170,6 +226,7 @@ class Browser
                 'previews' => array_slice($previewBag, 0, 4),
                 'ids' => $matchedIds,
             ],
+            'error' => $serviceError,
         ];
     }
 }
