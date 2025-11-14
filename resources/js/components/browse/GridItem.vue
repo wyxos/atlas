@@ -2,7 +2,7 @@
 import FileReactions from '@/components/audio/FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import LoaderOverlay from '@/components/ui/LoaderOverlay.vue';
-import { Eye, ZoomIn, MoreHorizontal, User, Newspaper, Book, BookOpen, Palette, Tag, Info, ImageOff, AlertTriangle, Copy } from 'lucide-vue-next';
+import { Eye, ZoomIn, MoreHorizontal, User, Newspaper, Book, BookOpen, Palette, Tag, Info, ImageOff, AlertTriangle, Copy, TestTube } from 'lucide-vue-next';
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import ActionMenu, { type ActionOption } from '@/components/browse/ActionMenu.vue';
@@ -64,6 +64,21 @@ function computeHighlightedPromptHtml(): string {
 }
 
 const highlightedPromptHtml = computed(() => computeHighlightedPromptHtml());
+
+// Build URL for moderation test page with prefilled data
+const moderationTestUrl = computed(() => {
+    const prompt = String((props.item as any)?.metadata?.prompt ?? '');
+    if (!prompt) return null;
+    
+    const params = new URLSearchParams();
+    params.set('text', prompt);
+    
+    if (moderationInfo.value?.rule_id) {
+        params.set('rule_id', String(moderationInfo.value.rule_id));
+    }
+    
+    return `/moderation/test?${params.toString()}`;
+});
 
 const emit = defineEmits<{
     (e: 'open', item: any): void;
@@ -1251,17 +1266,34 @@ function closeActionPanel(): void {
                                         <div v-if="moderationHits.length" class="flex flex-wrap gap-1 pt-1">
                                             <span v-for="t in moderationHits" :key="t" class="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{{ t }}</span>
                                         </div>
+                                        <div v-if="moderationTestUrl" class="pt-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                class="h-7 text-xs"
+                                                as="a"
+                                                :href="moderationTestUrl"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                @click.stop
+                                            >
+                                                <TestTube :size="12" class="mr-1.5" />
+                                                Test Rule
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <Button
-                                        v-if="item?.metadata?.prompt"
-                                        variant="ghost"
-                                        size="sm"
-                                        class="h-6 w-6 shrink-0 p-0"
-                                        aria-label="Copy prompt"
-                                        @click.stop="() => copyToClipboard(String(item?.metadata?.prompt || ''))"
-                                    >
-                                        <Copy :size="14" />
-                                    </Button>
+                                    <div class="flex shrink-0 flex-col gap-1">
+                                        <Button
+                                            v-if="item?.metadata?.prompt"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="h-6 w-6 p-0"
+                                            aria-label="Copy prompt"
+                                            @click.stop="() => copyToClipboard(String(item?.metadata?.prompt || ''))"
+                                        >
+                                            <Copy :size="14" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </TooltipContent>

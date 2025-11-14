@@ -14,7 +14,7 @@ import { Head, usePage } from '@inertiajs/vue3';
 import { useDebounceFn } from '@vueuse/core';
 import axios from 'axios';
 import { AlertCircle, Check, X } from 'lucide-vue-next';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 type RuleOperator = 'any' | 'all' | 'not_any' | 'at_least' | 'and' | 'or';
 
@@ -91,6 +91,35 @@ watch(
     },
     { deep: true },
 );
+
+// Read query parameters on mount to prefill form
+onMounted(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const textParam = urlParams.get('text');
+    const ruleIdParam = urlParams.get('rule_id');
+    
+    if (textParam) {
+        testText.value = textParam;
+    }
+    
+    if (ruleIdParam) {
+        const ruleId = parseInt(ruleIdParam, 10);
+        if (!isNaN(ruleId) && props.rules.some((r) => r.id === ruleId)) {
+            selectedRuleId.value = ruleId;
+            // The watch on selectedRuleId will trigger runTest if text is already set
+        }
+    }
+    
+    // If both text and rule_id are provided, run the test
+    if (textParam && ruleIdParam) {
+        // Small delay to ensure ruleForm is populated from watch
+        setTimeout(() => {
+            if (selectedRuleId.value && testText.value.trim()) {
+                void runTest();
+            }
+        }, 100);
+    }
+});
 
 async function runTest() {
     if (!selectedRuleId.value || !testText.value.trim()) {
