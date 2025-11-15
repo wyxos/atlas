@@ -28,32 +28,68 @@ function Start-QueueWorker {
     Start-Process -FilePath $shellExecutable -ArgumentList '-NoExit', '-Command', $command -WorkingDirectory $projectPath -WindowStyle Normal
 }
 
-# Default queue - quick operations (metadata, renames, deletions, covers, enrichment, Scout indexing)
-for ($i = 1; $i -le 3; $i++) {
-    Start-QueueWorker "default" $i @('--queue=default', '--tries=3')
+# Extract queue configuration from Horizon config using PHP
+Write-Host "Reading queue configuration from Horizon config..."
+$phpCode = @'
+<?php
+require __DIR__ . '/vendor/autoload.php';
+$app = require_once __DIR__ . '/bootstrap/app.php';
+$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
+
+$defaults = config('horizon.defaults', []);
+$environments = config('horizon.environments', []);
+$env = app()->environment();
+
+$envOverrides = $environments[$env] ?? [];
+
+$queues = [];
+foreach ($defaults as $supervisor => $supervisorConfig) {
+    // Merge environment-specific overrides
+    $mergedConfig = array_merge($supervisorConfig, $envOverrides[$supervisor] ?? []);
+    
+    foreach ($mergedConfig['queue'] ?? [] as $queueName) {
+        $queues[] = [
+            'name' => $queueName,
+            'supervisor' => $supervisor,
+            'maxProcesses' => $mergedConfig['maxProcesses'] ?? 1,
+            'tries' => $mergedConfig['tries'] ?? 3,
+            'timeout' => $mergedConfig['timeout'] ?? 60,
+        ];
+    }
 }
 
-# Processing queue - CPU/memory-intensive media processing (images, audio, video)
-for ($i = 1; $i -le 2; $i++) {
-    Start-QueueWorker "processing" $i @('--queue=processing', '--tries=3', '--timeout=300')
+echo json_encode($queues, JSON_PRETTY_PRINT);
+'@
+
+$horizonConfigJson = $phpCode | php
+$queues = $horizonConfigJson | ConvertFrom-Json
+
+$totalWorkers = 0
+$queueSummary = @()
+
+foreach ($queue in $queues) {
+    $queueName = $queue.name
+    $maxProcesses = $queue.maxProcesses
+    $tries = $queue.tries
+    $timeout = $queue.timeout
+    
+    $artisanArgs = @("--queue=$queueName", "--tries=$tries")
+    if ($timeout -gt 0) {
+        $artisanArgs += "--timeout=$timeout"
+    }
+    
+    for ($i = 1; $i -le $maxProcesses; $i++) {
+        Start-QueueWorker $queueName $i $artisanArgs
+        $totalWorkers++
+    }
+    
+    $queueSummary += "  - ${maxProcesses}x $queueName queue workers"
 }
 
-# Downloads queue - long-running file downloads
-for ($i = 1; $i -le 2; $i++) {
-    Start-QueueWorker "downloads" $i @('--queue=downloads', '--tries=2', '--timeout=600')
+Write-Host ""
+Write-Host "Started $totalWorkers queue workers successfully!"
+foreach ($summary in $queueSummary) {
+    Write-Host $summary
 }
-
-# Composer queue - system-level composer operations (single worker to prevent conflicts)
-Start-QueueWorker "composer" 1 @('--queue=composer', '--tries=1', '--timeout=600')
-
-# Spotify queue - API-bound Spotify operations
-Start-QueueWorker "spotify" 1 @('--queue=spotify', '--tries=2', '--timeout=300')
-
-Write-Host "Started 9 queue workers successfully!"
-Write-Host "  - 3x default queue workers"
-Write-Host "  - 2x processing queue workers"
-Write-Host "  - 2x downloads queue workers"
-Write-Host "  - 1x composer queue worker"
-Write-Host "  - 1x spotify queue worker"
 Write-Host ""
 Write-Host "Note: For production, use Horizon instead: php artisan horizon"
