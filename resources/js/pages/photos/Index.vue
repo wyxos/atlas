@@ -377,7 +377,9 @@ if (!(form as any).sort) {
     await nextTick();
 
     try {
-        processModerationPayload(props.moderation);
+        // Check both usePage props and component props for moderation data
+        const m = (usePage() as any).props?.moderation || props?.moderation || null;
+        processModerationPayload(m);
     } catch {}
 
     // If initial items are below page size, auto load next
