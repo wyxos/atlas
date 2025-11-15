@@ -161,9 +161,19 @@ class File extends Model
             'seen_count' => (int) ($this->seen_count ?? 0),
         ];
 
-        // mime_group for easy filtering
-        $mime = (string) $this->mime_type;
-        $array['mime_group'] = str_starts_with($mime, 'audio/') ? 'audio' : (str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : 'other'));
+        // mime_group for easy filtering - always calculate from current mime_type
+        $mime = $this->mime_type ? (string) $this->mime_type : '';
+        if ($mime === '') {
+            $array['mime_group'] = 'other';
+        } elseif (str_starts_with($mime, 'audio/')) {
+            $array['mime_group'] = 'audio';
+        } elseif (str_starts_with($mime, 'video/')) {
+            $array['mime_group'] = 'video';
+        } elseif (str_starts_with($mime, 'image/')) {
+            $array['mime_group'] = 'image';
+        } else {
+            $array['mime_group'] = 'other';
+        }
 
         // Include playlist IDs for engine-side filtering if relation loaded
         if ($this->playlists->count()) {
