@@ -676,6 +676,160 @@ async function thumbNext() {
 }
 
 const fullSeenIds = new Set<number>()
+const preloadingInstances = new Map<number, { image?: HTMLImageElement; video?: HTMLVideoElement }>()
+const preloadingIds = new Set<number>()
+
+function getMediaUrl(item: any): string | null {
+  if (!item) return null
+  const original = typeof item?.original === 'string' ? item.original.trim() : ''
+  if (original) return original
+  const preview = typeof item?.preview === 'string' ? item.preview.trim() : ''
+  return preview || null
+}
+
+function isVideoType(item: any): boolean {
+  return item?.type === 'video'
+}
+
+function preloadFile(item: any): void {
+  if (!item?.id) return
+  const id = item.id as number
+  
+  // Skip if already preloading or already loaded in DOM
+  if (preloadingIds.has(id)) return
+  
+  const url = getMediaUrl(item)
+  if (!url) return
+  
+  preloadingIds.add(id)
+  
+  if (isVideoType(item)) {
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.src = url
+    video.referrerPolicy = 'no-referrer'
+    video.style.display = 'none'
+    document.body.appendChild(video)
+    
+    // Clean up after load or error
+    const cleanup = () => {
+      preloadingIds.delete(id)
+      preloadingInstances.delete(id)
+      try {
+        document.body.removeChild(video)
+      } catch {}
+    }
+    
+    video.addEventListener('loadedmetadata', cleanup, { once: true })
+    video.addEventListener('error', cleanup, { once: true })
+    
+    preloadingInstances.set(id, { video })
+  } else {
+    const img = new Image()
+    img.referrerPolicy = 'no-referrer'
+    img.src = url
+    
+    // Clean up after load or error
+    const cleanup = () => {
+      preloadingIds.delete(id)
+      preloadingInstances.delete(id)
+    }
+    
+    img.addEventListener('load', cleanup, { once: true })
+    img.addEventListener('error', cleanup, { once: true })
+    
+    preloadingInstances.set(id, { image: img })
+  }
+}
+
+function cancelAllPreloading(): void {
+  // Cancel all preloading instances
+  for (const [id, instance] of preloadingInstances.entries()) {
+    if (instance.video) {
+      instance.video.src = ''
+      instance.video.load()
+      try {
+        document.body.removeChild(instance.video)
+      } catch {}
+    }
+    if (instance.image) {
+      instance.image.src = ''
+    }
+    preloadingIds.delete(id)
+  }
+  preloadingInstances.clear()
+}
+
+function updatePreloadQueue(): void {
+  if (!dialogOpen.value || !dialogItem.value) {
+    cancelAllPreloading()
+    return
+  }
+  
+  const currentId = dialogItem.value?.id as number | undefined
+  if (!currentId) return
+  
+  // Find current item index in navList
+  const currentIndex = navList.value.findIndex((thumb) => thumb.id === currentId)
+  if (currentIndex < 0) return
+  
+  // Cancel preloading of files that are now too far away (more than 2 positions ahead)
+  // This prevents keeping too many preload instances active
+  const preloadCount = 2
+  const maxPreloadIndex = currentIndex + preloadCount + 1 // Allow one extra for buffer
+  for (const [id, instance] of preloadingInstances.entries()) {
+    const preloadIndex = navList.value.findIndex((thumb) => thumb.item?.id === id)
+    if (preloadIndex > maxPreloadIndex) {
+      // This file is too far ahead, cancel its preloading
+      if (instance.video) {
+        instance.video.src = ''
+        instance.video.load()
+        try {
+          document.body.removeChild(instance.video)
+        } catch {}
+      }
+      if (instance.image) {
+        instance.image.src = ''
+      }
+      preloadingIds.delete(id)
+      preloadingInstances.delete(id)
+    }
+  }
+  
+  // Preload next 2 files
+  for (let i = 1; i <= preloadCount; i++) {
+    const targetIndex = currentIndex + i
+    if (targetIndex >= navList.value.length) {
+      // If we're at the end, try to load more via scroller
+      if (scroller.value?.loadNext && i === 1) {
+        // Only trigger loadNext once, not for each preload attempt
+        void scroller.value.loadNext().then(() => {
+          // After loading, try to preload again
+          void nextTick().then(() => {
+            const newIndex = navList.value.findIndex((thumb) => thumb.id === currentId)
+            if (newIndex >= 0) {
+              const newTargetIndex = newIndex + i
+              if (newTargetIndex < navList.value.length) {
+                const thumb = navList.value[newTargetIndex]
+                if (thumb?.item && !preloadingIds.has(thumb.item.id)) {
+                  preloadFile(thumb.item)
+                }
+              }
+            }
+          })
+        })
+      }
+      continue
+    }
+    
+    const thumb = navList.value[targetIndex]
+    // Skip if already preloading (prevents duplicate preloading)
+    if (thumb?.item && !preloadingIds.has(thumb.item.id)) {
+      preloadFile(thumb.item)
+    }
+  }
+}
+
 async function reportFileSeen(item: any) {
   const id = item?.id
   if (!id || fullSeenIds.has(id)) return
@@ -698,13 +852,21 @@ function onFullImageLoad() {
   fullLoaded.value = true
   fullVerifiedAvailableOnce.value = false
   setFullErrorState('none', null, null, false)
-  if (dialogItem.value) void reportFileSeen(dialogItem.value)
+  if (dialogItem.value) {
+    void reportFileSeen(dialogItem.value)
+    // Start preloading next files when current file loads
+    updatePreloadQueue()
+  }
 }
 function onFullVideoCanPlay() {
   fullLoaded.value = true
   fullVerifiedAvailableOnce.value = false
   setFullErrorState('none', null, null, false)
   enableFullVideoAudio()
+  // Start preloading next files when current file loads
+  if (dialogItem.value) {
+    updatePreloadQueue()
+  }
 }
 function onFullVideoTimeUpdate(event: Event) {
   const videoElement = event?.target as HTMLVideoElement | null
@@ -849,6 +1011,10 @@ async function navigate(delta: number) {
       clearFullErrorState()
       console.log('[FullSizeViewer] Setting dialogItem to:', thumb.id)
       dialogItem.value = thumb.item
+      // Update preload queue after navigation
+      // Note: Preloading will also be triggered when the new file loads,
+      // but we update it here too in case the file is already cached
+      void nextTick().then(() => updatePreloadQueue())
     }
     return
   }
@@ -865,6 +1031,8 @@ async function navigate(delta: number) {
       fullLoaded.value = false
       clearFullErrorState()
       dialogItem.value = thumb.item
+      // Update preload queue after navigation
+      void nextTick().then(() => updatePreloadQueue())
     }
   }
 }
@@ -949,6 +1117,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousedown', onMouseDownHandler as any, true as any)
   window.removeEventListener('mouseup', onMouseUpHandler as any, true as any)
   window.removeEventListener('auxclick', onAuxClickHandler as any, true as any)
+  // Cancel all preloading on unmount
+  cancelAllPreloading()
 })
 
 // Global keyboard navigation while full-size dialog is open
@@ -1000,12 +1170,17 @@ watch(dialogItem, () => {
   fullLoaded.value = false
   fullRetryCount.value = 0
   if (dialogOpen.value && thumbsVisible.value) void nextTick().then(() => ensureActiveThumbInView())
+  // Update preload queue when item changes (but don't preload until current item loads)
+  // Preloading will be triggered in onFullImageLoad/onFullVideoCanPlay
 })
 
 watch(dialogOpen, (isOpen) => {
   if (isOpen) {
     fullLoaded.value = false
     fullRetryCount.value = 0
+  } else {
+    // Cancel all preloading when dialog closes
+    cancelAllPreloading()
   }
 })
 
