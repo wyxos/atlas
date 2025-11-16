@@ -13,24 +13,21 @@ elif [ -f ~/.profile ]; then
     source ~/.profile
 fi
 
+# Add Herd bin to PATH if it exists (Windows)
+HERD_BIN="$HOME/.config/herd/bin"
+if [ -d "$HERD_BIN" ]; then
+    export PATH="$HERD_BIN:$PATH"
+fi
+
 # Try to find herd or php in PATH
 if command -v herd &> /dev/null; then
     PHP_CMD="herd php"
 elif command -v php &> /dev/null; then
     PHP_CMD="php"
 else
-    # Try Windows-specific paths for Herd
-    HERD_PATH="$HOME/.config/herd/bin/herd"
-    PHP_PATH="$HOME/.config/herd/bin/php"
-    if [ -f "$HERD_PATH" ] || [ -f "${HERD_PATH}.bat" ]; then
-        PHP_CMD="herd php"
-    elif [ -f "$PHP_PATH" ] || [ -f "${PHP_PATH}.bat" ]; then
-        PHP_CMD="php"
-    else
-        echo "Error: Neither 'herd' nor 'php' found in PATH"
-        echo "Please ensure Herd is installed and in your PATH"
-        exit 1
-    fi
+    echo "Error: Neither 'herd' nor 'php' found in PATH"
+    echo "Please ensure Herd is installed and in your PATH"
+    exit 1
 fi
 
 echo "Running pre-push checks..."
