@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run from repo root
+cd "$(git rev-parse --show-toplevel)"
+
+echo "Running pre-push checks..."
+
+echo "1/2 Running npm tests..."
+npm run test
+
+echo "2/2 Running PHP tests..."
+herd php artisan test
+
+echo "All pre-push checks passed!"
+exit 0
+
