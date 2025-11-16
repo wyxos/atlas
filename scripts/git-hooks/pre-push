@@ -4,14 +4,33 @@ set -euo pipefail
 # Run from repo root
 cd "$(git rev-parse --show-toplevel)"
 
+# Source bash profile to get PATH (Windows Git Bash)
+if [ -f ~/.bash_profile ]; then
+    source ~/.bash_profile
+elif [ -f ~/.bashrc ]; then
+    source ~/.bashrc
+elif [ -f ~/.profile ]; then
+    source ~/.profile
+fi
+
 # Try to find herd or php in PATH
 if command -v herd &> /dev/null; then
     PHP_CMD="herd php"
 elif command -v php &> /dev/null; then
     PHP_CMD="php"
 else
-    echo "Error: Neither 'herd' nor 'php' found in PATH"
-    exit 1
+    # Try Windows-specific paths for Herd
+    HERD_PATH="$HOME/.config/herd/bin/herd"
+    PHP_PATH="$HOME/.config/herd/bin/php"
+    if [ -f "$HERD_PATH" ] || [ -f "${HERD_PATH}.bat" ]; then
+        PHP_CMD="herd php"
+    elif [ -f "$PHP_PATH" ] || [ -f "${PHP_PATH}.bat" ]; then
+        PHP_CMD="php"
+    else
+        echo "Error: Neither 'herd' nor 'php' found in PATH"
+        echo "Please ensure Herd is installed and in your PATH"
+        exit 1
+    fi
 fi
 
 echo "Running pre-push checks..."
