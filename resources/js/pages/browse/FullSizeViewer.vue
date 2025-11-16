@@ -391,10 +391,10 @@ const fullMenuOptions = computed<ActionOption[]>(() => {
     {
       label: 'react',
       children: [
-{ label: 'favorite', action: (event?: Event) => emit('favorite', file, (event || ({} as any)) as any) },
-        { label: 'like', action: (event?: Event) => emit('like', file, (event || ({} as any)) as any) },
-        { label: 'dislike', action: (event?: Event) => emit('dislike', file, (event || ({} as any)) as any) },
-        { label: 'funny', action: (event?: Event) => emit('laughed-at', file, (event || ({} as any)) as any) },
+{ label: 'favorite', action: (event?: Event) => handleFavorite(file, (event || ({} as any)) as any) },
+        { label: 'like', action: (event?: Event) => handleLike(file, (event || ({} as any)) as any) },
+        { label: 'dislike', action: (event?: Event) => handleDislike(file, (event || ({} as any)) as any) },
+        { label: 'funny', action: (event?: Event) => handleLaughedAt(file, (event || ({} as any)) as any) },
       ],
     },
   ]
@@ -469,7 +469,7 @@ function onFullMediaContextMenu(event: MouseEvent) {
   if (event.altKey) {
     event.preventDefault()
     event.stopPropagation()
-    emit('dislike', dialogItem.value as any, event as any)
+    handleDislike(dialogItem.value as any, event as any)
     return
   }
   event.preventDefault(); event.stopPropagation()
@@ -618,6 +618,33 @@ function onThumbClick(item: any) {
   clearFullErrorState()
   dialogItem.value = item
   void nextTick().then(() => ensureActiveThumbInView())
+}
+
+// Immediately hide media when reacting, before parent updates dialogItem
+function onReactionStart() {
+  if (!dialogItem.value) return
+  fullLoaded.value = false
+  clearFullErrorState()
+}
+
+function handleFavorite(file: any, ev: Event) {
+  onReactionStart()
+  emit('favorite', file, ev)
+}
+
+function handleLike(file: any, ev: Event) {
+  onReactionStart()
+  emit('like', file, ev)
+}
+
+function handleDislike(file: any, ev: Event) {
+  onReactionStart()
+  emit('dislike', file, ev)
+}
+
+function handleLaughedAt(file: any, ev: Event) {
+  onReactionStart()
+  emit('laughed-at', file, ev)
 }
 
 function thumbPrev() {
@@ -850,8 +877,8 @@ function onDialogMouseUp(event: MouseEvent) {
     event.preventDefault(); event.stopPropagation(); withNavLock(() => void navigate(delta)); return
   }
   if (!event.altKey) return
-  if (event.button === 0) { event.preventDefault(); event.stopPropagation(); emit('like', dialogItem.value as any, event as any) }
-  else if (event.button === 1) { event.preventDefault(); event.stopPropagation(); emit('favorite', dialogItem.value as any, event as any) }
+  if (event.button === 0) { event.preventDefault(); event.stopPropagation(); handleLike(dialogItem.value as any, event as any) }
+  else if (event.button === 1) { event.preventDefault(); event.stopPropagation(); handleFavorite(dialogItem.value as any, event as any) }
 }
 
 function mouseBackForwardDelta(event: MouseEvent): number {
@@ -1234,10 +1261,10 @@ const highlightedPromptHtml = computed(() => {
         </div>
         <div class="flex items-center justify-center gap-3 border-t p-3">
 <FileReactions v-if="dialogItem" :file="{ id: dialogItem.id }" :size="22"
-                         @favorite="(emittedFile, emittedEvent) => emit('favorite', dialogItem, emittedEvent)"
-                         @like="(emittedFile, emittedEvent) => emit('like', dialogItem, emittedEvent)"
-                         @dislike="(emittedFile, emittedEvent) => emit('dislike', dialogItem, emittedEvent)"
-                         @laughed-at="(emittedFile, emittedEvent) => emit('laughed-at', dialogItem, emittedEvent)" />
+                         @favorite="(emittedFile, emittedEvent) => handleFavorite(dialogItem, emittedEvent)"
+                         @like="(emittedFile, emittedEvent) => handleLike(dialogItem, emittedEvent)"
+                         @dislike="(emittedFile, emittedEvent) => handleDislike(dialogItem, emittedEvent)"
+                         @laughed-at="(emittedFile, emittedEvent) => handleLaughedAt(dialogItem, emittedEvent)" />
           <Button variant="outline" :disabled="!dialogItem" @click="openFullMediaInNewTab">Open</Button>
           <Button v-if="showFullErrorOverlay" variant="outline" :disabled="!dialogItem" @click="retryFullMedia(true)">Retry</Button>
           <Button v-if="isFileMarkedNotFound" variant="default" :disabled="!dialogItem" @click="clearNotFoundFlag">Clear Not Found</Button>
