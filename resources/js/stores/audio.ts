@@ -166,6 +166,14 @@ class AudioPlayerManager {
                 console.log('Spotify player ready with device ID:', device_id);
                 this.spotifyDeviceId = device_id;
                 this.spotifyPlayerReady.value = true;
+                // Set volume when player becomes ready to ensure consistency
+                if (this.spotifyPlayer) {
+                    try {
+                        void this.spotifyPlayer.setVolume(this.volume.value);
+                    } catch (error) {
+                        console.debug('Could not set volume on Spotify player ready:', error);
+                    }
+                }
             });
 
             this.spotifyPlayer.addListener('not_ready', ({ device_id }: { device_id: string }) => {

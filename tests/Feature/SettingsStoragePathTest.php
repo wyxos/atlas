@@ -10,7 +10,8 @@ it('updates atlas storage path for current machine and applies config', function
     // Hit update endpoint
     $newPath = DIRECTORY_SEPARATOR === '\\' ? 'D:/media/atlas' : '/tmp/media/atlas';
     $this->put(route('storage.update'), ['path' => $newPath])
-        ->assertRedirect();
+        ->assertOk()
+        ->assertJson(['status' => 'Storage path updated.']);
 
     // Stored as machine override
     $hostname = gethostname() ?: php_uname('n');

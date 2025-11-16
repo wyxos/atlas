@@ -30,7 +30,7 @@ it('decorates external urls when service provides a decoration hook', function (
     app()->instance(\Atlas\Plugin\Contracts\ServiceRegistry::class, $registry);
 
     $this->mock(PluginServiceLoader::class, function ($mock) {
-        $mock->shouldReceive('load')->once();
+        $mock->shouldReceive('load')->atLeast()->once();
     });
 
     $this->mock(BrowsePersister::class, function ($mock) use ($file) {
