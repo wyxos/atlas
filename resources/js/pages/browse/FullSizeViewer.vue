@@ -705,9 +705,9 @@ function preloadFile(item: any): void {
   
   if (isVideoType(item)) {
     const video = document.createElement('video')
-    // Use 'auto' to actually download video data for streaming playback
-    // This allows the browser to cache video chunks and start playback immediately
-    video.preload = 'auto'
+    // Use 'metadata' for preloading - browser will stream progressively when played
+    // This allows seeking to any part (if server supports range requests) without downloading full video
+    video.preload = 'metadata'
     video.src = url
     video.referrerPolicy = 'no-referrer'
     video.style.display = 'none'
@@ -715,11 +715,10 @@ function preloadFile(item: any): void {
     video.playsInline = true
     document.body.appendChild(video)
     
-    // Start loading the video data
+    // Start loading metadata (and some initial data for faster start)
     video.load()
     
-    // Clean up after enough data is loaded (canplaythrough) or error
-    // We don't wait for the full video to download - browser handles streaming
+    // Clean up after metadata is loaded or error
     const cleanup = () => {
       preloadingIds.delete(id)
       preloadingInstances.delete(id)
@@ -728,9 +727,8 @@ function preloadFile(item: any): void {
       } catch {}
     }
     
-    // Use 'canplaythrough' to ensure enough data is buffered for smooth playback
-    // This fires when enough data is loaded to play through without stopping
-    video.addEventListener('canplaythrough', cleanup, { once: true })
+    // Cleanup after metadata loads (loadedmetadata) or error
+    video.addEventListener('loadedmetadata', cleanup, { once: true })
     video.addEventListener('error', cleanup, { once: true })
     
     // Also cleanup after a timeout to prevent hanging preloads
@@ -738,7 +736,7 @@ function preloadFile(item: any): void {
       if (preloadingIds.has(id)) {
         cleanup()
       }
-    }, 30000) // 30 second timeout
+    }, 10000) // 10 second timeout for metadata
     
     preloadingInstances.set(id, { video })
   } else {
@@ -1294,7 +1292,7 @@ const highlightedPromptHtml = computed(() => {
                          referrerpolicy="no-referrer"
                          class="max-h-full max-w-full object-contain transition-opacity duration-300 select-none"
                          :class="[fullLoaded ? 'opacity-100' : 'opacity-0']"
-                         autoplay loop playsinline preload="auto" controls
+                         autoplay loop playsinline preload="metadata" controls
                          @click="onMediaClick" @canplay="onFullVideoCanPlay" @timeupdate="onFullVideoTimeUpdate" @error="onFullVideoError"
                          @mousedown.capture="onFullMediaMouseDown" @mouseup.capture="onFullMediaMouseUp" @auxclick.capture="onFullMediaAuxClick"
                          @contextmenu="onFullMediaContextMenu"></video>
