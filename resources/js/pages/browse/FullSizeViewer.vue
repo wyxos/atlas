@@ -705,13 +705,21 @@ function preloadFile(item: any): void {
   
   if (isVideoType(item)) {
     const video = document.createElement('video')
-    video.preload = 'metadata'
+    // Use 'auto' to actually download video data for streaming playback
+    // This allows the browser to cache video chunks and start playback immediately
+    video.preload = 'auto'
     video.src = url
     video.referrerPolicy = 'no-referrer'
     video.style.display = 'none'
+    video.muted = true // Mute preload videos to avoid audio issues
+    video.playsInline = true
     document.body.appendChild(video)
     
-    // Clean up after load or error
+    // Start loading the video data
+    video.load()
+    
+    // Clean up after enough data is loaded (canplaythrough) or error
+    // We don't wait for the full video to download - browser handles streaming
     const cleanup = () => {
       preloadingIds.delete(id)
       preloadingInstances.delete(id)
@@ -720,8 +728,17 @@ function preloadFile(item: any): void {
       } catch {}
     }
     
-    video.addEventListener('loadedmetadata', cleanup, { once: true })
+    // Use 'canplaythrough' to ensure enough data is buffered for smooth playback
+    // This fires when enough data is loaded to play through without stopping
+    video.addEventListener('canplaythrough', cleanup, { once: true })
     video.addEventListener('error', cleanup, { once: true })
+    
+    // Also cleanup after a timeout to prevent hanging preloads
+    setTimeout(() => {
+      if (preloadingIds.has(id)) {
+        cleanup()
+      }
+    }, 30000) // 30 second timeout
     
     preloadingInstances.set(id, { video })
   } else {
@@ -1277,7 +1294,7 @@ const highlightedPromptHtml = computed(() => {
                          referrerpolicy="no-referrer"
                          class="max-h-full max-w-full object-contain transition-opacity duration-300 select-none"
                          :class="[fullLoaded ? 'opacity-100' : 'opacity-0']"
-                         autoplay loop playsinline preload="metadata" controls
+                         autoplay loop playsinline preload="auto" controls
                          @click="onMediaClick" @canplay="onFullVideoCanPlay" @timeupdate="onFullVideoTimeUpdate" @error="onFullVideoError"
                          @mousedown.capture="onFullMediaMouseDown" @mouseup.capture="onFullMediaMouseUp" @auxclick.capture="onFullMediaAuxClick"
                          @contextmenu="onFullMediaContextMenu"></video>
