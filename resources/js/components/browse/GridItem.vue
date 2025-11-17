@@ -1379,7 +1379,7 @@ function closeActionPanel(): void {
                 loop
                 muted
                 playsinline
-                preload="metadata"
+                preload="auto"
                 @canplay="onPreviewVideoCanPlay"
                 @timeupdate="onPreviewVideoTimeUpdate"
                 @error="onPreviewError"
