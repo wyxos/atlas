@@ -58,7 +58,13 @@ class UrlResolver
         }
 
         $xpath = new DOMXPath($document);
+
+        // Try mp4 first, then webm
         $nodes = $xpath->query('//video//source[@type="video/mp4"][@src]');
+
+        if ($nodes === false || $nodes->length === 0) {
+            $nodes = $xpath->query('//video//source[@type="video/webm"][@src]');
+        }
 
         if ($nodes === false || $nodes->length === 0) {
             return null;
@@ -66,7 +72,7 @@ class UrlResolver
 
         $source = trim((string) $nodes->item(0)?->getAttribute('src'));
 
-        if ($source === '' || ! str_contains($source, '.mp4')) {
+        if ($source === '' || (! str_contains($source, '.mp4') && ! str_contains($source, '.webm'))) {
             return null;
         }
 

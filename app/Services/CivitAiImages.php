@@ -228,7 +228,8 @@ class CivitAiImages extends BaseService
         $extension = strtolower((string) pathinfo($file->path, PATHINFO_EXTENSION));
         $mimeType = strtolower((string) $file->mime_type);
 
-        return $extension === 'mp4' && str_contains($mimeType, 'video/mp4');
+        return ($extension === 'mp4' && str_contains($mimeType, 'video/mp4'))
+            || ($extension === 'webm' && str_contains($mimeType, 'video/webm'));
     }
 
     public function fixDownload(File $file): bool
@@ -247,7 +248,8 @@ class CivitAiImages extends BaseService
         $extension = strtolower((string) pathinfo($file->path, PATHINFO_EXTENSION));
         $mimeType = strtolower((string) $file->mime_type);
 
-        if ($extension === 'mp4' && str_contains($mimeType, 'video/mp4')) {
+        if (($extension === 'mp4' && str_contains($mimeType, 'video/mp4'))
+            || ($extension === 'webm' && str_contains($mimeType, 'video/webm'))) {
             return false;
         }
 
@@ -271,7 +273,10 @@ class CivitAiImages extends BaseService
             }
 
             $baseFilename = pathinfo($file->filename, PATHINFO_FILENAME);
-            $newFilename = $baseFilename.'.mp4';
+            $isWebm = str_contains($realUrl, '.webm');
+            $newExt = $isWebm ? 'webm' : 'mp4';
+            $newMimeType = $isWebm ? 'video/webm' : 'video/mp4';
+            $newFilename = $baseFilename.'.'.$newExt;
             $newPath = 'downloads/'.$newFilename;
 
             \Illuminate\Support\Facades\Storage::disk('atlas_app')->put($newPath, $content);
@@ -283,8 +288,8 @@ class CivitAiImages extends BaseService
             $file->update([
                 'path' => $newPath,
                 'filename' => $newFilename,
-                'ext' => 'mp4',
-                'mime_type' => 'video/mp4',
+                'ext' => $newExt,
+                'mime_type' => $newMimeType,
                 'url' => $realUrl,
             ]);
 
