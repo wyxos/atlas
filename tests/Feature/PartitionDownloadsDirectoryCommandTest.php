@@ -27,11 +27,11 @@ it('partitions files into subdirectories', function () {
         'filename' => 'test2.png',
     ]);
 
-    Artisan::call('files:partition-downloads');
+    Artisan::call('files:partition-downloads', ['--dispatch-now' => true]);
 
     $output = Artisan::output();
     expect($output)->toContain('Found 2 file(s) to process');
-    expect($output)->toContain('Moved: 2');
+    expect($output)->toContain('Jobs dispatched: 2');
 
     $file1->refresh();
     $file2->refresh();
@@ -64,7 +64,7 @@ it('shows dry run output without making changes', function () {
 
     $output = Artisan::output();
     expect($output)->toContain('DRY RUN MODE');
-    expect($output)->toContain('Would move');
+    expect($output)->toContain('Would partition');
 
     $file->refresh();
     expect($file->path)->toBe('downloads/test.jpg');
@@ -143,11 +143,11 @@ it('respects limit option', function () {
         'filename' => 'test3.jpg',
     ]);
 
-    Artisan::call('files:partition-downloads', ['--limit' => 2]);
+    Artisan::call('files:partition-downloads', ['--limit' => 2, '--dispatch-now' => true]);
 
     $output = Artisan::output();
     expect($output)->toContain('Found 2 file(s) to process');
-    expect($output)->toContain('Moved: 2');
+    expect($output)->toContain('Jobs dispatched: 2');
 });
 
 it('uses custom subdirectory length', function () {
@@ -159,7 +159,7 @@ it('uses custom subdirectory length', function () {
         'filename' => 'test.jpg',
     ]);
 
-    Artisan::call('files:partition-downloads', ['--subdir-length' => 3]);
+    Artisan::call('files:partition-downloads', ['--subdir-length' => 3, '--dispatch-now' => true]);
 
     $file->refresh();
     expect($file->path)->toMatch('/^downloads\/[a-z0-9]{3}\/test\.jpg$/');
@@ -175,7 +175,7 @@ it('handles files with random filenames correctly', function () {
         'filename' => $randomFilename,
     ]);
 
-    Artisan::call('files:partition-downloads');
+    Artisan::call('files:partition-downloads', ['--dispatch-now' => true]);
 
     $file->refresh();
     // Should use first 2 characters of random filename
@@ -199,9 +199,9 @@ it('processes files in chunks', function () {
         'filename' => 'test2.jpg',
     ]);
 
-    Artisan::call('files:partition-downloads', ['--chunk' => 1]);
+    Artisan::call('files:partition-downloads', ['--chunk' => 1, '--dispatch-now' => true]);
 
     $output = Artisan::output();
-    expect($output)->toContain('Moved: 2');
+    expect($output)->toContain('Jobs dispatched: 2');
 });
 

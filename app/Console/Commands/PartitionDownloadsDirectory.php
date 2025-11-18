@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\PartitionDownloadedFile;
 use App\Models\File;
 use App\Support\PartitionedPathHelper;
 use Illuminate\Console\Command;
@@ -12,9 +13,11 @@ class PartitionDownloadsDirectory extends Command
 {
     protected $signature = 'files:partition-downloads
                             {--dry-run : Show what would be moved without making changes}
-                            {--chunk=100 : Number of records to process per chunk}
+                            {--chunk=500 : Number of records to process per chunk}
                             {--limit= : Limit the number of files to process}
-                            {--subdir-length=2 : Number of characters to use for subdirectory name}';
+                            {--subdir-length=2 : Number of characters to use for subdirectory name}
+                            {--queue= : Queue name to dispatch jobs to}
+                            {--dispatch-now : Run jobs synchronously instead of queueing}';
 
     protected $description = 'Partition files in downloads directory into subdirectories to improve filesystem performance';
 
@@ -24,6 +27,8 @@ class PartitionDownloadsDirectory extends Command
         $chunk = max(1, (int) $this->option('chunk'));
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
         $subdirLength = max(1, min(4, (int) $this->option('subdir-length')));
+        $queueName = $this->option('queue');
+        $dispatchNow = (bool) $this->option('dispatch-now');
 
         if ($dryRun) {
             $this->warn('DRY RUN MODE - No changes will be made');
@@ -70,18 +75,64 @@ class PartitionDownloadsDirectory extends Command
 
         $stats = [
             'processed' => 0,
-            'moved' => 0,
+            'dispatched' => 0,
             'skipped' => 0,
             'failed' => 0,
             'missing' => 0,
         ];
 
-        $query->chunkById($chunk, function ($files) use ($dryRun, $subdirLength, &$stats, $bar) {
+        $query->chunkById($chunk, function ($files) use ($dryRun, $subdirLength, $queueName, $dispatchNow, &$stats, $bar) {
             foreach ($files as $file) {
                 try {
                     $stats['processed']++;
-                    $result = $this->partitionFile($file, $subdirLength, $dryRun);
-                    $stats[$result]++;
+
+                    // Check if already partitioned
+                    $filename = basename($file->path);
+                    if ($filename === '' || $filename === $file->path) {
+                        $filename = $file->filename ?? Str::random(40);
+                    }
+                    $newPath = PartitionedPathHelper::generatePath($filename, $subdirLength);
+                    if ($file->path === $newPath) {
+                        $stats['skipped']++;
+                        $bar->advance();
+
+                        continue;
+                    }
+
+                    // Check if file exists on disk
+                    $disksWithFile = collect(['atlas_app', 'atlas'])->filter(function (string $disk) use ($file) {
+                        return Storage::disk($disk)->exists($file->path);
+                    })->values();
+
+                    if ($disksWithFile->isEmpty()) {
+                        $stats['missing']++;
+                        $bar->advance();
+
+                        continue;
+                    }
+
+                    if ($dryRun) {
+                        $diskList = $disksWithFile->implode(', ');
+                        $this->line("Would partition: File ID {$file->id} from {$file->path} to {$newPath} (disks: {$diskList})");
+                        $stats['skipped']++;
+                        $bar->advance();
+
+                        continue;
+                    }
+
+                    // Dispatch job
+                    $job = new PartitionDownloadedFile($file->id, $subdirLength);
+                    if ($queueName) {
+                        $job->onQueue($queueName);
+                    }
+
+                    if ($dispatchNow) {
+                        $job->handle();
+                    } else {
+                        dispatch($job);
+                    }
+
+                    $stats['dispatched']++;
                 } catch (\Throwable $e) {
                     $this->newLine();
                     $this->error("Failed to process file ID {$file->id}: {$e->getMessage()}");
@@ -95,85 +146,27 @@ class PartitionDownloadsDirectory extends Command
         $this->newLine(2);
 
         $this->info("Processed: {$stats['processed']}");
-        $this->info("Moved: {$stats['moved']}");
-        $this->info("Skipped: {$stats['skipped']}");
+        if ($dryRun) {
+            $this->info('Dry run complete. No jobs dispatched.');
+        } else {
+            $this->info("Jobs dispatched: {$stats['dispatched']}");
+            if ($queueName) {
+                $this->info("Jobs dispatched to queue: {$queueName}");
+            } else {
+                $this->info('Jobs dispatched to default queue');
+            }
+        }
+        $this->info("Skipped (already partitioned): {$stats['skipped']}");
         $this->info("Missing: {$stats['missing']}");
         if ($stats['failed'] > 0) {
             $this->warn("Failed: {$stats['failed']}");
         }
 
-        if ($dryRun) {
-            $this->info('Dry run complete. No files were moved.');
+        if (! $dryRun && ! $dispatchNow) {
+            $this->newLine();
+            $this->comment('Monitor job progress with: php artisan queue:work'.($queueName ? " --queue={$queueName}" : ''));
         }
 
         return Command::SUCCESS;
-    }
-
-    protected function partitionFile(File $file, int $subdirLength, bool $dryRun): string
-    {
-        // Get the filename from path
-        $filename = basename($file->path);
-        if ($filename === '' || $filename === $file->path) {
-            // Path doesn't have a directory separator, use filename field
-            $filename = $file->filename ?? Str::random(40);
-        }
-
-        // Generate partitioned path
-        $newPath = PartitionedPathHelper::generatePath($filename, $subdirLength);
-
-        // Check if file already exists at new location (already partitioned)
-        if ($file->path === $newPath) {
-            return 'skipped';
-        }
-
-        // Find which disks have the file
-        $disksWithFile = collect(['atlas_app', 'atlas'])->filter(function (string $disk) use ($file) {
-            return Storage::disk($disk)->exists($file->path);
-        })->values();
-
-        if ($disksWithFile->isEmpty()) {
-            return 'missing';
-        }
-
-        if ($dryRun) {
-            $diskList = $disksWithFile->implode(', ');
-            $this->line("Would move: File ID {$file->id} from {$file->path} to {$newPath} (disks: {$diskList})");
-
-            return 'skipped';
-        }
-
-        // Move file on each disk
-        foreach ($disksWithFile as $disk) {
-            $storage = Storage::disk($disk);
-
-            // Ensure subdirectory exists
-            $subdir = PartitionedPathHelper::getSubdirectory($filename, $subdirLength);
-            $subdirPath = "downloads/{$subdir}";
-            if (! $storage->exists($subdirPath)) {
-                $storage->makeDirectory($subdirPath);
-            }
-
-            // Move the file
-            if (! $storage->move($file->path, $newPath)) {
-                throw new \RuntimeException("Failed to move file on disk {$disk} from {$file->path} to {$newPath}");
-            }
-        }
-
-        // Update database record
-        $file->update(['path' => $newPath]);
-
-        // Update search index
-        try {
-            $file->refresh();
-            $file->searchable();
-        } catch (\Throwable $e) {
-            // Log but don't fail - search index update is best-effort
-            \Illuminate\Support\Facades\Log::warning('PartitionDownloadsDirectory: searchable failed', [
-                'file_id' => $file->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return 'moved';
     }
 }
