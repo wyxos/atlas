@@ -112,11 +112,11 @@ it('fixes video download by downloading correct mp4 file', function () {
 
     expect($result)->toBeTrue();
     $file->refresh();
-    expect($file->path)->toBe('downloads/test.mp4');
+    expect($file->path)->toMatch('/^downloads\/[a-z0-9]{2}\/test\.mp4$/');
     expect($file->filename)->toBe('test.mp4');
     expect($file->ext)->toBe('mp4');
     expect($file->mime_type)->toBe('video/mp4');
-    expect(Storage::disk('atlas_app')->exists('downloads/test.mp4'))->toBeTrue();
+    expect(Storage::disk('atlas_app')->exists($file->path))->toBeTrue();
     expect(Storage::disk('atlas_app')->exists('downloads/test.webp'))->toBeFalse();
 });
 
@@ -223,10 +223,10 @@ HTML;
 
     expect($result)->toBeTrue();
     $file->refresh();
-    expect($file->path)->toBe('downloads/test.webm');
+    expect($file->path)->toMatch('/^downloads\/[a-z0-9]{2}\/test\.webm$/');
     expect($file->filename)->toBe('test.webm');
     expect($file->ext)->toBe('webm');
     expect($file->mime_type)->toBe('video/webm');
-    expect(Storage::disk('atlas_app')->exists('downloads/test.webm'))->toBeTrue();
+    expect(Storage::disk('atlas_app')->exists($file->path))->toBeTrue();
     expect(Storage::disk('atlas_app')->exists('downloads/test.webp'))->toBeFalse();
 });
