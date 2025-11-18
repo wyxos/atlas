@@ -6,6 +6,7 @@ use App\Events\DownloadCreated;
 use App\Events\FileDownloadProgress;
 use App\Models\Download;
 use App\Models\File;
+use App\Services\Plugin\PluginServiceResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -362,6 +363,9 @@ class DownloadFile implements ShouldQueue
             } catch (\Throwable $e) {
                 // ignore indexing errors
             }
+
+            // Validate download consistency with service
+            $this->validateDownloadConsistency();
         } catch (\Throwable $e) {
             // Update file with error status
             $this->file->update([
@@ -456,5 +460,26 @@ class DownloadFile implements ShouldQueue
         }
 
         return is_string($mime) ? strtolower(trim($mime)) : null;
+    }
+
+    protected function validateDownloadConsistency(): void
+    {
+        $source = (string) $this->file->source;
+        if ($source === '') {
+            return;
+        }
+
+        $resolver = app(PluginServiceResolver::class);
+        $service = $resolver->resolveBySource($source);
+
+        if (! $service || ! method_exists($service, 'validateDownload')) {
+            return;
+        }
+
+        if (! $service->validateDownload($this->file)) {
+            if (method_exists($service, 'fixDownload')) {
+                $service->fixDownload($this->file);
+            }
+        }
     }
 }

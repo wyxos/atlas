@@ -27,6 +27,7 @@ import { useMimeTypes } from '@/composables/useMimeTypes';
 const props = defineProps<{
     files?: any[];
     filter?: Record<string, any>;
+    sources?: string[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Reels', href: '/reels' }];
@@ -674,10 +675,13 @@ v-model.number="(form as any).limit"
                         data-test="reels-source"
                     >
                         <option :value="undefined">All</option>
-                        <option value="local">Local</option>
-                        <option value="youtube">YouTube</option>
-                        <option value="reddit">Reddit</option>
-                        <option value="twitter">Twitter</option>
+                        <option
+                            v-for="source in (props.sources || [])"
+                            :key="source"
+                            :value="source"
+                        >
+                            {{ source.charAt(0).toUpperCase() + source.slice(1) }}
+                        </option>
                     </select>
                 </div>
                 <div class="grid gap-1">

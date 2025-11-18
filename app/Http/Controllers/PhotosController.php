@@ -105,6 +105,7 @@ class PhotosController extends Controller
         return [
             'files' => $files,
             'filter' => $this->buildListingFilter($options, $paginator),
+            'sources' => $this->getDistinctSources('image'),
         ];
     }
 }

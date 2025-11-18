@@ -8,6 +8,7 @@ use App\Support\ListingOptions;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Pagination\Paginator as PaginatorContract;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 trait InteractsWithListings
 {
@@ -258,5 +259,38 @@ trait InteractsWithListings
         ];
 
         return array_replace($base, $overrides);
+    }
+
+    /**
+     * Get distinct source values for a given mime group (image or video) with caching.
+     *
+     * Optimized for large datasets (900k+ files) using GROUP BY and longer cache duration.
+     *
+     * @return array<string>
+     */
+    protected function getDistinctSources(string $mimeGroup): array
+    {
+        $cacheKey = "files.sources.{$mimeGroup}";
+
+        // Cache for 1 hour since sources don't change frequently
+        return Cache::remember($cacheKey, 3600, function () use ($mimeGroup) {
+            $mimePrefix = match ($mimeGroup) {
+                'image' => 'image/',
+                'video' => 'video/',
+                default => throw new \InvalidArgumentException("Invalid mime group: {$mimeGroup}"),
+            };
+
+            // Use GROUP BY instead of DISTINCT for better performance on large datasets
+            // The mime_type index will be used for the WHERE clause
+            return File::query()
+                ->select('source')
+                ->where('mime_type', 'like', "{$mimePrefix}%")
+                ->groupBy('source')
+                ->orderBy('source')
+                ->pluck('source')
+                ->filter()
+                ->values()
+                ->toArray();
+        });
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\File;
 use App\Support\FileTypeDetector;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
@@ -209,5 +210,90 @@ class CivitAiImages extends BaseService
         $normalized = strtolower(trim($value));
 
         return in_array($normalized, ['image', 'video'], true) ? $normalized : null;
+    }
+
+    public function validateDownload(File $file): bool
+    {
+        if (! $file->downloaded || ! $file->path) {
+            return true;
+        }
+
+        $metadata = is_array($file->listing_metadata) ? $file->listing_metadata : (is_string($file->listing_metadata) ? json_decode($file->listing_metadata, true) : []);
+        $type = $metadata['type'] ?? null;
+
+        if ($type !== 'video') {
+            return true;
+        }
+
+        $extension = strtolower((string) pathinfo($file->path, PATHINFO_EXTENSION));
+        $mimeType = strtolower((string) $file->mime_type);
+
+        return $extension === 'mp4' && str_contains($mimeType, 'video/mp4');
+    }
+
+    public function fixDownload(File $file): bool
+    {
+        if (! $file->downloaded || ! $file->path) {
+            return false;
+        }
+
+        $metadata = is_array($file->listing_metadata) ? $file->listing_metadata : (is_string($file->listing_metadata) ? json_decode($file->listing_metadata, true) : []);
+        $type = $metadata['type'] ?? null;
+
+        if ($type !== 'video') {
+            return false;
+        }
+
+        $extension = strtolower((string) pathinfo($file->path, PATHINFO_EXTENSION));
+        $mimeType = strtolower((string) $file->mime_type);
+
+        if ($extension === 'mp4' && str_contains($mimeType, 'video/mp4')) {
+            return false;
+        }
+
+        $resolver = new UrlResolver($file->id);
+        $realUrl = $resolver->resolve();
+
+        if (! $realUrl) {
+            return false;
+        }
+
+        try {
+            $response = Http::timeout(300)->get($realUrl);
+
+            if (! $response->successful()) {
+                return false;
+            }
+
+            $content = $response->body();
+            if (empty($content)) {
+                return false;
+            }
+
+            $baseFilename = pathinfo($file->filename, PATHINFO_FILENAME);
+            $newFilename = $baseFilename.'.mp4';
+            $newPath = 'downloads/'.$newFilename;
+
+            \Illuminate\Support\Facades\Storage::disk('atlas_app')->put($newPath, $content);
+
+            if ($file->path && $file->path !== $newPath) {
+                \Illuminate\Support\Facades\Storage::disk('atlas_app')->delete($file->path);
+            }
+
+            $file->update([
+                'path' => $newPath,
+                'filename' => $newFilename,
+                'ext' => 'mp4',
+                'mime_type' => 'video/mp4',
+                'url' => $realUrl,
+            ]);
+
+            $file->refresh();
+            $file->searchable();
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

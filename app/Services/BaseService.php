@@ -63,4 +63,15 @@ abstract class BaseService implements BrowseService
     {
         return app(BrowsePersister::class)->persist($transformedItems);
     }
+
+    /**
+     * Validate download consistency after a file has been downloaded.
+     * Services can override this to perform source-specific validation.
+     *
+     * @return bool True if download is valid, false if it needs to be fixed
+     */
+    public function validateDownload(File $file): bool
+    {
+        return true;
+    }
 }

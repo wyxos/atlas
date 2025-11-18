@@ -29,6 +29,7 @@ import { useMimeTypes } from '@/composables/useMimeTypes';
 const props = defineProps<{
     files?: any[];
     filter?: Record<string, any>;
+    sources?: string[];
     moderation?: {
         ids?: number[];
         previews?: Array<{ preview?: string | null; title?: string | null }>;
@@ -808,10 +809,13 @@ v-model.number="(form as any).limit"
                         data-test="photos-source"
                     >
                         <option value="">All</option>
-                        <option value="local">Local</option>
-                        <option value="spotify">Spotify</option>
-                        <option value="youtube">YouTube</option>
-                        <option value="booru">Booru</option>
+                        <option
+                            v-for="source in (props.sources || [])"
+                            :key="source"
+                            :value="source"
+                        >
+                            {{ source.charAt(0).toUpperCase() + source.slice(1) }}
+                        </option>
                     </select>
                 </div>
                 <div class="grid gap-1">

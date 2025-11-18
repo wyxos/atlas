@@ -85,7 +85,7 @@ class ReelsController extends Controller
             'filter' => $this->buildListingFilter($options, $paginator, [
                 'source' => $source,
             ]),
+            'sources' => $this->getDistinctSources('video'),
         ];
     }
-
 }
