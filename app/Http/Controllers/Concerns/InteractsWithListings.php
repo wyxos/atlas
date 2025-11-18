@@ -280,17 +280,28 @@ trait InteractsWithListings
                 default => throw new \InvalidArgumentException("Invalid mime group: {$mimeGroup}"),
             };
 
-            // Use GROUP BY instead of DISTINCT for better performance on large datasets
-            // The mime_type index will be used for the WHERE clause
-            return File::query()
-                ->select('source')
-                ->where('mime_type', 'like', "{$mimePrefix}%")
-                ->groupBy('source')
-                ->orderBy('source')
-                ->pluck('source')
-                ->filter()
-                ->values()
-                ->toArray();
+            try {
+                // Use GROUP BY instead of DISTINCT for better performance on large datasets
+                // The mime_type index will be used for the WHERE clause
+                $sources = File::query()
+                    ->select('source')
+                    ->whereNotNull('source')
+                    ->where('mime_type', 'like', "{$mimePrefix}%")
+                    ->groupBy('source')
+                    ->orderBy('source')
+                    ->pluck('source')
+                    ->filter()
+                    ->values()
+                    ->toArray();
+
+                // Ensure we return an array even if empty
+                return is_array($sources) ? $sources : [];
+            } catch (\Throwable $e) {
+                // Log error but return empty array to prevent breaking the page
+                report($e);
+
+                return [];
+            }
         });
     }
 }
