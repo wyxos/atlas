@@ -47,7 +47,9 @@ class FixCivitAiVideoDownloads extends Command
             ->whereRaw('JSON_UNQUOTE(JSON_EXTRACT(listing_metadata, ?)) = ?', ['$.type', 'video'])
             ->where(function ($q) {
                 $q->where('path', 'LIKE', '%.webp')
-                    ->orWhere('ext', 'webp');
+                    ->orWhere('path', 'LIKE', '%.bin')
+                    ->orWhere('ext', 'webp')
+                    ->orWhere('ext', 'bin');
             });
 
         $filesCount = $query->count();

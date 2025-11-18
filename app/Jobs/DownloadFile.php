@@ -7,6 +7,7 @@ use App\Events\FileDownloadProgress;
 use App\Models\Download;
 use App\Models\File;
 use App\Services\Plugin\PluginServiceResolver;
+use App\Support\PartitionedPathHelper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -47,7 +48,7 @@ class DownloadFile implements ShouldQueue
             if ($filename === '') {
                 $filename = Str::random(40);
             }
-            $filePath = 'downloads/'.$filename;
+            $filePath = PartitionedPathHelper::generatePath($filename);
 
             $resolvedMime = null;
 
@@ -312,14 +313,21 @@ class DownloadFile implements ShouldQueue
             }
 
             $sniffedMime = $this->detectMimeFromFile($tempFile);
-            if (! $resolvedMime && $sniffedMime) {
-                $resolvedMime = $sniffedMime;
-            }
 
+            // For CivitAI files, prioritize file sniffing over Content-Type header
+            // because CivitAI sometimes sends wrong Content-Type (e.g., image/webp or application/octet-stream for videos)
             if (strcasecmp((string) $this->file->source, 'CivitAI') === 0 && $sniffedMime) {
-                if ($resolvedMime && str_contains((string) $resolvedMime, 'image/webp') && str_starts_with($sniffedMime, 'video/')) {
+                // If file sniffing detects a video, use it (overrides Content-Type)
+                if (str_starts_with($sniffedMime, 'video/')) {
+                    $resolvedMime = $sniffedMime;
+                } elseif ($resolvedMime && str_contains((string) $resolvedMime, 'image/webp') && str_starts_with($sniffedMime, 'video/')) {
+                    $resolvedMime = $sniffedMime;
+                } elseif (! $resolvedMime && $sniffedMime) {
                     $resolvedMime = $sniffedMime;
                 }
+            } elseif (! $resolvedMime && $sniffedMime) {
+                // For other sources, use sniffed MIME if Content-Type wasn't available
+                $resolvedMime = $sniffedMime;
             }
 
             if (! $resolvedMime) {
@@ -328,8 +336,16 @@ class DownloadFile implements ShouldQueue
 
             [$filename, $filePath] = $this->adjustFilenameForMime($filename, $resolvedMime, $filePath);
 
+            // Ensure subdirectory exists
+            $subdir = PartitionedPathHelper::getSubdirectory($filename);
+            $subdirPath = "downloads/{$subdir}";
+            $storage = Storage::disk('atlas_app');
+            if (! $storage->exists($subdirPath)) {
+                $storage->makeDirectory($subdirPath);
+            }
+
             // Store the file in the 'atlas' disk under downloads folder
-            Storage::disk('atlas_app')->put($filePath, file_get_contents($tempFile));
+            $storage->put($filePath, file_get_contents($tempFile));
 
             // Clean up temp file
             @unlink($tempFile);
@@ -426,7 +442,7 @@ class DownloadFile implements ShouldQueue
             : $filename;
 
         $newFilename = $base.'.'.$extension;
-        $newPath = 'downloads/'.$newFilename;
+        $newPath = PartitionedPathHelper::generatePath($newFilename);
 
         return [$newFilename, $newPath];
     }

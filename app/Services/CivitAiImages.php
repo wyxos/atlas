@@ -248,8 +248,28 @@ class CivitAiImages extends BaseService
         $extension = strtolower((string) pathinfo($file->path, PATHINFO_EXTENSION));
         $mimeType = strtolower((string) $file->mime_type);
 
-        if (($extension === 'mp4' && str_contains($mimeType, 'video/mp4'))
-            || ($extension === 'webm' && str_contains($mimeType, 'video/webm'))) {
+        // Detect actual MIME type from file if database MIME is wrong
+        $actualMimeType = $mimeType;
+        if (in_array($extension, ['bin', 'webp'], true) || ! str_contains($mimeType, 'video/')) {
+            $storage = \Illuminate\Support\Facades\Storage::disk('atlas_app');
+            if ($storage->exists($file->path)) {
+                $fullPath = $storage->path($file->path);
+                if (function_exists('finfo_open') && is_file($fullPath)) {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    if ($finfo !== false) {
+                        $detectedMime = finfo_file($finfo, $fullPath);
+                        finfo_close($finfo);
+                        if ($detectedMime && str_starts_with(strtolower($detectedMime), 'video/')) {
+                            $actualMimeType = strtolower($detectedMime);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Skip if already correct
+        if (($extension === 'mp4' && str_contains($actualMimeType, 'video/mp4'))
+            || ($extension === 'webm' && str_contains($actualMimeType, 'video/webm'))) {
             return false;
         }
 
@@ -277,9 +297,17 @@ class CivitAiImages extends BaseService
             $newExt = $isWebm ? 'webm' : 'mp4';
             $newMimeType = $isWebm ? 'video/webm' : 'video/mp4';
             $newFilename = $baseFilename.'.'.$newExt;
-            $newPath = 'downloads/'.$newFilename;
+            $newPath = \App\Support\PartitionedPathHelper::generatePath($newFilename);
 
-            \Illuminate\Support\Facades\Storage::disk('atlas_app')->put($newPath, $content);
+            // Ensure subdirectory exists
+            $subdir = \App\Support\PartitionedPathHelper::getSubdirectory($newFilename);
+            $subdirPath = "downloads/{$subdir}";
+            $storage = \Illuminate\Support\Facades\Storage::disk('atlas_app');
+            if (! $storage->exists($subdirPath)) {
+                $storage->makeDirectory($subdirPath);
+            }
+
+            $storage->put($newPath, $content);
 
             if ($file->path && $file->path !== $newPath) {
                 \Illuminate\Support\Facades\Storage::disk('atlas_app')->delete($file->path);
