@@ -301,30 +301,27 @@ return [
 
         'pi5' => [
             'supervisor-1' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 10,
                 'balanceMaxShift' => 1,
-                'balanceCooldown' => 5,
-                'memory' => 96,
+                'balanceCooldown' => 3,
             ],
             'supervisor-processing' => [
-                'maxProcesses' => 1,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 5,
-                'memory' => 192,
+                'maxProcesses' => 8,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 3,
             ],
             'supervisor-downloads' => [
-                'maxProcesses' => 1,
+                'maxProcesses' => 4,
                 'balanceMaxShift' => 1,
-                'balanceCooldown' => 5,
-                'memory' => 192,
+                'balanceCooldown' => 3,
             ],
             'supervisor-composer' => [
                 'maxProcesses' => 1,
-                'memory' => 384,
             ],
             'supervisor-spotify' => [
-                'maxProcesses' => 1,
-                'memory' => 96,
+                'maxProcesses' => 2,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
             ],
         ],
     ],
