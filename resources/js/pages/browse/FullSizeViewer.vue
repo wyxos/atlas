@@ -776,6 +776,9 @@ function cancelAllPreloading(): void {
 }
 
 function updatePreloadQueue(): void {
+  // TEMPORARILY DISABLED: Preloading disabled for testing
+  return
+  
   if (!dialogOpen.value || !dialogItem.value) {
     cancelAllPreloading()
     return

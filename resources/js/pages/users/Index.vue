@@ -16,6 +16,7 @@ interface UserItem {
     name: string;
     email: string;
     created_at: string;
+    last_login_at: string | null;
 }
 
 defineProps<{
@@ -55,6 +56,11 @@ const tableHeight = height;
                         </OTableColumn>
                         <OTableColumn field="created_at" label="Created" v-slot="props">
                             <span class="px-1 text-sm">{{ new Date(props.row.created_at).toLocaleString() }}</span>
+                        </OTableColumn>
+                        <OTableColumn field="last_login_at" label="Last Login" v-slot="props">
+                            <span class="px-1 text-sm">
+                                {{ props.row.last_login_at ? new Date(props.row.last_login_at).toLocaleString() : 'Never' }}
+                            </span>
                         </OTableColumn>
 
                         <template #empty>

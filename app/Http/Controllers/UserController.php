@@ -18,7 +18,7 @@ class UserController extends Controller
         }
 
         $users = User::query()
-            ->select(['id', 'name', 'email', 'created_at'])
+            ->select(['id', 'name', 'email', 'created_at', 'last_login_at'])
             ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();

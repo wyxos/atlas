@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'is_admin',
         'active_playlist_id',
+        'last_login_at',
     ];
 
     /**
@@ -49,6 +50,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'active_playlist_id' => 'integer',
+            'last_login_at' => 'datetime',
         ];
     }
 
