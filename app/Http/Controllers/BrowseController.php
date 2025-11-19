@@ -521,6 +521,8 @@ class BrowseController extends Controller
                         'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
                         'Range' => 'bytes=0-0',
                     ]);
+                } elseif ($this->shouldSendCivitaiHeaders($file)) {
+                    $client = $client->withHeaders($this->getCivitaiHeaders());
                 }
 
                 $response = $client->head($candidateUrl);
@@ -553,5 +555,27 @@ class BrowseController extends Controller
         $thumb = (string) ($file->thumbnail_url ?? '');
 
         return str_contains(strtolower($url), 'wallhaven.cc') || str_contains(strtolower($thumb), 'wallhaven.cc');
+    }
+
+    protected function shouldSendCivitaiHeaders(File $file): bool
+    {
+        $source = (string) $file->source;
+        if ($source !== '' && strcasecmp($source, 'CivitAI') === 0) {
+            return true;
+        }
+
+        $url = (string) ($file->url ?? '');
+        $thumb = (string) ($file->thumbnail_url ?? '');
+
+        return str_contains(strtolower($url), 'civitai.com') || str_contains(strtolower($thumb), 'civitai.com');
+    }
+
+    protected function getCivitaiHeaders(): array
+    {
+        return [
+            'Referer' => 'https://civitai.com/',
+            'User-Agent' => config('services.civitai.user_agent', 'Atlas/1.0'),
+            'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        ];
     }
 }

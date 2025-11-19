@@ -135,3 +135,84 @@ it('does not mark as missing when thumbnail exists on disk', function (): void {
 
     expect($file->fresh()->not_found)->toBeFalse();
 });
+
+it('sends civitai headers when file source is CivitAI', function () {
+    Http::fake([
+        'https://image.civitai.com/*' => Http::response('', 200),
+    ]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $file = File::factory()->create([
+        'source' => 'CivitAI',
+        'thumbnail_url' => 'https://image.civitai.com/test.jpg',
+        'url' => 'https://image.civitai.com/original.jpg',
+        'not_found' => false,
+    ]);
+
+    $response = $this->postJson(route('browse.files.report-missing', ['file' => $file->id]), ['verify' => true]);
+
+    $response->assertOk();
+
+    Http::assertSent(function ($request) {
+        return $request->url() === 'https://image.civitai.com/test.jpg'
+            && $request->hasHeader('Referer', 'https://civitai.com/')
+            && $request->hasHeader('User-Agent', 'Atlas/1.0')
+            && $request->hasHeader('Accept', 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8');
+    });
+});
+
+it('sends civitai headers when url contains civitai.com', function () {
+    Http::fake([
+        'https://image.civitai.com/*' => Http::response('', 200),
+    ]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $file = File::factory()->create([
+        'source' => 'Other',
+        'thumbnail_url' => 'https://image.civitai.com/test.jpg',
+        'url' => 'https://image.civitai.com/original.jpg',
+        'not_found' => false,
+    ]);
+
+    $response = $this->postJson(route('browse.files.report-missing', ['file' => $file->id]), ['verify' => true]);
+
+    $response->assertOk();
+
+    Http::assertSent(function ($request) {
+        return $request->url() === 'https://image.civitai.com/test.jpg'
+            && $request->hasHeader('Referer', 'https://civitai.com/')
+            && $request->hasHeader('User-Agent', 'Atlas/1.0')
+            && $request->hasHeader('Accept', 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8');
+    });
+});
+
+it('sends civitai headers when thumbnail_url contains civitai.com', function () {
+    Http::fake([
+        'https://image.civitai.com/*' => Http::response('', 200),
+    ]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $file = File::factory()->create([
+        'source' => 'Other',
+        'thumbnail_url' => 'https://image.civitai.com/thumb.jpg',
+        'url' => 'https://other.com/original.jpg',
+        'not_found' => false,
+    ]);
+
+    $response = $this->postJson(route('browse.files.report-missing', ['file' => $file->id]), ['verify' => true]);
+
+    $response->assertOk();
+
+    Http::assertSent(function ($request) {
+        return $request->url() === 'https://image.civitai.com/thumb.jpg'
+            && $request->hasHeader('Referer', 'https://civitai.com/')
+            && $request->hasHeader('User-Agent', 'Atlas/1.0')
+            && $request->hasHeader('Accept', 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8');
+    });
+});
