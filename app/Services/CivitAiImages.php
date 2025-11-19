@@ -6,10 +6,8 @@ use App\Models\File;
 use App\Support\FileTypeDetector;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class CivitAiImages extends BaseService
 {
@@ -18,8 +16,6 @@ class CivitAiImages extends BaseService
     public const string SOURCE = 'CivitAI';
 
     public const string LABEL = 'CivitAI Images';
-
-    public const bool HOTLINK_PROTECTED = true;
 
     /**
      * Fetch images from CivitAI Images API.
@@ -332,71 +328,5 @@ class CivitAiImages extends BaseService
         } catch (\Throwable $e) {
             return false;
         }
-    }
-
-    public function shouldProxyOriginal(File $file): bool
-    {
-        return true;
-    }
-
-    public function proxyOriginal(Request $request, File $file): SymfonyResponse
-    {
-        $url = (string) $file->url;
-        if ($url === '') {
-            throw new \RuntimeException('Missing CivitAI asset URL');
-        }
-
-        $referrer = $file->referrer_url ?: 'https://civitai.com/';
-
-        return $this->proxyCivitaiAsset($url, $file, $referrer);
-    }
-
-    public function proxyThumbnail(Request $request, File $file): ?SymfonyResponse
-    {
-        $thumbnailUrl = (string) $file->thumbnail_url;
-        if ($thumbnailUrl === '') {
-            return null;
-        }
-
-        $referrer = $file->referrer_url ?: 'https://civitai.com/';
-
-        return $this->proxyCivitaiAsset($thumbnailUrl, $file, $referrer, true);
-    }
-
-    protected function proxyCivitaiAsset(string $url, File $file, string $referrer, bool $isThumbnail = false): SymfonyResponse
-    {
-        $origin = 'https://civitai.com';
-
-        $headers = [
-            'Referer' => $referrer,
-            'Origin' => $origin,
-            'User-Agent' => config('services.civitai.user_agent', 'Atlas/1.0'),
-            'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        ];
-
-        // Add API key as header if available
-        $apiKey = config('services.civitai.key');
-        if ($apiKey) {
-            $headers['Authorization'] = "Bearer {$apiKey}";
-        }
-
-        $response = Http::withHeaders($headers)->timeout(30)->get($url);
-
-        if (! $response->ok()) {
-            throw new \RuntimeException('CivitAI upstream responded with status '.$response->status());
-        }
-
-        $contentType = $response->header('Content-Type') ?: ($file->mime_type ?: 'application/octet-stream');
-        if ($isThumbnail && str_starts_with((string) $contentType, 'application/') && $file->mime_type) {
-            $contentType = $file->mime_type;
-        }
-
-        $filename = $file->filename ?: ($isThumbnail ? 'thumbnail.jpg' : 'file');
-
-        return response($response->body(), 200, [
-            'Content-Type' => $contentType,
-            'Content-Disposition' => 'inline; filename="'.$filename.'"',
-            'Cache-Control' => 'private, max-age=300',
-        ]);
     }
 }

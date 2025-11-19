@@ -33,7 +33,6 @@ return [
     // Third-party media integrations
     'civitai' => [
         'key' => env('CIVITAI_API'),
-        'user_agent' => env('CIVITAI_USER_AGENT', 'Atlas/1.0'),
     ],
     'wallhaven' => [
         'key' => env('WALLHAVEN_API'),
