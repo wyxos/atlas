@@ -256,28 +256,55 @@ return [
 
     'environments' => [
         'production' => [
+            // 'supervisor-1' => [
+            //     'maxProcesses' => 10,
+            //     'balanceMaxShift' => 1,
+            //     'balanceCooldown' => 3,
+            // ],
+            // 'supervisor-processing' => [
+            //     'maxProcesses' => 8,
+            //     'balanceMaxShift' => 2,
+            //     'balanceCooldown' => 3,
+            // ],
+            // 'supervisor-downloads' => [
+            //     'maxProcesses' => 4,
+            //     'balanceMaxShift' => 1,
+            //     'balanceCooldown' => 3,
+            // ],
+            // 'supervisor-composer' => [
+            //     'maxProcesses' => 1,
+            // ],
+            // 'supervisor-spotify' => [
+            //     'maxProcesses' => 2,
+            //     'balanceMaxShift' => 1,
+            //     'balanceCooldown' => 3,
+            // ],
+
             'supervisor-1' => [
-                'maxProcesses' => 10,
+                'maxProcesses' => 2,
                 'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
+                'balanceCooldown' => 5,
+                'memory' => 96,
             ],
             'supervisor-processing' => [
-                'maxProcesses' => 8,
-                'balanceMaxShift' => 2,
-                'balanceCooldown' => 3,
+                'maxProcesses' => 1,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 5,
+                'memory' => 192,
             ],
             'supervisor-downloads' => [
-                'maxProcesses' => 4,
+                'maxProcesses' => 1,
                 'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
+                'balanceCooldown' => 5,
+                'memory' => 192,
             ],
             'supervisor-composer' => [
                 'maxProcesses' => 1,
+                'memory' => 384,
             ],
             'supervisor-spotify' => [
-                'maxProcesses' => 2,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
+                'maxProcesses' => 1,
+                'memory' => 96,
             ],
         ],
 
@@ -296,32 +323,6 @@ return [
             ],
             'supervisor-spotify' => [
                 'maxProcesses' => 1,
-            ],
-        ],
-
-        'pi5' => [
-            'supervisor-1' => [
-                'maxProcesses' => 10,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
-            ],
-            'supervisor-processing' => [
-                'maxProcesses' => 8,
-                'balanceMaxShift' => 2,
-                'balanceCooldown' => 3,
-            ],
-            'supervisor-downloads' => [
-                'maxProcesses' => 4,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
-            ],
-            'supervisor-composer' => [
-                'maxProcesses' => 1,
-            ],
-            'supervisor-spotify' => [
-                'maxProcesses' => 2,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
             ],
         ],
     ],
