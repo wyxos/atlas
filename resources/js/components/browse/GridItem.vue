@@ -1394,7 +1394,6 @@ function closeActionPanel(): void {
                 :key="imageSrc"
                 :src="imageSrc"
                 alt=""
-                crossorigin="anonymous"
                 referrerpolicy="no-referrer"
                 class="h-full w-full cursor-zoom-in cursor-zoom-custom object-cover transition-opacity duration-300"
                 :class="hasLoaded ? 'opacity-100' : 'opacity-0'"
