@@ -33,11 +33,9 @@ return [
     // Third-party media integrations
     'civitai' => [
         'key' => env('CIVITAI_API'),
-        'user_agent' => env('CIVITAI_USER_AGENT', 'Atlas/1.0'),
     ],
     'wallhaven' => [
         'key' => env('WALLHAVEN_API'),
-        'user_agent' => env('WALLHAVEN_USER_AGENT', 'Atlas/1.0 (+https://wallhaven.cc)'),
     ], // Spotify (PKCE; no secret required)
     'spotify' => [
         'client_id' => env('SPOTIFY_CLIENT_ID'),
