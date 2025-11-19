@@ -177,11 +177,12 @@ class FileController extends Controller
     }
 
     /**
-     * Proxy originals for hosts that block cross-origin hotlinking. Thumbnails remain direct..
+     * Proxy originals and thumbnails for hosts that block cross-origin hotlinking.
      */
     public function remote(Request $request, File $file): SymfonyResponse
     {
-        $url = $file->url;
+        $isThumbnail = $request->boolean('thumbnail', false);
+        $url = $isThumbnail ? ($file->thumbnail_url ?? $file->url) : $file->url;
         abort_unless($url, 404);
 
         $service = $this->serviceResolver->resolveBySource((string) $file->source);
@@ -195,6 +196,21 @@ class FileController extends Controller
 
         if (! $shouldProxy) {
             abort(403, 'Service does not require proxying');
+        }
+
+        if ($isThumbnail && method_exists($service, 'proxyThumbnail')) {
+            try {
+                $response = $service->proxyThumbnail($request, $file);
+                if ($response instanceof SymfonyResponse) {
+                    return $response;
+                }
+
+                return response($response);
+            } catch (\Throwable $e) {
+                report($e);
+
+                abort(502, 'Failed to fetch remote thumbnail');
+            }
         }
 
         if (! method_exists($service, 'proxyOriginal')) {

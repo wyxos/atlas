@@ -11,9 +11,10 @@ class FileListingFormatter
      * @param  array<string, mixed>  $reactions
      * @param  callable(File, string, array&): string|null  $remoteUrlDecorator
      * @param  array<string, mixed>  $serviceCache
+     * @param  callable(File, string, array&): string|null  $thumbnailUrlDecorator
      * @return array<string, mixed>|null
      */
-    public static function format(?File $file, array $reactions, int $page, ?callable $remoteUrlDecorator = null, array &$serviceCache = []): ?array
+    public static function format(?File $file, array $reactions, int $page, ?callable $remoteUrlDecorator = null, array &$serviceCache = [], ?callable $thumbnailUrlDecorator = null): ?array
     {
         if (! $file) {
             return null;
@@ -36,7 +37,7 @@ class FileListingFormatter
         }
 
         $localPreview = FilePreviewUrl::for($file);
-        $thumbnail = $localPreview ?? $remoteThumbnail;
+        $thumbnail = $localPreview ?? ($thumbnailUrlDecorator && $remoteThumbnail ? $thumbnailUrlDecorator($file, (string) $remoteThumbnail, $serviceCache) : $remoteThumbnail);
         $type = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'other'));
 
         $detailMetadata = $file->metadata?->payload ?? [];

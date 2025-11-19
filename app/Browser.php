@@ -190,13 +190,25 @@ class Browser
             return $url;
         };
 
-        $files = collect($persisted)->map(function (File $file) use ($reactions, $remoteUrlDecorator, &$serviceCache) {
+        // Create thumbnail URL decorator for hotlink-protected sources
+        $thumbnailUrlDecorator = function (File $file, string $url, array &$cache) use ($hotlinkSources): string {
+            // Check if this source needs proxying
+            $needsProxy = in_array((string) $file->source, $hotlinkSources, true);
+            if ($needsProxy) {
+                return route('files.remote', ['file' => $file->id, 'thumbnail' => true]);
+            }
+
+            return $url;
+        };
+
+        $files = collect($persisted)->map(function (File $file) use ($reactions, $remoteUrlDecorator, $thumbnailUrlDecorator, &$serviceCache) {
             $formatted = FileListingFormatter::format(
                 $file,
                 $reactions,
                 (int) request()->input('page', 1),
                 $remoteUrlDecorator,
-                $serviceCache
+                $serviceCache,
+                $thumbnailUrlDecorator
             );
 
             if (! $formatted) {
