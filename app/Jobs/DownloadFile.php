@@ -54,7 +54,7 @@ class DownloadFile implements ShouldQueue
 
             // Initialize progress
             $this->file->update(['download_progress' => 0]);
-            event(new FileDownloadProgress($this->file->id, 0, 0, null, 'in-progress'));
+            // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, 0, 0, null, 'in-progress'));
 
             // If user explicitly downloads, clear blacklist flags (explicit intent overrides previous blacklist)
             if ($this->file->blacklisted_at !== null) {
@@ -197,7 +197,7 @@ class DownloadFile implements ShouldQueue
                             if ($total > 0) {
                                 $progress = (int) round(($currentOverall / $total) * 100);
                                 if ($progress >= $lastReportedProgress + 5 || $progress === 100) {
-                                    event(new FileDownloadProgress($this->file->id, $progress, $currentOverall, $total));
+                                    // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, $progress, $currentOverall, $total));
                                     if ($this->downloadId) {
                                         Download::where('id', $this->downloadId)->update([
                                             'progress' => $progress,
@@ -272,7 +272,7 @@ class DownloadFile implements ShouldQueue
                             $progress = (int) round(((int) $downloadedBytes / (int) $downloadTotal) * 100);
                             $lastReportedProgress = (int) ($this->file->download_progress ?? 0);
                             if ($progress >= $lastReportedProgress + 5 || $progress === 100) {
-                                event(new FileDownloadProgress($this->file->id, $progress, (int) $downloadedBytes, (int) $downloadTotal));
+                                // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, $progress, (int) $downloadedBytes, (int) $downloadTotal));
                                 if ($this->downloadId) {
                                     Download::where('id', $this->downloadId)->update([
                                         'progress' => $progress,
@@ -351,7 +351,7 @@ class DownloadFile implements ShouldQueue
             @unlink($tempFile);
 
             // Final progress update
-            event(new FileDownloadProgress($this->file->id, 100, $contentLength ?: null, $contentLength ?: null, 'completed'));
+            // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, 100, $contentLength ?: null, $contentLength ?: null, 'completed'));
             if ($this->downloadId) {
                 Download::where('id', $this->downloadId)->update([
                     'status' => 'completed',
@@ -416,7 +416,7 @@ class DownloadFile implements ShouldQueue
                 $row = \App\Models\Download::find($this->downloadId);
                 $status = $row?->status;
             }
-            event(new FileDownloadProgress($this->file->id, -1, null, null, $status === 'canceled' ? 'canceled' : ($status === 'paused' ? 'paused' : 'failed')));
+            // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, -1, null, null, $status === 'canceled' ? 'canceled' : ($status === 'paused' ? 'paused' : 'failed')));
             throw $e; // rethrow for failed job handling
         }
     }

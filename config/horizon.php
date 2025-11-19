@@ -287,13 +287,13 @@ return [
                 'memory' => 96,
             ],
             'supervisor-processing' => [
-                'maxProcesses' => 1,
+                'maxProcesses' => 4,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
                 'memory' => 192,
             ],
             'supervisor-downloads' => [
-                'maxProcesses' => 1,
+                'maxProcesses' => 4,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
                 'memory' => 192,
@@ -310,13 +310,13 @@ return [
 
         'local' => [
             'supervisor-1' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 4,
             ],
             'supervisor-processing' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 4,
             ],
             'supervisor-downloads' => [
-                'maxProcesses' => 2,
+                'maxProcesses' => 4,
             ],
             'supervisor-composer' => [
                 'maxProcesses' => 1,

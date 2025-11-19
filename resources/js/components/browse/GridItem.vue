@@ -69,14 +69,14 @@ const highlightedPromptHtml = computed(() => computeHighlightedPromptHtml());
 const moderationTestUrl = computed(() => {
     const prompt = String((props.item as any)?.metadata?.prompt ?? '');
     if (!prompt) return null;
-    
+
     const params = new URLSearchParams();
     params.set('text', prompt);
-    
+
     if (moderationInfo.value?.rule_id) {
         params.set('rule_id', String(moderationInfo.value.rule_id));
     }
-    
+
     return `/moderation/test?${params.toString()}`;
 });
 
@@ -1394,6 +1394,7 @@ function closeActionPanel(): void {
                 :key="imageSrc"
                 :src="imageSrc"
                 alt=""
+                crossorigin="anonymous"
                 referrerpolicy="no-referrer"
                 class="h-full w-full cursor-zoom-in cursor-zoom-custom object-cover transition-opacity duration-300"
                 :class="hasLoaded ? 'opacity-100' : 'opacity-0'"
