@@ -15,6 +15,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -392,17 +393,17 @@ class BrowseController extends Controller
         try {
             // Only enqueue download when a non-empty URL exists
             if (filled($file->url)) {
-                \Log::info('Dispatching DownloadFile job', [
+                Log::info('Dispatching DownloadFile job', [
                     'file_id' => $file->id,
                     'url' => $file->url,
                     'queue' => 'downloads',
                 ]);
                 DownloadFile::dispatch($file)->onQueue('downloads');
             } else {
-                \Log::debug('Skipping DownloadFile dispatch - no URL', ['file_id' => $file->id]);
+                Log::debug('Skipping DownloadFile dispatch - no URL', ['file_id' => $file->id]);
             }
         } catch (\Throwable $e) {
-            \Log::error('Failed to dispatch DownloadFile job', [
+            Log::error('Failed to dispatch DownloadFile job', [
                 'file_id' => $file->id,
                 'error' => $e->getMessage(),
             ]);
@@ -479,14 +480,14 @@ class BrowseController extends Controller
 
             foreach ($toDownload as $file) {
                 try {
-                    \Log::info('Dispatching DownloadFile job (batch)', [
+                    Log::info('Dispatching DownloadFile job (batch)', [
                         'file_id' => $file->id,
                         'url' => $file->url,
                         'queue' => 'downloads',
                     ]);
                     \App\Jobs\DownloadFile::dispatch($file)->onQueue('downloads');
                 } catch (\Throwable $e) {
-                    \Log::error('Failed to dispatch DownloadFile job (batch)', [
+                    Log::error('Failed to dispatch DownloadFile job (batch)', [
                         'file_id' => $file->id,
                         'error' => $e->getMessage(),
                     ]);
@@ -512,10 +513,16 @@ class BrowseController extends Controller
         $candidateUrl = $file->thumbnail_url ?? $file->url;
         if ($candidateUrl) {
             try {
-                $client = Http::timeout(5)->withoutVerifying();
+                // Throttle requests based on domain
+                $domain = parse_url($candidateUrl, PHP_URL_HOST);
+                if ($domain) {
+                    \App\Support\HttpRateLimiter::throttleDomain($domain, 10, 60);
+                }
+
+                $clientFactory = fn () => Http::timeout(5)->withoutVerifying();
 
                 if ($this->shouldSendWallhavenHeaders($file)) {
-                    $client = $client->withHeaders([
+                    $clientFactory = fn () => Http::timeout(5)->withoutVerifying()->withHeaders([
                         'Referer' => 'https://wallhaven.cc/',
                         'User-Agent' => config('services.wallhaven.user_agent', 'Atlas/1.0 (+https://wallhaven.cc)'),
                         'Accept' => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
@@ -523,11 +530,35 @@ class BrowseController extends Controller
                     ]);
                 }
 
-                $response = $client->head($candidateUrl);
+                // Use rate limiter for HEAD request with retry logic
+                $response = \App\Support\HttpRateLimiter::headWithRetry(
+                    $clientFactory,
+                    $candidateUrl,
+                    [],
+                    maxRetries: 2,
+                    baseDelaySeconds: 1
+                );
 
                 // If HEAD is not supported (405) or forbidden (403), try GET instead
                 if (in_array($response->status(), [403, 405], true)) {
-                    $response = $client->withOptions(['stream' => true])->get($candidateUrl);
+                    $response = \App\Support\HttpRateLimiter::requestWithRetry(
+                        fn () => $clientFactory()->withOptions(['stream' => true]),
+                        $candidateUrl,
+                        [],
+                        maxRetries: 2,
+                        baseDelaySeconds: 1
+                    );
+                }
+
+                // Handle 429 rate limit errors gracefully
+                if ($response->status() === 429) {
+                    Log::warning('Rate limited during media availability probe', [
+                        'url' => $candidateUrl,
+                        'status' => 429,
+                        'retry_after' => $response->header('Retry-After'),
+                    ]);
+
+                    return ['available' => false, 'status' => 429];
                 }
 
                 return [

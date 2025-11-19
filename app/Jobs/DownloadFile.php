@@ -7,6 +7,7 @@ use App\Events\FileDownloadProgress;
 use App\Models\Download;
 use App\Models\File;
 use App\Services\Plugin\PluginServiceResolver;
+use App\Support\HttpRateLimiter;
 use App\Support\PartitionedPathHelper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Mime\MimeTypes;
@@ -86,8 +88,22 @@ class DownloadFile implements ShouldQueue
             // Note: CivitAI video URL resolution is handled by GridItem when items are viewed,
             // so file->url should already be correct by the time DownloadFile runs
 
+            // Throttle requests based on domain
+            $domain = parse_url($fileUrl, PHP_URL_HOST);
+            if ($domain) {
+                HttpRateLimiter::throttleDomain($domain, 10, 60);
+            }
+
             try {
-                $head = Http::timeout(15)->head($fileUrl);
+                // Use rate limiter for HEAD request with retry logic
+                $head = HttpRateLimiter::headWithRetry(
+                    fn () => Http::timeout(15),
+                    $fileUrl,
+                    [],
+                    maxRetries: 3,
+                    baseDelaySeconds: 2
+                );
+
                 if ($head->status() === 404) {
                     $this->file->update(['not_found' => true]);
                     if ($this->downloadId) {
@@ -99,6 +115,17 @@ class DownloadFile implements ShouldQueue
                         return;
                     }
                 }
+
+                // Handle 429 rate limit errors
+                if ($head->status() === 429) {
+                    Log::warning('Rate limited during download HEAD request', [
+                        'url' => $fileUrl,
+                        'status' => 429,
+                        'retry_after' => $head->header('Retry-After'),
+                    ]);
+                    throw new \RuntimeException('Rate limited by server. Please try again later.');
+                }
+
                 if ($head->ok()) {
                     $resolvedMime = $head->header('Content-Type') ?: $resolvedMime;
                     $acceptRanges = $head->header('Accept-Ranges');
@@ -111,12 +138,28 @@ class DownloadFile implements ShouldQueue
                 }
             } catch (\Throwable $e) {
                 // Some servers do not support HEAD; we'll fallback to range probe below
+                // But rethrow if it's a rate limit error
+                if (str_contains($e->getMessage(), 'Rate limited')) {
+                    throw $e;
+                }
             }
 
             if (! $acceptRanges || strtolower((string) $acceptRanges) !== 'bytes' || ! $contentLength) {
                 // Try a 1-byte range probe to detect support and size via Content-Range
                 try {
-                    $probe = Http::withHeaders(['Range' => 'bytes=0-0'])->timeout(30)->get($fileUrl);
+                    // Throttle again before probe request
+                    if ($domain) {
+                        HttpRateLimiter::throttleDomain($domain, 10, 60);
+                    }
+
+                    $probe = HttpRateLimiter::requestWithRetry(
+                        fn () => Http::withHeaders(['Range' => 'bytes=0-0'])->timeout(30),
+                        $fileUrl,
+                        [],
+                        maxRetries: 3,
+                        baseDelaySeconds: 2
+                    );
+
                     if ($probe->status() === 404) {
                         $this->file->update(['not_found' => true]);
                         if ($this->downloadId) {
@@ -128,6 +171,17 @@ class DownloadFile implements ShouldQueue
 
                         return;
                     }
+
+                    // Handle 429 rate limit errors
+                    if ($probe->status() === 429) {
+                        Log::warning('Rate limited during download probe request', [
+                            'url' => $fileUrl,
+                            'status' => 429,
+                            'retry_after' => $probe->header('Retry-After'),
+                        ]);
+                        throw new \RuntimeException('Rate limited by server. Please try again later.');
+                    }
+
                     if ($probe->status() === 206) {
                         $acceptRanges = 'bytes';
                         $probeMime = $probe->header('Content-Type');
@@ -145,6 +199,10 @@ class DownloadFile implements ShouldQueue
                     }
                 } catch (\Throwable $e) {
                     // Ignore, will fallback to full GET
+                    // But rethrow if it's a rate limit error
+                    if (str_contains($e->getMessage(), 'Rate limited')) {
+                        throw $e;
+                    }
                 }
             }
 
@@ -187,34 +245,45 @@ class DownloadFile implements ShouldQueue
 
                     $lastReportedProgress = (int) ($this->file->download_progress ?? 0);
 
+                    // Throttle before each chunk request
+                    if ($domain) {
+                        HttpRateLimiter::throttleDomain($domain, 10, 60);
+                    }
+
                     // Download chunk to memory first, then write to file at correct position
                     // This avoids issues with passing file pointer resources to Guzzle
-                    $response = Http::withHeaders([
-                        'Range' => "bytes={$start}-{$end}",
-                    ])->withOptions([
-                        'progress' => function ($chunkTotal, $downloadedBytes) use (&$downloadedSoFar, $total, $lastReportedProgress) {
-                            $currentOverall = $downloadedSoFar + (int) $downloadedBytes;
-                            if ($total > 0) {
-                                $progress = (int) round(($currentOverall / $total) * 100);
-                                if ($progress >= $lastReportedProgress + 5 || $progress === 100) {
-                                    // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, $progress, $currentOverall, $total));
+                    $response = HttpRateLimiter::requestWithRetry(
+                        fn () => Http::withHeaders([
+                            'Range' => "bytes={$start}-{$end}",
+                        ])->withOptions([
+                            'progress' => function ($chunkTotal, $downloadedBytes) use (&$downloadedSoFar, $total, $lastReportedProgress) {
+                                $currentOverall = $downloadedSoFar + (int) $downloadedBytes;
+                                if ($total > 0) {
+                                    $progress = (int) round(($currentOverall / $total) * 100);
+                                    if ($progress >= $lastReportedProgress + 5 || $progress === 100) {
+                                        // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, $progress, $currentOverall, $total));
+                                        if ($this->downloadId) {
+                                            Download::where('id', $this->downloadId)->update([
+                                                'progress' => $progress,
+                                                'bytes_downloaded' => $currentOverall,
+                                            ]);
+                                        }
+                                    }
+                                    // Cancellation/pause check inside callback
                                     if ($this->downloadId) {
-                                        Download::where('id', $this->downloadId)->update([
-                                            'progress' => $progress,
-                                            'bytes_downloaded' => $currentOverall,
-                                        ]);
+                                        $row = Download::find($this->downloadId);
+                                        if ($row && $row->cancel_requested_at) {
+                                            throw new \RuntimeException('Download canceled');
+                                        }
                                     }
                                 }
-                                // Cancellation/pause check inside callback
-                                if ($this->downloadId) {
-                                    $row = Download::find($this->downloadId);
-                                    if ($row && $row->cancel_requested_at) {
-                                        throw new \RuntimeException('Download canceled');
-                                    }
-                                }
-                            }
-                        },
-                    ])->timeout(300)->get($fileUrl);
+                            },
+                        ])->timeout(300),
+                        $fileUrl,
+                        [],
+                        maxRetries: 3,
+                        baseDelaySeconds: 2
+                    );
 
                     // Write chunk to file at correct position
                     if ($response->successful() && $response->status() === 206) {
@@ -241,6 +310,25 @@ class DownloadFile implements ShouldQueue
                         }
                         throw new \Exception('Remote file not found (404)');
                     }
+
+                    // Handle 429 rate limit errors
+                    if ($response->status() === 429) {
+                        fclose($fp);
+                        Log::warning('Rate limited during chunk download', [
+                            'url' => $fileUrl,
+                            'chunk' => "{$start}-{$end}",
+                            'status' => 429,
+                            'retry_after' => $response->header('Retry-After'),
+                        ]);
+                        if ($this->downloadId) {
+                            Download::where('id', $this->downloadId)->update([
+                                'status' => 'failed',
+                                'error' => 'Rate limited by server. Please try again later.',
+                            ]);
+                        }
+                        throw new \RuntimeException('Rate limited by server. Please try again later.');
+                    }
+
                     if ($response->status() !== 206) {
                         // Server did not honor range; fallback to full GET
                         fclose($fp);
@@ -264,38 +352,66 @@ class DownloadFile implements ShouldQueue
             }
 
             if (! $usedRangeDownload) {
+                // Throttle before full download request
+                if ($domain) {
+                    HttpRateLimiter::throttleDomain($domain, 10, 60);
+                }
+
                 // Fallback: single request download with progress tracking
-                $response = Http::withOptions([
-                    'sink' => $tempFile,
-                    'progress' => function ($downloadTotal, $downloadedBytes) {
-                        if ($downloadTotal > 0) {
-                            $progress = (int) round(((int) $downloadedBytes / (int) $downloadTotal) * 100);
-                            $lastReportedProgress = (int) ($this->file->download_progress ?? 0);
-                            if ($progress >= $lastReportedProgress + 5 || $progress === 100) {
-                                // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, $progress, (int) $downloadedBytes, (int) $downloadTotal));
+                $response = HttpRateLimiter::requestWithRetry(
+                    fn () => Http::withOptions([
+                        'sink' => $tempFile,
+                        'progress' => function ($downloadTotal, $downloadedBytes) {
+                            if ($downloadTotal > 0) {
+                                $progress = (int) round(((int) $downloadedBytes / (int) $downloadTotal) * 100);
+                                $lastReportedProgress = (int) ($this->file->download_progress ?? 0);
+                                if ($progress >= $lastReportedProgress + 5 || $progress === 100) {
+                                    // TEMPORARILY DISABLED: event(new FileDownloadProgress($this->file->id, $progress, (int) $downloadedBytes, (int) $downloadTotal));
+                                    if ($this->downloadId) {
+                                        Download::where('id', $this->downloadId)->update([
+                                            'progress' => $progress,
+                                            'bytes_total' => $downloadTotal ?: null,
+                                            'bytes_downloaded' => (int) $downloadedBytes,
+                                        ]);
+                                    }
+                                }
+                                // Cancel/pause check
                                 if ($this->downloadId) {
-                                    Download::where('id', $this->downloadId)->update([
-                                        'progress' => $progress,
-                                        'bytes_total' => $downloadTotal ?: null,
-                                        'bytes_downloaded' => (int) $downloadedBytes,
-                                    ]);
+                                    $row = Download::find($this->downloadId);
+                                    if ($row && $row->cancel_requested_at) {
+                                        throw new \RuntimeException('Download canceled');
+                                    }
                                 }
                             }
-                            // Cancel/pause check
-                            if ($this->downloadId) {
-                                $row = Download::find($this->downloadId);
-                                if ($row && $row->cancel_requested_at) {
-                                    throw new \RuntimeException('Download canceled');
-                                }
-                            }
-                        }
-                    },
-                ])->timeout(300)->get($fileUrl);
+                        },
+                    ])->timeout(300),
+                    $fileUrl,
+                    [],
+                    maxRetries: 3,
+                    baseDelaySeconds: 2
+                );
 
                 if ($response->status() === 404) {
                     $this->file->update(['not_found' => true]);
                     throw new \Exception('Remote file not found (404)');
                 }
+
+                // Handle 429 rate limit errors
+                if ($response->status() === 429) {
+                    Log::warning('Rate limited during full download', [
+                        'url' => $fileUrl,
+                        'status' => 429,
+                        'retry_after' => $response->header('Retry-After'),
+                    ]);
+                    if ($this->downloadId) {
+                        Download::where('id', $this->downloadId)->update([
+                            'status' => 'failed',
+                            'error' => 'Rate limited by server. Please try again later.',
+                        ]);
+                    }
+                    throw new \RuntimeException('Rate limited by server. Please try again later.');
+                }
+
                 if (! $response->successful()) {
                     throw new \Exception('Failed to download file: HTTP '.$response->status());
                 }

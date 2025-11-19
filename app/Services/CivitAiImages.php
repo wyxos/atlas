@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\File;
 use App\Support\FileTypeDetector;
+use App\Support\HttpRateLimiter;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -28,11 +29,29 @@ class CivitAiImages extends BaseService
 
         $base = 'https://civitai.com/api/v1/images';
 
-        $response = Http::acceptJson()
-            ->get($base, $this->formatParams());
+        // Throttle requests to CivitAI domain
+        HttpRateLimiter::throttleDomain('civitai.com', 10, 60);
+
+        // Make request with retry logic for 429 errors
+        $response = HttpRateLimiter::requestWithRetry(
+            fn () => Http::acceptJson(),
+            $base,
+            $this->formatParams(),
+            maxRetries: 3,
+            baseDelaySeconds: 2
+        );
 
         // Handle HTTP errors
         if ($response->failed()) {
+            // Log 429 errors for debugging
+            if ($response->status() === 429) {
+                Log::warning('CivitAI API rate limited', [
+                    'status' => 429,
+                    'retry_after' => $response->header('Retry-After'),
+                    'url' => $base,
+                ]);
+            }
+
             // Return empty structure that transform() can handle
             return [
                 'items' => [],
@@ -281,7 +300,17 @@ class CivitAiImages extends BaseService
         }
 
         try {
-            $response = Http::timeout(300)->get($realUrl);
+            // Throttle requests to CivitAI domain
+            HttpRateLimiter::throttleDomain('civitai.com', 10, 60);
+
+            // Make request with retry logic for 429 errors
+            $response = HttpRateLimiter::requestWithRetry(
+                fn () => Http::timeout(300),
+                $realUrl,
+                [],
+                maxRetries: 3,
+                baseDelaySeconds: 2
+            );
 
             if (! $response->successful()) {
                 return false;
