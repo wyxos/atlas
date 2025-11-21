@@ -709,7 +709,8 @@ function preloadFile(item: any): void {
     // This allows seeking to any part (if server supports range requests) without downloading full video
     video.preload = 'metadata'
     video.src = url
-    video.referrerPolicy = 'no-referrer'
+    // Use attribute to avoid TS type mismatch on HTMLVideoElement
+    try { video.setAttribute('referrerpolicy', 'no-referrer') } catch {}
     video.style.display = 'none'
     video.muted = true // Mute preload videos to avoid audio issues
     video.playsInline = true
@@ -776,9 +777,6 @@ function cancelAllPreloading(): void {
 }
 
 function updatePreloadQueue(): void {
-  // TEMPORARILY DISABLED: Preloading disabled for testing
-  return
-  
   if (!dialogOpen.value || !dialogItem.value) {
     cancelAllPreloading()
     return
