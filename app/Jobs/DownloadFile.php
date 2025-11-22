@@ -97,7 +97,9 @@ class DownloadFile implements ShouldQueue
             try {
                 // Use rate limiter for HEAD request with retry logic
                 $head = HttpRateLimiter::headWithRetry(
-                    fn () => Http::timeout(15),
+                    fn () => Http::withHeaders([
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    ])->timeout(30), // Increased timeout for HEAD requests
                     $fileUrl,
                     [],
                     maxRetries: 3,
@@ -255,6 +257,7 @@ class DownloadFile implements ShouldQueue
                     $response = HttpRateLimiter::requestWithRetry(
                         fn () => Http::withHeaders([
                             'Range' => "bytes={$start}-{$end}",
+                            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                         ])->withOptions([
                             'progress' => function ($chunkTotal, $downloadedBytes) use (&$downloadedSoFar, $total, $lastReportedProgress) {
                                 $currentOverall = $downloadedSoFar + (int) $downloadedBytes;
@@ -278,7 +281,7 @@ class DownloadFile implements ShouldQueue
                                     }
                                 }
                             },
-                        ])->timeout(300),
+                        ])->timeout(900), // Increased timeout to 900 seconds (15 minutes) for large files
                         $fileUrl,
                         [],
                         maxRetries: 3,
@@ -359,7 +362,9 @@ class DownloadFile implements ShouldQueue
 
                 // Fallback: single request download with progress tracking
                 $response = HttpRateLimiter::requestWithRetry(
-                    fn () => Http::withOptions([
+                    fn () => Http::withHeaders([
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    ])->withOptions([
                         'sink' => $tempFile,
                         'progress' => function ($downloadTotal, $downloadedBytes) {
                             if ($downloadTotal > 0) {
@@ -384,7 +389,7 @@ class DownloadFile implements ShouldQueue
                                 }
                             }
                         },
-                    ])->timeout(300),
+                    ])->timeout(900), // Increased timeout to 900 seconds (15 minutes) for large files
                     $fileUrl,
                     [],
                     maxRetries: 3,

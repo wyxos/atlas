@@ -122,3 +122,116 @@ it('does not retry on non-429 errors', function () {
     Http::assertSentCount(1);
 });
 
+it('retries on connection timeout errors', function () {
+    $callCount = 0;
+
+    // Use a sequence that throws connection exceptions then succeeds
+    Http::fake([
+        '*' => function () use (&$callCount) {
+            $callCount++;
+            if ($callCount <= 1) {
+                // Simulate connection timeout exception
+                $request = new \GuzzleHttp\Psr7\Request('GET', 'https://example.com/api');
+                $connectException = new \GuzzleHttp\Exception\ConnectException(
+                    'cURL error 28: Operation timed out after 1000 milliseconds',
+                    $request
+                );
+                throw new \Illuminate\Http\Client\ConnectionException($connectException);
+            }
+
+            return Http::response(['success' => true], 200);
+        },
+    ]);
+
+    $response = HttpRateLimiter::requestWithRetry(
+        fn () => Http::acceptJson(),
+        'https://example.com/api',
+        [],
+        maxRetries: 2,
+        baseDelaySeconds: 1
+    );
+
+    expect($response->status())->toBe(200);
+    expect($response->json())->toHaveKey('success', true);
+    expect($callCount)->toBe(2); // Should have retried once
+});
+
+it('retries on connection errors with exponential backoff', function () {
+    $callCount = 0;
+    $delays = [];
+    $lastTime = microtime(true);
+
+    Http::fake([
+        '*' => function () use (&$callCount, &$delays, &$lastTime) {
+            $currentTime = microtime(true);
+            if ($callCount > 0) {
+                $delays[] = $currentTime - $lastTime;
+            }
+            $lastTime = $currentTime;
+
+            $callCount++;
+            if ($callCount <= 2) {
+                $request = new \GuzzleHttp\Psr7\Request('GET', 'https://example.com/api');
+                $connectException = new \GuzzleHttp\Exception\ConnectException(
+                    'Connection timed out',
+                    $request
+                );
+                throw new \Illuminate\Http\Client\ConnectionException($connectException);
+            }
+
+            return Http::response(['success' => true], 200);
+        },
+    ]);
+
+    $startTime = microtime(true);
+    $response = HttpRateLimiter::requestWithRetry(
+        fn () => Http::acceptJson(),
+        'https://example.com/api',
+        [],
+        maxRetries: 3,
+        baseDelaySeconds: 1
+    );
+
+    expect($response->status())->toBe(200);
+    // Should have waited with exponential backoff (at least 1 second for first retry)
+    $elapsed = microtime(true) - $startTime;
+    expect($elapsed)->toBeGreaterThan(1.0);
+    expect($callCount)->toBe(3); // Initial + 2 retries
+});
+
+it('throws exception after max retries on connection errors', function () {
+    Http::fake([
+        '*' => function () {
+            $request = new \GuzzleHttp\Psr7\Request('GET', 'https://example.com/api');
+            $connectException = new \GuzzleHttp\Exception\ConnectException(
+                'cURL error 28: Operation timed out',
+                $request
+            );
+            throw new \Illuminate\Http\Client\ConnectionException($connectException);
+        },
+    ]);
+
+    expect(fn () => HttpRateLimiter::requestWithRetry(
+        fn () => Http::acceptJson(),
+        'https://example.com/api',
+        [],
+        maxRetries: 2,
+        baseDelaySeconds: 1
+    ))->toThrow(\Illuminate\Http\Client\ConnectionException::class);
+});
+
+it('does not retry on non-connection errors', function () {
+    Http::fake([
+        '*' => function () {
+            throw new \RuntimeException('Some other error');
+        },
+    ]);
+
+    expect(fn () => HttpRateLimiter::requestWithRetry(
+        fn () => Http::acceptJson(),
+        'https://example.com/api',
+        [],
+        maxRetries: 3,
+        baseDelaySeconds: 1
+    ))->toThrow(\RuntimeException::class);
+});

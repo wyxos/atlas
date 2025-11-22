@@ -303,24 +303,6 @@ class CivitAiImages extends BaseService
             // Throttle requests to CivitAI domain
             HttpRateLimiter::throttleDomain('civitai.com', 10, 60);
 
-            // Make request with retry logic for 429 errors
-            $response = HttpRateLimiter::requestWithRetry(
-                fn () => Http::timeout(300),
-                $realUrl,
-                [],
-                maxRetries: 3,
-                baseDelaySeconds: 2
-            );
-
-            if (! $response->successful()) {
-                return false;
-            }
-
-            $content = $response->body();
-            if (empty($content)) {
-                return false;
-            }
-
             $baseFilename = pathinfo($file->filename, PATHINFO_FILENAME);
             $isWebm = str_contains($realUrl, '.webm');
             $newExt = $isWebm ? 'webm' : 'mp4';
@@ -334,6 +316,47 @@ class CivitAiImages extends BaseService
             $storage = \Illuminate\Support\Facades\Storage::disk('atlas_app');
             if (! $storage->exists($subdirPath)) {
                 $storage->makeDirectory($subdirPath);
+            }
+
+            // Use streaming download for large files to avoid memory issues
+            $tempFile = tempnam(sys_get_temp_dir(), 'civitai_download_');
+            if ($tempFile === false) {
+                return false;
+            }
+
+            // Make request with retry logic for 429 errors and connection timeouts
+            // Increased timeout to 900 seconds (15 minutes) for large video files
+            $response = HttpRateLimiter::requestWithRetry(
+                fn () => Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                ])->withOptions([
+                    'sink' => $tempFile, // Stream directly to file
+                ])->timeout(900),
+                $realUrl,
+                [],
+                maxRetries: 3,
+                baseDelaySeconds: 2
+            );
+
+            if (! $response->successful()) {
+                @unlink($tempFile);
+
+                return false;
+            }
+
+            // Verify the file was downloaded
+            if (! file_exists($tempFile) || filesize($tempFile) === 0) {
+                @unlink($tempFile);
+
+                return false;
+            }
+
+            // Read the file content and store it
+            $content = file_get_contents($tempFile);
+            @unlink($tempFile);
+
+            if (empty($content)) {
+                return false;
             }
 
             $storage->put($newPath, $content);
