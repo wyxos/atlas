@@ -140,6 +140,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('files/{file}/view', [App\Http\Controllers\FileController::class, 'view'])
         ->name('files.view');
 
+    // Preview URL for files (auth required) - uses file ID instead of exposing disk path
+    Route::get('files/{file}/preview', [App\Http\Controllers\FileController::class, 'preview'])
+        ->name('files.preview');
+
     // Proxy originals for hotlink-protected sources (host whitelist inside controller)
     Route::get('files/{file}/remote', [App\Http\Controllers\FileController::class, 'remote'])
         ->name('files.remote');
@@ -168,7 +172,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('moderation/rules', [App\Http\Controllers\ModerationRuleController::class, 'store'])->name('moderation.rules.store');
     Route::put('moderation/rules/{rule}', [App\Http\Controllers\ModerationRuleController::class, 'update'])->name('moderation.rules.update');
     Route::delete('moderation/rules/{rule}', [App\Http\Controllers\ModerationRuleController::class, 'destroy'])->name('moderation.rules.destroy');
-    
+
     // Moderation rule testing page
     Route::get('moderation/test', [App\Http\Controllers\ModerationRuleController::class, 'test'])->name('moderation.test');
     Route::post('moderation/rules/test', [App\Http\Controllers\ModerationRuleController::class, 'testRule'])->name('moderation.rules.test');

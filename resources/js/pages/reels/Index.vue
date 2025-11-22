@@ -239,7 +239,7 @@ function openImage(item: any) {
 }
 
 // Backfill gating (parity with Browse)
-const backfillEnabled = ref(true);
+const backfillEnabled = ref(false);
 
 // Note: ensureNextPageIfEmpty is no longer needed - Vibe now automatically
 // refreshes the current page when all items are removed via remove() or removeMany()
@@ -368,18 +368,6 @@ if (!(form as any).sort) {
         (props.filter?.next as any) ?? null,
     );
     await nextTick();
-
-    // If initial items are below page size, auto load next
-    const pageSize = Number(((form as any)?.limit as any) ?? 40) || 40;
-    const count = Array.isArray(items.value) ? items.value.length : 0;
-    const initialNext = (props.filter?.next as any) ?? ((form as any)?.next as any) ?? null;
-    if (count < pageSize && hasNextCursor(initialNext) && typeof scroller.value.loadNext === 'function') {
-        try {
-            await scroller.value.loadNext();
-        } catch {
-            // ignore auto-load errors on first paint
-        }
-    }
 });
 
 const limit = computed(() => Number(((form as any)?.limit as any) ?? 40) || 40);
@@ -811,7 +799,6 @@ v-model.number="(form as any).limit"
                     :retry-max-attempts="3"
                     :retry-initial-delay-ms="2000"
                     :retry-backoff-step-ms="2000"
-                    :load-threshold-px="0"
                     :backfill-max-calls="Infinity"
                     @backfill:start="onBackfillStart"
                     @backfill:tick="onBackfillTick"

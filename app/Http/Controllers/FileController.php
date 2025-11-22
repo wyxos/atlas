@@ -96,6 +96,20 @@ class FileController extends Controller
         $path = $file->path;
         abort_unless($path, 404);
 
+        return $this->serveFile($request, $file, $path);
+    }
+
+    public function preview(Request $request, File $file): SymfonyResponse
+    {
+        $path = $file->thumbnail_path ?: $file->path;
+        abort_unless($path, 404);
+
+        return $this->serveFile($request, $file, $path);
+    }
+
+    protected function serveFile(Request $request, File $file, string $path): SymfonyResponse
+    {
+        $normalized = ltrim($path, '/');
         $headers = [];
         if (! empty($file->mime_type)) {
             $headers['Content-Type'] = $file->mime_type;
@@ -105,71 +119,80 @@ class FileController extends Controller
         foreach (['atlas_app', 'atlas'] as $diskName) {
             try {
                 $disk = Storage::disk($diskName);
+
+                // Check if file exists on this disk before trying to get absolute path
+                if (! $disk->exists($normalized)) {
+                    continue;
+                }
+
                 // For local disks we can safely build the absolute path and serve the file inline.
-                $absolute = $disk->path($path);
-                if (is_file($absolute)) {
-                    $disposition = 'inline; filename="'.$file->filename.'"';
+                $absolute = $disk->path($normalized);
+                if (! is_file($absolute)) {
+                    continue;
+                }
 
-                    // Range support for seeking (important for video streaming)
-                    $size = filesize($absolute);
-                    $rangeHeader = $request->headers->get('Range');
+                $disposition = 'inline; filename="'.$file->filename.'"';
 
-                    if ($rangeHeader && preg_match('/bytes=(\d*)-(\d*)/', $rangeHeader, $matches)) {
-                        $start = $matches[1] !== '' ? (int) $matches[1] : 0;
-                        $end = $matches[2] !== '' ? (int) $matches[2] : ($size - 1);
-                        $start = max(0, $start);
-                        $end = min($end, $size - 1);
+                // Range support for seeking (important for video streaming)
+                $size = filesize($absolute);
+                $rangeHeader = $request->headers->get('Range');
 
-                        if ($start > $end || $start >= $size) {
-                            // Invalid range
-                            return response('', 416, [
-                                'Content-Range' => "bytes */{$size}",
-                                'Accept-Ranges' => 'bytes',
-                            ]);
-                        }
+                if ($rangeHeader && preg_match('/bytes=(\d*)-(\d*)/', $rangeHeader, $matches)) {
+                    $start = $matches[1] !== '' ? (int) $matches[1] : 0;
+                    $end = $matches[2] !== '' ? (int) $matches[2] : ($size - 1);
+                    $start = max(0, $start);
+                    $end = min($end, $size - 1);
 
-                        $length = $end - $start + 1;
-                        $mime = $headers['Content-Type'] ?? ($file->mime_type ?: 'application/octet-stream');
-
-                        $rangeHeaders = [
-                            'Content-Type' => $mime,
-                            'Content-Range' => "bytes {$start}-{$end}/{$size}",
-                            'Content-Length' => (string) $length,
+                    if ($start > $end || $start >= $size) {
+                        // Invalid range
+                        return response('', 416, [
+                            'Content-Range' => "bytes */{$size}",
                             'Accept-Ranges' => 'bytes',
-                            'Content-Disposition' => $disposition,
-                        ];
-
-                        return response()->stream(function () use ($absolute, $start, $length) {
-                            $stream = fopen($absolute, 'rb');
-                            if ($stream === false) {
-                                return;
-                            }
-                            // Seek to start position
-                            if ($start > 0) {
-                                @fseek($stream, $start);
-                            }
-                            $bytesRemaining = $length;
-                            while ($bytesRemaining > 0 && ! feof($stream)) {
-                                $chunk = fread($stream, min(8192, $bytesRemaining));
-                                if ($chunk === false) {
-                                    break;
-                                }
-                                echo $chunk;
-                                flush();
-                                $bytesRemaining -= strlen($chunk);
-                            }
-                            fclose($stream);
-                        }, 206, $rangeHeaders);
+                        ]);
                     }
 
-                    // Fallback: full response with range support headers
-                    $headers['Accept-Ranges'] = 'bytes';
-                    $headers['Content-Disposition'] = $disposition;
+                    $length = $end - $start + 1;
+                    $mime = $headers['Content-Type'] ?? ($file->mime_type ?: 'application/octet-stream');
 
-                    return response()->file($absolute, $headers);
+                    $rangeHeaders = [
+                        'Content-Type' => $mime,
+                        'Content-Range' => "bytes {$start}-{$end}/{$size}",
+                        'Content-Length' => (string) $length,
+                        'Accept-Ranges' => 'bytes',
+                        'Content-Disposition' => $disposition,
+                    ];
+
+                    return response()->stream(function () use ($absolute, $start, $length) {
+                        $stream = fopen($absolute, 'rb');
+                        if ($stream === false) {
+                            return;
+                        }
+                        // Seek to start position
+                        if ($start > 0) {
+                            @fseek($stream, $start);
+                        }
+                        $bytesRemaining = $length;
+                        while ($bytesRemaining > 0 && ! feof($stream)) {
+                            $chunk = fread($stream, min(8192, $bytesRemaining));
+                            if ($chunk === false) {
+                                break;
+                            }
+                            echo $chunk;
+                            flush();
+                            $bytesRemaining -= strlen($chunk);
+                        }
+                        fclose($stream);
+                    }, 206, $rangeHeaders);
                 }
+
+                // Fallback: full response with range support headers
+                $headers['Accept-Ranges'] = 'bytes';
+                $headers['Content-Disposition'] = $disposition;
+
+                return response()->file($absolute, $headers);
             } catch (\Throwable $e) {
                 // Try next disk
+                continue;
             }
         }
 
