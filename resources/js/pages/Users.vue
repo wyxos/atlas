@@ -1,6 +1,6 @@
 <template>
     <div class="w-full">
-        <div class="rounded-lg shadow-xl p-8 md:p-12 bg-prussian-blue-400">
+        <div class="rounded-lg shadow-xl md:p-8 md:p-12 bg-prussian-blue-400">
             <div class="mb-8">
                 <h1 class="text-3xl md:text-4xl font-bold mb-2 text-smart-blue-900">
                     Users
