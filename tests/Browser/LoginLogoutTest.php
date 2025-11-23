@@ -25,10 +25,15 @@ it('allows a guest to log in and sign out without any issues', function () {
 
     // Click the sign out button in the header menu
     $page->click('button[aria-label="User menu"]')
-        ->assertSee('Sign Out')
+        ->waitForText('Sign Out')
         ->click('Sign Out')
-        ->assertPathBeginsWith('/')
+        ->assertPathIs('/')
         ->assertSee('Atlas');
 
+    // Verify user is actually logged out
     $this->assertGuest();
+
+    // Verify user cannot access dashboard after logout
+    $page = visit('/dashboard');
+    $page->assertPathBeginsWith('/login');
 });
