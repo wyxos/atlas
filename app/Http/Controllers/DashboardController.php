@@ -52,30 +52,38 @@ class DashboardController extends Controller
 
     /**
      * Calculate file statistics without caching.
+     * Uses Scout/Typesense facets for fast counts on large datasets.
      */
     private function calculateFileStats(): array
     {
-        // Single-table aggregates only (fast path). Avoid joins on large tables.
-        $totals = File::selectRaw("
-            COUNT(*) as total_files,
-            COUNT(CASE WHEN mime_type LIKE 'audio/%' THEN 1 END) as audio_files_count,
-            COUNT(CASE WHEN mime_type LIKE 'video/%' THEN 1 END) as video_files_count,
-            COUNT(CASE WHEN mime_type LIKE 'image/%' THEN 1 END) as image_files_count,
-            COUNT(CASE WHEN not_found = 1 THEN 1 END) as total_not_found,
-            COUNT(CASE WHEN not_found = 1 AND mime_type LIKE 'audio/%' THEN 1 END) as audio_not_found,
-            COUNT(CASE WHEN not_found = 1 AND mime_type LIKE 'video/%' THEN 1 END) as video_not_found,
-            COUNT(CASE WHEN not_found = 1 AND mime_type LIKE 'image/%' THEN 1 END) as image_not_found,
+        // Use Scout for counts (fast with facets) - exclude blacklisted files
+        $baseQuery = File::search('*')
+            ->where('blacklisted', false)
+            ->take(0); // We only need counts, not results
+
+        // Get total count
+        $totalFiles = (int) $baseQuery->count();
+
+        // Get counts by mime_group using filtered searches
+        $audioFilesCount = (int) (clone $baseQuery)->where('mime_group', 'audio')->count();
+        $videoFilesCount = (int) (clone $baseQuery)->where('mime_group', 'video')->count();
+        $imageFilesCount = (int) (clone $baseQuery)->where('mime_group', 'image')->count();
+        $otherFiles = max(0, $totalFiles - ($audioFilesCount + $videoFilesCount + $imageFilesCount));
+
+        // Get not_found counts
+        $totalNotFound = (int) (clone $baseQuery)->where('not_found', true)->count();
+        $audioNotFound = (int) (clone $baseQuery)->where('mime_group', 'audio')->where('not_found', true)->count();
+        $videoNotFound = (int) (clone $baseQuery)->where('mime_group', 'video')->where('not_found', true)->count();
+        $imageNotFound = (int) (clone $baseQuery)->where('mime_group', 'image')->where('not_found', true)->count();
+
+        // Size sums still use database (Typesense doesn't support SUM aggregations)
+        // These are fast with the composite index on ['mime_type', 'size']
+        $sizeTotals = File::selectRaw("
             COALESCE(SUM(CASE WHEN mime_type LIKE 'audio/%' THEN size END), 0) as audio_size,
             COALESCE(SUM(CASE WHEN mime_type LIKE 'video/%' THEN size END), 0) as video_size,
             COALESCE(SUM(CASE WHEN mime_type LIKE 'image/%' THEN size END), 0) as image_size,
             COALESCE(SUM(CASE WHEN mime_type NOT LIKE 'audio/%' AND mime_type NOT LIKE 'video/%' AND mime_type NOT LIKE 'image/%' THEN size END), 0) as other_size
-        ")->first();
-
-        $totalFiles = (int) ($totals->total_files ?? 0);
-        $audioFilesCount = (int) ($totals->audio_files_count ?? 0);
-        $videoFilesCount = (int) ($totals->video_files_count ?? 0);
-        $imageFilesCount = (int) ($totals->image_files_count ?? 0);
-        $otherFiles = max(0, $totalFiles - ($audioFilesCount + $videoFilesCount + $imageFilesCount));
+        ")->where('blacklisted_at', null)->first();
 
         // Lightweight global reaction counts (no joins)
         $globalLoved = Reaction::where('type', 'love')->count();
@@ -92,31 +100,31 @@ class DashboardController extends Controller
         return [
             // Audio Count & Space Usage
             'audioFilesCount' => $audioFilesCount,
-            'audioSpaceUsed' => (int) ($totals->audio_size ?? 0),
-            'audioNotFound' => (int) ($totals->audio_not_found ?? 0),
+            'audioSpaceUsed' => (int) ($sizeTotals->audio_size ?? 0),
+            'audioNotFound' => $audioNotFound,
 
             // Video Count & Space Usage
             'videoFilesCount' => $videoFilesCount,
-            'videoSpaceUsed' => (int) ($totals->video_size ?? 0),
-            'videoNotFound' => (int) ($totals->video_not_found ?? 0),
+            'videoSpaceUsed' => (int) ($sizeTotals->video_size ?? 0),
+            'videoNotFound' => $videoNotFound,
 
             // Image Count & Space Usage
             'imageFilesCount' => $imageFilesCount,
-            'imageSpaceUsed' => (int) ($totals->image_size ?? 0),
-            'imageNotFound' => (int) ($totals->image_not_found ?? 0),
+            'imageSpaceUsed' => (int) ($sizeTotals->image_size ?? 0),
+            'imageNotFound' => $imageNotFound,
 
             // Total Files Not Found
-            'totalFilesNotFound' => (int) ($totals->total_not_found ?? 0),
+            'totalFilesNotFound' => $totalNotFound,
 
             // File Type Distribution (for charts)
             'audioFiles' => $audioFilesCount,
             'videoFiles' => $videoFilesCount,
             'imageFiles' => $imageFilesCount,
             'otherFiles' => (int) $otherFiles,
-            'audioSize' => (int) ($totals->audio_size ?? 0),
-            'videoSize' => (int) ($totals->video_size ?? 0),
-            'imageSize' => (int) ($totals->image_size ?? 0),
-            'otherSize' => (int) ($totals->other_size ?? 0),
+            'audioSize' => (int) ($sizeTotals->audio_size ?? 0),
+            'videoSize' => (int) ($sizeTotals->video_size ?? 0),
+            'imageSize' => (int) ($sizeTotals->image_size ?? 0),
+            'otherSize' => (int) ($sizeTotals->other_size ?? 0),
 
             // Global Reaction Stats (lightweight)
             'globalLoved' => (int) $globalLoved,
