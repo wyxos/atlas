@@ -37,12 +37,17 @@
                         </button>
                     </template>
                     
-                    <DropdownMenuItem href="/profile">
-                        <div class="flex items-center gap-2">
-                            <User class="w-4 h-4" />
-                            <span>Profile</span>
-                        </div>
-                    </DropdownMenuItem>
+                    <router-link
+                        to="/profile"
+                        class="block w-full"
+                    >
+                        <DropdownMenuItem>
+                            <div class="flex items-center gap-2">
+                                <User class="w-4 h-4" />
+                                <span>Profile</span>
+                            </div>
+                        </DropdownMenuItem>
+                    </router-link>
                     
                     <DropdownMenuItem @click="handleLogout">
                         <div class="flex items-center gap-2">
