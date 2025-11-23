@@ -4,7 +4,7 @@
             <!-- App Icon / Logo -->
             <div class="flex items-center gap-3">
                 <router-link to="/dashboard" class="flex items-center">
-                    <AtlasIcon class="w-8 h-8" />
+                    <AtlasIcon class="w-14 h-14" />
                 </router-link>
                 <span class="text-xl font-bold text-smart-blue-900">
                     {{ appName }}
