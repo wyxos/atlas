@@ -1,0 +1,20 @@
+- implement users listing
+    - list
+    - add
+    - delete
+    - last login
+    - edit
+- implement file listing
+    - list
+    - add
+        - link
+    - delete
+    - view
+        - containers
+- implement file scanning
+    - image
+    - audio
+    - video
+- implement browse
+    - masonry
+    - single view
