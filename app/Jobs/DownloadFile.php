@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Events\DownloadCreated;
 use App\Events\FileDownloadProgress;
 use App\Models\Download;
 use App\Models\File;
@@ -77,7 +76,7 @@ class DownloadFile implements ShouldQueue
                 'started_at' => now(),
             ]);
             $this->downloadId = $download->id;
-            event(new DownloadCreated($download->id, $this->file->id));
+            // Removed obsolete DownloadCreated event - no frontend listeners
 
             $tempFile = tempnam(sys_get_temp_dir(), 'download_');
 
