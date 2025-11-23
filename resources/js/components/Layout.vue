@@ -23,34 +23,37 @@ const userName = props.userName;
 const appName = props.appName;
 
 function handleLogout(): void {
-    // Always use form submission for logout to ensure CSRF token is properly handled
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    // Get CSRF token from meta tag or axios defaults
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    
+    // If not found, try to get it from axios defaults (set in bootstrap.ts)
+    if (!csrfToken && window.axios?.defaults?.headers?.common?.['X-CSRF-TOKEN']) {
+        csrfToken = window.axios.defaults.headers.common['X-CSRF-TOKEN'] as string;
+    }
     
     if (!csrfToken) {
         console.error('CSRF token not found');
-        // Still try to submit, Laravel will handle the error
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/logout';
-        document.body.appendChild(form);
-        form.submit();
-        return;
+        // Still try to submit - Laravel will handle CSRF validation
     }
 
-    // Create and submit form with CSRF token
+    // Always use form submission for logout to ensure proper session handling
+    // This ensures cookies and session are properly cleared
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = '/logout';
     form.style.display = 'none';
     
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = '_token';
-    csrfInput.value = csrfToken;
-    form.appendChild(csrfInput);
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '_token';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+    }
     
     document.body.appendChild(form);
     form.submit();
+    // Form submission will cause a full page reload, which ensures logout is complete
 }
 </script>
 

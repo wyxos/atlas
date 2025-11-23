@@ -18,7 +18,15 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+    // SPA routes - all serve the dashboard view so Vue Router can handle client-side routing
+    // These routes are handled by Vue Router on the client side, but Laravel needs to serve
+    // the dashboard view for direct navigation (e.g., refreshing the page or typing the URL)
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
+
+    Route::get('/users', function () {
+        return view('dashboard');
+    })->name('users');
 });
