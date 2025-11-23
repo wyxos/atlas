@@ -3,8 +3,7 @@
         <button
             ref="triggerRef"
             @click="toggle"
-            class="inline-flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-opacity-10"
-            style="color: #c3e0fe;"
+            class="inline-flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-opacity-10 cursor-pointer text-smart-blue-900"
         >
             <slot name="trigger" />
         </button>
@@ -20,8 +19,7 @@
             <div
                 v-if="isOpen"
                 ref="menuRef"
-                class="absolute right-0 mt-2 w-56 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
-                style="background-color: #000e29; border: 1px solid #33415c;"
+                class="absolute right-0 mt-2 w-56 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 bg-prussian-blue-400 border border-twilight-indigo-500"
             >
                 <div class="py-1">
                     <slot />
