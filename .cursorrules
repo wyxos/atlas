@@ -1,21 +1,20 @@
 ## Code Quality and Testing Requirements
 
-### Linting (MUST run before tests)
-- **Laravel Pint**: Run `vendor/bin/pint --dirty` before finalizing any changes. Fix ALL linting errors, regardless of whether they are related to the current task.
-- **JavaScript Linting**: If a JavaScript linter (ESLint, etc.) is configured, run it before finalizing changes. Fix ALL linting errors, regardless of whether they are related to the current task.
-- Linting errors must be fixed before proceeding to tests.
-
-### Testing (MUST run after each task)
-- **PHP Tests**: Run `php artisan test` after completing each task to ensure no regressions.
-- **JavaScript Tests**: Run `npm test -- --run` (Vitest) after completing each task to ensure no regressions.
-- **ALL test failures must be addressed**, even if they are unrelated to the recent task. The test suite must be green before considering a task complete.
-- If tests fail, investigate and fix the issues before proceeding.
+### Quality Checks (MUST run after each task)
+- **Use the check script**: Run `npm run check` (or `node scripts/check.mjs`) after completing each task to ensure code quality.
+- The check script automatically:
+  - Runs TypeScript type checking
+  - Auto-fixes and checks JavaScript/TypeScript linting (ESLint with --fix)
+  - Auto-fixes and checks PHP linting (Laravel Pint)
+  - Runs JavaScript tests (Vitest)
+  - Runs PHP tests (Pest)
+- **ALL failures must be addressed**, even if they are unrelated to the recent task. The check script must pass completely before considering a task complete.
+- If any check fails, investigate and fix the issues before proceeding.
 
 ### Workflow Order
 1. Make code changes
-2. Run linting (Laravel Pint + JS linting if configured)
-3. Fix any linting errors
-4. Run test suites (PHP + JS)
-5. Fix any test failures
-6. Only then consider the task complete
+2. Run `npm run check` (this handles linting with auto-fix, type checking, and testing)
+3. Fix any remaining errors (the script auto-fixes what it can)
+4. Re-run `npm run check` to verify everything passes
+5. Only then consider the task complete
 
