@@ -22,55 +22,35 @@ const props = withDefaults(defineProps<Props>(), {
 const userName = props.userName;
 const appName = props.appName;
 
-async function handleLogout(): Promise<void> {
-    try {
-        // Use axios if available, otherwise fallback to form submission
-        if (window.axios) {
-            await window.axios.post('/logout');
-            window.location.href = '/';
-        } else {
-            // Fallback to form submission
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            if (!csrfToken) {
-                console.error('CSRF token not found');
-                return;
-            }
-
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/logout';
-            
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = '_token';
-            csrfInput.value = csrfToken;
-            form.appendChild(csrfInput);
-            
-            document.body.appendChild(form);
-            form.submit();
-        }
-    } catch (error) {
-        console.error('Logout error:', error);
-        // Fallback to form submission on error
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        if (!csrfToken) {
-            console.error('CSRF token not found');
-            return;
-        }
-
+function handleLogout(): void {
+    // Always use form submission for logout to ensure CSRF token is properly handled
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    
+    if (!csrfToken) {
+        console.error('CSRF token not found');
+        // Still try to submit, Laravel will handle the error
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '/logout';
-        
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_token';
-        csrfInput.value = csrfToken;
-        form.appendChild(csrfInput);
-        
         document.body.appendChild(form);
         form.submit();
+        return;
     }
+
+    // Create and submit form with CSRF token
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/logout';
+    form.style.display = 'none';
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = '_token';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
 }
 </script>
 
