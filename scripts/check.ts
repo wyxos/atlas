@@ -9,7 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
 
-const colors = {
+type ColorKey = 'reset' | 'bright' | 'red' | 'green' | 'yellow' | 'blue' | 'cyan';
+
+const colors: Record<ColorKey, string> = {
     reset: '\x1b[0m',
     bright: '\x1b[1m',
     red: '\x1b[31m',
@@ -19,11 +21,11 @@ const colors = {
     cyan: '\x1b[36m',
 };
 
-function log(message, color = 'reset') {
+function log(message: string, color: ColorKey = 'reset'): void {
     console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-function runCommand(command, description, cwd = projectRoot) {
+function runCommand(command: string, description: string, cwd: string = projectRoot): boolean {
     log(`\n${colors.bright}${description}${colors.reset}`, 'cyan');
     log(`Running: ${command}`, 'blue');
     
@@ -41,7 +43,7 @@ function runCommand(command, description, cwd = projectRoot) {
     }
 }
 
-async function main() {
+async function main(): Promise<void> {
     log('\n' + '='.repeat(60), 'bright');
     log('Running Quality Checks', 'bright');
     log('='.repeat(60), 'bright');
@@ -177,7 +179,7 @@ async function main() {
     }
 }
 
-main().catch((error) => {
+main().catch((error: Error) => {
     log(`\n✗ Unexpected error: ${error.message}`, 'red');
     process.exit(1);
 });

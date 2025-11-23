@@ -1,4 +1,6 @@
-export default [
+import type { RouteRecordRaw } from 'vue-router';
+
+const routes: RouteRecordRaw[] = [
     // Vue Router routes will be defined here
     // Example:
     // {
@@ -7,4 +9,6 @@ export default [
     //     component: () => import('./pages/Home.vue'),
     // },
 ];
+
+export default routes;
 
