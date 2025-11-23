@@ -1,5 +1,5 @@
-@import 'tailwindcss';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -9,4 +9,100 @@
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    
+    /* Smart Blue */
+    --color-smart-blue: #0466c8;
+    --color-smart-blue-100: #011428;
+    --color-smart-blue-200: #022950;
+    --color-smart-blue-300: #023d78;
+    --color-smart-blue-400: #0352a0;
+    --color-smart-blue-500: #0466c8;
+    --color-smart-blue-600: #0f85fa;
+    --color-smart-blue-700: #4ba3fb;
+    --color-smart-blue-800: #87c2fd;
+    --color-smart-blue-900: #c3e0fe;
+    
+    /* Sapphire */
+    --color-sapphire: #0353a4;
+    --color-sapphire-100: #011121;
+    --color-sapphire-200: #012242;
+    --color-sapphire-300: #023263;
+    --color-sapphire-400: #034384;
+    --color-sapphire-500: #0353a4;
+    --color-sapphire-600: #0576e8;
+    --color-sapphire-700: #3698fb;
+    --color-sapphire-800: #79bbfc;
+    --color-sapphire-900: #bcddfe;
+    
+    /* Regal Navy */
+    --color-regal-navy: #023e7d;
+    --color-regal-navy-100: #000c19;
+    --color-regal-navy-200: #011932;
+    --color-regal-navy-300: #01254b;
+    --color-regal-navy-400: #023164;
+    --color-regal-navy-500: #023e7d;
+    --color-regal-navy-600: #0363c9;
+    --color-regal-navy-700: #1d89fc;
+    --color-regal-navy-800: #68b0fd;
+    --color-regal-navy-900: #b4d8fe;
+    
+    /* Prussian Blue (using the darkest variant #001233) */
+    --color-prussian-blue: #001233;
+    --color-prussian-blue-100: #00040a;
+    --color-prussian-blue-200: #000714;
+    --color-prussian-blue-300: #000b1f;
+    --color-prussian-blue-400: #000e29;
+    --color-prussian-blue-500: #001233;
+    --color-prussian-blue-600: #00328f;
+    --color-prussian-blue-700: #0052eb;
+    --color-prussian-blue-800: #4788ff;
+    --color-prussian-blue-900: #a3c3ff;
+    
+    /* Twilight Indigo */
+    --color-twilight-indigo: #33415c;
+    --color-twilight-indigo-100: #0a0d12;
+    --color-twilight-indigo-200: #141a25;
+    --color-twilight-indigo-300: #1e2737;
+    --color-twilight-indigo-400: #29344a;
+    --color-twilight-indigo-500: #33415c;
+    --color-twilight-indigo-600: #4d628b;
+    --color-twilight-indigo-700: #7186b1;
+    --color-twilight-indigo-800: #a0aecb;
+    --color-twilight-indigo-900: #d0d7e5;
+    
+    /* Blue Slate */
+    --color-blue-slate: #5c677d;
+    --color-blue-slate-100: #131519;
+    --color-blue-slate-200: #252a32;
+    --color-blue-slate-300: #383f4c;
+    --color-blue-slate-400: #4b5365;
+    --color-blue-slate-500: #5c677d;
+    --color-blue-slate-600: #79859c;
+    --color-blue-slate-700: #9ba3b5;
+    --color-blue-slate-800: #bcc2ce;
+    --color-blue-slate-900: #dee0e6;
+    
+    /* Slate Grey */
+    --color-slate-grey: #7d8597;
+    --color-slate-grey-100: #191a1f;
+    --color-slate-grey-200: #31353d;
+    --color-slate-grey-300: #4a4f5c;
+    --color-slate-grey-400: #62697a;
+    --color-slate-grey-500: #7d8597;
+    --color-slate-grey-600: #979dab;
+    --color-slate-grey-700: #b1b6c0;
+    --color-slate-grey-800: #cbced5;
+    --color-slate-grey-900: #e5e7ea;
+    
+    /* Lavender Grey */
+    --color-lavender-grey: #979dac;
+    --color-lavender-grey-100: #1d1f24;
+    --color-lavender-grey-200: #393d47;
+    --color-lavender-grey-300: #565c6b;
+    --color-lavender-grey-400: #737a8e;
+    --color-lavender-grey-500: #979dac;
+    --color-lavender-grey-600: #abb0bc;
+    --color-lavender-grey-700: #c0c4cd;
+    --color-lavender-grey-800: #d5d7dd;
+    --color-lavender-grey-900: #eaebee;
 }
