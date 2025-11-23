@@ -93,7 +93,7 @@ async function main() {
             // First, try to auto-fix issues
             log('\nAttempting to auto-fix ESLint issues...', 'blue');
             try {
-                execSync('npx eslint . --ext .js,.mjs,.cjs,.jsx,.ts,.tsx --fix', {
+                execSync('npx eslint . --ext .js,.mjs,.cjs,.jsx,.ts,.tsx,.vue --fix', {
                     cwd: projectRoot,
                     stdio: 'inherit',
                     encoding: 'utf-8',
@@ -104,8 +104,8 @@ async function main() {
             
             // Then check for remaining issues
             results.jsLint = runCommand(
-                'npx eslint . --ext .js,.mjs,.cjs,.jsx,.ts,.tsx',
-                'JavaScript/TypeScript Linting (ESLint)'
+                'npx eslint . --ext .js,.mjs,.cjs,.jsx,.ts,.tsx,.vue',
+                'JavaScript/TypeScript/Vue Linting (ESLint)'
             );
         } else {
             log('\n⚠ ESLint config not found, skipping linting', 'yellow');
