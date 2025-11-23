@@ -1,7 +1,7 @@
 ## Code Quality and Testing Requirements
 
 ### Quality Checks (MUST run after each task)
-- **Use the check script**: Run `npm run check` (or `node scripts/check.mjs`) after completing each task to ensure code quality.
+- **Use the check script**: Run `npm run check` (or `tsx scripts/check.ts`) after completing each task to ensure code quality.
 - The check script automatically:
   - Runs TypeScript type checking
   - Auto-fixes and checks JavaScript/TypeScript linting (ESLint with --fix)
@@ -33,10 +33,24 @@
   - Borders/separators: Twilight Indigo (#33415c)
 - Match the styling patterns, color usage, and component structure shown in the guidelines page.
 
+### Testing Requirements (MUST create/update tests)
+- **JavaScript/Vue Tests**: For any task that involves creating or modifying JavaScript or Vue code, you MUST create or update corresponding tests in the `resources/js` directory (using Vitest).
+  - Test files should follow the naming pattern: `*.test.ts` or `*.test.js`
+  - Tests should cover the functionality you've implemented or modified
+  - Use Vitest's testing utilities and assertions
+
+- **PHP Tests**: For any task that involves creating or modifying PHP code, you MUST create or update corresponding tests.
+  - Use Pest for all PHP tests
+  - **Unit Tests**: Use unit tests (`php artisan make:test --unit`) ONLY if the PHP code does NOT use Laravel features (facades, Eloquent, database, HTTP, etc.) or database operations
+  - **Feature Tests**: Use feature tests (`php artisan make:test --pest`) for code that uses Laravel features, database operations, HTTP requests, or any framework functionality
+  - Tests should cover the functionality you've implemented or modified
+  - Follow existing test patterns and conventions in the `tests` directory
+
 ### Workflow Order
 1. Make code changes
-2. Run `npm run check` (this handles linting with auto-fix, type checking, and testing)
-3. Fix any remaining errors (the script auto-fixes what it can)
-4. Re-run `npm run check` to verify everything passes
-5. Only then consider the task complete
+2. Create or update tests for the changes (JS/Vue tests for JS/Vue code, PHP tests for PHP code)
+3. Run `npm run check` (this handles linting with auto-fix, type checking, and testing)
+4. Fix any remaining errors (the script auto-fixes what it can)
+5. Re-run `npm run check` to verify everything passes
+6. Only then consider the task complete
 
