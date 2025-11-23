@@ -11,6 +11,11 @@ const routes: RouteRecordRaw[] = [
         name: 'users',
         component: () => import('./pages/Users.vue'),
     },
+    {
+        path: '/profile',
+        name: 'profile',
+        component: () => import('./pages/Profile.vue'),
+    },
     // Don't redirect / to /dashboard - let Laravel handle it
     // The home page is a Blade template, not a Vue route
     // Catch-all route for non-Vue pages (Blade templates like /login, /home, etc.)
