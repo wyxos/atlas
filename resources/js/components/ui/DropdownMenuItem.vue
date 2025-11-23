@@ -1,8 +1,9 @@
 <template>
-    <a
-        :href="href"
+    <component
+        :is="href && href !== '#' ? 'a' : 'button'"
+        :href="href && href !== '#' ? href : undefined"
         @click="handleClick"
-        class="block px-4 py-2 text-sm transition-colors"
+        class="block w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer"
         style="color: #d0d7e5;"
         :class="{
             'hover:bg-opacity-10': true,
@@ -14,7 +15,7 @@
         @mouseleave="isHovered = false"
     >
         <slot />
-    </a>
+    </component>
 </template>
 
 <script setup lang="ts">
@@ -24,7 +25,7 @@ interface Props {
     href?: string;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
     href: '#',
 });
 
@@ -35,6 +36,10 @@ const emit = defineEmits<{
 }>();
 
 function handleClick(event: MouseEvent): void {
+    // Always prevent default for buttons or # links
+    if (!props.href || props.href === '#') {
+        event.preventDefault();
+    }
     emit('click', event);
 }
 </script>
