@@ -1,17 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createMemoryHistory } from 'vue-router';
 import AppHeader from './AppHeader.vue';
 
-const router = createRouter({
-    history: createWebHistory(),
-    routes: [
-        { path: '/dashboard', component: { template: '<div>Dashboard</div>' } },
-    ],
-});
+async function createTestRouter(initialPath = '/dashboard') {
+    const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+            { path: '/dashboard', component: { template: '<div>Dashboard</div>' } },
+            { path: '/users', component: { template: '<div>Users</div>' } },
+            { path: '/profile', component: { template: '<div>Profile</div>' } },
+        ],
+    });
+    await router.push(initialPath);
+    return router;
+}
 
 describe('AppHeader', () => {
-    it('renders the app name', () => {
+    it('renders the app name', async () => {
+        const router = await createTestRouter();
         const wrapper = mount(AppHeader, {
             props: {
                 userName: 'Test User',
@@ -25,7 +32,8 @@ describe('AppHeader', () => {
         expect(wrapper.text()).toContain('Atlas');
     });
 
-    it('renders the user name', () => {
+    it('renders the user name', async () => {
+        const router = await createTestRouter();
         const wrapper = mount(AppHeader, {
             props: {
                 userName: 'Test User',
@@ -39,6 +47,7 @@ describe('AppHeader', () => {
     });
 
     it('emits logout event when logout is clicked', async () => {
+        const router = await createTestRouter();
         const wrapper = mount(AppHeader, {
             props: {
                 userName: 'Test User',

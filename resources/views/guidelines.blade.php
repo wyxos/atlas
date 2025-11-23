@@ -203,6 +203,49 @@
                             </div>
                         </div>
 
+                        <!-- Danger/Warning -->
+                        <div>
+                            <h3 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 1rem;">Danger/Warning</h3>
+                            <div class="grid grid-cols-5 md:grid-cols-10 gap-2">
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #1a0304;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5;">100</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #330608;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5;">200</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #660708;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5;">300</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #8d0a0c;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5;">400</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded border-2" style="background-color: #a4161a; border-color: #d32f2f;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5; font-weight: 600;">500</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #ba181b;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5;">600</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #d32f2f;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5;">700</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #e57373;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #9ba3b5;">800</span>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="h-16 rounded" style="background-color: #ffcdd2;"></div>
+                                    <span style="font-size: 0.75rem; margin-top: 0.25rem; color: #001233;">900</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Neutral Colors -->
                         <div>
                             <h3 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 1rem;">Neutral Colors</h3>
@@ -278,10 +321,10 @@
                         <div>
                             <h3 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 1rem;">Primary Buttons</h3>
                             <div class="flex flex-wrap gap-4">
-                                <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg" style="background-color: #0466c8;" onmouseover="this.style.backgroundColor='#0f85fa'" onmouseout="this.style.backgroundColor='#0466c8'">
+                                <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg cursor-pointer" style="background-color: #0466c8;" onmouseover="this.style.backgroundColor='#0f85fa'" onmouseout="this.style.backgroundColor='#0466c8'">
                                     Smart Blue Primary
                                 </button>
-                                <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg" style="background-color: #0353a4;" onmouseover="this.style.backgroundColor='#0576e8'" onmouseout="this.style.backgroundColor='#0353a4'">
+                                <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg cursor-pointer" style="background-color: #0353a4;" onmouseover="this.style.backgroundColor='#0576e8'" onmouseout="this.style.backgroundColor='#0353a4'">
                                     Sapphire Primary
                                 </button>
                                 <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg opacity-50 cursor-not-allowed" style="background-color: #0466c8;" disabled>
@@ -292,10 +335,10 @@
                         <div>
                             <h3 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 1rem;">Outline Buttons</h3>
                             <div class="flex flex-wrap gap-4">
-                                <button class="px-6 py-3 border-2 font-semibold rounded-lg transition-colors" style="border-color: #0f85fa; color: #0f85fa; background-color: transparent;" onmouseover="this.style.backgroundColor='#023d78'" onmouseout="this.style.backgroundColor='transparent'">
+                                <button class="px-6 py-3 border-2 font-semibold rounded-lg transition-colors cursor-pointer" style="border-color: #0f85fa; color: #0f85fa; background-color: transparent;" onmouseover="this.style.backgroundColor='#023d78'" onmouseout="this.style.backgroundColor='transparent'">
                                     Outline Smart Blue
                                 </button>
-                                <button class="px-6 py-3 border-2 font-semibold rounded-lg transition-colors" style="border-color: #0576e8; color: #0576e8; background-color: transparent;" onmouseover="this.style.backgroundColor='#023263'" onmouseout="this.style.backgroundColor='transparent'">
+                                <button class="px-6 py-3 border-2 font-semibold rounded-lg transition-colors cursor-pointer" style="border-color: #0576e8; color: #0576e8; background-color: transparent;" onmouseover="this.style.backgroundColor='#023263'" onmouseout="this.style.backgroundColor='transparent'">
                                     Outline Sapphire
                                 </button>
                             </div>
@@ -303,10 +346,10 @@
                         <div>
                             <h3 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 1rem;">Ghost Buttons</h3>
                             <div class="flex flex-wrap gap-4">
-                                <button class="px-6 py-3 font-semibold rounded-lg transition-colors" style="color: #4ba3fb; background-color: transparent;" onmouseover="this.style.backgroundColor='#023d78'" onmouseout="this.style.backgroundColor='transparent'">
+                                <button class="px-6 py-3 font-semibold rounded-lg transition-colors cursor-pointer" style="color: #4ba3fb; background-color: transparent;" onmouseover="this.style.backgroundColor='#023d78'" onmouseout="this.style.backgroundColor='transparent'">
                                     Ghost Smart Blue
                                 </button>
-                                <button class="px-6 py-3 font-semibold rounded-lg transition-colors" style="color: #3698fb; background-color: transparent;" onmouseover="this.style.backgroundColor='#023263'" onmouseout="this.style.backgroundColor='transparent'">
+                                <button class="px-6 py-3 font-semibold rounded-lg transition-colors cursor-pointer" style="color: #3698fb; background-color: transparent;" onmouseover="this.style.backgroundColor='#023263'" onmouseout="this.style.backgroundColor='transparent'">
                                     Ghost Sapphire
                                 </button>
                             </div>
@@ -314,14 +357,28 @@
                         <div>
                             <h3 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 1rem;">Button Sizes</h3>
                             <div class="flex flex-wrap items-center gap-4">
-                                <button class="px-3 py-1.5 text-sm text-white font-semibold rounded-lg transition-colors" style="background-color: #0466c8;">
+                                <button class="px-3 py-1.5 text-sm text-white font-semibold rounded-lg transition-colors cursor-pointer" style="background-color: #0466c8;">
                                     Small
                                 </button>
-                                <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors" style="background-color: #0466c8;">
+                                <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors cursor-pointer" style="background-color: #0466c8;">
                                     Medium
                                 </button>
-                                <button class="px-8 py-4 text-lg text-white font-semibold rounded-lg transition-colors" style="background-color: #0466c8;">
+                                <button class="px-8 py-4 text-lg text-white font-semibold rounded-lg transition-colors cursor-pointer" style="background-color: #0466c8;">
                                     Large
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 1rem;">Danger Buttons</h3>
+                            <div class="flex flex-wrap gap-4">
+                                <button class="px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg cursor-pointer" style="background-color: #ba181b;" onmouseover="this.style.backgroundColor='#d32f2f'" onmouseout="this.style.backgroundColor='#ba181b'">
+                                    Danger Primary
+                                </button>
+                                <button class="px-6 py-3 border-2 font-semibold rounded-lg transition-colors cursor-pointer" style="border-color: #ba181b; color: #ba181b; background-color: transparent;" onmouseover="this.style.backgroundColor='#660708'" onmouseout="this.style.backgroundColor='transparent'">
+                                    Danger Outline
+                                </button>
+                                <button class="px-6 py-3 font-semibold rounded-lg transition-colors cursor-pointer" style="color: #d32f2f; background-color: transparent;" onmouseover="this.style.backgroundColor='#660708'" onmouseout="this.style.backgroundColor='transparent'">
+                                    Danger Ghost
                                 </button>
                             </div>
                         </div>
@@ -456,7 +513,7 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-sm">
-                                        <button class="font-medium transition-colors" style="color: #4ba3fb;" onmouseover="this.style.color='#0f85fa'" onmouseout="this.style.color='#4ba3fb'">Edit</button>
+                                        <button class="font-medium transition-colors cursor-pointer" style="color: #4ba3fb;" onmouseover="this.style.color='#0f85fa'" onmouseout="this.style.color='#4ba3fb'">Edit</button>
                                     </td>
                                 </tr>
                                 <tr class="transition-colors" style="border-bottom: 1px solid #33415c;" onmouseover="this.style.backgroundColor='#023d78'" onmouseout="this.style.backgroundColor='transparent'">
@@ -469,7 +526,7 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-sm">
-                                        <button class="font-medium transition-colors" style="color: #4ba3fb;" onmouseover="this.style.color='#0f85fa'" onmouseout="this.style.color='#4ba3fb'">Edit</button>
+                                        <button class="font-medium transition-colors cursor-pointer" style="color: #4ba3fb;" onmouseover="this.style.color='#0f85fa'" onmouseout="this.style.color='#4ba3fb'">Edit</button>
                                     </td>
                                 </tr>
                                 <tr class="transition-colors" style="border-bottom: 1px solid #33415c;" onmouseover="this.style.backgroundColor='#023d78'" onmouseout="this.style.backgroundColor='transparent'">
@@ -482,7 +539,7 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-sm">
-                                        <button class="font-medium transition-colors" style="color: #4ba3fb;" onmouseover="this.style.color='#0f85fa'" onmouseout="this.style.color='#4ba3fb'">Edit</button>
+                                        <button class="font-medium transition-colors cursor-pointer" style="color: #4ba3fb;" onmouseover="this.style.color='#0f85fa'" onmouseout="this.style.color='#4ba3fb'">Edit</button>
                                     </td>
                                 </tr>
                             </tbody>

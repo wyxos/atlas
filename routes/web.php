@@ -19,22 +19,15 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-    // Profile routes
+    // API routes (must come before SPA catch-all)
     Route::post('/profile/password', [\App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::delete('/profile/account', [\App\Http\Controllers\ProfileController::class, 'deleteAccount'])->name('profile.account.delete');
 
-    // SPA routes - all serve the dashboard view so Vue Router can handle client-side routing
-    // These routes are handled by Vue Router on the client side, but Laravel needs to serve
-    // the dashboard view for direct navigation (e.g., refreshing the page or typing the URL)
-    Route::get('/dashboard', function () {
+    // SPA catch-all - serves the dashboard view for all GET requests
+    // Vue Router handles client-side routing, but Laravel needs to serve the view
+    // for direct navigation (e.g., refreshing the page or typing the URL)
+    // API routes above (POST/DELETE) won't match this GET route
+    Route::get('/{any}', function () {
         return view('dashboard');
-    })->name('dashboard');
-
-    Route::get('/users', function () {
-        return view('dashboard');
-    })->name('users');
-
-    Route::get('/profile', function () {
-        return view('dashboard');
-    })->name('profile');
+    })->where('any', '.*')->name('spa');
 });
