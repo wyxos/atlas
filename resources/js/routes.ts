@@ -1,13 +1,20 @@
 import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
-    // Vue Router routes will be defined here
-    // Example:
-    // {
-    //     path: '/',
-    //     name: 'home',
-    //     component: () => import('./pages/Home.vue'),
-    // },
+    {
+        path: '/dashboard',
+        name: 'dashboard',
+        component: () => import('./pages/Dashboard.vue'),
+    },
+    {
+        path: '/users',
+        name: 'users',
+        component: () => import('./pages/Users.vue'),
+    },
+    {
+        path: '/',
+        redirect: '/dashboard',
+    },
 ];
 
 export default routes;
