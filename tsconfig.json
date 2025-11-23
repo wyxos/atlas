@@ -20,7 +20,11 @@
     "types": [
       "node",
       "vite/client"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["resources/js/*"]
+    }
   },
   "include": [
     "resources/js/**/*",

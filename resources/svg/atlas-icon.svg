@@ -14,30 +14,29 @@
   <!-- Random Masonry Grid (Free standing) -->
   <g transform="translate(0, 16)">
     <!-- Column 1 -->
-    <rect x="60" y="40" width="110" height="140" rx="12" fill="url(#blockGrad)" opacity="0.5"/>
-    <rect x="60" y="200" width="110" height="90" rx="12" fill="url(#blockGrad)" opacity="0.3"/>
-    <rect x="60" y="310" width="110" height="140" rx="12" fill="url(#blockGrad)" opacity="0.6"/>
+    <rect x="50" y="30" width="120" height="150" rx="12" fill="url(#blockGrad)" opacity="0.5"/>
+    <rect x="50" y="190" width="120" height="100" rx="12" fill="url(#blockGrad)" opacity="0.3"/>
+    <rect x="50" y="300" width="120" height="150" rx="12" fill="url(#blockGrad)" opacity="0.6"/>
 
     <!-- Column 2 (Center) -->
-    <rect x="190" y="0" width="132" height="120" rx="12" fill="url(#blockGrad)" opacity="0.4"/>
+    <rect x="180" y="0" width="145" height="130" rx="12" fill="url(#blockGrad)" opacity="0.4"/>
     <!-- Central Hero Block -->
-    <rect x="190" y="140" width="132" height="200" rx="16" fill="url(#blockGrad)" opacity="1.0"/>
-    <rect x="190" y="360" width="132" height="110" rx="12" fill="url(#blockGrad)" opacity="0.4"/>
+    <rect x="180" y="140" width="145" height="210" rx="16" fill="url(#blockGrad)" opacity="1.0"/>
+    <rect x="180" y="360" width="145" height="120" rx="12" fill="url(#blockGrad)" opacity="0.4"/>
 
     <!-- Column 3 -->
-    <rect x="342" y="60" width="110" height="180" rx="12" fill="url(#blockGrad)" opacity="0.6"/>
-    <rect x="342" y="260" width="110" height="100" rx="12" fill="url(#blockGrad)" opacity="0.3"/>
-    <rect x="342" y="380" width="110" height="80" rx="12" fill="url(#blockGrad)" opacity="0.5"/>
+    <rect x="335" y="50" width="120" height="190" rx="12" fill="url(#blockGrad)" opacity="0.6"/>
+    <rect x="335" y="250" width="120" height="110" rx="12" fill="url(#blockGrad)" opacity="0.3"/>
+    <rect x="335" y="370" width="120" height="90" rx="12" fill="url(#blockGrad)" opacity="0.5"/>
   </g>
 
   <!-- Centered Play Button Composition -->
   <g filter="url(#playShadow)">
     <!-- Non-filled Circle Ring (Extra Large) -->
-    <circle cx="256" cy="256" r="128" stroke="#F59E0B" stroke-width="12" fill="none"/>
+    <circle cx="256" cy="256" r="246" stroke="#F59E0B" stroke-width="16" fill="none"/>
     
     <!-- Play Triangle (Extra Large) -->
-    <path d="M206 166 L356 256 L206 346 Z" fill="#F59E0B"/>
+    <path d="M156 96 L396 256 L156 416 Z" fill="#F59E0B"/>
   </g>
   
 </svg>
-
