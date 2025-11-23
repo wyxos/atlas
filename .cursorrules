@@ -11,6 +11,28 @@
 - **ALL failures must be addressed**, even if they are unrelated to the recent task. The check script must pass completely before considering a task complete.
 - If any check fails, investigate and fix the issues before proceeding.
 
+### UI/UX Design Guidelines (MUST follow)
+- **Always refer to the UI/UX Guidelines**: When implementing any UI elements, components, or styling, refer to `/guidelines` route for the design system.
+- The guidelines page (`resources/views/guidelines.blade.php`) defines:
+  - Color palette (Smart Blue, Sapphire, Regal Navy, Prussian Blue, and neutral colors)
+  - Typography styles and hierarchy
+  - Button styles (Primary, Outline, Ghost) and sizes
+  - Form input styling with dark theme
+  - Table styling
+  - Link styles
+- **Dark Theme**: The application uses a dark theme by default:
+  - Background: Prussian Blue (#001233)
+  - Card backgrounds: Darker shade (#000e29)
+  - Text: Light colors from the palette (900 shades for headings, 700-900 for body)
+  - Borders: Twilight Indigo (#33415c)
+- **Color Usage**:
+  - Primary actions: Smart Blue (#0466c8)
+  - Secondary actions: Sapphire (#0353a4)
+  - Headings: Smart Blue 900 (#c3e0fe) or Regal Navy 900 (#b4d8fe)
+  - Body text: Twilight Indigo 900 (#d0d7e5)
+  - Borders/separators: Twilight Indigo (#33415c)
+- Match the styling patterns, color usage, and component structure shown in the guidelines page.
+
 ### Workflow Order
 1. Make code changes
 2. Run `npm run check` (this handles linting with auto-fix, type checking, and testing)
