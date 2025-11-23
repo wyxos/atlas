@@ -16,10 +16,12 @@ return new class extends Migration
             $table->string('type'); // user, post, manga, etc
             $table->string('source'); // CivitAI, etc
             $table->string('source_id');
+            $table->string('referrer')->nullable();
             $table->timestamps();
 
             // Add unique constraint for source and source_id combination
             $table->unique(['source', 'source_id']);
+            $table->index(['source', 'source_id']);
         });
     }
 

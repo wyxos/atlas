@@ -15,8 +15,15 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->boolean('is_smart')->default(false);
+            $table->boolean('is_system')->default(false);
             $table->json('smart_parameters')->nullable();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
+        });
+
+        // Add foreign key constraint for users.active_playlist_id
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreign('active_playlist_id')->references('id')->on('playlists')->nullOnDelete();
         });
     }
 

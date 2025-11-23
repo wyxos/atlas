@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name')->nullable();
             $table->boolean('active')->default(true);
+            $table->boolean('nsfw')->default(false);
             $table->string('op');
             $table->json('terms')->nullable();
             $table->unsignedInteger('min')->nullable();
