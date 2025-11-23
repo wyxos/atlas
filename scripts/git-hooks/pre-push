@@ -1,87 +1,90 @@
-# #!/usr/bin/env bash
-# set -euo pipefail
+#!/usr/bin/env bash
+set -euo pipefail
 
-# # Run from repo root
-# cd "$(git rev-parse --show-toplevel)"
+# TEMPORARILY DISABLED - Remove this exit to re-enable
+exit 0
 
-# # Source bash profile to get PATH (Windows Git Bash)
-# if [ -f ~/.bash_profile ]; then
-#     source ~/.bash_profile
-# elif [ -f ~/.bashrc ]; then
-#     source ~/.bashrc
-# elif [ -f ~/.profile ]; then
-#     source ~/.profile
-# fi
+# Run from repo root
+cd "$(git rev-parse --show-toplevel)"
 
-# # Add Herd's bin directory to PATH if it exists (Windows and Unix/Mac)
-# HERD_BIN="$HOME/.config/herd/bin"
-# if [ -d "$HERD_BIN" ]; then
-#     export PATH="$HERD_BIN:$PATH"
-# fi
+# Source bash profile to get PATH (Windows Git Bash)
+if [ -f ~/.bash_profile ]; then
+    source ~/.bash_profile
+elif [ -f ~/.bashrc ]; then
+    source ~/.bashrc
+elif [ -f ~/.profile ]; then
+    source ~/.profile
+fi
 
-# # Determine PHP command and executable path
-# PHP_CMD=""
-# PHP_BINARY_PATH=""
+# Add Herd's bin directory to PATH if it exists (Windows and Unix/Mac)
+HERD_BIN="$HOME/.config/herd/bin"
+if [ -d "$HERD_BIN" ]; then
+    export PATH="$HERD_BIN:$PATH"
+fi
 
-# # Detect Windows (Git Bash)
-# if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
-#     # Windows: Try to find PHP executable directly in Herd's PHP directories
-#     # Herd stores PHP in subdirectories like php84, php83, etc.
-#     for php_dir in "$HERD_BIN"/php*; do
-#         if [ -d "$php_dir" ] && [ -f "$php_dir/php.exe" ]; then
-#             PHP_BINARY_PATH="$php_dir/php.exe"
-#             PHP_CMD="$PHP_BINARY_PATH"
-#             break
-#         fi
-#     done
+# Determine PHP command and executable path
+PHP_CMD=""
+PHP_BINARY_PATH=""
+
+# Detect Windows (Git Bash)
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
+    # Windows: Try to find PHP executable directly in Herd's PHP directories
+    # Herd stores PHP in subdirectories like php84, php83, etc.
+    for php_dir in "$HERD_BIN"/php*; do
+        if [ -d "$php_dir" ] && [ -f "$php_dir/php.exe" ]; then
+            PHP_BINARY_PATH="$php_dir/php.exe"
+            PHP_CMD="$PHP_BINARY_PATH"
+            break
+        fi
+    done
     
-#     # Fallback: Try herd.bat
-#     if [ -z "$PHP_CMD" ] && [ -f "$HERD_BIN/herd.bat" ]; then
-#         PHP_CMD="$HERD_BIN/herd.bat php"
-#         # Try to resolve PHP_BINARY from herd php
-#         PHP_BINARY_PATH=$("$HERD_BIN/herd.bat" php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
-#     fi
-# else
-#     # Unix/Mac: Try herd command first
-#     if command -v herd &> /dev/null; then
-#         PHP_CMD="herd php"
-#         PHP_BINARY_PATH=$(herd php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
-#     # Fallback: Try herd executable directly
-#     elif [ -f "$HERD_BIN/herd" ] && [ -x "$HERD_BIN/herd" ]; then
-#         PHP_CMD="$HERD_BIN/herd php"
-#         PHP_BINARY_PATH=$("$HERD_BIN/herd" php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
-#     fi
-# fi
+    # Fallback: Try herd.bat
+    if [ -z "$PHP_CMD" ] && [ -f "$HERD_BIN/herd.bat" ]; then
+        PHP_CMD="$HERD_BIN/herd.bat php"
+        # Try to resolve PHP_BINARY from herd php
+        PHP_BINARY_PATH=$("$HERD_BIN/herd.bat" php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
+    fi
+else
+    # Unix/Mac: Try herd command first
+    if command -v herd &> /dev/null; then
+        PHP_CMD="herd php"
+        PHP_BINARY_PATH=$(herd php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
+    # Fallback: Try herd executable directly
+    elif [ -f "$HERD_BIN/herd" ] && [ -x "$HERD_BIN/herd" ]; then
+        PHP_CMD="$HERD_BIN/herd php"
+        PHP_BINARY_PATH=$("$HERD_BIN/herd" php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
+    fi
+fi
 
-# # Last resort: Use php if available
-# if [ -z "$PHP_CMD" ] && command -v php &> /dev/null; then
-#     PHP_CMD="php"
-#     PHP_BINARY_PATH=$(php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
-# fi
+# Last resort: Use php if available
+if [ -z "$PHP_CMD" ] && command -v php &> /dev/null; then
+    PHP_CMD="php"
+    PHP_BINARY_PATH=$(php -r "echo PHP_BINARY;" 2>/dev/null || echo "")
+fi
 
-# # Verify PHP_CMD is set
-# if [ -z "$PHP_CMD" ]; then
-#     echo "Error: Neither 'herd' nor 'php' found"
-#     echo "Please ensure Herd is installed at $HERD_BIN"
-#     exit 1
-# fi
+# Verify PHP_CMD is set
+if [ -z "$PHP_CMD" ]; then
+    echo "Error: Neither 'herd' nor 'php' found"
+    echo "Please ensure Herd is installed at $HERD_BIN"
+    exit 1
+fi
 
-# # Set PHP_BINARY environment variable so Laravel sub-processes use the correct PHP
-# if [ -n "$PHP_BINARY_PATH" ]; then
-#     export PHP_BINARY="$PHP_BINARY_PATH"
-# fi
+# Set PHP_BINARY environment variable so Laravel sub-processes use the correct PHP
+if [ -n "$PHP_BINARY_PATH" ]; then
+    export PHP_BINARY="$PHP_BINARY_PATH"
+fi
 
-# echo "Running pre-push checks..."
+echo "Running pre-push checks..."
 
-# echo "1/3 Generating Laravel action classes..."
-# eval "$PHP_CMD artisan wayfinder:generate"
+echo "1/3 Generating Laravel action classes..."
+eval "$PHP_CMD artisan wayfinder:generate"
 
-# echo "2/3 Running npm tests..."
-# npm run test
+echo "2/3 Running npm tests..."
+npm run test
 
-# echo "3/3 Running PHP tests..."
-# eval "$PHP_CMD artisan test"
+echo "3/3 Running PHP tests..."
+eval "$PHP_CMD artisan test"
 
-# echo "All pre-push checks passed!"
-# exit 0
+echo "All pre-push checks passed!"
+exit 0
 
