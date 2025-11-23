@@ -9,7 +9,8 @@
         "test:ui": "vitest --ui",
         "test:run": "vitest run",
         "test:coverage": "vitest run --coverage",
-        "check": "tsx scripts/check.ts"
+        "check": "tsx scripts/check.ts",
+        "generate-favicons": "tsx scripts/generate-favicons.ts"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
