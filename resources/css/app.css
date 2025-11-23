@@ -105,4 +105,16 @@
     --color-lavender-grey-700: #c0c4cd;
     --color-lavender-grey-800: #d5d7dd;
     --color-lavender-grey-900: #eaebee;
+    
+    /* Danger/Warning */
+    --color-danger: #ba181b;
+    --color-danger-100: #1a0304;
+    --color-danger-200: #330608;
+    --color-danger-300: #660708;
+    --color-danger-400: #8d0a0c;
+    --color-danger-500: #a4161a;
+    --color-danger-600: #ba181b;
+    --color-danger-700: #d32f2f;
+    --color-danger-800: #e57373;
+    --color-danger-900: #ffcdd2;
 }

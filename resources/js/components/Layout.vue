@@ -1,8 +1,10 @@
 <template>
-    <div class="min-h-screen" style="background-color: #001233;">
+    <div class="min-h-screen bg-prussian-blue-500">
         <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" />
-        <main class="container mx-auto px-4 py-8">
-            <router-view />
+        <main class="min-h-[calc(100vh-4rem)]">
+            <div class="container bg-prussian-blue-400 mx-auto px-4 py-8">
+                <router-view />
+            </div>
         </main>
     </div>
 </template>

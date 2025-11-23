@@ -3,13 +3,9 @@
         :is="href && href !== '#' ? 'a' : 'button'"
         :href="href && href !== '#' ? href : undefined"
         @click="handleClick"
-        class="block w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer"
-        style="color: #d0d7e5;"
+        class="block w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer text-twilight-indigo-900"
         :class="{
-            'hover:bg-opacity-10': true,
-        }"
-        :style="{
-            backgroundColor: isHovered ? 'rgba(4, 102, 200, 0.1)' : 'transparent',
+            'bg-smart-blue-300 bg-opacity-20': isHovered,
         }"
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
