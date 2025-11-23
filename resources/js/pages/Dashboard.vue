@@ -1,7 +1,6 @@
 <template>
     <div class="w-full">
-        <div class="rounded-lg shadow-xl md:p-8 md:p-12 bg-prussian-blue-400">
-            <div class="text-center mb-8">
+        <div class="text-center mb-8">
                 <h1 class="text-3xl md:text-4xl font-bold mb-2 text-smart-blue-900">
                     Dashboard
                 </h1>
@@ -32,7 +31,6 @@
                     </p>
                 </div>
             </div>
-        </div>
     </div>
 </template>
 

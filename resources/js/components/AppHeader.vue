@@ -1,6 +1,6 @@
 <template>
     <header class="sticky top-0 z-50 w-full border-b bg-prussian-blue-400 border-twilight-indigo-500">
-        <div class="container mx-auto flex h-16 items-center justify-between px-4">
+        <div class="flex h-16 items-center justify-between px-4">
             <!-- App Icon / Logo -->
             <div class="flex items-center gap-3">
                 <router-link to="/dashboard" class="flex items-center">
