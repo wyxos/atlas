@@ -1,10 +1,12 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import vue from 'eslint-plugin-vue';
 import globals from 'globals';
 
 export default tseslint.config(
     js.configs.recommended,
     ...tseslint.configs.recommended,
+    ...vue.configs['flat/essential'],
     {
         files: ['**/*.{js,mjs,cjs,ts,tsx}'],
         languageOptions: {
@@ -21,6 +23,17 @@ export default tseslint.config(
             '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
             '@typescript-eslint/no-explicit-any': 'warn',
             '@typescript-eslint/require-await': 'off',
+        },
+    },
+    {
+        files: ['**/*.vue'],
+        languageOptions: {
+            globals: {
+                ...globals.browser,
+            },
+        },
+        rules: {
+            'vue/multi-word-component-names': 'off',
         },
     },
     {
