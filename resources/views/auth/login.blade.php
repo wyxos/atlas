@@ -15,7 +15,7 @@
     </head>
     <body style="background-color: #001233; color: #d0d7e5; min-height: 100vh;">
         <div id="app"></div>
-        <div class="flex min-h-screen items-center justify-center p-6">
+        <main class="flex min-h-screen items-center justify-center p-6">
             <div class="w-full max-w-md">
                 <div style="background-color: #000e29; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); padding: 2rem 3rem;">
                     <div class="text-center mb-8">
@@ -127,6 +127,6 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </body>
 </html>

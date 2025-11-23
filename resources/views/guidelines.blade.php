@@ -14,7 +14,7 @@
     </head>
     <body style="background-color: #001233; color: #d0d7e5; min-height: 100vh;">
         <div id="app"></div>
-        <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <main class="container mx-auto px-4 py-8 max-w-6xl">
             <div style="background-color: #000e29; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); padding: 2rem 3rem;">
                 <div class="mb-8">
                     <h1 style="font-size: 2.5rem; font-weight: 700; color: #c3e0fe; margin-bottom: 1rem;">
@@ -529,6 +529,6 @@
                     </a>
                 </div>
             </div>
-        </div>
+        </main>
     </body>
 </html>
