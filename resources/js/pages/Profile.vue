@@ -129,11 +129,11 @@
             <section>
                 <div
                     class="rounded-lg p-6"
-                    style="background-color: #023263; border: 2px solid #dc2626;"
+                    style="background-color: #1a0304; border: 2px solid #ba181b;"
                 >
                     <h2
                         class="text-xl font-semibold mb-2"
-                        style="color: #fca5a5;"
+                        style="color: #ffcdd2;"
                     >
                         Delete Account
                     </h2>
@@ -165,7 +165,7 @@
                             <p
                                 v-if="deleteErrors.password"
                                 class="mt-1 text-sm"
-                                style="color: #ef4444;"
+                                style="color: #d32f2f;"
                             >
                                 {{ deleteErrors.password }}
                             </p>
@@ -174,8 +174,10 @@
                         <button
                             type="submit"
                             :disabled="deleteLoading"
-                            class="px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            style="background-color: #dc2626; color: #ffffff;"
+                            class="px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            style="background-color: #ba181b; color: #ffffff;"
+                            onmouseover="if (!this.disabled) this.style.backgroundColor='#d32f2f'"
+                            onmouseout="if (!this.disabled) this.style.backgroundColor='#ba181b'"
                         >
                             <span v-if="deleteLoading">Deleting...</span>
                             <span v-else>Delete Account</span>

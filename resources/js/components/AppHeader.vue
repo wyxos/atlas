@@ -37,17 +37,12 @@
                         </button>
                     </template>
                     
-                    <router-link
-                        to="/profile"
-                        class="block w-full"
-                    >
-                        <DropdownMenuItem>
-                            <div class="flex items-center gap-2">
-                                <User class="w-4 h-4" />
-                                <span>Profile</span>
-                            </div>
-                        </DropdownMenuItem>
-                    </router-link>
+                    <DropdownMenuItem @click="handleProfileClick">
+                        <div class="flex items-center gap-2">
+                            <User class="w-4 h-4" />
+                            <span>Profile</span>
+                        </div>
+                    </DropdownMenuItem>
                     
                     <DropdownMenuItem @click="handleLogout">
                         <div class="flex items-center gap-2">
@@ -62,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
 import { Menu, User, LogOut } from 'lucide-vue-next';
 import DropdownMenu from './ui/DropdownMenu.vue';
 import DropdownMenuItem from './ui/DropdownMenuItem.vue';
@@ -79,6 +75,12 @@ withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     logout: [];
 }>();
+
+const router = useRouter();
+
+function handleProfileClick(): void {
+    router.push('/profile');
+}
 
 function handleLogout(): void {
     emit('logout');
