@@ -252,6 +252,19 @@ return [
             'timeout' => 300,
             'nice' => 0,
         ],
+        'supervisor-scout' => [
+            'connection' => 'redis',
+            'queue' => ['scout'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 1,
+            'timeout' => 300,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -306,6 +319,10 @@ return [
                 'maxProcesses' => 1,
                 'memory' => 96,
             ],
+            'supervisor-scout' => [
+                'maxProcesses' => 1,
+                'memory' => 128,
+            ],
         ],
 
         'local' => [
@@ -322,6 +339,9 @@ return [
                 'maxProcesses' => 1,
             ],
             'supervisor-spotify' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-scout' => [
                 'maxProcesses' => 1,
             ],
         ],
