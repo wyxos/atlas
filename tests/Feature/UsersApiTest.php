@@ -103,3 +103,112 @@ it('requires authentication to delete users', function () {
     $this->deleteJson("/api/users/{$userToDelete->id}")
         ->assertUnauthorized();
 });
+
+it('filters users by search query', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    User::factory()->create(['name' => 'John Doe', 'email' => 'john@example.com']);
+    User::factory()->create(['name' => 'Jane Smith', 'email' => 'jane@example.com']);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/users?search=john');
+
+    $response->assertSuccessful();
+    $users = $response->json('data');
+    expect($users)->toHaveCount(1);
+    expect($users[0]['name'])->toBe('John Doe');
+});
+
+it('filters users by email search', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    User::factory()->create(['name' => 'John Doe', 'email' => 'john@example.com']);
+    User::factory()->create(['name' => 'Jane Smith', 'email' => 'jane@example.com']);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/users?search=jane@example.com');
+
+    $response->assertSuccessful();
+    $users = $response->json('data');
+    expect($users)->toHaveCount(1);
+    expect($users[0]['email'])->toBe('jane@example.com');
+});
+
+it('filters users by date range', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    User::factory()->create(['created_at' => '2024-01-15 10:00:00']);
+    User::factory()->create(['created_at' => '2024-02-15 10:00:00']);
+    User::factory()->create(['created_at' => '2024-03-15 10:00:00']);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/users?date_from=2024-02-01&date_to=2024-02-28');
+
+    $response->assertSuccessful();
+    $users = $response->json('data');
+    expect($users)->toHaveCount(1);
+    expect($users[0]['created_at'])->toContain('2024-02-15');
+});
+
+it('filters users by verified status', function () {
+    $admin = User::factory()->create(['is_admin' => true, 'email_verified_at' => now()]);
+    User::factory()->create(['email_verified_at' => now()]);
+    User::factory()->create(['email_verified_at' => null]);
+    User::factory()->create(['email_verified_at' => now()]);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/users?status=verified');
+
+    $response->assertSuccessful();
+    $users = $response->json('data');
+    // Admin + 2 verified users = 3 total
+    expect($users)->toHaveCount(3);
+    foreach ($users as $user) {
+        expect($user['email_verified_at'])->not->toBeNull();
+    }
+});
+
+it('filters users by unverified status', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    User::factory()->create(['email_verified_at' => now()]);
+    User::factory()->create(['email_verified_at' => null]);
+    User::factory()->create(['email_verified_at' => null]);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/users?status=unverified');
+
+    $response->assertSuccessful();
+    $users = $response->json('data');
+    expect($users)->toHaveCount(2);
+    foreach ($users as $user) {
+        expect($user['email_verified_at'])->toBeNull();
+    }
+});
+
+it('combines multiple filters', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    User::factory()->create([
+        'name' => 'John Verified',
+        'email' => 'john@example.com',
+        'email_verified_at' => now(),
+        'created_at' => '2024-01-15 10:00:00',
+    ]);
+    User::factory()->create([
+        'name' => 'John Unverified',
+        'email' => 'john2@example.com',
+        'email_verified_at' => null,
+        'created_at' => '2024-01-15 10:00:00',
+    ]);
+    User::factory()->create([
+        'name' => 'Jane Verified',
+        'email' => 'jane@example.com',
+        'email_verified_at' => now(),
+        'created_at' => '2024-02-15 10:00:00',
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/users?search=john&status=verified&date_from=2024-01-01&date_to=2024-01-31');
+
+    $response->assertSuccessful();
+    $users = $response->json('data');
+    expect($users)->toHaveCount(1);
+    expect($users[0]['name'])->toBe('John Verified');
+    expect($users[0]['email_verified_at'])->not->toBeNull();
+});
