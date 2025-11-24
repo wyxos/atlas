@@ -452,24 +452,26 @@
                     <div class="space-y-4">
                         <div>
                             <h3 class="text-xl font-semibold text-smart-blue-900 mb-4">Status Badges</h3>
-                            <div class="flex flex-wrap gap-4">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-success-300 text-success-700 border border-success-500">
-                                    Verified
+                            <div class="flex flex-wrap gap-4 items-center">
+                                <span class="inline-flex items-center justify-center p-1.5 rounded-sm bg-success-300 border border-success-500" title="Verified">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
                                 </span>
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-smart-blue-300 text-smart-blue-700 border border-smart-blue-500">
+                                <span class="px-3 py-1 rounded-sm text-xs font-medium bg-smart-blue-300 border border-smart-blue-500">
                                     Active
                                 </span>
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-twilight-indigo-500 text-twilight-indigo-700 border border-blue-slate-500">
+                                <span class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500">
                                     Inactive
                                 </span>
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-danger-300 text-danger-800 border border-danger-600">
+                                <span class="px-3 py-1 rounded-sm text-xs font-medium bg-danger-300 border border-danger-600">
                                     Error
                                 </span>
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-sapphire-300 text-sapphire-800 border border-sapphire-500">
+                                <span class="px-3 py-1 rounded-sm text-xs font-medium bg-sapphire-300 border border-sapphire-500">
                                     Pending
                                 </span>
                             </div>
-                            <code class="block mt-2 text-xs text-twilight-indigo-700">Verified: bg-success-300 text-success-700 border-success-500. Active: bg-smart-blue-400 text-smart-blue-700 border-smart-blue-600</code>
+                            <code class="block mt-2 text-xs text-twilight-indigo-700">Verified: inline-flex items-center justify-center p-1.5 rounded-sm bg-success-300 border-success-500 (icon only). Other badges: px-3 py-1 rounded-sm text-xs font-medium bg-* border-*</code>
                         </div>
                     </div>
                 </section>
@@ -582,7 +584,7 @@
                                     <td class="px-6 py-4 text-sm text-twilight-indigo-900">john@example.com</td>
                                     <td class="px-6 py-4 text-sm text-twilight-indigo-900">Admin</td>
                                     <td class="px-6 py-4 text-sm">
-                                        <span class="px-3 py-1 rounded-full text-xs font-medium bg-smart-blue-300 text-smart-blue-700 border border-smart-blue-500">
+                                        <span class="px-3 py-1 rounded-sm text-xs font-medium bg-smart-blue-300 border border-smart-blue-500">
                                             Active
                                         </span>
                                     </td>
@@ -595,7 +597,7 @@
                                     <td class="px-6 py-4 text-sm text-twilight-indigo-900">jane@example.com</td>
                                     <td class="px-6 py-4 text-sm text-twilight-indigo-900">User</td>
                                     <td class="px-6 py-4 text-sm">
-                                        <span class="px-3 py-1 rounded-full text-xs font-medium bg-smart-blue-300 text-smart-blue-700 border border-smart-blue-500">
+                                        <span class="px-3 py-1 rounded-sm text-xs font-medium bg-smart-blue-300 border border-smart-blue-500">
                                             Active
                                         </span>
                                     </td>
@@ -608,7 +610,7 @@
                                     <td class="px-6 py-4 text-sm text-twilight-indigo-900">bob@example.com</td>
                                     <td class="px-6 py-4 text-sm text-twilight-indigo-900">User</td>
                                     <td class="px-6 py-4 text-sm">
-                                        <span class="px-3 py-1 rounded-full text-xs font-medium bg-twilight-indigo-500 text-twilight-indigo-700 border border-blue-slate-500">
+                                        <span class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500">
                                             Inactive
                                         </span>
                                     </td>
