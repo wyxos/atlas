@@ -7,6 +7,26 @@ const routes: RouteRecordRaw[] = [
         component: () => import('./pages/Dashboard.vue'),
     },
     {
+        path: '/browse',
+        name: 'browse',
+        component: () => import('./pages/Browse.vue'),
+    },
+    {
+        path: '/audio',
+        name: 'audio',
+        component: () => import('./pages/Audio.vue'),
+    },
+    {
+        path: '/videos',
+        name: 'videos',
+        component: () => import('./pages/Videos.vue'),
+    },
+    {
+        path: '/photos',
+        name: 'photos',
+        component: () => import('./pages/Photos.vue'),
+    },
+    {
         path: '/users',
         name: 'users',
         component: () => import('./pages/Users.vue'),

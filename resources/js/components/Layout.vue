@@ -3,9 +3,9 @@
         <!-- Side Menu -->
         <aside
             :class="[
-                'fixed md:static z-40 h-screen bg-prussian-blue-500 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
+                'fixed lg:static z-40 h-screen bg-prussian-blue-500 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
                 'flex flex-col',
-                isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-16 md:translate-x-0'
+                isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-16 lg:translate-x-0'
             ]"
         >
             <!-- Toggle Button -->
@@ -116,7 +116,7 @@
             <div
                 v-if="isMenuOpen"
                 @click="closeMenu"
-                class="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden transition-opacity duration-300"
+                class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden transition-opacity duration-300"
             />
         </Transition>
     </div>
@@ -135,6 +135,10 @@ import {
     Settings,
     User,
     LogOut,
+    Search,
+    Music,
+    Video,
+    Image,
 } from 'lucide-vue-next';
 import AppHeader from './AppHeader.vue';
 
@@ -154,12 +158,16 @@ defineEmits<{
 const userName = props.userName;
 const appName = props.appName;
 
-// On mobile, menu starts closed; on desktop, it starts open
-const isMenuOpen = ref(window.innerWidth >= 768);
+// On mobile/tablet, menu starts closed; on desktop, it starts open
+const isMenuOpen = ref(window.innerWidth >= 1024);
 const isUserMenuOpen = ref(false);
 
 const menuItems = [
     { name: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { name: 'browse', path: '/browse', label: 'Browse', icon: Search },
+    { name: 'audio', path: '/audio', label: 'Audio', icon: Music },
+    { name: 'videos', path: '/videos', label: 'Videos', icon: Video },
+    { name: 'photos', path: '/photos', label: 'Photos', icon: Image },
     { name: 'users', path: '/users', label: 'Users', icon: Users },
     { name: 'files', path: '/files', label: 'Files', icon: Folder },
     { name: 'settings', path: '/settings', label: 'Settings', icon: Settings },
@@ -173,8 +181,8 @@ function toggleMenu(): void {
 }
 
 function handleResize(): void {
-    // On desktop, menu should be open; on mobile, it should be closed
-    if (window.innerWidth >= 768) {
+    // On desktop, menu should be open; on mobile/tablet, it should be closed
+    if (window.innerWidth >= 1024) {
         if (!isMenuOpen.value) {
             isMenuOpen.value = true;
         }
@@ -202,8 +210,8 @@ function closeUserMenu(): void {
 }
 
 function handleMenuItemClick(): void {
-    // Close menu on mobile when clicking a menu item
-    if (window.innerWidth < 768) {
+    // Close menu on mobile/tablet when clicking a menu item
+    if (window.innerWidth < 1024) {
         closeMenu();
     }
 }
@@ -250,7 +258,7 @@ function handleLogout(): void {
 function handleClickOutside(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (!target.closest('aside') && !target.closest('.user-menu-button') && !target.closest('.mobile-menu-toggle')) {
-        if (window.innerWidth < 768) {
+        if (window.innerWidth < 1024) {
             closeMenu();
         }
     }

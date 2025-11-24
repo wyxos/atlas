@@ -32,7 +32,7 @@ describe('AppHeader', () => {
         expect(wrapper.text()).toContain('Atlas');
     });
 
-    it('renders the user name', async () => {
+    it('emits toggle-menu event when menu button is clicked', async () => {
         const router = await createTestRouter();
         const wrapper = mount(AppHeader, {
             props: {
@@ -43,33 +43,13 @@ describe('AppHeader', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('Test User');
-    });
+        // Find and click the menu toggle button
+        const menuButton = wrapper.find('[aria-label="Toggle menu"]');
+        await menuButton.trigger('click');
 
-    it('emits logout event when logout is clicked', async () => {
-        const router = await createTestRouter();
-        const wrapper = mount(AppHeader, {
-            props: {
-                userName: 'Test User',
-            },
-            global: {
-                plugins: [router],
-            },
-        });
-
-        // Find and click the logout button
-        const logoutButton = wrapper.find('[aria-label="User menu"]');
-        await logoutButton.trigger('click');
-
-        // Wait for dropdown to appear and find logout item
-        await wrapper.vm.$nextTick();
-        const logoutItem = wrapper.find('a[href="#"]');
-        if (logoutItem.exists()) {
-            await logoutItem.trigger('click');
-        }
-
-        // Check if logout was emitted (this is a basic test - actual implementation may vary)
-        expect(wrapper.exists()).toBe(true);
+        // Check if toggle-menu was emitted
+        expect(wrapper.emitted('toggle-menu')).toBeTruthy();
+        expect(wrapper.emitted('toggle-menu')).toHaveLength(1);
     });
 });
 

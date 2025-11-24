@@ -16,12 +16,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Demo user
+        // Demo user (admin)
         User::create([
             'name' => 'Demo User',
             'email' => 'demo@atlas.test',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
+            'is_admin' => true,
         ]);
+
+        // Seed additional users using factory
+        User::factory()->count(10)->create();
     }
 }
