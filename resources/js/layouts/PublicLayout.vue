@@ -1,3 +1,7 @@
+<script setup lang="ts">
+// Simple public layout
+</script>
+
 <template>
     <div class="min-h-screen bg-prussian-blue-500 text-dull-white-500">
         <header class="bg-prussian-blue-600 border-b border-twilight-indigo-500">
@@ -20,7 +24,3 @@
         </main>
     </div>
 </template>
-
-<script setup lang="ts">
-// Simple public layout
-</script>

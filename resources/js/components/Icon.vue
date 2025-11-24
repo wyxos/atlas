@@ -1,7 +1,3 @@
-<template>
-    <component :is="iconComponent" :size="size" :class="iconClass" :stroke-width="strokeWidth" />
-</template>
-
 <script setup>
 import { computed } from 'vue';
 import * as LucideIcons from 'lucide-vue-next';
@@ -33,3 +29,6 @@ const iconComponent = computed(() => {
 const iconClass = computed(() => props.class);
 </script>
 
+<template>
+    <component :is="iconComponent" :size="size" :class="iconClass" :stroke-width="strokeWidth" />
+</template>

@@ -1,11 +1,3 @@
-<template>
-    <div id="app">
-        <component :is="layout" :user-name="userName" :app-name="appName" @logout="handleLogout">
-            <router-view />
-        </component>
-    </div>
-</template>
-
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -46,7 +38,14 @@ function handleLogout() {
 }
 </script>
 
+<template>
+    <div id="app">
+        <component :is="layout" :user-name="userName" :app-name="appName" @logout="handleLogout">
+            <router-view />
+        </component>
+    </div>
+</template>
+
 <style>
 /* Global styles if needed */
 </style>
-

@@ -1,3 +1,26 @@
+<script setup lang="ts">
+import { Menu } from 'lucide-vue-next';
+import AtlasIcon from './AtlasIcon.vue';
+
+interface Props {
+    userName: string;
+    appName?: string;
+}
+
+withDefaults(defineProps<Props>(), {
+    appName: 'Atlas',
+});
+
+const emit = defineEmits<{
+    logout: [];
+    'toggle-menu': [];
+}>();
+
+function handleToggleMenu(): void {
+    emit('toggle-menu');
+}
+</script>
+
 <template>
     <header class="sticky top-0 z-50 w-full bg-prussian-blue-400">
         <div class="relative flex h-16 items-center justify-center lg:justify-between px-4 lg:px-8">
@@ -25,27 +48,3 @@
         </div>
     </header>
 </template>
-
-<script setup lang="ts">
-import { Menu } from 'lucide-vue-next';
-import AtlasIcon from './AtlasIcon.vue';
-
-interface Props {
-    userName: string;
-    appName?: string;
-}
-
-withDefaults(defineProps<Props>(), {
-    appName: 'Atlas',
-});
-
-const emit = defineEmits<{
-    logout: [];
-    'toggle-menu': [];
-}>();
-
-function handleToggleMenu(): void {
-    emit('toggle-menu');
-}
-</script>
-
