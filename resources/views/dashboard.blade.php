@@ -15,7 +15,7 @@
 
         @include('partials.favicons')
     </head>
-    <body style="background-color: #001233; color: #d0d7e5; min-height: 100vh;">
+    <body class="bg-prussian-blue-500 text-twilight-indigo-900 min-h-screen">
         <div id="app"></div>
     </body>
 </html>

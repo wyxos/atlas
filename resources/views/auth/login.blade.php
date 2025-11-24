@@ -13,31 +13,31 @@
 
         @include('partials.favicons')
     </head>
-    <body style="background-color: #001233; color: #d0d7e5; min-height: 100vh;">
+    <body class="bg-prussian-blue-500 text-twilight-indigo-900 min-h-screen">
         <div id="app"></div>
         <main class="flex min-h-screen items-center justify-center p-6">
             <div class="w-full max-w-md">
-                <div style="background-color: #000e29; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); padding: 2rem 3rem;">
+                <div class="bg-prussian-blue-600 rounded-lg shadow-2xl p-8 lg:p-12">
                     <div class="text-center mb-8">
                         <div class="flex justify-center mb-6">
                             <x-atlas-icon class="w-24 h-24" />
                         </div>
-                        <h1 style="font-size: 1.875rem; font-weight: 700; color: #c3e0fe; margin-bottom: 0.5rem;">
+                        <h1 class="text-3xl font-bold text-smart-blue-900 mb-2">
                             Welcome Back
                         </h1>
-                        <p style="color: #a0aecb;">
+                        <p class="text-blue-slate-700">
                             Sign in to your account
                         </p>
                     </div>
 
                     @if ($errors->any())
-                        <div class="mb-6 p-4 rounded-lg" style="background-color: #450a0a; border: 2px solid #dc2626;">
+                        <div class="mb-6 p-4 rounded-lg bg-danger-100 border-2 border-danger-600">
                             <div class="flex">
-                                <svg class="w-5 h-5 mr-2" style="color: #f87171;" fill="currentColor" viewBox="0 0 20 20">
+                                <svg class="w-5 h-5 mr-2 text-danger-800" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                                 </svg>
                                 <div class="flex-1">
-                                    <p style="font-size: 0.875rem; font-weight: 500; color: #fecaca;">
+                                    <p class="text-sm font-medium text-danger-900">
                                         {{ $errors->first() }}
                                     </p>
                                 </div>
@@ -49,7 +49,7 @@
                         @csrf
 
                         <div>
-                            <label for="email" class="block text-sm font-medium mb-2" style="color: #c3e0fe;">
+                            <label for="email" class="block text-sm font-medium mb-2 text-smart-blue-900">
                                 Email Address
                             </label>
                             <input
@@ -60,19 +60,16 @@
                                 required
                                 autofocus
                                 autocomplete="email"
-                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors"
-                                style="background-color: #001233; border: 2px solid #33415c; color: #d0d7e5;"
+                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
                                 placeholder="you@example.com"
-                                onfocus="this.style.borderColor='#0f85fa'; this.style.boxShadow='0 0 0 3px rgba(15, 133, 250, 0.2)'"
-                                onblur="this.style.borderColor='#33415c'; this.style.boxShadow='none'"
                             >
                             @error('email')
-                                <p class="mt-1 text-sm" style="color: #f87171;">{{ $message }}</p>
+                                <p class="mt-1 text-sm text-danger-800">{{ $message }}</p>
                             @enderror
                         </div>
 
                         <div>
-                            <label for="password" class="block text-sm font-medium mb-2" style="color: #c3e0fe;">
+                            <label for="password" class="block text-sm font-medium mb-2 text-smart-blue-900">
                                 Password
                             </label>
                             <input
@@ -81,14 +78,11 @@
                                 id="password"
                                 required
                                 autocomplete="current-password"
-                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors"
-                                style="background-color: #001233; border: 2px solid #33415c; color: #d0d7e5;"
+                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
                                 placeholder="••••••••"
-                                onfocus="this.style.borderColor='#0f85fa'; this.style.boxShadow='0 0 0 3px rgba(15, 133, 250, 0.2)'"
-                                onblur="this.style.borderColor='#33415c'; this.style.boxShadow='none'"
                             >
                             @error('password')
-                                <p class="mt-1 text-sm" style="color: #f87171;">{{ $message }}</p>
+                                <p class="mt-1 text-sm text-danger-800">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -98,10 +92,9 @@
                                     type="checkbox"
                                     name="remember"
                                     id="remember"
-                                    class="w-4 h-4 rounded focus:ring-2"
-                                    style="accent-color: #0466c8;"
+                                    class="w-4 h-4 rounded focus:ring-2 accent-smart-blue-500"
                                 >
-                                <label for="remember" class="ml-2 text-sm" style="color: #d0d7e5;">
+                                <label for="remember" class="ml-2 text-sm text-twilight-indigo-900">
                                     Remember me
                                 </label>
                             </div>
@@ -110,10 +103,7 @@
                         <div>
                             <button
                                 type="submit"
-                                class="w-full px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg focus:outline-none focus:ring-2"
-                                style="background-color: #0466c8;"
-                                onmouseover="this.style.backgroundColor='#0f85fa'"
-                                onmouseout="this.style.backgroundColor='#0466c8'"
+                                class="w-full px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg focus:outline-none focus:ring-2 bg-smart-blue-500 hover:bg-smart-blue-600 focus:ring-smart-blue-600"
                             >
                                 Sign In
                             </button>
@@ -121,7 +111,7 @@
                     </form>
 
                     <div class="mt-6 text-center">
-                        <a href="{{ route('home') }}" class="text-sm font-medium transition-colors" style="color: #4ba3fb;" onmouseover="this.style.color='#0f85fa'" onmouseout="this.style.color='#4ba3fb'">
+                        <a href="{{ route('home') }}" class="text-sm font-medium transition-colors text-smart-blue-700 hover:text-smart-blue-600">
                             ← Back to Home
                         </a>
                     </div>

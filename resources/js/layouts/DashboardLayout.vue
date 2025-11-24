@@ -100,7 +100,7 @@
         <div class="flex-1 flex flex-col min-w-0">
             <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" @toggle-menu="toggleMenu" />
             <main class="flex-1 bg-prussian-blue-400 rounded-lg shadow-xl overflow-auto">
-                <router-view />
+                <slot></slot>
             </main>
         </div>
 
@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import {
     ChevronLeft,
     ChevronRight,
@@ -140,23 +140,18 @@ import {
     Video,
     Image,
 } from 'lucide-vue-next';
-import AppHeader from './AppHeader.vue';
+import AppHeader from '../components/AppHeader.vue';
 
-interface Props {
-    userName: string;
-    appName?: string;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-    appName: 'Atlas',
+// Get user data from meta tag or global variable
+const userName = computed(() => {
+    const metaTag = document.querySelector('meta[name="user-name"]');
+    return metaTag?.getAttribute('content') || 'User';
 });
 
-defineEmits<{
-    logout: [];
-}>();
-
-const userName = props.userName;
-const appName = props.appName;
+const appName = computed(() => {
+    const metaTag = document.querySelector('meta[name="app-name"]');
+    return metaTag?.getAttribute('content') || 'Atlas';
+});
 
 // On mobile/tablet, menu starts closed; on desktop, it starts open
 const isMenuOpen = ref(window.innerWidth >= 1024);
@@ -287,4 +282,3 @@ onUnmounted(() => {
     opacity: 0;
 }
 </style>
-
