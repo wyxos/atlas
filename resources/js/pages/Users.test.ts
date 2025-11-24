@@ -42,6 +42,13 @@ describe('Users', () => {
         mockAxios.get.mockResolvedValue({
             data: {
                 data: [],
+                links: {},
+                meta: {
+                    current_page: 1,
+                    total: 0,
+                    per_page: 15,
+                    last_page: 1,
+                },
             },
         });
 
@@ -76,6 +83,13 @@ describe('Users', () => {
         mockAxios.get.mockResolvedValue({
             data: {
                 data: mockUsers,
+                links: {},
+                meta: {
+                    current_page: 1,
+                    total: 2,
+                    per_page: 15,
+                    last_page: 1,
+                },
             },
         });
 
@@ -89,7 +103,12 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
         await new Promise((resolve) => setTimeout(resolve, 100));
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/users');
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/users', {
+            params: {
+                page: 1,
+                per_page: 15,
+            },
+        });
         expect(wrapper.text()).toContain('John Doe');
         expect(wrapper.text()).toContain('jane@example.com');
     });
