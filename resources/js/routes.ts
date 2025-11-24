@@ -55,13 +55,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('./pages/Profile.vue'),
         meta: { layout: 'DashboardLayout' },
     },
-    {
-        path: '/guidelines',
-        name: 'guidelines',
-        component: () => import('./pages/Guidelines.vue'),
-        meta: { layout: 'PublicLayout' },
-    },
 ];
 
 export default routes;
-

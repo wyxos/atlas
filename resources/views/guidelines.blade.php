@@ -433,7 +433,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                 </button>
-                                <button class="p-2 border-2 rounded-lg transition-all cursor-pointer border-success-300 text-success-300 bg-transparent hover:bg-success-200 hover:border-success-300 hover:text-success-600">
+                                <button class="p-2 border-2 rounded-lg transition-all cursor-pointer border-success-600 text-success-600 bg-transparent hover:bg-success-300 hover:border-success-500 hover:text-success-700">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                                     </svg>
@@ -453,7 +453,7 @@
                         <div>
                             <h3 class="text-xl font-semibold text-smart-blue-900 mb-4">Status Badges</h3>
                             <div class="flex flex-wrap gap-4">
-                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-success-300 text-success-600 border border-success-400">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-success-300 text-success-700 border border-success-500">
                                     Verified
                                 </span>
                                 <span class="px-3 py-1 rounded-full text-xs font-medium bg-smart-blue-300 text-smart-blue-700 border border-smart-blue-500">
@@ -469,7 +469,7 @@
                                     Pending
                                 </span>
                             </div>
-                            <code class="block mt-2 text-xs text-twilight-indigo-700">Verified: bg-success-300 text-success-600 border-success-400. Active: bg-smart-blue-300 text-smart-blue-700 border-smart-blue-500</code>
+                            <code class="block mt-2 text-xs text-twilight-indigo-700">Verified: bg-success-300 text-success-700 border-success-500. Active: bg-smart-blue-400 text-smart-blue-700 border-smart-blue-600</code>
                         </div>
                     </div>
                 </section>
