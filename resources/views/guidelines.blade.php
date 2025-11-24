@@ -708,6 +708,70 @@ opacity-40 cursor-not-allowed (disabled)</code>
                     </div>
                 </section>
 
+                <!-- Scrollbars -->
+                <section class="mb-12">
+                    <h2 class="text-3xl font-bold text-smart-blue-900 mb-6 pb-2 border-b-2 border-twilight-indigo-500">
+                        Scrollbars
+                    </h2>
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-xl font-semibold text-smart-blue-900 mb-4">Custom Scrollbar Styling</h3>
+                            <p class="text-base text-twilight-indigo-900 mb-4">
+                                Scrollbars are styled to match the dark theme. The scrollbar track uses Twilight Indigo 300, 
+                                the thumb uses Twilight Indigo 600, and on hover it changes to Smart Blue 600.
+                            </p>
+                            <div class="bg-prussian-blue-500 rounded-lg p-6">
+                                <div class="h-64 overflow-y-auto pr-4">
+                                    <div class="space-y-4">
+                                        <p class="text-base text-twilight-indigo-900">
+                                            This is a scrollable container demonstrating the custom scrollbar styling. 
+                                            Scroll down to see the scrollbar in action.
+                                        </p>
+                                        @for ($i = 1; $i <= 20; $i++)
+                                            <div class="p-4 bg-prussian-blue-600 rounded-lg">
+                                                <h4 class="text-lg font-semibold text-smart-blue-900 mb-2">Item {{ $i }}</h4>
+                                                <p class="text-sm text-twilight-indigo-900">
+                                                    This is content item {{ $i }}. The scrollbar on the right demonstrates 
+                                                    the custom styling with Twilight Indigo colors that match the dark theme.
+                                                </p>
+                                            </div>
+                                        @endfor
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 p-4 bg-prussian-blue-500 rounded-lg">
+                                <p class="text-sm text-twilight-indigo-700 mb-2"><strong>CSS Properties:</strong></p>
+                                <code class="text-xs text-smart-blue-700 block whitespace-pre-wrap">/* Webkit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e2737; /* twilight-indigo-300 */
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4d628b; /* twilight-indigo-600 */
+    border-radius: 6px;
+    border: 2px solid #1e2737; /* twilight-indigo-300 */
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #0f85fa; /* smart-blue-600 */
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #4d628b #1e2737; /* thumb track */
+}</code>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Navigation -->
                 <div class="mt-8 pt-8 border-t-2 border-twilight-indigo-500">
                     <a href="{{ route('home') }}" class="inline-flex items-center gap-2 font-medium transition-colors text-smart-blue-700 hover:text-smart-blue-600">
