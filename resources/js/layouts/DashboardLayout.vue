@@ -97,9 +97,9 @@
         </aside>
 
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col min-w-0">
+        <div class="flex-1 flex flex-col min-w-0 lg:max-h-screen">
             <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" @toggle-menu="toggleMenu" />
-            <main class="flex-1 bg-prussian-blue-400 rounded-lg shadow-xl overflow-auto">
+            <main class="flex-1 bg-prussian-blue-400 rounded-lg shadow-xl overflow-auto lg:overflow-y-auto">
                 <slot></slot>
             </main>
         </div>
