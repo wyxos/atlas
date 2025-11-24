@@ -64,10 +64,12 @@ onUnmounted(() => {
             <div
                 v-if="isOpen"
                 class="fixed inset-0 z-50 flex items-center justify-center"
-                @click="handleBackdropClick"
             >
                 <!-- Backdrop -->
-                <div class="fixed inset-0 bg-black/50" />
+                <div 
+                    class="fixed inset-0 bg-black/50 -z-10" 
+                    @click="handleBackdropClick"
+                />
 
                 <!-- Dialog Content -->
                 <Transition
