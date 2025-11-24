@@ -18,10 +18,9 @@ const mockAxios = {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    global.window = {
-        ...global.window,
+    Object.assign(global.window, {
         axios: mockAxios,
-    } as typeof window;
+    });
 });
 
 async function createTestRouter(initialPath = '/users') {
@@ -101,7 +100,8 @@ describe('Users', () => {
         });
 
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Wait for the async fetchUsers to complete
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
         expect(mockAxios.get).toHaveBeenCalledWith('/api/users', {
             params: {
@@ -109,8 +109,14 @@ describe('Users', () => {
                 per_page: 15,
             },
         });
-        expect(wrapper.text()).toContain('John Doe');
-        expect(wrapper.text()).toContain('jane@example.com');
+        
+        // Wait for DOM updates after data is loaded
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        
+        const text = wrapper.text();
+        expect(text).toContain('John Doe');
+        expect(text).toContain('jane@example.com');
     });
 
     it('displays loading state', async () => {
