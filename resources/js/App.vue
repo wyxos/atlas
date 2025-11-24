@@ -19,9 +19,6 @@ const appName = computed(() => {
     return metaTag?.getAttribute('content') || 'Atlas';
 });
 
-function handleLogout(): void {
-    // Logout is handled in Layout component
-}
 </script>
 
 <style>
