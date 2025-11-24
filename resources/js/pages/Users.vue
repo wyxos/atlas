@@ -31,7 +31,7 @@
                     <template #default="{ row }">
                         <span
                             v-if="row.email_verified_at"
-                            class="px-3 py-1 rounded-full text-xs font-medium bg-success-300 text-success-600 border border-success-400"
+                            class="px-3 py-1 rounded-full text-xs font-medium bg-success-300 text-success-700 border border-success-500"
                         >
                             Verified
                         </span>
