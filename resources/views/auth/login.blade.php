@@ -31,13 +31,13 @@
                     </div>
 
                     @if ($errors->any())
-                        <div class="mb-6 p-4 rounded-lg" style="background-color: #023d78; border: 2px solid #0466c8;">
+                        <div class="mb-6 p-4 rounded-lg" style="background-color: #450a0a; border: 2px solid #dc2626;">
                             <div class="flex">
-                                <svg class="w-5 h-5 mr-2" style="color: #4ba3fb;" fill="currentColor" viewBox="0 0 20 20">
+                                <svg class="w-5 h-5 mr-2" style="color: #f87171;" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                                 </svg>
                                 <div class="flex-1">
-                                    <p style="font-size: 0.875rem; font-weight: 500; color: #c3e0fe;">
+                                    <p style="font-size: 0.875rem; font-weight: 500; color: #fecaca;">
                                         {{ $errors->first() }}
                                     </p>
                                 </div>
@@ -67,7 +67,7 @@
                                 onblur="this.style.borderColor='#33415c'; this.style.boxShadow='none'"
                             >
                             @error('email')
-                                <p class="mt-1 text-sm" style="color: #4ba3fb;">{{ $message }}</p>
+                                <p class="mt-1 text-sm" style="color: #f87171;">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -88,7 +88,7 @@
                                 onblur="this.style.borderColor='#33415c'; this.style.boxShadow='none'"
                             >
                             @error('password')
-                                <p class="mt-1 text-sm" style="color: #4ba3fb;">{{ $message }}</p>
+                                <p class="mt-1 text-sm" style="color: #f87171;">{{ $message }}</p>
                             @enderror
                         </div>
 
