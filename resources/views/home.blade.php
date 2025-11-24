@@ -12,44 +12,44 @@
 
         @include('partials.favicons')
     </head>
-    <body style="background-color: #001233; color: #d0d7e5; min-height: 100vh;">
+    <body class="bg-prussian-blue-500 text-twilight-indigo-900 min-h-screen">
         <div id="app"></div>
         <main class="flex min-h-screen items-center justify-center p-6">
             <div class="w-full max-w-4xl">
-                <div style="background-color: #000e29; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); padding: 2rem 3rem;">
+                <div class="bg-prussian-blue-600 rounded-lg shadow-2xl p-8 lg:p-12">
                     <div class="text-center mb-8">
                         <div class="flex justify-center mb-6">
                             <x-atlas-icon class="w-32 h-32" />
                         </div>
-                        <h1 style="font-size: 2.5rem; font-weight: 700; color: #c3e0fe; margin-bottom: 1rem;">
+                        <h1 class="text-5xl font-bold text-smart-blue-900 mb-4">
                             Welcome to {{ config('app.name', 'Atlas') }}
                         </h1>
-                        <p style="font-size: 1.125rem; color: #a0aecb;">
+                        <p class="text-lg text-blue-slate-700">
                             Your media server solution
                         </p>
                     </div>
 
                     <div class="grid md:grid-cols-2 gap-6 mb-8">
-                        <div style="background-color: #023d78; border: 2px solid #0466c8; border-radius: 0.5rem; padding: 1.5rem;">
-                            <h2 style="font-size: 1.25rem; font-weight: 600; color: #c3e0fe; margin-bottom: 0.75rem; display: flex; align-items: center;">
-                                <svg class="w-6 h-6 mr-2" style="color: #4ba3fb;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="bg-smart-blue-300 border-2 border-smart-blue-500 rounded-lg p-6">
+                            <h2 class="text-xl font-semibold text-smart-blue-900 mb-3 flex items-center">
+                                <svg class="w-6 h-6 mr-2 text-smart-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Features
                             </h2>
-                            <p style="color: #d0d7e5;">
+                            <p class="text-twilight-indigo-900">
                                 Manage your media library with ease. Organize, stream, and enjoy your content.
                             </p>
                         </div>
 
-                        <div style="background-color: #023263; border: 2px solid #0353a4; border-radius: 0.5rem; padding: 1.5rem;">
-                            <h2 style="font-size: 1.25rem; font-weight: 600; color: #bcddfe; margin-bottom: 0.75rem; display: flex; align-items: center;">
-                                <svg class="w-6 h-6 mr-2" style="color: #3698fb;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="bg-sapphire-300 border-2 border-sapphire-500 rounded-lg p-6">
+                            <h2 class="text-xl font-semibold text-sapphire-900 mb-3 flex items-center">
+                                <svg class="w-6 h-6 mr-2 text-sapphire-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                                 Performance
                             </h2>
-                            <p style="color: #d0d7e5;">
+                            <p class="text-twilight-indigo-900">
                                 Fast, reliable, and efficient. Built for modern media consumption.
                             </p>
                         </div>
@@ -59,11 +59,11 @@
                         @if (Route::has('login'))
                             <div class="flex flex-col sm:flex-row gap-4 justify-center">
                                 @auth
-                                    <a href="{{ url('/dashboard') }}" class="inline-block px-8 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg" style="background-color: #0466c8;" onmouseover="this.style.backgroundColor='#0f85fa'" onmouseout="this.style.backgroundColor='#0466c8'">
+                                    <a href="{{ url('/dashboard') }}" class="inline-block px-8 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg bg-smart-blue-500 hover:bg-smart-blue-600">
                                         Go to Dashboard
                                     </a>
                                 @else
-                                    <a href="{{ route('login') }}" class="inline-block px-8 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg" style="background-color: #0466c8;" onmouseover="this.style.backgroundColor='#0f85fa'" onmouseout="this.style.backgroundColor='#0466c8'">
+                                    <a href="{{ route('login') }}" class="inline-block px-8 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg bg-smart-blue-500 hover:bg-smart-blue-600">
                                         Log In
                                     </a>
                                 @endauth

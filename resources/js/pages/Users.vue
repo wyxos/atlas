@@ -18,10 +18,11 @@
                 <p class="text-red-500 text-lg">{{ error }}</p>
             </div>
 
-            <div v-else class="overflow-x-auto rounded-lg" style="background-color: #000e29;">
+            <div v-else class="w-full overflow-x-auto">
                 <o-table
                     :data="users"
                     :loading="loading"
+                    class="w-full rounded-lg overflow-hidden bg-prussian-blue-600"
                 >
                 <o-table-column field="id" label="ID" width="80" />
                 <o-table-column field="name" label="Name" />
@@ -30,15 +31,13 @@
                     <template #default="{ row }">
                         <span
                             v-if="row.email_verified_at"
-                            class="px-3 py-1 rounded-full text-xs font-medium"
-                            style="background-color: #023d78; color: #4ba3fb; border: 1px solid #0466c8;"
+                            class="px-3 py-1 rounded-full text-xs font-medium bg-success-300 text-success-600 border border-success-400"
                         >
                             Verified
                         </span>
                         <span
                             v-else
-                            class="px-3 py-1 rounded-full text-xs font-medium"
-                            style="background-color: #33415c; color: #9ba3b5; border: 1px solid #5c677d;"
+                            class="px-3 py-1 rounded-full text-xs font-medium bg-twilight-indigo-500 text-twilight-indigo-700 border border-twilight-indigo-600"
                         >
                             Unverified
                         </span>
@@ -59,12 +58,13 @@
                     <template #default="{ row }">
                         <button
                             @click="confirmDelete(row)"
-                            class="font-medium transition-colors cursor-pointer"
-                            style="color: #4ba3fb;"
-                            @mouseover="$event.target.style.color='#0f85fa'"
-                            @mouseleave="$event.target.style.color='#4ba3fb'"
+                            class="p-2 rounded-lg border-2 transition-all cursor-pointer delete-button border-danger-700 text-danger-700 bg-transparent"
+                            :class="{
+                                'opacity-50 cursor-not-allowed': deletingUserId === row.id
+                            }"
+                            :disabled="deletingUserId === row.id"
                         >
-                            Delete
+                            <Trash2 class="w-4 h-4" />
                         </button>
                     </template>
                 </o-table-column>
@@ -76,6 +76,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { Trash2 } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 
 interface User {
@@ -98,8 +99,9 @@ async function fetchUsers(): Promise<void> {
         error.value = null;
         const response = await window.axios.get('/api/users');
         users.value = response.data.data;
-    } catch (err: any) {
-        if (err.response?.status === 403) {
+    } catch (err: unknown) {
+        const axiosError = err as { response?: { status?: number } };
+        if (axiosError.response?.status === 403) {
             error.value = 'You do not have permission to view users.';
         } else {
             error.value = 'Failed to load users. Please try again later.';
@@ -115,8 +117,9 @@ async function deleteUser(userId: number): Promise<void> {
         deletingUserId.value = userId;
         await window.axios.delete(`/api/users/${userId}`);
         users.value = users.value.filter((user) => user.id !== userId);
-    } catch (err: any) {
-        if (err.response?.status === 403) {
+    } catch (err: unknown) {
+        const axiosError = err as { response?: { status?: number } };
+        if (axiosError.response?.status === 403) {
             error.value = 'You do not have permission to delete users.';
         } else {
             error.value = 'Failed to delete user. Please try again later.';
@@ -141,6 +144,7 @@ function formatDate(dateString: string): string {
         day: 'numeric',
     });
 }
+
 
 onMounted(() => {
     fetchUsers();

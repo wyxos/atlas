@@ -117,12 +117,27 @@
     --color-danger-700: #d32f2f;
     --color-danger-800: #e57373;
     --color-danger-900: #ffcdd2;
+
+    /* Success */
+    --color-success: #4ad66d;
+    --color-success-100: #1a7431;
+    --color-success-200: #2dc653;
+    --color-success-300: #4ad66d;
+    --color-success-400: #6ede8a;
+    --color-success-500: #92e6a7;
+    --color-success-600: #b7efc5;
+    --color-success-700: #b7efc5;
+    --color-success-800: #b7efc5;
+    --color-success-900: #b7efc5;
 }
 
 /* Oruga Table Styling to Match UI Guidelines */
 .o-table {
     background-color: transparent;
     color: #d0d7e5;
+    width: 100%;
+    border-radius: 0.5rem;
+    overflow: hidden;
 }
 
 .o-table table {
@@ -141,6 +156,14 @@
     font-weight: 600;
 }
 
+.o-table thead th:first-child {
+    border-top-left-radius: 0.5rem;
+}
+
+.o-table thead th:last-child {
+    border-top-right-radius: 0.5rem;
+}
+
 .o-table tbody tr {
     transition: background-color 0.2s;
     border-bottom: 1px solid #33415c;
@@ -155,9 +178,24 @@
     border-bottom: none;
 }
 
+.o-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 0.5rem;
+}
+
+.o-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 0.5rem;
+}
+
 .o-table tbody td {
     color: #d0d7e5;
     padding: 1rem 1.5rem;
     font-size: 0.875rem;
     background-color: transparent;
+}
+
+/* Delete Button Hover Effect */
+.delete-button:hover:not(:disabled) {
+    background-color: #a4161a !important;
+    border-color: #ba181b !important;
+    color: #ffcdd2 !important;
 }
