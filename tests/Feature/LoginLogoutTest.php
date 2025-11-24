@@ -23,10 +23,10 @@ it('allows a guest to log in and sign out without any issues', function () {
 
     $this->assertAuthenticatedAs($user);
 
-    // Click the sign out button in the header menu
-    $page->click('button[aria-label="User menu"]')
-        ->waitForText('Sign Out')
-        ->click('Sign Out')
+    // Click the user menu in the sidebar to expand it, then click logout
+    $page->click('button:has-text("Demo User")')
+        ->waitForText('Logout')
+        ->click('Logout')
         ->assertPathIs('/')
         ->assertSee('Atlas');
 

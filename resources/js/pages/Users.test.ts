@@ -1,7 +1,28 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import Users from './Users.vue';
+import Oruga from '@oruga-ui/oruga-next';
+
+// Mock axios
+vi.mock('axios', () => ({
+    default: {
+        get: vi.fn(),
+    },
+}));
+
+// Mock window.axios
+const mockAxios = {
+    get: vi.fn(),
+};
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    global.window = {
+        ...global.window,
+        axios: mockAxios,
+    } as typeof window;
+});
 
 async function createTestRouter(initialPath = '/users') {
     const router = createRouter({
@@ -18,25 +39,90 @@ async function createTestRouter(initialPath = '/users') {
 
 describe('Users', () => {
     it('renders the users title', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                data: [],
+            },
+        });
+
         const router = await createTestRouter();
         const wrapper = mount(Users, {
             global: {
-                plugins: [router],
+                plugins: [router, Oruga],
             },
         });
 
         expect(wrapper.text()).toContain('Users');
     });
 
-    it('renders placeholder message', async () => {
-        const router = await createTestRouter();
-        const wrapper = mount(Users, {
-            global: {
-                plugins: [router],
+    it('fetches and displays users', async () => {
+        const mockUsers = [
+            {
+                id: 1,
+                name: 'John Doe',
+                email: 'john@example.com',
+                email_verified_at: '2024-01-01T00:00:00Z',
+                created_at: '2024-01-01T00:00:00Z',
+            },
+            {
+                id: 2,
+                name: 'Jane Smith',
+                email: 'jane@example.com',
+                email_verified_at: null,
+                created_at: '2024-01-02T00:00:00Z',
+            },
+        ];
+
+        mockAxios.get.mockResolvedValue({
+            data: {
+                data: mockUsers,
             },
         });
 
-        expect(wrapper.text()).toContain('coming soon');
+        const router = await createTestRouter();
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/users');
+        expect(wrapper.text()).toContain('John Doe');
+        expect(wrapper.text()).toContain('jane@example.com');
+    });
+
+    it('displays loading state', async () => {
+        mockAxios.get.mockImplementation(() => new Promise(() => {})); // Never resolves
+
+        const router = await createTestRouter();
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.text()).toContain('Loading users');
+    });
+
+    it('displays error message on fetch failure', async () => {
+        mockAxios.get.mockRejectedValue(new Error('Network error'));
+
+        const router = await createTestRouter();
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(wrapper.text()).toContain('Failed to load users');
     });
 });
 

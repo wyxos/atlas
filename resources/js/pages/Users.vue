@@ -1,23 +1,149 @@
 <template>
-    <div class="w-full">
-        <div class="mb-8">
-                <h1 class="text-3xl md:text-4xl font-bold mb-2 text-smart-blue-900">
+    <PageLayout>
+        <div class="w-full">
+            <div class="mb-8">
+                <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
                     Users
-                </h1>
+                </h4>
                 <p class="text-blue-slate-700">
                     Manage your users
                 </p>
             </div>
 
-            <div class="text-center py-12">
-                <p class="text-twilight-indigo-900 text-lg">
-                    Users management coming soon...
-                </p>
+            <div v-if="loading" class="text-center py-12">
+                <p class="text-twilight-indigo-900 text-lg">Loading users...</p>
             </div>
-    </div>
+
+            <div v-else-if="error" class="text-center py-12">
+                <p class="text-red-500 text-lg">{{ error }}</p>
+            </div>
+
+            <div v-else class="overflow-x-auto rounded-lg" style="background-color: #000e29;">
+                <o-table
+                    :data="users"
+                    :loading="loading"
+                >
+                <o-table-column field="id" label="ID" width="80" />
+                <o-table-column field="name" label="Name" />
+                <o-table-column field="email" label="Email" />
+                <o-table-column field="email_verified_at" label="Verified">
+                    <template #default="{ row }">
+                        <span
+                            v-if="row.email_verified_at"
+                            class="px-3 py-1 rounded-full text-xs font-medium"
+                            style="background-color: #023d78; color: #4ba3fb; border: 1px solid #0466c8;"
+                        >
+                            Verified
+                        </span>
+                        <span
+                            v-else
+                            class="px-3 py-1 rounded-full text-xs font-medium"
+                            style="background-color: #33415c; color: #9ba3b5; border: 1px solid #5c677d;"
+                        >
+                            Unverified
+                        </span>
+                    </template>
+                </o-table-column>
+                <o-table-column field="last_login_at" label="Last Login">
+                    <template #default="{ row }">
+                        <span v-if="row.last_login_at">{{ formatDate(row.last_login_at) }}</span>
+                        <span v-else class="text-slate-grey-700">Never</span>
+                    </template>
+                </o-table-column>
+                <o-table-column field="created_at" label="Created At">
+                    <template #default="{ row }">
+                        {{ formatDate(row.created_at) }}
+                    </template>
+                </o-table-column>
+                <o-table-column label="Actions">
+                    <template #default="{ row }">
+                        <button
+                            @click="confirmDelete(row)"
+                            class="font-medium transition-colors cursor-pointer"
+                            style="color: #4ba3fb;"
+                            @mouseover="$event.target.style.color='#0f85fa'"
+                            @mouseleave="$event.target.style.color='#4ba3fb'"
+                        >
+                            Delete
+                        </button>
+                    </template>
+                </o-table-column>
+                </o-table>
+            </div>
+        </div>
+    </PageLayout>
 </template>
 
 <script setup lang="ts">
-// Dummy component - waiting for further instructions
+import { ref, onMounted } from 'vue';
+import PageLayout from '../components/PageLayout.vue';
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    email_verified_at: string | null;
+    last_login_at: string | null;
+    created_at: string;
+}
+
+const users = ref<User[]>([]);
+const loading = ref(true);
+const error = ref<string | null>(null);
+const deletingUserId = ref<number | null>(null);
+
+async function fetchUsers(): Promise<void> {
+    try {
+        loading.value = true;
+        error.value = null;
+        const response = await window.axios.get('/api/users');
+        users.value = response.data.data;
+    } catch (err: any) {
+        if (err.response?.status === 403) {
+            error.value = 'You do not have permission to view users.';
+        } else {
+            error.value = 'Failed to load users. Please try again later.';
+        }
+        console.error('Error fetching users:', err);
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function deleteUser(userId: number): Promise<void> {
+    try {
+        deletingUserId.value = userId;
+        await window.axios.delete(`/api/users/${userId}`);
+        users.value = users.value.filter((user) => user.id !== userId);
+    } catch (err: any) {
+        if (err.response?.status === 403) {
+            error.value = 'You do not have permission to delete users.';
+        } else {
+            error.value = 'Failed to delete user. Please try again later.';
+        }
+        console.error('Error deleting user:', err);
+    } finally {
+        deletingUserId.value = null;
+    }
+}
+
+function confirmDelete(user: User): void {
+    if (confirm(`Are you sure you want to delete ${user.name}? This action cannot be undone.`)) {
+        deleteUser(user.id);
+    }
+}
+
+function formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
+onMounted(() => {
+    fetchUsers();
+});
 </script>
 

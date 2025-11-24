@@ -1,9 +1,10 @@
 <template>
-    <div class="w-full">
-        <div class="text-center mb-8">
-                <h1 class="text-3xl md:text-4xl font-bold mb-2 text-smart-blue-900">
+    <PageLayout>
+        <div class="w-full">
+            <div class="text-center mb-8">
+                <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
                     Dashboard
-                </h1>
+                </h4>
                 <p class="text-blue-slate-700">
                     Welcome to your dashboard
                 </p>
@@ -31,6 +32,10 @@
                     </p>
                 </div>
             </div>
-    </div>
+        </div>
+    </PageLayout>
 </template>
 
+<script setup lang="ts">
+import PageLayout from '../components/PageLayout.vue';
+</script>
