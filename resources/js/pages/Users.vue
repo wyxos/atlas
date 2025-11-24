@@ -128,10 +128,13 @@ function handleDeleteCancel(): void {
 
 function formatDate(dateString: string): string {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
     });
 }
 
@@ -224,16 +227,21 @@ onMounted(() => {
 
             <!-- Delete Confirmation Dialog -->
             <Dialog v-model="dialogOpen">
-                <DialogContent class="sm:max-w-[425px]">
+                <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
                     <DialogHeader>
-                        <DialogTitle>Delete User</DialogTitle>
-                        <DialogDescription class="text-base mt-2">
-                            Are you sure you want to delete <span class="font-semibold text-smart-blue-400">{{ userToDelete?.name }}</span>? This action cannot be undone.
+                        <DialogTitle class="text-danger-600">Delete User</DialogTitle>
+                        <DialogDescription class="text-base mt-2 text-twilight-indigo-900">
+                            Are you sure you want to delete <span class="font-semibold text-danger-600">{{ userToDelete?.name }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <DialogClose as-child>
-                            <Button variant="outline" @click="handleDeleteCancel" :disabled="deletingUserId !== null">
+                            <Button 
+                                variant="outline" 
+                                @click="handleDeleteCancel" 
+                                :disabled="deletingUserId !== null"
+                                class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                            >
                                 Cancel
                             </Button>
                         </DialogClose>
