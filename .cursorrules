@@ -46,11 +46,26 @@
   - Tests should cover the functionality you've implemented or modified
   - Follow existing test patterns and conventions in the `tests` directory
 
+### Frontend Verification (MUST verify before completion)
+- **Browser Testing**: For any task that involves frontend changes (UI components, styling, Vue components, CSS, etc.), you MUST use browser MCP server and/or Playwright to visually verify the changes before marking the task as complete.
+- Navigate to the relevant pages, take screenshots, and verify that:
+  - The changes render correctly
+  - Styling matches the design guidelines (if applicable)
+  - Interactive elements work as expected
+  - The UI matches the intended design
+- Do not mark frontend tasks as complete without visual verification in a real browser environment.
+
+### Authentication and Testing
+- **Demo Credentials**: When testing pages behind authentication or using browser tools to verify authenticated pages, use the demo credentials from the seeder.
+- Check `database/seeders/DatabaseSeeder.php` for the current demo/test credentials. Use the credentials defined there for all authenticated testing scenarios.
+- Do not hardcode credentials in rules or documentation - always reference the seeder file as the source of truth.
+
 ### Workflow Order
 1. Make code changes
 2. Create or update tests for the changes (JS/Vue tests for JS/Vue code, PHP tests for PHP code)
-3. Run `npm run check` (this handles linting with auto-fix, type checking, and testing)
-4. Fix any remaining errors (the script auto-fixes what it can)
-5. Re-run `npm run check` to verify everything passes
-6. Only then consider the task complete
+3. For frontend changes: Use browser MCP server and/or Playwright to visually verify the changes
+4. Run `npm run check` (this handles linting with auto-fix, type checking, and testing)
+5. Fix any remaining errors (the script auto-fixes what it can)
+6. Re-run `npm run check` to verify everything passes
+7. Only then consider the task complete
 

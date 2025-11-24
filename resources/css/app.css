@@ -201,25 +201,23 @@
 }
 
 /* Oruga Pagination Styling - Matches Guidelines */
-.o-table .o-table__pagination-wrapper,
-.o-table .o-table__pagination {
-    display: flex !important;
-    justify-content: flex-end !important;
-    width: 100%;
-}
-
-.o-table .o-pagination {
+/* Target the pagination nav element */
+nav.o-pagination,
+nav[data-oruga="pagination"] {
     display: flex !important;
     align-items: center;
     justify-content: flex-end !important;
     gap: 0.5rem;
     padding: 1rem 1.5rem;
     background-color: transparent;
-    margin-left: auto;
+    margin-left: auto !important;
+    width: auto !important;
 }
 
-.o-table .o-pagination .o-pagination__list {
-    display: flex;
+/* Pagination list */
+.o-pagination__list {
+    display: flex !important;
+    flex-direction: row !important;
     align-items: center;
     gap: 0.5rem;
     list-style: none;
@@ -227,10 +225,107 @@
     padding: 0;
 }
 
-/* Regular pagination buttons */
-.o-table .o-pagination button,
-.o-table .o-pagination .o-pagination__link {
-    display: flex;
+/* Pagination list items */
+.o-pagination__item {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Regular pagination buttons - matches guidelines exactly */
+.o-pagination__button,
+.o-button.o-pagination__button,
+.o-button.o-pagination__button--previous,
+.o-button.o-pagination__button--next {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.5rem !important;
+    height: 2.5rem !important;
+    padding: 0 0.75rem !important;
+    border: 1px solid #33415c !important;
+    /* twilight-indigo-500 */
+    border-radius: 0.5rem !important;
+    background-color: transparent !important;
+    color: #d0d7e5 !important;
+    /* twilight-indigo-900 */
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Hover state for regular buttons - matches guidelines */
+.o-pagination__button:hover:not(:disabled):not(.o-pagination__button--current),
+.o-button.o-pagination__button:hover:not(:disabled):not(.o-pagination__button--current):not(.o-button--primary),
+.o-button.o-pagination__button--previous:hover:not(:disabled),
+.o-button.o-pagination__button--next:hover:not(:disabled) {
+    background-color: #023d78 !important;
+    /* smart-blue-300 */
+    border-color: #0f85fa !important;
+    /* smart-blue-600 */
+    color: #c3e0fe !important;
+    /* smart-blue-900 */
+}
+
+/* Current page button - matches guidelines */
+.o-pagination__button--current,
+.o-button.o-pagination__button--current,
+.o-button.o-pagination__button.o-button--primary,
+.o-pagination__button[aria-current="page"],
+.o-button.o-pagination__button[aria-current="page"] {
+    background-color: #0466c8 !important;
+    /* smart-blue-500 */
+    border-color: #0f85fa !important;
+    /* smart-blue-600 */
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+.o-pagination__button--current:hover,
+.o-button.o-pagination__button--current:hover,
+.o-button.o-pagination__button.o-button--primary:hover,
+.o-pagination__button[aria-current="page"]:hover,
+.o-button.o-pagination__button[aria-current="page"]:hover {
+    background-color: #0352a0 !important;
+    /* smart-blue-400 */
+    border-color: #0f85fa !important;
+    /* smart-blue-600 */
+    color: #ffffff !important;
+}
+
+/* Disabled state - matches guidelines */
+.o-pagination__button--disabled,
+.o-button.o-pagination__button--disabled,
+.o-pagination__button:disabled,
+.o-button.o-pagination__button:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+    background-color: transparent !important;
+    color: #33415c !important;
+    /* twilight-indigo-500 */
+    border-color: #33415c !important;
+    /* twilight-indigo-500 */
+}
+
+.o-pagination__button--disabled:hover,
+.o-button.o-pagination__button--disabled:hover,
+.o-pagination__button:disabled:hover,
+.o-button.o-pagination__button:disabled:hover {
+    background-color: transparent !important;
+    border-color: #33415c !important;
+    /* twilight-indigo-500 */
+    color: #33415c !important;
+    /* twilight-indigo-500 */
+}
+
+/* Previous and Next buttons */
+.o-pagination__button-previous,
+.o-pagination__button-next,
+.o-button.o-pagination__button-previous,
+.o-button.o-pagination__button-next {
+    display: flex !important;
     align-items: center;
     justify-content: center;
     min-width: 2.5rem;
@@ -242,59 +337,18 @@
     background-color: transparent;
     color: #d0d7e5;
     /* twilight-indigo-900 */
-    text-decoration: none;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 0.875rem;
-    font-weight: 500;
 }
 
-/* Hover state for regular buttons */
-.o-table .o-pagination button:hover:not(:disabled),
-.o-table .o-pagination .o-pagination__link:hover:not(.o-pagination__link--disabled) {
+.o-pagination__button-previous:hover:not(:disabled),
+.o-pagination__button-next:hover:not(:disabled),
+.o-button.o-pagination__button-previous:hover:not(:disabled),
+.o-button.o-pagination__button-next:hover:not(:disabled) {
     background-color: #023d78;
     /* smart-blue-300 */
     border-color: #0f85fa;
     /* smart-blue-600 */
     color: #c3e0fe;
     /* smart-blue-900 */
-}
-
-/* Disabled state */
-.o-table .o-pagination button:disabled,
-.o-table .o-pagination .o-pagination__link--disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    background-color: transparent;
-    color: #33415c;
-    /* twilight-indigo-500 */
-}
-
-.o-table .o-pagination button:disabled:hover,
-.o-table .o-pagination .o-pagination__link--disabled:hover {
-    background-color: transparent;
-    border-color: #33415c;
-    /* twilight-indigo-500 */
-    color: #33415c;
-    /* twilight-indigo-500 */
-}
-
-/* Current page */
-.o-table .o-pagination .o-pagination__link--current,
-.o-table .o-pagination button[aria-current="page"] {
-    background-color: #0466c8;
-    /* smart-blue-500 */
-    border-color: #0f85fa;
-    /* smart-blue-600 */
-    color: #ffffff;
-    font-weight: 600;
-}
-
-.o-table .o-pagination .o-pagination__link--current:hover,
-.o-table .o-pagination button[aria-current="page"]:hover {
-    background-color: #0352a0;
-    /* smart-blue-400 */
-    border-color: #0f85fa;
-    /* smart-blue-600 */
-    color: #ffffff;
 }
