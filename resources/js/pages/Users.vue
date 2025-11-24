@@ -22,6 +22,14 @@
                 <o-table
                     :data="users"
                     :loading="loading"
+                    paginated
+                    :per-page="perPage"
+                    :current-page="currentPage"
+                    :total="total"
+                    backend-pagination
+                    pagination-position="both"
+                    pagination-order="right"
+                    @page-change="handlePageChange"
                     class="w-full rounded-lg overflow-hidden bg-prussian-blue-600"
                 >
                 <o-table-column field="id" label="ID" width="80" />
@@ -93,13 +101,25 @@ const users = ref<User[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const deletingUserId = ref<number | null>(null);
+const currentPage = ref(1);
+const perPage = ref(15);
+const total = ref(0);
 
 async function fetchUsers(): Promise<void> {
     try {
         loading.value = true;
         error.value = null;
-        const response = await window.axios.get('/api/users');
+        const response = await window.axios.get('/api/users', {
+            params: {
+                page: currentPage.value,
+                per_page: perPage.value,
+            },
+        });
         users.value = response.data.data;
+        // Laravel pagination metadata is in the 'meta' object
+        const meta = response.data.meta || {};
+        currentPage.value = meta.current_page ?? response.data.current_page ?? 1;
+        total.value = meta.total ?? response.data.total ?? 0;
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number } };
         if (axiosError.response?.status === 403) {
@@ -113,11 +133,17 @@ async function fetchUsers(): Promise<void> {
     }
 }
 
+function handlePageChange(page: number): void {
+    currentPage.value = page;
+    fetchUsers();
+}
+
 async function deleteUser(userId: number): Promise<void> {
     try {
         deletingUserId.value = userId;
         await window.axios.delete(`/api/users/${userId}`);
-        users.value = users.value.filter((user) => user.id !== userId);
+        // Refresh the current page after deletion
+        await fetchUsers();
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number } };
         if (axiosError.response?.status === 403) {

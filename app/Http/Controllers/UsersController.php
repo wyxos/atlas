@@ -17,7 +17,8 @@ class UsersController extends Controller
     {
         Gate::authorize('viewAny', User::class);
 
-        $users = User::query()->orderBy('name')->get();
+        $perPage = request()->integer('per_page', 15);
+        $users = User::query()->orderBy('name')->paginate($perPage);
 
         return UserResource::collection($users);
     }

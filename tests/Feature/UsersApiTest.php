@@ -22,6 +22,11 @@ it('returns a list of users for admin users', function () {
                     'created_at',
                 ],
             ],
+            'links',
+            'meta' => [
+                'current_page',
+                'total',
+            ],
         ]);
 });
 
@@ -52,6 +57,19 @@ it('returns users ordered by name', function () {
     expect($users[0]['name'])->toBe('Alpha User');
     expect($users[1]['name'])->toBe('Beta User');
     expect($users[2]['name'])->toBe('Zebra User');
+});
+
+it('supports pagination', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    User::factory()->count(20)->create();
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/users?page=1&per_page=15');
+
+    $response->assertSuccessful();
+    expect($response->json('data'))->toHaveCount(15);
+    expect($response->json('meta.current_page'))->toBe(1);
+    expect($response->json('meta.total'))->toBeGreaterThanOrEqual(21); // 20 + admin
 });
 
 it('allows admin to delete users', function () {

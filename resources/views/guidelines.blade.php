@@ -652,6 +652,62 @@
                     </div>
                 </section>
 
+                <!-- Pagination -->
+                <section class="mb-12">
+                    <h2 class="text-3xl font-bold text-smart-blue-900 mb-6 pb-2 border-b-2 border-twilight-indigo-500">
+                        Pagination
+                    </h2>
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-xl font-semibold text-smart-blue-900 mb-4">Pagination Controls</h3>
+                            <div class="bg-prussian-blue-500 rounded-lg p-6">
+                                <div class="flex justify-end">
+                                    <nav class="flex items-center gap-2" aria-label="Pagination">
+                                        <button
+                                            disabled
+                                            class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-twilight-indigo-500 rounded-lg bg-transparent text-twilight-indigo-500 cursor-not-allowed opacity-40 transition-all"
+                                        >
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-smart-blue-600 rounded-lg bg-smart-blue-500 text-white font-semibold transition-all"
+                                            aria-current="page"
+                                        >
+                                            1
+                                        </button>
+                                        <button
+                                            class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-twilight-indigo-500 rounded-lg bg-transparent text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900 transition-all cursor-pointer"
+                                        >
+                                            2
+                                        </button>
+                                        <button
+                                            class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-twilight-indigo-500 rounded-lg bg-transparent text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900 transition-all cursor-pointer"
+                                        >
+                                            3
+                                        </button>
+                                        <button
+                                            class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-twilight-indigo-500 rounded-lg bg-transparent text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900 transition-all cursor-pointer"
+                                        >
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </button>
+                                    </nav>
+                                </div>
+                            </div>
+                            <div class="mt-4 p-4 bg-prussian-blue-500 rounded-lg">
+                                <p class="text-sm text-twilight-indigo-700 mb-2"><strong>Tailwind Classes:</strong></p>
+                                <code class="text-xs text-smart-blue-700 block whitespace-pre-wrap">flex items-center justify-center min-w-[2.5rem] h-10 px-3 border rounded-lg transition-all
+border-smart-blue-600 bg-smart-blue-500 text-white font-semibold (current page)
+border-twilight-indigo-500 bg-transparent text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900 (page buttons)
+opacity-40 cursor-not-allowed (disabled)</code>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Navigation -->
                 <div class="mt-8 pt-8 border-t-2 border-twilight-indigo-500">
                     <a href="{{ route('home') }}" class="inline-flex items-center gap-2 font-medium transition-colors text-smart-blue-700 hover:text-smart-blue-600">
