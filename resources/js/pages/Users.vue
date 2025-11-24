@@ -31,13 +31,14 @@
                     <template #default="{ row }">
                         <span
                             v-if="row.email_verified_at"
-                            class="px-3 py-1 rounded-full text-xs font-medium bg-success-300 text-success-700 border border-success-500"
+                            class="inline-flex items-center justify-center p-1.5 rounded-sm bg-success-300 border border-success-500"
+                            title="Verified"
                         >
-                            Verified
+                            <CheckCircle2 class="w-4 h-4" />
                         </span>
                         <span
                             v-else
-                            class="px-3 py-1 rounded-full text-xs font-medium bg-twilight-indigo-500 text-twilight-indigo-700 border border-twilight-indigo-600"
+                            class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-twilight-indigo-600"
                         >
                             Unverified
                         </span>
@@ -76,7 +77,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Trash2 } from 'lucide-vue-next';
+import { Trash2, CheckCircle2 } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 
 interface User {
