@@ -3,6 +3,14 @@
         <div class="flex h-16 items-center justify-between px-4">
             <!-- App Icon / Logo -->
             <div class="flex items-center gap-3">
+                <!-- Mobile Menu Toggle -->
+                <button
+                    @click="handleToggleMenu"
+                    class="md:hidden p-2 rounded-lg transition-colors hover:bg-prussian-blue-500 text-smart-blue-900 mobile-menu-toggle"
+                    aria-label="Toggle menu"
+                >
+                    <Menu class="w-6 h-6" />
+                </button>
                 <router-link to="/dashboard" class="flex items-center">
                     <AtlasIcon class="w-10 h-10" />
                 </router-link>
@@ -64,6 +72,7 @@ withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
     logout: [];
+    'toggle-menu': [];
 }>();
 
 const router = useRouter();
@@ -74,6 +83,10 @@ function handleProfileClick(): void {
 
 function handleLogout(): void {
     emit('logout');
+}
+
+function handleToggleMenu(): void {
+    emit('toggle-menu');
 }
 </script>
 

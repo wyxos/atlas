@@ -4,8 +4,8 @@
         <aside
             :class="[
                 'fixed md:static z-40 h-screen bg-prussian-blue-500 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
-                isMenuOpen ? 'w-64' : 'w-16',
-                'flex flex-col'
+                'flex flex-col',
+                isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-16 md:translate-x-0'
             ]"
         >
             <!-- Toggle Button -->
@@ -27,6 +27,7 @@
                         v-for="item in menuItems"
                         :key="item.name"
                         :to="item.path"
+                        @click="handleMenuItemClick"
                         class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-twilight-indigo-900 hover:bg-prussian-blue-400 hover:text-smart-blue-900"
                         :class="{
                             'bg-prussian-blue-400 text-smart-blue-900': $route.name === item.name
@@ -97,8 +98,8 @@
 
         <!-- Main Content -->
         <div class="flex-1 flex flex-col min-w-0">
-            <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" />
-            <main class="flex-1 bg-prussian-blue-400 rounded-lg shadow-xl md:p-8 md:p-12 overflow-auto">
+            <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" @toggle-menu="toggleMenu" />
+            <main class="flex-1 bg-prussian-blue-400 rounded-lg shadow-xl overflow-auto">
                 <router-view />
             </main>
         </div>
@@ -115,7 +116,7 @@
             <div
                 v-if="isMenuOpen"
                 @click="closeMenu"
-                class="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+                class="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden transition-opacity duration-300"
             />
         </Transition>
     </div>
@@ -153,7 +154,8 @@ defineEmits<{
 const userName = props.userName;
 const appName = props.appName;
 
-const isMenuOpen = ref(true);
+// On mobile, menu starts closed; on desktop, it starts open
+const isMenuOpen = ref(window.innerWidth >= 768);
 const isUserMenuOpen = ref(false);
 
 const menuItems = [
@@ -167,6 +169,19 @@ function toggleMenu(): void {
     isMenuOpen.value = !isMenuOpen.value;
     if (!isMenuOpen.value) {
         isUserMenuOpen.value = false;
+    }
+}
+
+function handleResize(): void {
+    // On desktop, menu should be open; on mobile, it should be closed
+    if (window.innerWidth >= 768) {
+        if (!isMenuOpen.value) {
+            isMenuOpen.value = true;
+        }
+    } else {
+        if (isMenuOpen.value) {
+            isMenuOpen.value = false;
+        }
     }
 }
 
@@ -184,6 +199,13 @@ function toggleUserMenu(): void {
 
 function closeUserMenu(): void {
     isUserMenuOpen.value = false;
+}
+
+function handleMenuItemClick(): void {
+    // Close menu on mobile when clicking a menu item
+    if (window.innerWidth < 768) {
+        closeMenu();
+    }
 }
 
 function handleUserLogout(): void {
@@ -227,7 +249,7 @@ function handleLogout(): void {
 
 function handleClickOutside(event: MouseEvent): void {
     const target = event.target as HTMLElement;
-    if (!target.closest('aside') && !target.closest('.user-menu-button')) {
+    if (!target.closest('aside') && !target.closest('.user-menu-button') && !target.closest('.mobile-menu-toggle')) {
         if (window.innerWidth < 768) {
             closeMenu();
         }
@@ -236,10 +258,13 @@ function handleClickOutside(event: MouseEvent): void {
 
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Set initial state based on screen size
 });
 
 onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside);
+    window.removeEventListener('resize', handleResize);
 });
 </script>
 
