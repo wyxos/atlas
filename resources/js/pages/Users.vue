@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Trash2, CheckCircle2 } from 'lucide-vue-next';
+import { Trash2, CheckCircle2, Filter } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import {
     Dialog,
@@ -12,6 +12,9 @@ import {
     DialogClose,
 } from '../components/ui/dialog';
 import Button from '../components/ui/Button.vue';
+import FilterPanel from '../components/ui/FilterPanel.vue';
+import FormInput from '../components/ui/FormInput.vue';
+import Select from '../components/ui/Select.vue';
 
 interface User {
     id: number;
@@ -31,17 +34,38 @@ const perPage = ref(15);
 const total = ref(0);
 const dialogOpen = ref(false);
 const userToDelete = ref<User | null>(null);
+const filterPanelOpen = ref(false);
+
+// Filter state
+const searchQuery = ref('');
+const dateFrom = ref('');
+const dateTo = ref('');
+const statusFilter = ref('all');
 
 async function fetchUsers(): Promise<void> {
     try {
         loading.value = true;
         error.value = null;
-        const response = await window.axios.get('/api/users', {
-            params: {
-                page: currentPage.value,
-                per_page: perPage.value,
-            },
-        });
+        const params: Record<string, string | number> = {
+            page: currentPage.value,
+            per_page: perPage.value,
+        };
+
+        // Add filter parameters
+        if (searchQuery.value.trim()) {
+            params.search = searchQuery.value.trim();
+        }
+        if (dateFrom.value) {
+            params.date_from = dateFrom.value;
+        }
+        if (dateTo.value) {
+            params.date_to = dateTo.value;
+        }
+        if (statusFilter.value !== 'all') {
+            params.status = statusFilter.value;
+        }
+
+        const response = await window.axios.get('/api/users', { params });
         users.value = response.data.data;
         // Laravel pagination metadata is in the 'meta' object
         const meta = response.data.meta || {};
@@ -138,6 +162,25 @@ function formatDate(dateString: string): string {
     });
 }
 
+function openFilterPanel(): void {
+    filterPanelOpen.value = true;
+}
+
+function applyFilters(): void {
+    currentPage.value = 1; // Reset to first page when applying filters
+    fetchUsers();
+    filterPanelOpen.value = false;
+}
+
+function resetFilters(): void {
+    searchQuery.value = '';
+    dateFrom.value = '';
+    dateTo.value = '';
+    statusFilter.value = 'all';
+    currentPage.value = 1;
+    fetchUsers();
+}
+
 onMounted(() => {
     fetchUsers();
 });
@@ -146,13 +189,23 @@ onMounted(() => {
 <template>
     <PageLayout>
         <div class="w-full">
-            <div class="mb-8">
-                <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
-                    Users
-                </h4>
-                <p class="text-blue-slate-700">
-                    Manage your users
-                </p>
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
+                        Users
+                    </h4>
+                    <p class="text-blue-slate-700">
+                        Manage your users
+                    </p>
+                </div>
+                <Button
+                    variant="outline"
+                    @click="openFilterPanel"
+                    class="border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                >
+                    <Filter class="w-4 h-4 mr-2" />
+                    Filters
+                </Button>
             </div>
 
             <div v-if="loading" class="text-center py-12">
@@ -224,6 +277,65 @@ onMounted(() => {
                 </o-table-column>
                 </o-table>
             </div>
+
+            <!-- Filter Panel -->
+            <FilterPanel
+                v-model="filterPanelOpen"
+                title="Filter Users"
+                @apply="applyFilters"
+                @reset="resetFilters"
+            >
+                <div class="space-y-6">
+                    <!-- Search Field -->
+                    <FormInput
+                        v-model="searchQuery"
+                        placeholder="Search by name or email..."
+                    >
+                        <template #label>
+                            Search
+                        </template>
+                    </FormInput>
+
+                    <!-- Date Range -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-smart-blue-900">
+                            Created Date Range
+                        </label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
+                                    From
+                                </label>
+                                <input
+                                    v-model="dateFrom"
+                                    type="date"
+                                    class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
+                                    To
+                                </label>
+                                <input
+                                    v-model="dateTo"
+                                    type="date"
+                                    class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <Select v-model="statusFilter">
+                        <template #label>
+                            Status
+                        </template>
+                        <option value="all">All</option>
+                        <option value="verified">Verified</option>
+                        <option value="unverified">Unverified</option>
+                    </Select>
+                </div>
+            </FilterPanel>
 
             <!-- Delete Confirmation Dialog -->
             <Dialog v-model="dialogOpen">
