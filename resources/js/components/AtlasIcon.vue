@@ -1,7 +1,3 @@
-<template>
-    <div v-html="svgWithClass" />
-</template>
-
 <script setup lang="ts">
 import { computed, useAttrs } from 'vue';
 import { cn } from '@/lib/utils';
@@ -14,3 +10,6 @@ const svgWithClass = computed(() => {
 });
 </script>
 
+<template>
+    <div v-html="svgWithClass" />
+</template>

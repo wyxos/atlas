@@ -1,3 +1,8 @@
+<script setup lang="ts">
+import PageLayout from '../components/PageLayout.vue';
+// Audio page
+</script>
+
 <template>
     <PageLayout>
         <div>
@@ -6,9 +11,3 @@
         </div>
     </PageLayout>
 </template>
-
-<script setup lang="ts">
-import PageLayout from '../components/PageLayout.vue';
-// Audio page
-</script>
-

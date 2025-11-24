@@ -1,12 +1,3 @@
-<template>
-    <button
-        :class="cn(buttonVariants({ variant, size }), $attrs.class)"
-        v-bind="$attrs"
-    >
-        <slot />
-    </button>
-</template>
-
 <script setup lang="ts">
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
@@ -46,6 +37,15 @@ withDefaults(defineProps<Props>(), {
 });
 </script>
 
+<template>
+    <button
+        :class="cn(buttonVariants({ variant, size }), $attrs.class)"
+        v-bind="$attrs"
+    >
+        <slot />
+    </button>
+</template>
+
 <style scoped>
 /* Smart Blue variant styles */
 button.variant-default {
@@ -73,4 +73,3 @@ button.variant-ghost:hover {
     background-color: #023d78;
 }
 </style>
-

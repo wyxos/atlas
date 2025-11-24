@@ -1,3 +1,90 @@
+<script setup lang="ts">
+import PageLayout from '../components/PageLayout.vue';
+import { ref } from 'vue';
+
+// Password form
+const passwordForm = ref({
+    current_password: '',
+    password: '',
+    password_confirmation: '',
+});
+
+const passwordErrors = ref<Record<string, string>>({});
+const passwordSuccess = ref('');
+const passwordLoading = ref(false);
+
+// Delete account form
+const deleteForm = ref({
+    password: '',
+});
+
+const deleteErrors = ref<Record<string, string>>({});
+const deleteLoading = ref(false);
+
+function clearPasswordErrors(): void {
+    passwordErrors.value = {};
+    passwordSuccess.value = '';
+}
+
+function clearDeleteErrors(): void {
+    deleteErrors.value = {};
+}
+
+async function handlePasswordUpdate(): Promise<void> {
+    clearPasswordErrors();
+    passwordLoading.value = true;
+
+    try {
+        const response = await window.axios.post('/profile/password', passwordForm.value);
+
+        passwordSuccess.value = response.data.message || 'Password updated successfully.';
+        passwordForm.value = {
+            current_password: '',
+            password: '',
+            password_confirmation: '',
+        };
+    } catch (error: unknown) {
+        if (window.axios.isAxiosError(error) && error.response?.data?.errors) {
+            passwordErrors.value = error.response.data.errors;
+        } else {
+            passwordErrors.value = {
+                current_password: 'An error occurred. Please try again.',
+            };
+        }
+    } finally {
+        passwordLoading.value = false;
+    }
+}
+
+async function handleAccountDeletion(): Promise<void> {
+    if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+        return;
+    }
+
+    clearDeleteErrors();
+    deleteLoading.value = true;
+
+    try {
+        await window.axios.delete('/profile/account', {
+            data: deleteForm.value,
+        });
+
+        // Account deleted, redirect to home
+        window.location.href = '/';
+    } catch (error: unknown) {
+        if (window.axios.isAxiosError(error) && error.response?.data?.errors) {
+            deleteErrors.value = error.response.data.errors;
+        } else {
+            deleteErrors.value = {
+                password: 'An error occurred. Please try again.',
+            };
+        }
+    } finally {
+        deleteLoading.value = false;
+    }
+}
+</script>
+
 <template>
     <PageLayout>
         <div class="w-full">
@@ -155,91 +242,3 @@
         </div>
     </PageLayout>
 </template>
-
-<script setup lang="ts">
-import PageLayout from '../components/PageLayout.vue';
-import { ref } from 'vue';
-
-// Password form
-const passwordForm = ref({
-    current_password: '',
-    password: '',
-    password_confirmation: '',
-});
-
-const passwordErrors = ref<Record<string, string>>({});
-const passwordSuccess = ref('');
-const passwordLoading = ref(false);
-
-// Delete account form
-const deleteForm = ref({
-    password: '',
-});
-
-const deleteErrors = ref<Record<string, string>>({});
-const deleteLoading = ref(false);
-
-function clearPasswordErrors(): void {
-    passwordErrors.value = {};
-    passwordSuccess.value = '';
-}
-
-function clearDeleteErrors(): void {
-    deleteErrors.value = {};
-}
-
-async function handlePasswordUpdate(): Promise<void> {
-    clearPasswordErrors();
-    passwordLoading.value = true;
-
-    try {
-        const response = await window.axios.post('/profile/password', passwordForm.value);
-
-        passwordSuccess.value = response.data.message || 'Password updated successfully.';
-        passwordForm.value = {
-            current_password: '',
-            password: '',
-            password_confirmation: '',
-        };
-    } catch (error: unknown) {
-        if (window.axios.isAxiosError(error) && error.response?.data?.errors) {
-            passwordErrors.value = error.response.data.errors;
-        } else {
-            passwordErrors.value = {
-                current_password: 'An error occurred. Please try again.',
-            };
-        }
-    } finally {
-        passwordLoading.value = false;
-    }
-}
-
-async function handleAccountDeletion(): Promise<void> {
-    if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-        return;
-    }
-
-    clearDeleteErrors();
-    deleteLoading.value = true;
-
-    try {
-        await window.axios.delete('/profile/account', {
-            data: deleteForm.value,
-        });
-
-        // Account deleted, redirect to home
-        window.location.href = '/';
-    } catch (error: unknown) {
-        if (window.axios.isAxiosError(error) && error.response?.data?.errors) {
-            deleteErrors.value = error.response.data.errors;
-        } else {
-            deleteErrors.value = {
-                password: 'An error occurred. Please try again.',
-            };
-        }
-    } finally {
-        deleteLoading.value = false;
-    }
-}
-</script>
-

@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import PageLayout from '../components/PageLayout.vue';
+</script>
+
 <template>
     <PageLayout>
         <div class="w-full">
@@ -35,7 +39,3 @@
         </div>
     </PageLayout>
 </template>
-
-<script setup lang="ts">
-import PageLayout from '../components/PageLayout.vue';
-</script>
