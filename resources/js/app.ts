@@ -12,12 +12,12 @@ if (appElement) {
     // Only initialize Vue Router if we're on a page that should use Vue (like dashboard)
     // Check if we're on a route that should use Vue Router
     const currentPath = window.location.pathname;
-    const vueRoutes = ['/dashboard', '/users', '/profile'];
-    
+    const vueRoutes = ['/dashboard', '/users', '/files', '/settings', '/profile'];
+
     // Check if this is a Vue route by checking if the app element is empty
     // (Blade pages will have content, Vue pages will be empty)
     const isVueRoute = vueRoutes.some(route => currentPath.startsWith(route)) && appElement.children.length === 0;
-    
+
     if (isVueRoute) {
         const router = createRouter({
             history: createWebHistory(),
