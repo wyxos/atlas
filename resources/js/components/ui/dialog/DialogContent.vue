@@ -5,6 +5,14 @@ import { inject, onMounted, onUnmounted, watch, computed, Teleport } from 'vue';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-vue-next';
 
+interface Props {
+    class?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+    class: '',
+});
+
 const dialogOpen = inject<{ value: boolean } | { get: () => boolean; set: (value: boolean) => void }>('dialogOpen');
 const setDialogOpen = inject<(value: boolean) => void>('setDialogOpen');
 
@@ -84,7 +92,7 @@ onUnmounted(() => {
                         v-if="isOpen"
                         :class="cn(
                             'relative z-50 w-full max-w-lg rounded-lg border border-twilight-indigo-500 bg-prussian-blue-600 p-6 shadow-lg focus:outline-none',
-                            $attrs.class
+                            props.class
                         )"
                         @click.stop
                     >

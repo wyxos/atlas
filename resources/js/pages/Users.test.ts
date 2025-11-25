@@ -503,5 +503,157 @@ describe('Users', () => {
         // Verify permission error message is displayed
         expect(wrapper.text()).toContain('You do not have permission to delete users');
     });
+
+    it('loads filters from URL query parameters', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                data: [],
+                links: {},
+                meta: {
+                    current_page: 2,
+                    total: 0,
+                    per_page: 15,
+                    last_page: 1,
+                },
+            },
+        });
+
+        const router = await createTestRouter('/users?page=2&search=john&status=verified&date_from=2024-01-01&date_to=2024-12-31');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.currentPage).toBe(2);
+        expect(vm.searchQuery).toBe('john');
+        expect(vm.statusFilter).toBe('verified');
+        expect(vm.dateFrom).toBe('2024-01-01');
+        expect(vm.dateTo).toBe('2024-12-31');
+
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/users', {
+            params: expect.objectContaining({
+                page: 2,
+                search: 'john',
+                status: 'verified',
+                date_from: '2024-01-01',
+                date_to: '2024-12-31',
+            }),
+        });
+    });
+
+    it('updates URL when applying filters', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                data: [],
+                links: {},
+                meta: {
+                    current_page: 1,
+                    total: 0,
+                    per_page: 15,
+                    last_page: 1,
+                },
+            },
+        });
+
+        const router = await createTestRouter();
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        vm.searchQuery = 'test';
+        vm.statusFilter = 'verified';
+        vm.dateFrom = '2024-01-01';
+        vm.dateTo = '2024-12-31';
+
+        await vm.applyFilters();
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(router.currentRoute.value.query).toEqual({
+            search: 'test',
+            status: 'verified',
+            date_from: '2024-01-01',
+            date_to: '2024-12-31',
+        });
+    });
+
+    it('updates URL when changing page', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                data: [],
+                links: {},
+                meta: {
+                    current_page: 2,
+                    total: 30,
+                    per_page: 15,
+                    last_page: 2,
+                },
+            },
+        });
+
+        const router = await createTestRouter();
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        await vm.handlePageChange(2);
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(router.currentRoute.value.query.page).toBe('2');
+    });
+
+    it('clears URL query parameters when resetting filters', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                data: [],
+                links: {},
+                meta: {
+                    current_page: 1,
+                    total: 0,
+                    per_page: 15,
+                    last_page: 1,
+                },
+            },
+        });
+
+        const router = await createTestRouter('/users?page=2&search=test&status=verified');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        await vm.resetFilters();
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(router.currentRoute.value.query).toEqual({});
+    });
 });
 
