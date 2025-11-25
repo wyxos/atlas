@@ -145,14 +145,91 @@ export class Listing<T extends Record<string, unknown>> {
     }
 
     /**
-     * Load data from the configured API path
-     * Automatically syncs filters and pagination from URL query parameters if router is configured
-     * @param path - Optional API endpoint path override
-     * @param parameters - Optional query parameters to include in the request
-     * @param query - Optional query object to sync from (if not provided, reads from router)
+     * Normalize params from various input types
      */
-    async load(path?: string, parameters?: Record<string, string | number>, query?: Record<string, unknown>): Promise<void> {
-        const apiPath = path || this.apiPath;
+    private normalizeParams(
+        params: string | Record<string, string | number> | (() => Record<string, string | number>) | undefined
+    ): Record<string, string | number> {
+        if (!params) {
+            return {};
+        }
+
+        // Handle string - could be query string or method name
+        if (typeof params === 'string') {
+            // If it starts with ? or &, parse as query string
+            if (params.startsWith('?') || params.startsWith('&')) {
+                const urlParams = new URLSearchParams(params.startsWith('?') ? params.slice(1) : params);
+                const result: Record<string, string | number> = {};
+                for (const [key, value] of urlParams.entries()) {
+                    const numValue = Number(value);
+                    result[key] = isNaN(numValue) ? value : numValue;
+                }
+                return result;
+            }
+            // Otherwise, treat as method name and call it if it exists
+            const method = (this as unknown as Record<string, () => Record<string, string | number>>)[params];
+            if (typeof method === 'function') {
+                return method();
+            }
+            // If not a method, return empty (or could throw error)
+            return {};
+        }
+
+        // Handle function/callback
+        if (typeof params === 'function') {
+            return params();
+        }
+
+        // Handle object
+        return params;
+    }
+
+    /**
+     * Get data from the configured API path (axios.get style signature)
+     * Automatically syncs filters and pagination from URL query parameters if router is configured
+     * 
+     * Usage:
+     * - get() - uses configured path from .path()
+     * - get('/api/users') - uses provided path
+     * - get('/api/users', { query }) - uses provided path with config
+     * - get({ query }) - uses configured path with config (when first param is object)
+     * 
+     * @param pathOrConfig - API endpoint path (string) or config object (when path is configured)
+     * @param config - Configuration object with params and optional query (only when path is provided)
+     * @param config.params - Query parameters (string, object, callback, or method name)
+     * @param config.query - Optional query object to sync from (if not provided, reads from router)
+     */
+    async get(
+        pathOrConfig?: string | {
+            params?: string | Record<string, string | number> | (() => Record<string, string | number>);
+            query?: Record<string, unknown>;
+        },
+        config?: {
+            params?: string | Record<string, string | number> | (() => Record<string, string | number>);
+            query?: Record<string, unknown>;
+        }
+    ): Promise<void> {
+        // Determine if first parameter is path (string) or config (object)
+        let apiPath: string | null;
+        let actualConfig: {
+            params?: string | Record<string, string | number> | (() => Record<string, string | number>);
+            query?: Record<string, unknown>;
+        } | undefined;
+
+        if (typeof pathOrConfig === 'string') {
+            // First param is a path string
+            apiPath = pathOrConfig;
+            actualConfig = config;
+        } else if (pathOrConfig && typeof pathOrConfig === 'object') {
+            // First param is a config object (using configured path)
+            apiPath = this.apiPath;
+            actualConfig = pathOrConfig;
+        } else {
+            // No params provided, use configured path
+            apiPath = this.apiPath;
+            actualConfig = undefined;
+        }
+
         if (!apiPath) {
             throw new Error('API path must be provided either as parameter or via path() method');
         }
@@ -160,9 +237,9 @@ export class Listing<T extends Record<string, unknown>> {
         // Sync from URL query parameters if router is configured or query is provided
         let routeQuery: Record<string, unknown> = {};
 
-        if (query) {
+        if (actualConfig?.query) {
             // Use provided query (from component's useRoute())
-            routeQuery = query;
+            routeQuery = actualConfig.query;
         } else if (this.routerInstance) {
             // Read from router instance
             const currentRoute = this.routerInstance.currentRoute;
@@ -170,6 +247,9 @@ export class Listing<T extends Record<string, unknown>> {
                 routeQuery = currentRoute.value.query || {};
             }
         }
+
+        // Normalize params from config
+        const parameters = actualConfig?.params ? this.normalizeParams(actualConfig.params) : {};
 
         // Update filters and pagination from query if available
         if (Object.keys(routeQuery).length > 0) {
@@ -196,21 +276,12 @@ export class Listing<T extends Record<string, unknown>> {
                 }
             }
 
-        }
-
-        // Update pagination from URL
-        if (Object.keys(routeQuery).length > 0 && routeQuery.page) {
-            const page = parseInt(String(routeQuery.page), 10);
-            if (!isNaN(page) && page > 0) {
-                this.currentPage = page;
-            }
-        }
-
-        // Update pagination from URL
-        if (Object.keys(routeQuery).length > 0 && routeQuery.page) {
-            const page = parseInt(String(routeQuery.page), 10);
-            if (!isNaN(page) && page > 0) {
-                this.currentPage = page;
+            // Update pagination from URL
+            if (routeQuery.page) {
+                const page = parseInt(String(routeQuery.page), 10);
+                if (!isNaN(page) && page > 0) {
+                    this.currentPage = page;
+                }
             }
         }
 
@@ -304,8 +375,19 @@ export class Listing<T extends Record<string, unknown>> {
         const shouldAutoLoad = autoLoad !== false && (this.apiPath !== null || this.routerInstance !== null);
         if (shouldAutoLoad) {
             await this.updateUrl();
-            await this.load();
+            await this.get(); // Uses configured path from .path()
         }
+    }
+
+    /**
+     * Load data from the configured API path (legacy method - use get() instead)
+     * @deprecated Use get() instead for axios.get style signature
+     */
+    async load(path?: string, parameters?: Record<string, string | number>, query?: Record<string, unknown>): Promise<void> {
+        await this.get(path, {
+            params: parameters,
+            query,
+        });
     }
 
     /**
