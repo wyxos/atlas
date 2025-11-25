@@ -53,6 +53,7 @@ async function createTestRouter(initialPath = '/users') {
         ],
     });
     await router.push(initialPath);
+    await router.isReady();
     return router;
 }
 
