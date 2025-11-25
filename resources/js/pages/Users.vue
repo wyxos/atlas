@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, CheckCircle2, Filter } from 'lucide-vue-next';
+import { Trash2, CheckCircle2, Filter, Users } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import {
     Dialog,
@@ -244,6 +244,13 @@ function resetFilters(): void {
     fetchUsers();
 }
 
+const hasActiveFilters = computed(() => {
+    return searchQuery.value.trim() !== '' || 
+           dateFrom.value !== '' || 
+           dateTo.value !== '' || 
+           statusFilter.value !== 'all';
+});
+
 // Watch for route query changes (back/forward navigation)
 watch(() => route.query, () => {
     loadFromUrl();
@@ -345,6 +352,27 @@ onMounted(() => {
                         </button>
                     </template>
                 </o-table-column>
+                <template #empty>
+                    <div class="flex flex-col items-center justify-center py-12 px-6">
+                        <Users class="w-16 h-16 text-twilight-indigo-600 mb-4" />
+                        <h3 class="text-xl font-semibold text-regal-navy-900 mb-2">
+                            {{ hasActiveFilters ? 'No users found' : 'No users yet' }}
+                        </h3>
+                        <p class="text-twilight-indigo-700 text-center max-w-md">
+                            {{ hasActiveFilters 
+                                ? 'Try adjusting your filters to see more results.' 
+                                : 'Get started by creating your first user.' }}
+                        </p>
+                        <Button
+                            v-if="hasActiveFilters"
+                            variant="outline"
+                            @click="resetFilters"
+                            class="mt-4 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                        >
+                            Clear Filters
+                        </Button>
+                    </div>
+                </template>
                 </o-table>
             </div>
 
