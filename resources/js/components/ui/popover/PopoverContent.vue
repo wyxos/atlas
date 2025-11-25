@@ -30,14 +30,34 @@ const isOpen = computed(() => {
 const contentRef = ref<HTMLElement | null>(null);
 const triggerRef = inject<{ value: HTMLElement | null } | undefined>('popoverTriggerRef', undefined);
 const popoverStyle = ref<{ top?: string; left?: string; right?: string }>({});
+const mouseDownHandlerRef = ref<((e: MouseEvent) => void) | null>(null);
+const touchEndHandlerRef = ref<((e: TouchEvent) => void) | null>(null);
 
 function handleClickOutside(event: MouseEvent | TouchEvent): void {
-    const target = event.target as Node;
+    // Don't process if popover is already closed
+    if (!isOpen.value) {
+        return;
+    }
+    
+    const target = event.target as Node | null;
+    if (!target) {
+        return;
+    }
+    
     const clickedInsideContent = contentRef.value?.contains(target);
     const clickedInsideTrigger = triggerRef && 'value' in triggerRef ? triggerRef.value?.contains(target) : false;
     
+    // Close if clicked outside both content and trigger
+    // Use setTimeout to ensure this runs after other click handlers (like trigger toggle)
     if (!clickedInsideContent && !clickedInsideTrigger) {
-        setPopoverOpen?.(false);
+        // Use a small delay to allow trigger toggle to run first
+        setTimeout(() => {
+            // Double-check that popover is still open before closing
+            // This prevents race conditions with trigger toggle
+            if (isOpen.value) {
+                setPopoverOpen?.(false);
+            }
+        }, 1);
     }
 }
 
@@ -96,16 +116,35 @@ function updatePosition(): void {
 
 watch(isOpen, (isOpenValue) => {
     if (isOpenValue) {
-        setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-            document.addEventListener('touchend', handleClickOutside);
-            updatePosition();
-            window.addEventListener('resize', updatePosition);
-            window.addEventListener('scroll', updatePosition, true);
-        }, 0);
+        // Attach listeners immediately when popover opens
+        // Use mousedown instead of click to catch events earlier
+        // This ensures we catch clicks even if stopPropagation is called
+        const handleMouseDown = (e: MouseEvent) => {
+            handleClickOutside(e);
+        };
+        const handleTouchEnd = (e: TouchEvent) => {
+            handleClickOutside(e);
+        };
+        
+        // Store handlers so we can remove them later
+        mouseDownHandlerRef.value = handleMouseDown;
+        touchEndHandlerRef.value = handleTouchEnd;
+        
+        document.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('touchend', handleTouchEnd);
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true);
     } else {
-        document.removeEventListener('click', handleClickOutside);
-        document.removeEventListener('touchend', handleClickOutside);
+        // Remove stored handlers
+        if (mouseDownHandlerRef.value) {
+            document.removeEventListener('mousedown', mouseDownHandlerRef.value);
+            mouseDownHandlerRef.value = null;
+        }
+        if (touchEndHandlerRef.value) {
+            document.removeEventListener('touchend', touchEndHandlerRef.value);
+            touchEndHandlerRef.value = null;
+        }
         window.removeEventListener('resize', updatePosition);
         window.removeEventListener('scroll', updatePosition, true);
     }
@@ -119,19 +158,33 @@ watch(() => [isOpen.value, triggerRef && 'value' in triggerRef ? triggerRef.valu
 
 onMounted(() => {
     if (isOpen.value) {
-        setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-            document.addEventListener('touchend', handleClickOutside);
-            updatePosition();
-            window.addEventListener('resize', updatePosition);
-            window.addEventListener('scroll', updatePosition, true);
-        }, 0);
+        const handleMouseDown = (e: MouseEvent) => {
+            handleClickOutside(e);
+        };
+        const handleTouchEnd = (e: TouchEvent) => {
+            handleClickOutside(e);
+        };
+        
+        mouseDownHandlerRef.value = handleMouseDown;
+        touchEndHandlerRef.value = handleTouchEnd;
+        
+        document.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('touchend', handleTouchEnd);
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true);
     }
 });
 
 onUnmounted(() => {
-    document.removeEventListener('click', handleClickOutside);
-    document.removeEventListener('touchend', handleClickOutside);
+    if (mouseDownHandlerRef.value) {
+        document.removeEventListener('mousedown', mouseDownHandlerRef.value);
+        mouseDownHandlerRef.value = null;
+    }
+    if (touchEndHandlerRef.value) {
+        document.removeEventListener('touchend', touchEndHandlerRef.value);
+        touchEndHandlerRef.value = null;
+    }
     window.removeEventListener('resize', updatePosition);
     window.removeEventListener('scroll', updatePosition, true);
 });
@@ -151,7 +204,7 @@ onUnmounted(() => {
                 v-if="isOpen"
                 ref="contentRef"
                 :class="cn(
-                    'fixed z-50 min-w-[8rem] max-w-[90vw] rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-1 shadow-lg',
+                    'fixed z-[70] min-w-[8rem] max-w-[90vw] rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-1 shadow-lg',
                     props.class
                 )"
                 :style="popoverStyle"
