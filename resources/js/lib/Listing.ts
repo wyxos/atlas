@@ -20,7 +20,7 @@ type FilterValue = string | number | { value: string | number | null | undefined
 
 export class Listing<T extends Record<string, unknown>> {
     public data: T[] = [];
-    public loading = false;
+    public isLoading = false;
     public error: string | null = null;
     public currentPage = 1;
     public perPage = 15;
@@ -37,11 +37,17 @@ export class Listing<T extends Record<string, unknown>> {
     private errorHandler: ErrorHandler | null = null;
 
     /**
-     * Set the loading state
-     * @param loading - Whether the listing is loading
+     * Set the loading state to true
      */
-    setLoading(loading: boolean): void {
-        this.loading = loading;
+    loading(): void {
+        this.isLoading = true;
+    }
+
+    /**
+     * Set the loading state to false
+     */
+    loaded(): void {
+        this.isLoading = false;
     }
 
     /**
@@ -124,10 +130,10 @@ export class Listing<T extends Record<string, unknown>> {
     }
 
     /**
-     * Set the error handler function to customize error messages
+     * Set the error handler function to customize load error messages
      * @param handler - Function that receives error message and status code, returns customized error message
      */
-    onError(handler: ErrorHandler): this {
+    onLoadError(handler: ErrorHandler): this {
         this.errorHandler = handler;
         return this;
     }
@@ -144,7 +150,7 @@ export class Listing<T extends Record<string, unknown>> {
         }
 
         try {
-            this.setLoading(true);
+            this.loading();
             this.error = null;
 
             // Build filter parameters from configured filter attributes
@@ -188,7 +194,7 @@ export class Listing<T extends Record<string, unknown>> {
 
             console.error('Error loading listing:', err);
         } finally {
-            this.setLoading(false);
+            this.loaded();
         }
     }
 
@@ -274,7 +280,7 @@ export class Listing<T extends Record<string, unknown>> {
      */
     reset(): void {
         this.data = [];
-        this.setLoading(false);
+        this.loaded();
         this.error = null;
         this.currentPage = 1;
         this.perPage = 15;
