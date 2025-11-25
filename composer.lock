@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "888554dbdbcf1ac2f84f75d476b848cd",
+    "content-hash": "00d40d01568bbc2fdb0c2168b24216e5",
     "packages": [
         {
             "name": "brick/math",
@@ -6532,30 +6532,27 @@
         },
         {
             "name": "wyxos/harmonie",
-            "version": "1.6.9",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/wyxos/harmonie.git",
-                "reference": "8111559868d7a3cdd5228b9fad22f9e65ee8090a"
-            },
+            "version": "dev-main",
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/wyxos/harmonie/zipball/8111559868d7a3cdd5228b9fad22f9e65ee8090a",
-                "reference": "8111559868d7a3cdd5228b9fad22f9e65ee8090a",
-                "shasum": ""
+                "type": "path",
+                "url": "D:/code/wyxos/laravel-plugin/harmonie",
+                "reference": "d2603d87362c0e1d4714141bd50452d546d5f7ff"
             },
             "require": {
-                "laravel/framework": "^11.31 || ^12.0",
+                "laravel/framework": "^11.31|^12.0",
                 "laravel/scout": "^10.6",
                 "league/csv": "^9.0",
-                "php": ">=8.1 || ^8.2",
+                "php": ">=8.1",
                 "phpoffice/phpspreadsheet": "^2.2"
             },
             "type": "library",
             "extra": {
                 "laravel": {
                     "providers": [
+                        "Wyxos\\Harmonie\\Resource\\ResourceServiceProvider",
                         "Wyxos\\Harmonie\\Listing\\ListingServiceProvider",
+                        "Wyxos\\Harmonie\\Export\\ExportServiceProvider",
+                        "Wyxos\\Harmonie\\Import\\ImportServiceProvider",
                         "Wyxos\\Harmonie\\Harmonie\\HarmonieServiceProvider"
                     ]
                 }
@@ -6565,7 +6562,6 @@
                     "Wyxos\\Harmonie\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -6576,11 +6572,9 @@
                 }
             ],
             "description": "Backend utilities for Laravel and @wyxos/vision",
-            "support": {
-                "issues": "https://github.com/wyxos/harmonie/issues",
-                "source": "https://github.com/wyxos/harmonie/tree/v1.6.9"
-            },
-            "time": "2025-07-11T07:47:23+00:00"
+            "transport-options": {
+                "relative": false
+            }
         }
     ],
     "packages-dev": [
@@ -11681,7 +11675,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "wyxos/harmonie": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

@@ -2,6 +2,7 @@
 
 namespace App\Listings;
 
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Scout\Builder as ScoutBuilder;
@@ -81,6 +82,6 @@ class UserListing extends ListingBase
 
     public function append($item)
     {
-        return $item;
+        return new UserResource($item);
     }
 }

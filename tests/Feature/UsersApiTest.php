@@ -12,21 +12,26 @@ it('returns a list of users for admin users', function () {
         ->getJson('/api/users')
         ->assertSuccessful()
         ->assertJsonStructure([
-            'data' => [
-                '*' => [
-                    'id',
-                    'name',
-                    'email',
-                    'email_verified_at',
-                    'last_login_at',
-                    'created_at',
+            'listing' => [
+                'items' => [
+                    '*' => [
+                        'id',
+                        'name',
+                        'email',
+                        'email_verified_at',
+                        'last_login_at',
+                        'created_at',
+                    ],
                 ],
+                'total',
+                'perPage',
+                'current_page',
+                'last_page',
+                'from',
+                'to',
             ],
             'links',
-            'meta' => [
-                'current_page',
-                'total',
-            ],
+            'filters',
         ]);
 });
 
@@ -53,7 +58,7 @@ it('returns users ordered by name', function () {
         ->getJson('/api/users');
 
     $response->assertSuccessful();
-    $users = $response->json('data');
+    $users = $response->json('listing.items');
     expect($users[0]['name'])->toBe('Alpha User');
     expect($users[1]['name'])->toBe('Beta User');
     expect($users[2]['name'])->toBe('Zebra User');
@@ -67,9 +72,9 @@ it('supports pagination', function () {
         ->getJson('/api/users?page=1&per_page=15');
 
     $response->assertSuccessful();
-    expect($response->json('data'))->toHaveCount(15);
-    expect($response->json('meta.current_page'))->toBe(1);
-    expect($response->json('meta.total'))->toBeGreaterThanOrEqual(21); // 20 + admin
+    expect($response->json('listing.items'))->toHaveCount(15);
+    expect($response->json('listing.current_page'))->toBe(1);
+    expect($response->json('listing.total'))->toBeGreaterThanOrEqual(21); // 20 + admin
 });
 
 it('allows admin to delete users', function () {
@@ -113,7 +118,7 @@ it('filters users by search query', function () {
         ->getJson('/api/users?search=john');
 
     $response->assertSuccessful();
-    $users = $response->json('data');
+    $users = $response->json('listing.items');
     expect($users)->toHaveCount(1);
     expect($users[0]['name'])->toBe('John Doe');
 });
@@ -127,7 +132,7 @@ it('filters users by email search', function () {
         ->getJson('/api/users?search=jane@example.com');
 
     $response->assertSuccessful();
-    $users = $response->json('data');
+    $users = $response->json('listing.items');
     expect($users)->toHaveCount(1);
     expect($users[0]['email'])->toBe('jane@example.com');
 });
@@ -142,7 +147,7 @@ it('filters users by date range', function () {
         ->getJson('/api/users?date_from=2024-02-01&date_to=2024-02-28');
 
     $response->assertSuccessful();
-    $users = $response->json('data');
+    $users = $response->json('listing.items');
     expect($users)->toHaveCount(1);
     expect($users[0]['created_at'])->toContain('2024-02-15');
 });
@@ -157,7 +162,7 @@ it('filters users by verified status', function () {
         ->getJson('/api/users?status=verified');
 
     $response->assertSuccessful();
-    $users = $response->json('data');
+    $users = $response->json('listing.items');
     // Admin + 2 verified users = 3 total
     expect($users)->toHaveCount(3);
     foreach ($users as $user) {
@@ -175,7 +180,7 @@ it('filters users by unverified status', function () {
         ->getJson('/api/users?status=unverified');
 
     $response->assertSuccessful();
-    $users = $response->json('data');
+    $users = $response->json('listing.items');
     expect($users)->toHaveCount(2);
     foreach ($users as $user) {
         expect($user['email_verified_at'])->toBeNull();
@@ -207,7 +212,7 @@ it('combines multiple filters', function () {
         ->getJson('/api/users?search=john&status=verified&date_from=2024-01-01&date_to=2024-01-31');
 
     $response->assertSuccessful();
-    $users = $response->json('data');
+    $users = $response->json('listing.items');
     expect($users)->toHaveCount(1);
     expect($users[0]['name'])->toBe('John Verified');
     expect($users[0]['email_verified_at'])->not->toBeNull();

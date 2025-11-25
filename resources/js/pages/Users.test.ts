@@ -54,20 +54,39 @@ async function createTestRouter(initialPath = '/users') {
     return router;
 }
 
+function createHarmonieResponse(items: User[], currentPage = 1, total?: number, perPage = 15) {
+    const itemTotal = total ?? items.length;
+    const lastPage = Math.ceil(itemTotal / perPage);
+    const from = items.length > 0 ? (currentPage - 1) * perPage + 1 : null;
+    const to = items.length > 0 ? from! + items.length - 1 : null;
+
+    return {
+        data: {
+            listing: {
+                items,
+                total: itemTotal,
+                perPage,
+                current_page: currentPage,
+                last_page: lastPage,
+                from,
+                to,
+                showing: to ?? 0,
+                nextPage: currentPage < lastPage ? currentPage + 1 : null,
+            },
+            links: {
+                first: '/api/users?page=1',
+                last: `/api/users?page=${lastPage}`,
+                prev: currentPage > 1 ? `/api/users?page=${currentPage - 1}` : null,
+                next: currentPage < lastPage ? `/api/users?page=${currentPage + 1}` : null,
+            },
+            filters: [],
+        },
+    };
+}
+
 describe('Users', () => {
     it('renders the users title', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: [],
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 0,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
 
         const router = await createTestRouter();
         const wrapper = mount(Users, {
@@ -80,12 +99,13 @@ describe('Users', () => {
     });
 
     it('fetches and displays users', async () => {
-        const mockUsers = [
+        const mockUsers: User[] = [
             {
                 id: 1,
                 name: 'John Doe',
                 email: 'john@example.com',
                 email_verified_at: '2024-01-01T00:00:00Z',
+                last_login_at: null,
                 created_at: '2024-01-01T00:00:00Z',
             },
             {
@@ -93,22 +113,12 @@ describe('Users', () => {
                 name: 'Jane Smith',
                 email: 'jane@example.com',
                 email_verified_at: null,
+                last_login_at: null,
                 created_at: '2024-01-02T00:00:00Z',
             },
         ];
 
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: mockUsers,
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 2,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse(mockUsers, 1, 2));
 
         const router = await createTestRouter();
         const wrapper = mount(Users, {
@@ -180,18 +190,7 @@ describe('Users', () => {
             },
         ];
 
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: mockUsers,
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 1,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse(mockUsers, 1, 1));
 
         const router = await createTestRouter();
         const wrapper = mount(Users, {
@@ -225,18 +224,7 @@ describe('Users', () => {
             },
         ];
 
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: mockUsers,
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 1,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse(mockUsers, 1, 1));
 
         const router = await createTestRouter();
         const wrapper = mount(Users, {
@@ -276,18 +264,7 @@ describe('Users', () => {
             },
         ];
 
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: mockUsers,
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 1,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse(mockUsers, 1, 1));
 
         const router = await createTestRouter();
         const wrapper = mount(Users, {
@@ -337,30 +314,8 @@ describe('Users', () => {
         const remainingUsers = [mockUsers[1]];
 
         mockAxios.get
-            .mockResolvedValueOnce({
-                data: {
-                    data: mockUsers,
-                    links: {},
-                    meta: {
-                        current_page: 1,
-                        total: 2,
-                        per_page: 15,
-                        last_page: 1,
-                    },
-                },
-            })
-            .mockResolvedValueOnce({
-                data: {
-                    data: remainingUsers,
-                    links: {},
-                    meta: {
-                        current_page: 1,
-                        total: 1,
-                        per_page: 15,
-                        last_page: 1,
-                    },
-                },
-            });
+            .mockResolvedValueOnce(createHarmonieResponse(mockUsers, 1, 2))
+            .mockResolvedValueOnce(createHarmonieResponse(remainingUsers, 1, 1));
 
         mockAxios.delete.mockResolvedValue({});
 
@@ -406,18 +361,7 @@ describe('Users', () => {
             },
         ];
 
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: mockUsers,
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 1,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse(mockUsers, 1, 1));
 
         mockAxios.delete.mockRejectedValue(new Error('Network error'));
 
@@ -460,18 +404,7 @@ describe('Users', () => {
             },
         ];
 
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: mockUsers,
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 1,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse(mockUsers, 1, 1));
 
         const forbiddenError = new Error('Forbidden');
         (forbiddenError as { response?: { status?: number } }).response = { status: 403 };
@@ -505,18 +438,7 @@ describe('Users', () => {
     });
 
     it('loads filters from URL query parameters', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: [],
-                links: {},
-                meta: {
-                    current_page: 2,
-                    total: 0,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 2, 0));
 
         const router = await createTestRouter('/users?page=2&search=john&status=verified&date_from=2024-01-01&date_to=2024-12-31');
         const wrapper = mount(Users, {
@@ -548,18 +470,7 @@ describe('Users', () => {
     });
 
     it('updates URL when applying filters', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: [],
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 0,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
 
         const router = await createTestRouter();
         const wrapper = mount(Users, {
@@ -591,18 +502,7 @@ describe('Users', () => {
     });
 
     it('updates URL when changing page', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: [],
-                links: {},
-                meta: {
-                    current_page: 2,
-                    total: 30,
-                    per_page: 15,
-                    last_page: 2,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 2, 30));
 
         const router = await createTestRouter();
         const wrapper = mount(Users, {
@@ -624,18 +524,7 @@ describe('Users', () => {
     });
 
     it('clears URL query parameters when resetting filters', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                data: [],
-                links: {},
-                meta: {
-                    current_page: 1,
-                    total: 0,
-                    per_page: 15,
-                    last_page: 1,
-                },
-            },
-        });
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
 
         const router = await createTestRouter('/users?page=2&search=test&status=verified');
         const wrapper = mount(Users, {
