@@ -72,37 +72,6 @@ async function handlePageChange(page: number): Promise<void> {
     await listing.setPagination(page);
 }
 
-// updateUrl is now handled internally by the Listing class
-
-async function loadFromUrl(): Promise<void> {
-    const query = route.query;
-    
-    // Load filter values from URL first
-    if (query.search) {
-        searchQuery.value = String(query.search);
-    }
-    
-    if (query.date_from) {
-        dateFrom.value = String(query.date_from);
-    }
-    
-    if (query.date_to) {
-        dateTo.value = String(query.date_to);
-    }
-    
-    if (query.status && ['verified', 'unverified'].includes(String(query.status))) {
-        statusFilter.value = String(query.status);
-    }
-    
-    // Set pagination after filters are loaded (but don't auto-load yet)
-    if (query.page) {
-        const page = parseInt(String(query.page), 10);
-        if (!isNaN(page) && page > 0) {
-            await listing.setPagination(page, undefined, false); // Don't auto-load, listing.load() will be called separately
-        }
-    }
-}
-
 async function deleteUser(userId: number): Promise<void> {
     try {
         deletingUserId.value = userId;
@@ -206,9 +175,8 @@ const hasActiveFilters = computed(() => {
 });
 
 // Watch for route query changes (back/forward navigation)
-watch(() => route.query, () => {
-    loadFromUrl();
-    listing.load();
+watch(() => route.query, async (newQuery) => {
+    await listing.load(undefined, undefined, newQuery);
 }, { deep: true });
 
 // Expose properties for testing
@@ -244,9 +212,8 @@ defineExpose({
     handlePageChange,
 });
 
-onMounted(() => {
-    loadFromUrl();
-    listing.load();
+onMounted(async () => {
+    await listing.load(undefined, undefined, route.query);
 });
 </script>
 
