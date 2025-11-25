@@ -42,6 +42,7 @@ const listing = reactive(new Listing<User>());
 listing.loading(); // Initial loading state
 
 // Configure listing with path, router, filters, and error handler
+// Note: .path() is used for convenience in setPagination, but we pass path directly to get() for clarity
 listing
     .path('/api/users')
     .router(router)
@@ -88,7 +89,7 @@ async function deleteUser(userId: number): Promise<void> {
             await listing.setPagination(listing.currentPage - 1);
         } else {
             // Refresh the current page to get updated data
-            await listing.load();
+            await listing.get();
         }
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number } };
@@ -175,7 +176,7 @@ const hasActiveFilters = computed(() => {
 
 // Watch for route query changes (back/forward navigation)
 watch(() => route.query, async (newQuery) => {
-    await listing.load(undefined, undefined, newQuery);
+    await listing.get({ query: newQuery });
 }, { deep: true });
 
 // Expose properties for testing
@@ -212,7 +213,7 @@ defineExpose({
 });
 
 onMounted(async () => {
-    await listing.load(undefined, undefined, route.query);
+    await listing.get({ query: route.query });
 });
 </script>
 

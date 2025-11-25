@@ -228,5 +228,208 @@ describe('Listing', () => {
             expect(listing.error).toBe('Handled: Failed to load data. Please try again later.');
         });
     });
+
+    describe('get() method with axios.get style signature', () => {
+        it('works with no config (uses configured path)', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.get();
+
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 1,
+                    per_page: 15,
+                }),
+            });
+            expect(listing.data).toEqual(mockItems);
+        });
+
+        it('works with path override', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.get('/api/other');
+
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/other', {
+                params: expect.objectContaining({
+                    page: 1,
+                    per_page: 15,
+                }),
+            });
+        });
+
+        it('handles params as object', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.get('/api/test', {
+                params: { search: 'test', limit: 10 },
+            });
+
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 1,
+                    per_page: 15,
+                    search: 'test',
+                    limit: 10,
+                }),
+            });
+        });
+
+        it('handles params as query string', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.get('/api/test', {
+                params: '?search=test&limit=10',
+            });
+
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 1,
+                    per_page: 15,
+                    search: 'test',
+                    limit: 10,
+                }),
+            });
+        });
+
+        it('handles params as callback function', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.get('/api/test', {
+                params: () => ({ search: 'test', limit: 10 }),
+            });
+
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 1,
+                    per_page: 15,
+                    search: 'test',
+                    limit: 10,
+                }),
+            });
+        });
+
+        it('handles query parameter for route sync', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 2, 20));
+
+            await listing.get('/api/test', {
+                query: { page: '2', search: 'test' },
+            });
+
+            expect(listing.currentPage).toBe(2);
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 2,
+                    per_page: 15,
+                }),
+            });
+        });
+
+        it('load() still works as deprecated wrapper', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.load();
+
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 1,
+                    per_page: 15,
+                }),
+            });
+            expect(listing.data).toEqual(mockItems);
+        });
+
+        it('allows config as first parameter when path is configured', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            // Pass config as first parameter (no undefined needed!)
+            await listing.get({ params: { search: 'test' } });
+
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 1,
+                    per_page: 15,
+                    search: 'test',
+                }),
+            });
+        });
+
+        it('allows config with query as first parameter when path is configured', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 2, 20));
+
+            // Pass config with query as first parameter
+            await listing.get({ query: { page: '2', search: 'test' } });
+
+            expect(listing.currentPage).toBe(2);
+            expect(mockAxios.get).toHaveBeenCalledWith('/api/test', {
+                params: expect.objectContaining({
+                    page: 2,
+                    per_page: 15,
+                }),
+            });
+        });
+    });
 });
 
