@@ -4,6 +4,10 @@ export interface ActiveFilter {
     rawValue: string;
     value: string;
 }
+// Note: We import markRaw to avoid Vue's ref-unwrapping when this class is made reactive.
+// Without markRaw, refs stored on a reactive instance are unwrapped to their .value on access,
+// which prevents us from updating the original refs from route query parameters.
+import { markRaw } from 'vue';
 
 export interface HarmonieListingResponse<T> {
     listing: {
@@ -76,7 +80,9 @@ export class Listing<T extends Record<string, unknown>> {
      * @param filters - Object mapping filter keys to refs or values
      */
     filters(filters: Record<string, FilterValue>): this {
-        this.filterAttributes = filters;
+        // Avoid Vue ref-unwrapping by storing the filters object as a raw object.
+        // This ensures we can detect and assign to ref.value within load().
+        this.filterAttributes = markRaw(filters) as Record<string, FilterValue>;
         return this;
     }
 
