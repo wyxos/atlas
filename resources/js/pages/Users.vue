@@ -17,7 +17,6 @@ import FilterPanel from '../components/ui/FilterPanel.vue';
 import FormInput from '../components/ui/FormInput.vue';
 import Select from '../components/ui/Select.vue';
 import DatePicker from '../components/ui/DatePicker.vue';
-import Link from '../components/ui/Link.vue';
 import { Listing } from '../lib/Listing';
 
 const route = useRoute();
@@ -259,14 +258,14 @@ onMounted(async () => {
                         <X class="h-3.5 w-3.5" />
                     </Button>
                 </div>
-                <Link
-                    href="#"
-                    variant="no-underline"
-                    @click.prevent="resetFilters"
-                    class="text-sm"
+                <Button
+                    variant="outline"
+                    size="sm"
+                    @click="resetFilters"
+                    class="border-danger-600 text-danger-600 bg-transparent hover:bg-danger-300 hover:border-danger-600 hover:text-danger-700"
                 >
                     Clear all
-                </Link>
+                </Button>
             </div>
 
             <div v-if="listing.isLoading" class="text-center py-12">
@@ -366,7 +365,7 @@ onMounted(async () => {
                 @apply="applyFilters"
                 @reset="resetFilters"
             >
-                <div class="space-y-6">
+                <form @submit.prevent="applyFilters" class="space-y-6">
                     <!-- Search Field -->
                     <FormInput
                         v-model="searchQuery"
@@ -413,7 +412,7 @@ onMounted(async () => {
                         <option value="verified">Verified</option>
                         <option value="unverified">Unverified</option>
                     </Select>
-                </div>
+                </form>
             </FilterPanel>
 
             <!-- Delete Confirmation Dialog -->
