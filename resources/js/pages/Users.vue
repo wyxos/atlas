@@ -42,7 +42,7 @@ const listing = reactive(new Listing<User>());
 listing.loading(); // Initial loading state
 
 // Configure listing with path, router, filters, and error handler
-// Note: .path() is used for convenience in setPagination, but we pass path directly to get() for clarity
+// Note: .path() is used for convenience in goToPage, but we pass path directly to get() for clarity
 listing
     .path('/api/users')
     .router(router)
@@ -68,9 +68,6 @@ const dialogOpen = ref(false);
 const userToDelete = ref<User | null>(null);
 const filterPanelOpen = ref(false);
 
-async function handlePageChange(page: number): Promise<void> {
-    await listing.setPagination(page);
-}
 
 async function deleteUser(userId: number): Promise<void> {
     try {
@@ -86,7 +83,7 @@ async function deleteUser(userId: number): Promise<void> {
         
         // If current page is empty and not page 1, go to previous page
         if (listing.data.length === 0 && listing.currentPage > 1) {
-            await listing.setPagination(listing.currentPage - 1);
+            await listing.goToPage(listing.currentPage - 1);
         } else {
             // Refresh the current page to get updated data
             await listing.get();
@@ -137,7 +134,7 @@ function openFilterPanel(): void {
 }
 
 async function applyFilters(): Promise<void> {
-    await listing.setPagination(1); // Reset to first page when applying filters
+    await listing.goToPage(1); // Reset to first page when applying filters
     filterPanelOpen.value = false;
 }
 
@@ -146,7 +143,7 @@ async function resetFilters(): Promise<void> {
     dateFrom.value = '';
     dateTo.value = '';
     statusFilter.value = 'all';
-    await listing.setPagination(1);
+    await listing.goToPage(1);
 }
 
 async function removeFilter(filterKey: string): Promise<void> {
@@ -164,7 +161,7 @@ async function removeFilter(filterKey: string): Promise<void> {
             statusFilter.value = 'all';
             break;
     }
-    await listing.setPagination(1);
+    await listing.goToPage(1);
 }
 
 const hasActiveFilters = computed(() => {
@@ -209,7 +206,7 @@ defineExpose({
     },
     applyFilters,
     resetFilters,
-    handlePageChange,
+    goToPage: (page: number) => listing.goToPage(page),
 });
 
 onMounted(async () => {
@@ -288,7 +285,7 @@ onMounted(async () => {
                     backend-pagination
                     pagination-position="both"
                     pagination-order="right"
-                    @page-change="handlePageChange"
+                    @page-change="listing.goToPage"
                     class="w-full rounded-lg overflow-hidden bg-prussian-blue-600"
                 >
                 <o-table-column field="id" label="ID" width="80" />

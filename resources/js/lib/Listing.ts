@@ -360,12 +360,12 @@ export class Listing<T extends Record<string, unknown>> {
     }
 
     /**
-     * Set pagination parameters and optionally update URL and reload data
-     * @param page - Page number
+     * Go to a specific page and optionally update URL and reload data
+     * @param page - Page number to navigate to
      * @param perPage - Items per page
      * @param autoLoad - Whether to automatically update URL and reload data (default: true if configured)
      */
-    async setPagination(page: number, perPage?: number, autoLoad?: boolean): Promise<void> {
+    async goToPage(page: number, perPage?: number, autoLoad?: boolean): Promise<void> {
         this.currentPage = page;
         if (perPage !== undefined) {
             this.perPage = perPage;

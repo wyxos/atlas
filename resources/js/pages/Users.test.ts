@@ -524,9 +524,9 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any 
         const vm = wrapper.vm as any;
-        await vm.handlePageChange(2);
+        await vm.goToPage(2);
         await flushPromises();
         await wrapper.vm.$nextTick();
 
