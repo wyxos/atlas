@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, CheckCircle2, Filter, Users } from 'lucide-vue-next';
+import { Trash2, CheckCircle2, Filter, Users, X } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import {
     Dialog,
@@ -40,6 +40,7 @@ const total = ref(0);
 const dialogOpen = ref(false);
 const userToDelete = ref<User | null>(null);
 const filterPanelOpen = ref(false);
+const activeFilters = ref<Array<{ key: string; label: string; rawValue: string; value: string }>>([]);
 
 // Filter state
 const searchQuery = ref('');
@@ -71,11 +72,15 @@ async function fetchUsers(): Promise<void> {
         }
 
         const response = await window.axios.get('/api/users', { params });
-        users.value = response.data.data;
-        // Laravel pagination metadata is in the 'meta' object
-        const meta = response.data.meta || {};
-        currentPage.value = meta.current_page ?? response.data.current_page ?? 1;
-        total.value = meta.total ?? response.data.total ?? 0;
+        // Harmonie format: response.data.listing.items
+        const listing = response.data.listing || {};
+        users.value = listing.items || [];
+        currentPage.value = listing.current_page ?? 1;
+        total.value = listing.total ?? 0;
+        perPage.value = listing.perPage ?? 15;
+        
+        // Store active filters for display
+        activeFilters.value = response.data.filters || [];
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number } };
         if (axiosError.response?.status === 403) {
@@ -167,10 +172,10 @@ async function deleteUser(userId: number): Promise<void> {
             },
         });
         
-        const newUsers = response.data.data;
-        const meta = response.data.meta || {};
-        const newTotal = meta.total ?? response.data.total ?? 0;
-        const newCurrentPage = meta.current_page ?? response.data.current_page ?? 1;
+        const listing = response.data.listing || {};
+        const newUsers = listing.items || [];
+        const newTotal = listing.total ?? 0;
+        const newCurrentPage = listing.current_page ?? 1;
         
         // If current page is empty and not page 1, go to previous page
         if (newUsers.length === 0 && currentPage.value > 1) {
@@ -181,6 +186,7 @@ async function deleteUser(userId: number): Promise<void> {
             users.value = newUsers;
             currentPage.value = newCurrentPage;
             total.value = newTotal;
+            activeFilters.value = response.data.filters || [];
         }
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number } };
@@ -244,6 +250,26 @@ function resetFilters(): void {
     fetchUsers();
 }
 
+function removeFilter(filterKey: string): void {
+    switch (filterKey) {
+        case 'search':
+            searchQuery.value = '';
+            break;
+        case 'date_from':
+            dateFrom.value = '';
+            break;
+        case 'date_to':
+            dateTo.value = '';
+            break;
+        case 'status':
+            statusFilter.value = 'all';
+            break;
+    }
+    currentPage.value = 1;
+    updateUrl();
+    fetchUsers();
+}
+
 const hasActiveFilters = computed(() => {
     return searchQuery.value.trim() !== '' || 
            dateFrom.value !== '' || 
@@ -283,6 +309,32 @@ onMounted(() => {
                     <Filter class="w-4 h-4 mr-2" />
                     Filters
                 </Button>
+            </div>
+
+            <!-- Active Filters Display -->
+            <div v-if="activeFilters.length > 0" class="mb-6 flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium text-twilight-indigo-700">Active filters:</span>
+                <div
+                    v-for="filter in activeFilters"
+                    :key="filter.key"
+                    class="inline-flex items-stretch rounded border border-smart-blue-600 text-sm"
+                >
+                    <span class="bg-smart-blue-600 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
+                    <span class="bg-smart-blue-300 px-3 py-1.5 text-smart-blue-900 truncate max-w-xs">{{ filter.value }}</span>
+                    <button
+                        @click="removeFilter(filter.key)"
+                        class="flex items-center justify-center bg-danger-600 px-1.5 transition-colors hover:bg-danger-700 text-white"
+                        :aria-label="`Remove ${filter.label} filter`"
+                    >
+                        <X class="h-3.5 w-3.5" />
+                    </button>
+                </div>
+                <button
+                    @click="resetFilters"
+                    class="text-sm font-medium text-smart-blue-600 underline hover:text-smart-blue-700"
+                >
+                    Clear all
+                </button>
             </div>
 
             <div v-if="loading" class="text-center py-12">
