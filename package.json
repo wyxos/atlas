@@ -10,6 +10,8 @@
         "test:run": "vitest run",
         "test:coverage": "vitest run --coverage",
         "check": "tsx scripts/check.ts",
+        "check:js": "tsx scripts/check-js.ts",
+        "check:php": "tsx scripts/check-php.ts",
         "generate-favicons": "tsx scripts/generate-favicons.ts"
     },
     "devDependencies": {

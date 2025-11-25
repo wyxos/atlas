@@ -1,13 +1,15 @@
 ## Code Quality and Testing Requirements
 
 ### Quality Checks (MUST run after each task)
-- **Use the check script**: Run `npm run check` (or `tsx scripts/check.ts`) after completing each task to ensure code quality.
-- The check script automatically:
-  - Runs TypeScript type checking
-  - Auto-fixes and checks JavaScript/TypeScript linting (ESLint with --fix)
-  - Auto-fixes and checks PHP linting (Laravel Pint)
-  - Runs JavaScript tests (Vitest)
-  - Runs PHP tests (Pest)
+- **Selective check scripts**: Use the appropriate check script based on the type of changes made:
+  - **JavaScript/TypeScript/Vue changes only**: Run `npm run check:js` (or `tsx scripts/check-js.ts`)
+    - Runs TypeScript type checking
+    - Auto-fixes and checks JavaScript/TypeScript/Vue linting (ESLint with --fix)
+  - **PHP changes only**: Run `npm run check:php` (or `tsx scripts/check-php.ts`)
+    - Auto-fixes and checks PHP linting (Laravel Pint)
+    - Runs PHP tests (Pest)
+  - **Both JavaScript and PHP changes**: Run `npm run check` (or `tsx scripts/check.ts`)
+    - Runs all checks: TypeScript type checking, JavaScript/TypeScript/Vue linting, PHP linting, JavaScript tests (Vitest), and PHP tests (Pest)
 - **ALL failures must be addressed**, even if they are unrelated to the recent task. The check script must pass completely before considering a task complete.
 - If any check fails, investigate and fix the issues before proceeding.
 
@@ -64,8 +66,11 @@
 1. Make code changes
 2. Create or update tests for the changes (JS/Vue tests for JS/Vue code, PHP tests for PHP code)
 3. For frontend changes: Use browser MCP server and/or Playwright to visually verify the changes
-4. Run `npm run check` (this handles linting with auto-fix, type checking, and testing)
+4. Run the appropriate check script:
+   - `npm run check:js` for JavaScript/TypeScript/Vue changes only
+   - `npm run check:php` for PHP changes only
+   - `npm run check` for both JavaScript and PHP changes
 5. Fix any remaining errors (the script auto-fixes what it can)
-6. Re-run `npm run check` to verify everything passes
+6. Re-run the appropriate check script to verify everything passes
 7. Only then consider the task complete
 
