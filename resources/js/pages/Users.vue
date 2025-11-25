@@ -17,6 +17,7 @@ import FilterPanel from '../components/ui/FilterPanel.vue';
 import FormInput from '../components/ui/FormInput.vue';
 import Select from '../components/ui/Select.vue';
 import DatePicker from '../components/ui/DatePicker.vue';
+import Link from '../components/ui/Link.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -321,20 +322,24 @@ onMounted(() => {
                 >
                     <span class="bg-smart-blue-600 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
                     <span class="bg-smart-blue-300 px-3 py-1.5 text-smart-blue-900 truncate max-w-xs">{{ filter.value }}</span>
-                    <button
+                    <Button
                         @click="removeFilter(filter.key)"
-                        class="flex items-center justify-center bg-danger-600 px-1.5 transition-colors hover:bg-danger-700 text-white rounded-br rounded-tr"
+                        variant="ghost"
+                        size="sm"
+                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white rounded-br rounded-tr border-0"
                         :aria-label="`Remove ${filter.label} filter`"
                     >
                         <X class="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                 </div>
-                <button
-                    @click="resetFilters"
-                    class="text-sm font-medium text-smart-blue-600 underline hover:text-smart-blue-700"
+                <Link
+                    href="#"
+                    variant="no-underline"
+                    @click.prevent="resetFilters"
+                    class="text-sm"
                 >
                     Clear all
-                </button>
+                </Link>
             </div>
 
             <div v-if="loading" class="text-center py-12">
@@ -392,16 +397,15 @@ onMounted(() => {
                 </o-table-column>
                 <o-table-column label="Actions">
                     <template #default="{ row }">
-                        <button
+                        <Button
                             @click="openDeleteDialog(row)"
-                            class="p-2 rounded-lg border-2 transition-all cursor-pointer delete-button border-danger-700 text-danger-700 bg-transparent"
-                            :class="{
-                                'opacity-50 cursor-not-allowed': deletingUserId === row.id
-                            }"
+                            variant="ghost"
+                            size="sm"
+                            class="p-2 border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-danger-900"
                             :disabled="deletingUserId === row.id"
                         >
                             <Trash2 class="w-4 h-4" />
-                        </button>
+                        </Button>
                     </template>
                 </o-table-column>
                 <template #empty>
@@ -505,13 +509,14 @@ onMounted(() => {
                                 Cancel
                             </Button>
                         </DialogClose>
-                        <button
+                        <Button
                             @click="handleDeleteConfirm"
                             :disabled="deletingUserId !== null"
-                            class="inline-flex items-center justify-center rounded-lg px-6 py-3 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none text-white shadow-lg bg-danger-600 hover:bg-danger-700"
+                            variant="default"
+                            class="bg-danger-600 hover:bg-danger-700"
                         >
                             {{ deletingUserId !== null ? 'Deleting...' : 'Delete' }}
-                        </button>
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
