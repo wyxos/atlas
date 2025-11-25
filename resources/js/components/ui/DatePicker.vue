@@ -102,6 +102,7 @@ function handleDateSelect(value: DateValue | null): void {
     <Popover v-model="popoverOpen">
         <PopoverTrigger>
             <Button
+                type="button"
                 variant="outline"
                 :class="cn(
                     'w-full justify-start text-left font-normal',
