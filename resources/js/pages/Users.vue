@@ -323,7 +323,7 @@ onMounted(() => {
                     <span class="bg-smart-blue-300 px-3 py-1.5 text-smart-blue-900 truncate max-w-xs">{{ filter.value }}</span>
                     <button
                         @click="removeFilter(filter.key)"
-                        class="flex items-center justify-center bg-danger-600 px-1.5 transition-colors hover:bg-danger-700 text-white"
+                        class="flex items-center justify-center bg-danger-600 px-1.5 transition-colors hover:bg-danger-700 text-white rounded-br rounded-tr"
                         :aria-label="`Remove ${filter.label} filter`"
                     >
                         <X class="h-3.5 w-3.5" />
