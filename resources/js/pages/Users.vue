@@ -40,7 +40,7 @@ const statusFilter = ref('all');
 
 // Create reactive listing instance
 const listing = reactive(new Listing<User>());
-listing.setLoading(true); // Initial loading state
+listing.loading(); // Initial loading state
 
 // Configure listing with path, router, filters, and error handler
 listing
@@ -52,7 +52,7 @@ listing
         date_to: dateTo,
         status: statusFilter,
     })
-    .onError((error: string | null, statusCode?: number) => {
+    .onLoadError((error: string | null, statusCode?: number) => {
         // Customize error messages for users context
         if (statusCode === 403) {
             return 'You do not have permission to view users.';
@@ -231,7 +231,7 @@ defineExpose({
         return listing.data;
     },
     get loading() {
-        return listing.loading;
+        return listing.isLoading;
     },
     get error() {
         return listing.error;
@@ -302,7 +302,7 @@ onMounted(() => {
                 </Link>
             </div>
 
-            <div v-if="listing.loading" class="text-center py-12">
+            <div v-if="listing.isLoading" class="text-center py-12">
                 <p class="text-twilight-indigo-900 text-lg">Loading users...</p>
             </div>
 
@@ -313,7 +313,7 @@ onMounted(() => {
             <div v-else class="w-full overflow-x-auto">
                 <o-table
                     :data="listing.data"
-                    :loading="listing.loading"
+                    :loading="listing.isLoading"
                     paginated
                     :per-page="listing.perPage"
                     :current-page="listing.currentPage"

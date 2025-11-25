@@ -37,7 +37,7 @@ const mockAxios = {
 beforeEach(() => {
     vi.clearAllMocks();
     // Suppress console.error output during tests to reduce noise
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => { });
     Object.assign(global.window, {
         axios: mockAxios,
     });
@@ -177,7 +177,34 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
         await new Promise((resolve) => setTimeout(resolve, 100));
 
+        // Verify onLoadError handler is working - should show customized message
         expect(wrapper.text()).toContain('Failed to load users');
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.error).toBe('Failed to load users. Please try again later.');
+    });
+
+    it('uses onLoadError handler for 403 permission errors', async () => {
+        const forbiddenError = new Error('Forbidden');
+        (forbiddenError as { response?: { status?: number } }).response = { status: 403 };
+        mockAxios.get.mockRejectedValue(forbiddenError);
+
+        const router = await createTestRouter();
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify onLoadError handler customizes 403 error message
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.error).toBe('You do not have permission to view users.');
+        expect(wrapper.text()).toContain('You do not have permission to view users.');
     });
 
     it('formats dates with time', async () => {
@@ -562,7 +589,7 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        
+
         // Verify filters are initially set from URL
         expect(vm.searchQuery).toBe('test');
         expect(vm.statusFilter).toBe('verified');
@@ -607,7 +634,7 @@ describe('Users', () => {
         // Verify search is cleared but status remains
         expect(vm.searchQuery).toBe('');
         expect(vm.statusFilter).toBe('verified');
-        
+
         // Verify URL is updated - search should be removed, status should remain
         expect(router.currentRoute.value.query.search).toBeUndefined();
         expect(router.currentRoute.value.query.status).toBe('verified');
@@ -639,7 +666,7 @@ describe('Users', () => {
         // Verify date_from is cleared but date_to remains
         expect(vm.dateFrom).toBe('');
         expect(vm.dateTo).toBe('2024-12-31');
-        
+
         // Verify URL is updated - date_from should be removed, date_to should remain
         expect(router.currentRoute.value.query.date_from).toBeUndefined();
         expect(router.currentRoute.value.query.date_to).toBe('2024-12-31');
@@ -671,7 +698,7 @@ describe('Users', () => {
         // Verify date_to is cleared but date_from remains
         expect(vm.dateFrom).toBe('2024-01-01');
         expect(vm.dateTo).toBe('');
-        
+
         // Verify URL is updated - date_to should be removed, date_from should remain
         expect(router.currentRoute.value.query.date_from).toBe('2024-01-01');
         expect(router.currentRoute.value.query.date_to).toBeUndefined();
@@ -703,7 +730,7 @@ describe('Users', () => {
         // Verify status is reset to 'all' but search remains
         expect(vm.searchQuery).toBe('test');
         expect(vm.statusFilter).toBe('all');
-        
+
         // Verify URL is updated - status should be removed (not included when 'all'), search should remain
         expect(router.currentRoute.value.query.search).toBe('test');
         expect(router.currentRoute.value.query.status).toBeUndefined();
