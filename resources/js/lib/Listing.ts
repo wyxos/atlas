@@ -140,13 +140,72 @@ export class Listing<T extends Record<string, unknown>> {
 
     /**
      * Load data from the configured API path
+     * Automatically syncs filters and pagination from URL query parameters if router is configured
      * @param path - Optional API endpoint path override
      * @param parameters - Optional query parameters to include in the request
+     * @param query - Optional query object to sync from (if not provided, reads from router)
      */
-    async load(path?: string, parameters?: Record<string, string | number>): Promise<void> {
+    async load(path?: string, parameters?: Record<string, string | number>, query?: Record<string, unknown>): Promise<void> {
         const apiPath = path || this.apiPath;
         if (!apiPath) {
             throw new Error('API path must be provided either as parameter or via path() method');
+        }
+
+        // Sync from URL query parameters if router is configured or query is provided
+        let routeQuery: Record<string, unknown> = {};
+
+        if (query) {
+            // Use provided query (from component's useRoute())
+            routeQuery = query;
+        } else if (this.routerInstance) {
+            // Read from router instance
+            const currentRoute = this.routerInstance.currentRoute;
+            if (currentRoute && currentRoute.value) {
+                routeQuery = currentRoute.value.query || {};
+            }
+        }
+
+        // Update filters and pagination from query if available
+        if (Object.keys(routeQuery).length > 0) {
+            // Update filter values from URL query parameters
+            for (const [key, filterValue] of Object.entries(this.filterAttributes)) {
+                const queryValue = routeQuery[key];
+
+                if (queryValue !== undefined && queryValue !== null) {
+                    // Handle array values (Vue Router can return arrays for query params)
+                    const stringValue = Array.isArray(queryValue)
+                        ? String(queryValue[0])
+                        : String(queryValue);
+
+                    // Special handling for status filter - validate against allowed values
+                    if (key === 'status' && !['verified', 'unverified'].includes(stringValue)) {
+                        continue; // Skip invalid status values
+                    }
+
+                    // Update the filter value (handle both refs and direct values)
+                    if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+                        // It's a ref-like object with .value property
+                        (filterValue as { value: string | number }).value = stringValue;
+                    }
+                }
+            }
+
+        }
+
+        // Update pagination from URL
+        if (Object.keys(routeQuery).length > 0 && routeQuery.page) {
+            const page = parseInt(String(routeQuery.page), 10);
+            if (!isNaN(page) && page > 0) {
+                this.currentPage = page;
+            }
+        }
+
+        // Update pagination from URL
+        if (Object.keys(routeQuery).length > 0 && routeQuery.page) {
+            const page = parseInt(String(routeQuery.page), 10);
+            if (!isNaN(page) && page > 0) {
+                this.currentPage = page;
+            }
         }
 
         try {
