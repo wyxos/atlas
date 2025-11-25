@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\UserResource;
+use App\Listings\UserListing;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 
 class UsersController extends Controller
@@ -13,50 +13,47 @@ class UsersController extends Controller
     /**
      * Display a listing of the users.
      */
-    public function index(): AnonymousResourceCollection
+    public function index(UserListing $listing): JsonResponse
     {
         Gate::authorize('viewAny', User::class);
 
-        $perPage = request()->integer('per_page', 15);
-        $query = User::query();
+        $result = $listing->handle();
 
-        // Search filter (name or email)
-        if (request()->has('search') && request()->string('search')->isNotEmpty()) {
-            $search = request()->string('search')->toString();
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
+        // Transform Harmonie's response format to match Laravel's pagination format
+        $listingData = $result['listing'];
+        $currentPage = request()->integer('page', 1);
+        $perPage = $listingData['perPage'];
+        $total = $listingData['total'];
+        $lastPage = (int) ceil($total / $perPage);
 
-        // Date range filter (created_at)
-        if (request()->has('date_from')) {
-            $dateFrom = request()->string('date_from')->toString();
-            if ($dateFrom !== '') {
-                $query->whereDate('created_at', '>=', $dateFrom);
-            }
-        }
+        // Transform items using UserResource
+        $data = collect($listingData['items'])->map(fn ($item) => new UserResource($item));
 
-        if (request()->has('date_to')) {
-            $dateTo = request()->string('date_to')->toString();
-            if ($dateTo !== '') {
-                $query->whereDate('created_at', '<=', $dateTo);
-            }
-        }
+        // Preserve query parameters in pagination links
+        $queryParams = request()->except('page');
+        $buildUrl = function ($page) use ($queryParams) {
+            $params = array_merge($queryParams, ['page' => $page]);
 
-        // Status filter (verified/unverified)
-        if (request()->has('status')) {
-            $status = request()->string('status')->toString();
-            if ($status === 'verified') {
-                $query->whereNotNull('email_verified_at');
-            } elseif ($status === 'unverified') {
-                $query->whereNull('email_verified_at');
-            }
-        }
+            return request()->url().'?'.http_build_query($params);
+        };
 
-        $users = $query->orderBy('name')->paginate($perPage);
-
-        return UserResource::collection($users);
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'current_page' => $currentPage,
+                'from' => $listingData['showing'] - count($listingData['items']) + 1,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'to' => $listingData['showing'],
+                'total' => $total,
+            ],
+            'links' => [
+                'first' => $buildUrl(1),
+                'last' => $buildUrl($lastPage),
+                'prev' => $currentPage > 1 ? $buildUrl($currentPage - 1) : null,
+                'next' => $listingData['nextPage'] ? $buildUrl($listingData['nextPage']) : null,
+            ],
+        ]);
     }
 
     /**
