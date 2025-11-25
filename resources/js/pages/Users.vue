@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch, computed, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Trash2, CheckCircle2, Filter, Users, X } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
@@ -18,11 +18,12 @@ import FormInput from '../components/ui/FormInput.vue';
 import Select from '../components/ui/Select.vue';
 import DatePicker from '../components/ui/DatePicker.vue';
 import Link from '../components/ui/Link.vue';
+import { Listing } from '../lib/Listing';
 
 const route = useRoute();
 const router = useRouter();
 
-interface User {
+interface User extends Record<string, unknown> {
     id: number;
     name: string;
     email: string;
@@ -31,114 +32,52 @@ interface User {
     created_at: string;
 }
 
-const users = ref<User[]>([]);
-const loading = ref(true);
-const error = ref<string | null>(null);
-const deletingUserId = ref<number | null>(null);
-const currentPage = ref(1);
-const perPage = ref(15);
-const total = ref(0);
-const dialogOpen = ref(false);
-const userToDelete = ref<User | null>(null);
-const filterPanelOpen = ref(false);
-const activeFilters = ref<Array<{ key: string; label: string; rawValue: string; value: string }>>([]);
-
 // Filter state
 const searchQuery = ref('');
 const dateFrom = ref('');
 const dateTo = ref('');
 const statusFilter = ref('all');
 
-async function fetchUsers(): Promise<void> {
-    try {
-        loading.value = true;
-        error.value = null;
-        const params: Record<string, string | number> = {
-            page: currentPage.value,
-            per_page: perPage.value,
-        };
+// Create reactive listing instance
+const listing = reactive(new Listing<User>());
+listing.setLoading(true); // Initial loading state
 
-        // Add filter parameters
-        if (searchQuery.value.trim()) {
-            params.search = searchQuery.value.trim();
+// Configure listing with path, router, filters, and error handler
+listing
+    .path('/api/users')
+    .router(router)
+    .filters({
+        search: searchQuery,
+        date_from: dateFrom,
+        date_to: dateTo,
+        status: statusFilter,
+    })
+    .onError((error: string | null, statusCode?: number) => {
+        // Customize error messages for users context
+        if (statusCode === 403) {
+            return 'You do not have permission to view users.';
         }
-        if (dateFrom.value) {
-            params.date_from = dateFrom.value;
+        if (error && error.includes('Failed to load data')) {
+            return 'Failed to load users. Please try again later.';
         }
-        if (dateTo.value) {
-            params.date_to = dateTo.value;
-        }
-        if (statusFilter.value !== 'all') {
-            params.status = statusFilter.value;
-        }
-
-        const response = await window.axios.get('/api/users', { params });
-        // Harmonie format: response.data.listing.items
-        const listing = response.data.listing || {};
-        users.value = listing.items || [];
-        currentPage.value = listing.current_page ?? 1;
-        total.value = listing.total ?? 0;
-        perPage.value = listing.perPage ?? 15;
-        
-        // Store active filters for display
-        activeFilters.value = response.data.filters || [];
-    } catch (err: unknown) {
-        const axiosError = err as { response?: { status?: number } };
-        if (axiosError.response?.status === 403) {
-            error.value = 'You do not have permission to view users.';
-        } else {
-            error.value = 'Failed to load users. Please try again later.';
-        }
-        console.error('Error fetching users:', err);
-    } finally {
-        loading.value = false;
-    }
-}
-
-function handlePageChange(page: number): void {
-    currentPage.value = page;
-    updateUrl();
-    fetchUsers();
-}
-
-function updateUrl(): void {
-    const query: Record<string, string> = {};
-    
-    if (currentPage.value > 1) {
-        query.page = String(currentPage.value);
-    }
-    
-    if (searchQuery.value.trim()) {
-        query.search = searchQuery.value.trim();
-    }
-    
-    if (dateFrom.value) {
-        query.date_from = dateFrom.value;
-    }
-    
-    if (dateTo.value) {
-        query.date_to = dateTo.value;
-    }
-    
-    if (statusFilter.value !== 'all') {
-        query.status = statusFilter.value;
-    }
-    
-    router.push({ query }).catch(() => {
-        // Ignore navigation errors (e.g., navigating to same route)
+        return error;
     });
+
+const deletingUserId = ref<number | null>(null);
+const dialogOpen = ref(false);
+const userToDelete = ref<User | null>(null);
+const filterPanelOpen = ref(false);
+
+async function handlePageChange(page: number): Promise<void> {
+    await listing.setPagination(page);
 }
 
-function loadFromUrl(): void {
+// updateUrl is now handled internally by the Listing class
+
+async function loadFromUrl(): Promise<void> {
     const query = route.query;
     
-    if (query.page) {
-        const page = parseInt(String(query.page), 10);
-        if (!isNaN(page) && page > 0) {
-            currentPage.value = page;
-        }
-    }
-    
+    // Load filter values from URL first
     if (query.search) {
         searchQuery.value = String(query.search);
     }
@@ -154,6 +93,14 @@ function loadFromUrl(): void {
     if (query.status && ['verified', 'unverified'].includes(String(query.status))) {
         statusFilter.value = String(query.status);
     }
+    
+    // Set pagination after filters are loaded (but don't auto-load yet)
+    if (query.page) {
+        const page = parseInt(String(query.page), 10);
+        if (!isNaN(page) && page > 0) {
+            await listing.setPagination(page, undefined, false); // Don't auto-load, listing.load() will be called separately
+        }
+    }
 }
 
 async function deleteUser(userId: number): Promise<void> {
@@ -165,36 +112,22 @@ async function deleteUser(userId: number): Promise<void> {
         dialogOpen.value = false;
         userToDelete.value = null;
         
-        // Fetch the same page to refresh data
-        const response = await window.axios.get('/api/users', {
-            params: {
-                page: currentPage.value,
-                per_page: perPage.value,
-            },
-        });
-        
-        const listing = response.data.listing || {};
-        const newUsers = listing.items || [];
-        const newTotal = listing.total ?? 0;
-        const newCurrentPage = listing.current_page ?? 1;
+        // Remove the user from the listing
+        listing.remove(userId);
         
         // If current page is empty and not page 1, go to previous page
-        if (newUsers.length === 0 && currentPage.value > 1) {
-            currentPage.value = currentPage.value - 1;
-            await fetchUsers();
+        if (listing.data.length === 0 && listing.currentPage > 1) {
+            await listing.setPagination(listing.currentPage - 1);
         } else {
-            // Update with new data
-            users.value = newUsers;
-            currentPage.value = newCurrentPage;
-            total.value = newTotal;
-            activeFilters.value = response.data.filters || [];
+            // Refresh the current page to get updated data
+            await listing.load();
         }
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number } };
         if (axiosError.response?.status === 403) {
-            error.value = 'You do not have permission to delete users.';
+            listing.error = 'You do not have permission to delete users.';
         } else {
-            error.value = 'Failed to delete user. Please try again later.';
+            listing.error = 'Failed to delete user. Please try again later.';
         }
         console.error('Error deleting user:', err);
     } finally {
@@ -234,24 +167,20 @@ function openFilterPanel(): void {
     filterPanelOpen.value = true;
 }
 
-function applyFilters(): void {
-    currentPage.value = 1; // Reset to first page when applying filters
-    updateUrl();
-    fetchUsers();
+async function applyFilters(): Promise<void> {
+    await listing.setPagination(1); // Reset to first page when applying filters
     filterPanelOpen.value = false;
 }
 
-function resetFilters(): void {
+async function resetFilters(): Promise<void> {
     searchQuery.value = '';
     dateFrom.value = '';
     dateTo.value = '';
     statusFilter.value = 'all';
-    currentPage.value = 1;
-    updateUrl();
-    fetchUsers();
+    await listing.setPagination(1);
 }
 
-function removeFilter(filterKey: string): void {
+async function removeFilter(filterKey: string): Promise<void> {
     switch (filterKey) {
         case 'search':
             searchQuery.value = '';
@@ -266,9 +195,7 @@ function removeFilter(filterKey: string): void {
             statusFilter.value = 'all';
             break;
     }
-    currentPage.value = 1;
-    updateUrl();
-    fetchUsers();
+    await listing.setPagination(1);
 }
 
 const hasActiveFilters = computed(() => {
@@ -281,12 +208,45 @@ const hasActiveFilters = computed(() => {
 // Watch for route query changes (back/forward navigation)
 watch(() => route.query, () => {
     loadFromUrl();
-    fetchUsers();
+    listing.load();
 }, { deep: true });
+
+// Expose properties for testing
+defineExpose({
+    listing,
+    searchQuery,
+    dateFrom,
+    dateTo,
+    statusFilter,
+    get currentPage() {
+        return listing.currentPage;
+    },
+    get perPage() {
+        return listing.perPage;
+    },
+    get total() {
+        return listing.total;
+    },
+    get users() {
+        return listing.data;
+    },
+    get loading() {
+        return listing.loading;
+    },
+    get error() {
+        return listing.error;
+    },
+    get activeFilters() {
+        return listing.activeFilters;
+    },
+    applyFilters,
+    resetFilters,
+    handlePageChange,
+});
 
 onMounted(() => {
     loadFromUrl();
-    fetchUsers();
+    listing.load();
 });
 </script>
 
@@ -313,10 +273,10 @@ onMounted(() => {
             </div>
 
             <!-- Active Filters Display -->
-            <div v-if="activeFilters.length > 0" class="mb-6 flex flex-wrap items-center gap-2">
+            <div v-if="listing.activeFilters.length > 0" class="mb-6 flex flex-wrap items-center gap-2">
                 <span class="text-sm font-medium text-twilight-indigo-700">Active filters:</span>
                 <div
-                    v-for="filter in activeFilters"
+                    v-for="filter in listing.activeFilters"
                     :key="filter.key"
                     class="inline-flex items-stretch rounded border border-smart-blue-600 text-sm"
                 >
@@ -342,22 +302,22 @@ onMounted(() => {
                 </Link>
             </div>
 
-            <div v-if="loading" class="text-center py-12">
+            <div v-if="listing.loading" class="text-center py-12">
                 <p class="text-twilight-indigo-900 text-lg">Loading users...</p>
             </div>
 
-            <div v-else-if="error" class="text-center py-12">
-                <p class="text-red-500 text-lg">{{ error }}</p>
+            <div v-else-if="listing.error" class="text-center py-12">
+                <p class="text-red-500 text-lg">{{ listing.error }}</p>
             </div>
 
             <div v-else class="w-full overflow-x-auto">
                 <o-table
-                    :data="users"
-                    :loading="loading"
+                    :data="listing.data"
+                    :loading="listing.loading"
                     paginated
-                    :per-page="perPage"
-                    :current-page="currentPage"
-                    :total="total"
+                    :per-page="listing.perPage"
+                    :current-page="listing.currentPage"
+                    :total="listing.total"
                     backend-pagination
                     pagination-position="both"
                     pagination-order="right"
