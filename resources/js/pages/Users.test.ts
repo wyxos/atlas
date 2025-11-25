@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import Users from './Users.vue';
 import Oruga from '@oruga-ui/oruga-next';
@@ -54,6 +54,22 @@ async function createTestRouter(initialPath = '/users') {
     });
     await router.push(initialPath);
     return router;
+}
+
+/**
+ * Wait for the listing to finish loading by flushing promises and waiting for Vue updates.
+ * Since axios is mocked, promises resolve immediately, so we just need to ensure
+ * all promise chains complete and Vue has updated the DOM.
+ */
+async function waitForListingToLoad(wrapper: ReturnType<typeof mount>): Promise<void> {
+    // Flush all pending promises multiple times to ensure promise chains complete
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+    // One more flush to catch any nested async operations
+    await flushPromises();
+    await wrapper.vm.$nextTick();
 }
 
 function createHarmonieResponse(items: User[], currentPage = 1, total?: number, perPage = 15) {
@@ -129,9 +145,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        // Wait for the async fetchUsers to complete
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         expect(mockAxios.get).toHaveBeenCalledWith('/api/users', {
             params: {
@@ -139,10 +153,6 @@ describe('Users', () => {
                 per_page: 15,
             },
         });
-
-        // Wait for DOM updates after data is loaded
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         const text = wrapper.text();
         expect(text).toContain('John Doe');
@@ -174,8 +184,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Verify onLoadError handler is working - should show customized message
         expect(wrapper.text()).toContain('Failed to load users');
@@ -197,8 +206,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Verify onLoadError handler customizes 403 error message
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,10 +236,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         const text = wrapper.text();
 
@@ -262,10 +267,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Verify dialog is initially closed
         const vm = wrapper.vm as unknown as UsersComponentInstance;
@@ -302,10 +304,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Open delete dialog using component method
         const vm = wrapper.vm as unknown as UsersComponentInstance;
@@ -355,10 +354,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Open delete dialog and confirm deletion using component methods
         const vm = wrapper.vm as unknown as UsersComponentInstance;
@@ -366,10 +362,7 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         await vm.handleDeleteConfirm();
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Verify delete was called
         expect(mockAxios.delete).toHaveBeenCalledWith('/api/users/1');
@@ -401,10 +394,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Open delete dialog and confirm deletion using component methods
         const vm = wrapper.vm as unknown as UsersComponentInstance;
@@ -412,10 +402,8 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         await vm.handleDeleteConfirm();
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify error message is displayed
         expect(wrapper.text()).toContain('Failed to delete user');
@@ -446,10 +434,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Open delete dialog and confirm deletion using component methods
         const vm = wrapper.vm as unknown as UsersComponentInstance;
@@ -457,10 +442,8 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         await vm.handleDeleteConfirm();
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify permission error message is displayed
         expect(wrapper.text()).toContain('You do not have permission to delete users');
@@ -476,8 +459,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -508,8 +490,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -519,8 +500,8 @@ describe('Users', () => {
         vm.dateTo = '2024-12-31';
 
         await vm.applyFilters();
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         expect(router.currentRoute.value.query).toEqual({
             search: 'test',
@@ -540,14 +521,13 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         await vm.handlePageChange(2);
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         expect(router.currentRoute.value.query.page).toBe('2');
     });
@@ -562,14 +542,13 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         await vm.resetFilters();
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         expect(router.currentRoute.value.query).toEqual({});
     });
@@ -584,8 +563,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -598,8 +576,8 @@ describe('Users', () => {
 
         // Reset filters
         await vm.resetFilters();
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify all filter values are reset to defaults
         expect(vm.searchQuery).toBe('');
@@ -618,8 +596,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -628,8 +605,8 @@ describe('Users', () => {
 
         // Remove search filter
         await vm.removeFilter('search');
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify search is cleared but status remains
         expect(vm.searchQuery).toBe('');
@@ -650,8 +627,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -660,8 +636,8 @@ describe('Users', () => {
 
         // Remove date_from filter
         await vm.removeFilter('date_from');
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify date_from is cleared but date_to remains
         expect(vm.dateFrom).toBe('');
@@ -682,8 +658,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -692,8 +667,8 @@ describe('Users', () => {
 
         // Remove date_to filter
         await vm.removeFilter('date_to');
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify date_to is cleared but date_from remains
         expect(vm.dateFrom).toBe('2024-01-01');
@@ -714,8 +689,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -724,8 +698,8 @@ describe('Users', () => {
 
         // Remove status filter
         await vm.removeFilter('status');
+        await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
 
         // Verify status is reset to 'all' but search remains
         expect(vm.searchQuery).toBe('test');
@@ -748,8 +722,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -757,8 +730,7 @@ describe('Users', () => {
 
         // Reset filters
         await vm.resetFilters();
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Verify pagination is reset to page 1
         expect(vm.currentPage).toBe(1);
@@ -778,8 +750,7 @@ describe('Users', () => {
             },
         });
 
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await waitForListingToLoad(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -787,8 +758,7 @@ describe('Users', () => {
 
         // Remove a filter
         await vm.removeFilter('search');
-        await wrapper.vm.$nextTick();
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await waitForListingToLoad(wrapper);
 
         // Verify pagination is reset to page 1
         expect(vm.currentPage).toBe(1);
