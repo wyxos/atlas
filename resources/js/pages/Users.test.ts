@@ -36,6 +36,8 @@ const mockAxios = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    // Suppress console.error output during tests to reduce noise
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     Object.assign(global.window, {
         axios: mockAxios,
     });
@@ -543,6 +545,228 @@ describe('Users', () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         expect(router.currentRoute.value.query).toEqual({});
+    });
+
+    it('resets all filter values to defaults when resetFilters is called', async () => {
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
+
+        const router = await createTestRouter('/users?search=test&status=verified&date_from=2024-01-01&date_to=2024-12-31');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        
+        // Verify filters are initially set from URL
+        expect(vm.searchQuery).toBe('test');
+        expect(vm.statusFilter).toBe('verified');
+        expect(vm.dateFrom).toBe('2024-01-01');
+        expect(vm.dateTo).toBe('2024-12-31');
+
+        // Reset filters
+        await vm.resetFilters();
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify all filter values are reset to defaults
+        expect(vm.searchQuery).toBe('');
+        expect(vm.statusFilter).toBe('all');
+        expect(vm.dateFrom).toBe('');
+        expect(vm.dateTo).toBe('');
+    });
+
+    it('removes individual search filter when removeFilter is called', async () => {
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
+
+        const router = await createTestRouter('/users?search=test&status=verified');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.searchQuery).toBe('test');
+        expect(vm.statusFilter).toBe('verified');
+
+        // Remove search filter
+        await vm.removeFilter('search');
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify search is cleared but status remains
+        expect(vm.searchQuery).toBe('');
+        expect(vm.statusFilter).toBe('verified');
+        
+        // Verify URL is updated - search should be removed, status should remain
+        expect(router.currentRoute.value.query.search).toBeUndefined();
+        expect(router.currentRoute.value.query.status).toBe('verified');
+    });
+
+    it('removes individual date_from filter when removeFilter is called', async () => {
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
+
+        const router = await createTestRouter('/users?date_from=2024-01-01&date_to=2024-12-31');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.dateFrom).toBe('2024-01-01');
+        expect(vm.dateTo).toBe('2024-12-31');
+
+        // Remove date_from filter
+        await vm.removeFilter('date_from');
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify date_from is cleared but date_to remains
+        expect(vm.dateFrom).toBe('');
+        expect(vm.dateTo).toBe('2024-12-31');
+        
+        // Verify URL is updated - date_from should be removed, date_to should remain
+        expect(router.currentRoute.value.query.date_from).toBeUndefined();
+        expect(router.currentRoute.value.query.date_to).toBe('2024-12-31');
+    });
+
+    it('removes individual date_to filter when removeFilter is called', async () => {
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
+
+        const router = await createTestRouter('/users?date_from=2024-01-01&date_to=2024-12-31');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.dateFrom).toBe('2024-01-01');
+        expect(vm.dateTo).toBe('2024-12-31');
+
+        // Remove date_to filter
+        await vm.removeFilter('date_to');
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify date_to is cleared but date_from remains
+        expect(vm.dateFrom).toBe('2024-01-01');
+        expect(vm.dateTo).toBe('');
+        
+        // Verify URL is updated - date_to should be removed, date_from should remain
+        expect(router.currentRoute.value.query.date_from).toBe('2024-01-01');
+        expect(router.currentRoute.value.query.date_to).toBeUndefined();
+    });
+
+    it('removes individual status filter when removeFilter is called', async () => {
+        mockAxios.get.mockResolvedValue(createHarmonieResponse([], 1, 0));
+
+        const router = await createTestRouter('/users?search=test&status=verified');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.searchQuery).toBe('test');
+        expect(vm.statusFilter).toBe('verified');
+
+        // Remove status filter
+        await vm.removeFilter('status');
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify status is reset to 'all' but search remains
+        expect(vm.searchQuery).toBe('test');
+        expect(vm.statusFilter).toBe('all');
+        
+        // Verify URL is updated - status should be removed (not included when 'all'), search should remain
+        expect(router.currentRoute.value.query.search).toBe('test');
+        expect(router.currentRoute.value.query.status).toBeUndefined();
+    });
+
+    it('resets pagination to page 1 when resetFilters is called', async () => {
+        mockAxios.get
+            .mockResolvedValueOnce(createHarmonieResponse([], 2, 30))
+            .mockResolvedValueOnce(createHarmonieResponse([], 1, 30));
+
+        const router = await createTestRouter('/users?page=2&search=test');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.currentPage).toBe(2);
+
+        // Reset filters
+        await vm.resetFilters();
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify pagination is reset to page 1
+        expect(vm.currentPage).toBe(1);
+        // When page is 1, Listing class doesn't include it in URL query (only includes page if > 1)
+        expect(router.currentRoute.value.query.page).toBeUndefined();
+    });
+
+    it('resets pagination to page 1 when removeFilter is called', async () => {
+        mockAxios.get
+            .mockResolvedValueOnce(createHarmonieResponse([], 2, 30))
+            .mockResolvedValueOnce(createHarmonieResponse([], 1, 30));
+
+        const router = await createTestRouter('/users?page=2&search=test');
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.currentPage).toBe(2);
+
+        // Remove a filter
+        await vm.removeFilter('search');
+        await wrapper.vm.$nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify pagination is reset to page 1
+        expect(vm.currentPage).toBe(1);
+        // When page is 1, Listing class doesn't include it in URL query (only includes page if > 1)
+        expect(router.currentRoute.value.query.page).toBeUndefined();
     });
 });
 
