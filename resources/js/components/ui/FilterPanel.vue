@@ -55,37 +55,29 @@ watch(isOpen, (isOpenValue) => {
 
 <template>
     <Teleport to="body">
-        <div
-            v-if="isOpen"
-            class="fixed inset-0 z-50 flex"
-            @click="handleBackdropClick"
+        <!-- Backdrop -->
+        <Transition
+            enter-active-class="transition-opacity duration-300"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition-opacity duration-300"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
         >
-            <!-- Backdrop -->
-            <Transition
-                enter-active-class="transition-opacity duration-300"
-                enter-from-class="opacity-0"
-                enter-to-class="opacity-100"
-                leave-active-class="transition-opacity duration-300"
-                leave-from-class="opacity-100"
-                leave-to-class="opacity-0"
-            >
-                <div v-if="isOpen" class="fixed inset-0 bg-black/50" />
-            </Transition>
+            <div
+                v-if="isOpen"
+                class="fixed inset-0 z-50 bg-black/50"
+                @click="handleBackdropClick"
+            />
+        </Transition>
 
-            <!-- Panel -->
-            <Transition
-                enter-active-class="transition-transform duration-300 ease-out"
-                enter-from-class="translate-x-full"
-                enter-to-class="translate-x-0"
-                leave-active-class="transition-transform duration-300 ease-in"
-                leave-from-class="translate-x-0"
-                leave-to-class="translate-x-full"
+        <!-- Panel -->
+        <Transition name="slide-right">
+            <div
+                v-if="isOpen"
+                class="fixed top-0 right-0 z-[60] w-96 max-w-[90vw] md:w-[32rem] lg:w-[36rem] xl:w-[40rem] h-full bg-prussian-blue-100 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
+                @click.stop
             >
-                <div
-                    v-if="isOpen"
-                    class="relative z-50 w-full h-full bg-prussian-blue-100 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
-                    @click.stop
-                >
                     <div class="flex flex-col h-full">
                         <!-- Header -->
                         <div class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500">
@@ -102,12 +94,12 @@ watch(isOpen, (isOpenValue) => {
                         </div>
 
                         <!-- Content -->
-                        <div class="flex-1 p-6 md:max-w-2xl md:mx-auto">
+                        <div class="flex-1 p-6">
                             <slot />
                         </div>
 
                         <!-- Footer -->
-                        <div class="flex items-center justify-end gap-4 p-6 border-t-2 border-twilight-indigo-500 md:max-w-2xl md:mx-auto">
+                        <div class="flex items-center justify-end gap-4 p-6 border-t-2 border-twilight-indigo-500">
                             <Button
                                 variant="outline"
                                 @click="$emit('reset')"
@@ -125,8 +117,33 @@ watch(isOpen, (isOpenValue) => {
                         </div>
                     </div>
                 </div>
-            </Transition>
-        </div>
+        </Transition>
     </Teleport>
 </template>
+
+<style scoped>
+.slide-right-enter-active {
+    transition: transform 0.3s ease-out;
+}
+
+.slide-right-leave-active {
+    transition: transform 0.3s ease-in;
+}
+
+.slide-right-enter-from {
+    transform: translateX(100%);
+}
+
+.slide-right-enter-to {
+    transform: translateX(0);
+}
+
+.slide-right-leave-from {
+    transform: translateX(0);
+}
+
+.slide-right-leave-to {
+    transform: translateX(100%);
+}
+</style>
 

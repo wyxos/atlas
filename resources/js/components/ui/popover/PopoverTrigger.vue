@@ -21,7 +21,7 @@ function toggle(): void {
     setPopoverOpen?.(!isOpen.value);
 }
 
-function handleTouchEnd(event: TouchEvent): void {
+function handleTouchEnd(): void {
     // Mark that we're handling a touch event
     touchHandled = true;
     toggle();
