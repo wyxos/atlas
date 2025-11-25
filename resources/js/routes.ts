@@ -2,6 +2,10 @@ import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
     {
+        path: '/',
+        redirect: '/dashboard',
+    },
+    {
         path: '/dashboard',
         name: 'dashboard',
         component: () => import('./pages/Dashboard.vue'),
@@ -53,6 +57,12 @@ const routes: RouteRecordRaw[] = [
         path: '/profile',
         name: 'profile',
         component: () => import('./pages/Profile.vue'),
+        meta: { layout: 'DashboardLayout' },
+    },
+    {
+        path: '/guidelines',
+        name: 'guidelines',
+        component: () => import('./pages/Guidelines.vue'),
         meta: { layout: 'DashboardLayout' },
     },
 ];
