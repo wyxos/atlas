@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { Trash2, CheckCircle2, Filter } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import {
@@ -15,6 +16,10 @@ import Button from '../components/ui/Button.vue';
 import FilterPanel from '../components/ui/FilterPanel.vue';
 import FormInput from '../components/ui/FormInput.vue';
 import Select from '../components/ui/Select.vue';
+import DatePicker from '../components/ui/DatePicker.vue';
+
+const route = useRoute();
+const router = useRouter();
 
 interface User {
     id: number;
@@ -86,7 +91,63 @@ async function fetchUsers(): Promise<void> {
 
 function handlePageChange(page: number): void {
     currentPage.value = page;
+    updateUrl();
     fetchUsers();
+}
+
+function updateUrl(): void {
+    const query: Record<string, string> = {};
+    
+    if (currentPage.value > 1) {
+        query.page = String(currentPage.value);
+    }
+    
+    if (searchQuery.value.trim()) {
+        query.search = searchQuery.value.trim();
+    }
+    
+    if (dateFrom.value) {
+        query.date_from = dateFrom.value;
+    }
+    
+    if (dateTo.value) {
+        query.date_to = dateTo.value;
+    }
+    
+    if (statusFilter.value !== 'all') {
+        query.status = statusFilter.value;
+    }
+    
+    router.push({ query }).catch(() => {
+        // Ignore navigation errors (e.g., navigating to same route)
+    });
+}
+
+function loadFromUrl(): void {
+    const query = route.query;
+    
+    if (query.page) {
+        const page = parseInt(String(query.page), 10);
+        if (!isNaN(page) && page > 0) {
+            currentPage.value = page;
+        }
+    }
+    
+    if (query.search) {
+        searchQuery.value = String(query.search);
+    }
+    
+    if (query.date_from) {
+        dateFrom.value = String(query.date_from);
+    }
+    
+    if (query.date_to) {
+        dateTo.value = String(query.date_to);
+    }
+    
+    if (query.status && ['verified', 'unverified'].includes(String(query.status))) {
+        statusFilter.value = String(query.status);
+    }
 }
 
 async function deleteUser(userId: number): Promise<void> {
@@ -168,6 +229,7 @@ function openFilterPanel(): void {
 
 function applyFilters(): void {
     currentPage.value = 1; // Reset to first page when applying filters
+    updateUrl();
     fetchUsers();
     filterPanelOpen.value = false;
 }
@@ -178,10 +240,18 @@ function resetFilters(): void {
     dateTo.value = '';
     statusFilter.value = 'all';
     currentPage.value = 1;
+    updateUrl();
     fetchUsers();
 }
 
+// Watch for route query changes (back/forward navigation)
+watch(() => route.query, () => {
+    loadFromUrl();
+    fetchUsers();
+}, { deep: true });
+
 onMounted(() => {
+    loadFromUrl();
     fetchUsers();
 });
 </script>
@@ -301,25 +371,23 @@ onMounted(() => {
                         <label class="block text-sm font-medium mb-2 text-smart-blue-900">
                             Created Date Range
                         </label>
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
                                     From
                                 </label>
-                                <input
+                                <DatePicker
                                     v-model="dateFrom"
-                                    type="date"
-                                    class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                                    placeholder="Pick start date"
                                 />
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
                                     To
                                 </label>
-                                <input
+                                <DatePicker
                                     v-model="dateTo"
-                                    type="date"
-                                    class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                                    placeholder="Pick end date"
                                 />
                             </div>
                         </div>

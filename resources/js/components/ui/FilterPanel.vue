@@ -81,51 +81,51 @@ watch(isOpen, (isOpenValue) => {
                 leave-from-class="translate-x-0"
                 leave-to-class="translate-x-full"
             >
-                    <div
-                        v-if="isOpen"
-                        class="relative z-50 w-full h-full bg-prussian-blue-100 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
-                        @click.stop
-                    >
-                        <div class="flex flex-col h-full">
-                            <!-- Header -->
-                            <div class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500">
-                                <h2 class="text-2xl font-semibold text-regal-navy-900">
-                                    {{ title }}
-                                </h2>
-                                <button
-                                    @click="close"
-                                    class="p-2 rounded-lg transition-colors hover:bg-smart-blue-300 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
-                                    aria-label="Close filters"
-                                >
-                                    <X class="h-5 w-5 text-twilight-indigo-900" />
-                                </button>
-                            </div>
+                <div
+                    v-if="isOpen"
+                    class="relative z-50 w-full h-full bg-prussian-blue-100 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
+                    @click.stop
+                >
+                    <div class="flex flex-col h-full">
+                        <!-- Header -->
+                        <div class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500">
+                            <h2 class="text-2xl font-semibold text-regal-navy-900">
+                                {{ title }}
+                            </h2>
+                            <button
+                                @click="close"
+                                class="p-2 rounded-lg transition-colors hover:bg-smart-blue-300 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
+                                aria-label="Close filters"
+                            >
+                                <X class="h-5 w-5 text-twilight-indigo-900" />
+                            </button>
+                        </div>
 
-                            <!-- Content -->
-                            <div class="flex-1 p-6">
-                                <slot />
-                            </div>
+                        <!-- Content -->
+                        <div class="flex-1 p-6 md:max-w-2xl md:mx-auto">
+                            <slot />
+                        </div>
 
-                            <!-- Footer -->
-                            <div class="flex items-center justify-end gap-4 p-6 border-t-2 border-twilight-indigo-500">
-                                <Button
-                                    variant="outline"
-                                    @click="$emit('reset')"
-                                    class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
-                                >
-                                    Reset
-                                </Button>
-                                <Button
-                                    variant="default"
-                                    @click="$emit('apply')"
-                                    class="bg-smart-blue-500 hover:bg-smart-blue-600 text-white"
-                                >
-                                    Apply Filters
-                                </Button>
-                            </div>
+                        <!-- Footer -->
+                        <div class="flex items-center justify-end gap-4 p-6 border-t-2 border-twilight-indigo-500 md:max-w-2xl md:mx-auto">
+                            <Button
+                                variant="outline"
+                                @click="$emit('reset')"
+                                class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                            >
+                                Reset
+                            </Button>
+                            <Button
+                                variant="default"
+                                @click="$emit('apply')"
+                                class="bg-smart-blue-500 hover:bg-smart-blue-600 text-white"
+                            >
+                                Apply Filters
+                            </Button>
                         </div>
                     </div>
-                </Transition>
+                </div>
+            </Transition>
         </div>
     </Teleport>
 </template>
