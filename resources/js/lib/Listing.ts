@@ -38,6 +38,8 @@ export class Listing<T extends Record<string, unknown>> {
     } | null = null;
     private filterAttributes: Record<string, FilterValue> = {};
     private filterDefaults: Record<string, string | number | null> = {};
+    private filterVisibility: Record<string, boolean> = {};
+    private panelOpen = false;
     private buildQueryParameters: (() => Record<string, string>) | null = null;
     private errorHandler: ErrorHandler | null = null;
 
@@ -84,13 +86,16 @@ export class Listing<T extends Record<string, unknown>> {
         // Avoid Vue ref-unwrapping by storing the filters object as a raw object.
         // This ensures we can detect and assign to ref.value within load().
         this.filterAttributes = markRaw(filters) as Record<string, FilterValue>;
-        
+
         // Initialize defaults to null for all filters (can be overridden with defaults() method)
         this.filterDefaults = {};
+        this.filterVisibility = {};
+
         for (const key of Object.keys(filters)) {
             this.filterDefaults[key] = null as unknown as string | number; // null is the default
+            this.filterVisibility[key] = true; // visible by default
         }
-        
+
         return this;
     }
 
@@ -105,6 +110,73 @@ export class Listing<T extends Record<string, unknown>> {
             }
         }
         return this;
+    }
+
+    /**
+     * Panel visibility helpers (for filter UI panels or similar)
+     */
+    isPanelOpen(): boolean {
+        return this.panelOpen;
+    }
+
+    openPanel(): void {
+        this.panelOpen = true;
+    }
+
+    closePanel(): void {
+        this.panelOpen = false;
+    }
+
+    togglePanel(): void {
+        this.panelOpen = !this.panelOpen;
+    }
+
+    /**
+     * Check if a given filter is currently visible.
+     * If the filter has no explicit visibility state, it is treated as visible.
+     */
+    isFilterVisible(key: string): boolean {
+        if (Object.prototype.hasOwnProperty.call(this.filterVisibility, key)) {
+            return this.filterVisibility[key];
+        }
+
+        return true;
+    }
+
+    /**
+     * Mark a given filter as visible.
+     */
+    showFilter(key: string): void {
+        if (key in this.filterAttributes) {
+            this.filterVisibility[key] = true;
+        }
+    }
+
+    /**
+     * Mark a given filter as hidden.
+     */
+    hideFilter(key: string): void {
+        if (key in this.filterAttributes) {
+            this.filterVisibility[key] = false;
+        }
+    }
+
+    /**
+     * Toggle visibility state for a given filter.
+     */
+    toggleFilter(key: string): void {
+        if (key in this.filterAttributes) {
+            this.filterVisibility[key] = !this.isFilterVisible(key);
+        }
+    }
+
+    /**
+     * Get a list of filter keys that are currently visible.
+     */
+    get visibleFilters(): string[] {
+        return Object.entries(this.filterVisibility)
+            .filter(([, visible]) => visible)
+            .map(([key]) => key);
     }
 
     /**
@@ -208,13 +280,13 @@ export class Listing<T extends Record<string, unknown>> {
     /**
      * Get data from the configured API path (axios.get style signature)
      * Automatically syncs filters and pagination from URL query parameters if router is configured
-     * 
+     *
      * Usage:
      * - get() - uses configured path from .path()
      * - get('/api/users') - uses provided path
      * - get('/api/users', { query }) - uses provided path with config
      * - get({ query }) - uses configured path with config (when first param is object)
-     * 
+     *
      * @param pathOrConfig - API endpoint path (string) or config object (when path is configured)
      * @param config - Configuration object with params and optional query (only when path is provided)
      * @param config.params - Query parameters (string, object, callback, or method name)
@@ -476,9 +548,9 @@ export class Listing<T extends Record<string, unknown>> {
         for (const [key, value] of Object.entries(filterParameters)) {
             query[key] = String(value);
         }
-        
+
         await this.updateUrl();
-        
+
         // Pass the query explicitly to prevent get() from reading stale router query
         // This ensures we use the current filter state, not the old URL params
         await this.get(undefined, { query });
@@ -510,7 +582,7 @@ export class Listing<T extends Record<string, unknown>> {
         for (const [key, value] of Object.entries(filterParameters)) {
             query[key] = String(value);
         }
-        
+
         await this.updateUrl();
         await this.get(undefined, { query });
     }
@@ -529,4 +601,3 @@ export class Listing<T extends Record<string, unknown>> {
         this.activeFilters = [];
     }
 }
-

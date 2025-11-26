@@ -28,5 +28,3 @@ const linkClasses = computed(() => {
         <slot />
     </a>
 </template>
-
-

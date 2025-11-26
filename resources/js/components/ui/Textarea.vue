@@ -61,5 +61,3 @@ function handleFocus(event: FocusEvent): void {
         </p>
     </div>
 </template>
-
-
