@@ -19,6 +19,8 @@ interface UsersComponentInstance {
     openDeleteDialog: (user: User) => void;
     handleDeleteCancel: () => void;
     handleDeleteConfirm: () => Promise<void>;
+    deleteError: string | null;
+    canRetryDelete: boolean;
 }
 
 // Mock axios
@@ -406,8 +408,10 @@ describe('Users', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // Verify error message is displayed
-        expect(wrapper.text()).toContain('Failed to delete user');
+        // Verify error state is set on the dialog
+        expect(vm.dialogOpen).toBe(true);
+        expect(vm.deleteError).toBe('Failed to delete user. Please try again later.');
+        expect(vm.canRetryDelete).toBe(false);
     });
 
     it('displays permission error when deletion is forbidden', async () => {
@@ -446,8 +450,10 @@ describe('Users', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // Verify permission error message is displayed
-        expect(wrapper.text()).toContain('You do not have permission to delete users');
+        // Verify permission error state is set on the dialog
+        expect(vm.dialogOpen).toBe(true);
+        expect(vm.deleteError).toBe('You do not have permission to delete users.');
+        expect(vm.canRetryDelete).toBe(false);
     });
 
     it('loads filters from URL query parameters', async () => {
