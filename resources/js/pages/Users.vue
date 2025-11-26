@@ -216,7 +216,7 @@ onMounted(async () => {
                         @click="() => listing.removeFilter(filter.key)"
                         variant="ghost"
                         size="sm"
-                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr"
+                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr rounded-tl-none rounded-bl-none"
                         :aria-label="`Remove ${filter.label} filter`"
                     >
                         <X class="h-3.5 w-3.5" />
