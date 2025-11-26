@@ -52,6 +52,12 @@ listing
         date_to: dateTo,
         status: statusFilter,
     })
+    .defaults({
+        search: '',
+        date_from: '',
+        date_to: '',
+        status: 'all',
+    })
     .onLoadError((error: string | null, statusCode?: number) => {
         // Customize error messages for users context
         if (statusCode === 403) {
@@ -138,30 +144,18 @@ async function applyFilters(): Promise<void> {
     filterPanelOpen.value = false;
 }
 
+// resetFilters and removeFilter are now internalized in Listing class,
+// but we provide local wrappers for template usage and testing.
 async function resetFilters(): Promise<void> {
-    searchQuery.value = '';
-    dateFrom.value = '';
-    dateTo.value = '';
-    statusFilter.value = 'all';
-    await listing.goToPage(1);
+    await listing.resetFilters();
 }
 
 async function removeFilter(filterKey: string): Promise<void> {
-    switch (filterKey) {
-        case 'search':
-            searchQuery.value = '';
-            break;
-        case 'date_from':
-            dateFrom.value = '';
-            break;
-        case 'date_to':
-            dateTo.value = '';
-            break;
-        case 'status':
-            statusFilter.value = 'all';
-            break;
-    }
-    await listing.goToPage(1);
+    await listing.removeFilter(filterKey);
+}
+
+async function goToPage(page: number): Promise<void> {
+    await listing.goToPage(page);
 }
 
 const hasActiveFilters = computed(() => {
@@ -206,7 +200,8 @@ defineExpose({
     },
     applyFilters,
     resetFilters,
-    goToPage: (page: number) => listing.goToPage(page),
+    removeFilter,
+    goToPage,
 });
 
 onMounted(async () => {
@@ -285,7 +280,7 @@ onMounted(async () => {
                     backend-pagination
                     pagination-position="both"
                     pagination-order="right"
-                    @page-change="listing.goToPage"
+                    @page-change="goToPage"
                     class="w-full rounded-lg overflow-hidden bg-prussian-blue-600"
                 >
                 <o-table-column field="id" label="ID" width="80" />

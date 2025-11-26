@@ -37,6 +37,7 @@ export class Listing<T extends Record<string, unknown>> {
         currentRoute: { value: { query: Record<string, unknown> } };
     } | null = null;
     private filterAttributes: Record<string, FilterValue> = {};
+    private filterDefaults: Record<string, string | number | null> = {};
     private buildQueryParameters: (() => Record<string, string>) | null = null;
     private errorHandler: ErrorHandler | null = null;
 
@@ -83,6 +84,26 @@ export class Listing<T extends Record<string, unknown>> {
         // Avoid Vue ref-unwrapping by storing the filters object as a raw object.
         // This ensures we can detect and assign to ref.value within load().
         this.filterAttributes = markRaw(filters) as Record<string, FilterValue>;
+        
+        // Initialize defaults to null for all filters (can be overridden with defaults() method)
+        this.filterDefaults = {};
+        for (const key of Object.keys(filters)) {
+            this.filterDefaults[key] = null as unknown as string | number; // null is the default
+        }
+        
+        return this;
+    }
+
+    /**
+     * Set default values for filters (all filters default to null unless specified here)
+     * @param defaults - Object mapping filter keys to their default values
+     */
+    defaults(defaults: Record<string, string | number | null>): this {
+        for (const [key, value] of Object.entries(defaults)) {
+            if (key in this.filterAttributes) {
+                this.filterDefaults[key] = value === null ? null as unknown as string | number : value;
+            }
+        }
         return this;
     }
 
@@ -236,12 +257,13 @@ export class Listing<T extends Record<string, unknown>> {
 
         // Sync from URL query parameters if router is configured or query is provided
         let routeQuery: Record<string, unknown> = {};
+        const hasExplicitQuery = actualConfig?.query !== undefined;
 
-        if (actualConfig?.query) {
-            // Use provided query (from component's useRoute())
-            routeQuery = actualConfig.query;
+        if (hasExplicitQuery && actualConfig?.query) {
+            // Use provided query (from component's useRoute() or explicit query)
+            routeQuery = actualConfig.query as Record<string, unknown>;
         } else if (this.routerInstance) {
-            // Read from router instance
+            // Read from router instance only if no explicit query was provided
             const currentRoute = this.routerInstance.currentRoute;
             if (currentRoute && currentRoute.value) {
                 routeQuery = currentRoute.value.query || {};
@@ -252,6 +274,9 @@ export class Listing<T extends Record<string, unknown>> {
         const parameters = actualConfig?.params ? this.normalizeParams(actualConfig.params) : {};
 
         // Update filters and pagination from query if available
+        // Only sync if we have query values AND either:
+        // 1. No explicit query was provided (read from router), OR
+        // 2. Explicit query was provided and has values (sync from provided query)
         if (Object.keys(routeQuery).length > 0) {
             // Update filter values from URL query parameters
             for (const [key, filterValue] of Object.entries(this.filterAttributes)) {
@@ -420,6 +445,74 @@ export class Listing<T extends Record<string, unknown>> {
         } catch {
             // Ignore navigation errors (e.g., navigating to same route)
         }
+    }
+
+    /**
+     * Reset all filters to their default values and reload data
+     */
+    async resetFilters(): Promise<void> {
+        if (!this.filterDefaults || Object.keys(this.filterDefaults).length === 0) {
+            // No filters configured, just reset pagination
+            await this.goToPage(1);
+            return;
+        }
+
+        // Reset all filter values to their defaults
+        for (const [key, defaultValue] of Object.entries(this.filterDefaults)) {
+            const filterValue = this.filterAttributes[key];
+            if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+                // Access the ref directly and set its value
+                // Handle null defaults - set to null or the specified default
+                const ref = filterValue as { value: string | number | null | undefined };
+                ref.value = defaultValue;
+            }
+        }
+
+        // Build the query from current filter state (after reset) - this will exclude default values
+        // Then update URL and reload with explicit query to prevent reading stale router query
+        this.currentPage = 1;
+        const query: Record<string, string> = {};
+        const filterParameters = this.buildFilterParameters();
+        for (const [key, value] of Object.entries(filterParameters)) {
+            query[key] = String(value);
+        }
+        
+        await this.updateUrl();
+        
+        // Pass the query explicitly to prevent get() from reading stale router query
+        // This ensures we use the current filter state, not the old URL params
+        await this.get(undefined, { query });
+    }
+
+    /**
+     * Remove/reset a specific filter to its default value and reload data
+     * @param filterKey - The key of the filter to remove
+     */
+    async removeFilter(filterKey: string): Promise<void> {
+        if (!this.filterDefaults || !(filterKey in this.filterDefaults)) {
+            // Filter key doesn't exist or no defaults configured - do nothing
+            return;
+        }
+
+        const defaultValue = this.filterDefaults[filterKey];
+        const filterValue = this.filterAttributes[filterKey];
+        if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+            // Handle null defaults - set to null or the specified default
+            const ref = filterValue as { value: string | number | null | undefined };
+            ref.value = defaultValue;
+        }
+
+        // Build query from current filter state (which now has the reset value)
+        // and pass it explicitly to prevent get() from reading stale router query
+        this.currentPage = 1;
+        const query: Record<string, string> = {};
+        const filterParameters = this.buildFilterParameters();
+        for (const [key, value] of Object.entries(filterParameters)) {
+            query[key] = String(value);
+        }
+        
+        await this.updateUrl();
+        await this.get(undefined, { query });
     }
 
     /**

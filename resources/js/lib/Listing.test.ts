@@ -431,5 +431,105 @@ describe('Listing', () => {
             });
         });
     });
+
+    describe('resetFilters() and removeFilter()', () => {
+        it('resets all filters to their default values', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const searchRef = { value: 'test search' };
+            const statusRef = { value: 'verified' };
+            
+            listing.filters({
+                search: searchRef,
+                status: statusRef,
+            }).defaults({
+                search: '',
+                status: 'all',
+            });
+
+            // Change values
+            searchRef.value = 'changed';
+            statusRef.value = 'verified';
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.resetFilters();
+
+            expect(searchRef.value).toBe('');
+            expect(statusRef.value).toBe('all');
+            expect(mockAxios.get).toHaveBeenCalled();
+        });
+
+        it('removes a specific filter by key', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const searchRef = { value: 'test search' };
+            const statusRef = { value: 'verified' };
+            
+            listing.filters({
+                search: searchRef,
+                status: statusRef,
+            });
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.removeFilter('search');
+
+            expect(searchRef.value).toBeNull();
+            expect(statusRef.value).toBe('verified'); // Should remain unchanged
+            expect(mockAxios.get).toHaveBeenCalled();
+        });
+
+        it('uses provided default values when configuring filters', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const searchRef = { value: 'test search' };
+            const statusRef = { value: 'verified' };
+            
+            listing.filters({
+                search: searchRef,
+                status: statusRef,
+            }).defaults({
+                search: '',
+                status: 'none', // Custom default
+            });
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            await listing.resetFilters();
+
+            expect(searchRef.value).toBe('');
+            expect(statusRef.value).toBe('none'); // Uses provided default
+        });
+
+        it('does nothing when removing a non-existent filter', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const searchRef = { value: 'test search' };
+            
+            listing.filters({
+                search: searchRef,
+            });
+
+            // Should not throw or cause issues
+            await listing.removeFilter('nonexistent');
+
+            expect(searchRef.value).toBe('test search'); // Unchanged
+            expect(mockAxios.get).not.toHaveBeenCalled();
+        });
+    });
 });
 
