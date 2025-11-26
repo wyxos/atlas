@@ -127,7 +127,7 @@ describe('Listing', () => {
             });
 
             const axiosError = new Error('Network error');
-            (axiosError as { response?: { status?: number; data?: { message?: string } } }).response = { 
+            (axiosError as { response?: { status?: number; data?: { message?: string } } }).response = {
                 status: 500,
                 data: { message: 'Server error' }
             };
@@ -196,16 +196,16 @@ describe('Listing', () => {
 
             // Before load, should be false
             expect(listing.isLoading).toBe(false);
-            
+
             // Start loading (this happens inside load())
             const loadPromise = listing.load();
-            
+
             // During load, should be true (loading() was called)
             expect(listing.isLoading).toBe(true);
-            
+
             // Wait for load to complete
             await loadPromise;
-            
+
             // After load, should be false (loaded() was called)
             expect(listing.isLoading).toBe(false);
         });
@@ -439,7 +439,7 @@ describe('Listing', () => {
 
             const searchRef = { value: 'test search' };
             const statusRef = { value: 'verified' };
-            
+
             listing.filters({
                 search: searchRef,
                 status: statusRef,
@@ -470,7 +470,7 @@ describe('Listing', () => {
 
             const searchRef = { value: 'test search' };
             const statusRef = { value: 'verified' };
-            
+
             listing.filters({
                 search: searchRef,
                 status: statusRef,
@@ -494,7 +494,7 @@ describe('Listing', () => {
 
             const searchRef = { value: 'test search' };
             const statusRef = { value: 'verified' };
-            
+
             listing.filters({
                 search: searchRef,
                 status: statusRef,
@@ -519,7 +519,7 @@ describe('Listing', () => {
             listing.path('/api/test');
 
             const searchRef = { value: 'test search' };
-            
+
             listing.filters({
                 search: searchRef,
             });
@@ -531,5 +531,71 @@ describe('Listing', () => {
             expect(mockAxios.get).not.toHaveBeenCalled();
         });
     });
-});
 
+    describe('filter visibility', () => {
+        it('defaults all filters to visible after filters() is called', () => {
+            const listing = new Listing<TestItem>();
+
+            const searchRef = { value: 'test' };
+            const statusRef = { value: 'verified' };
+
+            listing.filters({
+                search: searchRef,
+                status: statusRef,
+            });
+
+            expect(listing.isFilterVisible('search')).toBe(true);
+            expect(listing.isFilterVisible('status')).toBe(true);
+            expect(listing.visibleFilters).toEqual(expect.arrayContaining(['search', 'status']));
+        });
+
+        it('can hide and show individual filters', () => {
+            const listing = new Listing<TestItem>();
+
+            listing.filters({
+                search: { value: 'test' },
+                status: { value: 'verified' },
+            });
+
+            listing.hideFilter('search');
+            expect(listing.isFilterVisible('search')).toBe(false);
+            expect(listing.isFilterVisible('status')).toBe(true);
+            expect(listing.visibleFilters).toEqual(['status']);
+
+            listing.showFilter('search');
+            expect(listing.isFilterVisible('search')).toBe(true);
+            expect(listing.visibleFilters).toEqual(expect.arrayContaining(['search', 'status']));
+        });
+
+        it('toggles filter visibility', () => {
+            const listing = new Listing<TestItem>();
+
+            listing.filters({
+                search: { value: 'test' },
+            });
+
+            // Initially visible
+            expect(listing.isFilterVisible('search')).toBe(true);
+
+            listing.toggleFilter('search');
+            expect(listing.isFilterVisible('search')).toBe(false);
+
+            listing.toggleFilter('search');
+            expect(listing.isFilterVisible('search')).toBe(true);
+        });
+
+        it('treats unknown filters as visible and does not track them', () => {
+            const listing = new Listing<TestItem>();
+
+            listing.filters({
+                search: { value: 'test' },
+            });
+
+            expect(listing.isFilterVisible('unknown')).toBe(true);
+
+            // Toggling an unknown filter should be a no-op
+            listing.toggleFilter('unknown');
+            expect(listing.isFilterVisible('unknown')).toBe(true);
+        });
+    });
+});

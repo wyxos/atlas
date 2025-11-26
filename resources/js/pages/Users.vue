@@ -72,21 +72,34 @@ listing
 const deletingUserId = ref<number | null>(null);
 const dialogOpen = ref(false);
 const userToDelete = ref<User | null>(null);
-const filterPanelOpen = ref(false);
+// Panel visibility is tracked by the Listing instance; this computed bridges
+// it to the FilterPanel's v-model.
+const filterPanelOpen = computed({
+    get() {
+        return listing.isPanelOpen();
+    },
+    set(open: boolean) {
+        if (open) {
+            listing.openPanel();
+        } else {
+            listing.closePanel();
+        }
+    },
+});
 
 
 async function deleteUser(userId: number): Promise<void> {
     try {
         deletingUserId.value = userId;
         await window.axios.delete(`/api/users/${userId}`);
-        
+
         // Close dialog first
         dialogOpen.value = false;
         userToDelete.value = null;
-        
+
         // Remove the user from the listing
         listing.remove(userId);
-        
+
         // If current page is empty and not page 1, go to previous page
         if (listing.data.length === 0 && listing.currentPage > 1) {
             await listing.goToPage(listing.currentPage - 1);
@@ -136,12 +149,12 @@ function formatDate(dateString: string): string {
 }
 
 function openFilterPanel(): void {
-    filterPanelOpen.value = true;
+    listing.openPanel();
 }
 
 async function applyFilters(): Promise<void> {
     await listing.goToPage(1); // Reset to first page when applying filters
-    filterPanelOpen.value = false;
+    listing.closePanel();
 }
 
 // resetFilters and removeFilter are now internalized in Listing class,
@@ -159,9 +172,9 @@ async function goToPage(page: number): Promise<void> {
 }
 
 const hasActiveFilters = computed(() => {
-    return searchQuery.value.trim() !== '' || 
-           dateFrom.value !== '' || 
-           dateTo.value !== '' || 
+    return searchQuery.value.trim() !== '' ||
+           dateFrom.value !== '' ||
+           dateTo.value !== '' ||
            statusFilter.value !== 'all';
 });
 
@@ -334,8 +347,8 @@ onMounted(async () => {
                             {{ hasActiveFilters ? 'No users found' : 'No users yet' }}
                         </h3>
                         <p class="text-twilight-indigo-700 text-center max-w-md">
-                            {{ hasActiveFilters 
-                                ? 'Try adjusting your filters to see more results.' 
+                            {{ hasActiveFilters
+                                ? 'Try adjusting your filters to see more results.'
                                 : 'Get started by creating your first user.' }}
                         </p>
                         <Button
@@ -419,9 +432,9 @@ onMounted(async () => {
                     </DialogHeader>
                     <DialogFooter>
                         <DialogClose as-child>
-                            <Button 
-                                variant="outline" 
-                                @click="handleDeleteCancel" 
+                            <Button
+                                variant="outline"
+                                @click="handleDeleteCancel"
                                 :disabled="deletingUserId !== null"
                                 class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
                             >
