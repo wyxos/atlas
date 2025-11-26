@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed, reactive } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Trash2, CheckCircle2, Filter, Users, X } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
@@ -31,33 +31,25 @@ interface User extends Record<string, unknown> {
     created_at: string;
 }
 
-// Filter state
-const searchQuery = ref('');
-const dateFrom = ref('');
-const dateTo = ref('');
-const statusFilter = ref('all');
-
-// Create reactive listing instance
-const listing = reactive(new Listing<User>()) as unknown as Listing<User>;
-listing.loading(); // Initial loading state
-
-// Configure listing with path, router, filters, and error handler
-// Note: .path() is used for convenience in goToPage, but we pass path directly to get() for clarity
-listing
-    .path('/api/users')
-    .router(router)
-    .filters({
-        search: searchQuery,
-        date_from: dateFrom,
-        date_to: dateTo,
-        status: statusFilter,
-    })
-    .defaults({
+// Create reactive listing instance (Listing.create returns a reactive Proxy)
+// Proxy provides dynamic filter properties (e.g., listing.search, listing.date_from)
+// TypeScript can't infer dynamic Proxy properties, so we cast to any
+ 
+const listing = Listing.create<User>({
+    filters: {
         search: '',
         date_from: '',
         date_to: '',
         status: 'all',
-    })
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+}) as any;
+listing.loading(); // Initial loading state
+
+// Configure listing with path, router, filters, and error handler
+listing
+    .path('/api/users')
+    .router(router)
     .onLoadError((error: string | null, statusCode?: number) => {
         // Customize error messages for users context
         if (statusCode === 403) {
@@ -157,10 +149,15 @@ async function applyFilters(): Promise<void> {
 }
 
 const hasActiveFilters = computed(() => {
-    return searchQuery.value.trim() !== '' ||
-           dateFrom.value !== '' ||
-           dateTo.value !== '' ||
-           statusFilter.value !== 'all';
+    const search = listing.filters.search ?? '';
+    const from = listing.filters.date_from ?? '';
+    const to = listing.filters.date_to ?? '';
+    const status = listing.filters.status ?? 'all';
+
+    return String(search).trim() !== '' ||
+        String(from) !== '' ||
+        String(to) !== '' ||
+        String(status) !== 'all';
 });
 
 // Watch for route query changes (back/forward navigation)
@@ -171,10 +168,6 @@ watch(() => route.query, async (newQuery) => {
 // Expose properties for testing
 defineExpose({
     listing,
-    searchQuery,
-    dateFrom,
-    dateTo,
-    statusFilter,
     get currentPage() {
         return listing.currentPage;
     },
@@ -356,7 +349,7 @@ onMounted(async () => {
                 <form @submit.prevent="applyFilters" class="space-y-6">
                     <!-- Search Field -->
                     <FormInput
-                        v-model="searchQuery"
+                        v-model="listing.search"
                         placeholder="Search by name or email..."
                     >
                         <template #label>
@@ -375,7 +368,7 @@ onMounted(async () => {
                                     From
                                 </label>
                                 <DatePicker
-                                    v-model="dateFrom"
+                                    v-model="listing.date_from"
                                     placeholder="Pick start date"
                                 />
                             </div>
@@ -384,7 +377,7 @@ onMounted(async () => {
                                     To
                                 </label>
                                 <DatePicker
-                                    v-model="dateTo"
+                                    v-model="listing.date_to"
                                     placeholder="Pick end date"
                                 />
                             </div>
@@ -392,7 +385,7 @@ onMounted(async () => {
                     </div>
 
                     <!-- Status Filter -->
-                    <Select v-model="statusFilter">
+                    <Select v-model="listing.status">
                         <template #label>
                             Status
                         </template>
