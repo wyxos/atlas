@@ -74,20 +74,7 @@ const canRetryDelete = ref(false);
 function canDeleteUser(user: User): boolean {
     return user.id !== currentUserId;
 }
-// Panel visibility is tracked by the Listing instance; this computed bridges
-// it to the FilterPanel's v-model.
-const filterPanelOpen = computed({
-    get() {
-        return listing.isPanelOpen();
-    },
-    set(open: boolean) {
-        if (open) {
-            listing.openPanel();
-        } else {
-            listing.closePanel();
-        }
-    },
-});
+// No computed wrapper needed - FilterPanel will use separate modelValue and update:modelValue
 
 
 async function deleteUser(userId: number): Promise<void> {
@@ -357,7 +344,8 @@ onMounted(async () => {
 
             <!-- Filter Panel -->
             <FilterPanel
-                v-model="filterPanelOpen"
+                :modelValue="listing.isPanelOpen()"
+                @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()"
                 title="Filter Users"
                 @apply="applyFilters"
                 @reset="() => listing.resetFilters()"
