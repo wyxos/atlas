@@ -22,6 +22,13 @@ export interface HarmonieListingResponse<T> {
 type ErrorHandler = (error: string | null, statusCode?: number) => string | null;
 type FilterValue = string | number | { value: string | number | null | undefined } | null | undefined;
 
+type DeleteConfig<TItem extends Record<string, unknown>> = {
+    key?: string;
+    refresh?: boolean;
+    onSuccess?: (id: string | number, listing: Listing<TItem>) => void;
+    onError?: (error: unknown, statusCode?: number, listing?: Listing<TItem>) => void;
+};
+
 export class Listing<T extends Record<string, unknown>> {
     public data: T[] = [];
     public isLoading = false;
@@ -439,6 +446,102 @@ export class Listing<T extends Record<string, unknown>> {
     remove(id: unknown, key: string = 'id'): void {
         this.data = this.data.filter((item) => item[key] !== id);
         this.total = Math.max(0, this.total - 1);
+    }
+
+    /**
+     * Delete an item on the server and update the listing.
+     *
+     * Flexible signature, similar in spirit to get():
+     * - delete(path, id)
+     * - delete(path, { id, key, refresh })
+     * - delete({ id, key, refresh })  // uses configured path from path()
+     */
+    async delete(
+        path: string,
+        id: string | number,
+        config?: DeleteConfig<T>
+    ): Promise<void>;
+
+    async delete(
+        path: string,
+        config: { id: string | number } & DeleteConfig<T>
+    ): Promise<void>;
+
+    async delete(config: { id: string | number } & DeleteConfig<T>): Promise<void>;
+
+    async delete(
+        pathOrConfig: string | ({ id: string | number } & DeleteConfig<T>),
+        idOrConfig?: string | number | DeleteConfig<T>,
+        maybeConfig?: DeleteConfig<T>
+    ): Promise<void> {
+        let path: string | null = null;
+        let id: string | number;
+        let key = 'id';
+        let refresh = true;
+        let onSuccess: ((id: string | number, listing: Listing<T>) => void) | undefined;
+        let onError: ((error: unknown, statusCode?: number, listing?: Listing<T>) => void) | undefined;
+
+        if (typeof pathOrConfig === 'string') {
+            path = pathOrConfig;
+
+            if (typeof idOrConfig === 'object' && idOrConfig !== null) {
+                const configObject = idOrConfig as { id: string | number } & DeleteConfig<T>;
+                id = configObject.id;
+                key = configObject.key ?? 'id';
+                refresh = configObject.refresh ?? true;
+                onSuccess = configObject.onSuccess;
+                onError = configObject.onError;
+            } else {
+                if (idOrConfig === undefined || idOrConfig === null) {
+                    throw new Error('ID must be provided when calling delete(path, id)');
+                }
+                id = idOrConfig as string | number;
+                key = maybeConfig?.key ?? 'id';
+                refresh = maybeConfig?.refresh ?? true;
+                onSuccess = maybeConfig?.onSuccess;
+                onError = maybeConfig?.onError;
+            }
+        } else {
+            if (!this.apiPath) {
+                throw new Error('API path must be provided either as parameter or via path() method');
+            }
+
+            id = pathOrConfig.id;
+            key = pathOrConfig.key ?? 'id';
+            refresh = pathOrConfig.refresh ?? true;
+            onSuccess = pathOrConfig.onSuccess;
+            onError = pathOrConfig.onError;
+            path = `${this.apiPath}/${id}`;
+        }
+
+        try {
+            await window.axios.delete(path as string);
+
+            this.remove(id, key);
+
+            if (this.data.length === 0 && this.currentPage > 1) {
+                await this.goToPage(this.currentPage - 1);
+            } else if (refresh) {
+                await this.get();
+            }
+
+            if (onSuccess) {
+                onSuccess(id, this);
+            }
+        } catch (error: unknown) {
+            // Attempt to extract HTTP status code if this looks like an Axios error
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const maybeAxiosError = error as any;
+            const statusCode: number | undefined = maybeAxiosError?.response?.status;
+
+            if (onError) {
+                onError(error, statusCode, this);
+                return;
+            }
+
+            // If no onError callback is provided, rethrow so callers can handle it.
+            throw error;
+        }
     }
 
     /**
