@@ -526,7 +526,7 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any 
         const vm = wrapper.vm as any;
-        await vm.goToPage(2);
+        await vm.listing.goToPage(2);
         await flushPromises();
         await wrapper.vm.$nextTick();
 
@@ -547,7 +547,7 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        await vm.resetFilters();
+        await vm.listing.resetFilters();
         await flushPromises();
         await wrapper.vm.$nextTick();
 
@@ -576,7 +576,7 @@ describe('Users', () => {
         expect(vm.dateTo).toBe('2024-12-31');
 
         // Reset filters
-        await vm.resetFilters();
+        await vm.listing.resetFilters();
         await flushPromises();
         await wrapper.vm.$nextTick();
 
@@ -605,7 +605,7 @@ describe('Users', () => {
         expect(vm.statusFilter).toBe('verified');
 
         // Remove search filter
-        await vm.removeFilter('search');
+        await vm.listing.removeFilter('search');
         await flushPromises();
         await wrapper.vm.$nextTick();
 
@@ -636,7 +636,7 @@ describe('Users', () => {
         expect(vm.dateTo).toBe('2024-12-31');
 
         // Remove date_from filter
-        await vm.removeFilter('date_from');
+        await vm.listing.removeFilter('date_from');
         await flushPromises();
         await wrapper.vm.$nextTick();
 
@@ -667,7 +667,7 @@ describe('Users', () => {
         expect(vm.dateTo).toBe('2024-12-31');
 
         // Remove date_to filter
-        await vm.removeFilter('date_to');
+        await vm.listing.removeFilter('date_to');
         await flushPromises();
         await wrapper.vm.$nextTick();
 
@@ -698,7 +698,7 @@ describe('Users', () => {
         expect(vm.statusFilter).toBe('verified');
 
         // Remove status filter
-        await vm.removeFilter('status');
+        await vm.listing.removeFilter('status');
         await flushPromises();
         await wrapper.vm.$nextTick();
 
@@ -730,7 +730,7 @@ describe('Users', () => {
         expect(vm.currentPage).toBe(2);
 
         // Reset filters
-        await vm.resetFilters();
+        await vm.listing.resetFilters();
         await waitForListingToLoad(wrapper);
 
         // Verify pagination is reset to page 1
@@ -758,7 +758,7 @@ describe('Users', () => {
         expect(vm.currentPage).toBe(2);
 
         // Remove a filter
-        await vm.removeFilter('search');
+        await vm.listing.removeFilter('search');
         await waitForListingToLoad(wrapper);
 
         // Verify pagination is reset to page 1

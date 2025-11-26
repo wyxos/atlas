@@ -148,27 +148,9 @@ function formatDate(dateString: string): string {
     });
 }
 
-function openFilterPanel(): void {
-    listing.openPanel();
-}
-
 async function applyFilters(): Promise<void> {
     await listing.goToPage(1); // Reset to first page when applying filters
     listing.closePanel();
-}
-
-// resetFilters and removeFilter are now internalized in Listing class,
-// but we provide local wrappers for template usage and testing.
-async function resetFilters(): Promise<void> {
-    await listing.resetFilters();
-}
-
-async function removeFilter(filterKey: string): Promise<void> {
-    await listing.removeFilter(filterKey);
-}
-
-async function goToPage(page: number): Promise<void> {
-    await listing.goToPage(page);
 }
 
 const hasActiveFilters = computed(() => {
@@ -212,9 +194,6 @@ defineExpose({
         return listing.activeFilters;
     },
     applyFilters,
-    resetFilters,
-    removeFilter,
-    goToPage,
 });
 
 onMounted(async () => {
@@ -236,7 +215,7 @@ onMounted(async () => {
                 </div>
                 <Button
                     variant="outline"
-                    @click="openFilterPanel"
+                    @click="() => listing.openPanel()"
                     class="border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
                 >
                     <Filter class="w-4 h-4 mr-2" />
@@ -255,7 +234,7 @@ onMounted(async () => {
                     <span class="bg-smart-blue-600 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
                     <span class="bg-smart-blue-300 px-3 py-1.5 text-smart-blue-900 truncate max-w-xs">{{ filter.value }}</span>
                     <Button
-                        @click="removeFilter(filter.key)"
+                        @click="() => listing.removeFilter(filter.key)"
                         variant="ghost"
                         size="sm"
                         class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white rounded-br rounded-tr border-0"
@@ -267,8 +246,8 @@ onMounted(async () => {
                 <Button
                     variant="outline"
                     size="sm"
-                    @click="resetFilters"
-                    class="border-danger-600 text-danger-600 bg-transparent hover:bg-danger-300 hover:border-danger-600 hover:text-danger-700"
+                    @click="() => listing.resetFilters()"
+                    class="border-danger-600 text-danger-600 bg-transparent hover:bg-danger-300 hover:border-danger-600 hover:text-danger-600"
                 >
                     Clear all
                 </Button>
@@ -293,7 +272,7 @@ onMounted(async () => {
                     backend-pagination
                     pagination-position="both"
                     pagination-order="right"
-                    @page-change="goToPage"
+                    @page-change="(page: number) => listing.goToPage(page)"
                     class="w-full rounded-lg overflow-hidden bg-prussian-blue-600"
                 >
                 <o-table-column field="id" label="ID" width="80" />
@@ -354,7 +333,7 @@ onMounted(async () => {
                         <Button
                             v-if="hasActiveFilters"
                             variant="outline"
-                            @click="resetFilters"
+                            @click="() => listing.resetFilters()"
                             class="mt-4 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
                         >
                             Clear Filters
@@ -369,7 +348,7 @@ onMounted(async () => {
                 v-model="filterPanelOpen"
                 title="Filter Users"
                 @apply="applyFilters"
-                @reset="resetFilters"
+                @reset="() => listing.resetFilters()"
             >
                 <form @submit.prevent="applyFilters" class="space-y-6">
                     <!-- Search Field -->
