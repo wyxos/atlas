@@ -7,7 +7,7 @@ export interface ActiveFilter {
 // Note: We import markRaw to avoid Vue's ref-unwrapping when this class is made reactive.
 // Without markRaw, refs stored on a reactive instance are unwrapped to their .value on access,
 // which prevents us from updating the original refs from route query parameters.
-import { markRaw } from 'vue';
+import { markRaw, computed, reactive, type ComputedRef } from 'vue';
 
 export interface HarmonieListingResponse<T> {
     listing: {
@@ -51,6 +51,50 @@ export class Listing<T extends Record<string, unknown>> {
     private errorHandler: ErrorHandler | null = null;
 
     /**
+     * Vue bindings for filters, suitable for v-model usage in templates.
+     */
+    public bindings: Record<string, ComputedRef<string>> = {};
+
+    /**
+     * Factory helper to create a reactive Listing with optional initial filters.
+     * Returns a Proxy that allows direct property access for filter keys (e.g., listing.date_from).
+     */
+    static create<T extends Record<string, unknown>>(options?: {
+        filters?: Record<string, string | number | null>;
+    }): Listing<T> {
+        const instance = new Listing<T>();
+
+        if (options?.filters) {
+            instance.parameters(options.filters);
+        }
+
+        // Make the instance reactive
+        const reactiveInstance = reactive(instance);
+
+        // Create a Proxy that intercepts property access for filter keys
+        return new Proxy(reactiveInstance, {
+            get(target, prop) {
+                // If accessing a filter key that exists in bindings, return the computed ref
+                if (typeof prop === 'string' && prop in target.bindings) {
+                    return target.bindings[prop];
+                }
+                // Otherwise, return the property normally
+                return Reflect.get(target, prop);
+            },
+            set(target, prop, value) {
+                // If setting a filter key that exists in bindings, update filters directly
+                // The computed refs will reactively read from filters
+                if (typeof prop === 'string' && prop in target.bindings) {
+                    target.filters[prop] = String(value) as string | number | null;
+                    return true;
+                }
+                // Otherwise, set the property normally
+                return Reflect.set(target, prop, value);
+            },
+        }) as unknown as Listing<T>;
+    }
+
+    /**
      * Set the loading state to true
      */
     loading(): void {
@@ -86,10 +130,14 @@ export class Listing<T extends Record<string, unknown>> {
     }
 
     /**
-     * Define filter attributes that will be automatically converted to filter parameters
+     * Define filter attributes that will be automatically converted to filter parameters,
+     * using external refs / values (legacy configuration style).
+     *
+     * Prefer using parameters() when you want Listing to own filter state.
+     *
      * @param filters - Object mapping filter keys to refs or values
      */
-    filters(filters: Record<string, FilterValue>): this {
+    filterRefs(filters: Record<string, FilterValue>): this {
         // Avoid Vue ref-unwrapping by storing the filters object as a raw object.
         // This ensures we can detect and assign to ref.value within load().
         this.filterAttributes = markRaw(filters) as Record<string, FilterValue>;
@@ -102,6 +150,51 @@ export class Listing<T extends Record<string, unknown>> {
             this.filterDefaults[key] = null as unknown as string | number; // null is the default
             this.filterVisibility[key] = true; // visible by default
         }
+
+        return this;
+    }
+
+    /**
+     * Initialize filter state owned by Listing.
+     *
+     * This sets up:
+     * - listing.filters[key] as the live reactive value
+     * - defaults for resetFilters()/removeFilter()
+     * - internal filterAttributes proxies used by URL sync
+     */
+    public filters: Record<string, string | number | null> = {};
+
+    parameters(initials: Record<string, string | number | null>): this {
+        // Live reactive state (once Listing instance is wrapped in reactive())
+        this.filters = { ...initials };
+
+        // Proxies / bindings that bridge existing internals to filters[key]
+        const attrs: Record<string, FilterValue> = {};
+        this.filterDefaults = {};
+        this.filterVisibility = {};
+        this.bindings = {};
+
+        for (const [key, defaultValue] of Object.entries(initials)) {
+            const binding = computed<string>({
+                get: () => {
+                    const current = this.filters[key];
+                    return current === null || current === undefined ? '' : String(current);
+                },
+                set: (value: string) => {
+                    // Store back as string; consumers can coerce to number if needed.
+                    this.filters[key] = value as unknown as string | number | null;
+                },
+            });
+
+            this.bindings[key] = binding;
+            attrs[key] = binding as unknown as FilterValue;
+            this.filterDefaults[key] = (defaultValue === null
+                ? null
+                : defaultValue) as unknown as string | number;
+            this.filterVisibility[key] = true;
+        }
+
+        this.filterAttributes = markRaw(attrs) as Record<string, FilterValue>;
 
         return this;
     }
@@ -192,11 +285,20 @@ export class Listing<T extends Record<string, unknown>> {
     private buildFilterParameters(): Record<string, string | number> {
         const parameters: Record<string, string | number> = {};
 
-        for (const [key, value] of Object.entries(this.filterAttributes)) {
-            // Extract value from ref if it's an object with .value property
+        // Read directly from filters if available (new parameters() API)
+        // Otherwise fall back to filterAttributes (legacy filterRefs() API)
+        const source = Object.keys(this.filters).length > 0 ? this.filters : this.filterAttributes;
+
+        for (const [key, value] of Object.entries(source)) {
+            // Extract value - if it's from filters, it's already the actual value
+            // If it's from filterAttributes, it might be a ref-like object
             let actualValue: string | number | null | undefined;
-            if (value && typeof value === 'object' && 'value' in value) {
-                actualValue = value.value;
+            if (source === this.filters) {
+                // Direct value from filters
+                actualValue = value as string | number | null | undefined;
+            } else if (value && typeof value === 'object' && 'value' in value) {
+                // Extract from ref-like object (legacy API)
+                actualValue = (value as { value: string | number | null | undefined }).value;
             } else {
                 actualValue = value as string | number | null | undefined;
             }
@@ -358,7 +460,13 @@ export class Listing<T extends Record<string, unknown>> {
         // 2. Explicit query was provided and has values (sync from provided query)
         if (Object.keys(routeQuery).length > 0) {
             // Update filter values from URL query parameters
-            for (const [key, filterValue] of Object.entries(this.filterAttributes)) {
+            // Prefer updating this.filters directly (new parameters() API)
+            // Otherwise fall back to filterAttributes (legacy filterRefs() API)
+            const filterKeys = Object.keys(this.filters).length > 0
+                ? Object.keys(this.filters)
+                : Object.keys(this.filterAttributes);
+
+            for (const key of filterKeys) {
                 const queryValue = routeQuery[key];
 
                 if (queryValue !== undefined && queryValue !== null) {
@@ -372,10 +480,16 @@ export class Listing<T extends Record<string, unknown>> {
                         continue; // Skip invalid status values
                     }
 
-                    // Update the filter value (handle both refs and direct values)
-                    if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
-                        // It's a ref-like object with .value property
-                        (filterValue as { value: string | number }).value = stringValue;
+                    // Update the filter value
+                    if (key in this.filters) {
+                        // New API: update filters directly
+                        this.filters[key] = stringValue as string | number | null;
+                    } else if (key in this.filterAttributes) {
+                        // Legacy API: update via filterAttributes ref
+                        const filterValue = this.filterAttributes[key];
+                        if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+                            (filterValue as { value: string | number }).value = stringValue;
+                        }
                     }
                 }
             }
@@ -634,12 +748,16 @@ export class Listing<T extends Record<string, unknown>> {
 
         // Reset all filter values to their defaults
         for (const [key, defaultValue] of Object.entries(this.filterDefaults)) {
-            const filterValue = this.filterAttributes[key];
-            if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
-                // Access the ref directly and set its value
-                // Handle null defaults - set to null or the specified default
-                const ref = filterValue as { value: string | number | null | undefined };
-                ref.value = defaultValue;
+            if (key in this.filters) {
+                // New API: update filters directly
+                this.filters[key] = defaultValue;
+            } else if (key in this.filterAttributes) {
+                // Legacy API: update via filterAttributes ref
+                const filterValue = this.filterAttributes[key];
+                if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+                    const ref = filterValue as { value: string | number | null | undefined };
+                    ref.value = defaultValue;
+                }
             }
         }
 
@@ -670,11 +788,16 @@ export class Listing<T extends Record<string, unknown>> {
         }
 
         const defaultValue = this.filterDefaults[filterKey];
-        const filterValue = this.filterAttributes[filterKey];
-        if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
-            // Handle null defaults - set to null or the specified default
-            const ref = filterValue as { value: string | number | null | undefined };
-            ref.value = defaultValue;
+        if (filterKey in this.filters) {
+            // New API: update filters directly
+            this.filters[filterKey] = defaultValue;
+        } else if (filterKey in this.filterAttributes) {
+            // Legacy API: update via filterAttributes ref
+            const filterValue = this.filterAttributes[filterKey];
+            if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+                const ref = filterValue as { value: string | number | null | undefined };
+                ref.value = defaultValue;
+            }
         }
 
         // Build query from current filter state (which now has the reset value)

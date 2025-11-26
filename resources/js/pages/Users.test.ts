@@ -471,10 +471,10 @@ describe('Users', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
-        expect(vm.searchQuery).toBe('john');
-        expect(vm.statusFilter).toBe('verified');
-        expect(vm.dateFrom).toBe('2024-01-01');
-        expect(vm.dateTo).toBe('2024-12-31');
+        expect(vm.listing.filters.search).toBe('john');
+        expect(vm.listing.filters.status).toBe('verified');
+        expect(vm.listing.filters.date_from).toBe('2024-01-01');
+        expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
         expect(mockAxios.get).toHaveBeenCalledWith('/api/users', {
             params: expect.objectContaining({
@@ -501,10 +501,10 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        vm.searchQuery = 'test';
-        vm.statusFilter = 'verified';
-        vm.dateFrom = '2024-01-01';
-        vm.dateTo = '2024-12-31';
+        vm.listing.filters.search = 'test';
+        vm.listing.filters.status = 'verified';
+        vm.listing.filters.date_from = '2024-01-01';
+        vm.listing.filters.date_to = '2024-12-31';
 
         await vm.applyFilters();
         await flushPromises();
@@ -576,10 +576,10 @@ describe('Users', () => {
         const vm = wrapper.vm as any;
 
         // Verify filters are initially set from URL
-        expect(vm.searchQuery).toBe('test');
-        expect(vm.statusFilter).toBe('verified');
-        expect(vm.dateFrom).toBe('2024-01-01');
-        expect(vm.dateTo).toBe('2024-12-31');
+        expect(vm.listing.filters.search).toBe('test');
+        expect(vm.listing.filters.status).toBe('verified');
+        expect(vm.listing.filters.date_from).toBe('2024-01-01');
+        expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
         // Reset filters
         await vm.listing.resetFilters();
@@ -587,10 +587,10 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         // Verify all filter values are reset to defaults
-        expect(vm.searchQuery).toBe('');
-        expect(vm.statusFilter).toBe('all');
-        expect(vm.dateFrom).toBe('');
-        expect(vm.dateTo).toBe('');
+        expect(vm.listing.filters.search).toBe('');
+        expect(vm.listing.filters.status).toBe('all');
+        expect(vm.listing.filters.date_from).toBe('');
+        expect(vm.listing.filters.date_to).toBe('');
     });
 
     it('removes individual search filter when removeFilter is called', async () => {
@@ -607,8 +607,8 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        expect(vm.searchQuery).toBe('test');
-        expect(vm.statusFilter).toBe('verified');
+        expect(vm.listing.filters.search).toBe('test');
+        expect(vm.listing.filters.status).toBe('verified');
 
         // Remove search filter
         await vm.listing.removeFilter('search');
@@ -616,8 +616,8 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         // Verify search is cleared but status remains
-        expect(vm.searchQuery).toBe('');
-        expect(vm.statusFilter).toBe('verified');
+        expect(vm.listing.filters.search).toBe('');
+        expect(vm.listing.filters.status).toBe('verified');
 
         // Verify URL is updated - search should be removed, status should remain
         expect(router.currentRoute.value.query.search).toBeUndefined();
@@ -638,8 +638,8 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        expect(vm.dateFrom).toBe('2024-01-01');
-        expect(vm.dateTo).toBe('2024-12-31');
+        expect(vm.listing.filters.date_from).toBe('2024-01-01');
+        expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
         // Remove date_from filter
         await vm.listing.removeFilter('date_from');
@@ -647,8 +647,8 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         // Verify date_from is cleared but date_to remains
-        expect(vm.dateFrom).toBe('');
-        expect(vm.dateTo).toBe('2024-12-31');
+        expect(vm.listing.filters.date_from).toBe('');
+        expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
         // Verify URL is updated - date_from should be removed, date_to should remain
         expect(router.currentRoute.value.query.date_from).toBeUndefined();
@@ -669,8 +669,8 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        expect(vm.dateFrom).toBe('2024-01-01');
-        expect(vm.dateTo).toBe('2024-12-31');
+        expect(vm.listing.filters.date_from).toBe('2024-01-01');
+        expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
         // Remove date_to filter
         await vm.listing.removeFilter('date_to');
@@ -678,8 +678,8 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         // Verify date_to is cleared but date_from remains
-        expect(vm.dateFrom).toBe('2024-01-01');
-        expect(vm.dateTo).toBe('');
+        expect(vm.listing.filters.date_from).toBe('2024-01-01');
+        expect(vm.listing.filters.date_to).toBe('');
 
         // Verify URL is updated - date_to should be removed, date_from should remain
         expect(router.currentRoute.value.query.date_from).toBe('2024-01-01');
@@ -700,8 +700,8 @@ describe('Users', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        expect(vm.searchQuery).toBe('test');
-        expect(vm.statusFilter).toBe('verified');
+        expect(vm.listing.filters.search).toBe('test');
+        expect(vm.listing.filters.status).toBe('verified');
 
         // Remove status filter
         await vm.listing.removeFilter('status');
@@ -709,8 +709,8 @@ describe('Users', () => {
         await wrapper.vm.$nextTick();
 
         // Verify status is reset to 'all' but search remains
-        expect(vm.searchQuery).toBe('test');
-        expect(vm.statusFilter).toBe('all');
+        expect(vm.listing.filters.search).toBe('test');
+        expect(vm.listing.filters.status).toBe('all');
 
         // Verify URL is updated - status should be removed (not included when 'all'), search should remain
         expect(router.currentRoute.value.query.search).toBe('test');

@@ -441,7 +441,7 @@ describe('Listing', () => {
             const searchRef = { value: 'test search' };
             const statusRef = { value: 'verified' };
 
-            listing.filters({
+            listing.filterRefs({
                 search: searchRef,
                 status: statusRef,
             }).defaults({
@@ -472,7 +472,7 @@ describe('Listing', () => {
             const searchRef = { value: 'test search' };
             const statusRef = { value: 'verified' };
 
-            listing.filters({
+            listing.filterRefs({
                 search: searchRef,
                 status: statusRef,
             });
@@ -496,7 +496,7 @@ describe('Listing', () => {
             const searchRef = { value: 'test search' };
             const statusRef = { value: 'verified' };
 
-            listing.filters({
+            listing.filterRefs({
                 search: searchRef,
                 status: statusRef,
             }).defaults({
@@ -521,7 +521,7 @@ describe('Listing', () => {
 
             const searchRef = { value: 'test search' };
 
-            listing.filters({
+            listing.filterRefs({
                 search: searchRef,
             });
 
@@ -661,7 +661,7 @@ describe('Listing', () => {
             const searchRef = { value: 'test' };
             const statusRef = { value: 'verified' };
 
-            listing.filters({
+            listing.filterRefs({
                 search: searchRef,
                 status: statusRef,
             });
@@ -674,7 +674,7 @@ describe('Listing', () => {
         it('can hide and show individual filters', () => {
             const listing = new Listing<TestItem>();
 
-            listing.filters({
+            listing.filterRefs({
                 search: { value: 'test' },
                 status: { value: 'verified' },
             });
@@ -692,7 +692,7 @@ describe('Listing', () => {
         it('toggles filter visibility', () => {
             const listing = new Listing<TestItem>();
 
-            listing.filters({
+            listing.filterRefs({
                 search: { value: 'test' },
             });
 
@@ -709,7 +709,7 @@ describe('Listing', () => {
         it('treats unknown filters as visible and does not track them', () => {
             const listing = new Listing<TestItem>();
 
-            listing.filters({
+            listing.filterRefs({
                 search: { value: 'test' },
             });
 
