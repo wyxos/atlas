@@ -814,6 +814,22 @@ export class Listing<T extends Record<string, unknown>> {
     }
 
     /**
+     * Apply current filters - go to first page and close filter panel
+     * Common pattern for filter application in UI components
+     */
+    async applyFilters(): Promise<void> {
+        await this.goToPage(1); // Reset to first page when applying filters
+        this.closePanel();
+    }
+
+    /**
+     * Check if there are any active filters applied
+     */
+    get hasActiveFilters(): boolean {
+        return this.activeFilters.length > 0;
+    }
+
+    /**
      * Reset the listing to initial state
      */
     reset(): void {

@@ -138,22 +138,8 @@ function formatDate(dateString: string): string {
     });
 }
 
-async function applyFilters(): Promise<void> {
-    await listing.goToPage(1); // Reset to first page when applying filters
-    listing.closePanel();
-}
 
-const hasActiveFilters = computed(() => {
-    const search = listing.filters.search ?? '';
-    const from = listing.filters.date_from ?? '';
-    const to = listing.filters.date_to ?? '';
-    const status = listing.filters.status ?? 'all';
-
-    return String(search).trim() !== '' ||
-        String(from) !== '' ||
-        String(to) !== '' ||
-        String(status) !== 'all';
-});
+const hasActiveFilters = computed(() => listing.hasActiveFilters);
 
 // Watch for route query changes (back/forward navigation)
 watch(() => route.query, async (newQuery) => {
@@ -184,7 +170,9 @@ defineExpose({
     get activeFilters() {
         return listing.activeFilters;
     },
-    applyFilters,
+    get hasActiveFilters() {
+        return listing.hasActiveFilters;
+    },
 });
 
 onMounted(async () => {
@@ -228,7 +216,7 @@ onMounted(async () => {
                         @click="() => listing.removeFilter(filter.key)"
                         variant="ghost"
                         size="sm"
-                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white rounded-br rounded-tr border-0"
+                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr"
                         :aria-label="`Remove ${filter.label} filter`"
                     >
                         <X class="h-3.5 w-3.5" />
@@ -347,7 +335,7 @@ onMounted(async () => {
                 :modelValue="listing.isPanelOpen()"
                 @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()"
                 title="Filter Users"
-                @apply="applyFilters"
+                @apply="() => listing.applyFilters()"
                 @reset="() => listing.resetFilters()"
             >
                 <form @submit.prevent="applyFilters" class="space-y-6">

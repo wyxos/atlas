@@ -564,7 +564,7 @@ describe('Users', () => {
         vm.listing.filters.date_from = '2024-01-01';
         vm.listing.filters.date_to = '2024-12-31';
 
-        await vm.applyFilters();
+        await vm.listing.applyFilters();
         await flushPromises();
         await wrapper.vm.$nextTick();
 
