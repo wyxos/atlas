@@ -38,7 +38,7 @@ const dateTo = ref('');
 const statusFilter = ref('all');
 
 // Create reactive listing instance
-const listing = reactive(new Listing<User>());
+const listing = reactive(new Listing<User>()) as unknown as Listing<User>;
 listing.loading(); // Initial loading state
 
 // Configure listing with path, router, filters, and error handler
@@ -72,6 +72,8 @@ listing
 const deletingUserId = ref<number | null>(null);
 const dialogOpen = ref(false);
 const userToDelete = ref<User | null>(null);
+const deleteError = ref<string | null>(null);
+const canRetryDelete = ref(false);
 // Panel visibility is tracked by the Listing instance; this computed bridges
 // it to the FilterPanel's v-model.
 const filterPanelOpen = computed({
@@ -89,40 +91,39 @@ const filterPanelOpen = computed({
 
 
 async function deleteUser(userId: number): Promise<void> {
-    try {
-        deletingUserId.value = userId;
-        await window.axios.delete(`/api/users/${userId}`);
+    deletingUserId.value = userId;
+    deleteError.value = null;
+    canRetryDelete.value = false;
 
-        // Close dialog first
-        dialogOpen.value = false;
-        userToDelete.value = null;
+    await listing.delete(`/api/users/${userId}`, userId, {
+        onSuccess: () => {
+            dialogOpen.value = false;
+            userToDelete.value = null;
+            deletingUserId.value = null;
+        },
+        onError: (error: unknown, statusCode?: number) => {
+            if (statusCode === 403) {
+                deleteError.value = 'You do not have permission to delete users.';
+                canRetryDelete.value = false;
+            } else if (statusCode && statusCode >= 500) {
+                deleteError.value = 'Something went wrong while deleting the user. Please try again.';
+                canRetryDelete.value = true;
+            } else {
+                deleteError.value = 'Failed to delete user. Please try again later.';
+                canRetryDelete.value = false;
+            }
 
-        // Remove the user from the listing
-        listing.remove(userId);
-
-        // If current page is empty and not page 1, go to previous page
-        if (listing.data.length === 0 && listing.currentPage > 1) {
-            await listing.goToPage(listing.currentPage - 1);
-        } else {
-            // Refresh the current page to get updated data
-            await listing.get();
-        }
-    } catch (err: unknown) {
-        const axiosError = err as { response?: { status?: number } };
-        if (axiosError.response?.status === 403) {
-            listing.error = 'You do not have permission to delete users.';
-        } else {
-            listing.error = 'Failed to delete user. Please try again later.';
-        }
-        console.error('Error deleting user:', err);
-    } finally {
-        deletingUserId.value = null;
-    }
+            console.error('Error deleting user:', error);
+            deletingUserId.value = null;
+        },
+    });
 }
 
 function openDeleteDialog(user: User): void {
     userToDelete.value = user;
     dialogOpen.value = true;
+    deleteError.value = null;
+    canRetryDelete.value = false;
 }
 
 async function handleDeleteConfirm(): Promise<void> {
@@ -134,6 +135,8 @@ async function handleDeleteConfirm(): Promise<void> {
 function handleDeleteCancel(): void {
     dialogOpen.value = false;
     userToDelete.value = null;
+    deleteError.value = null;
+    canRetryDelete.value = false;
 }
 
 function formatDate(dateString: string): string {
@@ -409,6 +412,9 @@ onMounted(async () => {
                             Are you sure you want to delete <span class="font-semibold text-danger-600">{{ userToDelete?.name }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
+                    <div v-if="deleteError" class="mt-4 rounded border border-danger-600 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
+                        {{ deleteError }}
+                    </div>
                     <DialogFooter>
                         <DialogClose as-child>
                             <Button
@@ -421,12 +427,13 @@ onMounted(async () => {
                             </Button>
                         </DialogClose>
                         <Button
+                            v-if="canRetryDelete || !deleteError"
                             @click="handleDeleteConfirm"
                             :disabled="deletingUserId !== null"
                             variant="default"
                             class="bg-danger-600 hover:bg-danger-700"
                         >
-                            {{ deletingUserId !== null ? 'Deleting...' : 'Delete' }}
+                            {{ deletingUserId !== null ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

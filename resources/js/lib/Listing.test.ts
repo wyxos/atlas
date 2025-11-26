@@ -9,6 +9,7 @@ interface TestItem extends Record<string, unknown> {
 // Mock window.axios
 const mockAxios = {
     get: vi.fn(),
+    delete: vi.fn(),
 };
 
 beforeEach(() => {
@@ -529,6 +530,127 @@ describe('Listing', () => {
 
             expect(searchRef.value).toBe('test search'); // Unchanged
             expect(mockAxios.get).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('delete()', () => {
+        it('deletes an item using path and id, removes it locally, and refreshes the page', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            listing.data = [
+                { id: 1, name: 'Item 1' },
+                { id: 2, name: 'Item 2' },
+            ];
+            listing.total = 2;
+            listing.currentPage = 1;
+
+            mockAxios.delete.mockResolvedValue({});
+            mockAxios.get.mockResolvedValue(createHarmonieResponse([{ id: 2, name: 'Item 2' }], 1, 1));
+
+            await listing.delete('/api/test/1', 1);
+
+            expect(mockAxios.delete).toHaveBeenCalledWith('/api/test/1');
+            expect(listing.data).toEqual([{ id: 2, name: 'Item 2' }]);
+            expect(listing.total).toBe(1);
+            expect(mockAxios.get).toHaveBeenCalled();
+        });
+
+        it('deletes an item using configured path and id from config object', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            listing.data = [
+                { id: 1, name: 'Item 1' },
+                { id: 2, name: 'Item 2' },
+            ];
+            listing.total = 2;
+            listing.currentPage = 1;
+
+            mockAxios.delete.mockResolvedValue({});
+            mockAxios.get.mockResolvedValue(createHarmonieResponse([{ id: 2, name: 'Item 2' }], 1, 1));
+
+            await listing.delete({ id: 1 });
+
+            expect(mockAxios.delete).toHaveBeenCalledWith('/api/test/1');
+            expect(listing.data).toEqual([{ id: 2, name: 'Item 2' }]);
+            expect(listing.total).toBe(1);
+        });
+
+        it('goes to previous page when current page becomes empty after delete', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            listing.data = [{ id: 3, name: 'Item 3' }];
+            listing.total = 3;
+            listing.currentPage = 2;
+
+            mockAxios.delete.mockResolvedValue({});
+            mockAxios.get
+                .mockResolvedValueOnce(createHarmonieResponse([{ id: 1, name: 'Item 1' }, { id: 2, name: 'Item 2' }], 1, 2));
+
+            await listing.delete('/api/test/3', 3);
+
+            expect(listing.currentPage).toBe(1);
+            expect(mockAxios.get).toHaveBeenCalled();
+        });
+
+        it('calls onSuccess callback after successful delete', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            listing.data = [
+                { id: 1, name: 'Item 1' },
+                { id: 2, name: 'Item 2' },
+            ];
+            listing.total = 2;
+            listing.currentPage = 1;
+
+            mockAxios.delete.mockResolvedValue({});
+            mockAxios.get.mockResolvedValue(createHarmonieResponse([{ id: 2, name: 'Item 2' }], 1, 1));
+
+            const onSuccess = vi.fn();
+
+            await listing.delete('/api/test/1', 1, { onSuccess });
+
+            expect(onSuccess).toHaveBeenCalledWith(1, listing);
+        });
+
+        it('calls onError callback when delete fails and does not throw', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            listing.data = [
+                { id: 1, name: 'Item 1' },
+            ];
+            listing.total = 1;
+            listing.currentPage = 1;
+
+            const error = { response: { status: 500 } };
+            mockAxios.delete.mockRejectedValue(error);
+
+            const onError = vi.fn();
+
+            await expect(
+                listing.delete('/api/test/1', 1, { onError })
+            ).resolves.toBeUndefined();
+
+            expect(onError).toHaveBeenCalledWith(error, 500, listing);
+            expect(listing.data).toEqual([{ id: 1, name: 'Item 1' }]);
+            expect(listing.total).toBe(1);
+            expect(mockAxios.get).not.toHaveBeenCalled();
+        });
+
+        it('rethrows error when delete fails and no onError callback is provided', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const error = new Error('Delete failed');
+            mockAxios.delete.mockRejectedValue(error);
+
+            await expect(
+                listing.delete('/api/test/1', 1)
+            ).rejects.toBe(error);
         });
     });
 
