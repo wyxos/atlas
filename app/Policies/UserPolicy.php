@@ -40,10 +40,11 @@ class UserPolicy
 
     /**
      * Determine whether the user can delete the model.
+     * Users cannot delete themselves.
      */
     public function delete(User $user, User $model): bool
     {
-        return $user->is_admin;
+        return $user->is_admin && $user->id !== $model->id;
     }
 
     /**

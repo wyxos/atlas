@@ -109,6 +109,16 @@ it('requires authentication to delete users', function () {
         ->assertUnauthorized();
 });
 
+it('prevents admin from deleting themselves', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->deleteJson("/api/users/{$admin->id}")
+        ->assertForbidden();
+
+    expect(User::find($admin->id))->not->toBeNull();
+});
+
 it('filters users by search query', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     User::factory()->create(['name' => 'John Doe', 'email' => 'john@example.com']);
