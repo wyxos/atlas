@@ -43,6 +43,17 @@ beforeEach(() => {
     Object.assign(global.window, {
         axios: mockAxios,
     });
+
+    // Mock the user-id meta tag (default to user ID 999 so it doesn't match test users)
+    const metaTag = document.querySelector('meta[name="user-id"]');
+    if (metaTag) {
+        metaTag.setAttribute('content', '999');
+    } else {
+        const meta = document.createElement('meta');
+        meta.setAttribute('name', 'user-id');
+        meta.setAttribute('content', '999');
+        document.head.appendChild(meta);
+    }
 });
 
 async function createTestRouter(initialPath = '/users') {
@@ -454,6 +465,53 @@ describe('Users', () => {
         expect(vm.dialogOpen).toBe(true);
         expect(vm.deleteError).toBe('You do not have permission to delete users.');
         expect(vm.canRetryDelete).toBe(false);
+    });
+
+    it('hides delete button for current user', async () => {
+        // Set the current user ID to match one of the mock users
+        const metaTag = document.querySelector('meta[name="user-id"]');
+        metaTag?.setAttribute('content', '1');
+
+        const mockUsers = [
+            {
+                id: 1, // Current user
+                name: 'Current User',
+                email: 'current@example.com',
+                email_verified_at: '2024-01-01T00:00:00Z',
+                last_login_at: null,
+                created_at: '2024-01-01T00:00:00Z',
+            },
+            {
+                id: 2,
+                name: 'Other User',
+                email: 'other@example.com',
+                email_verified_at: null,
+                last_login_at: null,
+                created_at: '2024-01-02T00:00:00Z',
+            },
+        ];
+
+        mockAxios.get.mockResolvedValue(createHarmonieResponse(mockUsers, 1, 2));
+
+        const router = await createTestRouter();
+        const wrapper = mount(Users, {
+            global: {
+                plugins: [router, Oruga],
+            },
+        });
+
+        await waitForListingToLoad(wrapper);
+
+        // Find all delete buttons - should only have one (for the other user)
+        const deleteButtons = wrapper.findAll('button').filter(btn =>
+            btn.html().includes('Trash2') || btn.html().includes('trash')
+        );
+
+        // There should be only 1 delete button (for user id=2, not for current user id=1)
+        expect(deleteButtons.length).toBe(1);
+
+        // Reset meta tag for other tests
+        metaTag?.setAttribute('content', '999');
     });
 
     it('loads filters from URL query parameters', async () => {

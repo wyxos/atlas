@@ -26,6 +26,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Seed additional users using factory
-        User::factory()->count(10)->create();
+        User::factory()->count(25)->create();
     }
 }

@@ -61,11 +61,19 @@ listing
         return error;
     });
 
+// Get current user ID from meta tag
+const currentUserId = parseInt(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || '0', 10);
+
 const deletingUserId = ref<number | null>(null);
 const dialogOpen = ref(false);
 const userToDelete = ref<User | null>(null);
 const deleteError = ref<string | null>(null);
 const canRetryDelete = ref(false);
+
+// Check if a user can be deleted (users cannot delete themselves)
+function canDeleteUser(user: User): boolean {
+    return user.id !== currentUserId;
+}
 // Panel visibility is tracked by the Listing instance; this computed bridges
 // it to the FilterPanel's v-model.
 const filterPanelOpen = computed({
@@ -305,6 +313,7 @@ onMounted(async () => {
                 <o-table-column label="Actions">
                     <template #default="{ row }">
                         <Button
+                            v-if="canDeleteUser(row)"
                             @click="openDeleteDialog(row)"
                             variant="ghost"
                             size="sm"
@@ -313,6 +322,13 @@ onMounted(async () => {
                         >
                             <Trash2 class="w-4 h-4" />
                         </Button>
+                        <span
+                            v-else
+                            class="text-xs text-twilight-indigo-600 italic"
+                            title="You cannot delete your own account"
+                        >
+                            —
+                        </span>
                     </template>
                 </o-table-column>
                 <template #empty>
