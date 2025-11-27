@@ -1,0 +1,5 @@
+# Ignore large video files - they are downloaded during seeding
+videos/
+audio/
+*.mp4
+

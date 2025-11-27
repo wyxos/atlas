@@ -38,6 +38,34 @@ vi.mock('axios', () => ({
     },
 }));
 
+// Mock vue-sonner
+vi.mock('vue-sonner', () => ({
+    toast: {
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warning: vi.fn(),
+    },
+    Toaster: {
+        name: 'Toaster',
+        template: '<div></div>',
+    },
+}));
+
+// Mock toast from local sonner implementation
+vi.mock('../components/ui/sonner', () => ({
+    toast: {
+        success: vi.fn(),
+        error: vi.fn(),
+        info: vi.fn(),
+        warning: vi.fn(),
+    },
+    Toaster: {
+        name: 'Toaster',
+        template: '<div></div>',
+    },
+}));
+
 // Mock window.axios
 const mockAxios = {
     get: vi.fn(),

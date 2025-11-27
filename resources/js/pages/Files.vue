@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, Filter, File as FileIcon, X, Download, FileText } from 'lucide-vue-next';
+import { Trash2, Filter, File as FileIcon, X, Download, FileText, Copy } from 'lucide-vue-next';
+import { toast } from '../components/ui/sonner';
 import PageLayout from '../components/PageLayout.vue';
 import {
     Dialog,
@@ -32,6 +33,7 @@ interface File extends Record<string, unknown> {
     title: string | null;
     url: string | null;
     path: string | null;
+    absolute_path: string | null;
     thumbnail_url: string | null;
     downloaded: boolean;
     not_found: boolean;
@@ -165,6 +167,20 @@ function getMimeTypeCategory(mimeType: string | null): string {
     return 'other';
 }
 
+async function copyToClipboard(text: string, label: string): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(text);
+        toast.success(`${label} copied to clipboard`, {
+            description: text,
+        });
+    } catch (error) {
+        toast.error('Failed to copy to clipboard', {
+            description: 'Please try again or copy manually',
+        });
+        console.error('Error copying to clipboard:', error);
+    }
+}
+
 const hasActiveFilters = computed(() => listing.hasActiveFilters);
 
 // Watch for route query changes (back/forward navigation)
@@ -283,10 +299,15 @@ onMounted(async () => {
                 <o-table-column field="id" label="ID" width="80" />
                 <o-table-column field="filename" label="Filename">
                     <template #default="{ row }">
-                        <div class="flex items-center gap-2">
+                        <button
+                            @click="() => copyToClipboard(row.filename, 'Filename')"
+                            class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group"
+                            :title="`Click to copy: ${row.filename}`"
+                        >
                             <FileText class="w-4 h-4 text-smart-blue-600" />
-                            <span class="truncate max-w-xs" :title="row.filename">{{ row.filename }}</span>
-                        </div>
+                            <span class="truncate max-w-xs group-hover:text-smart-blue-600 transition-colors" :title="row.filename">{{ row.filename }}</span>
+                            <Copy class="w-3 h-3 text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
                     </template>
                 </o-table-column>
                 <o-table-column field="source" label="Source" width="120" />
@@ -321,6 +342,27 @@ onMounted(async () => {
                             class="px-2 py-1 rounded text-xs font-medium bg-twilight-indigo-500/20 text-twilight-indigo-300"
                         >
                             No
+                        </span>
+                    </template>
+                </o-table-column>
+                <o-table-column field="absolute_path" label="Path" width="300">
+                    <template #default="{ row }">
+                        <button
+                            v-if="row.absolute_path"
+                            @click="() => copyToClipboard(row.absolute_path, 'Path')"
+                            class="font-mono text-xs text-twilight-indigo-700 truncate max-w-xs block hover:text-smart-blue-600 transition-colors cursor-pointer group text-left w-full"
+                            :title="`Click to copy: ${row.absolute_path}`"
+                        >
+                            <span class="flex items-center gap-1">
+                                <span class="truncate">{{ row.absolute_path }}</span>
+                                <Copy class="w-3 h-3 text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                            </span>
+                        </button>
+                        <span
+                            v-else
+                            class="text-twilight-indigo-500 italic text-xs"
+                        >
+                            —
                         </span>
                     </template>
                 </o-table-column>
