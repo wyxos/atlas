@@ -1,13 +1,487 @@
 <script setup lang="ts">
+import { ref, onMounted, watch, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { Trash2, Filter, File as FileIcon, X, Download, FileText } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
-// Files page
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogClose,
+} from '../components/ui/dialog';
+import Button from '../components/ui/Button.vue';
+import FilterPanel from '../components/ui/FilterPanel.vue';
+import FormInput from '../components/ui/FormInput.vue';
+import Select from '../components/ui/Select.vue';
+import DatePicker from '../components/ui/DatePicker.vue';
+import { Listing } from '../lib/Listing';
+
+const route = useRoute();
+const router = useRouter();
+
+interface File extends Record<string, unknown> {
+    id: number;
+    source: string;
+    filename: string;
+    ext: string | null;
+    size: number | null;
+    mime_type: string | null;
+    title: string | null;
+    url: string | null;
+    path: string | null;
+    thumbnail_url: string | null;
+    downloaded: boolean;
+    not_found: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+// Create reactive listing instance (Listing.create returns a reactive Proxy)
+// Proxy provides dynamic filter properties (e.g., listing.search, listing.date_from)
+// TypeScript can't infer dynamic Proxy properties, so we cast to any
+const listing = Listing.create<File>({
+    filters: {
+        search: '',
+        date_from: '',
+        date_to: '',
+        source: 'all',
+        mime_type: 'all',
+        downloaded: 'all',
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+}) as any;
+listing.loading(); // Initial loading state
+
+// Configure listing with path, router, filters, and error handler
+listing
+    .path('/api/files')
+    .router(router)
+    .onLoadError((error: string | null, statusCode?: number) => {
+        // Customize error messages for files context
+        if (statusCode === 403) {
+            return 'You do not have permission to view files.';
+        }
+        if (error && error.includes('Failed to load data')) {
+            return 'Failed to load files. Please try again later.';
+        }
+        return error;
+    });
+
+const deletingFileId = ref<number | null>(null);
+const dialogOpen = ref(false);
+const fileToDelete = ref<File | null>(null);
+const deleteError = ref<string | null>(null);
+const canRetryDelete = ref(false);
+
+async function deleteFile(fileId: number): Promise<void> {
+    deletingFileId.value = fileId;
+    deleteError.value = null;
+    canRetryDelete.value = false;
+
+    await listing.delete(`/api/files/${fileId}`, fileId, {
+        onSuccess: () => {
+            dialogOpen.value = false;
+            fileToDelete.value = null;
+            deletingFileId.value = null;
+        },
+        onError: (error: unknown, statusCode?: number) => {
+            if (statusCode === 403) {
+                deleteError.value = 'You do not have permission to delete files.';
+                canRetryDelete.value = false;
+            } else if (statusCode && statusCode >= 500) {
+                deleteError.value = 'Something went wrong while deleting the file. Please try again.';
+                canRetryDelete.value = true;
+            } else {
+                deleteError.value = 'Failed to delete file. Please try again later.';
+                canRetryDelete.value = false;
+            }
+
+            console.error('Error deleting file:', error);
+            deletingFileId.value = null;
+        },
+    });
+}
+
+function openDeleteDialog(file: File): void {
+    fileToDelete.value = file;
+    dialogOpen.value = true;
+    deleteError.value = null;
+    canRetryDelete.value = false;
+}
+
+async function handleDeleteConfirm(): Promise<void> {
+    if (fileToDelete.value) {
+        await deleteFile(fileToDelete.value.id);
+    }
+}
+
+function handleDeleteCancel(): void {
+    dialogOpen.value = false;
+    fileToDelete.value = null;
+    deleteError.value = null;
+    canRetryDelete.value = false;
+}
+
+function formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
+}
+
+function formatFileSize(bytes: number | null): string {
+    if (bytes === null || bytes === 0) {
+        return '0 B';
+    }
+
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+function getMimeTypeCategory(mimeType: string | null): string {
+    if (!mimeType) {
+        return 'unknown';
+    }
+    if (mimeType.startsWith('image/')) {
+        return 'image';
+    }
+    if (mimeType.startsWith('video/')) {
+        return 'video';
+    }
+    if (mimeType.startsWith('audio/')) {
+        return 'audio';
+    }
+    return 'other';
+}
+
+const hasActiveFilters = computed(() => listing.hasActiveFilters);
+
+// Watch for route query changes (back/forward navigation)
+watch(() => route.query, async (newQuery) => {
+    await listing.get({ query: newQuery });
+}, { deep: true });
+
+// Expose properties for testing
+defineExpose({
+    listing,
+    get currentPage() {
+        return listing.currentPage;
+    },
+    get perPage() {
+        return listing.perPage;
+    },
+    get total() {
+        return listing.total;
+    },
+    get files() {
+        return listing.data;
+    },
+    get loading() {
+        return listing.isLoading;
+    },
+    get error() {
+        return listing.error;
+    },
+    get activeFilters() {
+        return listing.activeFilters;
+    },
+    get hasActiveFilters() {
+        return listing.hasActiveFilters;
+    },
+});
+
+onMounted(async () => {
+    await listing.get({ query: route.query });
+});
 </script>
 
 <template>
     <PageLayout>
-        <div>
-            <h4 class="text-2xl font-semibold text-regal-navy-900 mb-4">Files</h4>
-            <p class="text-twilight-indigo-900">Files page coming soon.</p>
+        <div class="w-full">
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
+                        Files
+                    </h4>
+                    <p class="text-blue-slate-700">
+                        Manage your files
+                    </p>
+                </div>
+                <Button
+                    variant="outline"
+                    @click="() => listing.openPanel()"
+                    class="border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                >
+                    <Filter class="w-4 h-4 mr-2" />
+                    Filters
+                </Button>
+            </div>
+
+            <!-- Active Filters Display -->
+            <div v-if="listing.activeFilters.length > 0" class="mb-6 flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium text-twilight-indigo-700">Active filters:</span>
+                <div
+                    v-for="filter in listing.activeFilters"
+                    :key="filter.key"
+                    class="inline-flex items-stretch rounded border border-smart-blue-600 text-sm"
+                >
+                    <span class="bg-smart-blue-600 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
+                    <span class="bg-smart-blue-300 px-3 py-1.5 text-smart-blue-900 truncate max-w-xs">{{ filter.value }}</span>
+                    <Button
+                        @click="() => listing.removeFilter(filter.key)"
+                        variant="ghost"
+                        size="sm"
+                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr rounded-tl-none rounded-bl-none"
+                        :aria-label="`Remove ${filter.label} filter`"
+                    >
+                        <X class="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    @click="() => listing.resetFilters()"
+                    class="border-danger-600 text-danger-600 bg-transparent hover:bg-danger-300 hover:border-danger-600 hover:text-danger-600"
+                >
+                    Clear all
+                </Button>
+            </div>
+
+            <div v-if="listing.isLoading" class="text-center py-12">
+                <p class="text-twilight-indigo-900 text-lg">Loading files...</p>
+            </div>
+
+            <div v-else-if="listing.error" class="text-center py-12">
+                <p class="text-red-500 text-lg">{{ listing.error }}</p>
+            </div>
+
+            <div v-else class="w-full overflow-x-auto">
+                <o-table
+                    :data="listing.data"
+                    :loading="listing.isLoading"
+                    paginated
+                    :per-page="listing.perPage"
+                    :current-page="listing.currentPage"
+                    :total="listing.total"
+                    backend-pagination
+                    pagination-position="both"
+                    pagination-order="right"
+                    @page-change="(page: number) => listing.goToPage(page)"
+                    class="w-full rounded-lg overflow-hidden bg-prussian-blue-600"
+                >
+                <o-table-column field="id" label="ID" width="80" />
+                <o-table-column field="filename" label="Filename">
+                    <template #default="{ row }">
+                        <div class="flex items-center gap-2">
+                            <FileText class="w-4 h-4 text-smart-blue-600" />
+                            <span class="truncate max-w-xs" :title="row.filename">{{ row.filename }}</span>
+                        </div>
+                    </template>
+                </o-table-column>
+                <o-table-column field="source" label="Source" width="120" />
+                <o-table-column field="mime_type" label="Type" width="120">
+                    <template #default="{ row }">
+                        <span class="px-2 py-1 rounded text-xs font-medium" :class="{
+                            'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
+                            'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
+                            'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
+                            'bg-twilight-indigo-500/20 text-twilight-indigo-300': getMimeTypeCategory(row.mime_type) === 'other',
+                        }">
+                            {{ row.mime_type || 'Unknown' }}
+                        </span>
+                    </template>
+                </o-table-column>
+                <o-table-column field="size" label="Size" width="100">
+                    <template #default="{ row }">
+                        {{ formatFileSize(row.size) }}
+                    </template>
+                </o-table-column>
+                <o-table-column field="downloaded" label="Downloaded" width="120">
+                    <template #default="{ row }">
+                        <span
+                            v-if="row.downloaded"
+                            class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-success-300/20 text-success-300"
+                        >
+                            <Download class="w-3 h-3" />
+                            Yes
+                        </span>
+                        <span
+                            v-else
+                            class="px-2 py-1 rounded text-xs font-medium bg-twilight-indigo-500/20 text-twilight-indigo-300"
+                        >
+                            No
+                        </span>
+                    </template>
+                </o-table-column>
+                <o-table-column field="created_at" label="Created At" width="180">
+                    <template #default="{ row }">
+                        {{ formatDate(row.created_at) }}
+                    </template>
+                </o-table-column>
+                <o-table-column label="Actions" width="100">
+                    <template #default="{ row }">
+                        <Button
+                            @click="openDeleteDialog(row)"
+                            variant="ghost"
+                            size="sm"
+                            class="p-2 border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-danger-900"
+                            :disabled="deletingFileId === row.id"
+                        >
+                            <Trash2 class="w-4 h-4" />
+                        </Button>
+                    </template>
+                </o-table-column>
+                <template #empty>
+                    <div class="flex flex-col items-center justify-center py-12 px-6">
+                        <FileIcon class="w-16 h-16 text-twilight-indigo-600 mb-4" />
+                        <h3 class="text-xl font-semibold text-regal-navy-900 mb-2">
+                            {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
+                        </h3>
+                        <p class="text-twilight-indigo-700 text-center max-w-md">
+                            {{ hasActiveFilters
+                                ? 'Try adjusting your filters to see more results.'
+                                : 'Get started by adding your first file.' }}
+                        </p>
+                        <Button
+                            v-if="hasActiveFilters"
+                            variant="outline"
+                            @click="() => listing.resetFilters()"
+                            class="mt-4 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                        >
+                            Clear Filters
+                        </Button>
+                    </div>
+                </template>
+                </o-table>
+            </div>
+
+            <!-- Filter Panel -->
+            <FilterPanel
+                :modelValue="listing.isPanelOpen()"
+                @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()"
+                title="Filter Files"
+                @apply="() => listing.applyFilters()"
+                @reset="() => listing.resetFilters()"
+            >
+                <form @submit.prevent="() => listing.applyFilters()" class="space-y-6">
+                    <!-- Search Field -->
+                    <FormInput
+                        v-model="listing.search"
+                        placeholder="Search by filename, title, or source..."
+                    >
+                        <template #label>
+                            Search
+                        </template>
+                    </FormInput>
+
+                    <!-- Date Range -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-smart-blue-900">
+                            Created Date Range
+                        </label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
+                                    From
+                                </label>
+                                <DatePicker
+                                    v-model="listing.date_from"
+                                    placeholder="Pick start date"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
+                                    To
+                                </label>
+                                <DatePicker
+                                    v-model="listing.date_to"
+                                    placeholder="Pick end date"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Source Filter -->
+                    <Select v-model="listing.source">
+                        <template #label>
+                            Source
+                        </template>
+                        <option value="all">All</option>
+                        <option value="local">Local</option>
+                        <option value="NAS">NAS</option>
+                        <option value="YouTube">YouTube</option>
+                        <option value="Booru">Booru</option>
+                    </Select>
+
+                    <!-- MIME Type Filter -->
+                    <Select v-model="listing.mime_type">
+                        <template #label>
+                            Type
+                        </template>
+                        <option value="all">All</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="audio">Audio</option>
+                    </Select>
+
+                    <!-- Downloaded Filter -->
+                    <Select v-model="listing.downloaded">
+                        <template #label>
+                            Downloaded
+                        </template>
+                        <option value="all">All</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                    </Select>
+                </form>
+            </FilterPanel>
+
+            <!-- Delete Confirmation Dialog -->
+            <Dialog v-model="dialogOpen">
+                <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
+                    <DialogHeader>
+                        <DialogTitle class="text-danger-600">Delete File</DialogTitle>
+                        <DialogDescription class="text-base mt-2 text-twilight-indigo-900">
+                            Are you sure you want to delete <span class="font-semibold text-danger-600">{{ fileToDelete?.filename }}</span>? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div v-if="deleteError" class="mt-4 rounded border border-danger-600 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
+                        {{ deleteError }}
+                    </div>
+                    <DialogFooter>
+                        <DialogClose as-child>
+                            <Button
+                                variant="outline"
+                                @click="handleDeleteCancel"
+                                :disabled="deletingFileId !== null"
+                                class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                            >
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button
+                            v-if="canRetryDelete || !deleteError"
+                            @click="handleDeleteConfirm"
+                            :disabled="deletingFileId !== null"
+                            variant="default"
+                            class="bg-danger-600 hover:bg-danger-700"
+                        >
+                            {{ deletingFileId !== null ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     </PageLayout>
 </template>
