@@ -37,3 +37,4 @@ const badgeClasses = computed(() => {
         <slot v-else />
     </span>
 </template>
+
