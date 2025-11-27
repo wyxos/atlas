@@ -25,14 +25,10 @@ class FileSeeder extends Seeder
             }
         }
 
-        // Copy files from fixtures to storage during seeding
+        // Copy files from fixtures to storage during seeding (images only)
         $fixtureFiles = [
             'images/sample-image-1.jpg' => 'private/images/sample-image-1.jpg',
             'images/sample-image-2.jpg' => 'private/images/sample-image-2.jpg',
-            'audio/sample-audio-1.mp3' => 'private/audio/sample-audio-1.mp3',
-            'audio/sample-audio-2.mp3' => 'private/audio/sample-audio-2.mp3',
-            'videos/sample-video-1.mp4' => 'private/videos/sample-video-1.mp4',
-            'videos/sample-video-2.mp4' => 'private/videos/sample-video-2.mp4',
         ];
 
         foreach ($fixtureFiles as $fixturePath => $storagePath) {
@@ -42,6 +38,84 @@ class FileSeeder extends Seeder
             if (file_exists($source)) {
                 // Copy file from fixtures to storage
                 copy($source, $destination);
+            }
+        }
+
+        // Download audio files from public URLs during seeding (too large for fixtures)
+        $audioDownloads = [
+            [
+                'url' => 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+                'path' => 'private/audio/sample-audio-1.mp3',
+            ],
+            [
+                'url' => 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+                'path' => 'private/audio/sample-audio-2.mp3',
+            ],
+        ];
+
+        foreach ($audioDownloads as $audio) {
+            $destination = storage_path("app/{$audio['path']}");
+
+            // Only download if file doesn't exist
+            if (! file_exists($destination)) {
+                $this->command?->info("Downloading audio: {$audio['url']}");
+
+                $ch = curl_init($audio['url']);
+                $fp = fopen($destination, 'wb');
+                curl_setopt($ch, CURLOPT_FILE, $fp);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 120); // 2 minute timeout
+                curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                fclose($fp);
+
+                if ($httpCode !== 200 || ! file_exists($destination)) {
+                    $this->command?->warn("Failed to download audio: {$audio['url']}");
+                    // Create a placeholder file if download fails
+                    if (! file_exists($destination)) {
+                        file_put_contents($destination, '');
+                    }
+                }
+            }
+        }
+
+        // Download videos from public URLs during seeding (too large for fixtures)
+        $videoDownloads = [
+            [
+                'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                'path' => 'private/videos/sample-video-1.mp4',
+            ],
+            [
+                'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+                'path' => 'private/videos/sample-video-2.mp4',
+            ],
+        ];
+
+        foreach ($videoDownloads as $video) {
+            $destination = storage_path("app/{$video['path']}");
+
+            // Only download if file doesn't exist
+            if (! file_exists($destination)) {
+                $this->command?->info("Downloading video: {$video['url']}");
+
+                $ch = curl_init($video['url']);
+                $fp = fopen($destination, 'wb');
+                curl_setopt($ch, CURLOPT_FILE, $fp);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 300); // 5 minute timeout for large files
+                curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                fclose($fp);
+
+                if ($httpCode !== 200 || ! file_exists($destination)) {
+                    $this->command?->warn("Failed to download video: {$video['url']}");
+                    // Create a placeholder file if download fails
+                    if (! file_exists($destination)) {
+                        file_put_contents($destination, '');
+                    }
+                }
             }
         }
 
