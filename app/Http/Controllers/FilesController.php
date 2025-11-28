@@ -20,6 +20,18 @@ class FilesController extends Controller
     }
 
     /**
+     * Display the specified file.
+     */
+    public function show(File $file): JsonResponse
+    {
+        Gate::authorize('view', $file);
+
+        return response()->json([
+            'file' => new \App\Http\Resources\FileResource($file),
+        ]);
+    }
+
+    /**
      * Remove the specified file from storage.
      */
     public function destroy(File $file): JsonResponse

@@ -48,6 +48,12 @@ const routes: RouteRecordRaw[] = [
         meta: { layout: 'DashboardLayout' },
     },
     {
+        path: '/files/:id',
+        name: 'file-detail',
+        component: () => import('./pages/FileDetail.vue'),
+        meta: { layout: 'DashboardLayout' },
+    },
+    {
         path: '/settings',
         name: 'settings',
         component: () => import('./pages/Settings.vue'),
