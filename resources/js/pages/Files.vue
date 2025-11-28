@@ -15,9 +15,8 @@ import {
 } from '../components/ui/dialog';
 import Button from '../components/ui/Button.vue';
 import FilterPanel from '../components/ui/FilterPanel.vue';
-import FormInput from '../components/ui/FormInput.vue';
 import Select from '../components/ui/Select.vue';
-import DatePicker from '../components/ui/DatePicker.vue';
+import ListingFilterForm from '../components/ListingFilterForm.vue';
 import { Listing } from '../lib/Listing';
 
 const route = useRoute();
@@ -474,44 +473,16 @@ onMounted(async () => {
                 @apply="() => listing.applyFilters()"
                 @reset="() => listing.resetFilters()"
             >
-                <form @submit.prevent="() => listing.applyFilters()" class="space-y-6">
-                    <!-- Search Field -->
-                    <FormInput
-                        v-model="listing.search"
-                        placeholder="Search by filename, title, or source..."
-                    >
-                        <template #label>
-                            Search
-                        </template>
-                    </FormInput>
-
-                    <!-- Date Range -->
-                    <div>
-                        <label class="block text-sm font-medium mb-2 text-smart-blue-900">
-                            Created Date Range
-                        </label>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
-                                    From
-                                </label>
-                                <DatePicker
-                                    v-model="listing.date_from"
-                                    placeholder="Pick start date"
-                                />
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium mb-1 text-twilight-indigo-700">
-                                    To
-                                </label>
-                                <DatePicker
-                                    v-model="listing.date_to"
-                                    placeholder="Pick end date"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
+                <ListingFilterForm
+                    :search="listing.search"
+                    :date-from="listing.date_from"
+                    :date-to="listing.date_to"
+                    search-placeholder="Search by filename, title, or source..."
+                    @update:search="(value) => listing.search = value"
+                    @update:date-from="(value) => listing.date_from = value"
+                    @update:date-to="(value) => listing.date_to = value"
+                    @submit="() => listing.applyFilters()"
+                >
                     <!-- Source Filter -->
                     <Select v-model="listing.source">
                         <template #label>
@@ -544,7 +515,7 @@ onMounted(async () => {
                         <option value="yes">Yes</option>
                         <option value="no">No</option>
                     </Select>
-                </form>
+                </ListingFilterForm>
             </FilterPanel>
 
             <!-- Delete Confirmation Dialog -->
