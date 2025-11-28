@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import '@oruga-ui/theme-oruga/style.css';
 @import 'tailwindcss';
 @import "tw-animate-css";
 
@@ -138,13 +139,10 @@
 .o-table {
     background-color: transparent;
     color: #d0d7e5;
-    width: 100%;
     border-radius: 0.5rem;
-    overflow: hidden;
 }
 
 .o-table table {
-    width: 100%;
     border-collapse: collapse;
     background-color: transparent;
 }
@@ -213,8 +211,19 @@ nav[data-oruga="pagination"] {
     gap: 0.5rem;
     padding: 1rem 0;
     background-color: transparent;
-    margin-left: auto !important;
-    width: auto !important;
+    width: 100% !important;
+    position: relative;
+}
+
+/* Ensure pagination breaks out of overflow containers */
+.o-table-wrapper nav.o-pagination,
+.o-table-wrapper nav[data-oruga="pagination"],
+div[class*="overflow"] nav.o-pagination,
+div[class*="overflow"] nav[data-oruga="pagination"] {
+    position: relative;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
 }
 
 /* Pagination list */
@@ -498,10 +507,11 @@ nav[data-oruga="pagination"] {
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+    * {
+        @apply border-border outline-ring/50;
     }
-  body {
-    @apply bg-background text-foreground;
+
+    body {
+        @apply bg-background text-foreground;
     }
 }

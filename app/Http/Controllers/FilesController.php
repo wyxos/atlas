@@ -32,6 +32,28 @@ class FilesController extends Controller
     }
 
     /**
+     * Serve the file content.
+     */
+    public function serve(File $file)
+    {
+        Gate::authorize('view', $file);
+
+        if (! $file->path) {
+            abort(404, 'File not found');
+        }
+
+        $fullPath = storage_path('app/'.$file->path);
+
+        if (! file_exists($fullPath)) {
+            abort(404, 'File not found');
+        }
+
+        return response()->file($fullPath, [
+            'Content-Type' => $file->mime_type ?? 'application/octet-stream',
+        ]);
+    }
+
+    /**
      * Remove the specified file from storage.
      */
     public function destroy(File $file): JsonResponse
