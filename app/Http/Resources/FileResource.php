@@ -30,6 +30,14 @@ class FileResource extends JsonResource
             }
         }
 
+        $fileUrl = null;
+        if ($this->url) {
+            $fileUrl = $this->url;
+        } elseif ($this->path) {
+            // Generate URL for local files
+            $fileUrl = route('api.files.serve', ['file' => $this->id]);
+        }
+
         return [
             'id' => $this->id,
             'source' => $this->source,
@@ -42,6 +50,7 @@ class FileResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'url' => $this->url,
+            'file_url' => $fileUrl,
             'referrer_url' => $this->referrer_url,
             'path' => $this->path,
             'absolute_path' => $absolutePath,

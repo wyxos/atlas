@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/api/users/{user}', [\App\Http\Controllers\UsersController::class, 'destroy'])->name('api.users.destroy');
     Route::get('/api/files', [\App\Http\Controllers\FilesController::class, 'index'])->name('api.files.index');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
+    Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::delete('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'destroy'])->name('api.files.destroy');
 
     // SPA catch-all - serves the dashboard view for all GET requests

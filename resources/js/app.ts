@@ -23,10 +23,10 @@ if (appElement && appElement.children.length === 0 && !appElement.nextElementSib
 
     const app = createApp(App);
     app.use(router);
-    
+
     // Register FontAwesomeIcon component globally
     app.component('font-awesome-icon', FontAwesomeIcon);
-    
+
     // Use Oruga with Font Awesome as the default icon pack
     app.use(Oruga, {
         iconPack: 'fas',
@@ -36,7 +36,7 @@ if (appElement && appElement.children.length === 0 && !appElement.nextElementSib
             iconNext: 'chevron-right',
         },
     });
-    
+
     app.mount('#app');
 }
 

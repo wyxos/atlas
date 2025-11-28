@@ -283,7 +283,7 @@ onMounted(async () => {
                 <p class="text-red-500 text-lg">{{ listing.error }}</p>
             </div>
 
-            <div v-else class="w-full overflow-x-auto">
+            <div v-else class="w-full">
                 <o-table
                     :data="listing.data"
                     :loading="listing.isLoading"
@@ -295,7 +295,7 @@ onMounted(async () => {
                     pagination-position="both"
                     pagination-order="right"
                     @page-change="(page: number) => listing.goToPage(page)"
-                    class="w-full rounded-lg overflow-hidden bg-prussian-blue-600"
+                    class="rounded-lg bg-prussian-blue-600"
                 >
                 <o-table-column field="id" label="ID" width="80" />
                 <o-table-column field="filename" label="Filename">
@@ -356,7 +356,7 @@ onMounted(async () => {
                         >
                             <span class="flex items-center gap-1">
                                 <span class="truncate">{{ row.absolute_path }}</span>
-                                <Copy class="w-3 h-3 text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                <Copy class="w-3 h-3 text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                             </span>
                         </button>
                         <span
