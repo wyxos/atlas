@@ -68,8 +68,8 @@ class FileListing extends ListingBase
             }
         }
 
-        // Order by created_at descending (newest first)
-        $base->orderBy('created_at', 'desc');
+        // Order by updated_at descending (latest first)
+        $base->orderBy('updated_at', 'desc');
     }
 
     public function perPage(): int

@@ -58,11 +58,11 @@ it('requires authentication to access files', function () {
         ->assertUnauthorized();
 });
 
-it('returns files ordered by created_at descending', function () {
+it('returns files ordered by updated_at descending', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    $oldFile = File::factory()->create(['created_at' => '2024-01-01 10:00:00']);
-    $newFile = File::factory()->create(['created_at' => '2024-01-03 10:00:00']);
-    $middleFile = File::factory()->create(['created_at' => '2024-01-02 10:00:00']);
+    $oldFile = File::factory()->create(['updated_at' => '2024-01-01 10:00:00']);
+    $newFile = File::factory()->create(['updated_at' => '2024-01-03 10:00:00']);
+    $middleFile = File::factory()->create(['updated_at' => '2024-01-02 10:00:00']);
 
     $response = $this->actingAs($admin)
         ->getJson('/api/files');

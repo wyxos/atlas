@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, Filter, File as FileIcon, X, Download, FileText, Copy } from 'lucide-vue-next';
+import { Trash2, Filter, File as FileIcon, X, Download, FileText, Copy, Eye } from 'lucide-vue-next';
 import { toast } from '../components/ui/sonner';
 import PageLayout from '../components/PageLayout.vue';
 import {
@@ -32,6 +32,7 @@ interface File extends Record<string, unknown> {
     mime_type: string | null;
     title: string | null;
     url: string | null;
+    referrer_url: string | null;
     path: string | null;
     absolute_path: string | null;
     thumbnail_url: string | null;
@@ -332,14 +333,14 @@ onMounted(async () => {
                     <template #default="{ row }">
                         <span
                             v-if="row.downloaded"
-                            class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-success-300/20 text-success-300"
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-300 border border-success-500 text-success-900"
                         >
                             <Download class="w-3 h-3" />
                             Yes
                         </span>
                         <span
                             v-else
-                            class="px-2 py-1 rounded text-xs font-medium bg-twilight-indigo-500/20 text-twilight-indigo-300"
+                            class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-900"
                         >
                             No
                         </span>
@@ -366,22 +367,79 @@ onMounted(async () => {
                         </span>
                     </template>
                 </o-table-column>
+                <o-table-column field="url" label="URL" width="250">
+                    <template #default="{ row }">
+                        <a
+                            v-if="row.url"
+                            :href="row.url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-smart-blue-600 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
+                            :title="row.url"
+                        >
+                            {{ row.url }}
+                        </a>
+                        <span
+                            v-else
+                            class="text-twilight-indigo-500 italic text-xs"
+                        >
+                            —
+                        </span>
+                    </template>
+                </o-table-column>
+                <o-table-column field="referrer_url" label="Referrer URL" width="250">
+                    <template #default="{ row }">
+                        <a
+                            v-if="row.referrer_url"
+                            :href="row.referrer_url"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-smart-blue-600 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
+                            :title="row.referrer_url"
+                        >
+                            {{ row.referrer_url }}
+                        </a>
+                        <span
+                            v-else
+                            class="text-twilight-indigo-500 italic text-xs"
+                        >
+                            —
+                        </span>
+                    </template>
+                </o-table-column>
                 <o-table-column field="created_at" label="Created At" width="180">
                     <template #default="{ row }">
                         {{ formatDate(row.created_at) }}
                     </template>
                 </o-table-column>
-                <o-table-column label="Actions" width="100">
+                <o-table-column field="updated_at" label="Last Updated" width="180">
                     <template #default="{ row }">
-                        <Button
-                            @click="openDeleteDialog(row)"
-                            variant="ghost"
-                            size="sm"
-                            class="p-2 border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-danger-900"
-                            :disabled="deletingFileId === row.id"
-                        >
-                            <Trash2 class="w-4 h-4" />
-                        </Button>
+                        {{ formatDate(row.updated_at) }}
+                    </template>
+                </o-table-column>
+                <o-table-column label="Actions" width="140">
+                    <template #default="{ row }">
+                        <div class="flex items-center justify-center gap-2">
+                            <Button
+                                @click="() => router.push(`/files/${row.id}`)"
+                                variant="ghost"
+                                size="sm"
+                                class="flex items-center justify-center p-2 h-8 w-8 border-2 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-600 hover:text-white"
+                                :title="`View ${row.filename}`"
+                            >
+                                <Eye class="w-4 h-4" />
+                            </Button>
+                            <Button
+                                @click="openDeleteDialog(row)"
+                                variant="ghost"
+                                size="sm"
+                                class="flex items-center justify-center p-2 h-8 w-8 border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-white"
+                                :disabled="deletingFileId === row.id"
+                                :title="`Delete ${row.filename}`"
+                            >
+                                <Trash2 class="w-4 h-4" />
+                            </Button>
+                        </div>
                     </template>
                 </o-table-column>
                 <template #empty>
