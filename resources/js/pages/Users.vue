@@ -291,10 +291,10 @@ onMounted(async () => {
                             @click="openDeleteDialog(row)"
                             variant="ghost"
                             size="sm"
-                            class="p-2 border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-danger-900"
+                            class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
                             :disabled="deletingUserId === row.id"
                         >
-                            <Trash2 class="w-4 h-4" />
+                            <Trash2 class="w-6 h-6 md:w-5 md:h-5" />
                         </Button>
                         <span
                             v-else
