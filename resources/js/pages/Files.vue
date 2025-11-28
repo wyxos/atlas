@@ -295,7 +295,7 @@ onMounted(async () => {
                     pagination-position="both"
                     pagination-order="right"
                     @page-change="(page: number) => listing.goToPage(page)"
-                    class="rounded-lg bg-prussian-blue-600"
+                    class="rounded-lg"
                 >
                 <o-table-column field="id" label="ID" width="80" />
                 <o-table-column field="filename" label="Filename">

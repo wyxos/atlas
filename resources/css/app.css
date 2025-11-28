@@ -137,61 +137,67 @@
 
 /* Oruga Table Styling to Match UI Guidelines */
 .o-table {
-    background-color: transparent;
-    color: #d0d7e5;
+    background-color: transparent !important;
+    color: #d0d7e5 !important;
     border-radius: 0.5rem;
 }
 
 .o-table table {
-    border-collapse: collapse;
-    background-color: transparent;
+    border-collapse: collapse !important;
+    background-color: transparent !important;
 }
 
 .o-table thead th {
-    background-color: #023d78;
-    color: #c3e0fe;
-    border-bottom: 2px solid #0466c8;
-    padding: 1rem 1.5rem;
-    text-align: left;
-    font-size: 0.875rem;
-    font-weight: 600;
+    background-color: #023d78 !important;
+    /* smart-blue-300 */
+    color: #c3e0fe !important;
+    /* smart-blue-900 */
+    border-bottom: 2px solid #0466c8 !important;
+    /* smart-blue-500 */
+    padding: 1rem 1.5rem !important;
+    text-align: left !important;
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
 }
 
 .o-table thead th:first-child {
-    border-top-left-radius: 0.5rem;
+    border-top-left-radius: 0.5rem !important;
 }
 
 .o-table thead th:last-child {
-    border-top-right-radius: 0.5rem;
+    border-top-right-radius: 0.5rem !important;
 }
 
 .o-table tbody tr {
-    transition: background-color 0.2s;
-    border-bottom: 1px solid #33415c;
-    background-color: transparent;
+    transition: background-color 0.2s !important;
+    border-bottom: 1px solid #33415c !important;
+    /* twilight-indigo-500 */
+    background-color: transparent !important;
 }
 
 .o-table tbody tr:hover {
-    background-color: #023d78;
+    background-color: #023d78 !important;
+    /* smart-blue-300 */
 }
 
 .o-table tbody tr:last-child {
-    border-bottom: none;
+    border-bottom: none !important;
 }
 
 .o-table tbody tr:last-child td:first-child {
-    border-bottom-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem !important;
 }
 
 .o-table tbody tr:last-child td:last-child {
-    border-bottom-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem !important;
 }
 
 .o-table tbody td {
-    color: #d0d7e5;
-    padding: 1rem 1.5rem;
-    font-size: 0.875rem;
-    background-color: transparent;
+    color: #d0d7e5 !important;
+    /* twilight-indigo-900 */
+    padding: 1rem 1.5rem !important;
+    font-size: 0.875rem !important;
+    background-color: transparent !important;
 }
 
 /* Delete Button Hover Effect */
