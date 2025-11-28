@@ -338,7 +338,7 @@ onMounted(async () => {
                 @apply="() => listing.applyFilters()"
                 @reset="() => listing.resetFilters()"
             >
-                <form @submit.prevent="applyFilters" class="space-y-6">
+                <form @submit.prevent="listing.applyFilters()" class="space-y-6">
                     <!-- Search Field -->
                     <FormInput
                         v-model="listing.search"
