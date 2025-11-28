@@ -423,20 +423,20 @@ onMounted(async () => {
                                 @click="() => router.push(`/files/${row.id}`)"
                                 variant="ghost"
                                 size="sm"
-                                class="flex items-center justify-center p-2 h-8 w-8 border-2 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-600 hover:text-white"
+                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
                                 :title="`View ${row.filename}`"
                             >
-                                <Eye class="w-4 h-4" />
+                                <Eye class="w-6 h-6 md:w-5 md:h-5" />
                             </Button>
                             <Button
                                 @click="openDeleteDialog(row)"
                                 variant="ghost"
                                 size="sm"
-                                class="flex items-center justify-center p-2 h-8 w-8 border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-white"
+                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
                                 :disabled="deletingFileId === row.id"
                                 :title="`Delete ${row.filename}`"
                             >
-                                <Trash2 class="w-4 h-4" />
+                                <Trash2 class="w-6 h-6 md:w-5 md:h-5" />
                             </Button>
                         </div>
                     </template>

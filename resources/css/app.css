@@ -222,14 +222,18 @@ nav[data-oruga="pagination"] {
 }
 
 /* Ensure pagination breaks out of overflow containers */
-.o-table-wrapper nav.o-pagination,
-.o-table-wrapper nav[data-oruga="pagination"],
+.o-table__wrapper nav.o-pagination,
+.o-table__wrapper nav[data-oruga="pagination"],
 div[class*="overflow"] nav.o-pagination,
 div[class*="overflow"] nav[data-oruga="pagination"] {
     position: relative;
     width: 100% !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
+}
+
+.o-table__wrapper {
+    overflow: auto;
 }
 
 /* Pagination list */

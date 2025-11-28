@@ -241,34 +241,63 @@ onMounted(() => {
 
             <!-- File Details -->
             <div v-else-if="file" class="flex flex-col flex-1 min-h-0 md:overflow-hidden">
+                <!-- Actions - Mobile: Outside at top, Desktop: Inside preview -->
+                <div class="flex items-center justify-between mb-4 md:hidden">
+                    <Button
+                        variant="ghost"
+                        @click="() => router.push('/files')"
+                        class="flex items-center justify-center h-16 w-16 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                        title="Back to Files"
+                    >
+                        <ArrowLeft class="w-6 h-6" />
+                    </Button>
+                    <div class="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            @click="detailsPanelOpen = true"
+                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                            title="View Details"
+                        >
+                            <Info class="w-6 h-6" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            @click="openDeleteDialog"
+                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
+                            title="Delete File"
+                        >
+                            <Trash2 class="w-6 h-6" />
+                        </Button>
+                    </div>
+                </div>
                 <!-- File Preview -->
                 <div class="flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-prussian-blue-100 rounded-lg border-2 border-twilight-indigo-500 p-6 relative">
-                    <!-- Actions -->
-                    <div class="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+                    <!-- Actions - Desktop: Inside preview -->
+                    <div class="hidden md:flex absolute top-4 left-4 right-4 items-center justify-between z-10">
                         <Button
                             variant="ghost"
                             @click="() => router.push('/files')"
-                            class="p-2 h-8 w-8 flex items-center justify-center border-2 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-600 hover:text-white"
+                            class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
                             title="Back to Files"
                         >
-                            <ArrowLeft class="w-4 h-4" />
+                            <ArrowLeft class="w-5 h-5" />
                         </Button>
                         <div class="flex items-center gap-2">
                             <Button
                                 variant="ghost"
                                 @click="detailsPanelOpen = true"
-                                class="p-2 h-8 w-8 flex items-center justify-center border-2 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-600 hover:text-white"
+                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
                                 title="View Details"
                             >
-                                <Info class="w-4 h-4" />
+                                <Info class="w-5 h-5" />
                             </Button>
                             <Button
                                 variant="ghost"
                                 @click="openDeleteDialog"
-                                class="p-2 h-8 w-8 flex items-center justify-center border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-white"
+                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
                                 title="Delete File"
                             >
-                                <Trash2 class="w-4 h-4" />
+                                <Trash2 class="w-5 h-5" />
                             </Button>
                         </div>
                     </div>

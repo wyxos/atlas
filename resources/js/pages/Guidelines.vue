@@ -359,21 +359,73 @@ function goHome() {
                         <h3 class="text-xl font-semibold text-smart-blue-900 mb-4">
                             Icon Buttons
                         </h3>
-                        <div class="flex flex-wrap gap-4">
-                            <button
-                                class="p-2 border-2 rounded-lg transition-all cursor-pointer border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-danger-900"
-                            >
-                                <Trash2 class="w-5 h-5" />
-                            </button>
-                            <button
-                                class="p-2 border-2 rounded-lg transition-all cursor-pointer border-success-600 text-success-600 bg-transparent hover:bg-success-300 hover:border-success-500 hover:text-success-700"
-                            >
-                                <CheckCircle2 class="w-5 h-5" />
-                            </button>
+                        <div class="space-y-6">
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-900 mb-3">
+                                    Primary (Filled)
+                                </h4>
+                                <div class="flex flex-wrap gap-4">
+                                    <button
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                                    >
+                                        <Trash2 class="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
+                                    >
+                                        <Trash2 class="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer bg-success-500 border-2 border-success-600 text-white hover:bg-success-600"
+                                    >
+                                        <CheckCircle2 class="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <code class="block mt-2 text-xs text-twilight-indigo-700">
+                                    h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600
+                                </code>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-900 mb-3">
+                                    Outline
+                                </h4>
+                                <div class="flex flex-wrap gap-4">
+                                    <button
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border-2 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-600 hover:text-white"
+                                    >
+                                        <Trash2 class="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-white"
+                                    >
+                                        <Trash2 class="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <code class="block mt-2 text-xs text-twilight-indigo-700">
+                                    h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg border-2 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-600 hover:text-white
+                                </code>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-900 mb-3">
+                                    Ghost
+                                </h4>
+                                <div class="flex flex-wrap gap-4">
+                                    <button
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer text-smart-blue-700 bg-transparent hover:bg-smart-blue-300"
+                                    >
+                                        <Trash2 class="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer text-danger-700 bg-transparent hover:bg-danger-300"
+                                    >
+                                        <Trash2 class="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <code class="block mt-2 text-xs text-twilight-indigo-700">
+                                    h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg text-smart-blue-700 bg-transparent hover:bg-smart-blue-300
+                                </code>
+                            </div>
                         </div>
-                        <code class="block mt-2 text-xs text-twilight-indigo-700">
-                            p-2 border-2 rounded-lg border-danger-700 text-danger-700 hover:bg-danger-500 hover:border-danger-600 hover:text-danger-900
-                        </code>
                     </div>
                 </div>
             </Section>
