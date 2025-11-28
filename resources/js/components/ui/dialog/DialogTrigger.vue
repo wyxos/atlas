@@ -22,8 +22,7 @@ function handleClick(): void {
     <div v-if="!asChild" @click="handleClick">
         <slot />
     </div>
-    <div v-else @click="handleClick">
+    <div v-else @click="handleClick" style="display: contents;">
         <slot />
     </div>
 </template>
-

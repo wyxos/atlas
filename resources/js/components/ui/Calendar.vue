@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { DateValue } from '@internationalized/date';
 import { CalendarDate, getLocalTimeZone, today, toCalendarDate } from '@internationalized/date';
 import { cn } from '@/lib/utils';
@@ -36,6 +36,13 @@ const selectedDate = computed(() => {
 });
 
 const currentMonth = ref(selectedDate.value || placeholder.value);
+
+// Update currentMonth when selectedDate changes
+watch(selectedDate, (newDate) => {
+    if (newDate) {
+        currentMonth.value = newDate;
+    }
+}, { immediate: true });
 
 const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -158,14 +165,14 @@ const monthNames = [
             <button
                 v-for="date in calendarDays"
                 :key="`${date.year}-${date.month}-${date.day}`"
-                @click="selectDate(date)"
+                @click.stop="selectDate(date)"
                 :class="cn(
-                    'h-9 w-9 rounded text-sm transition-colors',
+                    'h-9 w-9 rounded text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2 focus:ring-offset-prussian-blue-600',
                     isSelected(date)
-                        ? 'bg-smart-blue-500 text-white font-semibold'
+                        ? 'bg-smart-blue-500 text-white font-semibold hover:bg-smart-blue-600 shadow-lg scale-105'
                         : isCurrentMonth(date)
-                        ? 'text-twilight-indigo-900 hover:bg-smart-blue-300'
-                        : 'text-twilight-indigo-600 hover:bg-smart-blue-300/50'
+                        ? 'text-twilight-indigo-900 hover:bg-smart-blue-500 hover:text-white hover:shadow-md hover:scale-105'
+                        : 'text-twilight-indigo-600 hover:bg-smart-blue-500/80 hover:text-white hover:shadow-md hover:scale-105'
                 )"
             >
                 {{ date.day }}
