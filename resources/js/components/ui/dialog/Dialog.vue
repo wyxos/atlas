@@ -1,21 +1,31 @@
 <script setup lang="ts">
-import { provide, computed } from 'vue';
+import { provide, computed, ref } from 'vue';
 
 interface Props {
     modelValue?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    modelValue: false,
+    modelValue: undefined,
 });
 
 const emit = defineEmits<{
     'update:modelValue': [value: boolean];
 }>();
 
+// Internal state for uncontrolled usage
+const internalOpen = ref(false);
+
+// Use modelValue if provided (controlled), otherwise use internal state (uncontrolled)
 const open = computed({
-    get: () => props.modelValue,
-    set: (value: boolean) => emit('update:modelValue', value),
+    get: () => props.modelValue !== undefined ? props.modelValue : internalOpen.value,
+    set: (value: boolean) => {
+        if (props.modelValue !== undefined) {
+            emit('update:modelValue', value);
+        } else {
+            internalOpen.value = value;
+        }
+    },
 });
 
 function setOpen(value: boolean): void {
@@ -29,4 +39,3 @@ provide('setDialogOpen', setOpen);
 <template>
     <slot />
 </template>
-

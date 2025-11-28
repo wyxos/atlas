@@ -39,6 +39,17 @@ function handleInput(event: Event): void {
 function handleFocus(event: FocusEvent): void {
     emit('focus', event);
 }
+
+function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+        // Find the closest form and submit it
+        const form = (event.target as HTMLElement).closest('form');
+        if (form) {
+            event.preventDefault();
+            form.requestSubmit();
+        }
+    }
+}
 </script>
 
 <template>
@@ -55,6 +66,7 @@ function handleFocus(event: FocusEvent): void {
             :class="inputClasses"
             @input="handleInput"
             @focus="handleFocus"
+            @keydown="handleKeydown"
         />
         <p v-if="error" class="mt-1 text-sm text-danger-700">
             {{ error }}
