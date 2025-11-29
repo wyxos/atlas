@@ -259,10 +259,279 @@ function goHome() {
 
             <!-- Buttons -->
             <Section title="Buttons">
-                <div class="space-y-6">
+                <div class="space-y-8">
+                    <!-- Button States Grid -->
                     <div>
                         <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
-                            Primary Buttons
+                            Button States
+                        </h3>
+                        <p class="text-sm text-twilight-indigo-300 mb-6">
+                            All button variants support the following states: Default, Hover, Active, Focus, and Disabled.
+                        </p>
+                        <div class="space-y-8">
+                            <!-- Primary Buttons States -->
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-100 mb-4">
+                                    Primary (Filled) - Smart Blue
+                                </h4>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full border-collapse">
+                                        <thead>
+                                            <tr class="bg-smart-blue-700 border-b-2 border-smart-blue-500">
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">State</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">Example</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">Classes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Default</td>
+                                                <td class="px-4 py-3">
+                                                    <Button variant="default" class="bg-smart-blue-500">
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">bg-smart-blue-500</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Hover</td>
+                                                <td class="px-4 py-3">
+                                                    <Button variant="default" class="bg-smart-blue-500 hover:bg-smart-blue-400">
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">bg-smart-blue-500 hover:bg-smart-blue-400</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Active</td>
+                                                <td class="px-4 py-3">
+                                                    <Button variant="default" class="bg-smart-blue-500 active:bg-smart-blue-600">
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">bg-smart-blue-500 active:bg-smart-blue-600</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Focus</td>
+                                                <td class="px-4 py-3">
+                                                    <Button variant="default" class="bg-smart-blue-500 focus-visible:ring-2 focus-visible:ring-smart-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-prussian-blue-500">
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">bg-smart-blue-500 focus-visible:ring-2 focus-visible:ring-smart-blue-400</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Disabled</td>
+                                                <td class="px-4 py-3">
+                                                    <Button variant="default" disabled class="bg-smart-blue-500">
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">bg-smart-blue-500 disabled:opacity-50</code>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Outline Buttons States -->
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-100 mb-4">
+                                    Outline - Smart Blue
+                                </h4>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full border-collapse">
+                                        <thead>
+                                            <tr class="bg-smart-blue-700 border-b-2 border-smart-blue-500">
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">State</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">Example</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">Classes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Default</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="outline"
+                                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">border-smart-blue-400 text-smart-blue-400 bg-transparent</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Hover</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="outline"
+                                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">hover:bg-smart-blue-700 hover:border-smart-blue-400</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Active</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="outline"
+                                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent active:bg-smart-blue-600 active:border-smart-blue-500"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">active:bg-smart-blue-600 active:border-smart-blue-500</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Focus</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="outline"
+                                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent focus-visible:ring-2 focus-visible:ring-smart-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-prussian-blue-500"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">focus-visible:ring-2 focus-visible:ring-smart-blue-400</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Disabled</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="outline"
+                                                        disabled
+                                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">disabled:opacity-50 disabled:pointer-events-none</code>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Ghost Buttons States -->
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-100 mb-4">
+                                    Ghost - Smart Blue
+                                </h4>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full border-collapse">
+                                        <thead>
+                                            <tr class="bg-smart-blue-700 border-b-2 border-smart-blue-500">
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">State</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">Example</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-smart-blue-100">Classes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Default</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="ghost"
+                                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">border border-smart-blue-500/30 text-smart-blue-300 bg-transparent</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Hover</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="ghost"
+                                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Active</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="ghost"
+                                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent active:bg-smart-blue-700/30 active:border-smart-blue-500/70"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">active:bg-smart-blue-700/30 active:border-smart-blue-500/70</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Focus</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="ghost"
+                                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent focus-visible:ring-2 focus-visible:ring-smart-blue-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-prussian-blue-500"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">focus-visible:ring-2 focus-visible:ring-smart-blue-400/50</code>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-twilight-indigo-500">
+                                                <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Disabled</td>
+                                                <td class="px-4 py-3">
+                                                    <Button
+                                                        variant="ghost"
+                                                        disabled
+                                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent"
+                                                    >
+                                                        Button
+                                                    </Button>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <code class="text-xs text-smart-blue-300">disabled:opacity-50 disabled:pointer-events-none</code>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Reference -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                            Quick Reference
                         </h3>
                         <div class="flex flex-wrap gap-4">
                             <Button variant="default" class="bg-smart-blue-500 hover:bg-smart-blue-400">
@@ -275,12 +544,7 @@ function goHome() {
                                 Disabled
                             </Button>
                         </div>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
-                            Outline Buttons
-                        </h3>
-                        <div class="flex flex-wrap gap-4">
+                        <div class="flex flex-wrap gap-4 mt-4">
                             <Button
                                 variant="outline"
                                 class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700"
@@ -294,21 +558,16 @@ function goHome() {
                                 Outline Sapphire
                             </Button>
                         </div>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
-                            Ghost Buttons
-                        </h3>
-                        <div class="flex flex-wrap gap-4">
+                        <div class="flex flex-wrap gap-4 mt-4">
                             <Button
                                 variant="ghost"
-                                class="text-smart-blue-300 bg-transparent hover:bg-smart-blue-700"
+                                class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50"
                             >
                                 Ghost Smart Blue
                             </Button>
                             <Button
                                 variant="ghost"
-                                class="text-sapphire-300 bg-transparent hover:bg-sapphire-700"
+                                class="border border-sapphire-500/30 text-sapphire-300 bg-transparent hover:bg-sapphire-700/20 hover:border-sapphire-500/50"
                             >
                                 Ghost Sapphire
                             </Button>
@@ -318,16 +577,79 @@ function goHome() {
                         <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
                             Button Sizes
                         </h3>
-                        <div class="flex flex-wrap items-center gap-4">
-                            <Button size="sm" variant="default" class="bg-smart-blue-500">
-                                Small
-                            </Button>
-                            <Button size="default" variant="default" class="bg-smart-blue-500">
-                                Medium
-                            </Button>
-                            <Button size="lg" variant="default" class="bg-smart-blue-500">
-                                Large
-                            </Button>
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                    Primary (Filled)
+                                </h4>
+                                <div class="flex flex-wrap items-center gap-4">
+                                    <Button size="sm" variant="default" class="bg-smart-blue-500">
+                                        Small
+                                    </Button>
+                                    <Button size="default" variant="default" class="bg-smart-blue-500">
+                                        Medium
+                                    </Button>
+                                    <Button size="lg" variant="default" class="bg-smart-blue-500">
+                                        Large
+                                    </Button>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                    Outline
+                                </h4>
+                                <div class="flex flex-wrap items-center gap-4">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700"
+                                    >
+                                        Small
+                                    </Button>
+                                    <Button
+                                        size="default"
+                                        variant="outline"
+                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700"
+                                    >
+                                        Medium
+                                    </Button>
+                                    <Button
+                                        size="lg"
+                                        variant="outline"
+                                        class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700"
+                                    >
+                                        Large
+                                    </Button>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                    Ghost
+                                </h4>
+                                <div class="flex flex-wrap items-center gap-4">
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50"
+                                    >
+                                        Small
+                                    </Button>
+                                    <Button
+                                        size="default"
+                                        variant="ghost"
+                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50"
+                                    >
+                                        Medium
+                                    </Button>
+                                    <Button
+                                        size="lg"
+                                        variant="ghost"
+                                        class="border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50"
+                                    >
+                                        Large
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -349,7 +671,7 @@ function goHome() {
                             </Button>
                             <Button
                                 variant="ghost"
-                                class="text-danger-300 bg-transparent hover:bg-danger-700"
+                                class="border border-danger-500/30 text-danger-300 bg-transparent hover:bg-danger-700/20 hover:border-danger-500/50"
                             >
                                 Danger Ghost
                             </Button>
@@ -411,18 +733,18 @@ function goHome() {
                                 </h4>
                                 <div class="flex flex-wrap gap-4">
                                     <button
-                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer text-smart-blue-300 bg-transparent hover:bg-smart-blue-700"
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50"
                                     >
                                         <Trash2 :size="20" />
                                     </button>
                                     <button
-                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer text-danger-300 bg-transparent hover:bg-danger-700"
+                                        class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border border-danger-500/30 text-danger-300 bg-transparent hover:bg-danger-700/20 hover:border-danger-500/50"
                                     >
                                         <Trash2 :size="20" />
                                     </button>
                                 </div>
                                 <code class="block mt-2 text-xs text-twilight-indigo-100">
-                                    h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg text-smart-blue-300 bg-transparent hover:bg-smart-blue-700
+                                    h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50
                                 </code>
                             </div>
                         </div>
