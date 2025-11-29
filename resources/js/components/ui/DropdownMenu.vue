@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { Button } from '@/components/ui/button';
 
 const isOpen = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
@@ -31,13 +32,15 @@ onUnmounted(() => {
 
 <template>
     <div class="relative inline-block text-left">
-        <button
+        <Button
             ref="triggerRef"
+            variant="ghost"
+            size="sm"
             @click="toggle"
-            class="inline-flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-opacity-10 cursor-pointer text-smart-blue-100"
+            class="inline-flex items-center gap-2 cursor-pointer text-smart-blue-100"
         >
             <slot name="trigger" />
-        </button>
+        </Button>
         
         <Transition
             enter-active-class="transition ease-out duration-100"

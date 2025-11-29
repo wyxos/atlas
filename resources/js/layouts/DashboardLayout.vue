@@ -17,6 +17,7 @@ import {
     Image,
 } from 'lucide-vue-next';
 import AppHeader from '../components/AppHeader.vue';
+import { Button } from '@/components/ui/button';
 
 // Get user data from meta tag or global variable
 const userName = computed(() => {
@@ -159,14 +160,16 @@ onUnmounted(() => {
         >
             <!-- Toggle Button -->
             <div class="flex items-center justify-end h-16 px-4">
-                <button
+                <Button
+                    variant="ghost"
+                    size="icon"
                     @click="toggleMenu"
-                    class="p-2 rounded-lg transition-colors hover:bg-prussian-blue-600 text-smart-blue-100"
+                    class="text-smart-blue-100"
                     aria-label="Toggle menu"
                 >
                     <ChevronLeft v-if="isMenuOpen" class="w-5 h-5" />
                     <ChevronRight v-else class="w-5 h-5" />
-                </button>
+                </Button>
             </div>
 
             <!-- Menu Items -->
@@ -195,9 +198,10 @@ onUnmounted(() => {
             <!-- User Menu at Bottom -->
             <div class="border-t border-twilight-indigo-500 p-4">
                 <div class="relative">
-                    <button
+                    <Button
+                        variant="ghost"
+                        class="w-full flex items-center gap-3 px-3 py-2 text-twilight-indigo-100 hover:text-smart-blue-100"
                         @click="toggleUserMenu"
-                        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100"
                     >
                         <User class="w-5 h-5 flex-shrink-0" />
                         <Transition name="fade">
@@ -209,7 +213,7 @@ onUnmounted(() => {
                             <ChevronUp v-if="isMenuOpen && isUserMenuOpen" class="w-4 h-4 flex-shrink-0 ml-auto" />
                             <ChevronDown v-else-if="isMenuOpen" class="w-4 h-4 flex-shrink-0 ml-auto" />
                         </Transition>
-                    </button>
+                    </Button>
 
                     <!-- User Dropdown Menu (expands upward) -->
                     <Transition
@@ -232,13 +236,14 @@ onUnmounted(() => {
                                 <User class="w-4 h-4" />
                                 <span class="font-medium">Profile</span>
                             </router-link>
-                            <button
+                            <Button
+                                variant="ghost"
+                                class="w-full flex items-center gap-3 px-3 py-2 text-twilight-indigo-100 hover:text-smart-blue-100"
                                 @click="handleUserLogout"
-                                class="w-full flex items-center gap-3 px-3 py-2 transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100"
                             >
                                 <LogOut class="w-4 h-4" />
                                 <span class="font-medium">Logout</span>
-                            </button>
+                            </Button>
                         </div>
                     </Transition>
                 </div>

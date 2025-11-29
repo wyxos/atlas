@@ -201,15 +201,19 @@ onMounted(async () => {
                     <o-table-column field="id" label="ID" width="80" />
                     <o-table-column field="filename" label="Filename">
                         <template #default="{ row }">
-                            <button @click="() => copyToClipboard(row.filename, 'Filename')"
-                                class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group flex-1 min-w-0 w-0"
-                                :title="`Click to copy: ${row.filename}`">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                @click="() => copyToClipboard(row.filename, 'Filename')"
+                                class="flex items-center gap-2 cursor-pointer group flex-1 min-w-0 w-0"
+                                :title="`Click to copy: ${row.filename}`"
+                            >
                                 <FileText :size="16" class="text-smart-blue-400 shrink-0" />
-                                <span class="truncate md:max-w-xs group-hover:text-smart-blue-400 transition-colors"
+                                <span class="truncate md:max-w-xs transition-colors group-hover:text-smart-blue-400"
                                     :title="row.filename">{{ row.filename }}</span>
                                 <Copy :size="12"
                                     class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                            </button>
+                            </Button>
                         </template>
                     </o-table-column>
                     <o-table-column field="source" label="Source" width="120" />
@@ -245,15 +249,20 @@ onMounted(async () => {
                     </o-table-column>
                     <o-table-column field="absolute_path" label="Path" width="300">
                         <template #default="{ row }">
-                            <button v-if="row.absolute_path" @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                                class="font-mono text-xs text-twilight-indigo-100 truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left"
-                                :title="`Click to copy: ${row.absolute_path}`">
+                            <Button
+                                v-if="row.absolute_path"
+                                variant="ghost"
+                                size="sm"
+                                @click="() => copyToClipboard(row.absolute_path, 'Path')"
+                                class="font-mono text-xs text-twilight-indigo-100 truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block cursor-pointer group text-left hover:text-smart-blue-400 transition-colors"
+                                :title="`Click to copy: ${row.absolute_path}`"
+                            >
                                 <span class="flex items-center gap-1">
                                     <span class="truncate">{{ row.absolute_path }}</span>
                                     <Copy :size="12"
                                         class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                                 </span>
-                            </button>
+                            </Button>
                             <span v-else class="text-twilight-indigo-500 italic text-xs">
                                 —
                             </span>

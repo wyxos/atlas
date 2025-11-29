@@ -3,6 +3,7 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { computed, watch, Teleport } from 'vue';
 import { X } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
 
 interface Props {
     modelValue?: boolean;
@@ -71,11 +72,14 @@ watch(isOpen, (isOpenValue) => {
                         <h2 class="text-2xl font-semibold text-regal-navy-100">
                             {{ title }}
                         </h2>
-                        <button @click="close"
-                            class="p-2 rounded-lg transition-colors hover:bg-smart-blue-700 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
-                            aria-label="Close details">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            @click="close"
+                            aria-label="Close details"
+                        >
                             <X :size="20" class="text-twilight-indigo-100" />
-                        </button>
+                        </Button>
                     </div>
 
                     <!-- Content -->

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Menu } from 'lucide-vue-next';
 import AtlasIcon from './AtlasIcon.vue';
+import { Button } from '@/components/ui/button';
 
 interface Props {
     userName: string;
@@ -25,13 +26,15 @@ function handleToggleMenu(): void {
     <header class="sticky top-0 z-50 w-full bg-prussian-blue-600">
         <div class="relative flex h-16 items-center justify-center lg:justify-between px-4 lg:px-8">
             <!-- Mobile/Tablet Menu Toggle (Absolute on mobile/tablet) -->
-            <button
+            <Button
+                variant="ghost"
+                size="icon"
                 @click="handleToggleMenu"
-                class="absolute left-4 lg:static lg:hidden p-2 rounded-lg transition-colors hover:bg-prussian-blue-500 text-smart-blue-100 mobile-menu-toggle"
+                class="absolute left-4 lg:static lg:hidden text-smart-blue-100 mobile-menu-toggle"
                 aria-label="Toggle menu"
             >
                 <Menu :size="24" />
-            </button>
+            </Button>
 
             <!-- App Icon / Logo -->
             <div class="flex items-center gap-3">
