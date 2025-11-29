@@ -4,6 +4,7 @@ import Oruga from '@oruga-ui/oruga-next';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { fas } from '@fortawesome/free-solid-svg-icons';
+import '@oruga-ui/theme-oruga/style.css';
 import App from './App.vue';
 import routes from './routes';
 import './bootstrap';

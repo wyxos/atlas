@@ -30,7 +30,7 @@ function handleToggleMenu(): void {
                 class="absolute left-4 lg:static lg:hidden p-2 rounded-lg transition-colors hover:bg-prussian-blue-500 text-smart-blue-900 mobile-menu-toggle"
                 aria-label="Toggle menu"
             >
-                <Menu class="w-6 h-6" />
+                <Menu :size="24" />
             </button>
 
             <!-- App Icon / Logo -->

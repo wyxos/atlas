@@ -368,17 +368,17 @@ function goHome() {
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
                                     >
-                                        <Trash2 class="w-5 h-5" />
+                                        <Trash2 :size="20" />
                                     </button>
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
                                     >
-                                        <Trash2 class="w-5 h-5" />
+                                        <Trash2 :size="20" />
                                     </button>
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer bg-success-500 border-2 border-success-600 text-white hover:bg-success-600"
                                     >
-                                        <CheckCircle2 class="w-5 h-5" />
+                                        <CheckCircle2 :size="20" />
                                     </button>
                                 </div>
                                 <code class="block mt-2 text-xs text-twilight-indigo-700">
@@ -393,12 +393,12 @@ function goHome() {
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border-2 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-600 hover:text-white"
                                     >
-                                        <Trash2 class="w-5 h-5" />
+                                        <Trash2 :size="20" />
                                     </button>
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border-2 border-danger-700 text-danger-700 bg-transparent hover:bg-danger-500 hover:border-danger-600 hover:text-white"
                                     >
-                                        <Trash2 class="w-5 h-5" />
+                                        <Trash2 :size="20" />
                                     </button>
                                 </div>
                                 <code class="block mt-2 text-xs text-twilight-indigo-700">
@@ -413,12 +413,12 @@ function goHome() {
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer text-smart-blue-700 bg-transparent hover:bg-smart-blue-300"
                                     >
-                                        <Trash2 class="w-5 h-5" />
+                                        <Trash2 :size="20" />
                                     </button>
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer text-danger-700 bg-transparent hover:bg-danger-300"
                                     >
-                                        <Trash2 class="w-5 h-5" />
+                                        <Trash2 :size="20" />
                                     </button>
                                 </div>
                                 <code class="block mt-2 text-xs text-twilight-indigo-700">
@@ -639,7 +639,7 @@ function goHome() {
                                         disabled
                                         class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-twilight-indigo-500 rounded-lg bg-transparent text-twilight-indigo-500 cursor-not-allowed opacity-40 transition-all"
                                     >
-                                        <ArrowLeft class="w-5 h-5" />
+                                        <ArrowLeft :size="20" />
                                     </button>
                                     <button
                                         class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-smart-blue-600 rounded-lg bg-smart-blue-500 text-white font-semibold transition-all"
@@ -660,7 +660,7 @@ function goHome() {
                                     <button
                                         class="flex items-center justify-center min-w-[2.5rem] h-10 px-3 border border-twilight-indigo-500 rounded-lg bg-transparent text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900 transition-all cursor-pointer"
                                     >
-                                        <ArrowLeft class="w-5 h-5 rotate-180" />
+                                        <ArrowLeft :size="20" class="rotate-180" />
                                     </button>
                                 </nav>
                             </div>
@@ -765,7 +765,7 @@ opacity-40 cursor-not-allowed (disabled)</code
                     @click.prevent="goHome"
                     class="inline-flex items-center gap-2"
                 >
-                    <ArrowLeft class="w-5 h-5" />
+                    <ArrowLeft :size="20" />
                     Back to Home
                 </Link>
             </div>

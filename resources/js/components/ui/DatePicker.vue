@@ -128,7 +128,7 @@ function handleDateSelect(value: DateValue | null): void {
                     !date && 'text-twilight-indigo-700'
                 )"
             >
-                <CalendarIcon class="mr-2 h-4 w-4" />
+                <CalendarIcon :size="16" class="mr-2" />
                 {{ displayValue }}
             </Button>
         </PopoverTrigger>

@@ -101,7 +101,7 @@ onUnmounted(() => {
                             @click="setDialogOpen(false)"
                             class="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2 disabled:pointer-events-none"
                         >
-                            <X class="h-4 w-4 text-twilight-indigo-900" />
+                            <X :size="16" class="text-twilight-indigo-900" />
                             <span class="sr-only">Close</span>
                         </button>
                         <slot />

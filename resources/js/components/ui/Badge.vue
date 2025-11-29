@@ -33,7 +33,7 @@ const badgeClasses = computed(() => {
 
 <template>
     <span :class="badgeClasses" :title="iconOnly && variant === 'verified' ? 'Verified' : undefined">
-        <CheckCircle2 v-if="iconOnly && variant === 'verified'" class="w-4 h-4" />
+        <CheckCircle2 v-if="iconOnly && variant === 'verified'" :size="16" />
         <slot v-else />
     </span>
 </template>

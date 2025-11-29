@@ -239,7 +239,7 @@ onMounted(async () => {
                     @click="() => listing.openPanel()"
                     class="border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
                 >
-                    <Filter class="w-4 h-4 mr-2" />
+                    <Filter :size="16" class="mr-2" />
                     Filters
                 </Button>
             </div>
@@ -261,7 +261,7 @@ onMounted(async () => {
                         class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr rounded-tl-none rounded-bl-none"
                         :aria-label="`Remove ${filter.label} filter`"
                     >
-                        <X class="h-3.5 w-3.5" />
+                        <X :size="14" />
                     </Button>
                 </div>
                 <Button
@@ -304,9 +304,9 @@ onMounted(async () => {
                             class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group"
                             :title="`Click to copy: ${row.filename}`"
                         >
-                            <FileText class="w-4 h-4 text-smart-blue-600" />
+                            <FileText :size="16" class="text-smart-blue-600" />
                             <span class="truncate max-w-xs group-hover:text-smart-blue-600 transition-colors" :title="row.filename">{{ row.filename }}</span>
-                            <Copy class="w-3 h-3 text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                     </template>
                 </o-table-column>
@@ -334,7 +334,7 @@ onMounted(async () => {
                             v-if="row.downloaded"
                             class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-300 border border-success-500 text-success-900"
                         >
-                            <Download class="w-3 h-3" />
+                            <Download :size="12" />
                             Yes
                         </span>
                         <span
@@ -355,7 +355,7 @@ onMounted(async () => {
                         >
                             <span class="flex items-center gap-1">
                                 <span class="truncate">{{ row.absolute_path }}</span>
-                                <Copy class="w-3 h-3 text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                             </span>
                         </button>
                         <span
@@ -426,7 +426,8 @@ onMounted(async () => {
                                 class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
                                 :title="`View ${row.filename}`"
                             >
-                                <Eye class="w-6 h-6 md:w-5 md:h-5" />
+                                <Eye :size="40" class="text-white block md:hidden" />
+                                <Eye :size="28" class="text-white hidden md:block" />
                             </Button>
                             <Button
                                 @click="openDeleteDialog(row)"
@@ -436,14 +437,15 @@ onMounted(async () => {
                                 :disabled="deletingFileId === row.id"
                                 :title="`Delete ${row.filename}`"
                             >
-                                <Trash2 class="w-6 h-6 md:w-5 md:h-5" />
+                                <Trash2 :size="40" class="text-white block md:hidden" />
+                                <Trash2 :size="28" class="text-white hidden md:block" />
                             </Button>
                         </div>
                     </template>
                 </o-table-column>
                 <template #empty>
                     <div class="flex flex-col items-center justify-center py-12 px-6">
-                        <FileIcon class="w-16 h-16 text-twilight-indigo-600 mb-4" />
+                        <FileIcon :size="64" class="text-twilight-indigo-600 mb-4" />
                         <h3 class="text-xl font-semibold text-regal-navy-900 mb-2">
                             {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
                         </h3>
