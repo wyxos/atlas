@@ -252,6 +252,7 @@ onMounted(async () => {
                     pagination-order="right"
                     @page-change="(page: number) => listing.goToPage(page)"
                     class="w-full rounded-lg overflow-hidden"
+                    striped
                 >
                 <o-table-column field="id" label="ID" width="80" />
                 <o-table-column field="name" label="Name" />
