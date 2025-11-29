@@ -302,12 +302,12 @@ onMounted(async () => {
                     <template #default="{ row }">
                         <button
                             @click="() => copyToClipboard(row.filename, 'Filename')"
-                            class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group"
+                            class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group flex-1 min-w-0 w-0"
                             :title="`Click to copy: ${row.filename}`"
                         >
-                            <FileText :size="16" class="text-smart-blue-400" />
-                            <span class="truncate max-w-[12rem] md:max-w-xs group-hover:text-smart-blue-400 transition-colors" :title="row.filename">{{ row.filename }}</span>
-                            <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <FileText :size="16" class="text-smart-blue-400 shrink-0" />
+                            <span class="truncate md:max-w-xs group-hover:text-smart-blue-400 transition-colors" :title="row.filename">{{ row.filename }}</span>
+                            <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                         </button>
                     </template>
                 </o-table-column>
@@ -351,7 +351,7 @@ onMounted(async () => {
                         <button
                             v-if="row.absolute_path"
                             @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                            class="font-mono text-xs text-twilight-indigo-100 truncate max-w-[12rem] md:max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left w-full"
+                            class="font-mono text-xs text-twilight-indigo-100 truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left"
                             :title="`Click to copy: ${row.absolute_path}`"
                         >
                             <span class="flex items-center gap-1">
@@ -374,7 +374,7 @@ onMounted(async () => {
                             :href="row.url"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-[12rem] md:max-w-xs block"
+                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
                             :title="row.url"
                         >
                             {{ row.url }}
@@ -394,7 +394,7 @@ onMounted(async () => {
                             :href="row.referrer_url"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-[12rem] md:max-w-xs block"
+                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
                             :title="row.referrer_url"
                         >
                             {{ row.referrer_url }}
