@@ -101,12 +101,12 @@
                         </div>
 
                         <div>
-                            <button
+                            <x-ui.button
                                 type="submit"
-                                class="w-full px-6 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg focus:outline-none focus:ring-2 bg-smart-blue-500 hover:bg-smart-blue-600 focus:ring-smart-blue-600"
+                                class="w-full px-6 py-3 shadow-lg"
                             >
                                 Sign In
-                            </button>
+                            </x-ui.button>
                         </div>
                     </form>
 

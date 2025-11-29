@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import type { DateValue } from '@internationalized/date';
 import { CalendarDate, getLocalTimeZone, today, toCalendarDate } from '@internationalized/date';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface Props {
     modelValue?: DateValue | Date | null;
@@ -105,49 +106,57 @@ const monthNames = [
     <div class="rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-4">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-2">
-                <button
+                <Button
                     v-if="layout === 'month-and-year'"
                     @click="previousMonth"
-                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-twilight-indigo-100"
                     aria-label="Previous month"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
-                </button>
-                <button
+                </Button>
+                <Button
                     v-else
                     @click="previousYear"
-                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-twilight-indigo-100"
                     aria-label="Previous year"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
-                </button>
+                </Button>
                 <div class="text-sm font-semibold text-smart-blue-100 min-w-[120px] text-center">
                     {{ monthNames[currentMonth.month - 1] }} {{ currentMonth.year }}
                 </div>
-                <button
+                <Button
                     v-if="layout === 'month-and-year'"
                     @click="nextMonth"
-                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-twilight-indigo-100"
                     aria-label="Next month"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
-                </button>
-                <button
+                </Button>
+                <Button
                     v-else
                     @click="nextYear"
-                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-twilight-indigo-100"
                     aria-label="Next year"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
-                </button>
+                </Button>
             </div>
         </div>
         
@@ -162,12 +171,14 @@ const monthNames = [
         </div>
         
         <div class="grid grid-cols-7 gap-1">
-            <button
+            <Button
                 v-for="date in calendarDays"
                 :key="`${date.year}-${date.month}-${date.day}`"
                 @click.stop="selectDate(date)"
+                variant="ghost"
+                size="icon"
                 :class="cn(
-                    'h-9 w-9 rounded text-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2 focus:ring-offset-prussian-blue-600',
+                    'text-sm transition-all duration-150',
                     isSelected(date)
                         ? 'bg-smart-blue-500 text-white font-semibold hover:bg-smart-blue-600 shadow-lg scale-105'
                         : isCurrentMonth(date)
@@ -176,7 +187,7 @@ const monthNames = [
                 )"
             >
                 {{ date.day }}
-            </button>
+            </Button>
         </div>
     </div>
 </template>
