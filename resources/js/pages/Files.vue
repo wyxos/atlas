@@ -179,11 +179,8 @@ onMounted(async () => {
                         Manage your files
                     </p>
                 </div>
-                <Button
-                    variant="outline"
-                    @click="() => listing.openPanel()"
-                    class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
-                >
+                <Button variant="outline" @click="() => listing.openPanel()"
+                    class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100">
                     <Filter :size="16" class="mr-2" />
                     Filters
                 </Button>
@@ -202,195 +199,151 @@ onMounted(async () => {
 
             <div v-else class="w-full">
                 <ListingTable :listing="listing">
-                <o-table-column field="id" label="ID" width="80" />
-                <o-table-column field="filename" label="Filename">
-                    <template #default="{ row }">
-                        <button
-                            @click="() => copyToClipboard(row.filename, 'Filename')"
-                            class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group flex-1 min-w-0 w-0"
-                            :title="`Click to copy: ${row.filename}`"
-                        >
-                            <FileText :size="16" class="text-smart-blue-400 shrink-0" />
-                            <span class="truncate md:max-w-xs group-hover:text-smart-blue-400 transition-colors" :title="row.filename">{{ row.filename }}</span>
-                            <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                        </button>
-                    </template>
-                </o-table-column>
-                <o-table-column field="source" label="Source" width="120" />
-                <o-table-column field="mime_type" label="Type" width="120">
-                    <template #default="{ row }">
-                        <span class="px-2 py-1 rounded text-xs font-medium" :class="{
-                            'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
-                            'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
-                            'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
-                            'bg-twilight-indigo-500/20 text-twilight-indigo-100': getMimeTypeCategory(row.mime_type) === 'other',
-                        }">
-                            {{ row.mime_type || 'Unknown' }}
-                        </span>
-                    </template>
-                </o-table-column>
-                <o-table-column field="size" label="Size" width="100">
-                    <template #default="{ row }">
-                        {{ formatFileSize(row.size) }}
-                    </template>
-                </o-table-column>
-                <o-table-column field="downloaded" label="Downloaded" width="120">
-                    <template #default="{ row }">
-                        <span
-                            v-if="row.downloaded"
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-700 border border-success-500 text-success-100"
-                        >
-                            <Download :size="12" />
-                            Yes
-                        </span>
-                        <span
-                            v-else
-                            class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100"
-                        >
-                            No
-                        </span>
-                    </template>
-                </o-table-column>
-                <o-table-column field="absolute_path" label="Path" width="300">
-                    <template #default="{ row }">
-                        <button
-                            v-if="row.absolute_path"
-                            @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                            class="font-mono text-xs text-twilight-indigo-100 truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left"
-                            :title="`Click to copy: ${row.absolute_path}`"
-                        >
-                            <span class="flex items-center gap-1">
-                                <span class="truncate">{{ row.absolute_path }}</span>
-                                <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    <o-table-column field="id" label="ID" width="80" />
+                    <o-table-column field="filename" label="Filename">
+                        <template #default="{ row }">
+                            <button @click="() => copyToClipboard(row.filename, 'Filename')"
+                                class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group flex-1 min-w-0 w-0"
+                                :title="`Click to copy: ${row.filename}`">
+                                <FileText :size="16" class="text-smart-blue-400 shrink-0" />
+                                <span class="truncate md:max-w-xs group-hover:text-smart-blue-400 transition-colors"
+                                    :title="row.filename">{{ row.filename }}</span>
+                                <Copy :size="12"
+                                    class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </button>
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="source" label="Source" width="120" />
+                    <o-table-column field="mime_type" label="Type" width="120">
+                        <template #default="{ row }">
+                            <span class="px-2 py-1 rounded text-xs font-medium" :class="{
+                                'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
+                                'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
+                                'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
+                                'bg-twilight-indigo-500/20 text-twilight-indigo-100': getMimeTypeCategory(row.mime_type) === 'other',
+                            }">
+                                {{ row.mime_type || 'Unknown' }}
                             </span>
-                        </button>
-                        <span
-                            v-else
-                            class="text-twilight-indigo-500 italic text-xs"
-                        >
-                            —
-                        </span>
-                    </template>
-                </o-table-column>
-                <o-table-column field="url" label="URL" width="250">
-                    <template #default="{ row }">
-                        <a
-                            v-if="row.url"
-                            :href="row.url"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
-                            :title="row.url"
-                        >
-                            {{ row.url }}
-                        </a>
-                        <span
-                            v-else
-                            class="text-twilight-indigo-500 italic text-xs"
-                        >
-                            —
-                        </span>
-                    </template>
-                </o-table-column>
-                <o-table-column field="referrer_url" label="Referrer URL" width="250">
-                    <template #default="{ row }">
-                        <a
-                            v-if="row.referrer_url"
-                            :href="row.referrer_url"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
-                            :title="row.referrer_url"
-                        >
-                            {{ row.referrer_url }}
-                        </a>
-                        <span
-                            v-else
-                            class="text-twilight-indigo-500 italic text-xs"
-                        >
-                            —
-                        </span>
-                    </template>
-                </o-table-column>
-                <o-table-column field="created_at" label="Created At" width="180">
-                    <template #default="{ row }">
-                        {{ formatDate(row.created_at) }}
-                    </template>
-                </o-table-column>
-                <o-table-column field="updated_at" label="Last Updated" width="180">
-                    <template #default="{ row }">
-                        {{ formatDate(row.updated_at) }}
-                    </template>
-                </o-table-column>
-                <o-table-column label="Actions" width="140">
-                    <template #default="{ row }">
-                        <div class="flex items-center justify-center gap-2">
-                            <Button
-                                @click="() => router.push(`/files/${row.id}`)"
-                                variant="ghost"
-                                size="sm"
-                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400"
-                                :title="`View ${row.filename}`"
-                            >
-                                <Eye :size="40" class="text-white block md:hidden" />
-                                <Eye :size="28" class="text-white hidden md:block" />
-                            </Button>
-                            <Button
-                                @click="deletionHandler.openDialog(row)"
-                                variant="ghost"
-                                size="sm"
-                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 text-white hover:bg-danger-700"
-                                :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id"
-                                :title="`Delete ${row.filename}`"
-                            >
-                                <Trash2 :size="40" class="text-white block md:hidden" />
-                                <Trash2 :size="28" class="text-white hidden md:block" />
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="size" label="Size" width="100">
+                        <template #default="{ row }">
+                            {{ formatFileSize(row.size) }}
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="downloaded" label="Downloaded" width="120">
+                        <template #default="{ row }">
+                            <span v-if="row.downloaded"
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-700 border border-success-500 text-success-100">
+                                <Download :size="12" />
+                                Yes
+                            </span>
+                            <span v-else
+                                class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100">
+                                No
+                            </span>
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="absolute_path" label="Path" width="300">
+                        <template #default="{ row }">
+                            <button v-if="row.absolute_path" @click="() => copyToClipboard(row.absolute_path, 'Path')"
+                                class="font-mono text-xs text-twilight-indigo-100 truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left"
+                                :title="`Click to copy: ${row.absolute_path}`">
+                                <span class="flex items-center gap-1">
+                                    <span class="truncate">{{ row.absolute_path }}</span>
+                                    <Copy :size="12"
+                                        class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                </span>
+                            </button>
+                            <span v-else class="text-twilight-indigo-500 italic text-xs">
+                                —
+                            </span>
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="url" label="URL" width="250">
+                        <template #default="{ row }">
+                            <a v-if="row.url" :href="row.url" target="_blank" rel="noopener noreferrer"
+                                class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
+                                :title="row.url">
+                                {{ row.url }}
+                            </a>
+                            <span v-else class="text-twilight-indigo-500 italic text-xs">
+                                —
+                            </span>
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="referrer_url" label="Referrer URL" width="250">
+                        <template #default="{ row }">
+                            <a v-if="row.referrer_url" :href="row.referrer_url" target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
+                                :title="row.referrer_url">
+                                {{ row.referrer_url }}
+                            </a>
+                            <span v-else class="text-twilight-indigo-500 italic text-xs">
+                                —
+                            </span>
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="created_at" label="Created At" width="180">
+                        <template #default="{ row }">
+                            {{ formatDate(row.created_at) }}
+                        </template>
+                    </o-table-column>
+                    <o-table-column field="updated_at" label="Last Updated" width="180">
+                        <template #default="{ row }">
+                            {{ formatDate(row.updated_at) }}
+                        </template>
+                    </o-table-column>
+                    <o-table-column label="Actions" width="140">
+                        <template #default="{ row }">
+                            <div class="flex items-center justify-center gap-2">
+                                <Button @click="() => router.push(`/files/${row.id}`)" variant="ghost" size="sm"
+                                    class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400"
+                                    :title="`View ${row.filename}`">
+                                    <Eye :size="40" class="text-white block md:hidden" />
+                                    <Eye :size="28" class="text-white hidden md:block" />
+                                </Button>
+                                <Button @click="deletionHandler.openDialog(row)" variant="ghost" size="sm"
+                                    class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 text-white hover:bg-danger-700"
+                                    :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id"
+                                    :title="`Delete ${row.filename}`">
+                                    <Trash2 :size="40" class="text-white block md:hidden" />
+                                    <Trash2 :size="28" class="text-white hidden md:block" />
+                                </Button>
+                            </div>
+                        </template>
+                    </o-table-column>
+                    <template #empty>
+                        <div class="flex flex-col items-center justify-center py-12 px-6">
+                            <FileIcon :size="64" class="text-twilight-indigo-400 mb-4" />
+                            <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
+                                {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
+                            </h3>
+                            <p class="text-twilight-indigo-700 text-center max-w-md">
+                                {{ hasActiveFilters
+                                    ? 'Try adjusting your filters to see more results.'
+                                    : 'Get started by adding your first file.' }}
+                            </p>
+                            <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
+                                class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100">
+                                Clear Filters
                             </Button>
                         </div>
                     </template>
-                </o-table-column>
-                <template #empty>
-                    <div class="flex flex-col items-center justify-center py-12 px-6">
-                        <FileIcon :size="64" class="text-twilight-indigo-400 mb-4" />
-                        <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
-                            {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
-                        </h3>
-                        <p class="text-twilight-indigo-700 text-center max-w-md">
-                            {{ hasActiveFilters
-                                ? 'Try adjusting your filters to see more results.'
-                                : 'Get started by adding your first file.' }}
-                        </p>
-                        <Button
-                            v-if="hasActiveFilters"
-                            variant="outline"
-                            @click="() => listing.resetFilters()"
-                            class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
-                        >
-                            Clear Filters
-                        </Button>
-                    </div>
-                </template>
                 </ListingTable>
             </div>
 
             <!-- Filter Panel -->
-            <FilterPanel
-                :modelValue="listing.isPanelOpen()"
-                @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()"
-                title="Filter Files"
-                @apply="() => listing.applyFilters()"
-                @reset="() => listing.resetFilters()"
-            >
-                <ListingFilterForm
-                    :search="listing.search"
-                    :date-from="listing.date_from"
-                    :date-to="listing.date_to"
+            <FilterPanel :modelValue="listing.isPanelOpen()"
+                @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()" title="Filter Files"
+                :is-filtering="listing.isFiltering" :is-resetting="listing.isResetting"
+                @apply="() => listing.applyFilters()" @reset="() => listing.resetFilters()">
+                <ListingFilterForm :search="listing.search" :date-from="listing.date_from" :date-to="listing.date_to"
                     search-placeholder="Search by filename, title, or source..."
                     @update:search="(value) => listing.search = value"
                     @update:date-from="(value) => listing.date_from = value"
-                    @update:date-to="(value) => listing.date_to = value"
-                    @submit="() => listing.applyFilters()"
-                >
+                    @update:date-to="(value) => listing.date_to = value" @submit="() => listing.applyFilters()">
                     <!-- Source Filter -->
                     <Select v-model="listing.source">
                         <template #label>
@@ -432,31 +385,27 @@ onMounted(async () => {
                     <DialogHeader>
                         <DialogTitle class="text-danger-400">Delete File</DialogTitle>
                         <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
-                            Are you sure you want to delete <span class="font-semibold text-danger-400">{{ deletionHandler.itemToDelete?.filename }}</span>? This action cannot be undone.
+                            Are you sure you want to delete <span class="font-semibold text-danger-400">{{
+                                deletionHandler.itemToDelete?.filename }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <div v-if="deletionHandler.deleteError" class="mt-4 rounded border border-danger-400 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
+                    <div v-if="deletionHandler.deleteError"
+                        class="mt-4 rounded border border-danger-400 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
                         {{ deletionHandler.deleteError }}
                     </div>
                     <DialogFooter>
                         <DialogClose as-child>
-                            <Button
-                                variant="outline"
-                                @click="deletionHandler.closeDialog"
+                            <Button variant="outline" @click="deletionHandler.closeDialog"
                                 :disabled="deletionHandler.isDeleting"
-                                class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
-                            >
+                                class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100">
                                 Cancel
                             </Button>
                         </DialogClose>
-                        <Button
-                            v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
-                            @click="deletionHandler.delete"
-                            :disabled="deletionHandler.isDeleting"
-                            variant="default"
-                            class="bg-danger-400 hover:bg-danger-700"
-                        >
-                            {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError && deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
+                        <Button v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
+                            @click="deletionHandler.delete" :disabled="deletionHandler.isDeleting" variant="default"
+                            class="bg-danger-400 hover:bg-danger-700">
+                            {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError &&
+                                deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

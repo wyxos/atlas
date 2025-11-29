@@ -209,179 +209,127 @@ onMounted(() => {
 </script>
 
 <template>
-    <PageLayout>
-        <div class="w-full flex flex-col h-full md:flex-1 md:min-h-0 md:overflow-hidden">
-            <!-- Loading State -->
-            <div v-if="loading" class="text-center py-12">
-                <p class="text-twilight-indigo-100 text-lg">Loading file...</p>
-            </div>
+    <div class="w-full flex flex-col h-full md:flex-1 md:min-h-0 md:overflow-hidden">
+        <!-- Loading State -->
+        <div v-if="loading" class="text-center py-12">
+            <p class="text-twilight-indigo-100 text-lg">Loading file...</p>
+        </div>
 
-            <!-- Error State -->
-            <div v-else-if="error" class="text-center py-12">
-                <p class="text-red-500 text-lg">{{ error }}</p>
-                <Button
-                    variant="outline"
-                    @click="loadFile"
-                    class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
-                >
-                    Retry
+        <!-- Error State -->
+        <div v-else-if="error" class="text-center py-12">
+            <p class="text-red-500 text-lg">{{ error }}</p>
+            <Button variant="outline" @click="loadFile"
+                class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100">
+                Retry
+            </Button>
+        </div>
+
+        <!-- File Details -->
+        <div v-else-if="file" class="flex flex-col h-full md:flex-1 md:min-h-0 md:overflow-hidden">
+            <!-- Actions - Mobile: Outside at top, Desktop: Inside preview -->
+            <div class="flex items-center justify-between mb-4 md:hidden shrink-0">
+                <Button variant="ghost" size="sm" @click="() => router.push('/files')"
+                    class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400"
+                    title="Back to Files">
+                    <ArrowLeft :size="40" class="text-white block md:hidden" />
+                    <ArrowLeft :size="28" class="text-white hidden md:block" />
                 </Button>
+                <div class="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" @click="detailsPanelOpen = true"
+                        class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
+                        title="View Details">
+                        <Info :size="40" class="text-white block md:hidden" />
+                        <Info :size="28" class="text-white hidden md:block" />
+                    </Button>
+                    <Button variant="ghost" size="sm" @click="openDeleteDialog"
+                        class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 hover:bg-danger-300"
+                        title="Delete File">
+                        <Trash2 :size="40" class="text-white block md:hidden" />
+                        <Trash2 :size="28" class="text-white hidden md:block" />
+                    </Button>
+                </div>
             </div>
-
-            <!-- File Details -->
-            <div v-else-if="file" class="flex flex-col h-full md:flex-1 md:min-h-0 md:overflow-hidden">
-                <!-- Actions - Mobile: Outside at top, Desktop: Inside preview -->
-                <div class="flex items-center justify-between mb-4 md:hidden shrink-0">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        @click="() => router.push('/files')"
-                        class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400"
-                        title="Back to Files"
-                    >
+            <!-- File Preview -->
+            <div
+                class="flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-prussian-blue-800 p-6 relative">
+                <!-- Actions - Desktop: Inside preview -->
+                <div class="hidden md:flex absolute top-4 left-4 right-4 items-center justify-between z-10">
+                    <Button variant="ghost" size="sm" @click="() => router.push('/files')"
+                        class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
+                        title="Back to Files">
                         <ArrowLeft :size="40" class="text-white block md:hidden" />
                         <ArrowLeft :size="28" class="text-white hidden md:block" />
                     </Button>
                     <div class="flex items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            @click="detailsPanelOpen = true"
+                        <Button variant="ghost" size="sm" @click="detailsPanelOpen = true"
                             class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
-                            title="View Details"
-                        >
+                            title="View Details">
                             <Info :size="40" class="text-white block md:hidden" />
                             <Info :size="28" class="text-white hidden md:block" />
                         </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            @click="openDeleteDialog"
+                        <Button variant="ghost" size="sm" @click="openDeleteDialog"
                             class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 hover:bg-danger-300"
-                            title="Delete File"
-                        >
+                            title="Delete File">
                             <Trash2 :size="40" class="text-white block md:hidden" />
                             <Trash2 :size="28" class="text-white hidden md:block" />
                         </Button>
                     </div>
                 </div>
-                <!-- File Preview -->
-                <div class="flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-prussian-blue-900 rounded-lg border-2 border-twilight-indigo-500 p-6 relative">
-                    <!-- Actions - Desktop: Inside preview -->
-                    <div class="hidden md:flex absolute top-4 left-4 right-4 items-center justify-between z-10">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            @click="() => router.push('/files')"
-                            class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
-                            title="Back to Files"
-                        >
-                            <ArrowLeft :size="40" class="text-white block md:hidden" />
-                            <ArrowLeft :size="28" class="text-white hidden md:block" />
-                        </Button>
-                        <div class="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                @click="detailsPanelOpen = true"
-                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
-                                title="View Details"
-                            >
-                                <Info :size="40" class="text-white block md:hidden" />
-                                <Info :size="28" class="text-white hidden md:block" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                @click="openDeleteDialog"
-                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 hover:bg-danger-300"
-                                title="Delete File"
-                            >
-                                <Trash2 :size="40" class="text-white block md:hidden" />
-                                <Trash2 :size="28" class="text-white hidden md:block" />
-                            </Button>
-                        </div>
-                    </div>
-                    <img
-                        v-if="fileType === 'image' && fileUrl"
-                        :src="fileUrl"
-                        :alt="file.title || file.filename"
-                        class="max-w-full max-h-full rounded object-contain"
-                        @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }"
-                    />
-                    <video
-                        v-else-if="fileType === 'video' && fileUrl"
-                        :src="fileUrl"
-                        controls
-                        class="w-full h-full object-contain rounded"
-                    >
-                        Your browser does not support the video tag.
-                    </video>
-                    <audio
-                        v-else-if="fileType === 'audio' && fileUrl"
-                        :src="fileUrl"
-                        controls
-                        class="w-full max-w-2xl"
-                    >
-                        Your browser does not support the audio tag.
-                    </audio>
-                    <div v-else class="text-center py-12">
-                        <FileText :size="64" class="text-twilight-indigo-400 mx-auto mb-4" />
-                        <p class="text-twilight-indigo-100 text-lg">
-                            {{ fileUrl ? 'Preview not available for this file type' : 'File not available for preview' }}
-                        </p>
-                        <p v-if="!fileUrl" class="text-twilight-indigo-300 text-sm mt-2">
-                            This file has no URL or local path.
-                        </p>
-                    </div>
+                <img v-if="fileType === 'image' && fileUrl" :src="fileUrl" :alt="file.title || file.filename"
+                    class="max-w-full max-h-full rounded object-contain"
+                    @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }" />
+                <video v-else-if="fileType === 'video' && fileUrl" :src="fileUrl" controls
+                    class="w-full h-full object-contain rounded">
+                    Your browser does not support the video tag.
+                </video>
+                <audio v-else-if="fileType === 'audio' && fileUrl" :src="fileUrl" controls class="w-full max-w-2xl">
+                    Your browser does not support the audio tag.
+                </audio>
+                <div v-else class="text-center py-12">
+                    <FileText :size="64" class="text-twilight-indigo-400 mx-auto mb-4" />
+                    <p class="text-twilight-indigo-100 text-lg">
+                        {{ fileUrl ? 'Preview not available for this file type' : 'File not available for preview' }}
+                    </p>
+                    <p v-if="!fileUrl" class="text-twilight-indigo-300 text-sm mt-2">
+                        This file has no URL or local path.
+                    </p>
                 </div>
-
-                <!-- File Details Panel -->
-                <FileDetailsPanel
-                    :modelValue="detailsPanelOpen"
-                    @update:modelValue="(value) => detailsPanelOpen = value"
-                    title="File Details"
-                >
-                    <FileDetailsCard :file="file" />
-                </FileDetailsPanel>
             </div>
 
-            <!-- Delete Confirmation Dialog -->
-            <Dialog v-model="dialogOpen">
-                <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
-                    <DialogHeader>
-                        <DialogTitle class="text-danger-400">Delete File</DialogTitle>
-                        <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
-                            Are you sure you want to delete <span class="font-semibold text-danger-400">{{ file?.filename }}</span>? This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div v-if="deleteError" class="mt-4 rounded border border-danger-400 bg-danger-300/20 px-3 py-2 text-sm text-danger-700">
-                        {{ deleteError }}
-                    </div>
-                    <DialogFooter>
-                        <DialogClose as-child>
-                            <Button
-                                variant="outline"
-                                @click="handleDeleteCancel"
-                                :disabled="deleting"
-                                class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
-                            >
-                                Cancel
-                            </Button>
-                        </DialogClose>
-                        <Button
-                            v-if="canRetryDelete || !deleteError"
-                            @click="handleDeleteConfirm"
-                            :disabled="deleting"
-                            variant="default"
-                            class="bg-danger-400 hover:bg-danger-300"
-                        >
-                            {{ deleting ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <!-- File Details Panel -->
+            <FileDetailsPanel :modelValue="detailsPanelOpen" @update:modelValue="(value) => detailsPanelOpen = value"
+                title="File Details">
+                <FileDetailsCard :file="file" />
+            </FileDetailsPanel>
         </div>
-    </PageLayout>
-</template>
 
+        <!-- Delete Confirmation Dialog -->
+        <Dialog v-model="dialogOpen">
+            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
+                <DialogHeader>
+                    <DialogTitle class="text-danger-400">Delete File</DialogTitle>
+                    <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
+                        Are you sure you want to delete <span class="font-semibold text-danger-400">{{ file?.filename
+                        }}</span>? This action cannot be undone.
+                    </DialogDescription>
+                </DialogHeader>
+                <div v-if="deleteError"
+                    class="mt-4 rounded border border-danger-400 bg-danger-300/20 px-3 py-2 text-sm text-danger-700">
+                    {{ deleteError }}
+                </div>
+                <DialogFooter>
+                    <DialogClose as-child>
+                        <Button variant="outline" @click="handleDeleteCancel" :disabled="deleting"
+                            class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100">
+                            Cancel
+                        </Button>
+                    </DialogClose>
+                    <Button v-if="canRetryDelete || !deleteError" @click="handleDeleteConfirm" :disabled="deleting"
+                        variant="default" class="bg-danger-400 hover:bg-danger-300">
+                        {{ deleting ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    </div>
+</template>
