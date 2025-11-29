@@ -14,13 +14,16 @@ interface User {
 }
 
 interface UsersComponentInstance {
-    dialogOpen: boolean;
-    userToDelete: User | null;
-    openDeleteDialog: (user: User) => void;
-    handleDeleteCancel: () => void;
-    handleDeleteConfirm: () => Promise<void>;
-    deleteError: string | null;
-    canRetryDelete: boolean;
+    deletionHandler: {
+        dialogOpen: boolean;
+        itemToDelete: User | null;
+        openDialog: (user: User) => void;
+        closeDialog: () => void;
+        delete: () => Promise<void>;
+        deleteError: string | null;
+        canRetryDelete: boolean;
+        isDeleting: boolean;
+    };
 }
 
 // Mock axios
@@ -285,16 +288,16 @@ describe('Users', () => {
 
         // Verify dialog is initially closed
         const vm = wrapper.vm as unknown as UsersComponentInstance;
-        expect(vm.dialogOpen).toBe(false);
-        expect(vm.userToDelete).toBe(null);
+        expect(vm.deletionHandler.dialogOpen).toBe(false);
+        expect(vm.deletionHandler.itemToDelete).toBe(null);
 
         // Open delete dialog using component method
-        vm.openDeleteDialog(mockUsers[0]);
+        vm.deletionHandler.openDialog(mockUsers[0]);
         await wrapper.vm.$nextTick();
 
         // Check that dialog state is updated
-        expect(vm.dialogOpen).toBe(true);
-        expect(vm.userToDelete).toEqual(mockUsers[0]);
+        expect(vm.deletionHandler.dialogOpen).toBe(true);
+        expect(vm.deletionHandler.itemToDelete).toEqual(mockUsers[0]);
     });
 
     it('cancels deletion when cancel button is clicked', async () => {
@@ -322,11 +325,11 @@ describe('Users', () => {
 
         // Open delete dialog using component method
         const vm = wrapper.vm as unknown as UsersComponentInstance;
-        vm.openDeleteDialog(mockUsers[0]);
+        vm.deletionHandler.openDialog(mockUsers[0]);
         await wrapper.vm.$nextTick();
 
         // Cancel deletion using component method
-        vm.handleDeleteCancel();
+        vm.deletionHandler.closeDialog();
         await wrapper.vm.$nextTick();
 
         // Verify delete was not called
@@ -372,10 +375,10 @@ describe('Users', () => {
 
         // Open delete dialog and confirm deletion using component methods
         const vm = wrapper.vm as unknown as UsersComponentInstance;
-        vm.openDeleteDialog(mockUsers[0]);
+        vm.deletionHandler.openDialog(mockUsers[0]);
         await wrapper.vm.$nextTick();
 
-        await vm.handleDeleteConfirm();
+        await vm.deletionHandler.delete();
         await waitForListingToLoad(wrapper);
 
         // Verify delete was called
@@ -412,17 +415,17 @@ describe('Users', () => {
 
         // Open delete dialog and confirm deletion using component methods
         const vm = wrapper.vm as unknown as UsersComponentInstance;
-        vm.openDeleteDialog(mockUsers[0]);
+        vm.deletionHandler.openDialog(mockUsers[0]);
         await wrapper.vm.$nextTick();
 
-        await vm.handleDeleteConfirm();
+        await vm.deletionHandler.delete();
         await flushPromises();
         await wrapper.vm.$nextTick();
 
         // Verify error state is set on the dialog
-        expect(vm.dialogOpen).toBe(true);
-        expect(vm.deleteError).toBe('Failed to delete user. Please try again later.');
-        expect(vm.canRetryDelete).toBe(false);
+        expect(vm.deletionHandler.dialogOpen).toBe(true);
+        expect(vm.deletionHandler.deleteError).toBe('Failed to delete user. Please try again later.');
+        expect(vm.deletionHandler.canRetryDelete).toBe(false);
     });
 
     it('displays permission error when deletion is forbidden', async () => {
@@ -454,17 +457,17 @@ describe('Users', () => {
 
         // Open delete dialog and confirm deletion using component methods
         const vm = wrapper.vm as unknown as UsersComponentInstance;
-        vm.openDeleteDialog(mockUsers[0]);
+        vm.deletionHandler.openDialog(mockUsers[0]);
         await wrapper.vm.$nextTick();
 
-        await vm.handleDeleteConfirm();
+        await vm.deletionHandler.delete();
         await flushPromises();
         await wrapper.vm.$nextTick();
 
         // Verify permission error state is set on the dialog
-        expect(vm.dialogOpen).toBe(true);
-        expect(vm.deleteError).toBe('You do not have permission to delete users.');
-        expect(vm.canRetryDelete).toBe(false);
+        expect(vm.deletionHandler.dialogOpen).toBe(true);
+        expect(vm.deletionHandler.deleteError).toBe('You do not have permission to delete users.');
+        expect(vm.deletionHandler.canRetryDelete).toBe(false);
     });
 
     it('hides delete button for current user', async () => {
