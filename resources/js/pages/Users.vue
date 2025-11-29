@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, CheckCircle2, Filter, Users, X } from 'lucide-vue-next';
+import { Trash2, CheckCircle2, Filter, Users } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import {
     Dialog,
@@ -16,6 +16,8 @@ import Button from '../components/ui/Button.vue';
 import FilterPanel from '../components/ui/FilterPanel.vue';
 import Select from '../components/ui/Select.vue';
 import ListingFilterForm from '../components/ListingFilterForm.vue';
+import ActiveFilters from '../components/ActiveFilters.vue';
+import ListingTable from '../components/ListingTable.vue';
 import { Listing } from '../lib/Listing';
 
 const route = useRoute();
@@ -202,34 +204,7 @@ onMounted(async () => {
             </div>
 
             <!-- Active Filters Display -->
-            <div v-if="listing.activeFilters.length > 0" class="mb-6 flex flex-wrap items-center gap-2">
-                <span class="text-sm font-medium text-twilight-indigo-300">Active filters:</span>
-                <div
-                    v-for="filter in listing.activeFilters"
-                    :key="filter.key"
-                    class="inline-flex items-stretch rounded border border-smart-blue-400 text-sm"
-                >
-                    <span class="bg-smart-blue-600 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
-                    <span class="bg-smart-blue-700 px-3 py-1.5 text-smart-blue-100 truncate max-w-xs">{{ filter.value }}</span>
-                    <Button
-                        @click="() => listing.removeFilter(filter.key)"
-                        variant="ghost"
-                        size="sm"
-                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr rounded-tl-none rounded-bl-none"
-                        :aria-label="`Remove ${filter.label} filter`"
-                    >
-                        <X :size="14" />
-                    </Button>
-                </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    @click="() => listing.resetFilters()"
-                    class="border-danger-600 text-danger-600 bg-transparent hover:bg-danger-300 hover:border-danger-600 hover:text-danger-600"
-                >
-                    Clear all
-                </Button>
-            </div>
+            <ActiveFilters :listing="listing" />
 
             <div v-if="listing.isLoading" class="text-center py-12">
                 <p class="text-twilight-indigo-100 text-lg">Loading users...</p>
@@ -240,20 +215,7 @@ onMounted(async () => {
             </div>
 
             <div v-else class="w-full overflow-x-auto">
-                <o-table
-                    :data="listing.data"
-                    :loading="listing.isLoading"
-                    paginated
-                    :per-page="listing.perPage"
-                    :current-page="listing.currentPage"
-                    :total="listing.total"
-                    backend-pagination
-                    pagination-position="both"
-                    pagination-order="right"
-                    @page-change="(page: number) => listing.goToPage(page)"
-                    class="w-full rounded-lg overflow-hidden"
-                    striped
-                >
+                <ListingTable :listing="listing" class="w-full overflow-hidden">
                 <o-table-column field="id" label="ID" width="80" />
                 <o-table-column field="name" label="Name" />
                 <o-table-column field="email" label="Email" />
@@ -328,7 +290,7 @@ onMounted(async () => {
                         </Button>
                     </div>
                 </template>
-                </o-table>
+                </ListingTable>
             </div>
 
             <!-- Filter Panel -->
