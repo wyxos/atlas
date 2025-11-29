@@ -13,7 +13,7 @@ import {
     DialogTitle,
     DialogClose,
 } from '../components/ui/dialog';
-import Button from '../components/ui/Button.vue';
+import { Button } from '@/components/ui/button';
 import FilterPanel from '../components/ui/FilterPanel.vue';
 import Select from '../components/ui/Select.vue';
 import ListingFilterForm from '../components/ListingFilterForm.vue';
@@ -179,7 +179,7 @@ onMounted(async () => {
                         Manage your files
                     </p>
                 </div>
-                <Button variant="outline" color="default" @click="() => listing.openPanel()">
+                <Button variant="outline" @click="() => listing.openPanel()">
                     <Filter :size="16" class="mr-2" />
                     Filters
                 </Button>
@@ -324,8 +324,8 @@ onMounted(async () => {
                                     ? 'Try adjusting your filters to see more results.'
                                     : 'Get started by adding your first file.' }}
                             </p>
-                            <Button v-if="hasActiveFilters" variant="outline" color="default"
-                                @click="() => listing.resetFilters()" class="mt-4">
+                            <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
+                                class="mt-4">
                                 Clear Filters
                             </Button>
                         </div>
@@ -394,14 +394,14 @@ onMounted(async () => {
                     </div>
                     <DialogFooter>
                         <DialogClose as-child>
-                            <Button variant="outline" color="default" @click="deletionHandler.closeDialog"
+                            <Button variant="outline" @click="deletionHandler.closeDialog"
                                 :disabled="deletionHandler.isDeleting">
                                 Cancel
                             </Button>
                         </DialogClose>
                         <Button v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
-                            @click="deletionHandler.delete" :disabled="deletionHandler.isDeleting" variant="default"
-                            color="danger">
+                            @click="deletionHandler.delete" :disabled="deletionHandler.isDeleting"
+                            variant="destructive">
                             {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError &&
                                 deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>

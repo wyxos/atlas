@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Download, FileText, Copy, ExternalLink } from 'lucide-vue-next';
-import Button from './ui/Button.vue';
+import { Button } from '@/components/ui/button';
 import { toast } from './ui/sonner';
 import { formatDate } from '../utils/date';
 

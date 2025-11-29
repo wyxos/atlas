@@ -3,10 +3,11 @@ import { ArrowLeft, Trash2, CheckCircle2 } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
-import Button from '../components/ui/Button.vue';
+import { Button } from '@/components/ui/button';
 import Badge from '../components/ui/Badge.vue';
 import FormInput from '../components/ui/FormInput.vue';
 import Link from '../components/ui/Link.vue';
+import Heading from '../components/ui/Heading.vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -189,9 +190,9 @@ function goHome() {
             <Section title="Color Palette">
                 <div class="space-y-8">
                     <div v-for="palette in colorPalettes" :key="palette.name">
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
                             {{ palette.name }}
-                        </h3>
+                        </Heading>
                         <div class="grid grid-cols-5 md:grid-cols-10 gap-2">
                             <div v-for="shade in [100, 200, 300, 400, 500, 600, 700, 800, 900]" :key="shade"
                                 class="flex flex-col">
@@ -215,14 +216,14 @@ function goHome() {
 
                     <!-- Neutral Colors -->
                     <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
                             Neutral Colors
-                        </h3>
+                        </Heading>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div v-for="color in neutralColors" :key="color.name">
-                                <h4 class="text-sm font-medium text-slate-grey-300 mb-2">
+                                <Heading as="h4" size="sm" weight="medium" class="text-slate-grey-300 mb-2">
                                     {{ color.name }}
-                                </h4>
+                                </Heading>
                                 <div :class="`h-12 rounded ${color.class}`"></div>
                             </div>
                         </div>
@@ -249,9 +250,9 @@ function goHome() {
                 <div class="space-y-8">
                     <!-- Button States Grid -->
                     <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
                             Button States
-                        </h3>
+                        </Heading>
                         <p class="text-sm text-twilight-indigo-300 mb-6">
                             All button variants support the following states: Default, Hover, Active, Focus, and
                             Disabled.
@@ -259,9 +260,9 @@ function goHome() {
                         <div class="space-y-8">
                             <!-- Primary Buttons States -->
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-4">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-4">
                                     Primary (Filled) - Smart Blue
-                                </h4>
+                                </Heading>
                                 <div class="overflow-x-auto">
                                     <table class="w-full border-collapse">
                                         <thead>
@@ -282,65 +283,61 @@ function goHome() {
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Default</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="default" color="default">
+                                                    <Button variant="default">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="default" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="default"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Hover
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="default" color="default">
+                                                    <Button variant="default">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="default" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="default"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Active</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="default" color="default">
+                                                    <Button variant="default">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="default" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="default"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Focus
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="default" color="default">
+                                                    <Button variant="default">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="default" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="default"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Disabled</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="default" color="default" disabled>
+                                                    <Button variant="default" disabled>
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
                                                     <code
-                                                        class="text-xs text-smart-blue-300">variant="default" color="default" disabled</code>
+                                                        class="text-xs text-smart-blue-300">variant="default" disabled</code>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -350,9 +347,9 @@ function goHome() {
 
                             <!-- Outline Buttons States -->
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-4">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-4">
                                     Outline - Smart Blue
-                                </h4>
+                                </Heading>
                                 <div class="overflow-x-auto">
                                     <table class="w-full border-collapse">
                                         <thead>
@@ -373,65 +370,61 @@ function goHome() {
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Default</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="outline" color="default">
+                                                    <Button variant="outline">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="outline" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="outline"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Hover
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="outline" color="default">
+                                                    <Button variant="outline">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="outline" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="outline"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Active</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="outline" color="default">
+                                                    <Button variant="outline">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="outline" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="outline"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Focus
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="outline" color="default">
+                                                    <Button variant="outline">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="outline" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="outline"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Disabled</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="outline" color="default" disabled>
+                                                    <Button variant="outline" disabled>
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
                                                     <code
-                                                        class="text-xs text-smart-blue-300">variant="outline" color="default" disabled</code>
+                                                        class="text-xs text-smart-blue-300">variant="outline" disabled</code>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -441,9 +434,9 @@ function goHome() {
 
                             <!-- Ghost Buttons States -->
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-4">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-4">
                                     Ghost - Smart Blue
-                                </h4>
+                                </Heading>
                                 <div class="overflow-x-auto">
                                     <table class="w-full border-collapse">
                                         <thead>
@@ -464,65 +457,61 @@ function goHome() {
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Default</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="ghost" color="default">
+                                                    <Button variant="ghost">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="ghost" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="ghost"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Hover
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="ghost" color="default">
+                                                    <Button variant="ghost">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="ghost" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="ghost"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Active</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="ghost" color="default">
+                                                    <Button variant="ghost">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="ghost" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="ghost"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">Focus
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="ghost" color="default">
+                                                    <Button variant="ghost">
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <code
-                                                        class="text-xs text-smart-blue-300">variant="ghost" color="default"</code>
+                                                    <code class="text-xs text-smart-blue-300">variant="ghost"</code>
                                                 </td>
                                             </tr>
                                             <tr class="border-b border-twilight-indigo-500">
                                                 <td class="px-4 py-3 text-sm text-twilight-indigo-100 font-medium">
                                                     Disabled</td>
                                                 <td class="px-4 py-3">
-                                                    <Button variant="ghost" color="default" disabled>
+                                                    <Button variant="ghost" disabled>
                                                         Button
                                                     </Button>
                                                 </td>
                                                 <td class="px-4 py-3">
                                                     <code
-                                                        class="text-xs text-smart-blue-300">variant="ghost" color="default" disabled</code>
+                                                        class="text-xs text-smart-blue-300">variant="ghost" disabled</code>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -534,86 +523,88 @@ function goHome() {
 
                     <!-- Quick Reference -->
                     <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
                             Quick Reference
-                        </h3>
+                        </Heading>
                         <div class="flex flex-wrap gap-4">
-                            <Button variant="default" color="default">
+                            <Button variant="default">
                                 Smart Blue Primary
                             </Button>
-                            <Button variant="default" color="sapphire">
+                            <Button variant="secondary">
                                 Sapphire Primary
                             </Button>
-                            <Button variant="default" color="default" disabled>
+                            <Button variant="default" disabled>
                                 Disabled
                             </Button>
                         </div>
                         <div class="flex flex-wrap gap-4 mt-4">
-                            <Button variant="outline" color="default">
+                            <Button variant="outline">
                                 Outline Smart Blue
                             </Button>
-                            <Button variant="outline" color="sapphire">
+                            <Button variant="outline"
+                                class="border-sapphire-600 text-sapphire-600 hover:bg-sapphire-300">
                                 Outline Sapphire
                             </Button>
                         </div>
                         <div class="flex flex-wrap gap-4 mt-4">
-                            <Button variant="ghost" color="default">
+                            <Button variant="ghost">
                                 Ghost Smart Blue
                             </Button>
-                            <Button variant="ghost" color="sapphire">
+                            <Button variant="ghost"
+                                class="border-sapphire-500/30 text-sapphire-300 hover:bg-sapphire-700/20 hover:border-sapphire-500/50">
                                 Ghost Sapphire
                             </Button>
                         </div>
                     </div>
                     <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
                             Button Sizes
-                        </h3>
+                        </Heading>
                         <div class="space-y-4">
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-3">
                                     Primary (Filled)
-                                </h4>
+                                </Heading>
                                 <div class="flex flex-wrap items-center gap-4">
-                                    <Button size="sm" variant="default" color="default">
+                                    <Button size="sm" variant="default">
                                         Small
                                     </Button>
-                                    <Button size="default" variant="default" color="default">
+                                    <Button size="default" variant="default">
                                         Medium
                                     </Button>
-                                    <Button size="lg" variant="default" color="default">
+                                    <Button size="lg" variant="default">
                                         Large
                                     </Button>
                                 </div>
                             </div>
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-3">
                                     Outline
-                                </h4>
+                                </Heading>
                                 <div class="flex flex-wrap items-center gap-4">
-                                    <Button size="sm" variant="outline" color="default">
+                                    <Button size="sm" variant="outline">
                                         Small
                                     </Button>
-                                    <Button size="default" variant="outline" color="default">
+                                    <Button size="default" variant="outline">
                                         Medium
                                     </Button>
-                                    <Button size="lg" variant="outline" color="default">
+                                    <Button size="lg" variant="outline">
                                         Large
                                     </Button>
                                 </div>
                             </div>
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-3">
                                     Ghost
-                                </h4>
+                                </Heading>
                                 <div class="flex flex-wrap items-center gap-4">
-                                    <Button size="sm" variant="ghost" color="default">
+                                    <Button size="sm" variant="ghost">
                                         Small
                                     </Button>
-                                    <Button size="default" variant="ghost" color="default">
+                                    <Button size="default" variant="ghost">
                                         Medium
                                     </Button>
-                                    <Button size="lg" variant="ghost" color="default">
+                                    <Button size="lg" variant="ghost">
                                         Large
                                     </Button>
                                 </div>
@@ -621,30 +612,32 @@ function goHome() {
                         </div>
                     </div>
                     <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
                             Danger Buttons
-                        </h3>
+                        </Heading>
                         <div class="flex flex-wrap gap-4">
-                            <Button variant="default" color="danger">
+                            <Button variant="destructive">
                                 Danger Primary
                             </Button>
-                            <Button variant="outline" color="danger">
+                            <Button variant="outline"
+                                class="border-danger-400 text-danger-400 hover:bg-danger-700 hover:border-danger-400 hover:text-danger-100">
                                 Danger Outline
                             </Button>
-                            <Button variant="ghost" color="danger">
+                            <Button variant="ghost"
+                                class="border-danger-500/30 text-danger-300 hover:bg-danger-700/20 hover:border-danger-500/50">
                                 Danger Ghost
                             </Button>
                         </div>
                     </div>
                     <div>
-                        <h3 class="text-xl font-semibold text-smart-blue-100 mb-4">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
                             Icon Buttons
-                        </h3>
+                        </Heading>
                         <div class="space-y-6">
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-3">
                                     Primary (Filled)
-                                </h4>
+                                </Heading>
                                 <div class="flex flex-wrap gap-4">
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400">
@@ -664,9 +657,9 @@ function goHome() {
                                 </code>
                             </div>
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-3">
                                     Outline
-                                </h4>
+                                </Heading>
                                 <div class="flex flex-wrap gap-4">
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border-2 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-500 hover:border-smart-blue-400 hover:text-white">
@@ -682,9 +675,9 @@ function goHome() {
                                 </code>
                             </div>
                             <div>
-                                <h4 class="text-lg font-medium text-regal-navy-100 mb-3">
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-3">
                                     Ghost
-                                </h4>
+                                </Heading>
                                 <div class="flex flex-wrap gap-4">
                                     <button
                                         class="h-10 w-10 md:h-10 md:w-10 flex items-center justify-center rounded-lg transition-all cursor-pointer border border-smart-blue-500/30 text-smart-blue-300 bg-transparent hover:bg-smart-blue-700/20 hover:border-smart-blue-500/50">
@@ -929,9 +922,9 @@ function goHome() {
                                         scrollbar styling. Scroll down to see the scrollbar in action.
                                     </p>
                                     <div v-for="i in 20" :key="i" class="p-4 bg-prussian-blue-400 rounded-lg">
-                                        <h4 class="text-lg font-semibold text-smart-blue-100 mb-2">
+                                        <Heading as="h4" size="lg" weight="semibold" color="smart-blue" class="mb-2">
                                             Item {{ i }}
-                                        </h4>
+                                        </Heading>
                                         <p class="text-sm text-twilight-indigo-100">
                                             This is content item {{ i }}. The scrollbar on the right
                                             demonstrates the custom styling with Twilight Indigo

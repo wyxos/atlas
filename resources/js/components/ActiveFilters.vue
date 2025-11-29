@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { X } from 'lucide-vue-next';
-import Button from './ui/Button.vue';
+import { Button } from '@/components/ui/button';
 import type { Listing } from '../lib/Listing';
 
 interface Props {
@@ -17,13 +17,13 @@ defineProps<Props>();
             class="inline-flex items-stretch rounded border border-smart-blue-400 text-sm">
             <span class="bg-smart-blue-400 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
             <span class="bg-smart-blue-700 px-3 py-1.5 text-smart-blue-100 truncate max-w-xs">{{ filter.value }}</span>
-            <Button @click="() => listing.removeFilter(filter.key)" variant="default" color="danger" size="sm"
+            <Button @click="() => listing.removeFilter(filter.key)" variant="destructive" size="sm"
                 class="flex items-center justify-center px-1.5 border-0 rounded-br rounded-tr rounded-tl-none rounded-bl-none"
                 :aria-label="`Remove ${filter.label} filter`">
                 <X :size="14" />
             </Button>
         </div>
-        <Button variant="outline" color="danger" size="sm" @click="() => listing.resetFilters()">
+        <Button variant="destructive" size="sm" @click="() => listing.resetFilters()">
             Clear all
         </Button>
     </div>
