@@ -71,6 +71,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('./pages/Guidelines.vue'),
         meta: { layout: 'DashboardLayout' },
     },
+    {
+        path: '/guidelines/colors',
+        name: 'guidelines-colors',
+        component: () => import('./pages/ColorPalette.vue'),
+        meta: { layout: 'DashboardLayout' },
+    },
 ];
 
 export default routes;
