@@ -113,7 +113,7 @@ function openUrl(url: string): void {
                 <div>
                     <label class="text-xs font-semibold text-smart-blue-700 uppercase tracking-wide mb-2 block">Filename</label>
                     <div class="flex items-center gap-2">
-                        <FileText class="w-4 h-4 text-smart-blue-600" />
+                        <FileText :size="16" class="text-smart-blue-600" />
                         <span class="text-regal-navy-900 font-medium">{{ file.filename }}</span>
                         <Button
                             variant="ghost"
@@ -121,7 +121,7 @@ function openUrl(url: string): void {
                             @click="() => copyToClipboard(file.filename, 'Filename')"
                             class="p-1 h-auto"
                         >
-                            <Copy class="w-3 h-3 text-smart-blue-600" />
+                            <Copy :size="12" class="text-smart-blue-600" />
                         </Button>
                     </div>
                 </div>
@@ -146,7 +146,7 @@ function openUrl(url: string): void {
                             @click="() => copyToClipboard(file.source_id!, 'Source ID')"
                             class="p-1 h-auto"
                         >
-                            <Copy class="w-3 h-3 text-smart-blue-600" />
+                            <Copy :size="12" class="text-smart-blue-600" />
                         </Button>
                     </div>
                     <span v-else class="text-regal-navy-700 italic text-sm">—</span>
@@ -184,7 +184,7 @@ function openUrl(url: string): void {
                             @click="() => copyToClipboard(file.hash!, 'Hash')"
                             class="p-1 h-auto shrink-0"
                         >
-                            <Copy class="w-3 h-3 text-smart-blue-600" />
+                            <Copy :size="12" class="text-smart-blue-600" />
                         </Button>
                     </div>
                     <span v-else class="text-regal-navy-700 italic text-sm">—</span>
@@ -196,7 +196,7 @@ function openUrl(url: string): void {
                         v-if="file.downloaded"
                         class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-300 border border-success-500 text-success-900"
                     >
-                        <Download class="w-3 h-3" />
+                        <Download :size="12" />
                         Yes
                     </span>
                     <span
@@ -250,7 +250,7 @@ function openUrl(url: string): void {
                             @click="() => copyToClipboard(file.url!, 'URL')"
                             class="p-1 h-auto"
                         >
-                            <Copy class="w-3 h-3 text-smart-blue-600" />
+                            <Copy :size="12" class="text-smart-blue-600" />
                         </Button>
                         <Button
                             variant="ghost"
@@ -258,7 +258,7 @@ function openUrl(url: string): void {
                             @click="() => openUrl(file.url!)"
                             class="p-1 h-auto"
                         >
-                            <ExternalLink class="w-3 h-3 text-smart-blue-600" />
+                            <ExternalLink :size="12" class="text-smart-blue-600" />
                         </Button>
                     </div>
                     <span v-else class="text-regal-navy-700 italic text-sm">—</span>
@@ -282,7 +282,7 @@ function openUrl(url: string): void {
                             @click="() => copyToClipboard(file.referrer_url!, 'Referrer URL')"
                             class="p-1 h-auto"
                         >
-                            <Copy class="w-3 h-3 text-smart-blue-600" />
+                            <Copy :size="12" class="text-smart-blue-600" />
                         </Button>
                         <Button
                             variant="ghost"
@@ -290,7 +290,7 @@ function openUrl(url: string): void {
                             @click="() => openUrl(file.referrer_url!)"
                             class="p-1 h-auto"
                         >
-                            <ExternalLink class="w-3 h-3 text-smart-blue-600" />
+                            <ExternalLink :size="12" class="text-smart-blue-600" />
                         </Button>
                     </div>
                     <span v-else class="text-regal-navy-700 italic text-sm">—</span>
@@ -315,7 +315,7 @@ function openUrl(url: string): void {
                                 @click="() => copyToClipboard(file.thumbnail_url!, 'Thumbnail URL')"
                                 class="p-1 h-auto"
                             >
-                                <Copy class="w-3 h-3 text-smart-blue-600" />
+                                <Copy :size="12" class="text-smart-blue-600" />
                             </Button>
                             <Button
                                 variant="ghost"
@@ -323,7 +323,7 @@ function openUrl(url: string): void {
                                 @click="() => openUrl(file.thumbnail_url!)"
                                 class="p-1 h-auto"
                             >
-                                <ExternalLink class="w-3 h-3 text-smart-blue-600" />
+                                <ExternalLink :size="12" class="text-smart-blue-600" />
                             </Button>
                         </div>
                         <div class="mt-2">
@@ -356,7 +356,7 @@ function openUrl(url: string): void {
                             @click="() => copyToClipboard(file.absolute_path!, 'Path')"
                             class="p-1 h-auto shrink-0"
                         >
-                            <Copy class="w-3 h-3 text-smart-blue-600" />
+                            <Copy :size="12" class="text-smart-blue-600" />
                         </Button>
                     </div>
                 </div>
@@ -373,7 +373,7 @@ function openUrl(url: string): void {
                             @click="() => copyToClipboard(file.thumbnail_path!, 'Thumbnail Path')"
                             class="p-1 h-auto shrink-0"
                         >
-                            <Copy class="w-3 h-3 text-smart-blue-600" />
+                            <Copy :size="12" class="text-smart-blue-600" />
                         </Button>
                     </div>
                 </div>

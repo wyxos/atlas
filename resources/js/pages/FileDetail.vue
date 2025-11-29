@@ -221,7 +221,7 @@ onMounted(() => {
 
 <template>
     <PageLayout>
-        <div class="w-full flex flex-col flex-1 min-h-0 md:overflow-hidden">
+        <div class="w-full flex flex-col h-full md:flex-1 md:min-h-0 md:overflow-hidden">
             <!-- Loading State -->
             <div v-if="loading" class="text-center py-12">
                 <p class="text-twilight-indigo-900 text-lg">Loading file...</p>
@@ -240,33 +240,33 @@ onMounted(() => {
             </div>
 
             <!-- File Details -->
-            <div v-else-if="file" class="flex flex-col flex-1 min-h-0 md:overflow-hidden">
+            <div v-else-if="file" class="flex flex-col h-full md:flex-1 md:min-h-0 md:overflow-hidden">
                 <!-- Actions - Mobile: Outside at top, Desktop: Inside preview -->
-                <div class="flex items-center justify-between mb-4 md:hidden">
+                <div class="flex items-center justify-between mb-4 md:hidden shrink-0">
                     <Button
                         variant="ghost"
                         @click="() => router.push('/files')"
                         class="flex items-center justify-center h-16 w-16 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
                         title="Back to Files"
                     >
-                        <ArrowLeft class="w-6 h-6" />
+                        <ArrowLeft :size="40" class="text-white" />
                     </Button>
                     <div class="flex items-center gap-2">
                         <Button
                             variant="ghost"
                             @click="detailsPanelOpen = true"
-                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 hover:bg-smart-blue-600"
                             title="View Details"
                         >
-                            <Info class="w-6 h-6" />
+                            <Info :size="40" class="text-white" />
                         </Button>
                         <Button
                             variant="ghost"
                             @click="openDeleteDialog"
-                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
+                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-danger-600 border-2 border-danger-700 hover:bg-danger-700"
                             title="Delete File"
                         >
-                            <Trash2 class="w-6 h-6" />
+                            <Trash2 :size="40" class="text-white" />
                         </Button>
                     </div>
                 </div>
@@ -277,27 +277,27 @@ onMounted(() => {
                         <Button
                             variant="ghost"
                             @click="() => router.push('/files')"
-                            class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                            class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 hover:bg-smart-blue-600"
                             title="Back to Files"
                         >
-                            <ArrowLeft class="w-5 h-5" />
+                            <ArrowLeft :size="28" class="text-white" />
                         </Button>
                         <div class="flex items-center gap-2">
                             <Button
                                 variant="ghost"
                                 @click="detailsPanelOpen = true"
-                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 hover:bg-smart-blue-600"
                                 title="View Details"
                             >
-                                <Info class="w-5 h-5" />
+                                <Info :size="28" class="text-white" />
                             </Button>
                             <Button
                                 variant="ghost"
                                 @click="openDeleteDialog"
-                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
+                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-danger-600 border-2 border-danger-700 hover:bg-danger-700"
                                 title="Delete File"
                             >
-                                <Trash2 class="w-5 h-5" />
+                                <Trash2 :size="28" class="text-white" />
                             </Button>
                         </div>
                     </div>
@@ -305,14 +305,14 @@ onMounted(() => {
                         v-if="fileType === 'image' && fileUrl"
                         :src="fileUrl"
                         :alt="file.title || file.filename"
-                        class="max-w-full max-h-full object-contain rounded"
+                        class="w-full h-full object-contain rounded"
                         @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }"
                     />
                     <video
                         v-else-if="fileType === 'video' && fileUrl"
                         :src="fileUrl"
                         controls
-                        class="max-w-full max-h-full object-contain rounded"
+                        class="w-full h-full object-contain rounded"
                     >
                         Your browser does not support the video tag.
                     </video>
@@ -325,7 +325,7 @@ onMounted(() => {
                         Your browser does not support the audio tag.
                     </audio>
                     <div v-else class="text-center py-12">
-                        <FileText class="w-16 h-16 text-twilight-indigo-600 mx-auto mb-4" />
+                        <FileText :size="64" class="text-twilight-indigo-600 mx-auto mb-4" />
                         <p class="text-twilight-indigo-900 text-lg">
                             {{ fileUrl ? 'Preview not available for this file type' : 'File not available for preview' }}
                         </p>

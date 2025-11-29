@@ -86,7 +86,7 @@ watch(isOpen, (isOpenValue) => {
                             class="p-2 rounded-lg transition-colors hover:bg-smart-blue-300 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
                             aria-label="Close details"
                         >
-                            <X class="h-5 w-5 text-twilight-indigo-900" />
+                            <X :size="20" class="text-twilight-indigo-900" />
                         </button>
                     </div>
 
