@@ -16,7 +16,7 @@ const linkClasses = computed(() => {
     const variantClasses = {
         default: 'underline text-smart-blue-700 hover:text-smart-blue-600',
         'no-underline': 'text-smart-blue-700 hover:text-smart-blue-600',
-        sapphire: 'text-sapphire-700 hover:text-sapphire-600',
+        sapphire: 'text-sapphire-300 hover:text-sapphire-100',
         muted: 'text-twilight-indigo-700 hover:text-slate-grey-700',
     };
     return `${baseClasses} ${variantClasses[props.variant]}`;

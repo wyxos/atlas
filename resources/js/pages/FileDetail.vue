@@ -224,7 +224,7 @@ onMounted(() => {
         <div class="w-full flex flex-col h-full md:flex-1 md:min-h-0 md:overflow-hidden">
             <!-- Loading State -->
             <div v-if="loading" class="text-center py-12">
-                <p class="text-twilight-indigo-900 text-lg">Loading file...</p>
+                <p class="text-twilight-indigo-100 text-lg">Loading file...</p>
             </div>
 
             <!-- Error State -->
@@ -233,7 +233,7 @@ onMounted(() => {
                 <Button
                     variant="outline"
                     @click="loadFile"
-                    class="mt-4 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                    class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                 >
                     Retry
                 </Button>
@@ -245,59 +245,71 @@ onMounted(() => {
                 <div class="flex items-center justify-between mb-4 md:hidden shrink-0">
                     <Button
                         variant="ghost"
+                        size="sm"
                         @click="() => router.push('/files')"
-                        class="flex items-center justify-center h-16 w-16 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                        class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400"
                         title="Back to Files"
                     >
-                        <ArrowLeft :size="40" class="text-white" />
+                        <ArrowLeft :size="40" class="text-white block md:hidden" />
+                        <ArrowLeft :size="28" class="text-white hidden md:block" />
                     </Button>
                     <div class="flex items-center gap-2">
                         <Button
                             variant="ghost"
+                            size="sm"
                             @click="detailsPanelOpen = true"
-                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 hover:bg-smart-blue-600"
+                            class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
                             title="View Details"
                         >
-                            <Info :size="40" class="text-white" />
+                            <Info :size="40" class="text-white block md:hidden" />
+                            <Info :size="28" class="text-white hidden md:block" />
                         </Button>
                         <Button
                             variant="ghost"
+                            size="sm"
                             @click="openDeleteDialog"
-                            class="flex items-center justify-center h-16 w-16 rounded-lg bg-danger-600 border-2 border-danger-700 hover:bg-danger-700"
+                            class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 hover:bg-danger-300"
                             title="Delete File"
                         >
-                            <Trash2 :size="40" class="text-white" />
+                            <Trash2 :size="40" class="text-white block md:hidden" />
+                            <Trash2 :size="28" class="text-white hidden md:block" />
                         </Button>
                     </div>
                 </div>
                 <!-- File Preview -->
-                <div class="flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-prussian-blue-100 rounded-lg border-2 border-twilight-indigo-500 p-6 relative">
+                <div class="flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-prussian-blue-900 rounded-lg border-2 border-twilight-indigo-500 p-6 relative">
                     <!-- Actions - Desktop: Inside preview -->
                     <div class="hidden md:flex absolute top-4 left-4 right-4 items-center justify-between z-10">
                         <Button
                             variant="ghost"
+                            size="sm"
                             @click="() => router.push('/files')"
-                            class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 hover:bg-smart-blue-600"
+                            class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
                             title="Back to Files"
                         >
-                            <ArrowLeft :size="28" class="text-white" />
+                            <ArrowLeft :size="40" class="text-white block md:hidden" />
+                            <ArrowLeft :size="28" class="text-white hidden md:block" />
                         </Button>
                         <div class="flex items-center gap-2">
                             <Button
                                 variant="ghost"
+                                size="sm"
                                 @click="detailsPanelOpen = true"
-                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 hover:bg-smart-blue-600"
+                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 hover:bg-smart-blue-400"
                                 title="View Details"
                             >
-                                <Info :size="28" class="text-white" />
+                                <Info :size="40" class="text-white block md:hidden" />
+                                <Info :size="28" class="text-white hidden md:block" />
                             </Button>
                             <Button
                                 variant="ghost"
+                                size="sm"
                                 @click="openDeleteDialog"
-                                class="flex items-center justify-center h-10 w-10 rounded-lg bg-danger-600 border-2 border-danger-700 hover:bg-danger-700"
+                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 hover:bg-danger-300"
                                 title="Delete File"
                             >
-                                <Trash2 :size="28" class="text-white" />
+                                <Trash2 :size="40" class="text-white block md:hidden" />
+                                <Trash2 :size="28" class="text-white hidden md:block" />
                             </Button>
                         </div>
                     </div>
@@ -325,11 +337,11 @@ onMounted(() => {
                         Your browser does not support the audio tag.
                     </audio>
                     <div v-else class="text-center py-12">
-                        <FileText :size="64" class="text-twilight-indigo-600 mx-auto mb-4" />
-                        <p class="text-twilight-indigo-900 text-lg">
+                        <FileText :size="64" class="text-twilight-indigo-400 mx-auto mb-4" />
+                        <p class="text-twilight-indigo-100 text-lg">
                             {{ fileUrl ? 'Preview not available for this file type' : 'File not available for preview' }}
                         </p>
-                        <p v-if="!fileUrl" class="text-twilight-indigo-700 text-sm mt-2">
+                        <p v-if="!fileUrl" class="text-twilight-indigo-300 text-sm mt-2">
                             This file has no URL or local path.
                         </p>
                     </div>
@@ -349,12 +361,12 @@ onMounted(() => {
             <Dialog v-model="dialogOpen">
                 <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
                     <DialogHeader>
-                        <DialogTitle class="text-danger-600">Delete File</DialogTitle>
-                        <DialogDescription class="text-base mt-2 text-twilight-indigo-900">
-                            Are you sure you want to delete <span class="font-semibold text-danger-600">{{ file?.filename }}</span>? This action cannot be undone.
+                        <DialogTitle class="text-danger-400">Delete File</DialogTitle>
+                        <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
+                            Are you sure you want to delete <span class="font-semibold text-danger-400">{{ file?.filename }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <div v-if="deleteError" class="mt-4 rounded border border-danger-600 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
+                    <div v-if="deleteError" class="mt-4 rounded border border-danger-400 bg-danger-300/20 px-3 py-2 text-sm text-danger-700">
                         {{ deleteError }}
                     </div>
                     <DialogFooter>
@@ -363,7 +375,7 @@ onMounted(() => {
                                 variant="outline"
                                 @click="handleDeleteCancel"
                                 :disabled="deleting"
-                                class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                                class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                             >
                                 Cancel
                             </Button>
@@ -373,7 +385,7 @@ onMounted(() => {
                             @click="handleDeleteConfirm"
                             :disabled="deleting"
                             variant="default"
-                            class="bg-danger-600 hover:bg-danger-700"
+                            class="bg-danger-400 hover:bg-danger-300"
                         >
                             {{ deleting ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>

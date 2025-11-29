@@ -161,7 +161,7 @@ onUnmounted(() => {
             <div class="flex items-center justify-end h-16 px-4">
                 <button
                     @click="toggleMenu"
-                    class="p-2 rounded-lg transition-colors hover:bg-prussian-blue-400 text-smart-blue-900"
+                    class="p-2 rounded-lg transition-colors hover:bg-prussian-blue-600 text-smart-blue-100"
                     aria-label="Toggle menu"
                 >
                     <ChevronLeft v-if="isMenuOpen" class="w-5 h-5" />
@@ -177,9 +177,9 @@ onUnmounted(() => {
                         :key="item.name"
                         :to="item.path"
                         @click="handleMenuItemClick"
-                        class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-twilight-indigo-900 hover:bg-prussian-blue-400 hover:text-smart-blue-900"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100"
                         :class="{
-                            'bg-prussian-blue-400 text-smart-blue-900': $route.name === item.name
+                            'bg-prussian-blue-600 text-smart-blue-100': $route.name === item.name
                         }"
                     >
                         <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
@@ -197,7 +197,7 @@ onUnmounted(() => {
                 <div class="relative">
                     <button
                         @click="toggleUserMenu"
-                        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-twilight-indigo-900 hover:bg-prussian-blue-400 hover:text-smart-blue-900"
+                        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100"
                     >
                         <User class="w-5 h-5 flex-shrink-0" />
                         <Transition name="fade">
@@ -227,14 +227,14 @@ onUnmounted(() => {
                             <router-link
                                 to="/profile"
                                 @click="closeUserMenu"
-                                class="flex items-center gap-3 px-3 py-2 transition-colors text-twilight-indigo-900 hover:bg-prussian-blue-400 hover:text-smart-blue-900"
+                                class="flex items-center gap-3 px-3 py-2 transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100"
                             >
                                 <User class="w-4 h-4" />
                                 <span class="font-medium">Profile</span>
                             </router-link>
                             <button
                                 @click="handleUserLogout"
-                                class="w-full flex items-center gap-3 px-3 py-2 transition-colors text-twilight-indigo-900 hover:bg-prussian-blue-400 hover:text-smart-blue-900"
+                                class="w-full flex items-center gap-3 px-3 py-2 transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100"
                             >
                                 <LogOut class="w-4 h-4" />
                                 <span class="font-medium">Logout</span>
@@ -248,7 +248,7 @@ onUnmounted(() => {
         <!-- Main Content -->
         <div class="flex-1 flex flex-col min-w-0 lg:max-h-screen">
             <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" @toggle-menu="toggleMenu" />
-            <main class="flex-1 bg-prussian-blue-400 rounded-lg shadow-xl overflow-auto lg:overflow-y-auto">
+            <main class="flex-1 bg-prussian-blue-600 rounded-lg shadow-xl overflow-auto lg:overflow-y-auto">
                 <slot></slot>
             </main>
         </div>

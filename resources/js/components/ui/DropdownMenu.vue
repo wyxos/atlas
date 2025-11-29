@@ -34,7 +34,7 @@ onUnmounted(() => {
         <button
             ref="triggerRef"
             @click="toggle"
-            class="inline-flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-opacity-10 cursor-pointer text-smart-blue-900"
+            class="inline-flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-opacity-10 cursor-pointer text-smart-blue-100"
         >
             <slot name="trigger" />
         </button>

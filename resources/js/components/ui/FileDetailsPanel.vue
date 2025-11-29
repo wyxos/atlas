@@ -78,15 +78,15 @@ watch(isOpen, (isOpenValue) => {
                 <div class="flex flex-col h-full">
                     <!-- Header -->
                     <div class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500 sticky top-0 bg-smart-blue-200 z-10">
-                        <h2 class="text-2xl font-semibold text-regal-navy-900">
+                        <h2 class="text-2xl font-semibold text-regal-navy-100">
                             {{ title }}
                         </h2>
                         <button
                             @click="close"
-                            class="p-2 rounded-lg transition-colors hover:bg-smart-blue-300 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
+                            class="p-2 rounded-lg transition-colors hover:bg-smart-blue-700 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
                             aria-label="Close details"
                         >
-                            <X :size="20" class="text-twilight-indigo-900" />
+                            <X :size="20" class="text-twilight-indigo-100" />
                         </button>
                     </div>
 

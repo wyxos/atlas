@@ -184,17 +184,17 @@ onMounted(async () => {
         <div class="w-full">
             <div class="mb-8 flex items-center justify-between">
                 <div>
-                    <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
+                    <h4 class="text-2xl font-semibold mb-2 text-regal-navy-100">
                         Users
                     </h4>
-                    <p class="text-blue-slate-700">
+                    <p class="text-blue-slate-300">
                         Manage your users
                     </p>
                 </div>
                 <Button
                     variant="outline"
                     @click="() => listing.openPanel()"
-                    class="border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                    class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                 >
                     <Filter :size="16" class="mr-2" />
                     Filters
@@ -203,14 +203,14 @@ onMounted(async () => {
 
             <!-- Active Filters Display -->
             <div v-if="listing.activeFilters.length > 0" class="mb-6 flex flex-wrap items-center gap-2">
-                <span class="text-sm font-medium text-twilight-indigo-700">Active filters:</span>
+                <span class="text-sm font-medium text-twilight-indigo-300">Active filters:</span>
                 <div
                     v-for="filter in listing.activeFilters"
                     :key="filter.key"
-                    class="inline-flex items-stretch rounded border border-smart-blue-600 text-sm"
+                    class="inline-flex items-stretch rounded border border-smart-blue-400 text-sm"
                 >
                     <span class="bg-smart-blue-600 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
-                    <span class="bg-smart-blue-300 px-3 py-1.5 text-smart-blue-900 truncate max-w-xs">{{ filter.value }}</span>
+                    <span class="bg-smart-blue-700 px-3 py-1.5 text-smart-blue-100 truncate max-w-xs">{{ filter.value }}</span>
                     <Button
                         @click="() => listing.removeFilter(filter.key)"
                         variant="ghost"
@@ -232,7 +232,7 @@ onMounted(async () => {
             </div>
 
             <div v-if="listing.isLoading" class="text-center py-12">
-                <p class="text-twilight-indigo-900 text-lg">Loading users...</p>
+                <p class="text-twilight-indigo-100 text-lg">Loading users...</p>
             </div>
 
             <div v-else-if="listing.error" class="text-center py-12">
@@ -309,10 +309,10 @@ onMounted(async () => {
                 <template #empty>
                     <div class="flex flex-col items-center justify-center py-12 px-6">
                         <Users :size="64" class="text-twilight-indigo-600 mb-4" />
-                        <h3 class="text-xl font-semibold text-regal-navy-900 mb-2">
+                        <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
                             {{ hasActiveFilters ? 'No users found' : 'No users yet' }}
                         </h3>
-                        <p class="text-twilight-indigo-700 text-center max-w-md">
+                        <p class="text-twilight-indigo-300 text-center max-w-md">
                             {{ hasActiveFilters
                                 ? 'Try adjusting your filters to see more results.'
                                 : 'Get started by creating your first user.' }}
@@ -321,7 +321,7 @@ onMounted(async () => {
                             v-if="hasActiveFilters"
                             variant="outline"
                             @click="() => listing.resetFilters()"
-                            class="mt-4 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                            class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                         >
                             Clear Filters
                         </Button>
@@ -365,7 +365,7 @@ onMounted(async () => {
                 <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
                     <DialogHeader>
                         <DialogTitle class="text-danger-600">Delete User</DialogTitle>
-                        <DialogDescription class="text-base mt-2 text-twilight-indigo-900">
+                        <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
                             Are you sure you want to delete <span class="font-semibold text-danger-600">{{ userToDelete?.name }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
@@ -378,7 +378,7 @@ onMounted(async () => {
                                 variant="outline"
                                 @click="handleDeleteCancel"
                                 :disabled="deletingUserId !== null"
-                                class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                                class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                             >
                                 Cancel
                             </Button>

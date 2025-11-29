@@ -53,7 +53,7 @@ const dateToModel = computed({
 
         <!-- Date Range -->
         <div>
-            <label class="block text-sm font-medium mb-2 text-smart-blue-900">
+            <label class="block text-sm font-medium mb-2 text-smart-blue-100">
                 {{ dateRangeLabel }}
             </label>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
