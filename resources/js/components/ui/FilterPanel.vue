@@ -112,7 +112,7 @@ watch(isOpen, (isOpenValue) => {
                                 @click="$emit('apply')"
                                 class="bg-smart-blue-500 hover:bg-smart-blue-600 text-white"
                             >
-                                Apply Filters
+                                Apply
                             </Button>
                         </div>
                     </div>
