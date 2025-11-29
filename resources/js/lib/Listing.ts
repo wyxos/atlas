@@ -830,6 +830,36 @@ export class Listing<T extends Record<string, unknown>> {
     }
 
     /**
+     * Get table configuration object for v-bind usage with o-table
+     * Returns all common table props that can be spread onto o-table component
+     */
+    config(): {
+        data: T[];
+        loading: boolean;
+        paginated: boolean;
+        perPage: number;
+        currentPage: number;
+        total: number;
+        backendPagination: boolean;
+        paginationPosition: string;
+        paginationOrder: string;
+        striped: boolean;
+    } {
+        return {
+            data: this.data,
+            loading: this.isLoading,
+            paginated: true,
+            perPage: this.perPage,
+            currentPage: this.currentPage,
+            total: this.total,
+            backendPagination: true,
+            paginationPosition: 'both',
+            paginationOrder: 'right',
+            striped: true,
+        };
+    }
+
+    /**
      * Reset the listing to initial state
      */
     reset(): void {
