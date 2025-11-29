@@ -691,10 +691,14 @@ describe('Files', () => {
         vm.listing.filters.date_from = '2024-01-01';
         vm.listing.filters.date_to = '2024-12-31';
 
-        await vm.listing.applyFilters();
+        expect(vm.listing.isFiltering).toBe(false);
+        const applyPromise = vm.listing.applyFilters();
+        expect(vm.listing.isFiltering).toBe(true);
+        await applyPromise;
         await flushPromises();
         await wrapper.vm.$nextTick();
 
+        expect(vm.listing.isFiltering).toBe(false);
         expect(router.currentRoute.value.query).toEqual({
             search: 'test',
             source: 'YouTube',
@@ -740,10 +744,14 @@ describe('Files', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        await vm.listing.resetFilters();
+        expect(vm.listing.isResetting).toBe(false);
+        const resetPromise = vm.listing.resetFilters();
+        expect(vm.listing.isResetting).toBe(true);
+        await resetPromise;
         await flushPromises();
         await wrapper.vm.$nextTick();
 
+        expect(vm.listing.isResetting).toBe(false);
         expect(router.currentRoute.value.query).toEqual({});
     });
 
@@ -771,10 +779,14 @@ describe('Files', () => {
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
         // Reset filters
-        await vm.listing.resetFilters();
+        expect(vm.listing.isResetting).toBe(false);
+        const resetPromise = vm.listing.resetFilters();
+        expect(vm.listing.isResetting).toBe(true);
+        await resetPromise;
         await flushPromises();
         await wrapper.vm.$nextTick();
 
+        expect(vm.listing.isResetting).toBe(false);
         // Verify all filter values are reset to defaults
         expect(vm.listing.filters.search).toBe('');
         expect(vm.listing.filters.source).toBe('all');
@@ -834,9 +846,13 @@ describe('Files', () => {
         expect(vm.currentPage).toBe(2);
 
         // Reset filters
-        await vm.listing.resetFilters();
+        expect(vm.listing.isResetting).toBe(false);
+        const resetPromise = vm.listing.resetFilters();
+        expect(vm.listing.isResetting).toBe(true);
+        await resetPromise;
         await waitForListingToLoad(wrapper);
 
+        expect(vm.listing.isResetting).toBe(false);
         // Verify pagination was reset to page 1
         expect(vm.currentPage).toBe(1);
     });

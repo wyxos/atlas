@@ -239,6 +239,8 @@ onMounted(async () => {
                 :modelValue="listing.isPanelOpen()"
                 @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()"
                 title="Filter Users"
+                :is-filtering="listing.isFiltering"
+                :is-resetting="listing.isResetting"
                 @apply="() => listing.applyFilters()"
                 @reset="() => listing.resetFilters()"
             >

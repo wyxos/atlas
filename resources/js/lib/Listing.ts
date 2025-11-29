@@ -32,6 +32,8 @@ type DeleteConfig<TItem extends Record<string, unknown>> = {
 export class Listing<T extends Record<string, unknown>> {
     public data: T[] = [];
     public isLoading = false;
+    public isFiltering = false;
+    public isResetting = false;
     public error: string | null = null;
     public currentPage = 1;
     public perPage = 15;
@@ -740,41 +742,47 @@ export class Listing<T extends Record<string, unknown>> {
      * Reset all filters to their default values and reload data
      */
     async resetFilters(): Promise<void> {
-        if (!this.filterDefaults || Object.keys(this.filterDefaults).length === 0) {
-            // No filters configured, just reset pagination
-            await this.goToPage(1);
-            return;
-        }
+        this.isResetting = true;
+        try {
+            if (!this.filterDefaults || Object.keys(this.filterDefaults).length === 0) {
+                // No filters configured, just reset pagination
+                await this.goToPage(1);
+                return;
+            }
 
-        // Reset all filter values to their defaults
-        for (const [key, defaultValue] of Object.entries(this.filterDefaults)) {
-            if (key in this.filters) {
-                // New API: update filters directly
-                this.filters[key] = defaultValue;
-            } else if (key in this.filterAttributes) {
-                // Legacy API: update via filterAttributes ref
-                const filterValue = this.filterAttributes[key];
-                if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
-                    const ref = filterValue as { value: string | number | null | undefined };
-                    ref.value = defaultValue;
+            // Reset all filter values to their defaults
+            for (const [key, defaultValue] of Object.entries(this.filterDefaults)) {
+                if (key in this.filters) {
+                    // New API: update filters directly
+                    this.filters[key] = defaultValue;
+                } else if (key in this.filterAttributes) {
+                    // Legacy API: update via filterAttributes ref
+                    const filterValue = this.filterAttributes[key];
+                    if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+                        const ref = filterValue as { value: string | number | null | undefined };
+                        ref.value = defaultValue;
+                    }
                 }
             }
+
+            // Build the query from current filter state (after reset) - this will exclude default values
+            // Then update URL and reload with explicit query to prevent reading stale router query
+            this.currentPage = 1;
+            const query: Record<string, string> = {};
+            const filterParameters = this.buildFilterParameters();
+            for (const [key, value] of Object.entries(filterParameters)) {
+                query[key] = String(value);
+            }
+
+            await this.updateUrl();
+
+            // Pass the query explicitly to prevent get() from reading stale router query
+            // This ensures we use the current filter state, not the old URL params
+            await this.get(undefined, { query });
+            this.closePanel();
+        } finally {
+            this.isResetting = false;
         }
-
-        // Build the query from current filter state (after reset) - this will exclude default values
-        // Then update URL and reload with explicit query to prevent reading stale router query
-        this.currentPage = 1;
-        const query: Record<string, string> = {};
-        const filterParameters = this.buildFilterParameters();
-        for (const [key, value] of Object.entries(filterParameters)) {
-            query[key] = String(value);
-        }
-
-        await this.updateUrl();
-
-        // Pass the query explicitly to prevent get() from reading stale router query
-        // This ensures we use the current filter state, not the old URL params
-        await this.get(undefined, { query });
     }
 
     /**
@@ -818,8 +826,13 @@ export class Listing<T extends Record<string, unknown>> {
      * Common pattern for filter application in UI components
      */
     async applyFilters(): Promise<void> {
-        await this.goToPage(1); // Reset to first page when applying filters
-        this.closePanel();
+        this.isFiltering = true;
+        try {
+            await this.goToPage(1); // Reset to first page when applying filters
+            this.closePanel();
+        } finally {
+            this.isFiltering = false;
+        }
     }
 
     /**

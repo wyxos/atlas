@@ -53,39 +53,27 @@ watch(isOpen, (isOpenValue) => {
 <template>
     <Teleport to="body">
         <!-- Backdrop -->
-        <Transition
-            enter-active-class="transition-opacity duration-300"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition-opacity duration-300"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div
-                v-if="isOpen"
-                class="fixed inset-0 z-50 bg-black/50"
-                @click="handleBackdropClick"
-            />
+        <Transition enter-active-class="transition-opacity duration-300" enter-from-class="opacity-0"
+            enter-to-class="opacity-100" leave-active-class="transition-opacity duration-300"
+            leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="isOpen" class="fixed inset-0 z-50 bg-black/50" @click="handleBackdropClick" />
         </Transition>
 
         <!-- Panel -->
         <Transition name="slide-right">
-            <div
-                v-if="isOpen"
-                class="fixed top-0 right-0 z-[60] w-96 max-w-[90vw] md:w-[32rem] lg:w-[36rem] xl:w-[40rem] h-full bg-smart-blue-200 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
-                @click.stop
-            >
+            <div v-if="isOpen"
+                class="fixed top-0 right-0 z-[60] w-96 max-w-[90vw] md:w-[32rem] lg:w-[36rem] xl:w-[40rem] h-full bg-prussian-blue-500 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
+                @click.stop>
                 <div class="flex flex-col h-full">
                     <!-- Header -->
-                    <div class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500 sticky top-0 bg-smart-blue-200 z-10">
+                    <div
+                        class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500 sticky top-0 bg-prussian-blue-500 z-10">
                         <h2 class="text-2xl font-semibold text-regal-navy-100">
                             {{ title }}
                         </h2>
-                        <button
-                            @click="close"
+                        <button @click="close"
                             class="p-2 rounded-lg transition-colors hover:bg-smart-blue-700 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
-                            aria-label="Close details"
-                        >
+                            aria-label="Close details">
                             <X :size="20" class="text-twilight-indigo-100" />
                         </button>
                     </div>
@@ -125,4 +113,3 @@ watch(isOpen, (isOpenValue) => {
     transform: translateX(100%);
 }
 </style>
-
