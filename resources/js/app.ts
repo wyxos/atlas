@@ -13,7 +13,6 @@ import './icons';
 import * as Sentry from '@sentry/browser';
 
 Sentry.init({
-    dsn: '___DSN___',
     integrations: [Sentry.browserTracingIntegration()],
     // ...other Sentry options
 });

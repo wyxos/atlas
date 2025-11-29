@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ArrowLeft, Trash2, CheckCircle2 } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { ArrowLeft, Trash2, CheckCircle2, Copy, Check } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
@@ -12,105 +13,199 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-const colorPalettes = [
+// Type definitions
+type ShadeValue = {
+    class: string;
+    hex: string;
+};
+
+type ColorPalette = {
+    name: string;
+    slug: string;
+    shades: {
+        100: ShadeValue;
+        200: ShadeValue;
+        300: ShadeValue;
+        400: ShadeValue;
+        500: ShadeValue;
+        600: ShadeValue;
+        700: ShadeValue;
+        800: ShadeValue;
+        900: ShadeValue;
+    };
+};
+
+// Color palette data with hex values
+const colorPalettes: ColorPalette[] = [
     {
         name: 'Smart Blue',
-        classes: {
-            100: 'bg-smart-blue-100',
-            200: 'bg-smart-blue-200',
-            300: 'bg-smart-blue-700',
-            400: 'bg-smart-blue-400',
-            500: 'bg-smart-blue-500',
-            600: 'bg-smart-blue-600',
-            700: 'bg-smart-blue-700',
-            800: 'bg-smart-blue-800',
-            900: 'bg-smart-blue-900',
+        slug: 'smart-blue',
+        shades: {
+            100: { class: 'bg-smart-blue-100', hex: '#c3e0fe' },
+            200: { class: 'bg-smart-blue-200', hex: '#87c2fd' },
+            300: { class: 'bg-smart-blue-300', hex: '#4ba3fb' },
+            400: { class: 'bg-smart-blue-400', hex: '#0f85fa' },
+            500: { class: 'bg-smart-blue-500', hex: '#0466c8' },
+            600: { class: 'bg-smart-blue-600', hex: '#0352a0' },
+            700: { class: 'bg-smart-blue-700', hex: '#023d78' },
+            800: { class: 'bg-smart-blue-800', hex: '#022950' },
+            900: { class: 'bg-smart-blue-900', hex: '#011428' },
         },
-        borderClass: 'border-smart-blue-700',
     },
     {
         name: 'Sapphire',
-        classes: {
-            100: 'bg-sapphire-100',
-            200: 'bg-sapphire-200',
-            300: 'bg-sapphire-300',
-            400: 'bg-sapphire-400',
-            500: 'bg-sapphire-500',
-            600: 'bg-sapphire-600',
-            700: 'bg-sapphire-700',
-            800: 'bg-sapphire-800',
-            900: 'bg-sapphire-900',
+        slug: 'sapphire',
+        shades: {
+            100: { class: 'bg-sapphire-100', hex: '#bcddfe' },
+            200: { class: 'bg-sapphire-200', hex: '#79bbfc' },
+            300: { class: 'bg-sapphire-300', hex: '#3698fb' },
+            400: { class: 'bg-sapphire-400', hex: '#0576e8' },
+            500: { class: 'bg-sapphire-500', hex: '#0353a4' },
+            600: { class: 'bg-sapphire-600', hex: '#034384' },
+            700: { class: 'bg-sapphire-700', hex: '#023263' },
+            800: { class: 'bg-sapphire-800', hex: '#012242' },
+            900: { class: 'bg-sapphire-900', hex: '#011121' },
         },
-        borderClass: 'border-sapphire-700',
     },
     {
         name: 'Regal Navy',
-        classes: {
-            100: 'bg-regal-navy-100',
-            200: 'bg-regal-navy-200',
-            300: 'bg-regal-navy-300',
-            400: 'bg-regal-navy-400',
-            500: 'bg-regal-navy-500',
-            600: 'bg-regal-navy-600',
-            700: 'bg-regal-navy-700',
-            800: 'bg-regal-navy-800',
-            900: 'bg-regal-navy-900',
+        slug: 'regal-navy',
+        shades: {
+            100: { class: 'bg-regal-navy-100', hex: '#b4d8fe' },
+            200: { class: 'bg-regal-navy-200', hex: '#68b0fd' },
+            300: { class: 'bg-regal-navy-300', hex: '#1d89fc' },
+            400: { class: 'bg-regal-navy-400', hex: '#0363c9' },
+            500: { class: 'bg-regal-navy-500', hex: '#023e7d' },
+            600: { class: 'bg-regal-navy-600', hex: '#023164' },
+            700: { class: 'bg-regal-navy-700', hex: '#01254b' },
+            800: { class: 'bg-regal-navy-800', hex: '#011932' },
+            900: { class: 'bg-regal-navy-900', hex: '#000c19' },
         },
-        borderClass: 'border-regal-navy-700',
     },
     {
         name: 'Prussian Blue',
-        classes: {
-            100: 'bg-prussian-blue-100',
-            200: 'bg-prussian-blue-200',
-            300: 'bg-prussian-blue-300',
-            400: 'bg-prussian-blue-400',
-            500: 'bg-prussian-blue-500',
-            600: 'bg-prussian-blue-400',
-            700: 'bg-prussian-blue-700',
-            800: 'bg-prussian-blue-800',
-            900: 'bg-prussian-blue-900',
+        slug: 'prussian-blue',
+        shades: {
+            100: { class: 'bg-prussian-blue-100', hex: '#a3c3ff' },
+            200: { class: 'bg-prussian-blue-200', hex: '#4788ff' },
+            300: { class: 'bg-prussian-blue-300', hex: '#0052eb' },
+            400: { class: 'bg-prussian-blue-400', hex: '#00328f' },
+            500: { class: 'bg-prussian-blue-500', hex: '#001233' },
+            600: { class: 'bg-prussian-blue-600', hex: '#000e29' },
+            700: { class: 'bg-prussian-blue-700', hex: '#000b1f' },
+            800: { class: 'bg-prussian-blue-800', hex: '#000714' },
+            900: { class: 'bg-prussian-blue-900', hex: '#00040a' },
         },
-        borderClass: 'border-prussian-blue-700',
     },
     {
-        name: 'Danger/Warning',
-        classes: {
-            100: 'bg-danger-100',
-            200: 'bg-danger-200',
-            300: 'bg-danger-700',
-            400: 'bg-danger-400',
-            500: 'bg-danger-500',
-            600: 'bg-danger-400',
-            700: 'bg-danger-700',
-            800: 'bg-danger-800',
-            900: 'bg-danger-900',
+        name: 'Danger',
+        slug: 'danger',
+        shades: {
+            100: { class: 'bg-danger-100', hex: '#ffcdd2' },
+            200: { class: 'bg-danger-200', hex: '#e57373' },
+            300: { class: 'bg-danger-300', hex: '#d32f2f' },
+            400: { class: 'bg-danger-400', hex: '#ba181b' },
+            500: { class: 'bg-danger-500', hex: '#a4161a' },
+            600: { class: 'bg-danger-600', hex: '#8d0a0c' },
+            700: { class: 'bg-danger-700', hex: '#660708' },
+            800: { class: 'bg-danger-800', hex: '#330608' },
+            900: { class: 'bg-danger-900', hex: '#1a0304' },
         },
-        borderClass: 'border-danger-300',
     },
     {
         name: 'Success',
-        classes: {
-            100: 'bg-success-100',
-            200: 'bg-success-200',
-            300: 'bg-success-300',
-            400: 'bg-success-400',
-            500: 'bg-success-500',
-            600: 'bg-success-600',
-            700: 'bg-success-700',
-            800: 'bg-success-800',
-            900: 'bg-success-900',
+        slug: 'success',
+        shades: {
+            100: { class: 'bg-success-100', hex: '#b7efc5' },
+            200: { class: 'bg-success-200', hex: '#6ede8a' },
+            300: { class: 'bg-success-300', hex: '#4ad66d' },
+            400: { class: 'bg-success-400', hex: '#2dc653' },
+            500: { class: 'bg-success-500', hex: '#25a244' },
+            600: { class: 'bg-success-600', hex: '#208b3a' },
+            700: { class: 'bg-success-700', hex: '#1a7431' },
+            800: { class: 'bg-success-800', hex: '#155d27' },
+            900: { class: 'bg-success-900', hex: '#10451d' },
         },
-        borderClass: 'border-success-300',
+    },
+    {
+        name: 'Twilight Indigo',
+        slug: 'twilight-indigo',
+        shades: {
+            100: { class: 'bg-twilight-indigo-100', hex: '#d0d7e5' },
+            200: { class: 'bg-twilight-indigo-200', hex: '#a0aecb' },
+            300: { class: 'bg-twilight-indigo-300', hex: '#7186b1' },
+            400: { class: 'bg-twilight-indigo-400', hex: '#4d628b' },
+            500: { class: 'bg-twilight-indigo-500', hex: '#33415c' },
+            600: { class: 'bg-twilight-indigo-600', hex: '#29344a' },
+            700: { class: 'bg-twilight-indigo-700', hex: '#1e2737' },
+            800: { class: 'bg-twilight-indigo-800', hex: '#141a25' },
+            900: { class: 'bg-twilight-indigo-900', hex: '#0a0d12' },
+        },
+    },
+    {
+        name: 'Blue Slate',
+        slug: 'blue-slate',
+        shades: {
+            100: { class: 'bg-blue-slate-100', hex: '#dee0e6' },
+            200: { class: 'bg-blue-slate-200', hex: '#bcc2ce' },
+            300: { class: 'bg-blue-slate-300', hex: '#9ba3b5' },
+            400: { class: 'bg-blue-slate-400', hex: '#79859c' },
+            500: { class: 'bg-blue-slate-500', hex: '#5c677d' },
+            600: { class: 'bg-blue-slate-600', hex: '#4b5365' },
+            700: { class: 'bg-blue-slate-700', hex: '#383f4c' },
+            800: { class: 'bg-blue-slate-800', hex: '#252a32' },
+            900: { class: 'bg-blue-slate-900', hex: '#131519' },
+        },
+    },
+    {
+        name: 'Slate Grey',
+        slug: 'slate-grey',
+        shades: {
+            100: { class: 'bg-slate-grey-100', hex: '#e5e7ea' },
+            200: { class: 'bg-slate-grey-200', hex: '#cbced5' },
+            300: { class: 'bg-slate-grey-300', hex: '#b1b6c0' },
+            400: { class: 'bg-slate-grey-400', hex: '#979dab' },
+            500: { class: 'bg-slate-grey-500', hex: '#7d8597' },
+            600: { class: 'bg-slate-grey-600', hex: '#62697a' },
+            700: { class: 'bg-slate-grey-700', hex: '#4a4f5c' },
+            800: { class: 'bg-slate-grey-800', hex: '#31353d' },
+            900: { class: 'bg-slate-grey-900', hex: '#191a1f' },
+        },
+    },
+    {
+        name: 'Lavender Grey',
+        slug: 'lavender-grey',
+        shades: {
+            100: { class: 'bg-lavender-grey-100', hex: '#eaebee' },
+            200: { class: 'bg-lavender-grey-200', hex: '#d5d7dd' },
+            300: { class: 'bg-lavender-grey-300', hex: '#c0c4cd' },
+            400: { class: 'bg-lavender-grey-400', hex: '#abb0bc' },
+            500: { class: 'bg-lavender-grey-500', hex: '#979dac' },
+            600: { class: 'bg-lavender-grey-600', hex: '#737a8e' },
+            700: { class: 'bg-lavender-grey-700', hex: '#565c6b' },
+            800: { class: 'bg-lavender-grey-800', hex: '#393d47' },
+            900: { class: 'bg-lavender-grey-900', hex: '#1d1f24' },
+        },
     },
 ];
 
-const neutralColors = [
-    { name: 'Twilight Indigo', class: 'bg-twilight-indigo-500' },
-    { name: 'Blue Slate', class: 'bg-blue-slate-500' },
-    { name: 'Slate Grey', class: 'bg-slate-grey-500' },
-    { name: 'Lavender Grey', class: 'bg-lavender-grey-500' },
-];
+const shadeOrder: (keyof ColorPalette['shades'])[] = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+const copiedState = ref<Record<string, boolean>>({});
+
+function copyToClipboard(text: string, key: string): void {
+    navigator.clipboard.writeText(text).then(() => {
+        copiedState.value[key] = true;
+        setTimeout(() => {
+            copiedState.value[key] = false;
+        }, 2000);
+    });
+}
+
+function getTextColor(shade: keyof ColorPalette['shades']): string {
+    // Text is displayed below the swatch on the dark page background
+    // So all text should be light for visibility on dark background
+    return 'text-twilight-indigo-100';
+}
 
 const typographyExamples = [
     {
@@ -188,43 +283,118 @@ function goHome() {
 
             <!-- Color Palette -->
             <Section title="Color Palette">
-                <div class="space-y-8">
-                    <div v-for="palette in colorPalettes" :key="palette.name">
-                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
+                <div class="space-y-12">
+                    <p class="text-base text-twilight-indigo-100 mb-6">
+                        Click any color swatch to copy its hex value, or shift+click to copy the Tailwind class name.
+                    </p>
+
+                    <!-- Main Color Palettes -->
+                    <div v-for="palette in colorPalettes" :key="palette.slug" class="space-y-3">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue">
                             {{ palette.name }}
                         </Heading>
-                        <div class="grid grid-cols-5 md:grid-cols-10 gap-2">
-                            <div v-for="shade in [100, 200, 300, 400, 500, 600, 700, 800, 900]" :key="shade"
-                                class="flex flex-col">
+                        <div class="flex gap-1 overflow-x-auto pb-2 overflow-y-visible">
+                            <div v-for="shade in shadeOrder" :key="shade"
+                                class="shrink-0 flex flex-col items-center group cursor-pointer py-1"
+                                @click="copyToClipboard(palette.shades[shade].hex, `${palette.slug}-${shade}`)"
+                                @click.shift="copyToClipboard(palette.shades[shade].class, `${palette.slug}-${shade}-class`)">
                                 <div :class="[
-                                    'h-16 rounded',
-                                    palette.classes[shade as keyof typeof palette.classes],
-                                    shade === 500 ? 'border-2 ' + palette.borderClass : '',
+                                    'w-16 h-16 rounded transition-all hover:scale-105 hover:ring-2 hover:ring-smart-blue-400',
+                                    palette.shades[shade].class,
                                 ]"></div>
-                                <span :class="[
-                                    'text-xs mt-1',
-                                    shade === 500 ? 'font-semibold' : '',
-                                    shade === 900
-                                        ? 'text-prussian-blue-500'
-                                        : 'text-twilight-indigo-100',
-                                ]">
-                                    {{ shade }}
-                                </span>
+                                <div class="mt-2 flex flex-col items-center gap-1">
+                                    <span :class="[
+                                        'text-xs font-medium',
+                                        getTextColor(shade),
+                                    ]">
+                                        {{ shade }}
+                                    </span>
+                                    <div v-if="copiedState[`${palette.slug}-${shade}`] || copiedState[`${palette.slug}-${shade}-class`]"
+                                        class="flex items-center gap-1 text-xs text-success-400">
+                                        <Check :size="12" />
+                                        <span>Copied!</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Neutral Colors -->
-                    <div>
-                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-4">
-                            Neutral Colors
+                    <!-- Color Usage Examples -->
+                    <div class="space-y-6 pt-8 border-t border-twilight-indigo-500">
+                        <Heading as="h3" size="xl" weight="semibold" color="smart-blue" class="mb-6">
+                            Color Usage Examples
                         </Heading>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div v-for="color in neutralColors" :key="color.name">
-                                <Heading as="h4" size="sm" weight="medium" class="text-slate-grey-300 mb-2">
-                                    {{ color.name }}
+
+                        <div class="space-y-6">
+                            <!-- Background Colors -->
+                            <div>
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-4">
+                                    Background Colors
                                 </Heading>
-                                <div :class="`h-12 rounded ${color.class}`"></div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="p-4 rounded-lg bg-smart-blue-500">
+                                        <code class="text-xs text-smart-blue-100">bg-smart-blue-500</code>
+                                    </div>
+                                    <div class="p-4 rounded-lg bg-sapphire-500">
+                                        <code class="text-xs text-sapphire-100">bg-sapphire-500</code>
+                                    </div>
+                                    <div class="p-4 rounded-lg bg-regal-navy-500">
+                                        <code class="text-xs text-regal-navy-100">bg-regal-navy-500</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Text Colors -->
+                            <div>
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-4">
+                                    Text Colors
+                                </Heading>
+                                <div class="space-y-2">
+                                    <p class="text-smart-blue-300">text-smart-blue-300 - Primary text color</p>
+                                    <p class="text-sapphire-300">text-sapphire-300 - Secondary text color</p>
+                                    <p class="text-twilight-indigo-100">text-twilight-indigo-100 - Body text</p>
+                                    <p class="text-success-400">text-success-400 - Success message</p>
+                                    <p class="text-danger-400">text-danger-400 - Error message</p>
+                                </div>
+                            </div>
+
+                            <!-- Border Colors -->
+                            <div>
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-4">
+                                    Border Colors
+                                </Heading>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="p-4 rounded-lg border-2 border-smart-blue-400">
+                                        <code class="text-xs text-twilight-indigo-100">border-smart-blue-400</code>
+                                    </div>
+                                    <div class="p-4 rounded-lg border-2 border-twilight-indigo-500">
+                                        <code class="text-xs text-twilight-indigo-100">border-twilight-indigo-500</code>
+                                    </div>
+                                    <div class="p-4 rounded-lg border-2 border-success-400">
+                                        <code class="text-xs text-twilight-indigo-100">border-success-400</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Interactive States -->
+                            <div>
+                                <Heading as="h4" size="lg" weight="medium" color="regal-navy" class="mb-4">
+                                    Interactive States
+                                </Heading>
+                                <div class="flex flex-wrap gap-4">
+                                    <button
+                                        class="px-4 py-2 rounded-lg bg-smart-blue-500 text-white hover:bg-smart-blue-400 transition-colors">
+                                        Hover: bg-smart-blue-400
+                                    </button>
+                                    <button
+                                        class="px-4 py-2 rounded-lg border-2 border-sapphire-400 text-sapphire-300 hover:bg-sapphire-700 hover:border-sapphire-300 transition-colors">
+                                        Hover: bg-sapphire-700
+                                    </button>
+                                    <button
+                                        class="px-4 py-2 rounded-lg bg-danger-500 text-white hover:bg-danger-400 transition-colors">
+                                        Hover: bg-danger-400
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
