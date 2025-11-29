@@ -218,8 +218,7 @@ onMounted(() => {
         <!-- Error State -->
         <div v-else-if="error" class="text-center py-12">
             <p class="text-red-500 text-lg">{{ error }}</p>
-            <Button variant="outline" @click="loadFile"
-                class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100">
+            <Button variant="outline" color="default" @click="loadFile" class="mt-4">
                 Retry
             </Button>
         </div>
@@ -310,7 +309,7 @@ onMounted(() => {
                     <DialogTitle class="text-danger-400">Delete File</DialogTitle>
                     <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
                         Are you sure you want to delete <span class="font-semibold text-danger-400">{{ file?.filename
-                        }}</span>? This action cannot be undone.
+                            }}</span>? This action cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
                 <div v-if="deleteError"
@@ -319,13 +318,12 @@ onMounted(() => {
                 </div>
                 <DialogFooter>
                     <DialogClose as-child>
-                        <Button variant="outline" @click="handleDeleteCancel" :disabled="deleting"
-                            class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100">
+                        <Button variant="outline" color="default" @click="handleDeleteCancel" :disabled="deleting">
                             Cancel
                         </Button>
                     </DialogClose>
                     <Button v-if="canRetryDelete || !deleteError" @click="handleDeleteConfirm" :disabled="deleting"
-                        variant="default" class="bg-danger-400 hover:bg-danger-300">
+                        variant="default" color="danger">
                         {{ deleting ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
                     </Button>
                 </DialogFooter>

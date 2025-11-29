@@ -148,7 +148,7 @@ async function handleAccountDeletion(): Promise<void> {
                             type="submit"
                             :disabled="passwordLoading"
                             variant="default"
-                            class="bg-smart-blue-500 hover:bg-smart-blue-400"
+                            color="default"
                         >
                             <span v-if="passwordLoading">Updating...</span>
                             <span v-else>Update Password</span>
@@ -183,7 +183,7 @@ async function handleAccountDeletion(): Promise<void> {
                             type="submit"
                             :disabled="deleteLoading"
                             variant="default"
-                            class="bg-danger-600 hover:bg-danger-700"
+                            color="danger"
                         >
                             <span v-if="deleteLoading">Deleting...</span>
                             <span v-else>Delete Account</span>
