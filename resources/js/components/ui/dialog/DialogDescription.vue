@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 </script>
 
 <template>
-    <p :class="cn('text-sm text-blue-slate-700', $attrs.class)">
+    <p :class="cn('text-sm text-blue-slate-300', $attrs.class)">
         <slot />
     </p>
 </template>

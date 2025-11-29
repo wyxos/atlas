@@ -15,123 +15,123 @@
 
     /* Smart Blue */
     --color-smart-blue: #0466c8;
-    --color-smart-blue-100: #011428;
-    --color-smart-blue-200: #022950;
-    --color-smart-blue-300: #023d78;
-    --color-smart-blue-400: #0352a0;
+    --color-smart-blue-100: #c3e0fe;
+    --color-smart-blue-200: #87c2fd;
+    --color-smart-blue-300: #4ba3fb;
+    --color-smart-blue-400: #0f85fa;
     --color-smart-blue-500: #0466c8;
-    --color-smart-blue-600: #0f85fa;
-    --color-smart-blue-700: #4ba3fb;
-    --color-smart-blue-800: #87c2fd;
-    --color-smart-blue-900: #c3e0fe;
+    --color-smart-blue-600: #0352a0;
+    --color-smart-blue-700: #023d78;
+    --color-smart-blue-800: #022950;
+    --color-smart-blue-900: #011428;
 
     /* Sapphire */
     --color-sapphire: #0353a4;
-    --color-sapphire-100: #011121;
-    --color-sapphire-200: #012242;
-    --color-sapphire-300: #023263;
-    --color-sapphire-400: #034384;
+    --color-sapphire-100: #bcddfe;
+    --color-sapphire-200: #79bbfc;
+    --color-sapphire-300: #3698fb;
+    --color-sapphire-400: #0576e8;
     --color-sapphire-500: #0353a4;
-    --color-sapphire-600: #0576e8;
-    --color-sapphire-700: #3698fb;
-    --color-sapphire-800: #79bbfc;
-    --color-sapphire-900: #bcddfe;
+    --color-sapphire-600: #034384;
+    --color-sapphire-700: #023263;
+    --color-sapphire-800: #012242;
+    --color-sapphire-900: #011121;
 
     /* Regal Navy */
     --color-regal-navy: #023e7d;
-    --color-regal-navy-100: #000c19;
-    --color-regal-navy-200: #011932;
-    --color-regal-navy-300: #01254b;
-    --color-regal-navy-400: #023164;
+    --color-regal-navy-100: #b4d8fe;
+    --color-regal-navy-200: #68b0fd;
+    --color-regal-navy-300: #1d89fc;
+    --color-regal-navy-400: #0363c9;
     --color-regal-navy-500: #023e7d;
-    --color-regal-navy-600: #0363c9;
-    --color-regal-navy-700: #1d89fc;
-    --color-regal-navy-800: #68b0fd;
-    --color-regal-navy-900: #b4d8fe;
+    --color-regal-navy-600: #023164;
+    --color-regal-navy-700: #01254b;
+    --color-regal-navy-800: #011932;
+    --color-regal-navy-900: #000c19;
 
     /* Prussian Blue (using the darkest variant #001233) */
     --color-prussian-blue: #001233;
-    --color-prussian-blue-100: #00040a;
-    --color-prussian-blue-200: #000714;
-    --color-prussian-blue-300: #000b1f;
-    --color-prussian-blue-400: #000e29;
+    --color-prussian-blue-100: #a3c3ff;
+    --color-prussian-blue-200: #4788ff;
+    --color-prussian-blue-300: #0052eb;
+    --color-prussian-blue-400: #00328f;
     --color-prussian-blue-500: #001233;
-    --color-prussian-blue-600: #00328f;
-    --color-prussian-blue-700: #0052eb;
-    --color-prussian-blue-800: #4788ff;
-    --color-prussian-blue-900: #a3c3ff;
+    --color-prussian-blue-600: #000e29;
+    --color-prussian-blue-700: #000b1f;
+    --color-prussian-blue-800: #000714;
+    --color-prussian-blue-900: #00040a;
 
     /* Twilight Indigo */
     --color-twilight-indigo: #33415c;
-    --color-twilight-indigo-100: #0a0d12;
-    --color-twilight-indigo-200: #141a25;
-    --color-twilight-indigo-300: #1e2737;
-    --color-twilight-indigo-400: #29344a;
+    --color-twilight-indigo-100: #d0d7e5;
+    --color-twilight-indigo-200: #a0aecb;
+    --color-twilight-indigo-300: #7186b1;
+    --color-twilight-indigo-400: #4d628b;
     --color-twilight-indigo-500: #33415c;
-    --color-twilight-indigo-600: #4d628b;
-    --color-twilight-indigo-700: #7186b1;
-    --color-twilight-indigo-800: #a0aecb;
-    --color-twilight-indigo-900: #d0d7e5;
+    --color-twilight-indigo-600: #29344a;
+    --color-twilight-indigo-700: #1e2737;
+    --color-twilight-indigo-800: #141a25;
+    --color-twilight-indigo-900: #0a0d12;
 
     /* Blue Slate */
     --color-blue-slate: #5c677d;
-    --color-blue-slate-100: #131519;
-    --color-blue-slate-200: #252a32;
-    --color-blue-slate-300: #383f4c;
-    --color-blue-slate-400: #4b5365;
+    --color-blue-slate-100: #dee0e6;
+    --color-blue-slate-200: #bcc2ce;
+    --color-blue-slate-300: #9ba3b5;
+    --color-blue-slate-400: #79859c;
     --color-blue-slate-500: #5c677d;
-    --color-blue-slate-600: #79859c;
-    --color-blue-slate-700: #9ba3b5;
-    --color-blue-slate-800: #bcc2ce;
-    --color-blue-slate-900: #dee0e6;
+    --color-blue-slate-600: #4b5365;
+    --color-blue-slate-700: #383f4c;
+    --color-blue-slate-800: #252a32;
+    --color-blue-slate-900: #131519;
 
     /* Slate Grey */
     --color-slate-grey: #7d8597;
-    --color-slate-grey-100: #191a1f;
-    --color-slate-grey-200: #31353d;
-    --color-slate-grey-300: #4a4f5c;
-    --color-slate-grey-400: #62697a;
+    --color-slate-grey-100: #e5e7ea;
+    --color-slate-grey-200: #cbced5;
+    --color-slate-grey-300: #b1b6c0;
+    --color-slate-grey-400: #979dab;
     --color-slate-grey-500: #7d8597;
-    --color-slate-grey-600: #979dab;
-    --color-slate-grey-700: #b1b6c0;
-    --color-slate-grey-800: #cbced5;
-    --color-slate-grey-900: #e5e7ea;
+    --color-slate-grey-600: #62697a;
+    --color-slate-grey-700: #4a4f5c;
+    --color-slate-grey-800: #31353d;
+    --color-slate-grey-900: #191a1f;
 
     /* Lavender Grey */
     --color-lavender-grey: #979dac;
-    --color-lavender-grey-100: #1d1f24;
-    --color-lavender-grey-200: #393d47;
-    --color-lavender-grey-300: #565c6b;
-    --color-lavender-grey-400: #737a8e;
+    --color-lavender-grey-100: #eaebee;
+    --color-lavender-grey-200: #d5d7dd;
+    --color-lavender-grey-300: #c0c4cd;
+    --color-lavender-grey-400: #abb0bc;
     --color-lavender-grey-500: #979dac;
-    --color-lavender-grey-600: #abb0bc;
-    --color-lavender-grey-700: #c0c4cd;
-    --color-lavender-grey-800: #d5d7dd;
-    --color-lavender-grey-900: #eaebee;
+    --color-lavender-grey-600: #737a8e;
+    --color-lavender-grey-700: #565c6b;
+    --color-lavender-grey-800: #393d47;
+    --color-lavender-grey-900: #1d1f24;
 
     /* Danger/Warning */
     --color-danger: #ba181b;
-    --color-danger-100: #1a0304;
-    --color-danger-200: #330608;
-    --color-danger-300: #660708;
-    --color-danger-400: #8d0a0c;
+    --color-danger-100: #ffcdd2;
+    --color-danger-200: #e57373;
+    --color-danger-300: #d32f2f;
+    --color-danger-400: #ba181b;
     --color-danger-500: #a4161a;
-    --color-danger-600: #ba181b;
-    --color-danger-700: #d32f2f;
-    --color-danger-800: #e57373;
-    --color-danger-900: #ffcdd2;
+    --color-danger-600: #8d0a0c;
+    --color-danger-700: #660708;
+    --color-danger-800: #330608;
+    --color-danger-900: #1a0304;
 
     /* Success */
     --color-success: #25a244;
-    --color-success-100: #10451d;
-    --color-success-200: #155d27;
-    --color-success-300: #1a7431;
-    --color-success-400: #208b3a;
+    --color-success-100: #b7efc5;
+    --color-success-200: #6ede8a;
+    --color-success-300: #4ad66d;
+    --color-success-400: #2dc653;
     --color-success-500: #25a244;
-    --color-success-600: #2dc653;
-    --color-success-700: #4ad66d;
-    --color-success-800: #6ede8a;
-    --color-success-900: #b7efc5;
+    --color-success-600: #208b3a;
+    --color-success-700: #1a7431;
+    --color-success-800: #155d27;
+    --color-success-900: #10451d;
 }
 
 /* Oruga Table Styling to Match UI Guidelines */
@@ -148,9 +148,9 @@
 
 .o-table thead th {
     background-color: #023d78 !important;
-    /* smart-blue-300 */
+    /* smart-blue-700 */
     color: #c3e0fe !important;
-    /* smart-blue-900 */
+    /* smart-blue-100 */
     border-bottom: 2px solid #0466c8 !important;
     /* smart-blue-500 */
     padding: 1rem 1.5rem !important;
@@ -176,7 +176,7 @@
 
 .o-table tbody tr:hover {
     background-color: #023d78 !important;
-    /* smart-blue-300 */
+    /* smart-blue-700 */
 }
 
 .o-table tbody tr:last-child {
@@ -193,7 +193,7 @@
 
 .o-table tbody td {
     color: #d0d7e5 !important;
-    /* twilight-indigo-900 */
+    /* twilight-indigo-100 */
     padding: 1rem 1.5rem !important;
     font-size: 0.875rem !important;
     background-color: transparent !important;
@@ -204,6 +204,7 @@
     background-color: #a4161a !important;
     border-color: #ba181b !important;
     color: #ffcdd2 !important;
+    /* danger-500, danger-400, danger-100 */
 }
 
 /* Oruga Pagination Styling - Matches Guidelines */
@@ -269,7 +270,7 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
     border-radius: 0.5rem !important;
     background-color: transparent !important;
     color: #d0d7e5 !important;
-    /* twilight-indigo-900 */
+    /* twilight-indigo-100 */
     text-decoration: none;
     cursor: pointer;
     transition: all 0.2s;
@@ -283,11 +284,11 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
 .o-button.o-pagination__button--previous:hover:not(:disabled),
 .o-button.o-pagination__button--next:hover:not(:disabled) {
     background-color: #023d78 !important;
-    /* smart-blue-300 */
+    /* smart-blue-700 */
     border-color: #0f85fa !important;
-    /* smart-blue-600 */
+    /* smart-blue-400 */
     color: #c3e0fe !important;
-    /* smart-blue-900 */
+    /* smart-blue-100 */
 }
 
 /* Current page button - matches guidelines */
@@ -299,7 +300,7 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
     background-color: #0466c8 !important;
     /* smart-blue-500 */
     border-color: #0f85fa !important;
-    /* smart-blue-600 */
+    /* smart-blue-400 */
     color: #ffffff !important;
     font-weight: 600;
 }
@@ -310,9 +311,9 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
 .o-pagination__button[aria-current="page"]:hover,
 .o-button.o-pagination__button[aria-current="page"]:hover {
     background-color: #0352a0 !important;
-    /* smart-blue-400 */
-    border-color: #0f85fa !important;
     /* smart-blue-600 */
+    border-color: #0f85fa !important;
+    /* smart-blue-400 */
     color: #ffffff !important;
 }
 
@@ -357,7 +358,7 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
     border-radius: 0.5rem;
     background-color: transparent;
     color: #d0d7e5;
-    /* twilight-indigo-900 */
+    /* twilight-indigo-100 */
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -367,11 +368,11 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
 .o-button.o-pagination__button-previous:hover:not(:disabled),
 .o-button.o-pagination__button-next:hover:not(:disabled) {
     background-color: #023d78;
-    /* smart-blue-300 */
+    /* smart-blue-700 */
     border-color: #0f85fa;
-    /* smart-blue-600 */
+    /* smart-blue-400 */
     color: #c3e0fe;
-    /* smart-blue-900 */
+    /* smart-blue-100 */
 }
 
 /* Custom Scrollbar Styling - Matches Dark Theme */
@@ -383,29 +384,29 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
 
 ::-webkit-scrollbar-track {
     background: #1e2737;
-    /* twilight-indigo-300 */
+    /* twilight-indigo-700 */
     border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
     background: #4d628b;
-    /* twilight-indigo-600 */
+    /* twilight-indigo-400 */
     border-radius: 6px;
     border: 2px solid #1e2737;
-    /* twilight-indigo-300 */
+    /* twilight-indigo-700 */
     transition: background-color 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
     background: #0f85fa;
-    /* smart-blue-600 */
+    /* smart-blue-400 */
 }
 
 /* Firefox */
 * {
     scrollbar-width: thin;
     scrollbar-color: #4d628b #1e2737;
-    /* thumb track */
+    /* thumb track - twilight-indigo-400 twilight-indigo-700 */
 }
 
 @theme inline {

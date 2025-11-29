@@ -91,18 +91,18 @@ async function handleAccountDeletion(): Promise<void> {
     <PageLayout>
         <div class="w-full">
             <div class="text-center mb-8">
-                <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
+                <h4 class="text-2xl font-semibold mb-2 text-regal-navy-100">
                     Profile
                 </h4>
-                <p class="text-blue-slate-700">
+                <p class="text-blue-slate-300">
                     Manage your account settings
                 </p>
             </div>
 
             <!-- Password Reset Section -->
             <section class="mb-8">
-                <div class="rounded-lg p-6 mb-6 bg-smart-blue-300 border-2 border-smart-blue-500">
-                    <h2 class="text-xl font-semibold mb-4 text-smart-blue-900">
+                <div class="rounded-lg p-6 mb-6 bg-smart-blue-700 border-2 border-smart-blue-500">
+                    <h2 class="text-xl font-semibold mb-4 text-smart-blue-100">
                         Change Password
                     </h2>
 
@@ -138,8 +138,8 @@ async function handleAccountDeletion(): Promise<void> {
                             <template #label>Confirm New Password</template>
                         </FormInput>
 
-                        <div v-if="passwordSuccess" class="p-3 rounded-lg bg-smart-blue-300 border border-smart-blue-500">
-                            <p class="text-sm text-smart-blue-700">
+                        <div v-if="passwordSuccess" class="p-3 rounded-lg bg-smart-blue-700 border border-smart-blue-500">
+                            <p class="text-sm text-smart-blue-300">
                                 {{ passwordSuccess }}
                             </p>
                         </div>
@@ -148,7 +148,7 @@ async function handleAccountDeletion(): Promise<void> {
                             type="submit"
                             :disabled="passwordLoading"
                             variant="default"
-                            class="bg-smart-blue-500 hover:bg-smart-blue-600"
+                            class="bg-smart-blue-500 hover:bg-smart-blue-400"
                         >
                             <span v-if="passwordLoading">Updating...</span>
                             <span v-else>Update Password</span>
@@ -159,11 +159,11 @@ async function handleAccountDeletion(): Promise<void> {
 
             <!-- Delete Account Section -->
             <section>
-                <div class="rounded-lg p-6 bg-danger-100 border-2 border-danger-600">
-                    <h2 class="text-xl font-semibold mb-2 text-danger-900">
+                <div class="rounded-lg p-6 bg-danger-900 border-2 border-danger-400">
+                    <h2 class="text-xl font-semibold mb-2 text-danger-100">
                         Delete Account
                     </h2>
-                    <p class="mb-4 text-sm text-twilight-indigo-900">
+                    <p class="mb-4 text-sm text-twilight-indigo-100">
                         Once you delete your account, there is no going back. Please be certain.
                     </p>
 

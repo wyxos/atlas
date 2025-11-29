@@ -227,17 +227,17 @@ onMounted(async () => {
         <div class="w-full">
             <div class="mb-8 flex items-center justify-between">
                 <div>
-                    <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
+                    <h4 class="text-2xl font-semibold mb-2 text-regal-navy-100">
                         Files
                     </h4>
-                    <p class="text-blue-slate-700">
+                    <p class="text-blue-slate-300">
                         Manage your files
                     </p>
                 </div>
                 <Button
                     variant="outline"
                     @click="() => listing.openPanel()"
-                    class="border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                    class="border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                 >
                     <Filter :size="16" class="mr-2" />
                     Filters
@@ -250,15 +250,15 @@ onMounted(async () => {
                 <div
                     v-for="filter in listing.activeFilters"
                     :key="filter.key"
-                    class="inline-flex items-stretch rounded border border-smart-blue-600 text-sm"
+                    class="inline-flex items-stretch rounded border border-smart-blue-400 text-sm"
                 >
-                    <span class="bg-smart-blue-600 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
-                    <span class="bg-smart-blue-300 px-3 py-1.5 text-smart-blue-900 truncate max-w-xs">{{ filter.value }}</span>
+                    <span class="bg-smart-blue-400 px-3 py-1.5 font-medium text-white">{{ filter.label }}</span>
+                    <span class="bg-smart-blue-700 px-3 py-1.5 text-smart-blue-100 truncate max-w-xs">{{ filter.value }}</span>
                     <Button
                         @click="() => listing.removeFilter(filter.key)"
                         variant="ghost"
                         size="sm"
-                        class="flex items-center justify-center bg-danger-600 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr rounded-tl-none rounded-bl-none"
+                        class="flex items-center justify-center bg-danger-400 px-1.5 hover:bg-danger-700 text-white border-0 rounded-br rounded-tr rounded-tl-none rounded-bl-none"
                         :aria-label="`Remove ${filter.label} filter`"
                     >
                         <X :size="14" />
@@ -268,14 +268,14 @@ onMounted(async () => {
                     variant="outline"
                     size="sm"
                     @click="() => listing.resetFilters()"
-                    class="border-danger-600 text-danger-600 bg-transparent hover:bg-danger-300 hover:border-danger-600 hover:text-danger-600"
+                    class="border-danger-400 text-danger-400 bg-transparent hover:bg-danger-700 hover:border-danger-400 hover:text-danger-400"
                 >
                     Clear all
                 </Button>
             </div>
 
             <div v-if="listing.isLoading" class="text-center py-12">
-                <p class="text-twilight-indigo-900 text-lg">Loading files...</p>
+                <p class="text-twilight-indigo-100 text-lg">Loading files...</p>
             </div>
 
             <div v-else-if="listing.error" class="text-center py-12">
@@ -304,8 +304,8 @@ onMounted(async () => {
                             class="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer group"
                             :title="`Click to copy: ${row.filename}`"
                         >
-                            <FileText :size="16" class="text-smart-blue-600" />
-                            <span class="truncate max-w-xs group-hover:text-smart-blue-600 transition-colors" :title="row.filename">{{ row.filename }}</span>
+                            <FileText :size="16" class="text-smart-blue-400" />
+                            <span class="truncate max-w-xs group-hover:text-smart-blue-400 transition-colors" :title="row.filename">{{ row.filename }}</span>
                             <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                     </template>
@@ -317,7 +317,7 @@ onMounted(async () => {
                             'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
                             'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
                             'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
-                            'bg-twilight-indigo-500/20 text-twilight-indigo-300': getMimeTypeCategory(row.mime_type) === 'other',
+                            'bg-twilight-indigo-500/20 text-twilight-indigo-700': getMimeTypeCategory(row.mime_type) === 'other',
                         }">
                             {{ row.mime_type || 'Unknown' }}
                         </span>
@@ -332,14 +332,14 @@ onMounted(async () => {
                     <template #default="{ row }">
                         <span
                             v-if="row.downloaded"
-                            class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-300 border border-success-500 text-success-900"
+                            class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-700 border border-success-500 text-success-100"
                         >
                             <Download :size="12" />
                             Yes
                         </span>
                         <span
                             v-else
-                            class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-900"
+                            class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100"
                         >
                             No
                         </span>
@@ -350,7 +350,7 @@ onMounted(async () => {
                         <button
                             v-if="row.absolute_path"
                             @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                            class="font-mono text-xs text-twilight-indigo-700 truncate max-w-xs block hover:text-smart-blue-600 transition-colors cursor-pointer group text-left w-full"
+                            class="font-mono text-xs text-twilight-indigo-700 truncate max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left w-full"
                             :title="`Click to copy: ${row.absolute_path}`"
                         >
                             <span class="flex items-center gap-1">
@@ -373,7 +373,7 @@ onMounted(async () => {
                             :href="row.url"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="text-smart-blue-600 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
+                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
                             :title="row.url"
                         >
                             {{ row.url }}
@@ -393,7 +393,7 @@ onMounted(async () => {
                             :href="row.referrer_url"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="text-smart-blue-600 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
+                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
                             :title="row.referrer_url"
                         >
                             {{ row.referrer_url }}
@@ -423,7 +423,7 @@ onMounted(async () => {
                                 @click="() => router.push(`/files/${row.id}`)"
                                 variant="ghost"
                                 size="sm"
-                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-600 text-white hover:bg-smart-blue-600"
+                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400"
                                 :title="`View ${row.filename}`"
                             >
                                 <Eye :size="40" class="text-white block md:hidden" />
@@ -433,7 +433,7 @@ onMounted(async () => {
                                 @click="openDeleteDialog(row)"
                                 variant="ghost"
                                 size="sm"
-                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
+                                class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 text-white hover:bg-danger-700"
                                 :disabled="deletingFileId === row.id"
                                 :title="`Delete ${row.filename}`"
                             >
@@ -445,8 +445,8 @@ onMounted(async () => {
                 </o-table-column>
                 <template #empty>
                     <div class="flex flex-col items-center justify-center py-12 px-6">
-                        <FileIcon :size="64" class="text-twilight-indigo-600 mb-4" />
-                        <h3 class="text-xl font-semibold text-regal-navy-900 mb-2">
+                        <FileIcon :size="64" class="text-twilight-indigo-400 mb-4" />
+                        <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
                             {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
                         </h3>
                         <p class="text-twilight-indigo-700 text-center max-w-md">
@@ -458,7 +458,7 @@ onMounted(async () => {
                             v-if="hasActiveFilters"
                             variant="outline"
                             @click="() => listing.resetFilters()"
-                            class="mt-4 border-smart-blue-600 text-smart-blue-600 bg-transparent hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                            class="mt-4 border-smart-blue-400 text-smart-blue-400 bg-transparent hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                         >
                             Clear Filters
                         </Button>
@@ -524,12 +524,12 @@ onMounted(async () => {
             <Dialog v-model="dialogOpen">
                 <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
                     <DialogHeader>
-                        <DialogTitle class="text-danger-600">Delete File</DialogTitle>
-                        <DialogDescription class="text-base mt-2 text-twilight-indigo-900">
-                            Are you sure you want to delete <span class="font-semibold text-danger-600">{{ fileToDelete?.filename }}</span>? This action cannot be undone.
+                        <DialogTitle class="text-danger-400">Delete File</DialogTitle>
+                        <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
+                            Are you sure you want to delete <span class="font-semibold text-danger-400">{{ fileToDelete?.filename }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <div v-if="deleteError" class="mt-4 rounded border border-danger-600 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
+                    <div v-if="deleteError" class="mt-4 rounded border border-danger-400 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
                         {{ deleteError }}
                     </div>
                     <DialogFooter>
@@ -538,7 +538,7 @@ onMounted(async () => {
                                 variant="outline"
                                 @click="handleDeleteCancel"
                                 :disabled="deletingFileId !== null"
-                                class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                                class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                             >
                                 Cancel
                             </Button>
@@ -548,7 +548,7 @@ onMounted(async () => {
                             @click="handleDeleteConfirm"
                             :disabled="deletingFileId !== null"
                             variant="default"
-                            class="bg-danger-600 hover:bg-danger-700"
+                            class="bg-danger-400 hover:bg-danger-700"
                         >
                             {{ deletingFileId !== null ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>

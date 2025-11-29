@@ -22,12 +22,12 @@ function handleToggleMenu(): void {
 </script>
 
 <template>
-    <header class="sticky top-0 z-50 w-full bg-prussian-blue-400">
+    <header class="sticky top-0 z-50 w-full bg-prussian-blue-600">
         <div class="relative flex h-16 items-center justify-center lg:justify-between px-4 lg:px-8">
             <!-- Mobile/Tablet Menu Toggle (Absolute on mobile/tablet) -->
             <button
                 @click="handleToggleMenu"
-                class="absolute left-4 lg:static lg:hidden p-2 rounded-lg transition-colors hover:bg-prussian-blue-500 text-smart-blue-900 mobile-menu-toggle"
+                class="absolute left-4 lg:static lg:hidden p-2 rounded-lg transition-colors hover:bg-prussian-blue-500 text-smart-blue-100 mobile-menu-toggle"
                 aria-label="Toggle menu"
             >
                 <Menu :size="24" />
@@ -38,7 +38,7 @@ function handleToggleMenu(): void {
                 <router-link to="/dashboard" class="flex items-center">
                     <AtlasIcon class="w-10 h-10" />
                 </router-link>
-                <span class="text-xl font-bold text-smart-blue-900">
+                <span class="text-xl font-bold text-smart-blue-100">
                     {{ appName }}
                 </span>
             </div>

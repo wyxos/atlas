@@ -13,10 +13,10 @@ withDefaults(defineProps<Props>(), {
 
 <template>
     <div :class="{ 'text-center': centered }" class="mb-8">
-        <h4 class="text-2xl font-semibold mb-2 text-regal-navy-900">
+        <h4 class="text-2xl font-semibold mb-2 text-regal-navy-100">
             {{ title }}
         </h4>
-        <p v-if="subtitle" class="text-blue-slate-700">
+        <p v-if="subtitle" class="text-blue-slate-300">
             {{ subtitle }}
         </p>
     </div>

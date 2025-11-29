@@ -81,15 +81,15 @@ watch(isOpen, (isOpenValue) => {
                     <div class="flex flex-col h-full">
                         <!-- Header -->
                         <div class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500">
-                            <h2 class="text-2xl font-semibold text-regal-navy-900">
+                            <h2 class="text-2xl font-semibold text-regal-navy-100">
                                 {{ title }}
                             </h2>
                             <button
                                 @click="close"
-                                class="p-2 rounded-lg transition-colors hover:bg-smart-blue-300 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
+                                class="p-2 rounded-lg transition-colors hover:bg-smart-blue-700 focus:outline-none focus:ring-2 focus:ring-smart-blue-500 focus:ring-offset-2"
                                 aria-label="Close filters"
                             >
-                                <X :size="20" class="text-twilight-indigo-900" />
+                                <X :size="20" class="text-twilight-indigo-100" />
                             </button>
                         </div>
 
@@ -103,7 +103,7 @@ watch(isOpen, (isOpenValue) => {
                             <Button
                                 variant="outline"
                                 @click="$emit('reset')"
-                                class="border-twilight-indigo-500 text-twilight-indigo-900 hover:bg-smart-blue-300 hover:border-smart-blue-600 hover:text-smart-blue-900"
+                                class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                             >
                                 Reset
                             </Button>

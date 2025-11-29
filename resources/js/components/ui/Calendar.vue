@@ -108,7 +108,7 @@ const monthNames = [
                 <button
                     v-if="layout === 'month-and-year'"
                     @click="previousMonth"
-                    class="p-1 rounded hover:bg-smart-blue-300 text-twilight-indigo-900 transition-colors"
+                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
                     aria-label="Previous month"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,20 +118,20 @@ const monthNames = [
                 <button
                     v-else
                     @click="previousYear"
-                    class="p-1 rounded hover:bg-smart-blue-300 text-twilight-indigo-900 transition-colors"
+                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
                     aria-label="Previous year"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <div class="text-sm font-semibold text-smart-blue-900 min-w-[120px] text-center">
+                <div class="text-sm font-semibold text-smart-blue-100 min-w-[120px] text-center">
                     {{ monthNames[currentMonth.month - 1] }} {{ currentMonth.year }}
                 </div>
                 <button
                     v-if="layout === 'month-and-year'"
                     @click="nextMonth"
-                    class="p-1 rounded hover:bg-smart-blue-300 text-twilight-indigo-900 transition-colors"
+                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
                     aria-label="Next month"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,7 +141,7 @@ const monthNames = [
                 <button
                     v-else
                     @click="nextYear"
-                    class="p-1 rounded hover:bg-smart-blue-300 text-twilight-indigo-900 transition-colors"
+                    class="p-1 rounded hover:bg-smart-blue-700 text-twilight-indigo-100 transition-colors"
                     aria-label="Next year"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,7 +171,7 @@ const monthNames = [
                     isSelected(date)
                         ? 'bg-smart-blue-500 text-white font-semibold hover:bg-smart-blue-600 shadow-lg scale-105'
                         : isCurrentMonth(date)
-                        ? 'text-twilight-indigo-900 hover:bg-smart-blue-500 hover:text-white hover:shadow-md hover:scale-105'
+                        ? 'text-twilight-indigo-100 hover:bg-smart-blue-500 hover:text-white hover:shadow-md hover:scale-105'
                         : 'text-twilight-indigo-600 hover:bg-smart-blue-500/80 hover:text-white hover:shadow-md hover:scale-105'
                 )"
             >

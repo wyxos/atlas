@@ -19,12 +19,12 @@ const badgeClasses = computed(() => {
 
     const variantClasses = {
         verified: props.iconOnly
-            ? 'bg-success-300 border border-success-500'
-            : 'bg-smart-blue-300 border border-smart-blue-500',
-        active: 'bg-smart-blue-300 border border-smart-blue-500',
-        inactive: 'bg-twilight-indigo-500 border border-blue-slate-500',
-        error: 'bg-danger-300 border border-danger-600',
-        pending: 'bg-sapphire-300 border border-sapphire-500',
+            ? 'bg-success-700 border border-success-500 text-white'
+            : 'bg-smart-blue-700 border border-smart-blue-500 text-white',
+        active: 'bg-smart-blue-700 border border-smart-blue-500 text-white',
+        inactive: 'bg-twilight-indigo-500 border border-blue-slate-500 text-white',
+        error: 'bg-danger-700 border border-danger-400 text-white',
+        pending: 'bg-sapphire-700 border border-sapphire-500 text-white',
     };
 
     return `${baseClasses} ${variantClasses[props.variant]}`;

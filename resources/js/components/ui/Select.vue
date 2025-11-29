@@ -22,7 +22,7 @@ const emit = defineEmits<{
 
 const selectClasses = computed(() => {
     const baseClasses =
-        'w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20';
+        'w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-400 focus:ring-smart-blue-400/20';
     const errorClasses = props.error ? 'border-danger-700' : '';
     return `${baseClasses} ${errorClasses}`;
 });
@@ -39,7 +39,7 @@ function handleFocus(event: FocusEvent): void {
 
 <template>
     <div>
-        <label v-if="$slots.label" :for="id" class="block text-sm font-medium mb-2 text-smart-blue-900">
+        <label v-if="$slots.label" :for="id" class="block text-sm font-medium mb-2 text-smart-blue-100">
             <slot name="label" />
         </label>
         <select
