@@ -3,7 +3,7 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { computed, watch, Teleport } from 'vue';
 import { X } from 'lucide-vue-next';
-import Button from './Button.vue';
+import { Button } from '@/components/ui/button';
 
 interface Props {
     modelValue?: boolean;
@@ -91,11 +91,11 @@ watch(isOpen, (isOpenValue) => {
 
                     <!-- Footer -->
                     <div class="flex items-center justify-end gap-4 p-6 border-t-2 border-twilight-indigo-500">
-                        <Button variant="outline" color="danger" @click="$emit('reset')" :loading="isResetting"
+                        <Button variant="destructive" @click="$emit('reset')" :loading="isResetting"
                             :disabled="isFiltering || isResetting">
                             Reset
                         </Button>
-                        <Button variant="default" color="default" @click="$emit('apply')" :loading="isFiltering"
+                        <Button variant="default" @click="$emit('apply')" :loading="isFiltering"
                             :disabled="isFiltering || isResetting">
                             Apply
                         </Button>

@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Download, FileText, Copy, ExternalLink, Trash2, Eye, Info } from 'lucide-vue-next';
 import { toast } from '../components/ui/sonner';
 import PageLayout from '../components/PageLayout.vue';
-import Button from '../components/ui/Button.vue';
+import { Button } from '@/components/ui/button';
 import FileDetailsCard from '../components/FileDetailsCard.vue';
 import FileDetailsPanel from '../components/ui/FileDetailsPanel.vue';
 import {
@@ -218,7 +218,7 @@ onMounted(() => {
         <!-- Error State -->
         <div v-else-if="error" class="text-center py-12">
             <p class="text-red-500 text-lg">{{ error }}</p>
-            <Button variant="outline" color="default" @click="loadFile" class="mt-4">
+            <Button variant="outline" @click="loadFile" class="mt-4">
                 Retry
             </Button>
         </div>
@@ -318,12 +318,12 @@ onMounted(() => {
                 </div>
                 <DialogFooter>
                     <DialogClose as-child>
-                        <Button variant="outline" color="default" @click="handleDeleteCancel" :disabled="deleting">
+                        <Button variant="outline" @click="handleDeleteCancel" :disabled="deleting">
                             Cancel
                         </Button>
                     </DialogClose>
                     <Button v-if="canRetryDelete || !deleteError" @click="handleDeleteConfirm" :disabled="deleting"
-                        variant="default" color="danger">
+                        variant="destructive">
                         {{ deleting ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
                     </Button>
                 </DialogFooter>

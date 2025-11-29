@@ -4,7 +4,7 @@ import type { DateValue } from '@internationalized/date';
 import { CalendarDate, DateFormatter, getLocalTimeZone, today } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-vue-next';
 import { cn } from '@/lib/utils';
-import Button from './Button.vue';
+import { Button } from '@/components/ui/button';
 import Calendar from './Calendar.vue';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 

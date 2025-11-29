@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PageLayout from '../components/PageLayout.vue';
 import FormInput from '../components/ui/FormInput.vue';
-import Button from '../components/ui/Button.vue';
+import { Button } from '@/components/ui/button';
 import { ref } from 'vue';
 
 // Password form
@@ -107,49 +107,29 @@ async function handleAccountDeletion(): Promise<void> {
                     </h2>
 
                     <form @submit.prevent="handlePasswordUpdate" class="space-y-4">
-                        <FormInput
-                            id="current_password"
-                            v-model="passwordForm.current_password"
-                            type="password"
-                            required
-                            :error="passwordErrors.current_password"
-                            @focus="clearPasswordErrors"
-                        >
+                        <FormInput id="current_password" v-model="passwordForm.current_password" type="password"
+                            required :error="passwordErrors.current_password" @focus="clearPasswordErrors">
                             <template #label>Current Password</template>
                         </FormInput>
 
-                        <FormInput
-                            id="password"
-                            v-model="passwordForm.password"
-                            type="password"
-                            required
-                            :error="passwordErrors.password"
-                            @focus="clearPasswordErrors"
-                        >
+                        <FormInput id="password" v-model="passwordForm.password" type="password" required
+                            :error="passwordErrors.password" @focus="clearPasswordErrors">
                             <template #label>New Password</template>
                         </FormInput>
 
-                        <FormInput
-                            id="password_confirmation"
-                            v-model="passwordForm.password_confirmation"
-                            type="password"
-                            required
-                        >
+                        <FormInput id="password_confirmation" v-model="passwordForm.password_confirmation"
+                            type="password" required>
                             <template #label>Confirm New Password</template>
                         </FormInput>
 
-                        <div v-if="passwordSuccess" class="p-3 rounded-lg bg-smart-blue-700 border border-smart-blue-500">
+                        <div v-if="passwordSuccess"
+                            class="p-3 rounded-lg bg-smart-blue-700 border border-smart-blue-500">
                             <p class="text-sm text-smart-blue-300">
                                 {{ passwordSuccess }}
                             </p>
                         </div>
 
-                        <Button
-                            type="submit"
-                            :disabled="passwordLoading"
-                            variant="default"
-                            color="default"
-                        >
+                        <Button type="submit" :disabled="passwordLoading" variant="default">
                             <span v-if="passwordLoading">Updating...</span>
                             <span v-else>Update Password</span>
                         </Button>
@@ -168,23 +148,12 @@ async function handleAccountDeletion(): Promise<void> {
                     </p>
 
                     <form @submit.prevent="handleAccountDeletion" class="space-y-4">
-                        <FormInput
-                            id="delete_password"
-                            v-model="deleteForm.password"
-                            type="password"
-                            required
-                            :error="deleteErrors.password"
-                            @focus="clearDeleteErrors"
-                        >
+                        <FormInput id="delete_password" v-model="deleteForm.password" type="password" required
+                            :error="deleteErrors.password" @focus="clearDeleteErrors">
                             <template #label>Enter your password to confirm</template>
                         </FormInput>
 
-                        <Button
-                            type="submit"
-                            :disabled="deleteLoading"
-                            variant="default"
-                            color="danger"
-                        >
+                        <Button type="submit" :disabled="deleteLoading" variant="destructive">
                             <span v-if="deleteLoading">Deleting...</span>
                             <span v-else>Delete Account</span>
                         </Button>
