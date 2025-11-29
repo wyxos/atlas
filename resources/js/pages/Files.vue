@@ -295,6 +295,7 @@ onMounted(async () => {
                     pagination-order="right"
                     @page-change="(page: number) => listing.goToPage(page)"
                     class="rounded-lg"
+                    striped
                 >
                 <o-table-column field="id" label="ID" width="80" />
                 <o-table-column field="filename" label="Filename">
@@ -305,7 +306,7 @@ onMounted(async () => {
                             :title="`Click to copy: ${row.filename}`"
                         >
                             <FileText :size="16" class="text-smart-blue-400" />
-                            <span class="truncate max-w-xs group-hover:text-smart-blue-400 transition-colors" :title="row.filename">{{ row.filename }}</span>
+                            <span class="truncate max-w-[12rem] md:max-w-xs group-hover:text-smart-blue-400 transition-colors" :title="row.filename">{{ row.filename }}</span>
                             <Copy :size="12" class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                     </template>
@@ -317,7 +318,7 @@ onMounted(async () => {
                             'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
                             'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
                             'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
-                            'bg-twilight-indigo-500/20 text-twilight-indigo-700': getMimeTypeCategory(row.mime_type) === 'other',
+                            'bg-twilight-indigo-500/20 text-twilight-indigo-100': getMimeTypeCategory(row.mime_type) === 'other',
                         }">
                             {{ row.mime_type || 'Unknown' }}
                         </span>
@@ -350,7 +351,7 @@ onMounted(async () => {
                         <button
                             v-if="row.absolute_path"
                             @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                            class="font-mono text-xs text-twilight-indigo-700 truncate max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left w-full"
+                            class="font-mono text-xs text-twilight-indigo-100 truncate max-w-[12rem] md:max-w-xs block hover:text-smart-blue-400 transition-colors cursor-pointer group text-left w-full"
                             :title="`Click to copy: ${row.absolute_path}`"
                         >
                             <span class="flex items-center gap-1">
@@ -373,7 +374,7 @@ onMounted(async () => {
                             :href="row.url"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
+                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-[12rem] md:max-w-xs block"
                             :title="row.url"
                         >
                             {{ row.url }}
@@ -393,7 +394,7 @@ onMounted(async () => {
                             :href="row.referrer_url"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-xs block"
+                            class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate max-w-[12rem] md:max-w-xs block"
                             :title="row.referrer_url"
                         >
                             {{ row.referrer_url }}
