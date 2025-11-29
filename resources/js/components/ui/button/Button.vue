@@ -27,23 +27,16 @@ const isDisabled = computed(() => {
 </script>
 
 <template>
-  <Primitive
-    data-slot="button"
-    :as="as"
-    :as-child="asChild"
-    :class="cn(buttonVariants({ variant, size }), 'relative', props.class)"
-    :disabled="isDisabled"
-  >
-    <span class="invisible">
+  <Primitive data-slot="button" :as="as" :as-child="asChild"
+    :class="cn(buttonVariants({ variant, size }), 'relative', props.class)" :disabled="isDisabled">
+    <!-- Keep content in flow to preserve width/height; hide visually while loading -->
+    <span :class="['inline-flex items-center gap-2', loading ? 'opacity-0 pointer-events-none' : '']">
       <slot />
     </span>
-    <span class="absolute inset-0 flex items-center justify-center">
-      <Transition name="fade" mode="out-in">
-        <Loader2 v-if="loading" :size="size === 'sm' ? 16 : size === 'lg' ? 24 : 20" class="animate-spin" />
-        <span v-else>
-          <slot />
-        </span>
-      </Transition>
+
+    <!-- Centered loader that does not affect layout -->
+    <span v-if="loading" class="absolute inset-0 flex items-center justify-center">
+      <Loader2 :size="size === 'sm' ? 16 : size === 'lg' ? 24 : 20" class="animate-spin" />
     </span>
   </Primitive>
 </template>
