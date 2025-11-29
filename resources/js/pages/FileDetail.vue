@@ -317,7 +317,7 @@ onMounted(() => {
                         v-if="fileType === 'image' && fileUrl"
                         :src="fileUrl"
                         :alt="file.title || file.filename"
-                        class="w-full h-full object-contain rounded"
+                        class="max-w-full max-h-full rounded object-contain"
                         @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }"
                     />
                     <video
