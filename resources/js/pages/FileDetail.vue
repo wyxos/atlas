@@ -16,6 +16,7 @@ import {
     DialogTitle,
     DialogClose,
 } from '../components/ui/dialog';
+import { formatDate } from '../utils/date';
 
 const route = useRoute();
 const router = useRouter();
@@ -65,18 +66,6 @@ const deleteError = ref<string | null>(null);
 const canRetryDelete = ref(false);
 const deleting = ref(false);
 const detailsPanelOpen = ref(false);
-
-function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-    });
-}
 
 function formatFileSize(bytes: number | null): string {
     if (bytes === null || bytes === 0) {

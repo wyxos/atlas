@@ -2,6 +2,7 @@
 import { Download, FileText, Copy, ExternalLink } from 'lucide-vue-next';
 import Button from './ui/Button.vue';
 import { toast } from './ui/sonner';
+import { formatDate } from '../utils/date';
 
 interface File {
     id: number;
@@ -44,18 +45,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-    });
-}
 
 function formatFileSize(bytes: number | null): string {
     if (bytes === null || bytes === 0) {

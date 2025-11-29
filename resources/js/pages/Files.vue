@@ -20,6 +20,8 @@ import ListingFilterForm from '../components/ListingFilterForm.vue';
 import ActiveFilters from '../components/ActiveFilters.vue';
 import ListingTable from '../components/ListingTable.vue';
 import { Listing } from '../lib/Listing';
+import { DeletionHandler } from '../lib/DeletionHandler';
+import { formatDate } from '../utils/date';
 
 const route = useRoute();
 const router = useRouter();
@@ -74,72 +76,13 @@ listing
         return error;
     });
 
-const deletingFileId = ref<number | null>(null);
-const dialogOpen = ref(false);
-const fileToDelete = ref<File | null>(null);
-const deleteError = ref<string | null>(null);
-const canRetryDelete = ref(false);
-
-async function deleteFile(fileId: number): Promise<void> {
-    deletingFileId.value = fileId;
-    deleteError.value = null;
-    canRetryDelete.value = false;
-
-    await listing.delete(`/api/files/${fileId}`, fileId, {
-        onSuccess: () => {
-            dialogOpen.value = false;
-            fileToDelete.value = null;
-            deletingFileId.value = null;
-        },
-        onError: (error: unknown, statusCode?: number) => {
-            if (statusCode === 403) {
-                deleteError.value = 'You do not have permission to delete files.';
-                canRetryDelete.value = false;
-            } else if (statusCode && statusCode >= 500) {
-                deleteError.value = 'Something went wrong while deleting the file. Please try again.';
-                canRetryDelete.value = true;
-            } else {
-                deleteError.value = 'Failed to delete file. Please try again later.';
-                canRetryDelete.value = false;
-            }
-
-            console.error('Error deleting file:', error);
-            deletingFileId.value = null;
-        },
-    });
-}
-
-function openDeleteDialog(file: File): void {
-    fileToDelete.value = file;
-    dialogOpen.value = true;
-    deleteError.value = null;
-    canRetryDelete.value = false;
-}
-
-async function handleDeleteConfirm(): Promise<void> {
-    if (fileToDelete.value) {
-        await deleteFile(fileToDelete.value.id);
-    }
-}
-
-function handleDeleteCancel(): void {
-    dialogOpen.value = false;
-    fileToDelete.value = null;
-    deleteError.value = null;
-    canRetryDelete.value = false;
-}
-
-function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-    });
-}
+const deletionHandler = DeletionHandler.create<File>(listing, {
+    getDeleteUrl: (file) => `/api/files/${file.id}`,
+    getId: (file) => file.id,
+    permissionDeniedMessage: 'You do not have permission to delete files.',
+    serverErrorMessage: 'Something went wrong while deleting the file. Please try again.',
+    genericErrorMessage: 'Failed to delete file. Please try again later.',
+});
 
 function formatFileSize(bytes: number | null): string {
     if (bytes === null || bytes === 0) {
@@ -393,11 +336,11 @@ onMounted(async () => {
                                 <Eye :size="28" class="text-white hidden md:block" />
                             </Button>
                             <Button
-                                @click="openDeleteDialog(row)"
+                                @click="deletionHandler.openDialog(row)"
                                 variant="ghost"
                                 size="sm"
                                 class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 text-white hover:bg-danger-700"
-                                :disabled="deletingFileId === row.id"
+                                :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id"
                                 :title="`Delete ${row.filename}`"
                             >
                                 <Trash2 :size="40" class="text-white block md:hidden" />
@@ -484,36 +427,36 @@ onMounted(async () => {
             </FilterPanel>
 
             <!-- Delete Confirmation Dialog -->
-            <Dialog v-model="dialogOpen">
+            <Dialog v-model="deletionHandler.dialogOpen">
                 <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
                     <DialogHeader>
                         <DialogTitle class="text-danger-400">Delete File</DialogTitle>
                         <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
-                            Are you sure you want to delete <span class="font-semibold text-danger-400">{{ fileToDelete?.filename }}</span>? This action cannot be undone.
+                            Are you sure you want to delete <span class="font-semibold text-danger-400">{{ deletionHandler.itemToDelete?.filename }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <div v-if="deleteError" class="mt-4 rounded border border-danger-400 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
-                        {{ deleteError }}
+                    <div v-if="deletionHandler.deleteError" class="mt-4 rounded border border-danger-400 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
+                        {{ deletionHandler.deleteError }}
                     </div>
                     <DialogFooter>
                         <DialogClose as-child>
                             <Button
                                 variant="outline"
-                                @click="handleDeleteCancel"
-                                :disabled="deletingFileId !== null"
+                                @click="deletionHandler.closeDialog"
+                                :disabled="deletionHandler.isDeleting"
                                 class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                             >
                                 Cancel
                             </Button>
                         </DialogClose>
                         <Button
-                            v-if="canRetryDelete || !deleteError"
-                            @click="handleDeleteConfirm"
-                            :disabled="deletingFileId !== null"
+                            v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
+                            @click="deletionHandler.delete"
+                            :disabled="deletionHandler.isDeleting"
                             variant="default"
                             class="bg-danger-400 hover:bg-danger-700"
                         >
-                            {{ deletingFileId !== null ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
+                            {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError && deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

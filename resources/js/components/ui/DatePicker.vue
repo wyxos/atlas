@@ -125,7 +125,7 @@ function handleDateSelect(value: DateValue | null): void {
                 variant="outline"
                 :class="cn(
                     'w-full justify-start text-left font-normal',
-                    !date && 'text-twilight-indigo-700'
+                    !date && 'text-twilight-indigo-300'
                 )"
             >
                 <CalendarIcon :size="16" class="mr-2" />
