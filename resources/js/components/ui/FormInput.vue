@@ -26,7 +26,7 @@ const emit = defineEmits<{
 
 const inputClasses = computed(() => {
     const baseClasses =
-        'w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-400 focus:ring-smart-blue-400/20';
+        'w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-600 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-400 focus:ring-smart-blue-400/20';
     const errorClasses = props.error ? 'border-danger-700' : '';
     return `${baseClasses} ${errorClasses}`;
 });

@@ -53,7 +53,7 @@ onUnmounted(() => {
             <div
                 v-if="isOpen"
                 ref="menuRef"
-                class="absolute right-0 mt-2 w-56 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 bg-prussian-blue-400 border border-twilight-indigo-500"
+                class="absolute right-0 mt-2 w-56 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 bg-prussian-blue-600 border border-twilight-indigo-500"
             >
                 <div class="py-1">
                     <slot />

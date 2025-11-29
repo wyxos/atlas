@@ -3,8 +3,8 @@
 </script>
 
 <template>
-    <div class="min-h-screen bg-prussian-blue-500 text-dull-white-500">
-        <header class="bg-prussian-blue-600 border-b border-twilight-indigo-500">
+    <div class="min-h-screen bg-prussian-blue-600 text-dull-white-500">
+        <header class="bg-prussian-blue-700 border-b border-twilight-indigo-500">
             <div class="container mx-auto px-4 h-16 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded bg-smart-blue-500 flex items-center justify-center text-white font-bold">

@@ -12,11 +12,11 @@
 
         @include('partials.favicons')
     </head>
-    <body class="bg-prussian-blue-500 text-twilight-indigo-900 min-h-screen">
+    <body class="bg-prussian-blue-700 text-twilight-indigo-900 min-h-screen">
         <div id="app"></div>
         <main class="flex min-h-screen items-center justify-center p-6">
             <div class="w-full max-w-4xl">
-                <div class="bg-prussian-blue-600 rounded-lg shadow-2xl p-8 lg:p-12">
+                <div class="bg-prussian-blue-700 rounded-lg shadow-2xl p-8 lg:p-12">
                     <div class="text-center mb-8">
                         <div class="flex justify-center mb-6">
                             <x-atlas-icon class="w-32 h-32" />

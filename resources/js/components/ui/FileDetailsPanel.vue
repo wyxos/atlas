@@ -63,12 +63,12 @@ watch(isOpen, (isOpenValue) => {
         <!-- Panel -->
         <Transition name="slide-right">
             <div v-if="isOpen"
-                class="fixed top-0 right-0 z-[60] w-96 max-w-[90vw] md:w-[32rem] lg:w-[36rem] xl:w-[40rem] h-full bg-prussian-blue-500 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
+                class="fixed top-0 right-0 z-[60] w-96 max-w-[90vw] md:w-[32rem] lg:w-[36rem] xl:w-[40rem] h-full bg-prussian-blue-600 border-l-2 border-twilight-indigo-500 shadow-2xl overflow-y-auto"
                 @click.stop>
                 <div class="flex flex-col h-full">
                     <!-- Header -->
                     <div
-                        class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500 sticky top-0 bg-prussian-blue-500 z-10">
+                        class="flex items-center justify-between p-6 border-b-2 border-twilight-indigo-500 sticky top-0 bg-prussian-blue-600 z-10">
                         <h2 class="text-2xl font-semibold text-regal-navy-100">
                             {{ title }}
                         </h2>

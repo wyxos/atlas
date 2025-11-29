@@ -23,7 +23,7 @@ function handleToggleMenu(): void {
 </script>
 
 <template>
-    <header class="sticky top-0 z-50 w-full bg-prussian-blue-600">
+    <header class="sticky top-0 z-50 w-full">
         <div class="relative flex h-16 items-center justify-center lg:justify-between px-4 lg:px-8">
             <!-- Mobile/Tablet Menu Toggle (Absolute on mobile/tablet) -->
             <Button
