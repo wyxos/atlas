@@ -238,7 +238,7 @@ onMounted(async () => {
 
             <!-- Delete Confirmation Dialog -->
             <Dialog v-model="deletionHandler.dialogOpen">
-                <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
+                <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
                     <DialogHeader>
                         <DialogTitle class="text-danger-600">Delete User</DialogTitle>
                         <DialogDescription class="text-base mt-2 text-twilight-indigo-100">

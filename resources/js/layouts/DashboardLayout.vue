@@ -149,11 +149,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex min-h-screen bg-prussian-blue-500">
+    <div class="flex min-h-screen bg-gradient-to-b from-prussian-blue-900 via-prussian-blue-800 to-prussian-blue-700">
         <!-- Side Menu -->
         <aside
             :class="[
-                'fixed lg:static z-40 h-screen bg-prussian-blue-500 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
+                'fixed lg:static z-40 h-screen bg-prussian-blue-600 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
                 'flex flex-col',
                 isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-16 lg:translate-x-0'
             ]"
@@ -226,7 +226,7 @@ onUnmounted(() => {
                     >
                         <div
                             v-if="isUserMenuOpen && isMenuOpen"
-                            class="absolute bottom-full left-0 right-0 mb-2 rounded-lg shadow-lg bg-prussian-blue-500 border border-twilight-indigo-500 overflow-hidden"
+                            class="absolute bottom-full left-0 right-0 mb-2 rounded-lg shadow-lg bg-prussian-blue-600 border border-twilight-indigo-500 overflow-hidden"
                         >
                             <router-link
                                 to="/profile"
@@ -253,7 +253,7 @@ onUnmounted(() => {
         <!-- Main Content -->
         <div class="flex-1 flex flex-col min-w-0 lg:max-h-screen">
             <AppHeader :user-name="userName" :app-name="appName" @logout="handleLogout" @toggle-menu="toggleMenu" />
-            <main class="flex-1 bg-prussian-blue-600 rounded-lg shadow-xl overflow-auto lg:overflow-y-auto">
+            <main class="flex-1 overflow-auto lg:overflow-y-auto">
                 <slot></slot>
             </main>
         </div>

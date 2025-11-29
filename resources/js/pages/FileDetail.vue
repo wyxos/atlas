@@ -304,7 +304,7 @@ onMounted(() => {
 
         <!-- Delete Confirmation Dialog -->
         <Dialog v-model="dialogOpen">
-            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
+            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
                 <DialogHeader>
                     <DialogTitle class="text-danger-400">Delete File</DialogTitle>
                     <DialogDescription class="text-base mt-2 text-twilight-indigo-100">

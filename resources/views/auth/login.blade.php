@@ -13,7 +13,7 @@
 
         @include('partials.favicons')
     </head>
-    <body class="bg-prussian-blue-500 text-twilight-indigo-900 min-h-screen">
+    <body class="bg-prussian-blue-600 text-twilight-indigo-900 min-h-screen">
         <div id="app"></div>
         <main class="flex min-h-screen items-center justify-center p-6">
             <div class="w-full max-w-md">

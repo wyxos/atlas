@@ -103,7 +103,7 @@ const monthNames = [
 </script>
 
 <template>
-    <div class="rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-4">
+    <div class="rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-700 p-4">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-2">
                 <Button
