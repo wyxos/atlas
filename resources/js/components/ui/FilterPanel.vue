@@ -91,14 +91,12 @@ watch(isOpen, (isOpenValue) => {
 
                     <!-- Footer -->
                     <div class="flex items-center justify-end gap-4 p-6 border-t-2 border-twilight-indigo-500">
-                        <Button variant="outline" @click="$emit('reset')" :loading="isResetting"
-                            :disabled="isFiltering || isResetting"
-                            class="border-danger-400 text-danger-400 bg-transparent hover:bg-danger-700 hover:border-danger-400 hover:text-danger-100">
+                        <Button variant="outline" color="danger" @click="$emit('reset')" :loading="isResetting"
+                            :disabled="isFiltering || isResetting">
                             Reset
                         </Button>
-                        <Button variant="default" @click="$emit('apply')" :loading="isFiltering"
-                            :disabled="isFiltering || isResetting"
-                            class="bg-smart-blue-500 hover:bg-smart-blue-600 text-white">
+                        <Button variant="default" color="default" @click="$emit('apply')" :loading="isFiltering"
+                            :disabled="isFiltering || isResetting">
                             Apply
                         </Button>
                     </div>
