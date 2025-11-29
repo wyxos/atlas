@@ -19,6 +19,8 @@ import ListingFilterForm from '../components/ListingFilterForm.vue';
 import ActiveFilters from '../components/ActiveFilters.vue';
 import ListingTable from '../components/ListingTable.vue';
 import { Listing } from '../lib/Listing';
+import { DeletionHandler } from '../lib/DeletionHandler';
+import { formatDate } from '../utils/date';
 
 const route = useRoute();
 const router = useRouter();
@@ -65,79 +67,18 @@ listing
 // Get current user ID from meta tag
 const currentUserId = parseInt(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || '0', 10);
 
-const deletingUserId = ref<number | null>(null);
-const dialogOpen = ref(false);
-const userToDelete = ref<User | null>(null);
-const deleteError = ref<string | null>(null);
-const canRetryDelete = ref(false);
-
 // Check if a user can be deleted (users cannot delete themselves)
 function canDeleteUser(user: User): boolean {
     return user.id !== currentUserId;
 }
-// No computed wrapper needed - FilterPanel will use separate modelValue and update:modelValue
 
-
-async function deleteUser(userId: number): Promise<void> {
-    deletingUserId.value = userId;
-    deleteError.value = null;
-    canRetryDelete.value = false;
-
-    await listing.delete(`/api/users/${userId}`, userId, {
-        onSuccess: () => {
-            dialogOpen.value = false;
-            userToDelete.value = null;
-            deletingUserId.value = null;
-        },
-        onError: (error: unknown, statusCode?: number) => {
-            if (statusCode === 403) {
-                deleteError.value = 'You do not have permission to delete users.';
-                canRetryDelete.value = false;
-            } else if (statusCode && statusCode >= 500) {
-                deleteError.value = 'Something went wrong while deleting the user. Please try again.';
-                canRetryDelete.value = true;
-            } else {
-                deleteError.value = 'Failed to delete user. Please try again later.';
-                canRetryDelete.value = false;
-            }
-
-            console.error('Error deleting user:', error);
-            deletingUserId.value = null;
-        },
-    });
-}
-
-function openDeleteDialog(user: User): void {
-    userToDelete.value = user;
-    dialogOpen.value = true;
-    deleteError.value = null;
-    canRetryDelete.value = false;
-}
-
-async function handleDeleteConfirm(): Promise<void> {
-    if (userToDelete.value) {
-        await deleteUser(userToDelete.value.id);
-    }
-}
-
-function handleDeleteCancel(): void {
-    dialogOpen.value = false;
-    userToDelete.value = null;
-    deleteError.value = null;
-    canRetryDelete.value = false;
-}
-
-function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-    });
-}
+const deletionHandler = DeletionHandler.create<User>(listing, {
+    getDeleteUrl: (user) => `/api/users/${user.id}`,
+    getId: (user) => user.id,
+    permissionDeniedMessage: 'You do not have permission to delete users.',
+    serverErrorMessage: 'Something went wrong while deleting the user. Please try again.',
+    genericErrorMessage: 'Failed to delete user. Please try again later.',
+});
 
 
 const hasActiveFilters = computed(() => listing.hasActiveFilters);
@@ -251,11 +192,11 @@ onMounted(async () => {
                     <template #default="{ row }">
                         <Button
                             v-if="canDeleteUser(row)"
-                            @click="openDeleteDialog(row)"
+                            @click="deletionHandler.openDialog(row)"
                             variant="ghost"
                             size="sm"
                             class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-600 border-2 border-danger-700 text-white hover:bg-danger-700"
-                            :disabled="deletingUserId === row.id"
+                            :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id"
                         >
                             <Trash2 :size="40" class="text-white block md:hidden" />
                             <Trash2 :size="28" class="text-white hidden md:block" />
@@ -324,36 +265,36 @@ onMounted(async () => {
             </FilterPanel>
 
             <!-- Delete Confirmation Dialog -->
-            <Dialog v-model="dialogOpen">
+            <Dialog v-model="deletionHandler.dialogOpen">
                 <DialogContent class="sm:max-w-[425px] bg-prussian-blue-500 border-danger-500/30">
                     <DialogHeader>
                         <DialogTitle class="text-danger-600">Delete User</DialogTitle>
                         <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
-                            Are you sure you want to delete <span class="font-semibold text-danger-600">{{ userToDelete?.name }}</span>? This action cannot be undone.
+                            Are you sure you want to delete <span class="font-semibold text-danger-600">{{ deletionHandler.itemToDelete?.name }}</span>? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <div v-if="deleteError" class="mt-4 rounded border border-danger-600 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
-                        {{ deleteError }}
+                    <div v-if="deletionHandler.deleteError" class="mt-4 rounded border border-danger-600 bg-danger-700/20 px-3 py-2 text-sm text-danger-300">
+                        {{ deletionHandler.deleteError }}
                     </div>
                     <DialogFooter>
                         <DialogClose as-child>
                             <Button
                                 variant="outline"
-                                @click="handleDeleteCancel"
-                                :disabled="deletingUserId !== null"
+                                @click="deletionHandler.closeDialog"
+                                :disabled="deletionHandler.isDeleting"
                                 class="border-twilight-indigo-500 text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100"
                             >
                                 Cancel
                             </Button>
                         </DialogClose>
                         <Button
-                            v-if="canRetryDelete || !deleteError"
-                            @click="handleDeleteConfirm"
-                            :disabled="deletingUserId !== null"
+                            v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
+                            @click="deletionHandler.delete"
+                            :disabled="deletionHandler.isDeleting"
                             variant="default"
                             class="bg-danger-600 hover:bg-danger-700"
                         >
-                            {{ deletingUserId !== null ? 'Deleting...' : (deleteError && canRetryDelete ? 'Retry' : 'Delete') }}
+                            {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError && deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
