@@ -4,18 +4,10 @@ import Oruga from '@oruga-ui/oruga-next';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { fas } from '@fortawesome/free-solid-svg-icons';
-import '@oruga-ui/theme-oruga/style.css';
 import App from './App.vue';
 import routes from './routes';
 import './bootstrap';
 import './icons';
-
-import * as Sentry from '@sentry/browser';
-
-Sentry.init({
-    integrations: [Sentry.browserTracingIntegration()],
-    // ...other Sentry options
-});
 
 // Add all solid icons to the library
 library.add(fas);

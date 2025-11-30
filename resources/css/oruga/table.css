@@ -1,0 +1,149 @@
+/* Oruga Table Styling to Match UI Guidelines */
+.o-table {
+    background-color: transparent !important;
+    color: #d0d7e5 !important;
+    border-radius: 0.5rem;
+}
+
+/* Table wrapper to match guidelines - merged with overflow rule below */
+.o-table table {
+    border-collapse: collapse !important;
+    background-color: transparent !important;
+}
+
+.o-table thead th {
+    background-color: #000b1f !important;
+    /* prussian-blue-800 */
+    color: #7186b1 !important;
+    /* twilight-indigo-300 */
+    border-bottom: 1px solid #33415c !important;
+    /* twilight-indigo-500 */
+    padding: 1rem 1.5rem !important;
+    text-align: left !important;
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+.o-table thead th:first-child {
+    border-top-left-radius: 0.5rem !important;
+}
+
+.o-table thead th:last-child {
+    border-top-right-radius: 0.5rem !important;
+}
+
+.o-table tbody tr {
+    transition: background-color 0.2s !important;
+    border-bottom: 1px solid #33415c !important;
+    /* twilight-indigo-500 */
+    background-color: transparent !important;
+}
+
+.o-table tbody tr:hover {
+    background-color: rgba(2, 61, 120, 0.2) !important;
+    /* smart-blue-700/20 */
+}
+
+/* Striped Rows */
+.o-table--striped tbody tr:nth-child(odd) {
+    background-color: #000e29 !important;
+    /* prussian-blue-600 */
+}
+
+/* Mobile Table Adjustments */
+@media (max-width: 768px) {
+
+    /* Force table to be block layout */
+    .o-table table,
+    .o-table thead,
+    .o-table tbody,
+    .o-table th,
+    .o-table tr {
+        display: block !important;
+    }
+
+    /* Hide header row */
+    .o-table thead {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    .o-table__td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        text-align: right !important;
+        padding: 0.5rem 0.5rem !important;
+        width: auto !important;
+        /* Override fixed widths from props */
+        border-bottom: 1px solid #1e2737;
+        /* twilight-indigo-700 - separator between cells in card */
+    }
+
+    .o-table__td:last-child {
+        border-bottom: none;
+    }
+
+    .o-table__td:before {
+        content: attr(data-label);
+        font-weight: 600;
+        text-align: left;
+        margin-right: 0.75rem;
+        color: #c3e0fe;
+        /* smart-blue-100 */
+        min-width: 30%;
+        flex-shrink: 0;
+        /* Prevent label from shrinking */
+    }
+
+    /* Mobile Row Distinction */
+    .o-table tbody tr {
+        margin-bottom: 1rem !important;
+        border: 1px solid #33415c !important;
+        /* twilight-indigo-500 */
+        border-radius: 0.5rem !important;
+        background-color: #001233 !important;
+        /* prussian-blue-500 */
+        overflow: hidden;
+        /* Ensure rounded corners and content containment */
+    }
+
+    /* Striped Rows on Mobile */
+    .o-table--striped tbody tr:nth-child(odd) {
+        background-color: #000e29 !important;
+        /* prussian-blue-600 */
+    }
+}
+
+.o-table tbody tr:last-child {
+    border-bottom: none !important;
+}
+
+.o-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 0.5rem !important;
+}
+
+.o-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 0.5rem !important;
+}
+
+.o-table tbody td {
+    color: #d0d7e5 !important;
+    /* twilight-indigo-100 */
+    padding: 1rem 1.5rem !important;
+    font-size: 0.875rem !important;
+    background-color: transparent !important;
+}
+
+/* Table wrapper to match guidelines */
+.o-table__wrapper {
+    border: 1px solid #33415c !important;
+    /* twilight-indigo-500 */
+    border-radius: 0.5rem !important;
+    background-color: #000b1f !important;
+    /* prussian-blue-700 */
+    overflow: auto;
+}

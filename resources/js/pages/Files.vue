@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, Filter, File as FileIcon, Download, Eye } from 'lucide-vue-next';
+import { Trash2, Filter, File as FileIcon, Download, Eye, XCircle } from 'lucide-vue-next';
 import { toast } from '../components/ui/sonner';
 import PageLayout from '../components/PageLayout.vue';
 import {
@@ -229,13 +229,12 @@ onMounted(async () => {
                     <o-table-column field="downloaded" label="Downloaded" width="120">
                         <template #default="{ row }">
                             <span v-if="row.downloaded"
-                                class="inline-flex items-center gap-1 px-3 py-1 rounded-sm text-xs font-medium bg-success-700 border border-success-500 text-success-100">
-                                <Download :size="12" />
-                                Yes
+                                class="inline-flex items-center justify-center px-3 py-1 rounded-sm text-xs font-medium bg-success-700 border border-success-500 text-success-100">
+                                <Download :size="16" />
                             </span>
                             <span v-else
-                                class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100">
-                                No
+                                class="inline-flex items-center justify-center px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100">
+                                <XCircle :size="16" />
                             </span>
                         </template>
                     </o-table-column>
