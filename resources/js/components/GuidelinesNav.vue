@@ -1,5 +1,14 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/ui/sidebar';
 
 const route = useRoute();
 
@@ -20,17 +29,22 @@ function isActive(itemName: string): boolean {
 </script>
 
 <template>
-  <aside class="w-64 shrink-0 self-start">
-    <nav class="sticky top-8 space-y-1">
-      <router-link v-for="item in items" :key="item.name" :to="item.path"
-        class="block px-4 py-2 rounded-lg transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100 relative"
-        :class="{
-          'bg-smart-blue-600 text-white': isActive(item.name),
-        }">
-        <span class="absolute left-0 top-0 bottom-0 w-1 rounded-r transition-colors"
-          :class="isActive(item.name) ? 'bg-smart-blue-400' : 'bg-transparent'"></span>
-        <span class="font-medium">{{ item.label }}</span>
-      </router-link>
-    </nav>
-  </aside>
+  <Sidebar collapsible="none" class="bg-prussian-blue-600 border-r border-twilight-indigo-500">
+    <SidebarContent>
+      <SidebarGroup>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem v-for="item in items" :key="item.name">
+              <SidebarMenuButton as-child :is-active="isActive(item.name)"
+                class="text-twilight-indigo-100 hover:bg-prussian-blue-500 data-[active=true]:bg-smart-blue-600 data-[active=true]:text-white">
+                <router-link :to="item.path" class="flex items-center">
+                  <span>{{ item.label }}</span>
+                </router-link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </SidebarContent>
+  </Sidebar>
 </template>
