@@ -305,9 +305,8 @@ describe('Files', () => {
 
         const text = wrapper.text();
 
-        // Check that formatted dates include time indicators (AM/PM)
-        // The exact format may vary by locale, but should include time
-        const dateRegex = /\d{1,2}:\d{2}\s*(AM|PM)/i;
+        // Check that formatted dates include time in 24-hour format
+        const dateRegex = /\d{2}:\d{2}/;
         expect(text).toMatch(dateRegex);
     });
 

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
-import Heading from '../components/ui/Heading.vue';
 
 const sampleRows = [
   { id: 1, name: 'Smart Blue', value: '#0466c8', usage: 'Primary actions' },

@@ -46,8 +46,8 @@ const menuItems = [
     { name: 'audio', path: '/audio', label: 'Audio', icon: Music },
     { name: 'videos', path: '/videos', label: 'Videos', icon: Video },
     { name: 'photos', path: '/photos', label: 'Photos', icon: Image },
-    { name: 'users', path: '/users', label: 'Users', icon: Users },
     { name: 'files', path: '/files', label: 'Files', icon: Folder },
+    { name: 'users', path: '/users', label: 'Users', icon: Users },
     { name: 'settings', path: '/settings', label: 'Settings', icon: Settings },
 ];
 

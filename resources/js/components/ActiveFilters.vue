@@ -24,7 +24,7 @@ defineProps<Props>();
             </Button>
         </div>
         <Button variant="destructive" size="sm" @click="() => listing.resetFilters()">
-            Clear all
+            Clear
         </Button>
     </div>
 </template>
