@@ -24,6 +24,10 @@ const items = [
 ];
 
 function isActive(itemName: string): boolean {
+  if (itemName === 'guidelines') {
+    // Overview should only be active on exact match
+    return route.name === 'guidelines' && route.path === '/guidelines';
+  }
   return route.name === itemName;
 }
 </script>
@@ -37,7 +41,12 @@ function isActive(itemName: string): boolean {
             <SidebarMenuItem v-for="item in items" :key="item.name">
               <SidebarMenuButton as-child :is-active="isActive(item.name)"
                 class="bg-transparent text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white data-[active=true]:bg-smart-blue-600 data-[active=true]:text-white">
-                <router-link :to="item.path" class="flex items-center">
+                <router-link 
+                  :to="item.path" 
+                  :exact="item.name === 'guidelines'"
+                  exact-active-class="!bg-smart-blue-600 !text-white"
+                  active-class=""
+                  class="flex items-center">
                   <span>{{ item.label }}</span>
                 </router-link>
               </SidebarMenuButton>
