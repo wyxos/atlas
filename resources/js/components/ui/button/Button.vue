@@ -10,6 +10,7 @@ import { computed, useAttrs } from "vue"
 
 interface Props extends PrimitiveProps {
   variant?: ButtonVariants["variant"]
+  color?: ButtonVariants["color"]
   size?: ButtonVariants["size"]
   class?: HTMLAttributes["class"]
   loading?: boolean
@@ -28,7 +29,7 @@ const isDisabled = computed(() => {
 
 <template>
   <Primitive data-slot="button" :as="as" :as-child="asChild"
-    :class="cn(buttonVariants({ variant, size }), 'relative', props.class)" :disabled="isDisabled">
+    :class="cn(buttonVariants({ variant, color, size }), 'relative', props.class)" :disabled="isDisabled">
     <!-- Keep content in flow to preserve width/height; hide visually while loading -->
     <span :class="['inline-flex items-center gap-2', loading ? 'opacity-0 pointer-events-none' : '']">
       <slot />

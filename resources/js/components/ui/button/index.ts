@@ -12,13 +12,17 @@ export const buttonVariants = cva(
           "bg-smart-blue-500 text-white hover:bg-smart-blue-600 focus-visible:ring-smart-blue-400/50",
         destructive:
           "bg-danger-500 text-white hover:bg-danger-600 focus-visible:ring-danger-400/50",
-        outline:
-          "border border-twilight-indigo-500 bg-transparent text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100 focus-visible:ring-smart-blue-400/50",
+        outline: "",
         secondary:
           "bg-sapphire-500 text-white hover:bg-sapphire-600 focus-visible:ring-sapphire-400/50",
-        ghost:
-          "text-twilight-indigo-100 hover:bg-smart-blue-700 hover:text-smart-blue-100 focus-visible:ring-smart-blue-400/50",
+        ghost: "",
         link: "text-smart-blue-400 underline-offset-4 hover:underline hover:text-smart-blue-300",
+      },
+      color: {
+        default:
+          "",
+        danger:
+          "",
       },
       size: {
         "default": "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -29,8 +33,31 @@ export const buttonVariants = cva(
         "icon-lg": "size-10",
       },
     },
+    compoundVariants: [
+      {
+        variant: "outline",
+        color: "default",
+        class: "border border-smart-blue-500 bg-transparent text-smart-blue-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100 focus-visible:ring-smart-blue-400/50",
+      },
+      {
+        variant: "outline",
+        color: "danger",
+        class: "border border-danger-500 bg-transparent text-danger-100 hover:bg-danger-700 hover:border-danger-400 hover:text-danger-100 focus-visible:ring-danger-400/50",
+      },
+      {
+        variant: "ghost",
+        color: "default",
+        class: "border border-twilight-indigo-500 bg-transparent text-twilight-indigo-100 hover:bg-smart-blue-700 hover:border-smart-blue-400 hover:text-smart-blue-100 focus-visible:ring-smart-blue-400/50",
+      },
+      {
+        variant: "ghost",
+        color: "danger",
+        class: "border border-twilight-indigo-500 bg-transparent text-danger-100 hover:bg-danger-700 hover:border-danger-400 hover:text-danger-100 focus-visible:ring-danger-400/50",
+      },
+    ],
     defaultVariants: {
       variant: "default",
+      color: "default",
       size: "default",
     },
   },

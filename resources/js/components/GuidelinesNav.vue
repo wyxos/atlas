@@ -36,7 +36,7 @@ function isActive(itemName: string): boolean {
           <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.name">
               <SidebarMenuButton as-child :is-active="isActive(item.name)"
-                class="text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white data-[active=true]:bg-smart-blue-600 data-[active=true]:text-white">
+                class="bg-transparent text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white data-[active=true]:bg-smart-blue-600 data-[active=true]:text-white">
                 <router-link :to="item.path" class="flex items-center">
                   <span>{{ item.label }}</span>
                 </router-link>
