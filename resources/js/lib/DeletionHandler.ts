@@ -121,12 +121,14 @@ export class DeletionHandler<TItem extends Record<string, unknown>> {
         }
 
         const itemId = this.config.getId(this.itemToDelete);
+        const deleteUrl = this.config.getDeleteUrl(this.itemToDelete);
+
         this.isDeleting = true;
         this.deleteError = null;
         this.canRetryDelete = false;
 
         try {
-            await this.listing.delete(this.config.getDeleteUrl(this.itemToDelete), itemId, {
+            await this.listing.delete(deleteUrl, itemId, {
                 onSuccess: () => {
                     this.closeDialog();
                     if (this.config.onSuccess) {

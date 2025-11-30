@@ -37,8 +37,16 @@ alwaysApply: true
   - Primary actions: Smart Blue (#0466c8)
   - Secondary actions: Sapphire (#0353a4)
   - Headings: Smart Blue 900 (#c3e0fe) or Regal Navy 900 (#b4d8fe)
-  - Body text: Twilight Indigo 900 (#d0d7e5)
+  - Body text: Twilight Indigo 900 (#d0d7e5) or Twilight Indigo 300 (#7186b1) for secondary text
   - Borders/separators: Twilight Indigo (#33415c)
+- **CRITICAL: Text Color Rules for Dark Backgrounds**:
+  - **NEVER use dark color shades (600-900) for text on dark backgrounds** - they will have poor contrast and be hard to read
+  - **ALWAYS use light color shades (100-300) for text on dark backgrounds**:
+    - Primary body text: Use 900 shades (e.g., `text-twilight-indigo-900`, `text-smart-blue-900`)
+    - Secondary/muted text: Use 300 shades (e.g., `text-twilight-indigo-300`, `text-blue-slate-300`)
+    - Disabled/placeholder text: Use 500-600 shades (e.g., `text-twilight-indigo-500`)
+  - **Exception**: Only use dark shades (600-900) for text when the background is light/white
+  - **When in doubt**: Use `text-twilight-indigo-300` for secondary text or `text-twilight-indigo-900` for primary body text on dark backgrounds
 - Match the styling patterns, color usage, and component structure shown in the guidelines page.
 
 ### Testing Requirements (MUST create/update tests)

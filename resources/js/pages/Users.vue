@@ -257,7 +257,7 @@ onMounted(async () => {
                             </Button>
                         </DialogClose>
                         <Button v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
-                            @click="deletionHandler.delete" :disabled="deletionHandler.isDeleting"
+                            @click="() => deletionHandler.delete()" :disabled="deletionHandler.isDeleting"
                             variant="destructive">
                             {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError &&
                                 deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
