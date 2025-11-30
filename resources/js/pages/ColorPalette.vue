@@ -1,30 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { Check } from 'lucide-vue-next';
-import { useRoute } from 'vue-router';
-import PageLayout from '../components/PageLayout.vue';
+import GuidelinesPageLayout from '../components/GuidelinesPageLayout.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
 import Heading from '../components/ui/Heading.vue';
-
-const route = useRoute();
-
-const navigationItems = [
-    {
-        name: 'guidelines',
-        path: '/guidelines',
-        label: 'Overview',
-    },
-    {
-        name: 'guidelines-colors',
-        path: '/guidelines/colors',
-        label: 'Color Palette',
-    },
-];
-
-const isActive = computed(() => (itemName: string) => {
-    return route.name === itemName;
-});
 
 // Type definitions
 type ShadeValue = {
@@ -222,27 +202,7 @@ function getTextColor(shade: keyof ColorPalette['shades']): string {
 </script>
 
 <template>
-    <PageLayout>
-        <div class="flex gap-8 w-full">
-            <!-- Aside Navigation -->
-            <aside class="w-64 shrink-0">
-                <nav class="sticky top-8 space-y-1">
-                    <router-link
-                        v-for="item in navigationItems"
-                        :key="item.name"
-                        :to="item.path"
-                        class="block px-4 py-2 rounded-lg transition-colors text-twilight-indigo-100 hover:bg-prussian-blue-600 hover:text-smart-blue-100"
-                        :class="{
-                            'bg-prussian-blue-600 text-smart-blue-100': isActive(item.name),
-                        }"
-                    >
-                        <span class="font-medium">{{ item.label }}</span>
-                    </router-link>
-                </nav>
-            </aside>
-
-            <!-- Main Content -->
-            <main class="flex-1 min-w-0">
+    <GuidelinesPageLayout>
                 <PageHeader title="Color Palette" subtitle="Design system color palette with click-to-copy functionality" />
 
                 <Section title="Color Palette">
@@ -283,8 +243,6 @@ function getTextColor(shade: keyof ColorPalette['shades']): string {
                         </div>
                     </div>
                 </Section>
-            </main>
-        </div>
-    </PageLayout>
+    </GuidelinesPageLayout>
 </template>
 
