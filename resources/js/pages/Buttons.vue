@@ -86,11 +86,10 @@ const buttonSizes = [
                     <p class="text-sm text-twilight-indigo-200 mb-2">Destructive (Danger)</p>
                     <div class="flex flex-wrap gap-4">
                         <Button variant="destructive">Delete</Button>
-                        <Button variant="outline">Cancel</Button>
+                        <Button variant="outline" color="danger">Cancel</Button>
                     </div>
                 </div>
             </div>
         </Section>
     </div>
 </template>
-

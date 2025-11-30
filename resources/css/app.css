@@ -596,4 +596,28 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
     body {
         @apply bg-background text-foreground;
     }
+
+    /* Global smooth color transitions for interactive elements */
+    a,
+    button,
+    [role="button"],
+    [role="link"],
+    input,
+    select,
+    textarea,
+    [tabindex]:not([tabindex="-1"]) {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
+    }
+
+    /* Ensure sidebar elements have smooth color transitions */
+    [data-sidebar="menu-button"],
+    [data-sidebar="menu-sub-button"],
+    [data-sidebar="menu-action"],
+    [data-sidebar="group-action"] {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
+    }
 }
