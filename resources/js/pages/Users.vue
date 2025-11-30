@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, CheckCircle2, Filter, Users } from 'lucide-vue-next';
+import { Trash2, Filter, Users } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import {
     Dialog,
@@ -159,12 +159,11 @@ onMounted(async () => {
                     <o-table-column field="email_verified_at" label="Verified">
                         <template #default="{ row }">
                             <span v-if="row.email_verified_at"
-                                class="inline-flex items-center justify-center p-1.5 rounded-sm bg-success-300 border border-success-500"
-                                title="Verified">
-                                <CheckCircle2 :size="16" />
+                                class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium bg-success-600 text-white border border-success-500 hover:bg-success-500 transition-colors">
+                                Verified
                             </span>
                             <span v-else
-                                class="px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-twilight-indigo-600">
+                                class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium bg-prussian-blue-600 text-twilight-indigo-100 border border-twilight-indigo-500 hover:bg-prussian-blue-500 transition-colors">
                                 Unverified
                             </span>
                         </template>
