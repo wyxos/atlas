@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, Filter, File as FileIcon, Download, FileText, Copy, Eye } from 'lucide-vue-next';
+import { Trash2, Filter, File as FileIcon, Download, Eye } from 'lucide-vue-next';
 import { toast } from '../components/ui/sonner';
 import PageLayout from '../components/PageLayout.vue';
 import {
@@ -201,19 +201,11 @@ onMounted(async () => {
                     <o-table-column field="id" label="ID" width="80" />
                     <o-table-column field="filename" label="Filename">
                         <template #default="{ row }">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                @click="() => copyToClipboard(row.filename, 'Filename')"
-                                class="flex items-center gap-2 cursor-pointer group flex-1 min-w-0 w-0"
-                                :title="`Click to copy: ${row.filename}`"
-                            >
-                                <FileText :size="16" class="text-smart-blue-400 shrink-0" />
-                                <span class="truncate md:max-w-xs transition-colors group-hover:text-smart-blue-400"
-                                    :title="row.filename">{{ row.filename }}</span>
-                                <Copy :size="12"
-                                    class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                            </Button>
+                            <span @click="() => copyToClipboard(row.filename, 'Filename')"
+                                class="text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block"
+                                :title="`Click to copy: ${row.filename}`">
+                                {{ row.filename }}
+                            </span>
                         </template>
                     </o-table-column>
                     <o-table-column field="source" label="Source" width="120" />
@@ -249,20 +241,11 @@ onMounted(async () => {
                     </o-table-column>
                     <o-table-column field="absolute_path" label="Path" width="300">
                         <template #default="{ row }">
-                            <Button
-                                v-if="row.absolute_path"
-                                variant="ghost"
-                                size="sm"
-                                @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                                class="font-mono text-xs text-twilight-indigo-100 truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block cursor-pointer group text-left hover:text-smart-blue-400 transition-colors"
-                                :title="`Click to copy: ${row.absolute_path}`"
-                            >
-                                <span class="flex items-center gap-1">
-                                    <span class="truncate">{{ row.absolute_path }}</span>
-                                    <Copy :size="12"
-                                        class="text-twilight-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                                </span>
-                            </Button>
+                            <span v-if="row.absolute_path" @click="() => copyToClipboard(row.absolute_path, 'Path')"
+                                class="font-mono text-xs text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block"
+                                :title="`Click to copy: ${row.absolute_path}`">
+                                {{ row.absolute_path }}
+                            </span>
                             <span v-else class="text-twilight-indigo-500 italic text-xs">
                                 —
                             </span>
@@ -335,7 +318,7 @@ onMounted(async () => {
                             </p>
                             <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
                                 class="mt-4">
-                                Clear Filters
+                                Clear
                             </Button>
                         </div>
                     </template>

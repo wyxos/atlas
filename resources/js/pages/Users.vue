@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue';
+import { onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Trash2, CheckCircle2, Filter, Users } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
@@ -208,7 +208,7 @@ onMounted(async () => {
                             </p>
                             <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
                                 class="mt-4">
-                                Clear Filters
+                                Clear
                             </Button>
                         </div>
                     </template>
