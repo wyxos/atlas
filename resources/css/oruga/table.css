@@ -1,29 +1,15 @@
 /* Oruga Table Styling to Match UI Guidelines */
 .o-table {
-    background-color: transparent !important;
-    color: #d0d7e5 !important;
-    border-radius: 0.5rem;
+    @apply bg-transparent text-twilight-indigo-100 rounded-lg;
 }
 
 /* Table wrapper to match guidelines - merged with overflow rule below */
 .o-table table {
-    border-collapse: collapse !important;
-    background-color: transparent !important;
+    @apply border-collapse bg-transparent;
 }
 
 .o-table thead th {
-    background-color: #000b1f !important;
-    /* prussian-blue-800 */
-    color: #7186b1 !important;
-    /* twilight-indigo-300 */
-    border-bottom: 1px solid #33415c !important;
-    /* twilight-indigo-500 */
-    padding: 1rem 1.5rem !important;
-    text-align: left !important;
-    font-size: 0.875rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
+    @apply bg-prussian-blue-800 text-twilight-indigo-300 border-b border-twilight-indigo-500 px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide;
 }
 
 .o-table thead th:first-child {
@@ -35,21 +21,16 @@
 }
 
 .o-table tbody tr {
-    transition: background-color 0.2s !important;
-    border-bottom: 1px solid #33415c !important;
-    /* twilight-indigo-500 */
-    background-color: transparent !important;
+    @apply transition-colors border-b border-twilight-indigo-500 bg-transparent;
 }
 
 .o-table tbody tr:hover {
-    background-color: rgba(2, 61, 120, 0.2) !important;
-    /* smart-blue-700/20 */
+    @apply bg-smart-blue-700/20;
 }
 
 /* Striped Rows */
 .o-table--striped tbody tr:nth-child(odd) {
-    background-color: #000e29 !important;
-    /* prussian-blue-600 */
+    @apply bg-prussian-blue-600;
 }
 
 /* Mobile Table Adjustments */
@@ -131,19 +112,10 @@
 }
 
 .o-table tbody td {
-    color: #d0d7e5 !important;
-    /* twilight-indigo-100 */
-    padding: 1rem 1.5rem !important;
-    font-size: 0.875rem !important;
-    background-color: transparent !important;
+    @apply text-twilight-indigo-100 px-6 py-4 text-sm bg-transparent;
 }
 
 /* Table wrapper to match guidelines */
 .o-table__wrapper {
-    border: 1px solid #33415c !important;
-    /* twilight-indigo-500 */
-    border-radius: 0.5rem !important;
-    background-color: #000b1f !important;
-    /* prussian-blue-700 */
-    overflow: auto;
+    @apply border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 overflow-auto;
 }
