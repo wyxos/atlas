@@ -67,45 +67,50 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/guidelines',
-        name: 'guidelines',
-        component: () => import('./pages/Guidelines.vue'),
+        component: () => import('./components/GuidelinesPageLayout.vue'),
         meta: { layout: 'DashboardLayout' },
-    },
-    {
-        path: '/guidelines/colors',
-        name: 'guidelines-colors',
-        component: () => import('./pages/ColorPalette.vue'),
-        meta: { layout: 'DashboardLayout' },
-    },
-    {
-        path: '/guidelines/headings',
-        name: 'guidelines-headings',
-        component: () => import('./pages/Headings.vue'),
-        meta: { layout: 'DashboardLayout' },
-    },
-    {
-        path: '/guidelines/badges',
-        name: 'guidelines-badges',
-        component: () => import('./pages/Badges.vue'),
-        meta: { layout: 'DashboardLayout' },
-    },
-    {
-        path: '/guidelines/pills',
-        name: 'guidelines-pills',
-        component: () => import('./pages/Pills.vue'),
-        meta: { layout: 'DashboardLayout' },
-    },
-    {
-        path: '/guidelines/tables',
-        name: 'guidelines-tables',
-        component: () => import('./pages/Tables.vue'),
-        meta: { layout: 'DashboardLayout' },
-    },
-    {
-        path: '/guidelines/pagination',
-        name: 'guidelines-pagination',
-        component: () => import('./pages/Pagination.vue'),
-        meta: { layout: 'DashboardLayout' },
+        children: [
+            {
+                path: '',
+                name: 'guidelines',
+                component: () => import('./pages/Guidelines.vue'),
+            },
+            {
+                path: 'buttons',
+                name: 'guidelines-buttons',
+                component: () => import('./pages/Buttons.vue'),
+            },
+            {
+                path: 'colors',
+                name: 'guidelines-colors',
+                component: () => import('./pages/ColorPalette.vue'),
+            },
+            {
+                path: 'headings',
+                name: 'guidelines-headings',
+                component: () => import('./pages/Headings.vue'),
+            },
+            {
+                path: 'badges',
+                name: 'guidelines-badges',
+                component: () => import('./pages/Badges.vue'),
+            },
+            {
+                path: 'pills',
+                name: 'guidelines-pills',
+                component: () => import('./pages/Pills.vue'),
+            },
+            {
+                path: 'tables',
+                name: 'guidelines-tables',
+                component: () => import('./pages/Tables.vue'),
+            },
+            {
+                path: 'pagination',
+                name: 'guidelines-pagination',
+                component: () => import('./pages/Pagination.vue'),
+            },
+        ],
     },
 ];
 

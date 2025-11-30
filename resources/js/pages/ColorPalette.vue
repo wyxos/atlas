@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Check } from 'lucide-vue-next';
-import GuidelinesPageLayout from '../components/GuidelinesPageLayout.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
 import Heading from '../components/ui/Heading.vue';
@@ -202,7 +201,6 @@ function getTextColor(shade: keyof ColorPalette['shades']): string {
 </script>
 
 <template>
-    <GuidelinesPageLayout>
                 <PageHeader title="Color Palette" subtitle="Design system color palette with click-to-copy functionality" />
 
                 <Section title="Color Palette">
@@ -243,6 +241,5 @@ function getTextColor(shade: keyof ColorPalette['shades']): string {
                         </div>
                     </div>
                 </Section>
-    </GuidelinesPageLayout>
 </template>
 

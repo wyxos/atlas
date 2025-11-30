@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import GuidelinesPageLayout from '../components/GuidelinesPageLayout.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
 import Heading from '../components/ui/Heading.vue';
@@ -12,7 +11,6 @@ const sampleRows = [
 </script>
 
 <template>
-  <GuidelinesPageLayout>
         <PageHeader title="Tables" subtitle="How tables should look with our theme" />
 
         <div class="mt-8 space-y-12">
@@ -74,7 +72,6 @@ const sampleRows = [
             </div>
           </Section>
         </div>
-  </GuidelinesPageLayout>
 </template>
 
 
