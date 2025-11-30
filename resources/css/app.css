@@ -109,7 +109,7 @@
     --color-lavender-grey-800: #393d47;
     --color-lavender-grey-900: #1d1f24;
 
-    /* Danger/Warning */
+    /* Danger */
     --color-danger: #ba181b;
     --color-danger-100: #ffcdd2;
     --color-danger-200: #e57373;
@@ -120,6 +120,18 @@
     --color-danger-700: #660708;
     --color-danger-800: #330608;
     --color-danger-900: #1a0304;
+
+    /* Warning */
+    --color-warning: #f59e0b;
+    --color-warning-100: #fef3c7;
+    --color-warning-200: #fde68a;
+    --color-warning-300: #fcd34d;
+    --color-warning-400: #fbbf24;
+    --color-warning-500: #f59e0b;
+    --color-warning-600: #d97706;
+    --color-warning-700: #b45309;
+    --color-warning-800: #92400e;
+    --color-warning-900: #78350f;
 
     /* Success */
     --color-success: #25a244;
@@ -132,6 +144,18 @@
     --color-success-700: #1a7431;
     --color-success-800: #155d27;
     --color-success-900: #10451d;
+
+    /* Info */
+    --color-info: #0ea5e9;
+    --color-info-100: #e0f2fe;
+    --color-info-200: #bae6fd;
+    --color-info-300: #7dd3fc;
+    --color-info-400: #38bdf8;
+    --color-info-500: #0ea5e9;
+    --color-info-600: #0284c7;
+    --color-info-700: #0369a1;
+    --color-info-800: #075985;
+    --color-info-900: #0c4a6e;
 }
 
 /* Oruga Table Styling to Match UI Guidelines */
