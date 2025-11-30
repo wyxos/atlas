@@ -39,12 +39,15 @@ const breadcrumbs = computed(() => {
         <SidebarProvider>
             <GuidelinesNav />
             <SidebarInset class="bg-prussian-blue-600">
-                <header class="flex h-16 shrink-0 items-center gap-2 border-b border-twilight-indigo-500 bg-prussian-blue-600 px-4">
+                <header
+                    class="flex h-16 shrink-0 items-center gap-2 border-b border-twilight-indigo-500 bg-prussian-blue-600 px-4">
                     <div class="flex items-center gap-2">
                         <SidebarTrigger class="-ml-1" />
-                        <nav class="flex items-center gap-2 text-sm text-twilight-indigo-300">
+                        <nav class="breadcrumb-nav flex items-center gap-2 text-sm text-twilight-indigo-300">
                             <router-link v-for="(crumb, index) in breadcrumbs" :key="crumb.path" :to="crumb.path"
-                                class="flex items-center gap-2 hover:text-smart-blue-100 transition-colors">
+                                active-class="!bg-transparent !text-twilight-indigo-300"
+                                exact-active-class="!bg-transparent !text-twilight-indigo-300"
+                                class="breadcrumb-link flex items-center gap-2 hover:text-smart-blue-100 transition-colors !bg-transparent !text-twilight-indigo-300">
                                 <span>{{ crumb.name }}</span>
                                 <ChevronRight v-if="index < breadcrumbs.length - 1" class="h-4 w-4" />
                             </router-link>

@@ -621,11 +621,29 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
         transition-duration: 150ms;
     }
 
-    /* Router link active states - higher specificity to override base classes */
-    a.router-link-active,
-    a.router-link-exact-active {
+    /* Router link active states - only for navigation sidebar links, not breadcrumbs */
+    /* Target sidebar menu buttons specifically - links inside SidebarMenuButton */
+    [data-sidebar="menu-button"] a.router-link-active:not(.breadcrumb-link),
+    [data-sidebar="menu-button"] a.router-link-exact-active:not(.breadcrumb-link),
+    [data-sidebar="menu-sub-button"].router-link-active:not(.breadcrumb-link),
+    [data-sidebar="menu-sub-button"].router-link-exact-active:not(.breadcrumb-link),
+    aside nav a.router-link-active:not(.breadcrumb-link),
+    aside nav a.router-link-exact-active:not(.breadcrumb-link) {
         background-color: #0352a0 !important;
         /* smart-blue-600 */
         color: #ffffff !important;
+    }
+
+    /* Explicitly exclude breadcrumbs from active styling - highest specificity, must come after */
+    /* Use multiple class selectors for maximum specificity */
+    header nav.breadcrumb-nav a.breadcrumb-link.router-link-active.router-link-exact-active,
+    header nav.breadcrumb-nav a.breadcrumb-link.router-link-active,
+    header nav.breadcrumb-nav a.breadcrumb-link.router-link-exact-active,
+    header .breadcrumb-nav a.breadcrumb-link.router-link-active,
+    header .breadcrumb-nav a.breadcrumb-link.router-link-exact-active,
+    a.breadcrumb-link.router-link-active,
+    a.breadcrumb-link.router-link-exact-active {
+        background-color: transparent !important;
+        color: inherit !important;
     }
 }

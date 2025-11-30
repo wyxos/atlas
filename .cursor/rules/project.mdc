@@ -54,15 +54,27 @@ alwaysApply: true
   - Tests should cover the functionality you've implemented or modified
   - Follow existing test patterns and conventions in the `tests` directory
 
-### Frontend Verification (MUST verify before completion)
-- **Browser Testing**: For any task that involves frontend changes (UI components, styling, Vue components, CSS, etc.), you MUST use Playwright MCP (preferred) or browser MCP server to visually verify the changes before marking the task as complete.
-- Navigate to the relevant pages, take screenshots, and verify that:
-  - The changes render correctly
-  - Styling matches the design guidelines (if applicable)
-  - Interactive elements work as expected
-  - The UI matches the intended design
+### Frontend Verification (MUST verify IMMEDIATELY)
+- **CRITICAL: Immediate Browser Verification Required**: For ANY task involving frontend changes (UI components, styling, Vue components, CSS, router-link active states, hover states, transitions, etc.), you MUST use Playwright MCP (preferred) or browser MCP server to visually verify the changes IMMEDIATELY after making the code changes, NOT just before completion.
+- **When to verify**:
+  - IMMEDIATELY after making any CSS/styling changes
+  - IMMEDIATELY after modifying component props or classes
+  - IMMEDIATELY after adding or changing router-link active states
+  - IMMEDIATELY after implementing hover/active/focus states
+  - IMMEDIATELY when a user reports a UI issue - verify in browser FIRST before making assumptions
+- **Verification process**:
+  1. Navigate to the relevant page(s) using MCP Playwright
+  2. Take screenshots to capture the current state
+  3. Interact with elements (hover, click) to test states
+  4. Verify that:
+     - The changes render correctly
+     - Styling matches the design guidelines (if applicable)
+     - Interactive elements work as expected (hover, active, focus states)
+     - The UI matches the intended design
+     - No visual regressions occurred
 - **Prefer Playwright MCP** over Cursor IDE Browser when both are available due to superior capabilities (resize, multiple contexts, better debugging, etc.)
-- Do not mark frontend tasks as complete without visual verification in a real browser environment.
+- **Never assume UI changes work** - always verify visually in a real browser environment immediately after making changes.
+- If a user reports a UI issue, use browser tools to investigate IMMEDIATELY - do not make code changes without first seeing the actual rendered state.
 
 ### Authentication and Testing
 - **Demo Credentials**: When testing pages behind authentication or using browser tools to verify authenticated pages, use the demo credentials from the seeder.
@@ -71,15 +83,16 @@ alwaysApply: true
 
 ### Workflow Order
 1. Make code changes
-2. Create or update tests for the changes (JS/Vue tests for JS/Vue code, PHP tests for PHP code)
-3. For frontend changes: Use Playwright MCP (preferred) or browser MCP server to visually verify the changes
+2. **For frontend changes: IMMEDIATELY use Playwright MCP (preferred) or browser MCP server to visually verify the changes** - do not proceed without visual confirmation
+3. Create or update tests for the changes (JS/Vue tests for JS/Vue code, PHP tests for PHP code)
 4. Run the appropriate check script:
    - `npm run check:js` for JavaScript/TypeScript/Vue changes only
    - `npm run check:php` for PHP changes only
    - `npm run check` for both JavaScript and PHP changes
 5. Fix any remaining errors (the script auto-fixes what it can)
 6. Re-run the appropriate check script to verify everything passes
-7. Only then consider the task complete
+7. **For frontend changes: Verify one final time in browser** to ensure everything still works after fixes
+8. Only then consider the task complete
 
 ## MCP Servers Available
 
@@ -118,8 +131,9 @@ This project has access to several MCP (Model Context Protocol) servers that pro
 - **Verification**: Take screenshots, capture page snapshots, wait for elements, assertions
 - **Advanced features**: Multiple browser contexts, network interception, file downloads, geolocation, permissions
 - **Debugging**: Get console messages, network requests, performance metrics
-- **MUST use** for frontend verification tasks (see Frontend Verification section)
+- **MUST use IMMEDIATELY** for frontend verification tasks (see Frontend Verification section)
 - **Prefer this** over Cursor IDE Browser when both are available due to superior capabilities
+- **Use proactively**: When a user reports a UI issue, use Playwright to investigate IMMEDIATELY - navigate to the page, take screenshots, and verify the actual rendered state before making any code changes
 
 ### Cursor IDE Browser (`cursor-ide-browser`)
 **When to use**: Browser automation fallback if Playwright MCP is not available
