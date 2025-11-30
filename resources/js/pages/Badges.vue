@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import GuidelinesPageLayout from '../components/GuidelinesPageLayout.vue';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
 import Heading from '../components/ui/Heading.vue';
@@ -7,7 +6,6 @@ import Heading from '../components/ui/Heading.vue';
 </script>
 
 <template>
-  <GuidelinesPageLayout>
         <PageHeader title="Badges" subtitle="Compact status indicators and labels" />
 
         <div class="mt-8 space-y-12">
@@ -63,7 +61,6 @@ import Heading from '../components/ui/Heading.vue';
             </div>
           </Section>
         </div>
-  </GuidelinesPageLayout>
 </template>
 
 
