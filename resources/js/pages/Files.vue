@@ -196,8 +196,8 @@ onMounted(async () => {
                 <p class="text-red-500 text-lg">{{ listing.error }}</p>
             </div>
 
-            <div v-else class="w-full">
-                <ListingTable :listing="listing">
+            <div v-else class="w-full overflow-x-auto">
+                <ListingTable :listing="listing" class="w-full overflow-hidden">
                     <o-table-column field="id" label="ID" width="80" />
                     <o-table-column field="filename" label="Filename">
                         <template #default="{ row }">
@@ -310,7 +310,7 @@ onMounted(async () => {
                             <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
                                 {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
                             </h3>
-                            <p class="text-twilight-indigo-700 text-center max-w-md">
+                            <p class="text-twilight-indigo-300 text-center max-w-md">
                                 {{ hasActiveFilters
                                     ? 'Try adjusting your filters to see more results.'
                                     : 'Get started by adding your first file.' }}
@@ -391,7 +391,7 @@ onMounted(async () => {
                             </Button>
                         </DialogClose>
                         <Button v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
-                            @click="deletionHandler.delete" :disabled="deletionHandler.isDeleting"
+                            @click="() => deletionHandler.delete()" :disabled="deletionHandler.isDeleting"
                             variant="destructive">
                             {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError &&
                                 deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
