@@ -620,4 +620,12 @@ div[class*="overflow"] nav[data-oruga="pagination"] {
         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         transition-duration: 150ms;
     }
+
+    /* Router link active states - higher specificity to override base classes */
+    a.router-link-active,
+    a.router-link-exact-active {
+        background-color: #0352a0 !important;
+        /* smart-blue-600 */
+        color: #ffffff !important;
+    }
 }
