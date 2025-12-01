@@ -15,7 +15,7 @@ const mockAxios = {
 beforeEach(() => {
     vi.clearAllMocks();
     // Suppress console.error output during tests to reduce noise
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => { });
     Object.assign(global.window, {
         axios: mockAxios,
     });
@@ -53,12 +53,34 @@ function createHarmonieResponse(items: TestItem[], currentPage = 1, total?: numb
 
 describe('Listing', () => {
     describe('loading() and loaded()', () => {
-        it('sets loading to true when loading() is called', () => {
+        it('sets loading to true when loading() is called on initial load', () => {
             const listing = new Listing<TestItem>();
             expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(false);
 
             listing.loading();
             expect(listing.isLoading).toBe(true);
+            expect(listing.isUpdating).toBe(false);
+        });
+
+        it('sets updating to true when loading() is called after data has been loaded', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            // Initial load
+            await listing.load();
+            expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(false);
+
+            // Subsequent load should set isUpdating
+            listing.loading();
+            expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(true);
         });
 
         it('sets loading to false when loaded() is called', () => {
@@ -68,9 +90,10 @@ describe('Listing', () => {
 
             listing.loaded();
             expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(false);
         });
 
-        it('sets loading to true during load() and false after completion', async () => {
+        it('sets loading to true during initial load() and false after completion', async () => {
             const listing = new Listing<TestItem>();
             listing.path('/api/test');
 
@@ -81,16 +104,43 @@ describe('Listing', () => {
             mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
 
             expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(false);
 
             const loadPromise = listing.load();
 
-            // Loading should be true while request is in progress
+            // Loading should be true while request is in progress (initial load)
             expect(listing.isLoading).toBe(true);
+            expect(listing.isUpdating).toBe(false);
 
             await loadPromise;
 
             // Loading should be false after completion
             expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(false);
+        });
+
+        it('sets updating to true during subsequent load() calls', async () => {
+            const listing = new Listing<TestItem>();
+            listing.path('/api/test');
+
+            const mockItems: TestItem[] = [
+                { id: 1, name: 'Item 1' },
+            ];
+            mockAxios.get.mockResolvedValue(createHarmonieResponse(mockItems, 1, 1));
+
+            // Initial load
+            await listing.load();
+            expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(false);
+
+            // Subsequent load should set isUpdating
+            const loadPromise2 = listing.load();
+            expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(true);
+
+            await loadPromise2;
+            expect(listing.isLoading).toBe(false);
+            expect(listing.isUpdating).toBe(false);
         });
 
         it('sets loading to false even when load() fails', async () => {
