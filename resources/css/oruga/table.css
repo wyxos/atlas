@@ -62,6 +62,8 @@
         /* Override fixed widths from props */
         border-bottom: 1px solid #1e2737;
         /* twilight-indigo-700 - separator between cells in card */
+        overflow: hidden;
+        /* Prevent content from overflowing */
     }
 
     .o-table__td:last-child {
@@ -78,6 +80,25 @@
         min-width: 30%;
         flex-shrink: 0;
         /* Prevent label from shrinking */
+    }
+
+    /* Ensure value content can shrink and truncate on mobile */
+    .o-table__td > *:not(:before) {
+        min-width: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Allow nested elements to also truncate */
+    .o-table__td > *:not(:before) > *,
+    .o-table__td > *:not(:before) a,
+    .o-table__td > *:not(:before) span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
     }
 
     /* Mobile Row Distinction */
