@@ -13,7 +13,7 @@
 
         @include('partials.favicons')
     </head>
-    <body class="bg-prussian-blue-600 text-twilight-indigo-900 min-h-screen">
+    <body class="bg-prussian-blue-600 text-twilight-indigo-100 min-h-screen">
         <div id="app"></div>
         <main class="flex min-h-screen items-center justify-center p-6">
             <div class="w-full max-w-md">
@@ -25,7 +25,7 @@
                         <h1 class="text-3xl font-bold text-smart-blue-900 mb-2">
                             Welcome Back
                         </h1>
-                        <p class="text-blue-slate-700">
+                        <p class="text-blue-slate-300">
                             Sign in to your account
                         </p>
                     </div>
@@ -60,7 +60,7 @@
                                 required
                                 autofocus
                                 autocomplete="email"
-                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
                                 placeholder="you@example.com"
                             >
                             @error('email')
@@ -78,7 +78,7 @@
                                 id="password"
                                 required
                                 autocomplete="current-password"
-                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-900 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
+                                class="w-full px-4 py-3 rounded-lg focus:ring-2 focus:outline-none transition-colors bg-prussian-blue-500 border-2 border-twilight-indigo-500 text-twilight-indigo-100 focus:border-smart-blue-600 focus:ring-smart-blue-600/20"
                                 placeholder="••••••••"
                             >
                             @error('password')
@@ -94,7 +94,7 @@
                                     id="remember"
                                     class="w-4 h-4 rounded focus:ring-2 accent-smart-blue-500"
                                 >
-                                <label for="remember" class="ml-2 text-sm text-twilight-indigo-900">
+                                <label for="remember" class="ml-2 text-sm text-twilight-indigo-300">
                                     Remember me
                                 </label>
                             </div>
@@ -111,7 +111,7 @@
                     </form>
 
                     <div class="mt-6 text-center">
-                        <a href="{{ route('home') }}" class="text-sm font-medium transition-colors text-smart-blue-700 hover:text-smart-blue-600">
+                        <a href="{{ route('home') }}" class="text-sm font-medium transition-colors text-smart-blue-300 hover:text-smart-blue-200">
                             ← Back to Home
                         </a>
                     </div>

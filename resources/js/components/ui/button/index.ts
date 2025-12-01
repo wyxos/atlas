@@ -4,17 +4,17 @@ import { cva } from "class-variance-authority"
 export { default as Button } from "./Button.vue"
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
         default:
-          "bg-smart-blue-500 text-white hover:bg-smart-blue-600 focus-visible:ring-smart-blue-400/50",
+          "bg-smart-blue-500 text-white hover:bg-smart-blue-600 focus-visible:border-smart-blue-400 focus-visible:ring-smart-blue-400/50",
         destructive:
-          "bg-danger-500 text-white hover:bg-danger-600 focus-visible:ring-danger-400/50",
+          "bg-danger-500 text-white hover:bg-danger-600 focus-visible:border-danger-400 focus-visible:ring-danger-400/50",
         outline: "",
         secondary:
-          "bg-sapphire-500 text-white hover:bg-sapphire-600 focus-visible:ring-sapphire-400/50",
+          "bg-sapphire-500 text-white hover:bg-sapphire-600 focus-visible:border-sapphire-400 focus-visible:ring-sapphire-400/50",
         ghost: "",
         link: "text-smart-blue-400 underline-offset-4 hover:underline hover:text-smart-blue-300",
       },
@@ -51,8 +51,13 @@ export const buttonVariants = cva(
       },
       {
         variant: "ghost",
+        color: "default",
+        class: "bg-smart-blue-500 text-white border-2 border-smart-blue-400 hover:bg-smart-blue-400",
+      },
+      {
+        variant: "ghost",
         color: "danger",
-        class: "border border-twilight-indigo-500 bg-transparent text-danger-100 hover:bg-danger-700 hover:border-danger-400 hover:text-danger-100 focus-visible:ring-danger-400/50",
+        class: "bg-danger-500 text-white border-2 border-danger-400 hover:bg-danger-600",
       },
     ],
     defaultVariants: {
