@@ -647,14 +647,14 @@ function onRetryStart(payload: { attempt: number; max: number; totalMs: number }
     backfill.retryWaitTotalMs = payload.totalMs;
     backfill.retryWaitRemainingMs = payload.totalMs;
 }
- 
+
 function onRetryTick(payload: { attempt: number; remainingMs: number; totalMs: number }) {
     backfill.retryActive = true;
     backfill.retryAttempt = payload.attempt;
     backfill.retryWaitRemainingMs = payload.remainingMs;
     backfill.retryWaitTotalMs = payload.totalMs;
 }
- 
+
 function onRetryStop() {
     backfill.retryActive = false;
     backfill.retryAttempt = 0;
@@ -751,15 +751,11 @@ defineExpose({
                     <Label class="text-xs text-muted-foreground">Sort</Label>
                     <select class="h-9 rounded-md border px-2 text-sm dark:bg-neutral-900" v-model="form.sort as any">
                         <option value="Newest">Newest</option>
+                        <option value="Newest">Oldest</option>
                         <option value="Most Reactions">Most Reactions</option>
-                        <option value="Most Buzz">Most Buzz</option>
+                        <option value="Most Comments">Most Comments</option>
+                        <option value="Most Collected">Most Collected</option>
                         <!-- Wallhaven-compatible sorting (UI only; mapping handled in service defaults) -->
-                        <option value="date_added">date_added</option>
-                        <option value="relevance">relevance</option>
-                        <option value="random">random</option>
-                        <option value="views">views</option>
-                        <option value="favorites">favorites</option>
-                        <option value="toplist">toplist</option>
                     </select>
                 </div>
 
