@@ -185,8 +185,7 @@ onMounted(async () => {
                     <o-table-column label="Actions">
                         <template #default="{ row }">
                             <Button v-if="canDeleteUser(row)" @click="deletionHandler.openDialog(row)" variant="ghost"
-                                color="danger" size="sm"
-                                class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
+                                color="danger" size="sm" class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
                                 :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id">
                                 <Trash2 :size="40" class="text-white block md:hidden" />
                                 <Trash2 :size="28" class="text-white hidden md:block" />
