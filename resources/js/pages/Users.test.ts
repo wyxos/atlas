@@ -188,7 +188,7 @@ describe('Users', () => {
 
         await wrapper.vm.$nextTick();
 
-        expect(wrapper.text()).toContain('Loading users');
+        expect(wrapper.text()).toContain('Loading...');
     });
 
     it('displays error message on fetch failure', async () => {
