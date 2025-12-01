@@ -188,143 +188,146 @@ onMounted(async () => {
             <!-- Active Filters Display -->
             <ActiveFilters :listing="listing" />
 
-            <div v-if="listing.isLoading" class="text-center py-12">
-                <p class="text-twilight-indigo-100 text-lg">Loading...</p>
-            </div>
-            <div v-else-if="listing.isUpdating" class="text-center py-12">
-                <p class="text-twilight-indigo-100 text-lg">Updating...</p>
-            </div>
-
-            <div v-else-if="listing.error" class="text-center py-12">
-                <p class="text-red-500 text-lg">{{ listing.error }}</p>
-            </div>
-
-            <div v-else class="w-full overflow-x-auto">
-                <ListingTable :listing="listing" class="w-full overflow-hidden">
-                    <o-table-column field="id" label="ID" width="80" />
-                    <o-table-column field="filename" label="Filename">
-                        <template #default="{ row }">
-                            <span @click="() => copyToClipboard(row.filename, 'Filename')"
-                                class="text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block"
-                                :title="`Click to copy: ${row.filename}`">
-                                {{ row.filename }}
-                            </span>
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="source" label="Source" width="120" />
-                    <o-table-column field="mime_type" label="Type" width="120">
-                        <template #default="{ row }">
-                            <span class="px-2 py-1 rounded text-xs font-medium" :class="{
-                                'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
-                                'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
-                                'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
-                                'bg-twilight-indigo-500/20 text-twilight-indigo-100': getMimeTypeCategory(row.mime_type) === 'other',
-                            }">
-                                {{ row.mime_type || 'Unknown' }}
-                            </span>
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="size" label="Size" width="100">
-                        <template #default="{ row }">
-                            {{ formatFileSize(row.size) }}
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="downloaded" label="Downloaded" width="120">
-                        <template #default="{ row }">
-                            <span v-if="row.downloaded"
-                                class="inline-flex items-center justify-center px-3 py-1 rounded-sm text-xs font-medium bg-success-700 border border-success-500 text-success-100">
-                                <Download :size="16" />
-                            </span>
-                            <span v-else
-                                class="inline-flex items-center justify-center px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100">
-                                <XCircle :size="16" />
-                            </span>
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="absolute_path" label="Path" width="300">
-                        <template #default="{ row }">
-                            <span v-if="row.absolute_path" @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                                class="font-mono text-xs text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block max-w-[200px] md:max-w-[400px] lg:max-w-[400px]"
-                                :title="`Click to copy: ${row.absolute_path}`">
-                                {{ row.absolute_path }}
-                            </span>
-                            <span v-else class="text-twilight-indigo-500 italic text-xs">
-                                —
-                            </span>
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="url" label="URL" width="250">
-                        <template #default="{ row }">
-                            <a v-if="row.url" :href="row.url" target="_blank" rel="noopener noreferrer"
-                                class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate block max-w-[200px] md:max-w-[300px] lg:max-w-[400px]"
-                                :title="row.url">
-                                {{ row.url }}
-                            </a>
-                            <span v-else class="text-twilight-indigo-500 italic text-xs">
-                                —
-                            </span>
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="referrer_url" label="Referrer URL" width="250">
-                        <template #default="{ row }">
-                            <a v-if="row.referrer_url" :href="row.referrer_url" target="_blank"
-                                rel="noopener noreferrer"
-                                class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
-                                :title="row.referrer_url">
-                                {{ row.referrer_url }}
-                            </a>
-                            <span v-else class="text-twilight-indigo-500 italic text-xs">
-                                —
-                            </span>
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="created_at" label="Created At" width="180">
-                        <template #default="{ row }">
-                            {{ formatDate(row.created_at) }}
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="updated_at" label="Last Updated" width="180">
-                        <template #default="{ row }">
-                            {{ formatDate(row.updated_at) }}
-                        </template>
-                    </o-table-column>
-                    <o-table-column label="Actions" width="140">
-                        <template #default="{ row }">
-                            <div class="flex items-center justify-center gap-2">
-                                <Button @click="() => router.push(`/files/${row.id}`)" variant="ghost" size="sm"
-                                    class="h-16 w-16 md:h-10 md:w-10 rounded-lg" :title="`View ${row.filename}`">
-                                    <Eye :size="40" class="text-white block md:hidden" />
-                                    <Eye :size="28" class="text-white hidden md:block" />
-                                </Button>
-                                <Button @click="deletionHandler.openDialog(row)" variant="ghost" color="danger"
-                                    size="sm" class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
-                                    :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id"
-                                    :title="`Delete ${row.filename}`">
-                                    <Trash2 :size="40" class="text-white block md:hidden" />
-                                    <Trash2 :size="28" class="text-white hidden md:block" />
+            <Transition name="table-grow" appear mode="out-in">
+                <div v-if="listing.isLoading" key="loading"
+                    class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                    <p class="text-twilight-indigo-100 text-lg">Loading...</p>
+                </div>
+                <div v-else-if="listing.isUpdating" key="updating"
+                    class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                    <p class="text-twilight-indigo-100 text-lg">Updating...</p>
+                </div>
+                <div v-else-if="listing.error" key="error"
+                    class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                    <p class="text-red-500 text-lg">{{ listing.error }}</p>
+                </div>
+                <div v-else key="table" class="w-full overflow-x-auto">
+                    <ListingTable :listing="listing" class="w-full overflow-hidden">
+                        <o-table-column field="id" label="ID" width="80" />
+                        <o-table-column field="filename" label="Filename">
+                            <template #default="{ row }">
+                                <span @click="() => copyToClipboard(row.filename, 'Filename')"
+                                    class="text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block"
+                                    :title="`Click to copy: ${row.filename}`">
+                                    {{ row.filename }}
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="source" label="Source" width="120" />
+                        <o-table-column field="mime_type" label="Type" width="120">
+                            <template #default="{ row }">
+                                <span class="px-2 py-1 rounded text-xs font-medium" :class="{
+                                    'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
+                                    'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
+                                    'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
+                                    'bg-twilight-indigo-500/20 text-twilight-indigo-100': getMimeTypeCategory(row.mime_type) === 'other',
+                                }">
+                                    {{ row.mime_type || 'Unknown' }}
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="size" label="Size" width="100">
+                            <template #default="{ row }">
+                                {{ formatFileSize(row.size) }}
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="downloaded" label="Downloaded" width="120">
+                            <template #default="{ row }">
+                                <span v-if="row.downloaded"
+                                    class="inline-flex items-center justify-center px-3 py-1 rounded-sm text-xs font-medium bg-success-700 border border-success-500 text-success-100">
+                                    <Download :size="16" />
+                                </span>
+                                <span v-else
+                                    class="inline-flex items-center justify-center px-3 py-1 rounded-sm text-xs font-medium bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100">
+                                    <XCircle :size="16" />
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="absolute_path" label="Path" width="300">
+                            <template #default="{ row }">
+                                <span v-if="row.absolute_path" @click="() => copyToClipboard(row.absolute_path, 'Path')"
+                                    class="font-mono text-xs text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block max-w-[200px] md:max-w-[400px] lg:max-w-[400px]"
+                                    :title="`Click to copy: ${row.absolute_path}`">
+                                    {{ row.absolute_path }}
+                                </span>
+                                <span v-else class="text-twilight-indigo-500 italic text-xs">
+                                    —
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="url" label="URL" width="250">
+                            <template #default="{ row }">
+                                <a v-if="row.url" :href="row.url" target="_blank" rel="noopener noreferrer"
+                                    class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate block max-w-[200px] md:max-w-[300px] lg:max-w-[400px]"
+                                    :title="row.url">
+                                    {{ row.url }}
+                                </a>
+                                <span v-else class="text-twilight-indigo-500 italic text-xs">
+                                    —
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="referrer_url" label="Referrer URL" width="250">
+                            <template #default="{ row }">
+                                <a v-if="row.referrer_url" :href="row.referrer_url" target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
+                                    :title="row.referrer_url">
+                                    {{ row.referrer_url }}
+                                </a>
+                                <span v-else class="text-twilight-indigo-500 italic text-xs">
+                                    —
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="created_at" label="Created At" width="180">
+                            <template #default="{ row }">
+                                {{ formatDate(row.created_at) }}
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="updated_at" label="Last Updated" width="180">
+                            <template #default="{ row }">
+                                {{ formatDate(row.updated_at) }}
+                            </template>
+                        </o-table-column>
+                        <o-table-column label="Actions" width="140">
+                            <template #default="{ row }">
+                                <div class="flex items-center justify-center gap-2">
+                                    <Button @click="() => router.push(`/files/${row.id}`)" variant="ghost" size="sm"
+                                        class="h-16 w-16 md:h-10 md:w-10 rounded-lg" :title="`View ${row.filename}`">
+                                        <Eye :size="40" class="text-white block md:hidden" />
+                                        <Eye :size="28" class="text-white hidden md:block" />
+                                    </Button>
+                                    <Button @click="deletionHandler.openDialog(row)" variant="ghost" color="danger"
+                                        size="sm" class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
+                                        :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id"
+                                        :title="`Delete ${row.filename}`">
+                                        <Trash2 :size="40" class="text-white block md:hidden" />
+                                        <Trash2 :size="28" class="text-white hidden md:block" />
+                                    </Button>
+                                </div>
+                            </template>
+                        </o-table-column>
+                        <template #empty>
+                            <div class="flex flex-col items-center justify-center py-12 px-6">
+                                <FileIcon :size="64" class="text-twilight-indigo-400 mb-4" />
+                                <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
+                                    {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
+                                </h3>
+                                <p class="text-twilight-indigo-300 text-center max-w-md">
+                                    {{ hasActiveFilters
+                                        ? 'Try adjusting your filters to see more results.'
+                                        : 'Get started by adding your first file.' }}
+                                </p>
+                                <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
+                                    class="mt-4">
+                                    Clear
                                 </Button>
                             </div>
                         </template>
-                    </o-table-column>
-                    <template #empty>
-                        <div class="flex flex-col items-center justify-center py-12 px-6">
-                            <FileIcon :size="64" class="text-twilight-indigo-400 mb-4" />
-                            <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
-                                {{ hasActiveFilters ? 'No files found' : 'No files yet' }}
-                            </h3>
-                            <p class="text-twilight-indigo-300 text-center max-w-md">
-                                {{ hasActiveFilters
-                                    ? 'Try adjusting your filters to see more results.'
-                                    : 'Get started by adding your first file.' }}
-                            </p>
-                            <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
-                                class="mt-4">
-                                Clear
-                            </Button>
-                        </div>
-                    </template>
-                </ListingTable>
-            </div>
+                    </ListingTable>
+                </div>
+            </Transition>
 
             <!-- Filter Panel -->
             <FilterPanel :modelValue="listing.isPanelOpen()"
