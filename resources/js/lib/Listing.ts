@@ -645,16 +645,18 @@ export class Listing<T extends Record<string, unknown>> {
         try {
             await window.axios.delete(path as string);
 
+            // Call onSuccess immediately after successful delete (before refresh)
+            // This allows the dialog to close immediately while refresh happens in background
+            if (onSuccess) {
+                onSuccess(id, this);
+            }
+
             this.remove(id, key);
 
             if (this.data.length === 0 && this.currentPage > 1) {
                 await this.goToPage(this.currentPage - 1);
             } else if (refresh) {
                 await this.get();
-            }
-
-            if (onSuccess) {
-                onSuccess(id, this);
             }
         } catch (error: unknown) {
             // Attempt to extract HTTP status code if this looks like an Axios error
