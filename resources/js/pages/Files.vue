@@ -292,13 +292,13 @@ onMounted(async () => {
                         <template #default="{ row }">
                             <div class="flex items-center justify-center gap-2">
                                 <Button @click="() => router.push(`/files/${row.id}`)" variant="ghost" size="sm"
-                                    class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-smart-blue-500 border-2 border-smart-blue-400 text-white hover:bg-smart-blue-400"
+                                    class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
                                     :title="`View ${row.filename}`">
                                     <Eye :size="40" class="text-white block md:hidden" />
                                     <Eye :size="28" class="text-white hidden md:block" />
                                 </Button>
-                                <Button @click="deletionHandler.openDialog(row)" variant="ghost" size="sm"
-                                    class="flex items-center justify-center h-16 w-16 md:h-10 md:w-10 rounded-lg bg-danger-400 border-2 border-danger-300 text-white hover:bg-danger-700"
+                                <Button @click="deletionHandler.openDialog(row)" variant="ghost" color="danger" size="sm"
+                                    class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
                                     :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id"
                                     :title="`Delete ${row.filename}`">
                                     <Trash2 :size="40" class="text-white block md:hidden" />
