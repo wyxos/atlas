@@ -244,7 +244,7 @@ onMounted(async () => {
                     <o-table-column field="absolute_path" label="Path" width="300">
                         <template #default="{ row }">
                             <span v-if="row.absolute_path" @click="() => copyToClipboard(row.absolute_path, 'Path')"
-                                class="font-mono text-xs text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block"
+                                class="font-mono text-xs text-twilight-indigo-100 cursor-pointer hover:text-smart-blue-400 transition-colors truncate block max-w-[200px] md:max-w-[400px] lg:max-w-[400px]"
                                 :title="`Click to copy: ${row.absolute_path}`">
                                 {{ row.absolute_path }}
                             </span>
@@ -256,7 +256,7 @@ onMounted(async () => {
                     <o-table-column field="url" label="URL" width="250">
                         <template #default="{ row }">
                             <a v-if="row.url" :href="row.url" target="_blank" rel="noopener noreferrer"
-                                class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1 min-w-0 w-0 md:w-full md:max-w-xs block"
+                                class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate block max-w-[200px] md:max-w-[300px] lg:max-w-[400px]"
                                 :title="row.url">
                                 {{ row.url }}
                             </a>
