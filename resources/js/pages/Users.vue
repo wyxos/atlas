@@ -143,19 +143,18 @@ onMounted(async () => {
             <!-- Active Filters Display -->
             <ActiveFilters :listing="listing" />
 
-            <div v-if="listing.isLoading" class="text-center py-12">
-                <p class="text-twilight-indigo-100 text-lg">Loading...</p>
-            </div>
-            <div v-else-if="listing.isUpdating" class="text-center py-12">
-                <p class="text-twilight-indigo-100 text-lg">Updating...</p>
-            </div>
-
-            <div v-else-if="listing.error" class="text-center py-12">
-                <p class="text-red-500 text-lg">{{ listing.error }}</p>
-            </div>
-
-            <div v-else class="w-full overflow-x-auto">
-                <ListingTable :listing="listing" class="w-full overflow-hidden">
+            <Transition name="table-grow" appear mode="out-in">
+                <div v-if="listing.isLoading" key="loading" class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                    <p class="text-twilight-indigo-100 text-lg">Loading...</p>
+                </div>
+                <div v-else-if="listing.isUpdating" key="updating" class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                    <p class="text-twilight-indigo-100 text-lg">Updating...</p>
+                </div>
+                <div v-else-if="listing.error" key="error" class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                    <p class="text-red-500 text-lg">{{ listing.error }}</p>
+                </div>
+                <div v-else key="table" class="w-full overflow-x-auto">
+                    <ListingTable :listing="listing" class="w-full overflow-hidden">
                     <o-table-column field="id" label="ID" width="80" />
                     <o-table-column field="name" label="Name" />
                     <o-table-column field="email" label="Email" />
@@ -214,7 +213,8 @@ onMounted(async () => {
                         </div>
                     </template>
                 </ListingTable>
-            </div>
+                </div>
+            </Transition>
 
             <!-- Filter Panel -->
             <FilterPanel :modelValue="listing.isPanelOpen()"

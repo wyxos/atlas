@@ -140,3 +140,38 @@
 .o-table__wrapper {
     @apply border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 overflow-auto;
 }
+
+/* Table grow transition animation */
+.table-grow-enter-active {
+    transition: all 0.4s ease-out;
+    overflow: hidden;
+}
+
+.table-grow-leave-active {
+    transition: all 0.3s ease-in;
+    overflow: hidden;
+}
+
+.table-grow-enter-from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+}
+
+.table-grow-enter-to {
+    opacity: 1;
+    max-height: 5000px;
+    transform: translateY(0);
+}
+
+.table-grow-leave-from {
+    opacity: 1;
+    max-height: 5000px;
+    transform: translateY(0);
+}
+
+.table-grow-leave-to {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+}
