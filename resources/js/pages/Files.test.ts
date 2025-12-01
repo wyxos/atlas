@@ -228,7 +228,7 @@ describe('Files', () => {
 
         await wrapper.vm.$nextTick();
 
-        expect(wrapper.text()).toContain('Loading files');
+        expect(wrapper.text()).toContain('Loading...');
     });
 
     it('displays error message on fetch failure', async () => {

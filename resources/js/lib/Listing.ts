@@ -32,9 +32,12 @@ type DeleteConfig<TItem extends Record<string, unknown>> = {
 export class Listing<T extends Record<string, unknown>> {
     public data: T[] = [];
     public isLoading = false;
+    public isUpdating = false;
     public isFiltering = false;
     public isResetting = false;
+    public removingFilterKey: string | null = null;
     public error: string | null = null;
+    private hasLoadedOnce = false;
     public currentPage = 1;
     public perPage = 15;
     public total = 0;
@@ -97,10 +100,17 @@ export class Listing<T extends Record<string, unknown>> {
     }
 
     /**
-     * Set the loading state to true
+     * Set the loading state to true (for initial load)
      */
     loading(): void {
-        this.isLoading = true;
+        // If we've loaded data before, this is an update, not an initial load
+        if (this.hasLoadedOnce) {
+            this.isUpdating = true;
+            this.isLoading = false; // Clear loading state when updating
+        } else {
+            this.isLoading = true;
+            this.isUpdating = false; // Clear updating state when loading
+        }
     }
 
     /**
@@ -108,6 +118,7 @@ export class Listing<T extends Record<string, unknown>> {
      */
     loaded(): void {
         this.isLoading = false;
+        this.isUpdating = false;
     }
 
     /**
@@ -529,6 +540,7 @@ export class Listing<T extends Record<string, unknown>> {
             this.total = listing.total ?? 0;
             this.perPage = listing.perPage ?? 15;
             this.activeFilters = response.data.filters || [];
+            this.hasLoadedOnce = true; // Mark that we've successfully loaded data at least once
         } catch (err: unknown) {
             const axiosError = err as { response?: { status?: number; data?: { message?: string } } };
             const statusCode = axiosError.response?.status;
@@ -795,30 +807,35 @@ export class Listing<T extends Record<string, unknown>> {
             return;
         }
 
-        const defaultValue = this.filterDefaults[filterKey];
-        if (filterKey in this.filters) {
-            // New API: update filters directly
-            this.filters[filterKey] = defaultValue;
-        } else if (filterKey in this.filterAttributes) {
-            // Legacy API: update via filterAttributes ref
-            const filterValue = this.filterAttributes[filterKey];
-            if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
-                const ref = filterValue as { value: string | number | null | undefined };
-                ref.value = defaultValue;
+        this.removingFilterKey = filterKey;
+        try {
+            const defaultValue = this.filterDefaults[filterKey];
+            if (filterKey in this.filters) {
+                // New API: update filters directly
+                this.filters[filterKey] = defaultValue;
+            } else if (filterKey in this.filterAttributes) {
+                // Legacy API: update via filterAttributes ref
+                const filterValue = this.filterAttributes[filterKey];
+                if (filterValue && typeof filterValue === 'object' && 'value' in filterValue) {
+                    const ref = filterValue as { value: string | number | null | undefined };
+                    ref.value = defaultValue;
+                }
             }
-        }
 
-        // Build query from current filter state (which now has the reset value)
-        // and pass it explicitly to prevent get() from reading stale router query
-        this.currentPage = 1;
-        const query: Record<string, string> = {};
-        const filterParameters = this.buildFilterParameters();
-        for (const [key, value] of Object.entries(filterParameters)) {
-            query[key] = String(value);
-        }
+            // Build query from current filter state (which now has the reset value)
+            // and pass it explicitly to prevent get() from reading stale router query
+            this.currentPage = 1;
+            const query: Record<string, string> = {};
+            const filterParameters = this.buildFilterParameters();
+            for (const [key, value] of Object.entries(filterParameters)) {
+                query[key] = String(value);
+            }
 
-        await this.updateUrl();
-        await this.get(undefined, { query });
+            await this.updateUrl();
+            await this.get(undefined, { query });
+        } finally {
+            this.removingFilterKey = null;
+        }
     }
 
     /**

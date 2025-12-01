@@ -144,7 +144,10 @@ onMounted(async () => {
             <ActiveFilters :listing="listing" />
 
             <div v-if="listing.isLoading" class="text-center py-12">
-                <p class="text-twilight-indigo-100 text-lg">Loading users...</p>
+                <p class="text-twilight-indigo-100 text-lg">Loading...</p>
+            </div>
+            <div v-else-if="listing.isUpdating" class="text-center py-12">
+                <p class="text-twilight-indigo-100 text-lg">Updating...</p>
             </div>
 
             <div v-else-if="listing.error" class="text-center py-12">
@@ -258,7 +261,7 @@ onMounted(async () => {
                         </DialogClose>
                         <Button v-if="deletionHandler.canRetryDelete || !deletionHandler.deleteError"
                             @click="() => deletionHandler.delete()" :disabled="deletionHandler.isDeleting"
-                            variant="destructive">
+                            :loading="deletionHandler.isDeleting" variant="destructive">
                             {{ deletionHandler.isDeleting ? 'Deleting...' : (deletionHandler.deleteError &&
                                 deletionHandler.canRetryDelete ? 'Retry' : 'Delete') }}
                         </Button>

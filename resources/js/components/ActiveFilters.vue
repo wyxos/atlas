@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { X } from 'lucide-vue-next';
-import { Button } from '@/components/ui/button';
+import { X, Loader2 } from 'lucide-vue-next';
 import type { Listing } from '../lib/Listing';
+import { computed } from 'vue';
 
 interface Props {
     listing: Listing<Record<string, unknown>>;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+const isRemovingFilter = computed(() => (key: string) => props.listing.removingFilterKey === key);
+const isAnyFilterRemoving = computed(() => props.listing.removingFilterKey !== null);
 </script>
 
 <template>
@@ -17,18 +20,22 @@ defineProps<Props>();
             class="inline-flex items-stretch rounded overflow-hidden border border-smart-blue-500">
             <span
                 class="px-3 py-1 text-xs font-medium bg-smart-blue-600 text-white hover:bg-smart-blue-500 transition-colors">{{
-                filter.label }}</span>
+                    filter.label }}</span>
             <span
                 class="px-3 py-1 text-xs font-semibold bg-prussian-blue-700 text-twilight-indigo-100 border-l border-smart-blue-500 hover:bg-prussian-blue-600 transition-colors truncate max-w-xs">{{
-                filter.value }}</span>
+                    filter.value }}</span>
             <button type="button" @click="() => listing.removeFilter(filter.key)"
-                aria-label="`Remove ${filter.label} filter`"
-                class="px-2 text-xs font-bold border-l border-smart-blue-500 bg-transparent text-twilight-indigo-300 hover:bg-smart-blue-600/40 hover:text-twilight-indigo-100 transition-colors">
-                <X :size="12" />
+                :disabled="isRemovingFilter(filter.key) || isAnyFilterRemoving"
+                :aria-label="`Remove ${filter.label} filter`"
+                class="px-2 text-xs font-bold border-l border-smart-blue-500 bg-transparent text-twilight-indigo-300 hover:bg-smart-blue-600/40 hover:text-twilight-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <Loader2 v-if="isRemovingFilter(filter.key)" :size="12" class="animate-spin" />
+                <X v-else :size="12" />
             </button>
         </span>
-        <Button variant="destructive" size="sm" @click="() => listing.resetFilters()">
+        <button type="button" @click="() => listing.resetFilters()"
+            :disabled="isAnyFilterRemoving || listing.isResetting"
+            class="inline-flex items-center rounded px-3 py-1 text-xs font-medium bg-danger-600 text-white border border-danger-500 hover:bg-danger-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             Clear
-        </Button>
+        </button>
     </div>
 </template>
