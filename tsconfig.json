@@ -29,6 +29,7 @@
   "include": [
     "resources/js/**/*",
     "scripts/**/*",
+    "packages/**/*",
     "vite.config.js",
     "vitest.config.js"
   ],

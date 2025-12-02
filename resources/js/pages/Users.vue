@@ -16,9 +16,7 @@ import { Button } from '@/components/ui/button';
 import FilterPanel from '../components/ui/FilterPanel.vue';
 import Select from '../components/ui/Select.vue';
 import ListingFilterForm from '../components/ListingFilterForm.vue';
-import ActiveFilters from '../components/ActiveFilters.vue';
-import ListingTable from '../components/ListingTable.vue';
-import { Listing } from '../lib/Listing';
+import { Listing, ActiveFilters, ListingTable } from '@wyxos/listing';
 import { DeletionHandler } from '../lib/DeletionHandler';
 import { formatDate } from '../utils/date';
 
