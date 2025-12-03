@@ -17,7 +17,7 @@ class FileResource extends JsonResource
         $absolutePath = null;
         if ($this->path) {
             $fullPath = storage_path('app/'.$this->path);
-            
+
             // Normalize the path: use realpath() if file exists (returns canonical absolute path)
             // This handles symlinks, relative paths, and normalizes separators for the OS
             $normalized = realpath($fullPath);
