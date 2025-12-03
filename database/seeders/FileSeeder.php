@@ -8,6 +8,88 @@ use Illuminate\Database\Seeder;
 class FileSeeder extends Seeder
 {
     /**
+     * Available fixture files that can be used for local and downloaded files.
+     */
+    private array $fixtures = [
+        [
+            'path' => 'images/sample-image-1.jpg',
+            'filename' => 'sample-image-1.jpg',
+            'ext' => 'jpg',
+            'mime_type' => 'image/jpeg',
+            'type' => 'images',
+        ],
+        [
+            'path' => 'images/sample-image-2.jpg',
+            'filename' => 'sample-image-2.jpg',
+            'ext' => 'jpg',
+            'mime_type' => 'image/jpeg',
+            'type' => 'images',
+        ],
+        [
+            'path' => 'audio/sample-audio-1.mp3',
+            'filename' => 'sample-audio-1.mp3',
+            'ext' => 'mp3',
+            'mime_type' => 'audio/mpeg',
+            'type' => 'audio',
+        ],
+        [
+            'path' => 'audio/sample-audio-2.mp3',
+            'filename' => 'sample-audio-2.mp3',
+            'ext' => 'mp3',
+            'mime_type' => 'audio/mpeg',
+            'type' => 'audio',
+        ],
+        [
+            'path' => 'videos/sample-video-1.mp4',
+            'filename' => 'sample-video-1.mp4',
+            'ext' => 'mp4',
+            'mime_type' => 'video/mp4',
+            'type' => 'videos',
+        ],
+        [
+            'path' => 'videos/sample-video-2.mp4',
+            'filename' => 'sample-video-2.mp4',
+            'ext' => 'mp4',
+            'mime_type' => 'video/mp4',
+            'type' => 'videos',
+        ],
+    ];
+
+    /**
+     * Online URL templates for generating online files.
+     */
+    private array $onlineTemplates = [
+        [
+            'source' => 'YouTube',
+            'url_template' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/{name}.mp4',
+            'filename_template' => '{name}.mp4',
+            'ext' => 'mp4',
+            'mime_type' => 'video/mp4',
+            'type' => 'videos',
+            'names' => ['BigBuckBunny', 'ElephantsDream', 'ForBiggerBlazes', 'ForBiggerEscapes', 'ForBiggerFun', 'ForBiggerJoyrides', 'ForBiggerMeltdowns', 'Sintel', 'SubaruOutbackOnStreet', 'TearsOfSteel'],
+        ],
+        [
+            'source' => 'Booru',
+            'url_template' => 'https://picsum.photos/{width}/{height}?random={id}',
+            'filename_template' => 'random-image-{id}.jpg',
+            'ext' => 'jpg',
+            'mime_type' => 'image/jpeg',
+            'type' => 'images',
+            'widths' => [1920, 1600, 1280, 1024, 800],
+            'heights' => [1080, 900, 720, 768, 600],
+        ],
+        [
+            'source' => 'NAS',
+            'url_template' => 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-{id}.mp3',
+            'filename_template' => 'sample-audio-{id}.mp3',
+            'ext' => 'mp3',
+            'mime_type' => 'audio/mpeg',
+            'type' => 'audio',
+            'ids' => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        ],
+    ];
+
+    /**
      * Determine file type directory from mime type.
      */
     private function getFileType(string $mimeType): string
@@ -21,39 +103,119 @@ class FileSeeder extends Seeder
         if (str_starts_with($mimeType, 'video/')) {
             return 'videos';
         }
-        
+
         // Default fallback
         return 'images';
     }
 
     /**
      * Copy a fixture file to storage with the given filename.
-     * 
-     * @param string $fixturePath Path relative to tests/fixtures/
-     * @param string $targetFilename The filename to use in storage
-     * @param string $mimeType The MIME type of the file
+     *
+     * @param  string  $fixturePath  Path relative to tests/fixtures/
+     * @param  string  $targetFilename  The filename to use in storage
+     * @param  string  $mimeType  The MIME type of the file
      * @return string|null The full path where the file was copied, or null if fixture doesn't exist
      */
     private function copyFixtureToStorage(string $fixturePath, string $targetFilename, string $mimeType): ?string
     {
         $source = base_path("tests/fixtures/{$fixturePath}");
-        
+
         if (! file_exists($source)) {
             $this->command?->warn("Fixture file not found: {$fixturePath}");
+
             return null;
         }
-        
+
         // Generate hash from file content for consistent subfolder placement
         $hash = hash_file('sha256', $source);
         $type = $this->getFileType($mimeType);
-        
+
         // Use getStoragePath to ensure directories exist and get the full path
         $destination = File::getStoragePath($type, $targetFilename, $hash);
-        
+
         // Copy file from fixtures to storage
         copy($source, $destination);
-        
+
         return $destination;
+    }
+
+    /**
+     * Get a fixture by index, cycling through available fixtures.
+     */
+    private function getFixture(int $index): array
+    {
+        return $this->fixtures[$index % count($this->fixtures)];
+    }
+
+    /**
+     * Generate online file data from templates.
+     */
+    private function generateOnlineFileData(int $index): array
+    {
+        $template = $this->onlineTemplates[$index % count($this->onlineTemplates)];
+
+        if (isset($template['names'])) {
+            $name = $template['names'][$index % count($template['names'])];
+            $url = str_replace('{name}', $name, $template['url_template']);
+            $filename = str_replace('{name}', strtolower($name), $template['filename_template']);
+        } elseif (isset($template['ids'])) {
+            $id = $template['ids'][$index % count($template['ids'])];
+            $url = str_replace('{id}', (string) $id, $template['url_template']);
+            $filename = str_replace('{id}', (string) $id, $template['filename_template']);
+        } else {
+            $width = $template['widths'][$index % count($template['widths'])];
+            $height = $template['heights'][$index % count($template['heights'])];
+            $id = $index + 1;
+            $url = str_replace(['{width}', '{height}', '{id}'], [(string) $width, (string) $height, (string) $id], $template['url_template']);
+            $filename = str_replace('{id}', (string) $id, $template['filename_template']);
+        }
+
+        return [
+            'source' => $template['source'],
+            'filename' => $filename,
+            'ext' => $template['ext'],
+            'path' => null,
+            'url' => $url,
+            'mime_type' => $template['mime_type'],
+            'title' => ucfirst($template['source']).' File '.($index + 1),
+            'downloaded' => false,
+        ];
+    }
+
+    /**
+     * Find a file in storage by filename and type.
+     */
+    private function findFileInStorage(string $filename, string $type): ?array
+    {
+        // Try new subfolder structure first
+        $hash = hash('sha256', $filename);
+        $newPath = File::getStoragePath($type, $filename, $hash);
+
+        if (file_exists($newPath)) {
+            return [
+                'path' => $newPath,
+                'hash' => hash_file('sha256', $newPath),
+            ];
+        }
+
+        // Try old flat structure for backward compatibility
+        $oldPath = storage_path("app/private/{$type}/{$filename}");
+        if (file_exists($oldPath)) {
+            $hash = hash_file('sha256', $oldPath);
+            $newPath = File::getStoragePath($type, $filename, $hash);
+
+            // Move file to new subfolder structure
+            if (! file_exists($newPath)) {
+                rename($oldPath, $newPath);
+            }
+
+            return [
+                'path' => $newPath,
+                'hash' => $hash,
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -63,283 +225,85 @@ class FileSeeder extends Seeder
     {
         // Copy all fixture files to storage
         // These will be used as the base files that can be referenced by different file entries
-        $this->copyFixtureToStorage('images/sample-image-1.jpg', 'sample-image-1.jpg', 'image/jpeg');
-        $this->copyFixtureToStorage('images/sample-image-2.jpg', 'sample-image-2.jpg', 'image/jpeg');
-        $this->copyFixtureToStorage('audio/sample-audio-1.mp3', 'sample-audio-1.mp3', 'audio/mpeg');
-        $this->copyFixtureToStorage('audio/sample-audio-2.mp3', 'sample-audio-2.mp3', 'audio/mpeg');
-        $this->copyFixtureToStorage('videos/sample-video-1.mp4', 'sample-video-1.mp4', 'video/mp4');
-        $this->copyFixtureToStorage('videos/sample-video-2.mp4', 'sample-video-2.mp4', 'video/mp4');
-
-        // Local files (with path, no URL)
-        // Paths will be generated dynamically from fixture files
-        $localFiles = [
-            [
-                'source' => 'local',
-                'filename' => 'sample-image-1.jpg',
-                'ext' => 'jpg',
-                'url' => null,
-                'mime_type' => 'image/jpeg',
-                'title' => 'Local Sample Image 1',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'local',
-                'filename' => 'sample-image-2.jpg',
-                'ext' => 'jpg',
-                'url' => null,
-                'mime_type' => 'image/jpeg',
-                'title' => 'Local Sample Image 2',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'local',
-                'filename' => 'sample-audio-1.mp3',
-                'ext' => 'mp3',
-                'url' => null,
-                'mime_type' => 'audio/mpeg',
-                'title' => 'Local Sample Audio 1',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'local',
-                'filename' => 'sample-audio-2.mp3',
-                'ext' => 'mp3',
-                'url' => null,
-                'mime_type' => 'audio/mpeg',
-                'title' => 'Local Sample Audio 2',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'local',
-                'filename' => 'sample-video-1.mp4',
-                'ext' => 'mp4',
-                'url' => null,
-                'mime_type' => 'video/mp4',
-                'title' => 'Local Sample Video 1',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'local',
-                'filename' => 'sample-video-2.mp4',
-                'ext' => 'mp4',
-                'url' => null,
-                'mime_type' => 'video/mp4',
-                'title' => 'Local Sample Video 2',
-                'downloaded' => false,
-            ],
-        ];
-
-        // Online files (with URL, no path)
-        $onlineFiles = [
-            [
-                'source' => 'YouTube',
-                'filename' => 'big-buck-bunny.mp4',
-                'ext' => 'mp4',
-                'path' => null,
-                'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                'mime_type' => 'video/mp4',
-                'title' => 'Big Buck Bunny - Online Video',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'YouTube',
-                'filename' => 'elephants-dream.mp4',
-                'ext' => 'mp4',
-                'path' => null,
-                'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-                'mime_type' => 'video/mp4',
-                'title' => 'Elephants Dream - Online Video',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'Booru',
-                'filename' => 'random-image-1.jpg',
-                'ext' => 'jpg',
-                'path' => null,
-                'url' => 'https://picsum.photos/1920/1080',
-                'mime_type' => 'image/jpeg',
-                'title' => 'Random Image 1 - Online',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'Booru',
-                'filename' => 'random-image-2.jpg',
-                'ext' => 'jpg',
-                'path' => null,
-                'url' => 'https://picsum.photos/1600/900',
-                'mime_type' => 'image/jpeg',
-                'title' => 'Random Image 2 - Online',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'NAS',
-                'filename' => 'sample-audio-online.mp3',
-                'ext' => 'mp3',
-                'path' => null,
-                'url' => 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-                'mime_type' => 'audio/mpeg',
-                'title' => 'SoundHelix Song 1 - Online',
-                'downloaded' => false,
-            ],
-            [
-                'source' => 'NAS',
-                'filename' => 'sample-audio-online-2.mp3',
-                'ext' => 'mp3',
-                'path' => null,
-                'url' => 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-                'mime_type' => 'audio/mpeg',
-                'title' => 'SoundHelix Song 2 - Online',
-                'downloaded' => false,
-            ],
-        ];
-
-        // Downloaded files (with path and URL - simulating files downloaded from online sources)
-        // These will reuse existing files by finding them in storage
-        $downloadedFiles = [
-            [
-                'source' => 'YouTube',
-                'filename' => 'big-buck-bunny-downloaded.mp4',
-                'ext' => 'mp4',
-                'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                'mime_type' => 'video/mp4',
-                'title' => 'Big Buck Bunny - Downloaded',
-                'downloaded' => true,
-                'downloaded_at' => now()->subDays(5),
-                'reuse_file' => 'sample-video-1.mp4', // Reuse this existing file
-            ],
-            [
-                'source' => 'YouTube',
-                'filename' => 'elephants-dream-downloaded.mp4',
-                'ext' => 'mp4',
-                'url' => 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-                'mime_type' => 'video/mp4',
-                'title' => 'Elephants Dream - Downloaded',
-                'downloaded' => true,
-                'downloaded_at' => now()->subDays(3),
-                'reuse_file' => 'sample-video-2.mp4', // Reuse this existing file
-            ],
-            [
-                'source' => 'Booru',
-                'filename' => 'downloaded-image-1.jpg',
-                'ext' => 'jpg',
-                'url' => 'https://picsum.photos/1920/1080',
-                'mime_type' => 'image/jpeg',
-                'title' => 'Downloaded Image 1',
-                'downloaded' => true,
-                'downloaded_at' => now()->subDays(7),
-                'reuse_file' => 'sample-image-1.jpg', // Reuse this existing file
-            ],
-            [
-                'source' => 'Booru',
-                'filename' => 'downloaded-image-2.jpg',
-                'ext' => 'jpg',
-                'url' => 'https://picsum.photos/1600/900',
-                'mime_type' => 'image/jpeg',
-                'title' => 'Downloaded Image 2',
-                'downloaded' => true,
-                'downloaded_at' => now()->subDays(2),
-                'reuse_file' => 'sample-image-2.jpg', // Reuse this existing file
-            ],
-        ];
-
-        // Process local files
-        foreach ($localFiles as $fileData) {
-            $type = $this->getFileType($fileData['mime_type']);
-            
-            // Find the file in storage (should have been copied from fixtures)
-            // Try new subfolder structure first, then old flat structure for backward compatibility
-            $hash = hash('sha256', $fileData['filename']);
-            $newPath = File::getStoragePath($type, $fileData['filename'], $hash);
-            $oldPath = storage_path("app/private/{$type}/{$fileData['filename']}");
-            
-            $fullPath = null;
-            if (file_exists($newPath)) {
-                $fullPath = $newPath;
-                // Recalculate hash from actual file content
-                $hash = hash_file('sha256', $fullPath);
-            } elseif (file_exists($oldPath)) {
-                // File exists in old location, generate hash and move to new location
-                $hash = hash_file('sha256', $oldPath);
-                $newPath = File::getStoragePath($type, $fileData['filename'], $hash);
-                
-                // Move file to new subfolder structure
-                if (! file_exists($newPath)) {
-                    rename($oldPath, $newPath);
-                }
-                $fullPath = $newPath;
-            } else {
-                // File doesn't exist, this shouldn't happen if fixtures are set up correctly
-                $this->command?->warn("File not found for local file: {$fileData['filename']}");
-                $fullPath = $newPath;
-            }
-            
-            // Generate relative path for database
-            $relativePath = File::generateStoragePath($type, $fileData['filename'], $hash);
-            $size = file_exists($fullPath) ? filesize($fullPath) : null;
-
-            File::create(array_merge($fileData, [
-                'path' => $relativePath,
-                'hash' => $hash,
-                'size' => $size,
-                'created_at' => now()->subDays(rand(1, 30)),
-            ]));
+        foreach ($this->fixtures as $fixture) {
+            $this->copyFixtureToStorage($fixture['path'], $fixture['filename'], $fixture['mime_type']);
         }
 
-        // Process online files
-        foreach ($onlineFiles as $fileData) {
+        // Generate 10 local files (with path, no URL, downloaded = false)
+        for ($i = 0; $i < 10; $i++) {
+            $fixture = $this->getFixture($i);
+            $fileInfo = $this->findFileInStorage($fixture['filename'], $fixture['type']);
+
+            if (! $fileInfo) {
+                $this->command?->warn("File not found for local file: {$fixture['filename']}");
+                $hash = hash('sha256', $fixture['filename']);
+                $fileInfo = [
+                    'path' => File::getStoragePath($fixture['type'], $fixture['filename'], $hash),
+                    'hash' => $hash,
+                ];
+            }
+
+            $relativePath = File::generateStoragePath($fixture['type'], $fixture['filename'], $fileInfo['hash']);
+            $size = file_exists($fileInfo['path']) ? filesize($fileInfo['path']) : null;
+
+            File::create([
+                'source' => 'local',
+                'filename' => "local-{$i}-{$fixture['filename']}",
+                'ext' => $fixture['ext'],
+                'url' => null,
+                'path' => $relativePath,
+                'mime_type' => $fixture['mime_type'],
+                'title' => 'Local File '.($i + 1),
+                'downloaded' => false,
+                'hash' => $fileInfo['hash'],
+                'size' => $size,
+                'created_at' => now()->subDays(rand(1, 30)),
+            ]);
+        }
+
+        // Generate 10 online files (with URL, no path, downloaded = false)
+        for ($i = 0; $i < 10; $i++) {
+            $fileData = $this->generateOnlineFileData($i);
+
             File::create(array_merge($fileData, [
                 'size' => null, // Unknown size for online files
                 'created_at' => now()->subDays(rand(1, 30)),
             ]));
         }
 
-        // Process downloaded files
-        // These simulate files that were downloaded from online sources
-        // They reuse the fixture files but with different metadata
-        foreach ($downloadedFiles as $fileData) {
-            $type = $this->getFileType($fileData['mime_type']);
-            $reuseFile = $fileData['reuse_file'] ?? null;
-            unset($fileData['reuse_file']); // Remove from data before creating
-            
-            // Find the file to reuse (should have been copied from fixtures)
-            $fullPath = null;
-            $hash = null;
-            
-            if ($reuseFile) {
-                // Try to find the file to reuse in new structure first
-                $reuseHash = hash('sha256', $reuseFile);
-                $reusePath = File::getStoragePath($type, $reuseFile, $reuseHash);
-                
-                if (file_exists($reusePath)) {
-                    // Found the file, use its hash
-                    $hash = hash_file('sha256', $reusePath);
-                    $fullPath = $reusePath;
-                } else {
-                    // Try old flat structure
-                    $oldReusePath = storage_path("app/private/{$type}/{$reuseFile}");
-                    if (file_exists($oldReusePath)) {
-                        $hash = hash_file('sha256', $oldReusePath);
-                        $fullPath = $oldReusePath;
-                    }
-                }
-            }
-            
-            // If we couldn't find the file to reuse, generate a new path
-            if (! $fullPath) {
-                $hash = hash('sha256', $fileData['url']);
-                $fullPath = File::getStoragePath($type, $fileData['filename'], $hash);
-            }
-            
-            // Generate relative path for database (use the downloaded filename, not the reused one)
-            $relativePath = File::generateStoragePath($type, $fileData['filename'], $hash);
-            $size = file_exists($fullPath) ? filesize($fullPath) : null;
+        // Generate 10 downloaded files (with path and URL, downloaded = true)
+        // These reuse the fixture files but with different metadata
+        for ($i = 0; $i < 10; $i++) {
+            $fixture = $this->getFixture($i);
+            $onlineData = $this->generateOnlineFileData($i);
 
-            File::create(array_merge($fileData, [
+            $fileInfo = $this->findFileInStorage($fixture['filename'], $fixture['type']);
+
+            if (! $fileInfo) {
+                $hash = hash('sha256', $onlineData['url']);
+                $fileInfo = [
+                    'path' => File::getStoragePath($fixture['type'], $onlineData['filename'], $hash),
+                    'hash' => $hash,
+                ];
+            }
+
+            $relativePath = File::generateStoragePath($fixture['type'], $onlineData['filename'], $fileInfo['hash']);
+            $size = file_exists($fileInfo['path']) ? filesize($fileInfo['path']) : null;
+
+            File::create([
+                'source' => $onlineData['source'],
+                'filename' => "downloaded-{$i}-{$onlineData['filename']}",
+                'ext' => $onlineData['ext'],
+                'url' => $onlineData['url'],
                 'path' => $relativePath,
-                'hash' => $hash,
+                'mime_type' => $onlineData['mime_type'],
+                'title' => 'Downloaded File '.($i + 1),
+                'downloaded' => true,
+                'downloaded_at' => now()->subDays(rand(1, 30)),
+                'hash' => $fileInfo['hash'],
                 'size' => $size,
                 'created_at' => now()->subDays(rand(1, 30)),
-            ]));
+            ]);
         }
     }
 }
