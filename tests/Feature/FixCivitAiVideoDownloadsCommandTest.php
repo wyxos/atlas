@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\File;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -14,9 +15,8 @@ it('finds and fixes affected files', function () {
     $mp4Url = 'https://media.example.test/civitai/81113576/transcode=true,original=true,quality=90/falsified-video.mp4';
 
     Http::fake([
-        'https://civitai.com/images/81113576' => Http::response($html, 200, ['Content-Type' => 'text/html']),
-        'https://civitai.com/images/81113577' => Http::response($html, 200, ['Content-Type' => 'text/html']),
-        $mp4Url => Http::response('fake video content', 200),
+        'https://civitai.com/images/*' => fn (Request $request) => Http::response($html, 200, ['Content-Type' => 'text/html']),
+        $mp4Url => fn () => Http::response('fake video content', 200),
     ]);
 
     Storage::disk('atlas_app')->put('downloads/test1.webp', 'fake content');

@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\File;
 use App\Models\Reaction;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -56,25 +58,19 @@ class DashboardController extends Controller
      */
     private function calculateFileStats(): array
     {
-        // Use Scout for counts (fast with facets) - exclude blacklisted files
-        $baseQuery = File::search('*')
-            ->where('blacklisted', false)
-            ->take(0); // We only need counts, not results
+        // Count everything directly in the database; composite indexes keep this fast.
+        $baseQuery = File::query()->whereNull('blacklisted_at');
 
-        // Get total count
-        $totalFiles = (int) $baseQuery->count();
-
-        // Get counts by mime_group using filtered searches
-        $audioFilesCount = (int) (clone $baseQuery)->where('mime_group', 'audio')->count();
-        $videoFilesCount = (int) (clone $baseQuery)->where('mime_group', 'video')->count();
-        $imageFilesCount = (int) (clone $baseQuery)->where('mime_group', 'image')->count();
+        $totalFiles = (int) (clone $baseQuery)->count();
+        $audioFilesCount = (int) (clone $baseQuery)->audio()->count();
+        $videoFilesCount = (int) (clone $baseQuery)->video()->count();
+        $imageFilesCount = (int) (clone $baseQuery)->image()->count();
         $otherFiles = max(0, $totalFiles - ($audioFilesCount + $videoFilesCount + $imageFilesCount));
 
-        // Get not_found counts
         $totalNotFound = (int) (clone $baseQuery)->where('not_found', true)->count();
-        $audioNotFound = (int) (clone $baseQuery)->where('mime_group', 'audio')->where('not_found', true)->count();
-        $videoNotFound = (int) (clone $baseQuery)->where('mime_group', 'video')->where('not_found', true)->count();
-        $imageNotFound = (int) (clone $baseQuery)->where('mime_group', 'image')->where('not_found', true)->count();
+        $audioNotFound = (int) (clone $baseQuery)->audio()->where('not_found', true)->count();
+        $videoNotFound = (int) (clone $baseQuery)->video()->where('not_found', true)->count();
+        $imageNotFound = (int) (clone $baseQuery)->image()->where('not_found', true)->count();
 
         // Size sums still use database (Typesense doesn't support SUM aggregations)
         // These are fast with the composite index on ['mime_type', 'size']
@@ -83,7 +79,7 @@ class DashboardController extends Controller
             COALESCE(SUM(CASE WHEN mime_type LIKE 'video/%' THEN size END), 0) as video_size,
             COALESCE(SUM(CASE WHEN mime_type LIKE 'image/%' THEN size END), 0) as image_size,
             COALESCE(SUM(CASE WHEN mime_type NOT LIKE 'audio/%' AND mime_type NOT LIKE 'video/%' AND mime_type NOT LIKE 'image/%' THEN size END), 0) as other_size
-        ")->where('blacklisted_at', null)->first();
+        ")->whereNull('blacklisted_at')->first();
 
         // Lightweight global reaction counts (no joins)
         $globalLoved = Reaction::where('type', 'love')->count();
@@ -91,7 +87,7 @@ class DashboardController extends Controller
         $globalDisliked = Reaction::where('type', 'dislike')->count();
         $globalLaughedAt = Reaction::where('type', 'funny')->count();
         // "No rating" approximated as files without any reaction (anti-join via distinct reaction file ids)
-        $reactedDistinctFiles = \DB::table('reactions')->distinct()->count('file_id');
+        $reactedDistinctFiles = DB::table('reactions')->distinct()->count('file_id');
         $globalNoRating = max(0, $totalFiles - (int) $reactedDistinctFiles);
 
         // Disk space information (fast)
