@@ -110,19 +110,6 @@ const filtersDirty = computed(() => snapshotFilters() !== appliedFilterSnapshot.
 const containerCounts = reactive(new Map<string, Map<string | number, number>>());
 provide('browse-container-counts', containerCounts as unknown as Map<string, Map<string | number, number>>);
 
-function hasNextCursor(value: unknown): boolean {
-    if (value === null || typeof value === 'undefined') {
-        return false;
-    }
-    if (typeof value === 'string') {
-        const normalized = value.trim();
-        if (!normalized || normalized === 'null' || normalized === 'undefined') {
-            return false;
-        }
-    }
-    return true;
-}
-
 function recomputeContainerCounts(list: any[]) {
     const counts = new Map<string, Map<string | number, number>>();
     for (const entry of Array.isArray(list) ? list : []) {

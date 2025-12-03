@@ -3,6 +3,8 @@ import { nextTick } from 'vue'
 import { vi, describe, it, expect, afterEach } from 'vitest'
 import FullSizeViewer from '@/pages/browse/FullSizeViewer.vue'
 
+type Listener = (...args: any[]) => void
+
 vi.mock('axios', () => ({
   default: {
     post: vi.fn().mockResolvedValue({ data: {} }),
@@ -40,11 +42,11 @@ describe('FullSizeViewer preloading', () => {
     class MockImage {
       src = ''
       referrerPolicy = ''
-      private listeners: Record<string, Function[]> = {}
+      private listeners: Record<string, Listener[]> = {}
       constructor() {
         createdImages.push(this)
       }
-      addEventListener(evt: string, cb: any) {
+      addEventListener(evt: string, cb: Listener) {
         ;(this.listeners[evt] = this.listeners[evt] || []).push(cb)
       }
       removeEventListener() {}

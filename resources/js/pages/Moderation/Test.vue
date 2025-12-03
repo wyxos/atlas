@@ -10,13 +10,11 @@ import ContentLayout from '@/layouts/ContentLayout.vue';
 import ScrollableLayout from '@/layouts/ScrollableLayout.vue';
 import type { BreadcrumbItem } from '@/types';
 import { highlightPromptHtml } from '@/utils/moderationHighlight';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import { useDebounceFn } from '@vueuse/core';
 import axios from 'axios';
 import { AlertCircle, Check, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
-
-type RuleOperator = 'any' | 'all' | 'not_any' | 'at_least' | 'and' | 'or';
 
 interface Rule extends RuleNode {
     id?: number;
@@ -42,7 +40,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Test Rules', href: '/moderation/test' },
 ];
 
-const page = usePage();
 const testText = ref('');
 const selectedRuleId = ref<number | null>(null);
 const testResult = ref<TestResult | null>(null);

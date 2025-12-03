@@ -705,7 +705,7 @@ describe('FullSizeViewer navigation', () => {
       { name: 'handleLaughedAt', handler: wrapper.vm.handleLaughedAt },
     ]
 
-    for (const { name, handler } of reactionHandlers) {
+    for (const { handler } of reactionHandlers) {
       // Reset state
       wrapper.vm.fullLoaded = true
       wrapper.vm.setFullErrorState('unavailable', 503, 'Failed', false)

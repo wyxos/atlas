@@ -930,7 +930,7 @@ async function clearNotFoundFlag() {
       (dialogItem.value as any).not_found = false
       setFullErrorState('none', null, null, false)
     }
-  } catch (error) {
+  } catch {
     // Silently fail
   }
 }
