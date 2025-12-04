@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a3eb41447da5ecc03d2bca117979dd97",
+    "content-hash": "ba7b73d8edd7c9a3270e0de93f0cdc90",
     "packages": [
         {
             "name": "brick/math",
@@ -6535,10 +6535,16 @@
         {
             "name": "wyxos/harmonie",
             "version": "1.6.9",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/wyxos/harmonie.git",
+                "reference": "8111559868d7a3cdd5228b9fad22f9e65ee8090a"
+            },
             "dist": {
-                "type": "path",
-                "url": "D:/code/wyxos/composer/harmonie",
-                "reference": "60cfed6e9f2366d3971f45fc2c9c1a1277862a42"
+                "type": "zip",
+                "url": "https://api.github.com/repos/wyxos/harmonie/zipball/8111559868d7a3cdd5228b9fad22f9e65ee8090a",
+                "reference": "8111559868d7a3cdd5228b9fad22f9e65ee8090a",
+                "shasum": ""
             },
             "require": {
                 "laravel/framework": "^11.31 || ^12.0",
@@ -6561,6 +6567,7 @@
                     "Wyxos\\Harmonie\\": "src/"
                 }
             },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -6571,9 +6578,11 @@
                 }
             ],
             "description": "Backend utilities for Laravel and @wyxos/vision",
-            "transport-options": {
-                "relative": false
-            }
+            "support": {
+                "issues": "https://github.com/wyxos/harmonie/issues",
+                "source": "https://github.com/wyxos/harmonie/tree/v1.6.9"
+            },
+            "time": "2025-07-11T07:47:23+00:00"
         }
     ],
     "packages-dev": [
@@ -11675,9 +11684,7 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {
-        "wyxos/harmonie": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
