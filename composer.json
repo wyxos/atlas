@@ -8,17 +8,12 @@
         "media-server"
     ],
     "license": "MIT",
-    "repositories": [
-        {
-            "type": "path",
-            "url": "D:/code/wyxos/composer/harmonie"
-        }
-    ],
+    "repositories": [],
     "require": {
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "wyxos/harmonie": "@dev"
+        "wyxos/harmonie": "^1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
