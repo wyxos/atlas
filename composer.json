@@ -11,7 +11,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "D:/code/wyxos/laravel-plugin/harmonie"
+            "url": "D:/code/wyxos/composer/harmonie"
         }
     ],
     "require": {
