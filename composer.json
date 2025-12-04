@@ -8,12 +8,11 @@
         "media-server"
     ],
     "license": "MIT",
-    "repositories": [],
     "require": {
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "wyxos/harmonie": "^1.0"
+        "wyxos/harmonie": "1.6.13"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

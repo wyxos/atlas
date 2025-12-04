@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ba7b73d8edd7c9a3270e0de93f0cdc90",
+    "content-hash": "71f0ea53a747e9165230a0b7ee8c72a2",
     "packages": [
         {
             "name": "brick/math",
@@ -6534,16 +6534,16 @@
         },
         {
             "name": "wyxos/harmonie",
-            "version": "1.6.9",
+            "version": "1.6.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/wyxos/harmonie.git",
-                "reference": "8111559868d7a3cdd5228b9fad22f9e65ee8090a"
+                "reference": "67b6f734351c8962ac63642db45c5276d31d9ef2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/wyxos/harmonie/zipball/8111559868d7a3cdd5228b9fad22f9e65ee8090a",
-                "reference": "8111559868d7a3cdd5228b9fad22f9e65ee8090a",
+                "url": "https://api.github.com/repos/wyxos/harmonie/zipball/67b6f734351c8962ac63642db45c5276d31d9ef2",
+                "reference": "67b6f734351c8962ac63642db45c5276d31d9ef2",
                 "shasum": ""
             },
             "require": {
@@ -6580,9 +6580,9 @@
             "description": "Backend utilities for Laravel and @wyxos/vision",
             "support": {
                 "issues": "https://github.com/wyxos/harmonie/issues",
-                "source": "https://github.com/wyxos/harmonie/tree/v1.6.9"
+                "source": "https://github.com/wyxos/harmonie/tree/v1.6.13"
             },
-            "time": "2025-07-11T07:47:23+00:00"
+            "time": "2025-12-04T08:57:47+00:00"
         }
     ],
     "packages-dev": [
