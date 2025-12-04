@@ -219,12 +219,12 @@ onMounted(async () => {
                 @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()" title="Filter Users"
                 :is-filtering="listing.isFiltering" :is-resetting="listing.isResetting"
                 @apply="() => listing.applyFilters()" @reset="() => listing.resetFilters()">
-                <ListingFilterForm :search="listing.search" :date-from="listing.date_from" :date-to="listing.date_to"
-                    search-placeholder="Search by name or email..." @update:search="(value) => listing.search = value"
-                    @update:date-from="(value) => listing.date_from = value"
-                    @update:date-to="(value) => listing.date_to = value" @submit="listing.applyFilters()">
+                <ListingFilterForm :search="listing.filters.search || ''" :date-from="listing.filters.date_from || ''" :date-to="listing.filters.date_to || ''"
+                    search-placeholder="Search by name or email..." @update:search="(value) => listing.filters.search = value"
+                    @update:date-from="(value) => listing.filters.date_from = value"
+                    @update:date-to="(value) => listing.filters.date_to = value" @submit="listing.applyFilters()">
                     <!-- Status Filter -->
-                    <Select v-model="listing.status">
+                    <Select v-model="listing.filters.status">
                         <template #label>
                             Status
                         </template>
