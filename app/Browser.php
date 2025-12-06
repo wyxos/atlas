@@ -109,7 +109,8 @@ class Browser
                 'id' => (string) ($listingMetadata['id'] ?? $file->source_id ?? $file->id),
                 'width' => (int) ($metadata['width'] ?? 500),
                 'height' => (int) ($metadata['height'] ?? 500),
-                'src' => $file->url,
+                'src' => $file->thumbnail_url ?? $file->url, // Use thumbnail for masonry grid, fallback to original
+                'originalUrl' => $file->url, // Keep original URL for full-size viewing
                 'thumbnail' => $file->thumbnail_url,
                 'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
                 'page' => (int) (request()->input('page', 1)),

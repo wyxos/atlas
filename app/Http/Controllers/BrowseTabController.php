@@ -18,6 +18,30 @@ class BrowseTabController extends Controller
             ->ordered()
             ->get();
 
+        // Eager load files and format them for each tab
+        $tabs->each(function (BrowseTab $tab) {
+            if ($tab->file_ids && count($tab->file_ids) > 0) {
+                // file_ids contains referrer URLs
+                $files = \App\Models\File::with('metadata')
+                    ->whereIn('referrer_url', $tab->file_ids)
+                    ->get()
+                    ->sortBy(function ($file) use ($tab) {
+                        // Maintain order based on file_ids array
+                        return array_search($file->referrer_url, $tab->file_ids);
+                    })
+                    ->values();
+
+                // Format files into items structure
+                // Get page from query_params, default to 1
+                $page = isset($tab->query_params['page']) && is_numeric($tab->query_params['page'])
+                    ? (int) $tab->query_params['page']
+                    : 1;
+                $tab->items_data = BrowseTab::formatFilesToItems($files, $page);
+            } else {
+                $tab->items_data = [];
+            }
+        });
+
         return response()->json($tabs);
     }
 
@@ -35,9 +59,6 @@ class BrowseTabController extends Controller
             'label' => $request->label,
             'query_params' => $request->query_params,
             'file_ids' => $request->file_ids,
-            'next_cursor' => $request->next_cursor,
-            'current_page' => $request->current_page,
-            'items_data' => $request->items_data,
             'position' => $request->position ?? ($maxPosition + 1),
         ]);
 

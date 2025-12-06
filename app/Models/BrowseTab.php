@@ -14,9 +14,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string label
  * @property array|null query_params
  * @property array|null file_ids
- * @property string|null next_cursor
- * @property string|null current_page
- * @property array|null items_data
  * @property int position
  * @property Carbon|null created_at
  * @property Carbon|null updated_at
@@ -40,9 +37,6 @@ class BrowseTab extends Model
         'label',
         'query_params',
         'file_ids',
-        'next_cursor',
-        'current_page',
-        'items_data',
         'position',
     ];
 
@@ -56,7 +50,6 @@ class BrowseTab extends Model
         return [
             'query_params' => 'array',
             'file_ids' => 'array',
-            'items_data' => 'array',
             'position' => 'integer',
         ];
     }
@@ -83,5 +76,33 @@ class BrowseTab extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('position');
+    }
+
+    /**
+     * Format files into items structure for frontend (similar to Browser.php).
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection<int, \App\Models\File>  $files
+     * @param  int  $page
+     * @return array<int, array<string, mixed>>
+     */
+    public static function formatFilesToItems($files, int $page = 1): array
+    {
+        return $files->map(function (File $file, int $index) use ($page) {
+            $metadata = $file->metadata?->payload ?? [];
+            $listingMetadata = $file->listing_metadata ?? [];
+
+            return [
+                'id' => (string) ($listingMetadata['id'] ?? $file->source_id ?? $file->id),
+                'width' => (int) ($metadata['width'] ?? 500),
+                'height' => (int) ($metadata['height'] ?? 500),
+                'src' => $file->thumbnail_url ?? $file->url, // Use thumbnail for masonry grid, fallback to original
+                'originalUrl' => $file->url, // Keep original URL for full-size viewing
+                'thumbnail' => $file->thumbnail_url,
+                'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
+                'page' => $page,
+                'index' => $index,
+                'notFound' => false,
+            ];
+        })->values()->all();
     }
 }
