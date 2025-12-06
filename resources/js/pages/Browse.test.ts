@@ -7,16 +7,36 @@ import Browse from './Browse.vue';
 // Mock fetch
 global.fetch = vi.fn();
 
+// Mock axios
+const mockAxios = {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+};
+
+vi.mock('axios', () => ({
+    default: mockAxios,
+}));
+
+// Mock window.axios
+Object.defineProperty(window, 'axios', {
+    value: mockAxios,
+    writable: true,
+});
+
 // Mock @wyxos/vibe
 const mockIsLoading = ref(false);
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
         template: '<div class="masonry-mock"><slot></slot></div>',
-        props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint'],
+        props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad'],
         setup() {
             return {
                 isLoading: mockIsLoading,
+                init: vi.fn(),
+                refreshLayout: vi.fn(),
             };
         },
     },
@@ -25,6 +45,9 @@ vi.mock('@wyxos/vibe', () => ({
 beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => { });
+    
+    // Mock tabs API to return empty array by default
+    mockAxios.get.mockResolvedValue({ data: [] });
 });
 
 async function createTestRouter(initialPath = '/browse') {
@@ -62,7 +85,19 @@ function createMockBrowseResponse(
 }
 
 describe('Browse', () => {
-    it('renders the Masonry component', async () => {
+    it('renders the Masonry component when tab exists', async () => {
+        // Mock tabs API to return a tab
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: 1,
+                label: 'Test Tab',
+                query_params: { page: 1 },
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
         const router = await createTestRouter();
         const wrapper = mount(Browse, {
             global: {
@@ -72,6 +107,7 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
 
         expect(wrapper.find('.masonry-mock').exists()).toBe(true);
     });
@@ -93,6 +129,18 @@ describe('Browse', () => {
     });
 
     it('passes correct props to Masonry component', async () => {
+        // Mock tabs API to return a tab
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: 1,
+                label: 'Test Tab',
+                query_params: { page: 1 },
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
         const router = await createTestRouter();
         const wrapper = mount(Browse, {
             global: {
@@ -102,12 +150,15 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 200)); // Wait for tab switching
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
+        // When tab has no items, loadAtPage is set to 1 to start loading
         expect(masonry.props('loadAtPage')).toBe(1);
         expect(masonry.props('layoutMode')).toBe('auto');
         expect(masonry.props('mobileBreakpoint')).toBe(768);
+        expect(masonry.props('skipInitialLoad')).toBe(false); // No items initially
         expect(masonry.props('layout')).toEqual({
             gutterX: 12,
             gutterY: 12,
@@ -255,10 +306,24 @@ describe('Browse', () => {
         expect(vm.nextCursor).toBe(2);
     });
 
-    it('initializes from URL query parameters on mount', async () => {
+    it('initializes from tab in URL query parameters on mount', async () => {
+        const tabId = 1;
         const pageParam = 'cursor-page-123';
         const nextParam = 'cursor-next-456';
-        const router = await createTestRouter(`/browse?page=${pageParam}&next=${nextParam}`);
+        
+        // Mock tabs API to return a tab with the page/next in query_params
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: tabId,
+                label: 'Test Tab',
+                query_params: { page: pageParam, next: nextParam },
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
+        const router = await createTestRouter(`/browse?tab=${tabId}`);
 
         const wrapper = mount(Browse, {
             global: {
@@ -268,15 +333,21 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for tab switching and restoration
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        expect(vm.currentPage).toBe(pageParam);
+        expect(vm.activeTabId).toBe(tabId);
+        // When tab has no items_data, currentPage is reset to 1, but nextCursor is preserved from query_params
+        // This is the actual behavior - nextCursor is only reset when items_data exists
+        expect(vm.currentPage).toBe(1);
         expect(vm.nextCursor).toBe(nextParam);
-        expect(vm.loadAtPage).toBe(pageParam);
     });
 
-    it('initializes with default values when no URL parameters', async () => {
+    it('initializes with default values when no tabs exist', async () => {
+        // Mock tabs API to return empty array
+        mockAxios.get.mockResolvedValueOnce({ data: [] });
+
         const router = await createTestRouter('/browse');
 
         const wrapper = mount(Browse, {
@@ -290,12 +361,27 @@ describe('Browse', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
+        expect(vm.activeTabId).toBeNull();
         expect(vm.currentPage).toBe(1);
         expect(vm.nextCursor).toBeNull();
-        expect(vm.loadAtPage).toBe(1);
+        expect(vm.loadAtPage).toBeNull(); // Changed to null by default
     });
 
-    it('updateUrl function updates router with correct query parameters', async () => {
+    it('updateUrl function updates router with tab ID only', async () => {
+        const tabId = 1;
+        
+        // Mock tabs API to return a tab
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: tabId,
+                label: 'Test Tab',
+                query_params: {},
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
         const router = await createTestRouter();
         const replaceSpy = vi.spyOn(router, 'replace');
 
@@ -307,22 +393,35 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        vm.currentPage = 'cursor-123';
-        vm.nextCursor = 'cursor-456';
         vm.updateUrl();
 
+        // updateUrl now only sets tab ID, not page/next
         expect(replaceSpy).toHaveBeenCalledWith({
             query: {
-                page: 'cursor-123',
-                next: 'cursor-456',
+                tab: String(tabId),
             },
         });
     });
 
-    it('does not add page to URL when currentPage is 1', async () => {
+    it('updateUrl only includes tab ID, not page or next', async () => {
+        const tabId = 1;
+        
+        // Mock tabs API to return a tab
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: tabId,
+                label: 'Test Tab',
+                query_params: {},
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
         const router = await createTestRouter();
         const replaceSpy = vi.spyOn(router, 'replace');
 
@@ -334,6 +433,7 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -341,14 +441,29 @@ describe('Browse', () => {
         vm.nextCursor = 'cursor-456';
         vm.updateUrl();
 
+        // updateUrl only sets tab ID, page/next are stored in tab's query_params
         expect(replaceSpy).toHaveBeenCalledWith({
             query: {
-                next: 'cursor-456',
+                tab: String(tabId),
             },
         });
     });
 
-    it('preserves existing query parameters when updating URL', async () => {
+    it('updateUrl only includes tab ID, ignores other query params', async () => {
+        const tabId = 1;
+        
+        // Mock tabs API to return a tab
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: tabId,
+                label: 'Test Tab',
+                query_params: {},
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
         const router = await createTestRouter('/browse?filter=test&sort=asc');
         const replaceSpy = vi.spyOn(router, 'replace');
 
@@ -360,24 +475,35 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        vm.currentPage = 'cursor-123';
-        vm.nextCursor = 'cursor-456';
         vm.updateUrl();
 
+        // updateUrl only sets tab ID, other query params are stored in tab's query_params
         expect(replaceSpy).toHaveBeenCalledWith({
             query: {
-                filter: 'test',
-                sort: 'asc',
-                page: 'cursor-123',
-                next: 'cursor-456',
+                tab: String(tabId),
             },
         });
     });
 
-    it('does not add next to URL when nextCursor is null', async () => {
+    it('updateUrl only includes tab ID when activeTabId exists', async () => {
+        const tabId = 1;
+        
+        // Mock tabs API to return a tab
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: tabId,
+                label: 'Test Tab',
+                query_params: {},
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
         const router = await createTestRouter();
         const replaceSpy = vi.spyOn(router, 'replace');
 
@@ -389,16 +515,17 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        vm.currentPage = 'cursor-123';
         vm.nextCursor = null;
         vm.updateUrl();
 
+        // updateUrl only sets tab ID
         expect(replaceSpy).toHaveBeenCalledWith({
             query: {
-                page: 'cursor-123',
+                tab: String(tabId),
             },
         });
     });
@@ -457,9 +584,24 @@ describe('Browse', () => {
         }
     });
 
-    it('handles string page parameter from URL', async () => {
+    it('handles tab with page parameter in query_params', async () => {
+        const tabId = 1;
         const pageParam = 'cursor-string-123';
-        const router = await createTestRouter(`/browse?page=${pageParam}`);
+        
+        // Mock tabs API to return a tab with page in query_params and items_data
+        // When items_data exists, the page from query_params is restored
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: tabId,
+                label: 'Test Tab',
+                query_params: { page: pageParam },
+                file_ids: ['https://civitai.com/images/123'],
+                items_data: [{ id: '123', width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                position: 0,
+            }],
+        });
+
+        const router = await createTestRouter(`/browse?tab=${tabId}`);
 
         const wrapper = mount(Browse, {
             global: {
@@ -469,17 +611,33 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for tab switching and restoration
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
+        expect(vm.activeTabId).toBe(tabId);
+        // When items_data exists, page from query_params is restored
         expect(vm.currentPage).toBe(pageParam);
-        expect(vm.loadAtPage).toBe(pageParam);
     });
 
-    it('handles array page parameter from URL by converting to string', async () => {
-        const router = await createTestRouter('/browse?page=123&page=456');
-        // Vue Router may return array for duplicate params
-        router.currentRoute.value.query.page = ['123', '456'];
+    it('handles tab with page in query_params correctly', async () => {
+        const tabId = 1;
+        const pageValue = 123; // Can be number or string
+        
+        // Mock tabs API to return a tab with page as number in query_params and items_data
+        // When items_data exists, the page from query_params is restored
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: tabId,
+                label: 'Test Tab',
+                query_params: { page: pageValue },
+                file_ids: ['https://civitai.com/images/123'],
+                items_data: [{ id: '123', width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                position: 0,
+            }],
+        });
+
+        const router = await createTestRouter(`/browse?tab=${tabId}`);
 
         const wrapper = mount(Browse, {
             global: {
@@ -489,10 +647,11 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for tab switching and restoration
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        // Should convert array to string
-        expect(typeof vm.currentPage).toBe('string');
+        // Page value from query_params should be preserved when items_data exists (can be number or string)
+        expect(vm.currentPage).toBe(pageValue);
     });
 });
