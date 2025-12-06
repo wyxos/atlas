@@ -65,7 +65,7 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
             <!-- Current Page Pill -->
             <Pill label="Page" :value="currentPage" variant="neutral" reversed />
             <!-- Next Page Pill -->
-            <Pill v-if="nextCursor != null" label="Next" :value="nextCursor" variant="secondary" reversed />
+            <Pill label="Next" :value="nextCursor || 'N/A'" variant="secondary" reversed />
             <!-- Status Pill -->
             <Pill :label="'Status'" :value="masonry?.isLoading ? 'Loading...' : 'Ready'"
                 :variant="masonry?.isLoading ? 'primary' : 'success'" reversed>
