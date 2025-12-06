@@ -109,12 +109,12 @@ it('returns null for nextPage when no more pages available', function () {
 
         $response->assertSuccessful();
         $nextCursor = $response->json('nextPage'); // This is the cursor string
-        
+
         // If we got items but no nextPage, that's the last page
         if ($nextCursor === null) {
             break;
         }
-        
+
         // Use the cursor as the page for next request
         $page = $nextCursor;
         $iterations++;
@@ -250,17 +250,17 @@ it('filters out downloaded, previewed, and blacklisted files from results', func
     // Mark some files as downloaded, previewed, or blacklisted
     $files = File::where('source', 'CivitAI')->limit(5)->get();
     expect($files)->not->toBeEmpty();
-    
+
     $file1 = $files->first();
     $file1->downloaded = true;
     $file1->save();
-    
+
     $file2 = $files->skip(1)->first();
     if ($file2) {
         $file2->previewed_at = now();
         $file2->save();
     }
-    
+
     $file3 = $files->skip(2)->first();
     if ($file3) {
         $file3->blacklisted_at = now();
@@ -277,19 +277,19 @@ it('filters out downloaded, previewed, and blacklisted files from results', func
 
     // The filtered files should not appear in results
     $itemIds = collect($items2)->pluck('id')->toArray();
-    
+
     // Check that the downloaded file is not in results
     $listingMetadata1 = $file1->listing_metadata ?? [];
     $file1Id = (string) ($listingMetadata1['id'] ?? $file1->source_id ?? $file1->id);
     expect($itemIds)->not->toContain($file1Id);
-    
+
     // Check other files if they exist
     if ($file2) {
         $listingMetadata2 = $file2->listing_metadata ?? [];
         $file2Id = (string) ($listingMetadata2['id'] ?? $file2->source_id ?? $file2->id);
         expect($itemIds)->not->toContain($file2Id);
     }
-    
+
     if ($file3) {
         $listingMetadata3 = $file3->listing_metadata ?? [];
         $file3Id = (string) ($listingMetadata3['id'] ?? $file3->source_id ?? $file3->id);

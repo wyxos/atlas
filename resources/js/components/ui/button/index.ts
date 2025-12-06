@@ -17,6 +17,8 @@ export const buttonVariants = cva(
           "bg-sapphire-500 text-white hover:bg-sapphire-600 focus-visible:border-sapphire-400 focus-visible:ring-sapphire-400/50",
         ghost: "",
         link: "text-smart-blue-400 underline-offset-4 hover:underline hover:text-smart-blue-300",
+        dashed:
+          "border border-dashed bg-transparent text-twilight-indigo-300 hover:text-smart-blue-100 hover:bg-prussian-blue-800 border-twilight-indigo-500/30 hover:border-smart-blue-500/50",
       },
       color: {
         default:
