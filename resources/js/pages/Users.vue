@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Trash2, Filter, Users, CheckCircle2 } from 'lucide-vue-next';
+import { Trash2, Filter, Users, CheckCircle2, Loader2 } from 'lucide-vue-next';
 import PageLayout from '../components/PageLayout.vue';
 import {
     Dialog,
@@ -17,6 +17,7 @@ import FilterPanel from '../components/ui/FilterPanel.vue';
 import Select from '../components/ui/Select.vue';
 import ListingFilterForm from '../components/ListingFilterForm.vue';
 import { Listing, ActiveFilters, ListingTable } from '@wyxos/listing';
+import Pill from '../components/ui/Pill.vue';
 import { DeletionHandler } from '../lib/DeletionHandler';
 import { formatDate } from '../utils/date';
 
@@ -139,7 +140,32 @@ onMounted(async () => {
             </div>
 
             <!-- Active Filters Display -->
-            <ActiveFilters :listing="listing" />
+            <ActiveFilters :listing="listing">
+                <template #filter="{ filter, isRemoving, isAnyRemoving, remove }">
+                    <Pill
+                        :label="filter.label"
+                        :value="filter.value"
+                        variant="primary"
+                        reversed
+                        dismissible
+                        @dismiss="remove"
+                    >
+                        <template v-if="isRemoving" #value>
+                            <Loader2 :size="12" class="animate-spin" />
+                        </template>
+                    </Pill>
+                </template>
+                <template #clear="{ isAnyRemoving, isResetting, clear }">
+                    <Pill
+                        label="Clear"
+                        value="All"
+                        variant="danger"
+                        reversed
+                        dismissible
+                        @dismiss="clear"
+                    />
+                </template>
+            </ActiveFilters>
 
             <Transition name="table-grow" appear mode="out-in">
                 <div v-if="listing.isLoading" key="loading" class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
