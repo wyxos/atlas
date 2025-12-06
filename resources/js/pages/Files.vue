@@ -195,7 +195,10 @@ onMounted(async () => {
                     </Pill>
                 </template>
                 <template #clear="{ isAnyRemoving, isResetting, clear }">
-                    <Pill label="Clear" value="All" variant="danger" reversed dismissible @dismiss="clear" />
+                    <button type="button" @click="clear" :disabled="isAnyRemoving || isResetting"
+                        class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium bg-danger-600 text-white border border-danger-500 hover:bg-danger-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Clear
+                    </button>
                 </template>
             </ActiveFilters>
 
