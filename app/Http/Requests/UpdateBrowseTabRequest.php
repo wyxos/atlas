@@ -27,9 +27,6 @@ class UpdateBrowseTabRequest extends FormRequest
             'label' => ['sometimes', 'required', 'string', 'max:255'],
             'query_params' => ['nullable', 'array'],
             'file_ids' => ['nullable', 'array'],
-            'next_cursor' => ['nullable', 'string'],
-            'current_page' => ['nullable', 'string'],
-            'items_data' => ['nullable', 'array'],
             'position' => ['nullable', 'integer', 'min:0'],
         ];
     }

@@ -17,9 +17,6 @@ return new class extends Migration
             $table->string('label');
             $table->json('query_params')->nullable();
             $table->json('file_ids')->nullable();
-            $table->string('next_cursor')->nullable();
-            $table->string('current_page')->nullable();
-            $table->json('items_data')->nullable();
             $table->integer('position')->default(0);
             $table->timestamps();
         });

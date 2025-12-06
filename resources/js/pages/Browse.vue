@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Masonry } from '@wyxos/vibe';
 import { Loader2, Plus } from 'lucide-vue-next';
@@ -14,7 +14,9 @@ type MasonryItem = {
     height: number;
     page: number;
     index: number;
-    src: string;
+    src: string; // Preview/thumbnail URL for masonry grid
+    originalUrl?: string; // Original full-size URL
+    thumbnail?: string; // Thumbnail URL (may be same as src)
     type?: 'image' | 'video';
     notFound?: boolean;
     [key: string]: unknown;
@@ -28,11 +30,9 @@ type GetPageResult = {
 type BrowseTabData = {
     id: number;
     label: string;
-    queryParams: Record<string, string>;
+    queryParams: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
     fileIds: string[];
-    itemsData: MasonryItem[];
-    nextCursor: string | null;
-    currentPage: string | number;
+    itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
 };
 
@@ -42,7 +42,7 @@ const router = useRouter();
 const items = ref<MasonryItem[]>([]);
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number>(1); // Starts as 1, becomes cursor string
-const nextCursor = ref<string | null>(null); // The cursor from API
+const nextCursor = ref<string | number | null>(null); // The next page/cursor from API (service handles format)
 const previousLoadingState = ref(false);
 const loadAtPage = ref<string | number | null>(1); // Initial page to load, can be from URL
 const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
@@ -61,6 +61,16 @@ const layout = {
 };
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
+    // If we're restoring a tab and already have items, and masonry is trying to load page 1,
+    // prevent this load as we already have the items
+    if (isTabRestored.value && items.value.length > 0 && page === 1) {
+        // Return empty result to prevent loading page 1 when we already have items
+        return {
+            items: [],
+            nextPage: nextCursor.value,
+        };
+    }
+
     // Always pass as 'page' parameter - service will handle conversion
     const url = new URL('/api/browse', window.location.origin);
     url.searchParams.set('page', String(page));
@@ -68,15 +78,19 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     const response = await fetch(url.toString());
     const data = await response.json();
 
-    // Update current page to the cursor we just used (or keep as 1 if it was the first page)
-    if (page === 1) {
-        currentPage.value = 1;
-    } else {
-        currentPage.value = page; // This is the cursor we just used
+    // Don't update currentPage if we're restoring a tab and already have items
+    // This prevents resetting currentPage to 1 when masonry initializes with existing items
+    if (!isTabRestored.value || items.value.length === 0) {
+        // Update current page to the cursor we just used (or keep as 1 if it was the first page)
+        if (page === 1) {
+            currentPage.value = 1;
+        } else {
+            currentPage.value = page; // This is the cursor we just used
+        }
     }
 
-    // Update next cursor from API response
-    nextCursor.value = data.nextPage; // This is the cursor string from CivitAI
+    // Update next cursor from API response (for local state, used for loading more)
+    nextCursor.value = data.nextPage; // This is the cursor/page string from CivitAI
 
     // Update active tab with new items
     if (activeTabId.value) {
@@ -84,9 +98,14 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
         if (activeTab) {
             // Append new items to existing items
             activeTab.itemsData = [...activeTab.itemsData, ...data.items];
-            activeTab.fileIds = activeTab.itemsData.map(item => item.id);
-            activeTab.nextCursor = data.nextPage;
-            activeTab.currentPage = currentPage.value;
+            // Convert item IDs to referrer URLs for storage (backend expects referrer URLs)
+            activeTab.fileIds = activeTab.itemsData.map(item => `https://civitai.com/images/${item.id}`);
+            // Store both page and next in queryParams (service handles format conversion)
+            activeTab.queryParams = {
+                ...activeTab.queryParams,
+                page: currentPage.value,
+                next: data.nextPage,
+            };
             saveTabDebounced(activeTab);
         }
     }
@@ -134,11 +153,9 @@ async function loadTabs(): Promise<void> {
         tabs.value = data.map((tab: {
             id: number;
             label: string;
-            query_params?: Record<string, string>;
+            query_params?: Record<string, string | number | null>;
             file_ids?: string[];
             items_data?: MasonryItem[];
-            next_cursor?: string | null;
-            current_page?: string | number;
             position?: number;
         }) => ({
             id: tab.id,
@@ -146,8 +163,6 @@ async function loadTabs(): Promise<void> {
             queryParams: tab.query_params || {},
             fileIds: tab.file_ids || [],
             itemsData: tab.items_data || [],
-            nextCursor: tab.next_cursor,
-            currentPage: tab.current_page || 1,
             position: tab.position || 0,
         }));
 
@@ -176,22 +191,22 @@ async function createTab(): Promise<void> {
     const newTab: BrowseTabData = {
         id: 0, // Temporary ID, will be set from response
         label: `Browse ${tabs.value.length + 1}`,
-        queryParams: { ...route.query } as Record<string, string>,
+        queryParams: { ...route.query } as Record<string, string | number | null>,
         fileIds: [],
         itemsData: [],
-        nextCursor: null,
-        currentPage: 1,
         position: maxPosition + 1,
     };
+
+    // Ensure page is in queryParams (default to 1 if not present)
+    if (newTab.queryParams.page === undefined || newTab.queryParams.page === null) {
+        newTab.queryParams.page = 1;
+    }
 
     try {
         const response = await window.axios.post('/api/browse-tabs', {
             label: newTab.label,
             query_params: newTab.queryParams,
             file_ids: newTab.fileIds,
-            next_cursor: newTab.nextCursor,
-            current_page: String(newTab.currentPage),
-            items_data: newTab.itemsData,
             position: newTab.position,
         });
 
@@ -238,6 +253,35 @@ async function switchTab(tabId: number): Promise<void> {
     activeTabId.value = tabId;
     isTabRestored.value = true;
 
+    // Restore both page and next from queryParams (service handles format conversion)
+    const pageFromQuery = tab.queryParams.page;
+    const nextFromQuery = tab.queryParams.next;
+
+    if (pageFromQuery !== undefined && pageFromQuery !== null) {
+        currentPage.value = pageFromQuery;
+    } else {
+        currentPage.value = 1;
+    }
+
+    if (nextFromQuery !== undefined && nextFromQuery !== null) {
+        nextCursor.value = nextFromQuery;
+    } else {
+        nextCursor.value = null;
+    }
+
+    // Set loadAtPage immediately to prevent masonry from starting at page 1
+    // If tab has items, set loadAtPage to the current page so masonry can continue from there
+    // If no items, start from page 1
+    if (tab.itemsData && tab.itemsData.length > 0) {
+        // Use the page from queryParams, or set to null to prevent auto-loading
+        // Masonry will use the current page value when it needs to load more
+        loadAtPage.value = pageFromQuery || null;
+    } else {
+        // No items, start from beginning
+        loadAtPage.value = 1;
+        currentPage.value = 1;
+    }
+
     // Restore items from tab
     if (tab.itemsData && tab.itemsData.length > 0) {
         items.value = [...tab.itemsData];
@@ -245,23 +289,12 @@ async function switchTab(tabId: number): Promise<void> {
         items.value = [];
     }
 
-    // Restore cursor and page
-    nextCursor.value = tab.nextCursor;
-    currentPage.value = tab.currentPage;
+    // Wait for next tick to ensure masonry sees the correct state
+    await nextTick();
 
-    // Prevent masonry from auto-loading
-    loadAtPage.value = null;
-
-    // Reset the flag after a short delay to allow masonry to initialize
+    // Reset the flag after masonry has initialized
     setTimeout(() => {
         isTabRestored.value = false;
-        // If tab has items, set loadAtPage to next cursor for infinite scroll
-        if (tab.itemsData && tab.itemsData.length > 0 && tab.nextCursor) {
-            loadAtPage.value = tab.nextCursor;
-        } else if (tab.itemsData && tab.itemsData.length === 0) {
-            // No items, start from beginning
-            loadAtPage.value = 1;
-        }
     }, 100);
 
     // Update URL with tab ID
@@ -280,13 +313,15 @@ function updateCurrentTab(): void {
 
     // Update tab with current state
     // Exclude 'tab' from queryParams since it's managed separately in URL
-    const queryParams = { ...route.query } as Record<string, string>;
+    const queryParams = { ...route.query } as Record<string, string | number | null>;
     delete queryParams.tab;
+    // Store both page and next in queryParams (service handles format conversion)
+    queryParams.page = currentPage.value;
+    queryParams.next = nextCursor.value;
     activeTab.queryParams = queryParams;
-    activeTab.fileIds = items.value.map(item => item.id);
+    // Convert item IDs to referrer URLs for storage (backend expects referrer URLs)
+    activeTab.fileIds = items.value.map(item => `https://civitai.com/images/${item.id}`);
     activeTab.itemsData = [...items.value];
-    activeTab.nextCursor = nextCursor.value;
-    activeTab.currentPage = currentPage.value;
 
     saveTabDebounced(activeTab);
 }
@@ -305,11 +340,8 @@ async function saveTab(tab: BrowseTabData): Promise<void> {
     try {
         await window.axios.put(`/api/browse-tabs/${tab.id}`, {
             label: tab.label,
-            query_params: tab.queryParams,
-            file_ids: tab.fileIds,
-            next_cursor: tab.nextCursor,
-            current_page: String(tab.currentPage),
-            items_data: tab.itemsData,
+            query_params: tab.queryParams, // Contains 'page' key
+            file_ids: tab.fileIds, // Already in referrer URL format
             position: tab.position,
         });
     } catch (error) {
