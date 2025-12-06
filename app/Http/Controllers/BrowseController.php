@@ -2,64 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Browser;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class BrowseController extends Controller
 {
     /**
-     * Get a page of browse items.
+     * Get a page of browse items from CivitAI.
      */
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        $page = (int) $request->query('page', 1);
-        $itemsPerPage = 40;
-        $totalPages = 100;
+        $payload = Browser::handle();
 
-        $items = [];
+        // Set index for each item
+        $items = array_map(function ($item, $index) use ($payload) {
+            $item['index'] = $index;
+            $item['page'] = (int) ($payload['filter']['page'] ?? 1);
 
-        for ($i = 0; $i < $itemsPerPage; $i++) {
-            $indexOffset = ($page - 1) * $itemsPerPage + $i;
-            $width = rand(200, 500);
-            $height = rand(200, 500);
-
-            // Determine item type (90% images, 5% videos, 5% special cases)
-            $rand = rand(1, 100);
-            $type = 'image';
-            $notFound = false;
-
-            if ($rand <= 5) {
-                $type = 'video';
-            } elseif ($rand <= 7) {
-                $notFound = true;
-            } elseif ($rand <= 9) {
-                // Invalid URL for error testing
-                $src = "https://invalid-domain-that-does-not-exist-{$indexOffset}.com/image.jpg";
-            }
-
-            if (! isset($src)) {
-                if ($type === 'video') {
-                    $src = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-                } else {
-                    $src = "https://picsum.photos/id/{$indexOffset}/{$width}/{$height}";
-                }
-            }
-
-            $items[] = [
-                'id' => "item-{$page}-{$i}",
-                'width' => $width,
-                'height' => $height,
-                'src' => $src,
-                'type' => $type,
-                'page' => $page,
-                'index' => $i,
-                'notFound' => $notFound,
-            ];
-        }
+            return $item;
+        }, $payload['items'], array_keys($payload['items']));
 
         return response()->json([
             'items' => $items,
-            'nextPage' => $page < $totalPages ? $page + 1 : null,
+            'nextPage' => $payload['filter']['next'] ?? null, // Return cursor as nextPage for frontend
         ]);
     }
 }
