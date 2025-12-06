@@ -24,6 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::delete('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'destroy'])->name('api.files.destroy');
+    Route::get('/api/browse', [\App\Http\Controllers\BrowseController::class, 'index'])->name('api.browse.index');
 
     // SPA catch-all - serves the dashboard view for all GET requests
     // Vue Router handles client-side routing, but Laravel needs to serve the view

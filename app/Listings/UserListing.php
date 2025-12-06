@@ -84,4 +84,50 @@ class UserListing extends ListingBase
     {
         return new UserResource($item);
     }
+
+    public function handle(): array
+    {
+        $page = $this->offsetGet('page') ?: 1;
+        $base = $this->baseQuery();
+        $this->filters($base);
+
+        $perPage = $this->perPage() ?? $this->offsetGet('perPage');
+
+        if ($base instanceof ScoutBuilder) {
+            $pagination = $base->paginate($perPage);
+        } else {
+            $pagination = $base->paginate($perPage, ['*'], null, $page);
+        }
+
+        $this->load($pagination);
+        $items = collect($pagination->items())->map(fn ($item) => $this->append($item));
+
+        $listing = [
+            'listing' => [
+                'items' => $items,
+                'total' => $pagination->total(),
+                'perPage' => $perPage,
+                'current_page' => $pagination->currentPage(),
+                'last_page' => $pagination->lastPage(),
+                'from' => $pagination->firstItem(),
+                'to' => $pagination->lastItem(),
+                'showing' => $pagination->count() + (int) $perPage * max(0, $pagination->currentPage() - 1),
+                'nextPage' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
+            ],
+            'links' => [
+                'first' => $pagination->url(1),
+                'last' => $pagination->url($pagination->lastPage()),
+                'prev' => $pagination->previousPageUrl(),
+                'next' => $pagination->nextPageUrl(),
+            ],
+        ];
+
+        $filter = $this->formatFilters($this->all());
+
+        return [
+            ...$listing,
+            ...$this->customData($items),
+            'filters' => $filter,
+        ];
+    }
 }
