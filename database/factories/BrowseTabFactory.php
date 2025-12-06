@@ -19,6 +19,7 @@ class BrowseTabFactory extends Factory
     public function definition(): array
     {
         return [
+            'user_id' => User::factory(),
             'label' => fake()->words(2, true),
             'query_params' => [
                 'page' => fake()->numberBetween(1, 100),
