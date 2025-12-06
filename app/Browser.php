@@ -2,8 +2,11 @@
 
 namespace App;
 
+use App\Models\File;
+use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Storage;
 
 class Browser
 {
@@ -76,14 +79,16 @@ class Browser
             ];
         }
 
+        Storage::disk('local')->put('temp/'.time().'-response.json', json_encode($response, JSON_PRETTY_PRINT));
+
         try {
             $transformed = $service->transform($response, $params);
-            $items = $transformed['items'] ?? [];
-            $next = $transformed['next'] ?? null;
+            $filesPayload = $transformed['files'] ?? [];
+            $filter = $transformed['filter'] ?? [];
         } catch (\Throwable $e) {
             // If transform fails, use empty arrays
-            $items = [];
-            $next = null;
+            $filesPayload = [];
+            $filter = $params;
             if (! $serviceError) {
                 $serviceError = [
                     'message' => 'Failed to process service response: '.$e->getMessage(),
@@ -93,12 +98,33 @@ class Browser
             }
         }
 
+        $persisted = app(BrowsePersister::class)->persist($filesPayload);
+
+        // Transform persisted files to items format for frontend
+        $items = collect($persisted)->map(function (File $file) {
+            $metadata = $file->metadata?->payload ?? [];
+            $listingMetadata = $file->listing_metadata ?? [];
+
+            return [
+                'id' => (string) ($listingMetadata['id'] ?? $file->source_id ?? $file->id),
+                'width' => (int) ($metadata['width'] ?? 500),
+                'height' => (int) ($metadata['height'] ?? 500),
+                'src' => $file->url,
+                'thumbnail' => $file->thumbnail_url,
+                'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
+                'page' => (int) (request()->input('page', 1)),
+                'index' => 0, // Will be set by controller
+                'notFound' => false,
+            ];
+        })->values()->all();
+
         return [
             'items' => $items,
             'filter' => [
                 ...$service->defaultParams(),
+                ...$filter,
                 'page' => request()->input('page', 1),
-                'next' => $next, // Return cursor as 'next' in filter (matches atlas pattern)
+                'next' => $filter['next'] ?? null,
             ],
             'error' => $serviceError,
         ];

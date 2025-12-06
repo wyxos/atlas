@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Support\FileTypeDetector;
 use App\Support\HttpRateLimiter;
+use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class CivitAiImages
 {
@@ -120,7 +123,7 @@ class CivitAiImages
     }
 
     /**
-     * Return a normalized structure with items and next cursor.
+     * Return a normalized structure with files and next cursor.
      */
     public function transform(array $response, array $params = []): array
     {
@@ -129,8 +132,11 @@ class CivitAiImages
         $mapped = array_map(fn ($row) => $this->transformRow((array) $row), $rows);
 
         return [
-            'items' => $mapped,
-            'next' => $next, // Return cursor as 'next' (matches atlas pattern)
+            'files' => $mapped,
+            'filter' => [
+                ...$this->params,
+                'next' => $next,
+            ],
         ];
     }
 
@@ -148,6 +154,7 @@ class CivitAiImages
 
     protected function transformRow(array $row): array
     {
+        $now = Carbon::now();
         $id = $row['id'];
         $url = $row['url']; // Keep original URL as-is
         $referrer = "https://civitai.com/images/{$id}";
@@ -164,21 +171,38 @@ class CivitAiImages
             $thumbnail = "https://image.civitai.com/{$token}/{$guid}/transcode=true,width=450,optimized=true/{$id}.mp4";
         }
 
-        // Get width and height from metadata
-        $width = $row['width'] ?? 500;
-        $height = $row['height'] ?? 500;
-        $type = ($row['type'] ?? 'image') === 'video' ? 'video' : 'image';
+        $file = [
+            'source' => self::SOURCE,
+            'source_id' => (string) $id,
+            'url' => $url,
+            'referrer_url' => $referrer,
+            'filename' => Str::random(40),
+            'ext' => FileTypeDetector::extensionFromUrl($url),
+            'mime_type' => FileTypeDetector::mimeFromUrl($url),
+            'hash' => $row['hash'] ?? null,
+            'title' => null,
+            'description' => null,
+            'thumbnail_url' => $thumbnail,
+            'listing_metadata' => json_encode($row),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+
+        $meta = $row['meta'] ?? [];
+
+        $metadata = [
+            'file_referrer_url' => $referrer,
+            'payload' => json_encode(array_merge($meta, [
+                'width' => $row['width'] ?? null,
+                'height' => $row['height'] ?? null,
+            ])),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
 
         return [
-            'id' => (string) $id,
-            'width' => (int) $width,
-            'height' => (int) $height,
-            'src' => $url,
-            'thumbnail' => $thumbnail,
-            'type' => $type,
-            'page' => (int) ($this->params['page'] ?? 1),
-            'index' => 0, // Will be set by controller
-            'notFound' => false,
+            'file' => $file,
+            'metadata' => $metadata,
         ];
     }
 
