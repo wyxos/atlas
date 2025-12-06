@@ -44,7 +44,7 @@ const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number>(1); // Starts as 1, becomes cursor string
 const nextCursor = ref<string | number | null>(null); // The next page/cursor from API (service handles format)
 const previousLoadingState = ref(false);
-const loadAtPage = ref<string | number | null>(1); // Initial page to load, can be from URL
+const loadAtPage = ref<string | number | null>(null); // Initial page to load - set to 1 only when needed, null prevents auto-load
 const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
 
 // Tab state management
@@ -62,9 +62,10 @@ const layout = {
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
     // If we're restoring a tab and already have items, and masonry is trying to load page 1,
-    // prevent this load as we already have the items
-    if (isTabRestored.value && items.value.length > 0 && page === 1) {
-        // Return empty result to prevent loading page 1 when we already have items
+    // If we're restoring a tab and already have items, prevent any loading
+    // Masonry should only load when user scrolls to bottom, not during restoration
+    if (isTabRestored.value && items.value.length > 0) {
+        // Return empty result to prevent loading during tab restoration
         return {
             items: [],
             nextPage: nextCursor.value,
@@ -78,15 +79,11 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     const response = await fetch(url.toString());
     const data = await response.json();
 
-    // Don't update currentPage if we're restoring a tab and already have items
-    // This prevents resetting currentPage to 1 when masonry initializes with existing items
+    // Update currentPage to the page we just loaded
+    // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
     if (!isTabRestored.value || items.value.length === 0) {
-        // Update current page to the cursor we just used (or keep as 1 if it was the first page)
-        if (page === 1) {
-            currentPage.value = 1;
-        } else {
-            currentPage.value = page; // This is the cursor we just used
-        }
+        // Update current page to the page/cursor we just used
+        currentPage.value = page;
     }
 
     // Update next cursor from API response (for local state, used for loading more)
@@ -269,33 +266,39 @@ async function switchTab(tabId: number): Promise<void> {
         nextCursor.value = null;
     }
 
-    // Set loadAtPage immediately to prevent masonry from starting at page 1
-    // If tab has items, set loadAtPage to the current page so masonry can continue from there
-    // If no items, start from page 1
+    // Set loadAtPage and prepare for masonry initialization
     if (tab.itemsData && tab.itemsData.length > 0) {
-        // Use the page from queryParams, or set to null to prevent auto-loading
-        // Masonry will use the current page value when it needs to load more
-        loadAtPage.value = pageFromQuery || null;
+        // We have pre-loaded items - set loadAtPage to null to prevent auto-load
+        // We'll use masonry.init() to properly set up pagination state
+        loadAtPage.value = null;
+        // Clear items first - init() will add them back
+        items.value = [];
     } else {
         // No items, start from beginning
         loadAtPage.value = 1;
         currentPage.value = 1;
-    }
-
-    // Restore items from tab
-    if (tab.itemsData && tab.itemsData.length > 0) {
-        items.value = [...tab.itemsData];
-    } else {
         items.value = [];
     }
 
-    // Wait for next tick to ensure masonry sees the correct state
+    // Wait for next tick to ensure masonry component is ready
     await nextTick();
 
-    // Reset the flag after masonry has initialized
-    setTimeout(() => {
-        isTabRestored.value = false;
-    }, 100);
+    // If we have pre-loaded items, use masonry.init() to properly initialize
+    // This sets up pagination history and prevents auto-loading
+    if (tab.itemsData && tab.itemsData.length > 0 && masonry.value) {
+        const pageValue = pageFromQuery !== undefined && pageFromQuery !== null ? pageFromQuery : 1;
+        const nextValue = nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;
+
+        // Initialize masonry with pre-loaded items, current page, and next page
+        // init() will add items to masonry and set up pagination history correctly
+        masonry.value.init(tab.itemsData, pageValue, nextValue);
+
+        // Wait for masonry to recalculate layout after init
+        await nextTick();
+    }
+
+    // Reset the flag - masonry is now properly initialized
+    isTabRestored.value = false;
 
     // Update URL with tab ID
     updateUrl();
@@ -446,7 +449,7 @@ onMounted(async () => {
             <div class="flex-1 min-h-0 transition-all duration-300">
                 <Masonry v-if="activeTabId !== null" :key="activeTabId" ref="masonry" v-model:items="items"
                     :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" />
+                    :mobile-breakpoint="768" :skip-initial-load="items.length > 0" />
                 <div v-else class="flex items-center justify-center h-full">
                     <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                 </div>
