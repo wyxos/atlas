@@ -293,8 +293,22 @@ async function switchTab(tabId: number): Promise<void> {
         // init() will add items to masonry and set up pagination history correctly
         masonry.value.init(tab.itemsData, pageValue, nextValue);
 
-        // Wait for masonry to recalculate layout after init
+        // Wait for DOM to update
         await nextTick();
+
+        // After init, the layout will be calculated, but container dimensions might not be final yet
+        // The masonry component's ResizeObserver will handle dimension changes automatically
+        // However, we need to ensure layout refreshes when container is ready
+        // Use requestAnimationFrame (not a timeout) to wait for browser render cycle
+        // This ensures container has final dimensions after tab panel animation completes
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                // Refresh layout after container dimensions have settled
+                if (masonry.value && items.value.length > 0) {
+                    masonry.value.refreshLayout(items.value);
+                }
+            });
+        });
     }
 
     // Reset the flag - masonry is now properly initialized
