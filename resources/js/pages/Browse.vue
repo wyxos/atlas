@@ -427,45 +427,52 @@ onMounted(async () => {
 
 <template>
     <div class="h-full flex flex-col">
-        <div class="mb-4 flex items-center justify-center gap-3">
-            <!-- Count Pill -->
-            <Pill label="Items" :value="items.length" variant="primary" reversed />
-            <!-- Current Page Pill -->
-            <Pill label="Page" :value="currentPage" variant="neutral" reversed />
-            <!-- Next Page Pill -->
-            <Pill label="Next" :value="nextCursor || 'N/A'" variant="secondary" reversed />
-            <!-- Status Pill -->
-            <Pill :label="'Status'" :value="masonry?.isLoading ? 'Loading...' : 'Ready'"
-                :variant="masonry?.isLoading ? 'primary' : 'success'" reversed>
-                <template #label>
-                    <span class="flex items-center gap-1.5">
-                        Status
-                    </span>
-                </template>
-                <template #value>
-                    <Loader2 v-if="masonry?.isLoading" :size="14" class="animate-spin" />
-                </template>
-            </Pill>
-        </div>
         <div class="flex-1 min-h-0 relative flex">
             <TabPanel :model-value="true" v-model:is-minimized="isPanelMinimized">
-                <template #tabs>
+                <template #tabs="{ isMinimized }">
                     <BrowseTab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label"
-                        :is-active="tab.id === activeTabId" @click="switchTab(tab.id)" @close="closeTab(tab.id)" />
-
-                    <Button variant="dashed" size="sm" @click="createTab" class="w-full justify-start mt-2 rounded"
+                        :is-active="tab.id === activeTabId" :is-minimized="isMinimized" @click="switchTab(tab.id)"
+                        @close="closeTab(tab.id)" />
+                </template>
+                <template #footer="{ isMinimized }">
+                    <Button variant="dashed" size="sm" @click="createTab"
+                        :class="['w-full rounded', isMinimized ? 'justify-center' : 'justify-start']"
                         aria-label="New tab">
                         <Plus :size="16" />
-                        <span>New Tab</span>
+                        <Transition name="fade">
+                            <span v-if="!isMinimized" class="ml-2">New Tab</span>
+                        </Transition>
                     </Button>
                 </template>
             </TabPanel>
-            <div class="flex-1 min-h-0 transition-all duration-300">
-                <Masonry v-if="activeTabId !== null" :key="activeTabId" ref="masonry" v-model:items="items"
-                    :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" :skip-initial-load="items.length > 0" />
-                <div v-else class="flex items-center justify-center h-full">
-                    <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
+            <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col">
+                <div class="mb-4 flex items-center justify-center gap-3">
+                    <!-- Count Pill -->
+                    <Pill label="Items" :value="items.length" variant="primary" reversed />
+                    <!-- Current Page Pill -->
+                    <Pill label="Page" :value="currentPage" variant="neutral" reversed />
+                    <!-- Next Page Pill -->
+                    <Pill label="Next" :value="nextCursor || 'N/A'" variant="secondary" reversed />
+                    <!-- Status Pill -->
+                    <Pill :label="'Status'" :value="masonry?.isLoading ? 'Loading...' : 'Ready'"
+                        :variant="masonry?.isLoading ? 'primary' : 'success'" reversed>
+                        <template #label>
+                            <span class="flex items-center gap-1.5">
+                                Status
+                            </span>
+                        </template>
+                        <template #value>
+                            <Loader2 v-if="masonry?.isLoading" :size="14" class="animate-spin" />
+                        </template>
+                    </Pill>
+                </div>
+                <div class="flex-1 min-h-0">
+                    <Masonry v-if="activeTabId !== null" :key="activeTabId" ref="masonry" v-model:items="items"
+                        :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
+                        :mobile-breakpoint="768" :skip-initial-load="items.length > 0" />
+                    <div v-else class="flex items-center justify-center h-full">
+                        <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
+                    </div>
                 </div>
             </div>
         </div>

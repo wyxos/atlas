@@ -16,6 +16,7 @@ import {
     Image,
 } from 'lucide-vue-next';
 import AppHeader from '../components/AppHeader.vue';
+import AtlasIcon from '../components/AtlasIcon.vue';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -39,6 +40,7 @@ const appName = computed(() => {
 
 // On mobile/tablet, menu starts closed; on desktop, it starts open
 const isMenuOpen = ref(window.innerWidth >= 1024);
+const isDesktop = ref(window.innerWidth >= 1024);
 
 const menuItems = [
     { name: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -56,8 +58,10 @@ function toggleMenu(): void {
 }
 
 function handleResize(): void {
+    const isDesktopNow = window.innerWidth >= 1024;
+    isDesktop.value = isDesktopNow;
     // On desktop, menu should be open; on mobile/tablet, it should be closed
-    if (window.innerWidth >= 1024) {
+    if (isDesktopNow) {
         if (!isMenuOpen.value) {
             isMenuOpen.value = true;
         }
@@ -142,17 +146,18 @@ onUnmounted(() => {
     <div class="flex min-h-screen bg-gradient-to-b from-prussian-blue-900 via-prussian-blue-800 to-prussian-blue-700">
         <!-- Side Menu -->
         <aside :class="[
-            'fixed lg:static z-40 h-screen bg-prussian-blue-600 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
+            'absolute lg:static z-40 h-screen bg-prussian-blue-600 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
             'flex flex-col',
             isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-16 lg:translate-x-0'
         ]">
-            <!-- Toggle Button -->
-            <div class="flex items-center justify-end h-16 px-4">
-                <Button variant="ghost" size="icon" @click="toggleMenu" class="text-smart-blue-100"
-                    aria-label="Toggle menu">
-                    <ChevronLeft v-if="isMenuOpen" class="w-5 h-5" />
-                    <ChevronRight v-else class="w-5 h-5" />
-                </Button>
+            <!-- Atlas Icon / Logo -->
+            <div class="flex items-center justify-start h-16 px-4">
+                <div @click="toggleMenu" class="flex items-center cursor-pointer">
+                    <AtlasIcon class="w-10 h-10" />
+                    <span v-if="isMenuOpen || !isDesktop" class="hidden lg:block text-xl font-bold text-smart-blue-100 ml-3">
+                        {{ appName }}
+                    </span>
+                </div>
             </div>
 
             <!-- Menu Items -->

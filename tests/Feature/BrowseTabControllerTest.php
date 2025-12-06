@@ -347,7 +347,7 @@ it('updates tab position', function () {
 });
 
 it('requires authentication to access tabs', function () {
-    $response = test()->getJson('/api/browse-tabs');
+    $response = $this->getJson('/api/browse-tabs');
     $response->assertUnauthorized();
 });
 
