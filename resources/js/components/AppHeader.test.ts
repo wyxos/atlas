@@ -17,7 +17,7 @@ async function createTestRouter(initialPath = '/dashboard') {
 }
 
 describe('AppHeader', () => {
-    it('renders the app name', async () => {
+    it('renders the menu toggle button', async () => {
         const router = await createTestRouter();
         const wrapper = mount(AppHeader, {
             props: {
@@ -29,7 +29,9 @@ describe('AppHeader', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('Atlas');
+        // Check that the menu toggle button is rendered
+        const menuButton = wrapper.find('[aria-label="Toggle menu"]');
+        expect(menuButton.exists()).toBe(true);
     });
 
     it('emits toggle-menu event when menu button is clicked', async () => {

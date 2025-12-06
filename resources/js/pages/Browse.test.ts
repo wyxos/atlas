@@ -45,7 +45,7 @@ vi.mock('@wyxos/vibe', () => ({
 beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => { });
-    
+
     // Mock tabs API to return empty array by default
     mockAxios.get.mockResolvedValue({ data: [] });
 });
@@ -310,7 +310,7 @@ describe('Browse', () => {
         const tabId = 1;
         const pageParam = 'cursor-page-123';
         const nextParam = 'cursor-next-456';
-        
+
         // Mock tabs API to return a tab with the page/next in query_params
         mockAxios.get.mockResolvedValueOnce({
             data: [{
@@ -369,7 +369,7 @@ describe('Browse', () => {
 
     it('updateUrl function updates router with tab ID only', async () => {
         const tabId = 1;
-        
+
         // Mock tabs API to return a tab
         mockAxios.get.mockResolvedValueOnce({
             data: [{
@@ -409,7 +409,7 @@ describe('Browse', () => {
 
     it('updateUrl only includes tab ID, not page or next', async () => {
         const tabId = 1;
-        
+
         // Mock tabs API to return a tab
         mockAxios.get.mockResolvedValueOnce({
             data: [{
@@ -451,7 +451,7 @@ describe('Browse', () => {
 
     it('updateUrl only includes tab ID, ignores other query params', async () => {
         const tabId = 1;
-        
+
         // Mock tabs API to return a tab
         mockAxios.get.mockResolvedValueOnce({
             data: [{
@@ -491,7 +491,7 @@ describe('Browse', () => {
 
     it('updateUrl only includes tab ID when activeTabId exists', async () => {
         const tabId = 1;
-        
+
         // Mock tabs API to return a tab
         mockAxios.get.mockResolvedValueOnce({
             data: [{
@@ -587,7 +587,7 @@ describe('Browse', () => {
     it('handles tab with page parameter in query_params', async () => {
         const tabId = 1;
         const pageParam = 'cursor-string-123';
-        
+
         // Mock tabs API to return a tab with page in query_params and items_data
         // When items_data exists, the page from query_params is restored
         mockAxios.get.mockResolvedValueOnce({
@@ -623,7 +623,7 @@ describe('Browse', () => {
     it('handles tab with page in query_params correctly', async () => {
         const tabId = 1;
         const pageValue = 123; // Can be number or string
-        
+
         // Mock tabs API to return a tab with page as number in query_params and items_data
         // When items_data exists, the page from query_params is restored
         mockAxios.get.mockResolvedValueOnce({

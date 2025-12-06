@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next';
+import { Square } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -34,82 +34,39 @@ function toggleMinimize(): void {
 </script>
 
 <template>
-    <!-- Minimized Button (Always visible when minimized) -->
-    <Transition name="fade">
-        <Button
-            v-if="isOpen && isMinimized"
-            variant="ghost"
-            size="icon"
-            @click="toggleMinimize"
-            aria-label="Open panel"
-            class="absolute left-0 top-4 z-[60] text-twilight-indigo-100 bg-prussian-blue-900 border-r border-b border-t border-twilight-indigo-500 rounded-r-lg hover:bg-prussian-blue-800"
-        >
-            <PanelLeftOpen :size="20" />
-        </Button>
-    </Transition>
-    
-    <!-- Spacer when minimized to keep layout consistent -->
-    <div v-if="isOpen && isMinimized" class="w-0 shrink-0"></div>
-
-    <!-- Panel Content (Slides from left) -->
-    <Transition name="slide-width">
-        <div
-            v-if="isOpen && !isMinimized"
-            class="relative top-0 bottom-0 z-[60] w-72 bg-prussian-blue-900 border-r border-twilight-indigo-500 shadow-2xl overflow-hidden shrink-0"
-        >
-            <div class="flex flex-col h-full">
-                <!-- Tab Header Bar -->
-                <div class="flex items-center justify-between h-16 px-4 border-b border-twilight-indigo-500">
-                    <span class="text-lg font-bold text-smart-blue-100">Tabs</span>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        @click="toggleMinimize"
-                        aria-label="Minimize panel"
-                        class="text-twilight-indigo-100 hover:text-smart-blue-100 hover:bg-twilight-indigo-500/20"
-                    >
-                        <PanelLeftClose :size="20" />
-                    </Button>
-                </div>
-                <!-- Content -->
-                <div class="flex-1 flex flex-col gap-2 overflow-y-auto p-4">
-                    <slot name="tabs" />
-                    <slot />
-                </div>
-            </div>
+    <!-- Panel Content (Always rendered, transitions width like navigation menu) -->
+    <div
+        :class="[
+            'absolute lg:relative top-0 bottom-0 z-[60] bg-prussian-blue-900 border-r border-twilight-indigo-500 shadow-2xl shrink-0 transition-all duration-300 ease-in-out overflow-hidden flex flex-col',
+            isOpen && !isMinimized ? 'w-72 translate-x-0' : 'w-72 -translate-x-full lg:w-16 lg:translate-x-0'
+        ]"
+    >
+        <!-- Switch Button (Centered at top) -->
+        <div class="flex justify-center pt-4">
+            <Button
+                variant="ghost"
+                size="icon"
+                @click="toggleMinimize"
+                :aria-label="isMinimized ? 'Open panel' : 'Minimize panel'"
+                class="text-smart-blue-100 hover:bg-prussian-blue-800 w-18 h-18 md:w-11 md:h-11"
+            >
+                <Square class="w-9 h-9 md:w-6 md:h-6" />
+            </Button>
         </div>
-    </Transition>
+
+        <!-- Tabs List (Scrollable) -->
+        <div class="flex-1 flex flex-col gap-2 overflow-y-auto py-4 px-2">
+            <slot name="tabs" :isMinimized="isMinimized" />
+        </div>
+
+        <!-- New Tab Button (Fixed at bottom, always visible) -->
+        <div class="p-4 border-t border-twilight-indigo-500">
+            <slot name="footer" :isMinimized="isMinimized" />
+        </div>
+    </div>
 </template>
 
 <style scoped>
-.slide-width-enter-active {
-    transition: width 0.3s ease-out, opacity 0.3s ease-out;
-}
-
-.slide-width-leave-active {
-    transition: width 0.3s ease-in, opacity 0.3s ease-in;
-}
-
-.slide-width-enter-from {
-    width: 0;
-    opacity: 0;
-}
-
-.slide-width-enter-to {
-    width: 18rem;
-    opacity: 1;
-}
-
-.slide-width-leave-from {
-    width: 18rem;
-    opacity: 1;
-}
-
-.slide-width-leave-to {
-    width: 0;
-    opacity: 0;
-}
-
 .fade-enter-active,
 .fade-leave-active {
     transition: opacity 0.2s ease;
