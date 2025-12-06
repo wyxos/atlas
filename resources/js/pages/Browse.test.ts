@@ -101,7 +101,7 @@ describe('Browse', () => {
         expect(masonry.props('layout')).toEqual({
             gutterX: 12,
             gutterY: 12,
-            sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 8 },
+            sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
         });
     });
 
