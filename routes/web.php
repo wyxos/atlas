@@ -25,6 +25,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::delete('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'destroy'])->name('api.files.destroy');
     Route::get('/api/browse', [\App\Http\Controllers\BrowseController::class, 'index'])->name('api.browse.index');
+    Route::get('/api/browse-tabs', [\App\Http\Controllers\BrowseTabController::class, 'index'])->name('api.browse-tabs.index');
+    Route::post('/api/browse-tabs', [\App\Http\Controllers\BrowseTabController::class, 'store'])->name('api.browse-tabs.store');
+    Route::put('/api/browse-tabs/{browseTab}', [\App\Http\Controllers\BrowseTabController::class, 'update'])->name('api.browse-tabs.update');
+    Route::delete('/api/browse-tabs/{browseTab}', [\App\Http\Controllers\BrowseTabController::class, 'destroy'])->name('api.browse-tabs.destroy');
+    Route::patch('/api/browse-tabs/{browseTab}/position', [\App\Http\Controllers\BrowseTabController::class, 'updatePosition'])->name('api.browse-tabs.position');
 
     // SPA catch-all - serves the dashboard view for all GET requests
     // Vue Router handles client-side routing, but Laravel needs to serve the view
