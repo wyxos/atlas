@@ -12,7 +12,7 @@ class FilePolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->is_admin;
+        return (bool) $user->is_admin;
     }
 
     /**
@@ -20,7 +20,7 @@ class FilePolicy
      */
     public function view(User $user, File $file): bool
     {
-        return $user->is_admin;
+        return (bool) $user->is_admin;
     }
 
     /**
@@ -44,7 +44,7 @@ class FilePolicy
      */
     public function delete(User $user, File $file): bool
     {
-        return $user->is_admin;
+        return (bool) $user->is_admin;
     }
 
     /**
