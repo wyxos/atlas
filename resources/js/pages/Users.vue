@@ -142,101 +142,95 @@ onMounted(async () => {
             <!-- Active Filters Display -->
             <ActiveFilters :listing="listing">
                 <template #filter="{ filter, isRemoving, isAnyRemoving, remove }">
-                    <Pill
-                        :label="filter.label"
-                        :value="filter.value"
-                        variant="primary"
-                        reversed
-                        dismissible
-                        @dismiss="remove"
-                    >
+                    <Pill :label="filter.label" :value="filter.value" variant="primary" reversed dismissible
+                        @dismiss="remove">
                         <template v-if="isRemoving" #value>
                             <Loader2 :size="12" class="animate-spin" />
                         </template>
                     </Pill>
                 </template>
                 <template #clear="{ isAnyRemoving, isResetting, clear }">
-                    <Pill
-                        label="Clear"
-                        value="All"
-                        variant="danger"
-                        reversed
-                        dismissible
-                        @dismiss="clear"
-                    />
+                    <button type="button" @click="clear" :disabled="isAnyRemoving || isResetting"
+                        class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium bg-danger-600 text-white border border-danger-500 hover:bg-danger-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        Clear
+                    </button>
                 </template>
             </ActiveFilters>
 
             <Transition name="table-grow" appear mode="out-in">
-                <div v-if="listing.isLoading" key="loading" class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                <div v-if="listing.isLoading" key="loading"
+                    class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
                     <p class="text-twilight-indigo-100 text-lg">Loading...</p>
                 </div>
-                <div v-else-if="listing.isUpdating" key="updating" class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                <div v-else-if="listing.isUpdating" key="updating"
+                    class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
                     <p class="text-twilight-indigo-100 text-lg">Updating...</p>
                 </div>
-                <div v-else-if="listing.error" key="error" class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
+                <div v-else-if="listing.error" key="error"
+                    class="border border-twilight-indigo-500 rounded-lg bg-prussian-blue-700 text-center py-12">
                     <p class="text-red-500 text-lg">{{ listing.error }}</p>
                 </div>
                 <div v-else key="table" class="w-full overflow-x-auto">
                     <ListingTable :listing="listing" class="w-full overflow-hidden">
-                    <o-table-column field="id" label="ID" width="80" />
-                    <o-table-column field="name" label="Name" />
-                    <o-table-column field="email" label="Email" />
-                    <o-table-column field="email_verified_at" label="Verified">
-                        <template #default="{ row }">
-                            <span v-if="row.email_verified_at"
-                                class="inline-flex items-center justify-center rounded px-2.5 py-0.5 text-xs font-medium bg-success-600 text-white border border-success-500 hover:bg-success-500 transition-colors">
-                                <CheckCircle2 :size="16" />
-                            </span>
-                            <span v-else
-                                class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium bg-prussian-blue-600 text-twilight-indigo-100 border border-twilight-indigo-500 hover:bg-prussian-blue-500 transition-colors">
-                                Unverified
-                            </span>
+                        <o-table-column field="id" label="ID" width="80" />
+                        <o-table-column field="name" label="Name" />
+                        <o-table-column field="email" label="Email" />
+                        <o-table-column field="email_verified_at" label="Verified">
+                            <template #default="{ row }">
+                                <span v-if="row.email_verified_at"
+                                    class="inline-flex items-center justify-center rounded px-2.5 py-0.5 text-xs font-medium bg-success-600 text-white border border-success-500 hover:bg-success-500 transition-colors">
+                                    <CheckCircle2 :size="16" />
+                                </span>
+                                <span v-else
+                                    class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium bg-prussian-blue-600 text-twilight-indigo-100 border border-twilight-indigo-500 hover:bg-prussian-blue-500 transition-colors">
+                                    Unverified
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="last_login_at" label="Last Login">
+                            <template #default="{ row }">
+                                <span v-if="row.last_login_at">{{ formatDate(row.last_login_at) }}</span>
+                                <span v-else class="text-slate-grey-700">Never</span>
+                            </template>
+                        </o-table-column>
+                        <o-table-column field="created_at" label="Created At">
+                            <template #default="{ row }">
+                                {{ formatDate(row.created_at) }}
+                            </template>
+                        </o-table-column>
+                        <o-table-column label="Actions">
+                            <template #default="{ row }">
+                                <Button v-if="canDeleteUser(row)" @click="deletionHandler.openDialog(row)"
+                                    variant="ghost" color="danger" size="sm"
+                                    class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
+                                    :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id">
+                                    <Trash2 :size="40" class="text-white block md:hidden" />
+                                    <Trash2 :size="28" class="text-white hidden md:block" />
+                                </Button>
+                                <span v-else class="text-xs text-twilight-indigo-600 italic"
+                                    title="You cannot delete your own account">
+                                    —
+                                </span>
+                            </template>
+                        </o-table-column>
+                        <template #empty>
+                            <div class="flex flex-col items-center justify-center py-12 px-6">
+                                <Users :size="64" class="text-twilight-indigo-600 mb-4" />
+                                <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
+                                    {{ hasActiveFilters ? 'No users found' : 'No users yet' }}
+                                </h3>
+                                <p class="text-twilight-indigo-300 text-center max-w-md">
+                                    {{ hasActiveFilters
+                                        ? 'Try adjusting your filters to see more results.'
+                                        : 'Get started by creating your first user.' }}
+                                </p>
+                                <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
+                                    class="mt-4">
+                                    Clear
+                                </Button>
+                            </div>
                         </template>
-                    </o-table-column>
-                    <o-table-column field="last_login_at" label="Last Login">
-                        <template #default="{ row }">
-                            <span v-if="row.last_login_at">{{ formatDate(row.last_login_at) }}</span>
-                            <span v-else class="text-slate-grey-700">Never</span>
-                        </template>
-                    </o-table-column>
-                    <o-table-column field="created_at" label="Created At">
-                        <template #default="{ row }">
-                            {{ formatDate(row.created_at) }}
-                        </template>
-                    </o-table-column>
-                    <o-table-column label="Actions">
-                        <template #default="{ row }">
-                            <Button v-if="canDeleteUser(row)" @click="deletionHandler.openDialog(row)" variant="ghost"
-                                color="danger" size="sm" class="h-16 w-16 md:h-10 md:w-10 rounded-lg"
-                                :disabled="deletionHandler.isDeleting && deletionHandler.itemToDelete?.id === row.id">
-                                <Trash2 :size="40" class="text-white block md:hidden" />
-                                <Trash2 :size="28" class="text-white hidden md:block" />
-                            </Button>
-                            <span v-else class="text-xs text-twilight-indigo-600 italic"
-                                title="You cannot delete your own account">
-                                —
-                            </span>
-                        </template>
-                    </o-table-column>
-                    <template #empty>
-                        <div class="flex flex-col items-center justify-center py-12 px-6">
-                            <Users :size="64" class="text-twilight-indigo-600 mb-4" />
-                            <h3 class="text-xl font-semibold text-regal-navy-100 mb-2">
-                                {{ hasActiveFilters ? 'No users found' : 'No users yet' }}
-                            </h3>
-                            <p class="text-twilight-indigo-300 text-center max-w-md">
-                                {{ hasActiveFilters
-                                    ? 'Try adjusting your filters to see more results.'
-                                    : 'Get started by creating your first user.' }}
-                            </p>
-                            <Button v-if="hasActiveFilters" variant="outline" @click="() => listing.resetFilters()"
-                                class="mt-4">
-                                Clear
-                            </Button>
-                        </div>
-                    </template>
-                </ListingTable>
+                    </ListingTable>
                 </div>
             </Transition>
 
@@ -245,8 +239,9 @@ onMounted(async () => {
                 @update:modelValue="(open) => open ? listing.openPanel() : listing.closePanel()" title="Filter Users"
                 :is-filtering="listing.isFiltering" :is-resetting="listing.isResetting"
                 @apply="() => listing.applyFilters()" @reset="() => listing.resetFilters()">
-                <ListingFilterForm :search="listing.filters.search || ''" :date-from="listing.filters.date_from || ''" :date-to="listing.filters.date_to || ''"
-                    search-placeholder="Search by name or email..." @update:search="(value) => listing.filters.search = value"
+                <ListingFilterForm :search="listing.filters.search || ''" :date-from="listing.filters.date_from || ''"
+                    :date-to="listing.filters.date_to || ''" search-placeholder="Search by name or email..."
+                    @update:search="(value) => listing.filters.search = value"
                     @update:date-from="(value) => listing.filters.date_from = value"
                     @update:date-to="(value) => listing.filters.date_to = value" @submit="listing.applyFilters()">
                     <!-- Status Filter -->

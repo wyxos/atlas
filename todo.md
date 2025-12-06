@@ -1,14 +1,20 @@
-- implement users listing
-    - list
-    - add
-    - delete
-    - last login
-    - edit
+- Browse
+    - tab concept
+    - grouping by specific container
+    - reaction
+    - preview/view count
+    - download
+    - blacklist
+    - shortcuts
+    - full size view
+        - reaction
+        - thumbnail carousel
+        - container carousel
+        - detail panel
+    
+
+
 - implement file listing
-    - list
-    - add
-        - link
-    - delete
     - view
         - containers
 - implement file scanning

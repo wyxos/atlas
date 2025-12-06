@@ -23,7 +23,9 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["resources/js/*"]
+      "@/*": [
+        "resources/js/*"
+      ]
     }
   },
   "include": [
