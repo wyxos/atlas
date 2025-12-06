@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { Masonry } from '@wyxos/vibe';
 import { Loader2 } from 'lucide-vue-next';
 import Pill from '../components/ui/Pill.vue';
@@ -21,10 +22,15 @@ type GetPageResult = {
     nextPage: string | number | null; // Can be cursor string or number
 };
 
+const route = useRoute();
+const router = useRouter();
+
 const items = ref<MasonryItem[]>([]);
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number>(1); // Starts as 1, becomes cursor string
 const nextCursor = ref<string | null>(null); // The cursor from API
+const previousLoadingState = ref(false);
+const loadAtPage = ref<string | number>(1); // Initial page to load, can be from URL
 
 const layout = {
     gutterX: 12,
@@ -55,6 +61,60 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
         nextPage: data.nextPage, // Pass cursor to Masonry for next request
     };
 }
+
+// Watch for loading state changes to update URL when page loads successfully
+watch(
+    () => masonry.value?.isLoading,
+    (isLoading) => {
+        // When loading transitions from true to false, a page has successfully loaded
+        if (previousLoadingState.value && !isLoading) {
+            updateUrl();
+        }
+        previousLoadingState.value = isLoading ?? false;
+    },
+    { immediate: true }
+);
+
+function updateUrl(): void {
+    const query: Record<string, string> = {};
+
+    // Add current page to query
+    if (currentPage.value !== 1) {
+        query.page = String(currentPage.value);
+    }
+
+    // Add next cursor to query if available
+    if (nextCursor.value) {
+        query.next = nextCursor.value;
+    }
+
+    // Update URL without triggering navigation
+    router.replace({
+        query: {
+            ...route.query,
+            ...query,
+        },
+    });
+}
+
+// Initialize from URL on mount
+onMounted(() => {
+    const pageParam = route.query.page;
+    const nextParam = route.query.next;
+
+    if (pageParam) {
+        // If page is in URL, use it as the initial load page
+        const pageValue = typeof pageParam === 'string' ? pageParam : String(pageParam);
+        loadAtPage.value = pageValue;
+        currentPage.value = pageValue;
+    }
+
+    if (nextParam) {
+        // If next cursor is in URL, set it
+        const nextValue = typeof nextParam === 'string' ? nextParam : String(nextParam);
+        nextCursor.value = nextValue;
+    }
+});
 </script>
 
 <template>
@@ -80,8 +140,8 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
             </Pill>
         </div>
         <div class="flex-1 min-h-0">
-            <Masonry ref="masonry" v-model:items="items" :get-next-page="getNextPage" :load-at-page="1" :layout="layout"
-                layout-mode="auto" :mobile-breakpoint="768" />
+            <Masonry ref="masonry" v-model:items="items" :get-next-page="getNextPage" :load-at-page="loadAtPage"
+                :layout="layout" layout-mode="auto" :mobile-breakpoint="768" />
         </div>
         <div class="mb-4 flex items-center justify-center gap-3">
             Filters will be here
