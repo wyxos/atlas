@@ -29,10 +29,14 @@ class Browser
     public function run(): array
     {
         $params = request()->all();
-        $source = (string) ($params['source'] ?? CivitAiImages::KEY);
+        $source = (string) ($params['source'] ?? CivitAiImages::key());
 
         // For now, we only support CivitAI Images
         $service = new CivitAiImages;
+
+        if (method_exists($service, 'setParams')) {
+            $service->setParams($params);
+        }
 
         $serviceError = null;
         $response = null;
@@ -102,8 +106,10 @@ class Browser
 
         // Transform persisted files to items format for frontend
         $items = collect($persisted)->map(function (File $file) {
-            $metadata = $file->metadata?->payload ?? [];
-            $listingMetadata = $file->listing_metadata ?? [];
+            $metadataPayload = $file->metadata?->payload ?? '{}';
+            $metadata = is_string($metadataPayload) ? json_decode($metadataPayload, true) : $metadataPayload;
+            $listingMetadataRaw = $file->listing_metadata ?? '{}';
+            $listingMetadata = is_string($listingMetadataRaw) ? json_decode($listingMetadataRaw, true) : $listingMetadataRaw;
 
             return [
                 'id' => (string) ($listingMetadata['id'] ?? $file->source_id ?? $file->id),
