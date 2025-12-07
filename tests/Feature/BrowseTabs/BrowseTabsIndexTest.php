@@ -34,17 +34,12 @@ test('tabs are returned ordered by position', function () {
     expect($data[2]['id'])->toBe($tab1->id);
 });
 
-test('tabs include items_data when file_ids exist', function () {
+test('tabs include items_data when files exist', function () {
     $user = User::factory()->create();
     $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
     $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
     
-    $tab = BrowseTab::factory()->for($user)->create([
-        'file_ids' => [
-            'https://example.com/file1.jpg',
-            'https://example.com/file2.jpg',
-        ],
-    ]);
+    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
     $response = $this->actingAs($user)->getJson('/api/browse-tabs');
 
@@ -55,7 +50,7 @@ test('tabs include items_data when file_ids exist', function () {
     expect(count($tabData['items_data']))->toBe(2);
 });
 
-test('tabs with file_ids load and format files correctly', function () {
+test('tabs with files load and format files correctly', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
@@ -63,9 +58,7 @@ test('tabs with file_ids load and format files correctly', function () {
         'thumbnail_url' => 'https://example.com/thumb.jpg',
     ]);
     
-    $tab = BrowseTab::factory()->for($user)->create([
-        'file_ids' => ['https://example.com/file.jpg'],
-    ]);
+    $tab = BrowseTab::factory()->for($user)->withFiles([$file->id])->create();
 
     $response = $this->actingAs($user)->getJson('/api/browse-tabs');
 
@@ -75,24 +68,20 @@ test('tabs with file_ids load and format files correctly', function () {
     expect($tabData['items_data'])->toBeArray();
     if (count($tabData['items_data']) > 0) {
         expect($tabData['items_data'][0])->toHaveKey('id');
+        expect($tabData['items_data'][0]['id'])->toBe($file->id); // id is now the database file ID
         expect($tabData['items_data'][0])->toHaveKey('src');
         expect($tabData['items_data'][0])->toHaveKey('originalUrl');
     }
 });
 
-test('tabs maintain file order based on file_ids array', function () {
+test('tabs maintain file order based on pivot position', function () {
     $user = User::factory()->create();
     $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
     $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
     $file3 = File::factory()->create(['referrer_url' => 'https://example.com/file3.jpg']);
     
-    $tab = BrowseTab::factory()->for($user)->create([
-        'file_ids' => [
-            'https://example.com/file3.jpg',
-            'https://example.com/file1.jpg',
-            'https://example.com/file2.jpg',
-        ],
-    ]);
+    // Create tab with files in specific order: file3, file1, file2
+    $tab = BrowseTab::factory()->for($user)->withFiles([$file3->id, $file1->id, $file2->id])->create();
 
     $response = $this->actingAs($user)->getJson('/api/browse-tabs');
 
@@ -100,37 +89,16 @@ test('tabs maintain file order based on file_ids array', function () {
     $data = $response->json();
     $tabData = collect($data)->firstWhere('id', $tab->id);
     expect($tabData['items_data'])->toBeArray();
-    if (count($tabData['items_data']) >= 3) {
-        // Files should be in the order specified in file_ids
-        // The ID in items_data uses listing_metadata['id'] or source_id or file->id
-        // So we check that we have 3 items in the correct order
-        expect(count($tabData['items_data']))->toBe(3);
-        // Verify order by checking referrer_urls match the file_ids order
-        $file1Found = false;
-        $file2Found = false;
-        $file3Found = false;
-        foreach ($tabData['items_data'] as $item) {
-            if ($item['originalUrl'] === $file1->url || $item['src'] === $file1->url) {
-                $file1Found = true;
-            }
-            if ($item['originalUrl'] === $file2->url || $item['src'] === $file2->url) {
-                $file2Found = true;
-            }
-            if ($item['originalUrl'] === $file3->url || $item['src'] === $file3->url) {
-                $file3Found = true;
-            }
-        }
-        expect($file1Found)->toBeTrue();
-        expect($file2Found)->toBeTrue();
-        expect($file3Found)->toBeTrue();
-    }
+    expect(count($tabData['items_data']))->toBe(3);
+    // Verify order by checking id matches the order we specified (id is now the database file ID)
+    expect($tabData['items_data'][0]['id'])->toBe($file3->id);
+    expect($tabData['items_data'][1]['id'])->toBe($file1->id);
+    expect($tabData['items_data'][2]['id'])->toBe($file2->id);
 });
 
-test('tabs without file_ids have empty items_data', function () {
+test('tabs without files have empty items_data', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create([
-        'file_ids' => null,
-    ]);
+    $tab = BrowseTab::factory()->for($user)->create();
 
     $response = $this->actingAs($user)->getJson('/api/browse-tabs');
 
@@ -168,10 +136,10 @@ test('tabs with query_params use correct page number', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
     
-    $tab = BrowseTab::factory()->for($user)->create([
-        'file_ids' => ['https://example.com/file.jpg'],
-        'query_params' => ['page' => 3],
-    ]);
+    $tab = BrowseTab::factory()->for($user)
+        ->withQueryParams(['page' => 3])
+        ->withFiles([$file->id])
+        ->create();
 
     $response = $this->actingAs($user)->getJson('/api/browse-tabs');
 

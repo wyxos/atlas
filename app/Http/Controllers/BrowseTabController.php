@@ -15,23 +15,14 @@ class BrowseTabController extends Controller
     public function index(): JsonResponse
     {
         $tabs = BrowseTab::forUser(auth()->id())
+            ->with(['files.metadata'])
             ->ordered()
             ->get();
 
-        // Eager load files and format them for each tab
+        // Format files into items structure for each tab
         $tabs->each(function (BrowseTab $tab) {
-            if ($tab->file_ids && count($tab->file_ids) > 0) {
-                // file_ids contains referrer URLs
-                $files = \App\Models\File::with('metadata')
-                    ->whereIn('referrer_url', $tab->file_ids)
-                    ->get()
-                    ->sortBy(function ($file) use ($tab) {
-                        // Maintain order based on file_ids array
-                        return array_search($file->referrer_url, $tab->file_ids);
-                    })
-                    ->values();
-
-                // Format files into items structure
+            $files = $tab->files;
+            if ($files->isNotEmpty()) {
                 // Get page from query_params, default to 1
                 $page = isset($tab->query_params['page']) && is_numeric($tab->query_params['page'])
                     ? (int) $tab->query_params['page']
@@ -40,6 +31,8 @@ class BrowseTabController extends Controller
             } else {
                 $tab->items_data = [];
             }
+            // Add file_ids to response for frontend compatibility
+            $tab->file_ids = $tab->files->pluck('id')->toArray();
         });
 
         return response()->json($tabs);
@@ -58,9 +51,22 @@ class BrowseTabController extends Controller
             'user_id' => auth()->id(),
             'label' => $request->label,
             'query_params' => $request->query_params,
-            'file_ids' => $request->file_ids,
             'position' => $request->position ?? ($maxPosition + 1),
         ]);
+
+        // Sync files with positions if provided
+        if ($request->has('file_ids') && is_array($request->file_ids) && count($request->file_ids) > 0) {
+            $syncData = [];
+            foreach ($request->file_ids as $index => $fileId) {
+                $syncData[$fileId] = ['position' => $index];
+            }
+            $tab->files()->sync($syncData);
+        }
+
+        $tab->load('files.metadata');
+        
+        // Add file_ids to response for frontend compatibility
+        $tab->file_ids = $tab->files->pluck('id')->toArray();
 
         return response()->json($tab, 201);
     }
@@ -70,7 +76,37 @@ class BrowseTabController extends Controller
      */
     public function update(UpdateBrowseTabRequest $request, BrowseTab $browseTab): JsonResponse
     {
-        $browseTab->update($request->validated());
+        // Ensure user owns this tab
+        if ($browseTab->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validated();
+        $fileIds = $validated['file_ids'] ?? null;
+        
+        // Remove file_ids from validated data before updating
+        unset($validated['file_ids']);
+
+        $browseTab->update($validated);
+
+        // Sync files with positions if provided
+        if ($fileIds !== null) {
+            if (is_array($fileIds) && count($fileIds) > 0) {
+                $syncData = [];
+                foreach ($fileIds as $index => $fileId) {
+                    $syncData[$fileId] = ['position' => $index];
+                }
+                $browseTab->files()->sync($syncData);
+            } else {
+                // Empty array means remove all files
+                $browseTab->files()->sync([]);
+            }
+        }
+
+        $browseTab->load('files.metadata');
+        
+        // Add file_ids to response for frontend compatibility
+        $browseTab->file_ids = $browseTab->files->pluck('id')->toArray();
 
         return response()->json($browseTab);
     }

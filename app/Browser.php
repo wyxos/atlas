@@ -112,7 +112,7 @@ class Browser
             $listingMetadata = is_string($listingMetadataRaw) ? json_decode($listingMetadataRaw, true) : $listingMetadataRaw;
 
             return [
-                'id' => (string) ($listingMetadata['id'] ?? $file->source_id ?? $file->id),
+                'id' => $file->id, // Database file ID
                 'width' => (int) ($metadata['width'] ?? 500),
                 'height' => (int) ($metadata['height'] ?? 500),
                 'src' => $file->thumbnail_url ?? $file->url, // Use thumbnail for masonry grid, fallback to original

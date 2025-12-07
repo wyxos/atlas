@@ -668,8 +668,8 @@ describe('Browse', () => {
                 id: tabId,
                 label: 'Test Tab',
                 query_params: { page: pageParam },
-                file_ids: ['https://civitai.com/images/123'],
-                items_data: [{ id: '123', width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                file_ids: [123],
+                items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                 position: 0,
             }],
         });
@@ -704,8 +704,8 @@ describe('Browse', () => {
                 id: tabId,
                 label: 'Test Tab',
                 query_params: { page: pageValue },
-                file_ids: ['https://civitai.com/images/123'],
-                items_data: [{ id: '123', width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                file_ids: [123],
+                items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                 position: 0,
             }],
         });

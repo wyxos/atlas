@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Columns
@@ -13,13 +14,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int user_id
  * @property string label
  * @property array|null query_params
- * @property array|null file_ids
  * @property int position
  * @property Carbon|null created_at
  * @property Carbon|null updated_at
  *
  * Relationships
  * @property User user
+ * @property \Illuminate\Database\Eloquent\Collection<int, File> files
  *
  * Getters
  */
@@ -44,7 +45,6 @@ class BrowseTab extends Model
         'user_id',
         'label',
         'query_params',
-        'file_ids',
         'position',
     ];
 
@@ -57,7 +57,6 @@ class BrowseTab extends Model
     {
         return [
             'query_params' => 'array',
-            'file_ids' => 'array',
             'position' => 'integer',
         ];
     }
@@ -68,6 +67,16 @@ class BrowseTab extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the files associated with this browse tab.
+     */
+    public function files(): BelongsToMany
+    {
+        return $this->belongsToMany(File::class, 'browse_tab_file')
+            ->withPivot('position')
+            ->orderByPivot('position');
     }
 
     /**
@@ -100,7 +109,7 @@ class BrowseTab extends Model
             $listingMetadata = $file->listing_metadata ?? [];
 
             return [
-                'id' => (string) ($listingMetadata['id'] ?? $file->source_id ?? $file->id),
+                'id' => $file->id, // Database file ID
                 'width' => (int) ($metadata['width'] ?? 500),
                 'height' => (int) ($metadata['height'] ?? 500),
                 'src' => $file->thumbnail_url ?? $file->url, // Use thumbnail for masonry grid, fallback to original

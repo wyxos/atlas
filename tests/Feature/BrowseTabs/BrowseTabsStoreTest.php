@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\BrowseTab;
+use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -50,15 +51,22 @@ test('tab creation accepts optional query_params', function () {
 
 test('tab creation accepts optional file_ids', function () {
     $user = User::factory()->create();
+    $file1 = File::factory()->create();
+    $file2 = File::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/browse-tabs', [
         'label' => 'My Tab',
-        'file_ids' => ['https://example.com/file1.jpg', 'https://example.com/file2.jpg'],
+        'file_ids' => [$file1->id, $file2->id],
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['file_ids'])->toBe(['https://example.com/file1.jpg', 'https://example.com/file2.jpg']);
+    expect($data['file_ids'])->toBe([$file1->id, $file2->id]);
+    
+    // Verify files are attached via relationship
+    $tab = BrowseTab::find($data['id']);
+    expect($tab->files)->toHaveCount(2);
+    expect($tab->files->pluck('id')->toArray())->toBe([$file1->id, $file2->id]);
 });
 
 test('tab creation accepts optional position', function () {
@@ -198,5 +206,29 @@ test('validation fails when file_ids is not array', function () {
 
     $response->assertStatus(422);
     $response->assertJsonValidationErrors('file_ids');
+});
+
+test('validation fails when file_ids contains non-existent file', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/browse-tabs', [
+        'label' => 'My Tab',
+        'file_ids' => [99999], // Non-existent file ID
+    ]);
+
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors('file_ids.0');
+});
+
+test('validation fails when file_ids contains non-integer', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/browse-tabs', [
+        'label' => 'My Tab',
+        'file_ids' => ['not-an-integer'],
+    ]);
+
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors('file_ids.0');
 });
 
