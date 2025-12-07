@@ -175,11 +175,21 @@ describe('Browse', () => {
 
     it('provides getNextPage function that fetches from API', async () => {
         const mockResponse = createMockBrowseResponse(2, 3);
+        const tabId = 1;
 
-        // Override the mock for this specific test
+        // Mock tabs API to return a tab
         mockAxios.get.mockImplementation((url: string) => {
             if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({ data: [] });
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Test Tab',
+                        query_params: {},
+                        file_ids: [],
+                        items_data: [],
+                        position: 0,
+                    }],
+                });
             }
             if (url.includes('/api/browse')) {
                 return Promise.resolve({ data: mockResponse });
@@ -196,6 +206,7 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -214,6 +225,13 @@ describe('Browse', () => {
         expect(result.items).toBeInstanceOf(Array);
         expect(result.items.length).toBe(40);
         expect(result.nextPage).toBe(3);
+        
+        // Verify tab was updated with new items
+        const activeTab = vm.tabs.find((t: any) => t.id === tabId);
+        expect(activeTab).toBeDefined();
+        expect(activeTab.itemsData.length).toBe(40);
+        expect(activeTab.queryParams.page).toBe(2);
+        expect(activeTab.queryParams.next).toBe(3);
     });
 
     it('handles API errors gracefully', async () => {
@@ -366,7 +384,7 @@ describe('Browse', () => {
         expect(vm.nextCursor).toBe(2);
     });
 
-    it('initializes from tab in URL query parameters on mount', async () => {
+    it('initializes with first tab when tabs exist', async () => {
         const tabId = 1;
         const pageParam = 'cursor-page-123';
         const nextParam = 'cursor-next-456';
@@ -383,7 +401,7 @@ describe('Browse', () => {
             }],
         });
 
-        const router = await createTestRouter(`/browse?tab=${tabId}`);
+        const router = await createTestRouter('/browse');
 
         const wrapper = mount(Browse, {
             global: {
@@ -427,168 +445,6 @@ describe('Browse', () => {
         expect(vm.loadAtPage).toBeNull(); // Changed to null by default
     });
 
-    it('updateUrl function updates router with tab ID only', async () => {
-        const tabId = 1;
-
-        // Mock tabs API to return a tab
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: tabId,
-                label: 'Test Tab',
-                query_params: {},
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
-        });
-
-        const router = await createTestRouter();
-        const replaceSpy = vi.spyOn(router, 'replace');
-
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vm = wrapper.vm as any;
-        vm.updateUrl();
-
-        // updateUrl now only sets tab ID, not page/next
-        expect(replaceSpy).toHaveBeenCalledWith({
-            query: {
-                tab: String(tabId),
-            },
-        });
-    });
-
-    it('updateUrl only includes tab ID, not page or next', async () => {
-        const tabId = 1;
-
-        // Mock tabs API to return a tab
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: tabId,
-                label: 'Test Tab',
-                query_params: {},
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
-        });
-
-        const router = await createTestRouter();
-        const replaceSpy = vi.spyOn(router, 'replace');
-
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vm = wrapper.vm as any;
-        vm.currentPage = 1;
-        vm.nextCursor = 'cursor-456';
-        vm.updateUrl();
-
-        // updateUrl only sets tab ID, page/next are stored in tab's query_params
-        expect(replaceSpy).toHaveBeenCalledWith({
-            query: {
-                tab: String(tabId),
-            },
-        });
-    });
-
-    it('updateUrl only includes tab ID, ignores other query params', async () => {
-        const tabId = 1;
-
-        // Mock tabs API to return a tab
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: tabId,
-                label: 'Test Tab',
-                query_params: {},
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
-        });
-
-        const router = await createTestRouter('/browse?filter=test&sort=asc');
-        const replaceSpy = vi.spyOn(router, 'replace');
-
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vm = wrapper.vm as any;
-        vm.updateUrl();
-
-        // updateUrl only sets tab ID, other query params are stored in tab's query_params
-        expect(replaceSpy).toHaveBeenCalledWith({
-            query: {
-                tab: String(tabId),
-            },
-        });
-    });
-
-    it('updateUrl only includes tab ID when activeTabId exists', async () => {
-        const tabId = 1;
-
-        // Mock tabs API to return a tab
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: tabId,
-                label: 'Test Tab',
-                query_params: {},
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
-        });
-
-        const router = await createTestRouter();
-        const replaceSpy = vi.spyOn(router, 'replace');
-
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vm = wrapper.vm as any;
-        vm.nextCursor = null;
-        vm.updateUrl();
-
-        // updateUrl only sets tab ID
-        expect(replaceSpy).toHaveBeenCalledWith({
-            query: {
-                tab: String(tabId),
-            },
-        });
-    });
 
     it('displays Pill components with correct values', async () => {
         // Mock tabs API to return a tab so pills are rendered
@@ -674,7 +530,7 @@ describe('Browse', () => {
             }],
         });
 
-        const router = await createTestRouter(`/browse?tab=${tabId}`);
+        const router = await createTestRouter('/browse');
 
         const wrapper = mount(Browse, {
             global: {
@@ -710,7 +566,7 @@ describe('Browse', () => {
             }],
         });
 
-        const router = await createTestRouter(`/browse?tab=${tabId}`);
+        const router = await createTestRouter('/browse');
 
         const wrapper = mount(Browse, {
             global: {
