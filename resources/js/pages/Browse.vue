@@ -6,33 +6,11 @@ import Pill from '../components/ui/Pill.vue';
 import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
 import { Button } from '@/components/ui/button';
-
-type MasonryItem = {
-    id: number; // Database file ID
-    width: number;
-    height: number;
-    page: number;
-    index: number;
-    src: string; // Preview/thumbnail URL for masonry grid
-    originalUrl?: string; // Original full-size URL
-    thumbnail?: string; // Thumbnail URL (may be same as src)
-    type?: 'image' | 'video';
-    notFound?: boolean;
-    [key: string]: unknown;
-};
+import { useBrowseTabs, type MasonryItem, type BrowseTabData } from '../composables/useBrowseTabs';
 
 type GetPageResult = {
     items: MasonryItem[];
     nextPage: string | number | null; // Can be cursor string or number
-};
-
-type BrowseTabData = {
-    id: number;
-    label: string;
-    queryParams: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
-    fileIds: number[]; // Database file IDs
-    itemsData: MasonryItem[]; // Loaded from API, not stored in DB
-    position: number;
 };
 
 const items = ref<MasonryItem[]>([]);
@@ -41,175 +19,9 @@ const currentPage = ref<string | number>(1); // Starts as 1, becomes cursor stri
 const nextCursor = ref<string | number | null>(null); // The next page/cursor from API (service handles format)
 const loadAtPage = ref<string | number | null>(null); // Initial page to load - set to 1 only when needed, null prevents auto-load
 const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
-
-// Tab state management
-const tabs = ref<BrowseTabData[]>([]);
-const activeTabId = ref<number | null>(null);
-const isLoadingTabs = ref(false);
 const isPanelMinimized = ref(false);
-const saveTabDebounceTimer = ref<number | null>(null);
 
-const layout = {
-    gutterX: 12,
-    gutterY: 12,
-    sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
-};
-
-async function getNextPage(page: number | string): Promise<GetPageResult> {
-    // If we're restoring a tab and already have items, and masonry is trying to load page 1,
-    // If we're restoring a tab and already have items, prevent any loading
-    // Masonry should only load when user scrolls to bottom, not during restoration
-    if (isTabRestored.value && items.value.length > 0) {
-        // Return empty result to prevent loading during tab restoration
-        return {
-            items: [],
-            nextPage: nextCursor.value,
-        };
-    }
-
-    // Always pass as 'page' parameter - service will handle conversion
-    const url = new URL('/api/browse', window.location.origin);
-    url.searchParams.set('page', String(page));
-
-    const response = await window.axios.get(url.toString());
-    const data = response.data;
-
-    // Update currentPage to the page we just loaded
-    // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
-    if (!isTabRestored.value || items.value.length === 0) {
-        // Update current page to the page/cursor we just used
-        currentPage.value = page;
-    }
-
-    // Update next cursor from API response (for local state, used for loading more)
-    nextCursor.value = data.nextPage; // This is the cursor/page string from CivitAI
-
-    // Update active tab with new items - this is the single source of truth for tab updates
-    // Only update if we're not restoring a tab (to prevent overwriting restored state)
-    if (activeTabId.value && !isTabRestored.value) {
-        const activeTab = tabs.value.find(t => t.id === activeTabId.value);
-        if (activeTab) {
-            // Append new items to existing items (masonry will update items.value separately)
-            activeTab.itemsData = [...activeTab.itemsData, ...data.items];
-            // Extract database file IDs from all items in the tab
-            activeTab.fileIds = activeTab.itemsData.map(item => item.id);
-            // Store both page and next in queryParams (service handles format conversion)
-            activeTab.queryParams = {
-                ...activeTab.queryParams,
-                page: currentPage.value,
-                next: data.nextPage,
-            };
-            saveTabDebounced(activeTab);
-        }
-    }
-
-    return {
-        items: data.items,
-        nextPage: data.nextPage, // Pass cursor to Masonry for next request
-    };
-}
-
-
-// Tab management functions
-async function loadTabs(): Promise<void> {
-    isLoadingTabs.value = true;
-    try {
-        const response = await window.axios.get('/api/browse-tabs');
-        const data = response.data;
-        tabs.value = data.map((tab: {
-            id: number;
-            label: string;
-            query_params?: Record<string, string | number | null>;
-            file_ids?: number[];
-            items_data?: MasonryItem[];
-            position?: number;
-        }) => ({
-            id: tab.id,
-            label: tab.label,
-            queryParams: tab.query_params || {},
-            fileIds: tab.file_ids || [],
-            itemsData: tab.items_data || [],
-            position: tab.position || 0,
-        }));
-
-        // Sort by position
-        tabs.value.sort((a, b) => a.position - b.position);
-
-        // If tabs exist and no tab was restored from URL, set first tab as active
-        if (tabs.value.length > 0 && activeTabId.value === null) {
-            activeTabId.value = tabs.value[0].id;
-            await switchTab(tabs.value[0].id);
-        }
-        // If no tabs exist, don't create one - user must create manually
-    } catch (error) {
-        console.error('Failed to load tabs:', error);
-        // Don't create a tab on error - let user create manually
-    } finally {
-        isLoadingTabs.value = false;
-    }
-}
-
-async function createTab(): Promise<void> {
-    const maxPosition = tabs.value.length > 0
-        ? Math.max(...tabs.value.map(t => t.position))
-        : -1;
-
-    const newTab: BrowseTabData = {
-        id: 0, // Temporary ID, will be set from response
-        label: `Browse ${tabs.value.length + 1}`,
-        queryParams: {},
-        fileIds: [],
-        itemsData: [],
-        position: maxPosition + 1,
-    };
-
-    // Ensure page is in queryParams (default to 1 if not present)
-    if (newTab.queryParams.page === undefined || newTab.queryParams.page === null) {
-        newTab.queryParams.page = 1;
-    }
-
-    try {
-        const response = await window.axios.post('/api/browse-tabs', {
-            label: newTab.label,
-            query_params: newTab.queryParams,
-            file_ids: newTab.fileIds,
-            position: newTab.position,
-        });
-
-        const data = response.data;
-        newTab.id = data.id;
-        tabs.value.push(newTab);
-        activeTabId.value = newTab.id;
-        await switchTab(newTab.id);
-    } catch (error) {
-        console.error('Failed to create tab:', error);
-    }
-}
-
-async function closeTab(tabId: number): Promise<void> {
-    try {
-        await window.axios.delete(`/api/browse-tabs/${tabId}`);
-
-        const index = tabs.value.findIndex(t => t.id === tabId);
-        if (index !== -1) {
-            tabs.value.splice(index, 1);
-        }
-
-        // If we closed the active tab, switch to another one
-        if (activeTabId.value === tabId) {
-            if (tabs.value.length > 0) {
-                activeTabId.value = tabs.value[0].id;
-                await switchTab(tabs.value[0].id);
-            } else {
-                // No tabs left, create a new one
-                await createTab();
-            }
-        }
-    } catch (error) {
-        console.error('Failed to close tab:', error);
-    }
-}
-
+// Tab switching function - needs to stay here as it interacts with masonry
 async function switchTab(tabId: number): Promise<void> {
     const tab = tabs.value.find(t => t.id === tabId);
     if (!tab) {
@@ -284,29 +96,96 @@ async function switchTab(tabId: number): Promise<void> {
     isTabRestored.value = false;
 }
 
+// Tab management using composable - pass switchTab callback for UI handling
+const {
+    tabs,
+    activeTabId,
+    isLoadingTabs,
+    loadTabs: loadTabsFromComposable,
+    createTab,
+    closeTab,
+    getActiveTab,
+    updateActiveTab,
+} = useBrowseTabs(switchTab);
 
-function saveTabDebounced(tab: BrowseTabData): void {
-    if (saveTabDebounceTimer.value) {
-        clearTimeout(saveTabDebounceTimer.value);
+const layout = {
+    gutterX: 12,
+    gutterY: 12,
+    sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
+};
+
+async function getNextPage(page: number | string): Promise<GetPageResult> {
+    // If we're restoring a tab and already have items, and masonry is trying to load page 1,
+    // If we're restoring a tab and already have items, prevent any loading
+    // Masonry should only load when user scrolls to bottom, not during restoration
+    if (isTabRestored.value && items.value.length > 0) {
+        // Return empty result to prevent loading during tab restoration
+        return {
+            items: [],
+            nextPage: nextCursor.value,
+        };
     }
 
-    saveTabDebounceTimer.value = window.setTimeout(() => {
-        saveTab(tab);
-    }, 500); // Debounce for 500ms
+    // Always pass as 'page' parameter - service will handle conversion
+    const url = new URL('/api/browse', window.location.origin);
+    url.searchParams.set('page', String(page));
+
+    const response = await window.axios.get(url.toString());
+    const data = response.data;
+
+    // Update currentPage to the page we just loaded
+    // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
+    if (!isTabRestored.value || items.value.length === 0) {
+        // Update current page to the page/cursor we just used
+        currentPage.value = page;
+    }
+
+    // Update next cursor from API response (for local state, used for loading more)
+    nextCursor.value = data.nextPage; // This is the cursor/page string from CivitAI
+
+    // Update active tab with new items - this is the single source of truth for tab updates
+    // Only update if we're not restoring a tab (to prevent overwriting restored state)
+    if (activeTabId.value && !isTabRestored.value) {
+        const activeTab = getActiveTab();
+        if (activeTab) {
+            // Append new items to existing items (masonry will update items.value separately)
+            const updatedItemsData = [...activeTab.itemsData, ...data.items];
+            // Extract database file IDs from all items in the tab
+            const updatedFileIds = updatedItemsData.map(item => item.id);
+            // Store both page and next in queryParams (service handles format conversion)
+            const updatedQueryParams = {
+                ...activeTab.queryParams,
+                page: currentPage.value,
+                next: data.nextPage,
+            };
+            updateActiveTab(updatedItemsData, updatedFileIds, updatedQueryParams);
+        }
+    }
+
+    return {
+        items: data.items,
+        nextPage: data.nextPage, // Pass cursor to Masonry for next request
+    };
 }
 
-async function saveTab(tab: BrowseTabData): Promise<void> {
+
+// Tab management function
+async function loadTabs(): Promise<void> {
     try {
-        await window.axios.put(`/api/browse-tabs/${tab.id}`, {
-            label: tab.label,
-            query_params: tab.queryParams, // Contains 'page' key
-            file_ids: tab.fileIds, // Database file IDs
-            position: tab.position,
-        });
+        await loadTabsFromComposable();
+        // If tabs exist and no tab is active, set first tab as active
+        if (tabs.value.length > 0 && activeTabId.value === null) {
+            activeTabId.value = tabs.value[0].id;
+            await switchTab(tabs.value[0].id);
+        }
+        // If no tabs exist, don't create one - user must create manually
     } catch (error) {
-        console.error('Failed to save tab:', error);
+        // Error already logged in composable
+        // Don't create a tab on error - let user create manually
     }
 }
+
+
 
 
 // Initialize on mount
