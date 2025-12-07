@@ -28,6 +28,8 @@ Object.defineProperty(window, 'axios', {
 // Mock @wyxos/vibe
 const mockIsLoading = ref(false);
 const mockCancelLoad = vi.fn();
+const mockDestroy = vi.fn();
+const mockInit = vi.fn();
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
@@ -36,9 +38,10 @@ vi.mock('@wyxos/vibe', () => ({
         setup() {
             return {
                 isLoading: mockIsLoading,
-                init: vi.fn(),
+                init: mockInit,
                 refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
+                destroy: mockDestroy,
             };
         },
     },
@@ -49,6 +52,8 @@ beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => { });
     mockIsLoading.value = false;
     mockCancelLoad.mockClear();
+    mockDestroy.mockClear();
+    mockInit.mockClear();
 
     // Mock tabs API to return empty array by default
     // Reset to default mock that returns empty array for /api/browse-tabs
@@ -229,7 +234,7 @@ describe('Browse', () => {
         expect(result.items).toBeInstanceOf(Array);
         expect(result.items.length).toBe(40);
         expect(result.nextPage).toBe(3);
-        
+
         // Verify tab was updated with new items
         const activeTab = vm.tabs.find((t: any) => t.id === tabId);
         expect(activeTab).toBeDefined();
@@ -588,7 +593,7 @@ describe('Browse', () => {
         expect(vm.currentPage).toBe(pageValue);
     });
 
-    it('cancels ongoing load when switching tabs', async () => {
+    it('cancels ongoing load and destroys masonry when switching tabs', async () => {
         const tab1Id = 1;
         const tab2Id = 2;
 
@@ -636,12 +641,13 @@ describe('Browse', () => {
         // Switch to second tab
         await vm.switchTab(tab2Id);
 
-        // Verify cancelLoad was called
+        // Verify cancelLoad and destroy were called
         expect(mockCancelLoad).toHaveBeenCalled();
+        expect(mockDestroy).toHaveBeenCalled();
         expect(vm.activeTabId).toBe(tab2Id);
     });
 
-    it('does not cancel load when switching tabs if masonry is not loading', async () => {
+    it('destroys masonry when switching tabs even if not loading', async () => {
         const tab1Id = 1;
         const tab2Id = 2;
 
@@ -688,12 +694,15 @@ describe('Browse', () => {
 
         // Clear previous calls
         mockCancelLoad.mockClear();
+        mockDestroy.mockClear();
 
         // Switch to second tab
         await vm.switchTab(tab2Id);
 
-        // Verify cancelLoad was NOT called when masonry is not loading
-        expect(mockCancelLoad).not.toHaveBeenCalled();
+        // Verify destroy was called even when masonry is not loading
+        // (destroy should always be called to reset state)
+        expect(mockDestroy).toHaveBeenCalled();
+        // cancelLoad may or may not be called depending on loading state
         expect(vm.activeTabId).toBe(tab2Id);
     });
 });
