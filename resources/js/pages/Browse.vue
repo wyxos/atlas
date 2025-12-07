@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 import { Loader2, Plus } from 'lucide-vue-next';
 import Pill from '../components/ui/Pill.vue';
@@ -15,11 +15,14 @@ type GetPageResult = {
 
 const items = ref<MasonryItem[]>([]);
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
-const currentPage = ref<string | number>(1); // Starts as 1, becomes cursor string
+const currentPage = ref<string | number | null>(1); // Starts as 1, becomes cursor string, can be null
 const nextCursor = ref<string | number | null>(null); // The next page/cursor from API (service handles format)
 const loadAtPage = ref<string | number | null>(null); // Initial page to load - set to 1 only when needed, null prevents auto-load
 const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
 const isPanelMinimized = ref(false);
+
+// Computed property to display page value (defaults to 1 if null)
+const displayPage = computed(() => currentPage.value ?? 1);
 
 // Tab switching function - needs to stay here as it interacts with masonry
 async function switchTab(tabId: number): Promise<void> {
@@ -56,6 +59,18 @@ async function switchTab(tabId: number): Promise<void> {
         nextCursor.value = null;
     }
 
+    // Check if tab has files - if so, load items lazily
+    if (tab.fileIds && tab.fileIds.length > 0 && tab.itemsData.length === 0) {
+        // Load items for this tab
+        try {
+            const loadedItems = await loadTabItems(tabId);
+            tab.itemsData = loadedItems;
+        } catch (error) {
+            console.error('Failed to load tab items:', error);
+            // Continue with empty items
+        }
+    }
+
     // Set loadAtPage and prepare for masonry initialization
     if (tab.itemsData && tab.itemsData.length > 0) {
         // We have pre-loaded items - set loadAtPage to null to prevent auto-load
@@ -64,9 +79,16 @@ async function switchTab(tabId: number): Promise<void> {
         // Clear items first - init() will add them back
         items.value = [];
     } else {
-        // No items, start from beginning
-        loadAtPage.value = 1;
-        currentPage.value = 1;
+        // No items - check if we have query params to restore, otherwise start from beginning
+        // Note: currentPage and nextCursor are already set from query params above, don't reset them
+        if (pageFromQuery !== undefined && pageFromQuery !== null) {
+            // We have a page from query params, use it for loading
+            loadAtPage.value = pageFromQuery;
+        } else {
+            // No query params, start from beginning
+            loadAtPage.value = 1;
+            // currentPage is already set to 1 above if no query params, so no need to reset
+        }
         items.value = [];
     }
 
@@ -115,6 +137,7 @@ const {
     closeTab,
     getActiveTab,
     updateActiveTab,
+    loadTabItems,
 } = useBrowseTabs(switchTab);
 
 const layout = {
@@ -179,15 +202,22 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
 
 
 // Tab management function
+// Flow: Load tabs (without files) > Determine focus tab > If has files, load them > Restore query params
 async function loadTabs(): Promise<void> {
     try {
+        // Step 1: Load all tabs without files (items_data is not included)
         await loadTabsFromComposable();
-        // If tabs exist and no tab is active, set first tab as active
+
+        // Step 2: Determine which tab to focus (default to first tab if tabs exist)
         if (tabs.value.length > 0 && activeTabId.value === null) {
-            activeTabId.value = tabs.value[0].id;
-            await switchTab(tabs.value[0].id);
+            const firstTab = tabs.value[0];
+            activeTabId.value = firstTab.id;
+
+            // Step 3: If tab has files, load items lazily
+            // Step 4: Restore query params (handled in switchTab)
+            await switchTab(firstTab.id);
         }
-        // If no tabs exist, don't create one - user must create manually
+        // If no tabs exist, render nothing until a tab is created
     } catch (error) {
         // Error already logged in composable
         // Don't create a tab on error - let user create manually
@@ -239,7 +269,7 @@ onMounted(async () => {
                     <!-- Count Pill -->
                     <Pill label="Items" :value="items.length" variant="primary" reversed />
                     <!-- Current Page Pill -->
-                    <Pill label="Page" :value="currentPage" variant="neutral" reversed />
+                    <Pill label="Page" :value="displayPage" variant="neutral" reversed />
                     <!-- Next Page Pill -->
                     <Pill label="Next" :value="nextCursor || 'N/A'" variant="secondary" reversed />
                     <!-- Status Pill -->

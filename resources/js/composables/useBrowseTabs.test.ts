@@ -38,14 +38,13 @@ describe('useBrowseTabs', () => {
         expect(isLoadingTabs.value).toBe(false);
     });
 
-    it('loads tabs from API', async () => {
+    it('loads tabs from API without items_data (lazy loading)', async () => {
         const mockTabs = [
             {
                 id: 1,
                 label: 'Tab 1',
                 query_params: { page: 1 },
                 file_ids: [],
-                items_data: [],
                 position: 0,
             },
             {
@@ -53,7 +52,6 @@ describe('useBrowseTabs', () => {
                 label: 'Tab 2',
                 query_params: { page: 2 },
                 file_ids: [1, 2],
-                items_data: [{ id: 1, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                 position: 1,
             },
         ];
@@ -68,8 +66,11 @@ describe('useBrowseTabs', () => {
         expect(tabs.value).toHaveLength(2);
         expect(tabs.value[0].id).toBe(1);
         expect(tabs.value[0].label).toBe('Tab 1');
+        expect(tabs.value[0].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(tabs.value[1].id).toBe(2);
         expect(tabs.value[1].label).toBe('Tab 2');
+        expect(tabs.value[1].fileIds).toEqual([1, 2]);
+        expect(tabs.value[1].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(isLoadingTabs.value).toBe(false);
     });
 
@@ -255,6 +256,67 @@ describe('useBrowseTabs', () => {
             file_ids: fileIds,
             position: 0,
         });
+    });
+
+    it('loads items for a specific tab', async () => {
+        const { tabs, loadTabItems } = useBrowseTabs();
+
+        // Set up tabs manually
+        tabs.value = [
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1, 2], itemsData: [], position: 0 },
+        ];
+
+        const mockItemsData = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        // Clear previous mocks and set up specific mock for items endpoint
+        mockAxios.get.mockReset();
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url === '/api/browse-tabs/1/items' || url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: mockItemsData,
+                        file_ids: [1, 2],
+                    },
+                });
+            }
+            return Promise.resolve({ data: [] });
+        });
+
+        const result = await loadTabItems(1);
+
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
+        expect(result).toEqual(mockItemsData);
+        
+        const tab = tabs.value.find(t => t.id === 1);
+        expect(tab?.itemsData).toEqual(mockItemsData);
+        expect(tab?.fileIds).toEqual([1, 2]);
+    });
+
+    it('handles load tab items error gracefully', async () => {
+        const { tabs, loadTabItems } = useBrowseTabs();
+
+        tabs.value = [
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1], itemsData: [], position: 0 },
+        ];
+
+        const error = new Error('Network error');
+        // Clear previous mocks and set up specific mock for items endpoint to reject
+        mockAxios.get.mockReset();
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url === '/api/browse-tabs/1/items' || url.includes('/api/browse-tabs/1/items')) {
+                return Promise.reject(error);
+            }
+            return Promise.resolve({ data: [] });
+        });
+
+        await expect(loadTabItems(1)).rejects.toThrow('Network error');
+        
+        // Tab should remain unchanged on error
+        const tab = tabs.value.find(t => t.id === 1);
+        expect(tab?.itemsData).toEqual([]);
     });
 
     it('handles load tabs error gracefully', async () => {

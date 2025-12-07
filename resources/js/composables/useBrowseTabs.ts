@@ -41,14 +41,14 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
                 label: string;
                 query_params?: Record<string, string | number | null>;
                 file_ids?: number[];
-                items_data?: MasonryItem[];
+                items_data?: MasonryItem[]; // Not included in initial load, but kept for backward compatibility
                 position?: number;
             }) => ({
                 id: tab.id,
                 label: tab.label,
                 queryParams: tab.query_params || {},
                 fileIds: tab.file_ids || [],
-                itemsData: tab.items_data || [],
+                itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
                 position: tab.position || 0,
             }));
 
@@ -183,6 +183,29 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
+    /**
+     * Load items for a specific tab.
+     * This is called lazily when restoring a tab to avoid loading items for all tabs.
+     */
+    async function loadTabItems(tabId: number): Promise<MasonryItem[]> {
+        try {
+            const response = await window.axios.get(`/api/browse-tabs/${tabId}/items`);
+            const data = response.data;
+
+            // Update the tab with loaded items
+            const tab = tabs.value.find(t => t.id === tabId);
+            if (tab) {
+                tab.itemsData = data.items_data || [];
+                tab.fileIds = data.file_ids || [];
+            }
+
+            return data.items_data || [];
+        } catch (error) {
+            console.error('Failed to load tab items:', error);
+            throw error;
+        }
+    }
+
     return {
         tabs,
         activeTabId,
@@ -192,6 +215,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         closeTab,
         getActiveTab,
         updateActiveTab,
+        loadTabItems,
     };
 }
 

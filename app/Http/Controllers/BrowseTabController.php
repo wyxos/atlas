@@ -11,27 +11,18 @@ class BrowseTabController extends Controller
 {
     /**
      * Get all tabs for the authenticated user.
+     * Note: items_data is NOT loaded here to support 1000+ tabs efficiently.
+     * Use the items() method to load items for a specific tab when needed.
      */
     public function index(): JsonResponse
     {
         $tabs = BrowseTab::forUser(auth()->id())
-            ->with(['files.metadata'])
+            ->with('files:id') // Only load file IDs, not full file data
             ->ordered()
             ->get();
 
-        // Format files into items structure for each tab
+        // Only add file_ids, not the full items_data (for performance with 1000+ tabs)
         $tabs->each(function (BrowseTab $tab) {
-            $files = $tab->files;
-            if ($files->isNotEmpty()) {
-                // Get page from query_params, default to 1
-                $page = isset($tab->query_params['page']) && is_numeric($tab->query_params['page'])
-                    ? (int) $tab->query_params['page']
-                    : 1;
-                $tab->items_data = BrowseTab::formatFilesToItems($files, $page);
-            } else {
-                $tab->items_data = [];
-            }
-            // Add file_ids to response for frontend compatibility
             $tab->file_ids = $tab->files->pluck('id')->toArray();
         });
 
@@ -124,6 +115,36 @@ class BrowseTabController extends Controller
         $browseTab->delete();
 
         return response()->json(['message' => 'Tab deleted successfully']);
+    }
+
+    /**
+     * Get items for a specific tab.
+     * This endpoint is used to lazy-load items when restoring a tab.
+     */
+    public function items(BrowseTab $browseTab): JsonResponse
+    {
+        // Ensure user owns this tab
+        if ($browseTab->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        $browseTab->load(['files.metadata']);
+
+        $files = $browseTab->files;
+        $itemsData = [];
+
+        if ($files->isNotEmpty()) {
+            // Get page from query_params, default to 1
+            $page = isset($browseTab->query_params['page']) && is_numeric($browseTab->query_params['page'])
+                ? (int) $browseTab->query_params['page']
+                : 1;
+            $itemsData = BrowseTab::formatFilesToItems($files, $page);
+        }
+
+        return response()->json([
+            'items_data' => $itemsData,
+            'file_ids' => $files->pluck('id')->toArray(),
+        ]);
     }
 
     /**
