@@ -27,6 +27,7 @@ Object.defineProperty(window, 'axios', {
 
 // Mock @wyxos/vibe
 const mockIsLoading = ref(false);
+const mockCancelLoad = vi.fn();
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
@@ -37,6 +38,7 @@ vi.mock('@wyxos/vibe', () => ({
                 isLoading: mockIsLoading,
                 init: vi.fn(),
                 refreshLayout: vi.fn(),
+                cancelLoad: mockCancelLoad,
             };
         },
     },
@@ -45,6 +47,8 @@ vi.mock('@wyxos/vibe', () => ({
 beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => { });
+    mockIsLoading.value = false;
+    mockCancelLoad.mockClear();
 
     // Mock tabs API to return empty array by default
     // Reset to default mock that returns empty array for /api/browse-tabs
@@ -582,5 +586,114 @@ describe('Browse', () => {
         const vm = wrapper.vm as any;
         // Page value from query_params should be preserved when items_data exists (can be number or string)
         expect(vm.currentPage).toBe(pageValue);
+    });
+
+    it('cancels ongoing load when switching tabs', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+
+        // Mock tabs API to return two tabs
+        mockAxios.get.mockResolvedValueOnce({
+            data: [
+                {
+                    id: tab1Id,
+                    label: 'Tab 1',
+                    query_params: { page: 1 },
+                    file_ids: [],
+                    items_data: [],
+                    position: 0,
+                },
+                {
+                    id: tab2Id,
+                    label: 'Tab 2',
+                    query_params: { page: 1 },
+                    file_ids: [],
+                    items_data: [],
+                    position: 1,
+                },
+            ],
+        });
+
+        const router = await createTestRouter('/browse');
+
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for initial tab load
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Set masonry to loading state
+        mockIsLoading.value = true;
+        expect(vm.masonry?.isLoading).toBe(true);
+
+        // Switch to second tab
+        await vm.switchTab(tab2Id);
+
+        // Verify cancelLoad was called
+        expect(mockCancelLoad).toHaveBeenCalled();
+        expect(vm.activeTabId).toBe(tab2Id);
+    });
+
+    it('does not cancel load when switching tabs if masonry is not loading', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+
+        // Mock tabs API to return two tabs
+        mockAxios.get.mockResolvedValueOnce({
+            data: [
+                {
+                    id: tab1Id,
+                    label: 'Tab 1',
+                    query_params: { page: 1 },
+                    file_ids: [],
+                    items_data: [],
+                    position: 0,
+                },
+                {
+                    id: tab2Id,
+                    label: 'Tab 2',
+                    query_params: { page: 1 },
+                    file_ids: [],
+                    items_data: [],
+                    position: 1,
+                },
+            ],
+        });
+
+        const router = await createTestRouter('/browse');
+
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for initial tab load
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Ensure masonry is not loading
+        mockIsLoading.value = false;
+        expect(vm.masonry?.isLoading).toBe(false);
+
+        // Clear previous calls
+        mockCancelLoad.mockClear();
+
+        // Switch to second tab
+        await vm.switchTab(tab2Id);
+
+        // Verify cancelLoad was NOT called when masonry is not loading
+        expect(mockCancelLoad).not.toHaveBeenCalled();
+        expect(vm.activeTabId).toBe(tab2Id);
     });
 });
