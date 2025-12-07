@@ -4,7 +4,7 @@ import { createRouter, createMemoryHistory } from 'vue-router';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
 
-// Mock fetch
+// Mock fetch (no longer used, but keep for compatibility)
 global.fetch = vi.fn();
 
 // Mock axios
@@ -47,7 +47,14 @@ beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => { });
 
     // Mock tabs API to return empty array by default
-    mockAxios.get.mockResolvedValue({ data: [] });
+    // Reset to default mock that returns empty array for /api/browse-tabs
+    mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/browse-tabs')) {
+            return Promise.resolve({ data: [] });
+        }
+        // For other URLs, return a default response
+        return Promise.resolve({ data: { items: [], nextPage: null } });
+    });
 });
 
 async function createTestRouter(initialPath = '/browse') {
@@ -168,9 +175,16 @@ describe('Browse', () => {
 
     it('provides getNextPage function that fetches from API', async () => {
         const mockResponse = createMockBrowseResponse(2, 3);
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-            ok: true,
-            json: async () => mockResponse,
+
+        // Override the mock for this specific test
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({ data: mockResponse });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -185,11 +199,14 @@ describe('Browse', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
+        // Ensure tab restoration state is false and items are empty
+        vm.isTabRestored = false;
+        vm.items = [];
         const getNextPage = vm.getNextPage;
 
         const result = await getNextPage(2);
 
-        expect(global.fetch).toHaveBeenCalledWith(
+        expect(mockAxios.get).toHaveBeenCalledWith(
             expect.stringContaining('/api/browse?page=2')
         );
         expect(result).toHaveProperty('items');
@@ -201,7 +218,17 @@ describe('Browse', () => {
 
     it('handles API errors gracefully', async () => {
         const networkError = new Error('Network error');
-        (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(networkError);
+
+        // Override the mock for this specific test
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.reject(networkError);
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
 
         const router = await createTestRouter();
         const wrapper = mount(Browse, {
@@ -215,6 +242,9 @@ describe('Browse', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
+        // Ensure tab restoration state is false and items are empty
+        vm.isTabRestored = false;
+        vm.items = [];
         const getNextPage = vm.getNextPage;
 
         await expect(getNextPage(1)).rejects.toThrow('Network error');
@@ -222,9 +252,16 @@ describe('Browse', () => {
 
     it('returns correct structure from getNextPage with null nextPage', async () => {
         const mockResponse = createMockBrowseResponse(100, null);
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-            ok: true,
-            json: async () => mockResponse,
+
+        // Override the mock for this specific test
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({ data: mockResponse });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -239,6 +276,9 @@ describe('Browse', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
+        // Ensure tab restoration state is false and items are empty
+        vm.isTabRestored = false;
+        vm.items = [];
         const result = await vm.getNextPage(100);
 
         expect(result).toHaveProperty('items');
@@ -252,9 +292,16 @@ describe('Browse', () => {
         const cursor = 'cursor-abc123';
         const nextCursor = 'cursor-xyz789';
         const mockResponse = createMockBrowseResponse(cursor, nextCursor);
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-            ok: true,
-            json: async () => mockResponse,
+
+        // Override the mock for this specific test
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({ data: mockResponse });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -269,9 +316,12 @@ describe('Browse', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
+        // Ensure tab restoration state is false and items are empty
+        vm.isTabRestored = false;
+        vm.items = [];
         const result = await vm.getNextPage(cursor);
 
-        expect(global.fetch).toHaveBeenCalledWith(
+        expect(mockAxios.get).toHaveBeenCalledWith(
             expect.stringContaining(`/api/browse?page=${cursor}`)
         );
         expect(result).toHaveProperty('items');
@@ -283,9 +333,16 @@ describe('Browse', () => {
 
     it('updates currentPage to 1 when fetching first page', async () => {
         const mockResponse = createMockBrowseResponse(1, 2);
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-            ok: true,
-            json: async () => mockResponse,
+
+        // Override the mock for this specific test
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({ data: mockResponse });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -300,6 +357,9 @@ describe('Browse', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
+        // Ensure tab restoration state is false and items are empty
+        vm.isTabRestored = false;
+        vm.items = [];
         await vm.getNextPage(1);
 
         expect(vm.currentPage).toBe(1);
@@ -531,6 +591,18 @@ describe('Browse', () => {
     });
 
     it('displays Pill components with correct values', async () => {
+        // Mock tabs API to return a tab so pills are rendered
+        mockAxios.get.mockResolvedValueOnce({
+            data: [{
+                id: 1,
+                label: 'Test Tab',
+                query_params: { page: 1 },
+                file_ids: [],
+                items_data: [],
+                position: 0,
+            }],
+        });
+
         const router = await createTestRouter();
         const wrapper = mount(Browse, {
             global: {
@@ -540,6 +612,7 @@ describe('Browse', () => {
 
         await flushPromises();
         await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;

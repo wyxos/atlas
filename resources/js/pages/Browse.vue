@@ -76,8 +76,8 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     const url = new URL('/api/browse', window.location.origin);
     url.searchParams.set('page', String(page));
 
-    const response = await fetch(url.toString());
-    const data = await response.json();
+    const response = await window.axios.get(url.toString());
+    const data = response.data;
 
     // Update currentPage to the page we just loaded
     // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
@@ -436,17 +436,27 @@ onMounted(async () => {
                 </template>
                 <template #footer="{ isMinimized }">
                     <Button variant="dashed" size="sm" @click="createTab"
-                        :class="['w-full rounded', isMinimized ? 'justify-center' : 'justify-start']"
+                        :class="['w-full rounded h-8', isMinimized ? 'justify-center' : 'justify-start']"
                         aria-label="New tab">
                         <Plus :size="16" />
-                        <Transition name="fade">
-                            <span v-if="!isMinimized" class="ml-2">New Tab</span>
-                        </Transition>
+                        <span v-show="!isMinimized" class="ml-2 transition-opacity duration-200"
+                            :class="!isMinimized ? 'opacity-100' : 'opacity-0'">New Tab</span>
                     </Button>
                 </template>
             </TabPanel>
             <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col">
-                <div class="mb-4 flex items-center justify-center gap-3">
+                <!-- Masonry Content -->
+                <div class="flex-1 min-h-0">
+                    <Masonry v-if="activeTabId !== null" :key="activeTabId" ref="masonry" v-model:items="items"
+                        :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
+                        :mobile-breakpoint="768" :skip-initial-load="items.length > 0" />
+                    <div v-else class="flex items-center justify-center h-full">
+                        <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
+                    </div>
+                </div>
+
+                <!-- Status/Pagination Info at Bottom -->
+                <div v-if="activeTabId !== null" class="my-2 flex flex-wrap items-center justify-center gap-3">
                     <!-- Count Pill -->
                     <Pill label="Items" :value="items.length" variant="primary" reversed />
                     <!-- Current Page Pill -->
@@ -463,16 +473,9 @@ onMounted(async () => {
                         </template>
                         <template #value>
                             <Loader2 v-if="masonry?.isLoading" :size="14" class="animate-spin" />
+                            <span v-else>Ready</span>
                         </template>
                     </Pill>
-                </div>
-                <div class="flex-1 min-h-0">
-                    <Masonry v-if="activeTabId !== null" :key="activeTabId" ref="masonry" v-model:items="items"
-                        :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
-                        :mobile-breakpoint="768" :skip-initial-load="items.length > 0" />
-                    <div v-else class="flex items-center justify-center h-full">
-                        <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
-                    </div>
                 </div>
             </div>
         </div>
