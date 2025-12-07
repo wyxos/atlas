@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import {
-    ChevronLeft,
-    ChevronRight,
     ChevronDown,
     LayoutDashboard,
     Users,
@@ -40,7 +38,6 @@ const appName = computed(() => {
 
 // On mobile/tablet, menu starts closed; on desktop, it starts open
 const isMenuOpen = ref(window.innerWidth >= 1024);
-const isDesktop = ref(window.innerWidth >= 1024);
 
 const menuItems = [
     { name: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -59,7 +56,6 @@ function toggleMenu(): void {
 
 function handleResize(): void {
     const isDesktopNow = window.innerWidth >= 1024;
-    isDesktop.value = isDesktopNow;
     // On desktop, menu should be open; on mobile/tablet, it should be closed
     if (isDesktopNow) {
         if (!isMenuOpen.value) {
@@ -146,18 +142,13 @@ onUnmounted(() => {
     <div class="flex min-h-screen bg-gradient-to-b from-prussian-blue-900 via-prussian-blue-800 to-prussian-blue-700">
         <!-- Side Menu -->
         <aside :class="[
-            'absolute lg:static z-40 h-screen bg-prussian-blue-600 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
+            'absolute lg:static z-40 h-screen bg-prussian-blue-800 border-r border-twilight-indigo-500 transition-all duration-300 ease-in-out',
             'flex flex-col',
             isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-16 lg:translate-x-0'
         ]">
             <!-- Atlas Icon / Logo -->
-            <div class="flex items-center justify-start h-16 px-4">
-                <div @click="toggleMenu" class="flex items-center cursor-pointer">
-                    <AtlasIcon class="w-10 h-10" />
-                    <span v-if="isMenuOpen || !isDesktop" class="hidden lg:block text-xl font-bold text-smart-blue-100 ml-3">
-                        {{ appName }}
-                    </span>
-                </div>
+            <div class="flex items-center justify-center h-16 px-4">
+                <AtlasIcon @click="toggleMenu" class="w-10 h-10 cursor-pointer" />
             </div>
 
             <!-- Menu Items -->
@@ -166,13 +157,11 @@ onUnmounted(() => {
                     <router-link v-for="item in menuItems" :key="item.name" :to="item.path" @click="handleMenuItemClick"
                         active-class="!bg-smart-blue-600 !text-white"
                         exact-active-class="!bg-smart-blue-600 !text-white"
-                        class="flex items-center gap-3 px-3 py-2 rounded-lg bg-transparent transition-colors text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white">
+                        class="flex items-center gap-3 px-3 py-2 h-10 rounded-lg bg-transparent transition-colors text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white">
                         <component :is="item.icon" class="w-5 h-5 flex-shrink-0" />
-                        <Transition name="fade">
-                            <span v-if="isMenuOpen" class="font-medium whitespace-nowrap">
-                                {{ item.label }}
-                            </span>
-                        </Transition>
+                        <span v-show="isMenuOpen" class="text-sm font-medium whitespace-nowrap transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'">
+                            {{ item.label }}
+                        </span>
                     </router-link>
                 </div>
             </nav>
@@ -182,16 +171,12 @@ onUnmounted(() => {
                 <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                         <Button variant="ghost"
-                            class="w-full flex items-center gap-3 px-3 py-2 text-twilight-indigo-100 hover:text-smart-blue-100">
+                            class="w-full flex items-center gap-3 px-3 py-2 h-10 text-twilight-indigo-100 hover:text-smart-blue-100">
                             <User class="w-5 h-5 flex-shrink-0" />
-                            <Transition name="fade">
-                                <span v-if="isMenuOpen" class="font-medium whitespace-nowrap truncate flex-1 text-left">
-                                    {{ userName }}
-                                </span>
-                            </Transition>
-                            <Transition name="fade">
-                                <ChevronDown v-if="isMenuOpen" class="w-4 h-4 flex-shrink-0 ml-auto" />
-                            </Transition>
+                            <span v-show="isMenuOpen" class="text-sm font-medium whitespace-nowrap truncate flex-1 text-left transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'">
+                                {{ userName }}
+                            </span>
+                            <ChevronDown v-show="isMenuOpen" class="w-4 h-4 flex-shrink-0 ml-auto transition-opacity duration-200" :class="isMenuOpen ? 'opacity-100' : 'opacity-0'" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="top" align="start"
