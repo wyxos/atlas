@@ -9,7 +9,7 @@ import BrowseTab from '../components/BrowseTab.vue';
 import { Button } from '@/components/ui/button';
 
 type MasonryItem = {
-    id: string;
+    id: number; // Database file ID
     width: number;
     height: number;
     page: number;
@@ -31,7 +31,7 @@ type BrowseTabData = {
     id: number;
     label: string;
     queryParams: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
-    fileIds: string[];
+    fileIds: number[]; // Database file IDs
     itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
 };
@@ -95,8 +95,8 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
         if (activeTab) {
             // Append new items to existing items
             activeTab.itemsData = [...activeTab.itemsData, ...data.items];
-            // Convert item IDs to referrer URLs for storage (backend expects referrer URLs)
-            activeTab.fileIds = activeTab.itemsData.map(item => `https://civitai.com/images/${item.id}`);
+            // Extract database file IDs from items
+            activeTab.fileIds = activeTab.itemsData.map(item => item.id);
             // Store both page and next in queryParams (service handles format conversion)
             activeTab.queryParams = {
                 ...activeTab.queryParams,
@@ -151,7 +151,7 @@ async function loadTabs(): Promise<void> {
             id: number;
             label: string;
             query_params?: Record<string, string | number | null>;
-            file_ids?: string[];
+            file_ids?: number[];
             items_data?: MasonryItem[];
             position?: number;
         }) => ({
@@ -336,8 +336,8 @@ function updateCurrentTab(): void {
     queryParams.page = currentPage.value;
     queryParams.next = nextCursor.value;
     activeTab.queryParams = queryParams;
-    // Convert item IDs to referrer URLs for storage (backend expects referrer URLs)
-    activeTab.fileIds = items.value.map(item => `https://civitai.com/images/${item.id}`);
+    // Extract database file IDs from items
+    activeTab.fileIds = items.value.map(item => item.id);
     activeTab.itemsData = [...items.value];
 
     saveTabDebounced(activeTab);
@@ -358,7 +358,7 @@ async function saveTab(tab: BrowseTabData): Promise<void> {
         await window.axios.put(`/api/browse-tabs/${tab.id}`, {
             label: tab.label,
             query_params: tab.queryParams, // Contains 'page' key
-            file_ids: tab.fileIds, // Already in referrer URL format
+            file_ids: tab.fileIds, // Database file IDs
             position: tab.position,
         });
     } catch (error) {

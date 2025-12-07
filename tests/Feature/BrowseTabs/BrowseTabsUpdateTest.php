@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\BrowseTab;
+use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -116,5 +117,56 @@ test('updating non-existent tab returns 404', function () {
     ]);
 
     $response->assertNotFound();
+});
+
+test('tab update can sync files', function () {
+    $user = User::factory()->create();
+    $file1 = File::factory()->create();
+    $file2 = File::factory()->create();
+    $file3 = File::factory()->create();
+    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
+
+    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+        'file_ids' => [$file3->id, $file1->id],
+    ]);
+
+    $response->assertSuccessful();
+    $tab->refresh();
+    expect($tab->files)->toHaveCount(2);
+    expect($tab->files->pluck('id')->toArray())->toBe([$file3->id, $file1->id]);
+});
+
+test('tab update can remove all files', function () {
+    $user = User::factory()->create();
+    $file1 = File::factory()->create();
+    $file2 = File::factory()->create();
+    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
+
+    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+        'file_ids' => [],
+    ]);
+
+    $response->assertSuccessful();
+    $tab->refresh();
+    expect($tab->files)->toHaveCount(0);
+});
+
+test('tab update maintains file order', function () {
+    $user = User::factory()->create();
+    $file1 = File::factory()->create();
+    $file2 = File::factory()->create();
+    $file3 = File::factory()->create();
+    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
+
+    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+        'file_ids' => [$file3->id, $file2->id, $file1->id],
+    ]);
+
+    $response->assertSuccessful();
+    $tab->refresh();
+    $files = $tab->files()->orderByPivot('position')->get();
+    expect($files[0]->id)->toBe($file3->id);
+    expect($files[1]->id)->toBe($file2->id);
+    expect($files[2]->id)->toBe($file1->id);
 });
 

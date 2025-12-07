@@ -25,7 +25,7 @@ class BrowseTabFactory extends Factory
                 'page' => fake()->numberBetween(1, 100),
                 'next' => fake()->optional()->numerify('###|##########'),
             ],
-            'file_ids' => [],
+            // file_ids removed - use files relationship instead
             'position' => 0,
         ];
     }
@@ -41,12 +41,16 @@ class BrowseTabFactory extends Factory
     }
 
     /**
-     * Set the file IDs (referrer URLs).
+     * Attach files to the browse tab.
      */
-    public function withFileIds(array $fileIds): static
+    public function withFiles(array $fileIds): static
     {
-        return $this->state(fn (array $attributes) => [
-            'file_ids' => $fileIds,
-        ]);
+        return $this->afterCreating(function ($tab) use ($fileIds) {
+            $syncData = [];
+            foreach ($fileIds as $index => $fileId) {
+                $syncData[$fileId] = ['position' => $index];
+            }
+            $tab->files()->sync($syncData);
+        });
     }
 }
