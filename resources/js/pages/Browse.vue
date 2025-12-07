@@ -19,6 +19,7 @@ const currentPage = ref<string | number | null>(1); // Starts as 1, becomes curs
 const nextCursor = ref<string | number | null>(null); // The next page/cursor from API (service handles format)
 const loadAtPage = ref<string | number | null>(null); // Initial page to load - set to 1 only when needed, null prevents auto-load
 const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
+const pendingRestoreNextCursor = ref<string | number | null>(null); // Holds the saved cursor we should load first after restoring a tab
 const isPanelMinimized = ref(false);
 
 // Computed property to display page value (defaults to 1 if null)
@@ -41,25 +42,17 @@ async function switchTab(tabId: number): Promise<void> {
     }
 
     activeTabId.value = tabId;
-    isTabRestored.value = true;
+    const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
+    isTabRestored.value = tabHasRestorableItems;
 
     // Restore both page and next from queryParams (service handles format conversion)
-    const pageFromQuery = tab.queryParams.page;
-    const nextFromQuery = tab.queryParams.next;
+    // IMPORTANT: Always restore from saved queryParams - don't default to 1 if the tab has been scrolled
+    const pageFromQuery = tab.queryParams?.page;
+    const nextFromQuery = tab.queryParams?.next;
+    pendingRestoreNextCursor.value = tabHasRestorableItems ? (nextFromQuery ?? null) : null;
 
-    if (pageFromQuery !== undefined && pageFromQuery !== null) {
-        currentPage.value = pageFromQuery;
-    } else {
-        currentPage.value = 1;
-    }
-
-    if (nextFromQuery !== undefined && nextFromQuery !== null) {
-        nextCursor.value = nextFromQuery;
-    } else {
-        nextCursor.value = null;
-    }
-
-    // Check if tab has files - if so, load items lazily
+    // Check if tab has files - if so, load items lazily FIRST
+    // This ensures we have the full tab state before setting pagination
     if (tab.fileIds && tab.fileIds.length > 0 && tab.itemsData.length === 0) {
         // Load items for this tab
         try {
@@ -69,6 +62,22 @@ async function switchTab(tabId: number): Promise<void> {
             console.error('Failed to load tab items:', error);
             // Continue with empty items
         }
+    }
+
+    // Restore currentPage from saved queryParams AFTER loading items
+    // Only default to 1 if page is truly missing (new tab that hasn't loaded anything yet)
+    if (pageFromQuery !== undefined && pageFromQuery !== null) {
+        currentPage.value = pageFromQuery;
+    } else {
+        // No page in queryParams - this is a new tab, start at page 1
+        currentPage.value = 1;
+    }
+
+    // Restore nextCursor from saved queryParams
+    if (nextFromQuery !== undefined && nextFromQuery !== null) {
+        nextCursor.value = nextFromQuery;
+    } else {
+        nextCursor.value = null;
     }
 
     // Set loadAtPage and prepare for masonry initialization
@@ -100,6 +109,15 @@ async function switchTab(tabId: number): Promise<void> {
     if (tab.itemsData && tab.itemsData.length > 0 && masonry.value) {
         const pageValue = pageFromQuery !== undefined && pageFromQuery !== null ? pageFromQuery : 1;
         const nextValue = nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;
+
+        // Ensure currentPage and nextCursor are set before init (they should already be set above, but double-check)
+        // This ensures displayPage computed shows the correct value
+        if (pageValue !== undefined && pageValue !== null) {
+            currentPage.value = pageValue;
+        }
+        if (nextValue !== undefined && nextValue !== null) {
+            nextCursor.value = nextValue;
+        }
 
         // Initialize masonry with pre-loaded items, current page, and next page
         // init() will add items to masonry and set up pagination history correctly
@@ -150,7 +168,7 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     // If we're restoring a tab and already have items, and masonry is trying to load page 1,
     // If we're restoring a tab and already have items, prevent any loading
     // Masonry should only load when user scrolls to bottom, not during restoration
-    if (isTabRestored.value && items.value.length > 0) {
+    if (isTabRestored.value) {
         // Return empty result to prevent loading during tab restoration
         return {
             items: [],
@@ -158,9 +176,16 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
         };
     }
 
+    // Determine actual cursor/page to request. When restoring, Masonry may request page 1.
+    let pageToRequest: string | number = page;
+    if (pendingRestoreNextCursor.value !== null) {
+        pageToRequest = pendingRestoreNextCursor.value;
+        pendingRestoreNextCursor.value = null;
+    }
+
     // Always pass as 'page' parameter - service will handle conversion
     const url = new URL('/api/browse', window.location.origin);
-    url.searchParams.set('page', String(page));
+    url.searchParams.set('page', String(pageToRequest));
 
     const response = await window.axios.get(url.toString());
     const data = response.data;
@@ -169,7 +194,7 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
     if (!isTabRestored.value || items.value.length === 0) {
         // Update current page to the page/cursor we just used
-        currentPage.value = page;
+        currentPage.value = pageToRequest;
     }
 
     // Update next cursor from API response (for local state, used for loading more)
@@ -187,7 +212,7 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
             // Store both page and next in queryParams (service handles format conversion)
             const updatedQueryParams = {
                 ...activeTab.queryParams,
-                page: currentPage.value,
+                page: pageToRequest,
                 next: data.nextPage,
             };
             updateActiveTab(updatedItemsData, updatedFileIds, updatedQueryParams);
@@ -241,12 +266,12 @@ onMounted(async () => {
                 <template #tabs="{ isMinimized }">
                     <BrowseTab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label"
                         :is-active="tab.id === activeTabId" :is-minimized="isMinimized" @click="switchTab(tab.id)"
-                        @close="closeTab(tab.id)" />
+                        @close="closeTab(tab.id)" :data-test="`browse-tab-${tab.id}`" />
                 </template>
                 <template #footer="{ isMinimized }">
                     <Button variant="dashed" size="sm" @click="createTab"
                         :class="['w-full rounded h-8', isMinimized ? 'justify-center' : 'justify-start']"
-                        aria-label="New tab">
+                        aria-label="New tab" data-test="create-tab-button">
                         <Plus :size="16" />
                         <span v-show="!isMinimized" class="ml-2 transition-opacity duration-200"
                             :class="!isMinimized ? 'opacity-100' : 'opacity-0'">New Tab</span>
@@ -258,23 +283,25 @@ onMounted(async () => {
                 <div class="flex-1 min-h-0">
                     <Masonry v-if="activeTabId !== null" :key="activeTabId" ref="masonry" v-model:items="items"
                         :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
-                        :mobile-breakpoint="768" :skip-initial-load="items.length > 0" />
-                    <div v-else class="flex items-center justify-center h-full">
+                        :mobile-breakpoint="768" :skip-initial-load="items.length > 0" data-test="masonry-component" />
+                    <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
                         <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                     </div>
                 </div>
 
                 <!-- Status/Pagination Info at Bottom -->
-                <div v-if="activeTabId !== null" class="my-2 flex flex-wrap items-center justify-center gap-3">
+                <div v-if="activeTabId !== null" class="my-2 flex flex-wrap items-center justify-center gap-3"
+                    data-test="pagination-info">
                     <!-- Count Pill -->
-                    <Pill label="Items" :value="items.length" variant="primary" reversed />
+                    <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
                     <!-- Current Page Pill -->
-                    <Pill label="Page" :value="displayPage" variant="neutral" reversed />
+                    <Pill label="Page" :value="displayPage" variant="neutral" reversed data-test="page-pill" />
                     <!-- Next Page Pill -->
-                    <Pill label="Next" :value="nextCursor || 'N/A'" variant="secondary" reversed />
+                    <Pill label="Next" :value="nextCursor || 'N/A'" variant="secondary" reversed
+                        data-test="next-pill" />
                     <!-- Status Pill -->
                     <Pill :label="'Status'" :value="masonry?.isLoading ? 'Loading...' : 'Ready'"
-                        :variant="masonry?.isLoading ? 'primary' : 'success'" reversed>
+                        :variant="masonry?.isLoading ? 'primary' : 'success'" reversed data-test="status-pill">
                         <template #label>
                             <span class="flex items-center gap-1.5">
                                 Status

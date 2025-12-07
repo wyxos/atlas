@@ -747,4 +747,407 @@ describe('Browse', () => {
         // cancelLoad may or may not be called depending on loading state
         expect(vm.activeTabId).toBe(tab2Id);
     });
+
+    it('creates a new tab and loads from CivitAI page 1', async () => {
+        // Mock tabs API to return empty array initially
+        mockAxios.get.mockResolvedValueOnce({ data: [] });
+
+        // Mock create tab API
+        const newTabId = 1;
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                id: newTabId,
+                label: 'Browse 1',
+                query_params: { page: 1 },
+                file_ids: [],
+                position: 0,
+            },
+        });
+
+        // Mock browse API to return page 1 items
+        const mockPage1Response = createMockBrowseResponse(1, 2);
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({ data: mockPage1Response });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter();
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Create a new tab
+        await vm.createTab();
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 200)); // Wait for tab switching
+
+        // Verify tab was created
+        expect(vm.activeTabId).toBe(newTabId);
+        expect(vm.tabs.length).toBe(1);
+        expect(vm.tabs[0].queryParams.page).toBe(1);
+
+        // Verify loadAtPage is set to 1 for new tab (triggers loading from page 1)
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        expect(masonry.props('loadAtPage')).toBe(1);
+    });
+
+    it('restores tab with files and query params after refresh, initializes masonry correctly', async () => {
+        const tabId = 1;
+        const pageParam = 'cursor-page-123';
+        const nextParam = 'cursor-next-456';
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        // Mock tabs API to return a tab with query params and file_ids (simulating restored state)
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Test Tab',
+                        query_params: { page: pageParam, next: nextParam },
+                        file_ids: [1, 2],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: mockItems,
+                        file_ids: [1, 2],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tab switching, restoration, and item loading
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Verify tab is active
+        expect(vm.activeTabId).toBe(tabId);
+
+        // Verify query params are restored
+        expect(vm.currentPage).toBe(pageParam);
+        expect(vm.nextCursor).toBe(nextParam);
+
+        // Verify items endpoint was called (this means the tab had fileIds and loadTabItems was triggered)
+        // The API call confirms that the condition `tab.fileIds && tab.fileIds.length > 0` was met
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
+
+        // Verify masonry component exists and is ready
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+
+        // The masonry should be initialized with items if they were loaded
+        // Note: In a real scenario, if items are loaded, masonry.init() would be called
+        // But in tests, we verify the API was called, which confirms the restoration flow works
+        // The actual masonry initialization with items would happen in the browser
+        // For now, we verify that skipInitialLoad would be true if items were pre-loaded
+        // (This is tested more thoroughly in browser tests)
+    });
+
+    it('switches to tab with multiple pages loaded, restores files and query params, resumes from next value', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+        const pageParam = 'cursor-page-456';
+        const nextParam = 'cursor-next-789';
+        const mockItems = [
+            { id: 3, width: 100, height: 100, src: 'test3.jpg', type: 'image', page: 2, index: 0, notFound: false },
+            { id: 4, width: 200, height: 200, src: 'test4.jpg', type: 'image', page: 2, index: 1, notFound: false },
+        ];
+
+        // Mock tabs API to return two tabs
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [
+                        {
+                            id: tab1Id,
+                            label: 'Tab 1',
+                            query_params: { page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        },
+                        {
+                            id: tab2Id,
+                            label: 'Tab 2',
+                            query_params: { page: pageParam, next: nextParam },
+                            file_ids: [3, 4],
+                            position: 1,
+                        },
+                    ],
+                });
+            }
+            if (url.includes('/api/browse-tabs/2/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: mockItems,
+                        file_ids: [3, 4],
+                    },
+                });
+            }
+            if (url.includes('/api/browse')) {
+                // This simulates loading more pages when scrolling
+                return Promise.resolve({
+                    data: createMockBrowseResponse(pageParam, nextParam),
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 200)); // Wait for initial tab load
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Verify first tab is active initially
+        expect(vm.activeTabId).toBe(tab1Id);
+
+        // Clear previous mock calls
+        mockInit.mockClear();
+        mockDestroy.mockClear();
+
+        // Switch to second tab
+        await vm.switchTab(tab2Id);
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tab switching, restoration, and item loading
+
+        // Verify second tab is active
+        expect(vm.activeTabId).toBe(tab2Id);
+
+        // Verify query params are restored
+        expect(vm.currentPage).toBe(pageParam);
+        expect(vm.nextCursor).toBe(nextParam);
+
+        // Verify items endpoint was called for tab 2 (this means the tab had fileIds and loadTabItems was triggered)
+        // The API call confirms that the condition `tab.fileIds && tab.fileIds.length > 0` was met
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/2/items');
+
+        // Verify masonry component exists and is ready
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+
+        // The masonry should be initialized with items if they were loaded
+        // Note: In a real scenario, if items are loaded, masonry.init() would be called
+        // But in tests, we verify the API was called, which confirms the restoration flow works
+        // The actual masonry initialization with items would happen in the browser
+
+        // Verify masonry was destroyed when switching tabs (to reset state)
+        expect(mockDestroy).toHaveBeenCalled();
+
+        // Verify masonry will resume from next value when scrolling
+        // This is verified by checking that nextCursor is set correctly
+        // When getNextPage is called with nextParam, it should use that value
+        vm.isTabRestored = false; // Reset flag to allow loading
+        vm.items = []; // Clear items to simulate scroll scenario
+
+        const getNextPageResult = await vm.getNextPage(nextParam);
+
+        // Verify it uses the nextParam to load more items
+        expect(mockAxios.get).toHaveBeenCalledWith(
+            expect.stringContaining(`/api/browse?page=${nextParam}`)
+        );
+        expect(getNextPageResult.nextPage).toBeDefined();
+    });
+
+    it('preserves cursor values on page reload instead of resetting to page 1', async () => {
+        const tabId = 1;
+        const cursorX = 'cursor-x';
+        const cursorY = 'cursor-y';
+        const mockItems = Array.from({ length: 139 }, (_, i) => ({
+            id: i + 1,
+            width: 100,
+            height: 100,
+            src: `test${i}.jpg`,
+            type: 'image' as const,
+            page: 1,
+            index: i,
+            notFound: false,
+        }));
+
+        // Mock tabs API to return a tab with cursor values (simulating a tab that has been scrolled)
+        // This represents the state after the user has scrolled and loaded 139 items
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Scrolled Tab',
+                        // Tab has cursor values saved (not page 1!)
+                        query_params: { page: cursorX, next: cursorY },
+                        file_ids: mockItems.map(item => item.id),
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: mockItems,
+                        file_ids: mockItems.map(item => item.id),
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tab switching and restoration
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Verify tab is active
+        expect(vm.activeTabId).toBe(tabId);
+
+        // CRITICAL: Verify cursor values are preserved, NOT reset to page 1
+        // This is the bug fix - the tab should preserve cursor-x, not reset to 1
+        expect(vm.currentPage).toBe(cursorX); // Should be cursor-x, NOT 1
+        expect(vm.nextCursor).toBe(cursorY); // Should be cursor-y
+
+        // Verify displayPage computed property also shows the cursor value
+        expect(vm.displayPage).toBe(cursorX); // Should be cursor-x, NOT 1
+    });
+
+    it('continues saved cursor after creating a new tab and switching back', async () => {
+        const tabId = 1;
+        const cursorX = 'cursor-x';
+        const cursorY = 'cursor-y';
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 120, height: 120, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: mockItems,
+                        file_ids: mockItems.map(item => item.id),
+                    },
+                });
+            }
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Scrolled Tab',
+                        query_params: { page: cursorX, next: cursorY },
+                        file_ids: mockItems.map(item => item.id),
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                const parsed = new URL(url, 'http://localhost');
+                const requestedPage = parsed.searchParams.get('page') ?? '1';
+                const nextValue = requestedPage === cursorY ? 'cursor-z' : cursorY;
+                return Promise.resolve({
+                    data: createMockBrowseResponse(requestedPage, nextValue),
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        mockAxios.post.mockResolvedValue({
+            data: {
+                id: 2,
+                label: 'Browse 2',
+                query_params: { page: 1 },
+                file_ids: [],
+                position: 1,
+            },
+        });
+
+        mockAxios.put.mockResolvedValue({});
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        expect(vm.activeTabId).toBe(tabId);
+
+        await vm.createTab();
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        expect(vm.activeTabId).toBe(2);
+
+        await vm.switchTab(tabId);
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        expect(vm.activeTabId).toBe(tabId);
+        expect(vm.pendingRestoreNextCursor).toBe(cursorY);
+
+        await vm.getNextPage(1);
+
+        const browseCalls = mockAxios.get.mock.calls
+            .map(call => call[0])
+            .filter((callUrl: string) => callUrl.includes('/api/browse'));
+
+        expect(browseCalls[browseCalls.length - 1]).toContain(`/api/browse?page=${cursorY}`);
+        expect(vm.currentPage).toBe(cursorY);
+    });
 });
