@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, onMounted, nextTick } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 import { Loader2, Plus } from 'lucide-vue-next';
 import Pill from '../components/ui/Pill.vue';
@@ -36,14 +35,10 @@ type BrowseTabData = {
     position: number;
 };
 
-const route = useRoute();
-const router = useRouter();
-
 const items = ref<MasonryItem[]>([]);
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number>(1); // Starts as 1, becomes cursor string
 const nextCursor = ref<string | number | null>(null); // The next page/cursor from API (service handles format)
-const previousLoadingState = ref(false);
 const loadAtPage = ref<string | number | null>(null); // Initial page to load - set to 1 only when needed, null prevents auto-load
 const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
 
@@ -89,13 +84,14 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     // Update next cursor from API response (for local state, used for loading more)
     nextCursor.value = data.nextPage; // This is the cursor/page string from CivitAI
 
-    // Update active tab with new items
-    if (activeTabId.value) {
+    // Update active tab with new items - this is the single source of truth for tab updates
+    // Only update if we're not restoring a tab (to prevent overwriting restored state)
+    if (activeTabId.value && !isTabRestored.value) {
         const activeTab = tabs.value.find(t => t.id === activeTabId.value);
         if (activeTab) {
-            // Append new items to existing items
+            // Append new items to existing items (masonry will update items.value separately)
             activeTab.itemsData = [...activeTab.itemsData, ...data.items];
-            // Extract database file IDs from items
+            // Extract database file IDs from all items in the tab
             activeTab.fileIds = activeTab.itemsData.map(item => item.id);
             // Store both page and next in queryParams (service handles format conversion)
             activeTab.queryParams = {
@@ -113,33 +109,6 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     };
 }
 
-// Watch for loading state changes to update URL when page loads successfully
-watch(
-    () => masonry.value?.isLoading,
-    (isLoading) => {
-        // When loading transitions from true to false, a page has successfully loaded
-        if (previousLoadingState.value && !isLoading) {
-            updateUrl();
-            updateCurrentTab();
-        }
-        previousLoadingState.value = isLoading ?? false;
-    },
-    { immediate: true }
-);
-
-function updateUrl(): void {
-    const query: Record<string, string> = {};
-
-    // Add tab ID to query if we have an active tab
-    if (activeTabId.value !== null) {
-        query.tab = String(activeTabId.value);
-    }
-
-    // Update URL without triggering navigation
-    router.replace({
-        query,
-    });
-}
 
 // Tab management functions
 async function loadTabs(): Promise<void> {
@@ -188,7 +157,7 @@ async function createTab(): Promise<void> {
     const newTab: BrowseTabData = {
         id: 0, // Temporary ID, will be set from response
         label: `Browse ${tabs.value.length + 1}`,
-        queryParams: { ...route.query } as Record<string, string | number | null>,
+        queryParams: {},
         fileIds: [],
         itemsData: [],
         position: maxPosition + 1,
@@ -313,35 +282,8 @@ async function switchTab(tabId: number): Promise<void> {
 
     // Reset the flag - masonry is now properly initialized
     isTabRestored.value = false;
-
-    // Update URL with tab ID
-    updateUrl();
 }
 
-function updateCurrentTab(): void {
-    if (!activeTabId.value) {
-        return;
-    }
-
-    const activeTab = tabs.value.find(t => t.id === activeTabId.value);
-    if (!activeTab) {
-        return;
-    }
-
-    // Update tab with current state
-    // Exclude 'tab' from queryParams since it's managed separately in URL
-    const queryParams = { ...route.query } as Record<string, string | number | null>;
-    delete queryParams.tab;
-    // Store both page and next in queryParams (service handles format conversion)
-    queryParams.page = currentPage.value;
-    queryParams.next = nextCursor.value;
-    activeTab.queryParams = queryParams;
-    // Extract database file IDs from items
-    activeTab.fileIds = items.value.map(item => item.id);
-    activeTab.itemsData = [...items.value];
-
-    saveTabDebounced(activeTab);
-}
 
 function saveTabDebounced(tab: BrowseTabData): void {
     if (saveTabDebounceTimer.value) {
@@ -366,62 +308,11 @@ async function saveTab(tab: BrowseTabData): Promise<void> {
     }
 }
 
-// Watch for items changes to update active tab
-watch(
-    () => items.value,
-    () => {
-        if (!isTabRestored.value && activeTabId.value) {
-            updateCurrentTab();
-        }
-    },
-    { deep: true }
-);
 
-// Watch for cursor changes to update active tab
-watch(
-    () => nextCursor.value,
-    () => {
-        if (!isTabRestored.value && activeTabId.value) {
-            updateCurrentTab();
-        }
-    }
-);
-
-// Watch for page changes to update active tab
-watch(
-    () => currentPage.value,
-    () => {
-        if (!isTabRestored.value && activeTabId.value) {
-            updateCurrentTab();
-        }
-    }
-);
-
-// Initialize from URL on mount
+// Initialize on mount
 onMounted(async () => {
-    // Load tabs first
+    // Load tabs - loadTabs will set the first tab as active if tabs exist
     await loadTabs();
-
-    // Check for tab parameter in URL
-    const tabParam = route.query.tab;
-    if (tabParam) {
-        const tabId = typeof tabParam === 'string' ? parseInt(tabParam, 10) : Number(tabParam);
-        if (!isNaN(tabId)) {
-            const tab = tabs.value.find(t => t.id === tabId);
-            if (tab) {
-                // Switch to the tab specified in URL
-                await switchTab(tabId);
-                return;
-            }
-        }
-    }
-
-    // If no tab in URL or tab not found, use existing logic
-    // (loadTabs already sets the first tab as active if tabs exist)
-    if (activeTabId.value !== null && !isTabRestored.value) {
-        // Update URL with the active tab ID
-        updateUrl();
-    }
 });
 </script>
 
