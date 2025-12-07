@@ -10,15 +10,13 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class CivitAiImages
+class CivitAiImages extends BaseService
 {
     public const string KEY = 'civit-ai-images';
 
     public const string SOURCE = 'CivitAI';
 
     public const string LABEL = 'CivitAI Images';
-
-    protected array $params = [];
 
     /**
      * Fetch images from CivitAI Images API.
@@ -80,11 +78,9 @@ class CivitAiImages
 
     public function formatParams(): array
     {
-        $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 40;
+        $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 20;
         $limit = max(0, min(200, $limit));
-        // If page is 1, use null cursor. Otherwise, use page value as cursor (service handles conversion)
-        $page = $this->params['page'] ?? 1;
-        $cursor = ($page === 1 || $page === '1') ? null : (string) $page;
+        $cursor = (isset($this->params['page']) && (int) $this->params['page'] > 1) ? (string) $this->params['page'] : null;
         $sort = $this->params['sort'] ?? 'Newest';
         $nsfw = $this->params['nsfw'] ?? null; // boolean or enum: None|Soft|Mature|X
         $type = $this->resolveType($this->params['type'] ?? null);
@@ -117,8 +113,9 @@ class CivitAiImages
     {
         return [
             'nsfw' => 0,
-            'limit' => 40,
+            'limit' => 20,
             'sort' => 'Newest',
+            // Normalize to UI 'sorting' if consumer needs it; Wallhaven service reads 'sort' and maps to 'sorting'.
         ];
     }
 
@@ -172,7 +169,7 @@ class CivitAiImages
         }
 
         $file = [
-            'source' => self::SOURCE,
+            'source' => 'CivitAI',
             'source_id' => (string) $id,
             'url' => $url,
             'referrer_url' => $referrer,
