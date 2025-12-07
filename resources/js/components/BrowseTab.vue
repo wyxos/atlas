@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, FileText } from 'lucide-vue-next';
+import { X, Layers } from 'lucide-vue-next';
 
 interface Props {
     id: number | string;
@@ -32,35 +32,36 @@ function handleClose(event: MouseEvent): void {
     <div
         @click="handleClick"
         :class="[
-            'group flex items-center justify-between w-full px-3 py-2 rounded-lg transition-all cursor-pointer border border-transparent select-none',
+            'group flex items-center justify-between w-full px-2.5 py-1.5 h-8 rounded-md transition-all cursor-pointer select-none',
             isActive
-                ? 'bg-smart-blue-600 text-white border-smart-blue-500 shadow-md'
-                : 'text-twilight-indigo-100 hover:bg-smart-blue-700/50 hover:text-white',
+                ? 'bg-smart-blue-600/80 text-white'
+                : 'text-twilight-indigo-200 hover:bg-prussian-blue-700/50 hover:text-twilight-indigo-100',
         ]"
         role="button"
         tabindex="0"
         @keydown.enter="handleClick"
         @keydown.space.prevent="handleClick"
     >
-        <div class="flex items-center gap-3 flex-1 min-w-0">
-            <FileText class="w-5 h-5 flex-shrink-0" />
-            <Transition name="fade">
-                <span v-if="!isMinimized" class="text-sm font-medium whitespace-nowrap truncate">
-                    {{ label }}
-                </span>
-            </Transition>
-        </div>
-        <Transition name="fade">
-            <button
-                v-if="!isMinimized"
-                type="button"
-                @click.stop="handleClose"
-                class="flex items-center justify-center h-6 w-6 rounded text-current opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-black/20 focus:opacity-100 focus:outline-none flex-shrink-0"
-                aria-label="Close tab"
+        <div class="flex items-center gap-2 flex-1 min-w-0">
+            <Layers class="w-4 h-4 shrink-0" />
+            <span
+                v-show="!isMinimized"
+                class="text-xs font-normal whitespace-nowrap truncate transition-opacity duration-200"
+                :class="!isMinimized ? 'opacity-100' : 'opacity-0'"
             >
-                <X :size="14" />
-            </button>
-        </Transition>
+                {{ label }}
+            </span>
+        </div>
+        <button
+            v-show="!isMinimized"
+            type="button"
+            @click.stop="handleClose"
+            class="flex items-center justify-center h-6 w-6 rounded text-current opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-black/20 focus:opacity-100 focus:outline-none shrink-0"
+            :class="!isMinimized ? 'opacity-100' : 'opacity-0'"
+            aria-label="Close tab"
+        >
+            <X :size="14" />
+        </button>
     </div>
 </template>
 
