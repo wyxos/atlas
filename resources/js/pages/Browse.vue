@@ -28,9 +28,13 @@ async function switchTab(tabId: number): Promise<void> {
         return;
     }
 
-    // Cancel any ongoing load in masonry before switching tabs
-    if (masonry.value && masonry.value.isLoading) {
-        masonry.value.cancelLoad();
+    // Destroy and re-initialize masonry instance for clean state
+    if (masonry.value) {
+        if (masonry.value.isLoading) {
+            masonry.value.cancelLoad();
+        }
+        // Destroy the instance to reset all internal state
+        masonry.value.destroy();
     }
 
     activeTabId.value = tabId;
