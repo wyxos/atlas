@@ -393,21 +393,36 @@ describe('Browse', () => {
         expect(vm.nextCursor).toBe(2);
     });
 
-    it('initializes with first tab when tabs exist', async () => {
+    it('initializes with first tab when tabs exist and loads items if tab has files', async () => {
         const tabId = 1;
         const pageParam = 'cursor-page-123';
         const nextParam = 'cursor-next-456';
 
-        // Mock tabs API to return a tab with the page/next in query_params
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: tabId,
-                label: 'Test Tab',
-                query_params: { page: pageParam, next: nextParam },
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
+        // Mock tabs API to return a tab with the page/next in query_params and file_ids
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Test Tab',
+                        query_params: { page: pageParam, next: nextParam },
+                        file_ids: [1, 2],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: [
+                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                        ],
+                        file_ids: [1, 2],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter('/browse');
@@ -425,10 +440,11 @@ describe('Browse', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         expect(vm.activeTabId).toBe(tabId);
-        // When tab has no items_data, currentPage is reset to 1, but nextCursor is preserved from query_params
-        // This is the actual behavior - nextCursor is only reset when items_data exists
-        expect(vm.currentPage).toBe(1);
+        // Query params should be restored
+        expect(vm.currentPage).toBe(pageParam);
         expect(vm.nextCursor).toBe(nextParam);
+        // Items should be loaded
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
     });
 
     it('initializes with default values when no tabs exist', async () => {
@@ -522,21 +538,32 @@ describe('Browse', () => {
         }
     });
 
-    it('handles tab with page parameter in query_params', async () => {
+    it('handles tab with page parameter in query_params and loads items lazily', async () => {
         const tabId = 1;
         const pageParam = 'cursor-string-123';
 
-        // Mock tabs API to return a tab with page in query_params and items_data
-        // When items_data exists, the page from query_params is restored
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: tabId,
-                label: 'Test Tab',
-                query_params: { page: pageParam },
-                file_ids: [123],
-                items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
-                position: 0,
-            }],
+        // Mock tabs API to return a tab with page in query_params and file_ids (no items_data)
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Test Tab',
+                        query_params: { page: pageParam },
+                        file_ids: [123],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                        file_ids: [123],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter('/browse');
@@ -554,25 +581,38 @@ describe('Browse', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         expect(vm.activeTabId).toBe(tabId);
-        // When items_data exists, page from query_params is restored
+        // Page from query_params should be restored
         expect(vm.currentPage).toBe(pageParam);
+        // Items should be loaded lazily
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
     });
 
-    it('handles tab with page in query_params correctly', async () => {
+    it('handles tab with page in query_params correctly and loads items lazily', async () => {
         const tabId = 1;
         const pageValue = 123; // Can be number or string
 
-        // Mock tabs API to return a tab with page as number in query_params and items_data
-        // When items_data exists, the page from query_params is restored
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: tabId,
-                label: 'Test Tab',
-                query_params: { page: pageValue },
-                file_ids: [123],
-                items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
-                position: 0,
-            }],
+        // Mock tabs API to return a tab with page as number in query_params and file_ids (no items_data)
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Test Tab',
+                        query_params: { page: pageValue },
+                        file_ids: [123],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                        file_ids: [123],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter('/browse');
@@ -589,8 +629,10 @@ describe('Browse', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-        // Page value from query_params should be preserved when items_data exists (can be number or string)
+        // Page value from query_params should be preserved (can be number or string)
         expect(vm.currentPage).toBe(pageValue);
+        // Items should be loaded lazily
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
     });
 
     it('cancels ongoing load and destroys masonry when switching tabs', async () => {
