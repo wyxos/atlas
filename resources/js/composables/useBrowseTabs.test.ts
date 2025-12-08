@@ -98,7 +98,7 @@ describe('useBrowseTabs', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: { page: 1 },
+                query_params: {},
                 file_ids: [],
                 position: 0,
             },
@@ -112,7 +112,7 @@ describe('useBrowseTabs', () => {
 
         expect(mockAxios.post).toHaveBeenCalledWith('/api/browse-tabs', {
             label: 'Browse 1',
-            query_params: { page: 1 },
+            query_params: {},
             file_ids: [],
             position: 0,
         });
@@ -152,7 +152,7 @@ describe('useBrowseTabs', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: { page: 1 },
+                query_params: {},
                 file_ids: [],
                 position: 0,
             },

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Teleport is used in template but linter doesn't recognize template usage
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { inject, onMounted, onUnmounted, watch, computed, ref, Teleport } from 'vue';
+import { inject, onMounted, onUnmounted, watch, computed, ref, Teleport, useAttrs } from 'vue';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -13,6 +13,12 @@ const props = withDefaults(defineProps<Props>(), {
     align: 'start',
     class: '',
 });
+
+defineOptions({
+    inheritAttrs: false,
+});
+
+const attrs = useAttrs();
 
 const popoverOpen = inject<{ value: boolean } | { get: () => boolean; set: (value: boolean) => void }>('popoverOpen');
 const setPopoverOpen = inject<(value: boolean) => void>('setPopoverOpen');
@@ -207,6 +213,7 @@ onUnmounted(() => {
                     'fixed z-[70] min-w-[8rem] max-w-[90vw] rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-1 shadow-lg',
                     props.class
                 )"
+                v-bind="attrs"
                 :style="popoverStyle"
                 @click.stop
                 @touchend.stop

@@ -71,16 +71,13 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         const newTab: BrowseTabData = {
             id: 0, // Temporary ID, will be set from response
             label: `Browse ${tabs.value.length + 1}`,
-            queryParams: {},
+            queryParams: {
+                // Don't set page or service - user must select service first
+            },
             fileIds: [],
             itemsData: [],
             position: maxPosition + 1,
         };
-
-        // Ensure page is in queryParams (default to 1 if not present)
-        if (newTab.queryParams.page === undefined || newTab.queryParams.page === null) {
-            newTab.queryParams.page = 1;
-        }
 
         try {
             const response = await window.axios.post('/api/browse-tabs', {
