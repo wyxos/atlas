@@ -34,7 +34,8 @@ vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
         template: '<div class="masonry-mock"><slot></slot></div>',
-        props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad'],
+        props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
+        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop'],
         setup() {
             return {
                 isLoading: mockIsLoading,
@@ -102,16 +103,32 @@ function createMockBrowseResponse(
 
 describe('Browse', () => {
     it('renders the Masonry component when tab exists', async () => {
-        // Mock tabs API to return a tab
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: 1,
-                label: 'Test Tab',
-                query_params: { page: 1 },
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
+        // Mock tabs API to return a tab with service
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: 1,
+                        label: 'Test Tab',
+                        query_params: { service: 'civit-ai-images', page: 1 },
+                        file_ids: [],
+                        items_data: [],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -145,16 +162,32 @@ describe('Browse', () => {
     });
 
     it('passes correct props to Masonry component', async () => {
-        // Mock tabs API to return a tab
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: 1,
-                label: 'Test Tab',
-                query_params: { page: 1 },
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
+        // Mock tabs API to return a tab with service
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: 1,
+                        label: 'Test Tab',
+                        query_params: { service: 'civit-ai-images', page: 1 },
+                        file_ids: [],
+                        items_data: [],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -186,14 +219,14 @@ describe('Browse', () => {
         const mockResponse = createMockBrowseResponse(2, 3);
         const tabId = 1;
 
-        // Mock tabs API to return a tab
+        // Mock tabs API to return a tab with service
         mockAxios.get.mockImplementation((url: string) => {
             if (url.includes('/api/browse-tabs')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: {},
+                        query_params: { service: 'civit-ai-images' },
                         file_ids: [],
                         items_data: [],
                         position: 0,
@@ -201,7 +234,14 @@ describe('Browse', () => {
                 });
             }
             if (url.includes('/api/browse')) {
-                return Promise.resolve({ data: mockResponse });
+                return Promise.resolve({
+                    data: {
+                        ...mockResponse,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
         });
@@ -222,6 +262,11 @@ describe('Browse', () => {
         // Ensure tab restoration state is false and items are empty
         vm.isTabRestored = false;
         vm.items = [];
+        // Ensure service is set (tab should have it, but double-check)
+        const activeTab = vm.getActiveTab();
+        if (activeTab && !activeTab.queryParams.service) {
+            activeTab.queryParams.service = 'civit-ai-images';
+        }
         const getNextPage = vm.getNextPage;
 
         const result = await getNextPage(2);
@@ -236,11 +281,11 @@ describe('Browse', () => {
         expect(result.nextPage).toBe(3);
 
         // Verify tab was updated with new items
-        const activeTab = vm.tabs.find((t: any) => t.id === tabId);
-        expect(activeTab).toBeDefined();
-        expect(activeTab.itemsData.length).toBe(40);
-        expect(activeTab.queryParams.page).toBe(2);
-        expect(activeTab.queryParams.next).toBe(3);
+        const updatedTab = vm.tabs.find((t: any) => t.id === tabId);
+        expect(updatedTab).toBeDefined();
+        expect(updatedTab.itemsData.length).toBe(40);
+        expect(updatedTab.queryParams.page).toBe(2);
+        expect(updatedTab.queryParams.next).toBe(3);
     });
 
     it('handles API errors gracefully', async () => {
@@ -267,11 +312,29 @@ describe('Browse', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
+        mockAxios.post.mockResolvedValue({
+            data: {
+                id: 1,
+                label: 'Browse 1',
+                query_params: {},
+                file_ids: [],
+                position: 0,
+            },
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         // Ensure tab restoration state is false and items are empty
         vm.isTabRestored = false;
         vm.items = [];
+        // Create a tab with service for this test
+        await vm.createTab();
+        const activeTab = vm.getActiveTab();
+        if (activeTab) {
+            activeTab.queryParams.service = 'civit-ai-images';
+        }
+        await flushPromises();
+        await wrapper.vm.$nextTick();
         const getNextPage = vm.getNextPage;
 
         await expect(getNextPage(1)).rejects.toThrow('Network error');
@@ -301,11 +364,29 @@ describe('Browse', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
+        mockAxios.post.mockResolvedValue({
+            data: {
+                id: 1,
+                label: 'Browse 1',
+                query_params: {},
+                file_ids: [],
+                position: 0,
+            },
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         // Ensure tab restoration state is false and items are empty
         vm.isTabRestored = false;
         vm.items = [];
+        // Create a tab with service for this test
+        await vm.createTab();
+        const activeTab = vm.getActiveTab();
+        if (activeTab) {
+            activeTab.queryParams.service = 'civit-ai-images';
+        }
+        await flushPromises();
+        await wrapper.vm.$nextTick();
         const result = await vm.getNextPage(100);
 
         expect(result).toHaveProperty('items');
@@ -341,11 +422,29 @@ describe('Browse', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
+        mockAxios.post.mockResolvedValue({
+            data: {
+                id: 1,
+                label: 'Browse 1',
+                query_params: {},
+                file_ids: [],
+                position: 0,
+            },
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         // Ensure tab restoration state is false and items are empty
         vm.isTabRestored = false;
         vm.items = [];
+        // Create a tab with service for this test
+        await vm.createTab();
+        const activeTab = vm.getActiveTab();
+        if (activeTab) {
+            activeTab.queryParams.service = 'civit-ai-images';
+        }
+        await flushPromises();
+        await wrapper.vm.$nextTick();
         const result = await vm.getNextPage(cursor);
 
         expect(mockAxios.get).toHaveBeenCalledWith(
@@ -382,11 +481,29 @@ describe('Browse', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
+        mockAxios.post.mockResolvedValue({
+            data: {
+                id: 1,
+                label: 'Browse 1',
+                query_params: {},
+                file_ids: [],
+                position: 0,
+            },
+        });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         // Ensure tab restoration state is false and items are empty
         vm.isTabRestored = false;
         vm.items = [];
+        // Create a tab with service for this test
+        await vm.createTab();
+        const activeTab = vm.getActiveTab();
+        if (activeTab) {
+            activeTab.queryParams.service = 'civit-ai-images';
+        }
+        await flushPromises();
+        await wrapper.vm.$nextTick();
         await vm.getNextPage(1);
 
         expect(vm.currentPage).toBe(1);
@@ -405,7 +522,7 @@ describe('Browse', () => {
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: { page: pageParam, next: nextParam },
+                        query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
                         file_ids: [1, 2],
                         position: 0,
                     }],
@@ -472,16 +589,32 @@ describe('Browse', () => {
 
 
     it('displays Pill components with correct values', async () => {
-        // Mock tabs API to return a tab so pills are rendered
-        mockAxios.get.mockResolvedValueOnce({
-            data: [{
-                id: 1,
-                label: 'Test Tab',
-                query_params: { page: 1 },
-                file_ids: [],
-                items_data: [],
-                position: 0,
-            }],
+        // Mock tabs API to return a tab with service so pills are rendered
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: 1,
+                        label: 'Test Tab',
+                        query_params: { service: 'civit-ai-images', page: 1 },
+                        file_ids: [],
+                        items_data: [],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -549,7 +682,7 @@ describe('Browse', () => {
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: { page: pageParam },
+                        query_params: { service: 'civit-ai-images', page: pageParam },
                         file_ids: [123],
                         position: 0,
                     }],
@@ -598,7 +731,7 @@ describe('Browse', () => {
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: { page: pageValue },
+                        query_params: { service: 'civit-ai-images', page: pageValue },
                         file_ids: [123],
                         position: 0,
                     }],
@@ -639,26 +772,42 @@ describe('Browse', () => {
         const tab1Id = 1;
         const tab2Id = 2;
 
-        // Mock tabs API to return two tabs
-        mockAxios.get.mockResolvedValueOnce({
-            data: [
-                {
-                    id: tab1Id,
-                    label: 'Tab 1',
-                    query_params: { page: 1 },
-                    file_ids: [],
-                    items_data: [],
-                    position: 0,
-                },
-                {
-                    id: tab2Id,
-                    label: 'Tab 2',
-                    query_params: { page: 1 },
-                    file_ids: [],
-                    items_data: [],
-                    position: 1,
-                },
-            ],
+        // Mock tabs API to return two tabs with services
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [
+                        {
+                            id: tab1Id,
+                            label: 'Tab 1',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        },
+                        {
+                            id: tab2Id,
+                            label: 'Tab 2',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 1,
+                        },
+                    ],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter('/browse');
@@ -693,26 +842,42 @@ describe('Browse', () => {
         const tab1Id = 1;
         const tab2Id = 2;
 
-        // Mock tabs API to return two tabs
-        mockAxios.get.mockResolvedValueOnce({
-            data: [
-                {
-                    id: tab1Id,
-                    label: 'Tab 1',
-                    query_params: { page: 1 },
-                    file_ids: [],
-                    items_data: [],
-                    position: 0,
-                },
-                {
-                    id: tab2Id,
-                    label: 'Tab 2',
-                    query_params: { page: 1 },
-                    file_ids: [],
-                    items_data: [],
-                    position: 1,
-                },
-            ],
+        // Mock tabs API to return two tabs with services
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [
+                        {
+                            id: tab1Id,
+                            label: 'Tab 1',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        },
+                        {
+                            id: tab2Id,
+                            label: 'Tab 2',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 1,
+                        },
+                    ],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter('/browse');
@@ -748,9 +913,25 @@ describe('Browse', () => {
         expect(vm.activeTabId).toBe(tab2Id);
     });
 
-    it('creates a new tab and loads from CivitAI page 1', async () => {
+    it('creates a new tab and does not auto-load until service is selected', async () => {
         // Mock tabs API to return empty array initially
-        mockAxios.get.mockResolvedValueOnce({ data: [] });
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
 
         // Mock create tab API
         const newTabId = 1;
@@ -758,22 +939,10 @@ describe('Browse', () => {
             data: {
                 id: newTabId,
                 label: 'Browse 1',
-                query_params: { page: 1 },
+                query_params: {}, // No service - should not auto-load
                 file_ids: [],
                 position: 0,
             },
-        });
-
-        // Mock browse API to return page 1 items
-        const mockPage1Response = createMockBrowseResponse(1, 2);
-        mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({ data: [] });
-            }
-            if (url.includes('/api/browse')) {
-                return Promise.resolve({ data: mockPage1Response });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
         });
 
         const router = await createTestRouter();
@@ -798,12 +967,12 @@ describe('Browse', () => {
         // Verify tab was created
         expect(vm.activeTabId).toBe(newTabId);
         expect(vm.tabs.length).toBe(1);
-        expect(vm.tabs[0].queryParams.page).toBe(1);
+        // New tabs don't have page set by default (no service selected)
+        expect(vm.tabs[0].queryParams.page).toBeUndefined();
 
-        // Verify loadAtPage is set to 1 for new tab (triggers loading from page 1)
+        // Verify loadAtPage is null for new tab (no service selected, so no auto-load)
         const masonry = wrapper.findComponent({ name: 'Masonry' });
-        expect(masonry.exists()).toBe(true);
-        expect(masonry.props('loadAtPage')).toBe(1);
+        expect(masonry.exists()).toBe(false); // Masonry should not render without service
     });
 
     it('restores tab with files and query params after refresh, initializes masonry correctly', async () => {
@@ -822,7 +991,7 @@ describe('Browse', () => {
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: { page: pageParam, next: nextParam },
+                        query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
                         file_ids: [1, 2],
                         position: 0,
                     }],
@@ -894,7 +1063,7 @@ describe('Browse', () => {
                         {
                             id: tab1Id,
                             label: 'Tab 1',
-                            query_params: { page: 1 },
+                            query_params: { service: 'civit-ai-images', page: 1 },
                             file_ids: [],
                             items_data: [],
                             position: 0,
@@ -902,7 +1071,7 @@ describe('Browse', () => {
                         {
                             id: tab2Id,
                             label: 'Tab 2',
-                            query_params: { page: pageParam, next: nextParam },
+                            query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
                             file_ids: [3, 4],
                             position: 1,
                         },
@@ -920,7 +1089,12 @@ describe('Browse', () => {
             if (url.includes('/api/browse')) {
                 // This simulates loading more pages when scrolling
                 return Promise.resolve({
-                    data: createMockBrowseResponse(pageParam, nextParam),
+                    data: {
+                        ...createMockBrowseResponse(pageParam, nextParam),
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
                 });
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -1015,7 +1189,7 @@ describe('Browse', () => {
                         id: tabId,
                         label: 'Scrolled Tab',
                         // Tab has cursor values saved (not page 1!)
-                        query_params: { page: cursorX, next: cursorY },
+                        query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
                         file_ids: mockItems.map(item => item.id),
                         position: 0,
                     }],
@@ -1081,7 +1255,7 @@ describe('Browse', () => {
                     data: [{
                         id: tabId,
                         label: 'Scrolled Tab',
-                        query_params: { page: cursorX, next: cursorY },
+                        query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
                         file_ids: mockItems.map(item => item.id),
                         position: 0,
                     }],
@@ -1092,7 +1266,12 @@ describe('Browse', () => {
                 const requestedPage = parsed.searchParams.get('page') ?? '1';
                 const nextValue = requestedPage === cursorY ? 'cursor-z' : cursorY;
                 return Promise.resolve({
-                    data: createMockBrowseResponse(requestedPage, nextValue),
+                    data: {
+                        ...createMockBrowseResponse(requestedPage, nextValue),
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
                 });
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -1149,5 +1328,370 @@ describe('Browse', () => {
 
         expect(browseCalls[browseCalls.length - 1]).toContain(`/api/browse?page=${cursorY}`);
         expect(vm.currentPage).toBe(cursorY);
+    });
+
+    it('new tab does not auto-load until service is selected', async () => {
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({ data: [] });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            { key: 'wallhaven', label: 'Wallhaven' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        mockAxios.post.mockResolvedValue({
+            data: {
+                id: 1,
+                label: 'Browse 1',
+                query_params: {},
+                file_ids: [],
+                position: 0,
+            },
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Create a new tab
+        await vm.createTab();
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait longer for tab switching
+
+        expect(vm.activeTabId).toBe(1);
+
+        // Wait for switchTab to complete
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        expect(vm.hasServiceSelected).toBe(false);
+        expect(vm.loadAtPage).toBe(null); // Should not auto-load
+        expect(vm.items.length).toBe(0);
+
+        // Verify no browse API calls were made for loading items (only service fetch should happen)
+        // fetchServices() calls /api/browse?page=1&limit=1 to get services list - that's expected
+        // But no calls should be made to actually load items (which would have source= parameter)
+        const itemLoadingCalls = mockAxios.get.mock.calls
+            .map(call => call[0])
+            .filter((callUrl: string) => {
+                const url = callUrl as string;
+                // Only count calls that would load items (have source parameter)
+                // Service fetch calls have limit=1 and no source
+                return url.includes('/api/browse') &&
+                    url.includes('source=');
+            });
+        expect(itemLoadingCalls.length).toBe(0);
+    });
+
+    it('applies selected service and triggers loading', async () => {
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: 1,
+                        label: 'Test Tab',
+                        query_params: {},
+                        file_ids: [],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                const parsed = new URL(url, 'http://localhost');
+                const source = parsed.searchParams.get('source');
+                return Promise.resolve({
+                    data: {
+                        items: [
+                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                        ],
+                        nextPage: 'cursor-2',
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            { key: 'wallhaven', label: 'Wallhaven' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        mockAxios.put.mockResolvedValue({});
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        expect(vm.activeTabId).toBe(1);
+        expect(vm.hasServiceSelected).toBe(false);
+
+        // Select a service
+        vm.selectedService = 'civit-ai-images';
+        await wrapper.vm.$nextTick();
+
+        // Apply service
+        await vm.applyService();
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for masonry to render and trigger load
+
+        // Verify service was applied
+        const activeTab = vm.getActiveTab();
+        expect(activeTab.queryParams.service).toBe('civit-ai-images');
+        expect(vm.loadAtPage).toBe(1); // Should trigger load
+        expect(vm.hasServiceSelected).toBe(true); // Service should be selected
+
+        // Verify masonry is rendered
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+
+        // Manually trigger load if masonry hasn't loaded yet (for test environment)
+        // In real usage, masonry watches loadAtPage and auto-loads
+        if (vm.masonry && vm.loadAtPage !== null && vm.items.length === 0) {
+            // Simulate masonry triggering getNextPage
+            await vm.getNextPage(vm.loadAtPage);
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+        }
+
+        // Verify browse API was called with service parameter
+        // Filter out the fetchServices call (which uses limit=1) and check the actual image loading call
+        const browseCalls = mockAxios.get.mock.calls
+            .map(call => call[0])
+            .filter((callUrl: string) => {
+                // Only include /api/browse calls (not /api/browse-tabs)
+                // Exclude fetchServices call (limit=1) and services endpoint
+                return typeof callUrl === 'string'
+                    && callUrl.includes('/api/browse?')
+                    && !callUrl.includes('/api/browse-tabs')
+                    && !callUrl.includes('limit=1'); // Exclude fetchServices call
+            });
+        expect(browseCalls.length).toBeGreaterThan(0);
+        // Check the last call (the actual image loading call after applying service)
+        const lastCall = browseCalls[browseCalls.length - 1];
+        expect(lastCall).toContain('source=civit-ai-images');
+    });
+
+    it('restores service when switching to tab with saved service', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [
+                        {
+                            id: tab1Id,
+                            label: 'Tab 1',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            position: 0,
+                        },
+                        {
+                            id: tab2Id,
+                            label: 'Tab 2',
+                            query_params: { service: 'wallhaven', page: 1 },
+                            file_ids: [],
+                            position: 1,
+                        },
+                    ],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            { key: 'wallhaven', label: 'Wallhaven' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // First tab should be active with its service
+        expect(vm.activeTabId).toBe(tab1Id);
+        expect(vm.currentTabService).toBe('civit-ai-images');
+        expect(vm.selectedService).toBe('civit-ai-images');
+
+        // Switch to second tab
+        await vm.switchTab(tab2Id);
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Second tab should have its service restored
+        expect(vm.activeTabId).toBe(tab2Id);
+        expect(vm.currentTabService).toBe('wallhaven');
+        expect(vm.selectedService).toBe('wallhaven');
+    });
+
+    it('includes service parameter in browse API calls', async () => {
+        const tabId = 1;
+
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Test Tab',
+                        query_params: { service: 'wallhaven', page: 1 },
+                        file_ids: [],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [
+                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                        ],
+                        nextPage: 'cursor-2',
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            { key: 'wallhaven', label: 'Wallhaven' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Reset restoration flag to allow loading
+        vm.isTabRestored = false;
+        vm.loadAtPage = 1;
+
+        // Trigger getNextPage
+        await vm.getNextPage(1);
+        await flushPromises();
+
+        // Verify browse API was called with service parameter
+        const browseCalls = mockAxios.get.mock.calls
+            .map(call => call[0])
+            .filter((callUrl: string) => callUrl.includes('/api/browse') && !callUrl.includes('services'));
+
+        expect(browseCalls.length).toBeGreaterThan(0);
+        const lastCall = browseCalls[browseCalls.length - 1];
+        expect(lastCall).toContain('source=wallhaven');
+    });
+
+    it('registers backfill event handlers on masonry component', async () => {
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: 1,
+                        label: 'Test Tab',
+                        query_params: { service: 'civit-ai-images', page: 1 },
+                        file_ids: [],
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Verify backfill handlers exist
+        expect(typeof vm.onBackfillStart).toBe('function');
+        expect(typeof vm.onBackfillTick).toBe('function');
+        expect(typeof vm.onBackfillStop).toBe('function');
+        expect(typeof vm.onBackfillRetryStart).toBe('function');
+        expect(typeof vm.onBackfillRetryTick).toBe('function');
+        expect(typeof vm.onBackfillRetryStop).toBe('function');
+
+        // Verify backfill state exists
+        expect(vm.backfill).toBeDefined();
+        expect(vm.backfill.active).toBe(false);
+        expect(vm.backfill.fetched).toBe(0);
+        expect(vm.backfill.target).toBe(0);
     });
 });

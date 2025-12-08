@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'civitai' => [
+        'key' => env('CIVITAI_API_KEY'),
+    ],
+
+    'wallhaven' => [
+        'key' => env('WALLHAVEN_API_KEY'),
+        'user_agent' => env('WALLHAVEN_USER_AGENT', 'Atlas/1.0 (+https://wallhaven.cc)'),
+    ],
+
 ];

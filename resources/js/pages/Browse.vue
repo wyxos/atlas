@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, reactive } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 import { Loader2, Plus } from 'lucide-vue-next';
 import Pill from '../components/ui/Pill.vue';
 import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useBrowseTabs, type MasonryItem, type BrowseTabData } from '../composables/useBrowseTabs';
 
 type GetPageResult = {
@@ -22,8 +23,170 @@ const isTabRestored = ref(false); // Track if we restored from a tab to prevent 
 const pendingRestoreNextCursor = ref<string | number | null>(null); // Holds the saved cursor we should load first after restoring a tab
 const isPanelMinimized = ref(false);
 
+// Service selection state
+const availableServices = ref<Array<{ key: string; label: string; defaults?: Record<string, any> }>>([]);
+const selectedService = ref<string>(''); // Service selected in UI (not yet applied)
+const isApplyingService = ref(false);
+
+// Backfill progress state driven by Masonry events
+const backfill = reactive({
+    active: false,
+    fetched: 0,
+    target: 0,
+    calls: 0,
+    // normal fill wait (between successive successful calls)
+    waiting: false,
+    waitTotalMs: 0,
+    waitRemainingMs: 0,
+    // retry wait state
+    retryActive: false,
+    retryAttempt: 0,
+    retryMax: 3,
+    retryWaitTotalMs: 0,
+    retryWaitRemainingMs: 0,
+});
+
 // Computed property to display page value (defaults to 1 if null)
 const displayPage = computed(() => currentPage.value ?? 1);
+
+// Get current tab's service
+const currentTabService = computed(() => {
+    if (!activeTabId.value) return null;
+    const tab = getActiveTab();
+    return tab?.queryParams?.service as string | null;
+});
+
+// Check if current tab has a service selected
+const hasServiceSelected = computed(() => {
+    const service = currentTabService.value;
+    return typeof service === 'string' && service.length > 0;
+});
+
+// Fetch available services
+async function fetchServices(): Promise<void> {
+    try {
+        // Fetch services from browse endpoint (will return services metadata)
+        const response = await window.axios.get('/api/browse?page=1&limit=1');
+        availableServices.value = response.data.services || [];
+
+        // Fallback to default services if none returned
+        if (availableServices.value.length === 0) {
+            availableServices.value = [
+                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                { key: 'wallhaven', label: 'Wallhaven' },
+            ];
+        }
+    } catch (error) {
+        console.error('Failed to fetch services:', error);
+        // Fallback to default services
+        availableServices.value = [
+            { key: 'civit-ai-images', label: 'CivitAI Images' },
+            { key: 'wallhaven', label: 'Wallhaven' },
+        ];
+    }
+}
+
+// Apply selected service to current tab
+async function applyService(): Promise<void> {
+    if (!activeTabId.value || !selectedService.value || isApplyingService.value) {
+        return;
+    }
+
+    isApplyingService.value = true;
+    try {
+        const tab = getActiveTab();
+        if (!tab) {
+            return;
+        }
+
+        // Update tab's queryParams with service
+        const updatedQueryParams = {
+            ...tab.queryParams,
+            service: selectedService.value,
+            page: 1, // Reset to page 1 when changing service
+            next: null,
+        };
+
+        // Clear existing items and reset pagination
+        items.value = [];
+        currentPage.value = 1;
+        nextCursor.value = null;
+        loadAtPage.value = 1;
+
+        // Update tab
+        updateActiveTab([], [], updatedQueryParams);
+
+        // Reset masonry and trigger load
+        if (masonry.value) {
+            if (masonry.value.isLoading) {
+                masonry.value.cancelLoad();
+            }
+            masonry.value.destroy();
+        }
+
+        await nextTick();
+
+        // Trigger initial load
+        if (masonry.value && loadAtPage.value !== null) {
+            // Masonry will auto-load when loadAtPage is set
+        }
+    } catch (error) {
+        console.error('Failed to apply service:', error);
+    } finally {
+        isApplyingService.value = false;
+        selectedService.value = ''; // Clear selection after applying
+    }
+}
+
+// Backfill event handlers
+function onBackfillStart(payload: { target: number; fetched: number; calls?: number }): void {
+    backfill.active = true;
+    backfill.target = payload.target;
+    backfill.fetched = payload.fetched;
+    backfill.calls = payload.calls ?? 0;
+    backfill.waiting = false;
+}
+
+function onBackfillTick(payload: { fetched: number; target: number; calls?: number; remainingMs: number; totalMs: number }): void {
+    backfill.active = true;
+    backfill.fetched = payload.fetched;
+    backfill.target = payload.target;
+    backfill.calls = payload.calls ?? backfill.calls;
+    backfill.waiting = true;
+    backfill.waitRemainingMs = payload.remainingMs;
+    backfill.waitTotalMs = payload.totalMs;
+}
+
+function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
+    backfill.active = false;
+    backfill.waiting = false;
+    if (payload.fetched != null) backfill.fetched = payload.fetched;
+    if (payload.calls != null) backfill.calls = payload.calls;
+    backfill.waitRemainingMs = 0;
+    backfill.waitTotalMs = 0;
+}
+
+function onBackfillRetryStart(payload: { attempt: number; max: number; totalMs: number }): void {
+    backfill.retryActive = true;
+    backfill.retryAttempt = payload.attempt;
+    backfill.retryMax = payload.max;
+    backfill.retryWaitTotalMs = payload.totalMs;
+    backfill.retryWaitRemainingMs = payload.totalMs;
+}
+
+function onBackfillRetryTick(payload: { attempt: number; remainingMs: number; totalMs: number }): void {
+    backfill.retryActive = true;
+    backfill.retryAttempt = payload.attempt;
+    backfill.retryWaitRemainingMs = payload.remainingMs;
+    backfill.retryWaitTotalMs = payload.totalMs;
+}
+
+function onBackfillRetryStop(): void {
+    backfill.retryActive = false;
+    backfill.retryAttempt = 0;
+    backfill.retryWaitTotalMs = 0;
+    backfill.retryWaitRemainingMs = 0;
+}
 
 // Tab switching function - needs to stay here as it interacts with masonry
 async function switchTab(tabId: number): Promise<void> {
@@ -44,6 +207,10 @@ async function switchTab(tabId: number): Promise<void> {
     activeTabId.value = tabId;
     const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
     isTabRestored.value = tabHasRestorableItems;
+
+    // Restore selected service for UI
+    const serviceFromQuery = tab.queryParams?.service as string | null;
+    selectedService.value = serviceFromQuery || '';
 
     // Restore both page and next from queryParams (service handles format conversion)
     // IMPORTANT: Always restore from saved queryParams - don't default to 1 if the tab has been scrolled
@@ -81,14 +248,19 @@ async function switchTab(tabId: number): Promise<void> {
     }
 
     // Set loadAtPage and prepare for masonry initialization
+    // IMPORTANT: Only auto-load if tab has a service selected
+    // Check if service exists and is a non-empty string
+    const serviceValue = tab.queryParams?.service;
+    const hasService = typeof serviceValue === 'string' && serviceValue.length > 0;
+
     if (tab.itemsData && tab.itemsData.length > 0) {
         // We have pre-loaded items - set loadAtPage to null to prevent auto-load
         // We'll use masonry.init() to properly set up pagination state
         loadAtPage.value = null;
         // Clear items first - init() will add them back
         items.value = [];
-    } else {
-        // No items - check if we have query params to restore, otherwise start from beginning
+    } else if (hasService) {
+        // Tab has service - check if we have query params to restore, otherwise start from beginning
         // Note: currentPage and nextCursor are already set from query params above, don't reset them
         if (pageFromQuery !== undefined && pageFromQuery !== null) {
             // We have a page from query params, use it for loading
@@ -98,6 +270,10 @@ async function switchTab(tabId: number): Promise<void> {
             loadAtPage.value = 1;
             // currentPage is already set to 1 above if no query params, so no need to reset
         }
+        items.value = [];
+    } else {
+        // No service selected - don't auto-load
+        loadAtPage.value = null;
         items.value = [];
     }
 
@@ -165,6 +341,14 @@ const layout = {
 };
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
+    // IMPORTANT: Don't load if no service is selected
+    if (!hasServiceSelected.value) {
+        return {
+            items: [],
+            nextPage: null,
+        };
+    }
+
     // If we're restoring a tab and already have items, and masonry is trying to load page 1,
     // If we're restoring a tab and already have items, prevent any loading
     // Masonry should only load when user scrolls to bottom, not during restoration
@@ -186,6 +370,12 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     // Always pass as 'page' parameter - service will handle conversion
     const url = new URL('/api/browse', window.location.origin);
     url.searchParams.set('page', String(pageToRequest));
+
+    // Include service parameter if available
+    const currentService = currentTabService.value;
+    if (currentService) {
+        url.searchParams.set('source', currentService);
+    }
 
     const response = await window.axios.get(url.toString());
     const data = response.data;
@@ -254,8 +444,14 @@ async function loadTabs(): Promise<void> {
 
 // Initialize on mount
 onMounted(async () => {
+    // Fetch available services first (in parallel with tabs for faster loading)
+    const servicesPromise = fetchServices();
+
     // Load tabs - loadTabs will set the first tab as active if tabs exist
-    await loadTabs();
+    const tabsPromise = loadTabs();
+
+    // Wait for both to complete
+    await Promise.all([servicesPromise, tabsPromise]);
 });
 </script>
 
@@ -279,19 +475,56 @@ onMounted(async () => {
                 </template>
             </TabPanel>
             <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col">
+                <!-- Service Selection Header -->
+                <div v-if="activeTabId !== null"
+                    class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
+                    data-test="service-selection-header">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-1">
+                            <Select v-model="selectedService" :disabled="isApplyingService">
+                                <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
+                                    <SelectValue
+                                        :placeholder="hasServiceSelected ? (availableServices.find(s => s.key === currentTabService)?.label || currentTabService) : 'Select a service...'" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="service in availableServices" :key="service.key"
+                                        :value="service.key" data-test="service-select-item">
+                                        {{ service.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button @click="applyService"
+                            :disabled="!selectedService || isApplyingService || selectedService === currentTabService"
+                            size="sm" data-test="apply-service-button">
+                            <Loader2 v-if="isApplyingService" :size="14" class="mr-2 animate-spin" />
+                            Apply
+                        </Button>
+                    </div>
+                </div>
+
                 <!-- Masonry Content -->
                 <div class="flex-1 min-h-0">
-                    <Masonry v-if="activeTabId !== null" :key="activeTabId" ref="masonry" v-model:items="items"
-                        :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
-                        :mobile-breakpoint="768" :skip-initial-load="items.length > 0" data-test="masonry-component" />
+                    <Masonry v-if="activeTabId !== null && hasServiceSelected" :key="activeTabId" ref="masonry"
+                        v-model:items="items" :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout"
+                        layout-mode="auto" :mobile-breakpoint="768" :skip-initial-load="items.length > 0"
+                        :backfill-enabled="true" :backfill-delay-ms="2000" :backfill-max-calls="Infinity"
+                        @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
+                        @backfill:stop="onBackfillStop" @backfill:retry-start="onBackfillRetryStart"
+                        @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
+                        data-test="masonry-component" />
+                    <div v-else-if="activeTabId !== null && !hasServiceSelected"
+                        class="flex items-center justify-center h-full" data-test="no-service-message">
+                        <p class="text-twilight-indigo-300 text-lg">Select a service to start browsing</p>
+                    </div>
                     <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
                         <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                     </div>
                 </div>
 
                 <!-- Status/Pagination Info at Bottom -->
-                <div v-if="activeTabId !== null" class="my-2 flex flex-wrap items-center justify-center gap-3"
-                    data-test="pagination-info">
+                <div v-if="activeTabId !== null && hasServiceSelected"
+                    class="my-2 flex flex-wrap items-center justify-center gap-3" data-test="pagination-info">
                     <!-- Count Pill -->
                     <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
                     <!-- Current Page Pill -->
@@ -312,6 +545,45 @@ onMounted(async () => {
                             <span v-else>Ready</span>
                         </template>
                     </Pill>
+                    <!-- Backfill Progress Pills -->
+                    <div v-if="backfill.active" class="flex items-center gap-2" data-test="backfill-active-pill">
+                        <Loader2 :size="16" class="animate-spin text-amber-500" />
+                        <span class="font-semibold">filling</span>
+                        <span class="font-medium text-foreground">{{ backfill.fetched }} / {{ backfill.target }} ({{
+                            backfill.calls }} calls)</span>
+                    </div>
+                    <div v-if="backfill.waiting" class="flex min-w-[220px] items-center gap-2"
+                        data-test="backfill-waiting-pill">
+                        <Loader2 :size="16" class="animate-spin text-amber-500" />
+                        <div class="flex w-40 flex-col gap-1">
+                            <div class="h-2 w-full overflow-hidden rounded bg-muted">
+                                <div class="h-full bg-primary transition-[width] duration-100" :style="{
+                                    width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
+                                }" />
+                            </div>
+                            <div class="text-[11px] text-muted-foreground">next in {{ (backfill.waitRemainingMs /
+                                1000).toFixed(1) }}s</div>
+                        </div>
+                    </div>
+                    <div v-if="backfill.retryActive" class="flex min-w-[260px] items-center gap-2"
+                        data-test="backfill-retry-pill">
+                        <Loader2 :size="16" class="animate-spin text-orange-500" />
+                        <div class="flex w-48 flex-col gap-1">
+                            <div class="h-2 w-full overflow-hidden rounded bg-muted">
+                                <div class="h-full bg-orange-500 transition-[width] duration-100" :style="{
+                                    width:
+                                        Math.max(
+                                            0,
+                                            100 - Math.round((backfill.retryWaitRemainingMs / Math.max(1, backfill.retryWaitTotalMs)) * 100),
+                                        ) + '%',
+                                }" />
+                            </div>
+                            <div class="text-[11px] text-muted-foreground">
+                                retry {{ backfill.retryAttempt }} / {{ backfill.retryMax }} in {{
+                                    (backfill.retryWaitRemainingMs / 1000).toFixed(1) }}s
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

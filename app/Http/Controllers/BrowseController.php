@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 class BrowseController extends Controller
 {
     /**
-     * Get a page of browse items from CivitAI.
+     * Get a page of browse items from the selected service (CivitAI, Wallhaven, etc.).
      */
     public function index(): JsonResponse
     {
@@ -25,6 +25,7 @@ class BrowseController extends Controller
         return response()->json([
             'items' => $items,
             'nextPage' => $payload['filter']['next'] ?? null, // Return cursor as nextPage for frontend
+            'services' => $payload['services'] ?? [], // Return available services
         ]);
     }
 }

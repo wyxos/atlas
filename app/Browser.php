@@ -3,8 +3,10 @@
 namespace App;
 
 use App\Models\File;
+use App\Services\BaseService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
+use App\Services\Wallhaven;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Storage;
 
@@ -31,8 +33,21 @@ class Browser
         $params = request()->all();
         $source = (string) ($params['source'] ?? CivitAiImages::key());
 
-        // For now, we only support CivitAI Images
-        $service = new CivitAiImages;
+        // Get available services
+        $services = $this->getAvailableServices();
+        $servicesMeta = [];
+        foreach ($services as $key => $serviceClass) {
+            $serviceInstance = app($serviceClass);
+            $servicesMeta[] = [
+                'key' => $serviceInstance::key(),
+                'label' => $serviceInstance::label(),
+                'defaults' => $serviceInstance->defaultParams(),
+            ];
+        }
+
+        // Resolve service instance
+        $serviceClass = $services[$source] ?? $services[CivitAiImages::key()] ?? CivitAiImages::class;
+        $service = app($serviceClass);
 
         if (method_exists($service, 'setParams')) {
             $service->setParams($params);
@@ -134,6 +149,20 @@ class Browser
                 'next' => $filter['next'] ?? null,
             ],
             'error' => $serviceError,
+            'services' => $servicesMeta,
+        ];
+    }
+
+    /**
+     * Get available browse services.
+     *
+     * @return array<string, class-string<BaseService>>
+     */
+    protected function getAvailableServices(): array
+    {
+        return [
+            CivitAiImages::key() => CivitAiImages::class,
+            Wallhaven::key() => Wallhaven::class,
         ];
     }
 }
