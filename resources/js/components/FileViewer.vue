@@ -40,6 +40,7 @@ const isNavigating = ref(false); // Track if we're navigating between images
 const isBottomPanelOpen = ref(false); // Track if bottom panel is open
 const imageTranslateX = ref(0); // Translate X for slide animation
 const navigationDirection = ref<'left' | 'right' | null>(null); // Track navigation direction
+const currentNavigationTarget = ref<number | null>(null); // Track current navigation target to cancel stale preloads
 
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
@@ -445,29 +446,31 @@ async function openFromClick(e: MouseEvent): Promise<void> {
 
 // Navigate to next image
 async function navigateToNext(): Promise<void> {
-    if (!overlayRect.value || !overlayFillComplete.value || isNavigating.value || currentItemIndex.value === null) return;
+    if (!overlayRect.value || !overlayFillComplete.value || currentItemIndex.value === null) return;
     if (currentItemIndex.value >= props.items.length - 1) return; // Already at last item
 
     const nextIndex = currentItemIndex.value + 1;
     // Update index immediately - both carousel and fileviewer animate together
     currentItemIndex.value = nextIndex;
-    await navigateToIndex(nextIndex, 'right');
+    // Don't await - allow rapid navigation
+    navigateToIndex(nextIndex, 'right');
 }
 
 // Navigate to previous image
 async function navigateToPrevious(): Promise<void> {
-    if (!overlayRect.value || !overlayFillComplete.value || isNavigating.value || currentItemIndex.value === null) return;
+    if (!overlayRect.value || !overlayFillComplete.value || currentItemIndex.value === null) return;
     if (currentItemIndex.value <= 0) return; // Already at first item
 
     const prevIndex = currentItemIndex.value - 1;
     // Update index immediately - both carousel and fileviewer animate together
     currentItemIndex.value = prevIndex;
-    await navigateToIndex(prevIndex, 'left');
+    // Don't await - allow rapid navigation
+    navigateToIndex(prevIndex, 'left');
 }
 
 // Navigate to a specific index
 async function navigateToIndex(index: number, direction?: 'left' | 'right'): Promise<void> {
-    if (!overlayRect.value || !overlayFillComplete.value || isNavigating.value) return;
+    if (!overlayRect.value || !overlayFillComplete.value) return;
     if (index < 0 || index >= props.items.length) return;
 
     const tabContent = props.containerRef;
@@ -479,6 +482,8 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     }
     navigationDirection.value = direction || 'right';
 
+    // Set current navigation target - this will cancel any stale preloads
+    currentNavigationTarget.value = index;
     isNavigating.value = true;
 
     // Note: currentItemIndex is already updated in navigateToNext/navigateToPrevious
@@ -542,12 +547,29 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     await nextTick(); // Ensure DOM updates before continuing
 
     // Step 3: Preload the full-size image
+    // Check if navigation target has changed (user spammed navigation)
+    const preloadTarget = index;
     try {
         const imageDimensions = await preloadImage(nextFullSizeUrl);
+
+        // Cancel if navigation target changed during preload
+        if (currentNavigationTarget.value !== preloadTarget) {
+            isNavigating.value = false;
+            overlayIsAnimating.value = false;
+            return;
+        }
+
         originalImageDimensions.value = imageDimensions;
         overlayFullSizeImage.value = nextFullSizeUrl;
 
         // Step 4: Calculate best-fit size BEFORE switching to full-size image
+        // Check again if navigation target changed
+        if (currentNavigationTarget.value !== preloadTarget) {
+            isNavigating.value = false;
+            overlayIsAnimating.value = false;
+            return;
+        }
+
         const tabContentBox = tabContent.getBoundingClientRect();
         const containerWidth = tabContentBox.width;
         const containerHeight = tabContentBox.height;
@@ -582,6 +604,13 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         // Wait for DOM to update with new image size/position
         await nextTick();
 
+        // Check again before continuing with animation
+        if (currentNavigationTarget.value !== preloadTarget) {
+            isNavigating.value = false;
+            overlayIsAnimating.value = false;
+            return;
+        }
+
         // Use requestAnimationFrame to ensure the new image element is rendered at scale 0
         // before we start the scale-up animation
         await new Promise(resolve => {
@@ -591,6 +620,13 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
                 });
             });
         });
+
+        // Check again before switching to full-size image
+        if (currentNavigationTarget.value !== preloadTarget) {
+            isNavigating.value = false;
+            overlayIsAnimating.value = false;
+            return;
+        }
 
         // Now switch to full-size image (still at scale 0)
         overlayIsLoading.value = false;
@@ -611,11 +647,25 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
             });
         });
 
+        // Final check before animating
+        if (currentNavigationTarget.value !== preloadTarget) {
+            isNavigating.value = false;
+            overlayIsAnimating.value = false;
+            return;
+        }
+
         // Now slide image in from the side
         imageTranslateX.value = 0;
 
         // Wait for scale animation to complete
         await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Final check before marking navigation complete
+        if (currentNavigationTarget.value !== preloadTarget) {
+            isNavigating.value = false;
+            overlayIsAnimating.value = false;
+            return;
+        }
     } catch (error) {
         console.warn('Failed to preload next image:', error);
         overlayFullSizeImage.value = nextImageSrc;
