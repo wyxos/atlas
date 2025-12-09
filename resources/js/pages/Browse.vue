@@ -478,47 +478,42 @@ onMounted(async () => {
                         data-test="next-pill" />
                     <!-- Status Pill -->
                     <Pill :label="'Status'" :value="masonry?.isLoading ? 'Loading...' : 'Ready'"
-                        :variant="masonry?.isLoading ? 'primary' : 'success'" reversed data-test="status-pill">
+                        :variant="masonry?.isLoading ? 'danger' : 'success'" reversed data-test="status-pill">
                         <template #value>
-                            <Loader2 v-if="masonry?.isLoading" :size="14" class="animate-spin" />
+                            <span v-if="masonry?.isLoading" class="flex items-center gap-2">
+                                <Loader2 :size="14" class="animate-spin" />
+                                <span>Loading...</span>
+                            </span>
                             <span v-else>Ready</span>
                         </template>
                     </Pill>
                     <!-- Backfill Progress Pills -->
                     <span v-if="backfill.active"
-                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500 px-3 py-1 text-xs"
+                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500"
                         data-test="backfill-active-pill">
                         <span
                             class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
                             <Loader2 :size="14" class="animate-spin" />
-                            <span>Filling</span>
+                            <span>{{ backfill.waiting ? 'Waiting' : 'Filling' }}</span>
                         </span>
                         <span
-                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100">
-                            {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} calls)
-                        </span>
-                    </span>
-                    <span v-if="backfill.waiting"
-                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500 min-w-[220px]"
-                        data-test="backfill-waiting-pill">
-                        <span
-                            class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
-                            <Loader2 :size="14" class="animate-spin" />
-                            <span>Waiting</span>
-                        </span>
-                        <span
-                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex-1 flex flex-col gap-1">
-                            <div class="h-2 w-full overflow-hidden rounded bg-muted">
-                                <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
-                                    width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
-                                }" />
-                            </div>
-                            <div class="text-[11px] text-warning-100/70">next in {{ (backfill.waitRemainingMs /
-                                1000).toFixed(1) }}s</div>
+                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex items-center gap-3">
+                            <span v-if="!backfill.waiting">
+                                {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} calls)
+                            </span>
+                            <template v-else>
+                                <div class="h-2 w-20 overflow-hidden rounded bg-muted">
+                                    <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
+                                        width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
+                                    }" />
+                                </div>
+                                <span class="text-xs text-warning-100">next in {{ (backfill.waitRemainingMs /
+                                    1000).toFixed(1) }}s</span>
+                            </template>
                         </span>
                     </span>
                     <span v-if="backfill.retryActive"
-                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500 min-w-[260px]"
+                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500"
                         data-test="backfill-retry-pill">
                         <span
                             class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
@@ -526,8 +521,8 @@ onMounted(async () => {
                             <span>Retry</span>
                         </span>
                         <span
-                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex-1 flex flex-col gap-1">
-                            <div class="h-2 w-full overflow-hidden rounded bg-muted">
+                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex items-center gap-3">
+                            <div class="h-2 w-20 overflow-hidden rounded bg-muted">
                                 <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
                                     width:
                                         Math.max(
@@ -536,10 +531,10 @@ onMounted(async () => {
                                         ) + '%',
                                 }" />
                             </div>
-                            <div class="text-[11px] text-warning-100/70">
+                            <span class="text-xs text-warning-100">
                                 retry {{ backfill.retryAttempt }} / {{ backfill.retryMax }} in {{
                                     (backfill.retryWaitRemainingMs / 1000).toFixed(1) }}s
-                            </div>
+                            </span>
                         </span>
                     </span>
                 </div>
