@@ -2647,5 +2647,413 @@ describe('Browse', () => {
             expect(fileViewerVm.overlayImage).toBeNull();
         });
 
+        it('navigates to next image when pressing ArrowRight key', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                {
+                                    id: 1,
+                                    width: 100,
+                                    height: 100,
+                                    page: 1,
+                                    index: 0,
+                                    src: 'test1.jpg',
+                                    originalUrl: 'test1-full.jpg',
+                                },
+                                {
+                                    id: 2,
+                                    width: 200,
+                                    height: 200,
+                                    page: 1,
+                                    index: 1,
+                                    src: 'test2.jpg',
+                                    originalUrl: 'test2-full.jpg',
+                                },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            
+            // Set items on Browse component (FileViewer receives this as prop)
+            vm.items = [
+                {
+                    id: 1,
+                    width: 100,
+                    height: 100,
+                    page: 1,
+                    index: 0,
+                    src: 'test1.jpg',
+                    originalUrl: 'test1-full.jpg',
+                },
+                {
+                    id: 2,
+                    width: 200,
+                    height: 200,
+                    page: 1,
+                    index: 1,
+                    src: 'test2.jpg',
+                    originalUrl: 'test2-full.jpg',
+                },
+            ];
+            
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state (filled and complete)
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.imageScale = 1;
+            fileViewerVm.overlayFullSizeImage = 'test1-full.jpg';
+            fileViewerVm.overlayIsLoading = false;
+            fileViewerVm.overlayImageSize = { width: 400, height: 400 };
+            fileViewerVm.imageCenterPosition = { top: 100, left: 200 };
+            
+            // Ensure containerRef is set (needed for navigation)
+            const tabContentContainer = wrapper.find('[ref="tabContentContainer"]');
+            if (tabContentContainer.exists()) {
+                fileViewerVm.containerRef = tabContentContainer.element;
+            }
+            
+            await wrapper.vm.$nextTick();
+
+            // Verify initial state
+            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerVm.imageScale).toBe(1);
+
+            // Simulate ArrowRight key press
+            const arrowRightEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
+            window.dispatchEvent(arrowRightEvent);
+
+            // Wait for navigation to start (async function)
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Verify navigation started (image should start shrinking)
+            expect(fileViewerVm.isNavigating).toBe(true);
+            expect(fileViewerVm.imageScale).toBe(0);
+            
+            // Note: Full navigation completion requires image preloading which may fail in test environment
+            // The important part is that navigation starts correctly when ArrowRight is pressed
+        });
+
+        it('navigates to previous image when pressing ArrowLeft key', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                {
+                                    id: 1,
+                                    width: 100,
+                                    height: 100,
+                                    page: 1,
+                                    index: 0,
+                                    src: 'test1.jpg',
+                                    originalUrl: 'test1-full.jpg',
+                                },
+                                {
+                                    id: 2,
+                                    width: 200,
+                                    height: 200,
+                                    page: 1,
+                                    index: 1,
+                                    src: 'test2.jpg',
+                                    originalUrl: 'test2-full.jpg',
+                                },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            
+            // Set items on Browse component
+            vm.items = [
+                {
+                    id: 1,
+                    width: 100,
+                    height: 100,
+                    page: 1,
+                    index: 0,
+                    src: 'test1.jpg',
+                    originalUrl: 'test1-full.jpg',
+                },
+                {
+                    id: 2,
+                    width: 200,
+                    height: 200,
+                    page: 1,
+                    index: 1,
+                    src: 'test2.jpg',
+                    originalUrl: 'test2-full.jpg',
+                },
+            ];
+            
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state (filled and complete, at second item)
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test2.jpg', alt: 'Test 2' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 1;
+            fileViewerVm.imageScale = 1;
+            fileViewerVm.overlayFullSizeImage = 'test2-full.jpg';
+            fileViewerVm.overlayIsLoading = false;
+            fileViewerVm.overlayImageSize = { width: 400, height: 400 };
+            fileViewerVm.imageCenterPosition = { top: 100, left: 200 };
+            
+            // Ensure containerRef is set
+            const tabContentContainer = wrapper.find('[ref="tabContentContainer"]');
+            if (tabContentContainer.exists()) {
+                fileViewerVm.containerRef = tabContentContainer.element;
+            }
+            
+            await wrapper.vm.$nextTick();
+
+            // Verify initial state
+            expect(fileViewerVm.currentItemIndex).toBe(1);
+            expect(fileViewerVm.imageScale).toBe(1);
+
+            // Simulate ArrowLeft key press
+            const arrowLeftEvent = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true });
+            window.dispatchEvent(arrowLeftEvent);
+
+            // Wait for navigation to start
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Verify navigation started (image should start shrinking)
+            expect(fileViewerVm.isNavigating).toBe(true);
+            expect(fileViewerVm.imageScale).toBe(0);
+            
+            // Note: Full navigation completion requires image preloading which may fail in test environment
+            // The important part is that navigation starts correctly when ArrowLeft is pressed
+        });
+
+        it('does not navigate when at first item and pressing ArrowLeft', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                {
+                                    id: 1,
+                                    width: 100,
+                                    height: 100,
+                                    page: 1,
+                                    index: 0,
+                                    src: 'test1.jpg',
+                                    originalUrl: 'test1-full.jpg',
+                                },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state (filled and complete, at first item)
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.imageScale = 1;
+            await wrapper.vm.$nextTick();
+
+            // Simulate ArrowLeft key press
+            const arrowLeftEvent = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true });
+            window.dispatchEvent(arrowLeftEvent);
+
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify no navigation occurred (still at first item)
+            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerVm.isNavigating).toBe(false);
+            expect(fileViewerVm.imageScale).toBe(1);
+        });
+
+        it('does not navigate when at last item and pressing ArrowRight', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                {
+                                    id: 1,
+                                    width: 100,
+                                    height: 100,
+                                    page: 1,
+                                    index: 0,
+                                    src: 'test1.jpg',
+                                    originalUrl: 'test1-full.jpg',
+                                },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state (filled and complete, at last item)
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0; // Last item (only one item in array)
+            fileViewerVm.imageScale = 1;
+            await wrapper.vm.$nextTick();
+
+            // Simulate ArrowRight key press
+            const arrowRightEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
+            window.dispatchEvent(arrowRightEvent);
+
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify no navigation occurred (still at last item)
+            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerVm.isNavigating).toBe(false);
+            expect(fileViewerVm.imageScale).toBe(1);
+        });
+
     });
 });
