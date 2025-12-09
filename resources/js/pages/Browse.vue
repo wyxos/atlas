@@ -36,49 +36,36 @@ const overlayImageSize = ref<{ width: number; height: number } | null>(null); //
 const overlayIsFilled = ref(false); // Track if overlay has expanded to fill container
 const overlayFillComplete = ref(false); // Track if fill animation has completed (for close button visibility)
 const overlayIsClosing = ref(false); // Track if overlay is closing (shrinking animation)
-const backdropOpacity = ref(0); // Backdrop opacity for smooth fade-in
+const overlayScale = ref(1); // Scale factor for closing animation (1 = normal, 0 = fully shrunk)
 const imageCenterPosition = ref<{ top: number; left: number } | null>(null); // Exact center position when filled
 
 function closeOverlay(): void {
-    if (!overlayRect.value || !overlayImageSize.value) return;
+    if (!overlayRect.value) return;
 
-    // Start closing animation - shrink towards center
+    // Start closing animation - shrink towards center using CSS scale
     overlayIsClosing.value = true;
     overlayIsAnimating.value = true;
 
     // Calculate center position of the container
     const tabContent = tabContentContainer.value;
-    if (tabContent) {
+    if (tabContent && overlayRect.value) {
         const tabContentBox = tabContent.getBoundingClientRect();
         const containerWidth = tabContentBox.width;
         const containerHeight = tabContentBox.height;
 
-        // Calculate center position
-        const centerLeft = Math.round(containerWidth / 2);
-        const centerTop = Math.round(containerHeight / 2);
+        // Calculate center position - move container to center
+        const centerLeft = Math.round((containerWidth - overlayRect.value.width) / 2);
+        const centerTop = Math.round((containerHeight - overlayRect.value.height) / 2);
 
-        // Shrink to center - animate to a small size at center
-        const shrinkSize = Math.min(overlayImageSize.value.width, overlayImageSize.value.height);
-
+        // Move container to center
         overlayRect.value = {
-            top: centerTop - shrinkSize / 2,
-            left: centerLeft - shrinkSize / 2,
-            width: shrinkSize,
-            height: shrinkSize,
+            ...overlayRect.value,
+            top: centerTop,
+            left: centerLeft,
         };
 
-        // Update image position to center of shrinking container
-        // Account for border-2 (2px each side) - flexbox centers within content area
-        const borderWidth = 2; // border-2 = 2px
-        const shrinkContentWidth = shrinkSize - (borderWidth * 2);
-        const shrinkContentHeight = shrinkSize - (borderWidth * 2);
-        imageCenterPosition.value = {
-            top: Math.round((shrinkContentHeight - overlayImageSize.value.height) / 2) + borderWidth,
-            left: Math.round((shrinkContentWidth - overlayImageSize.value.width) / 2) + borderWidth,
-        };
-
-        // Fade out backdrop
-        backdropOpacity.value = 0;
+        // Scale down to 0 - CSS will shrink everything inside proportionally
+        overlayScale.value = 0;
 
         // After animation completes, clear everything
         setTimeout(() => {
@@ -87,7 +74,7 @@ function closeOverlay(): void {
             overlayIsClosing.value = false;
             overlayIsFilled.value = false;
             overlayFillComplete.value = false;
-            backdropOpacity.value = 0;
+            overlayScale.value = 1; // Reset scale
             overlayImageSize.value = null;
             imageCenterPosition.value = null;
             overlayRect.value = null;
@@ -101,7 +88,7 @@ function closeOverlay(): void {
         overlayIsClosing.value = false;
         overlayIsFilled.value = false;
         overlayFillComplete.value = false;
-        backdropOpacity.value = 0;
+        overlayScale.value = 1;
         overlayImageSize.value = null;
         imageCenterPosition.value = null;
         overlayRect.value = null;
@@ -162,10 +149,11 @@ async function onMasonryClick(e: MouseEvent) {
     overlayIsFilled.value = false;
     overlayFillComplete.value = false;
     overlayIsClosing.value = false;
+    overlayScale.value = 1; // Reset scale to normal
 
     // Precalculate flexbox center position for initial (small) container
-    // Flexbox centers within the content area (inside the border), so account for border-2 (2px each side)
-    const borderWidth = 2; // border-2 = 2px
+    // Flexbox centers within the content area (inside the border), so account for border-4 (4px each side)
+    const borderWidth = 4; // border-4 = 4px
     const initialContentWidth = width - (borderWidth * 2);
     const initialContentHeight = height - (borderWidth * 2);
     // Initially image size equals container size (overlayImageSize is set to { width, height })
@@ -182,15 +170,9 @@ async function onMasonryClick(e: MouseEvent) {
     overlayImage.value = { src, srcset, sizes, alt };
     overlayBorderRadius.value = radius || null;
     overlayIsAnimating.value = false;
-    backdropOpacity.value = 0; // Start at 0 for fade-in
 
     // Animate to center after DOM update
     await nextTick();
-
-    // Fade in backdrop smoothly
-    requestAnimationFrame(() => {
-        backdropOpacity.value = 0.75;
-    });
 
     // Use requestAnimationFrame to ensure initial render is complete
     requestAnimationFrame(() => {
@@ -208,8 +190,8 @@ async function onMasonryClick(e: MouseEvent) {
             const centerTop = Math.round((containerHeight - height) / 2);
 
             // Precalculate flexbox center position for centered (small) container
-            // Flexbox centers within the content area (inside the border), so account for border-2 (2px each side)
-            const borderWidth = 2; // border-2 = 2px
+            // Flexbox centers within the content area (inside the border), so account for border-4 (4px each side)
+            const borderWidth = 4; // border-4 = 4px
             const contentWidth = width - (borderWidth * 2);
             const contentHeight = height - (borderWidth * 2);
             const centeredImageLeft = Math.round((contentWidth - overlayImageSize.value.width) / 2) + borderWidth;
@@ -234,8 +216,8 @@ async function onMasonryClick(e: MouseEvent) {
                 if (!tabContent || !overlayRect.value || !overlayImageSize.value) return;
 
                 // Precalculate flexbox center position for full container
-                // Flexbox centers within the content area (inside the border), so account for border-2 (2px each side)
-                const borderWidth = 2; // border-2 = 2px
+                // Flexbox centers within the content area (inside the border), so account for border-4 (4px each side)
+                const borderWidth = 4; // border-4 = 4px
                 const fullContentWidth = containerWidth - (borderWidth * 2);
                 const fullContentHeight = containerHeight - (borderWidth * 2);
                 const fullImageLeft = Math.round((fullContentWidth - overlayImageSize.value.width) / 2) + borderWidth;
@@ -708,15 +690,9 @@ onMounted(async () => {
                     </div>
                 </div>
 
-                <!-- Modal backdrop/mask -->
-                <div v-if="overlayRect && overlayImage"
-                    class="absolute inset-0 bg-black z-40 transition-opacity duration-500 ease-in-out" :style="{
-                        opacity: backdropOpacity,
-                    }" />
-
                 <!-- Click overlay -->
                 <div v-if="overlayRect && overlayImage" :class="[
-                    'absolute z-50 border-2 border-twilight-indigo-500',
+                    'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900',
                     overlayIsFilled && !overlayIsClosing ? '' : 'overflow-hidden pointer-events-none',
                     overlayIsAnimating || overlayIsClosing ? 'transition-all duration-500 ease-in-out' : ''
                 ]" :style="{
@@ -725,6 +701,8 @@ onMounted(async () => {
                     width: overlayRect.width + 'px',
                     height: overlayRect.height + 'px',
                     borderRadius: overlayBorderRadius || undefined,
+                    transform: `scale(${overlayScale})`,
+                    transformOrigin: 'center center',
                 }">
                     <img :key="overlayKey" :src="overlayImage.src" :srcset="overlayImage.srcset"
                         :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
