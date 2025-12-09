@@ -29,14 +29,47 @@ const overlayScale = ref(1); // Scale factor for closing animation (1 = normal, 
 const imageCenterPosition = ref<{ top: number; left: number } | null>(null); // Exact center position when filled
 const overlayIsLoading = ref(false); // Track if full-size image is loading
 const overlayFullSizeImage = ref<string | null>(null); // Full-size image URL once loaded
+const originalImageDimensions = ref<{ width: number; height: number } | null>(null); // Original full-size image dimensions
 
-function preloadImage(url: string): Promise<void> {
+function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
         img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
         img.src = url;
     });
+}
+
+function calculateBestFitSize(
+    originalWidth: number,
+    originalHeight: number,
+    containerWidth: number,
+    containerHeight: number
+): { width: number; height: number } {
+    const aspectRatio = originalWidth / originalHeight;
+    const containerAspectRatio = containerWidth / containerHeight;
+
+    let fitWidth: number;
+    let fitHeight: number;
+
+    if (aspectRatio > containerAspectRatio) {
+        // Image is wider - fit to width
+        fitWidth = containerWidth;
+        fitHeight = containerWidth / aspectRatio;
+    } else {
+        // Image is taller - fit to height
+        fitHeight = containerHeight;
+        fitWidth = containerHeight * aspectRatio;
+    }
+
+    // Ensure dimensions don't exceed container bounds (account for rounding errors)
+    fitWidth = Math.min(fitWidth, containerWidth);
+    fitHeight = Math.min(fitHeight, containerHeight);
+
+    return {
+        width: Math.floor(fitWidth), // Use floor to ensure we don't exceed bounds
+        height: Math.floor(fitHeight),
+    };
 }
 
 function findMasonryItemByImageSrc(imageSrc: string, itemElement: HTMLElement): MasonryItem | null {
@@ -99,6 +132,7 @@ function closeOverlay(): void {
             overlayBorderRadius.value = null;
             overlayIsLoading.value = false;
             overlayFullSizeImage.value = null;
+            originalImageDimensions.value = null;
             emit('close');
         }, 500); // Match transition duration
     } else {
@@ -189,9 +223,11 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     // Wait for DOM update
     await nextTick();
 
-    // Preload the full-size image
+    // Preload the full-size image and get its dimensions
     try {
-        await preloadImage(fullSizeUrl);
+        const imageDimensions = await preloadImage(fullSizeUrl);
+        // Store original dimensions for best-fit calculation
+        originalImageDimensions.value = imageDimensions;
         // Once loaded, update to use full-size image
         overlayFullSizeImage.value = fullSizeUrl;
         overlayIsLoading.value = false;
@@ -204,6 +240,15 @@ async function openFromClick(e: MouseEvent): Promise<void> {
         console.warn('Failed to preload full-size image, using original:', error);
         overlayFullSizeImage.value = src;
         overlayIsLoading.value = false;
+        // Use masonry item dimensions as fallback
+        if (masonryItem) {
+            originalImageDimensions.value = {
+                width: masonryItem.width,
+                height: masonryItem.height,
+            };
+        } else {
+            originalImageDimensions.value = { width, height };
+        }
         await nextTick();
     }
 
@@ -264,15 +309,26 @@ async function openFromClick(e: MouseEvent): Promise<void> {
 
             // After center animation completes (500ms), animate to fill container
             setTimeout(() => {
-                if (!tabContent || !overlayRect.value || !overlayImageSize.value) return;
+                if (!tabContent || !overlayRect.value || !overlayImageSize.value || !originalImageDimensions.value) return;
 
-                // Precalculate flexbox center position for full container
-                // Flexbox centers within the content area (inside the border), so account for border-4 (4px each side)
+                // Calculate best-fit size for the image within the expanded container
                 const borderWidth = 4; // border-4 = 4px
-                const fullContentWidth = containerWidth - (borderWidth * 2);
-                const fullContentHeight = containerHeight - (borderWidth * 2);
-                const fullImageLeft = Math.round((fullContentWidth - overlayImageSize.value.width) / 2) + borderWidth;
-                const fullImageTop = Math.round((fullContentHeight - overlayImageSize.value.height) / 2) + borderWidth;
+                const availableWidth = containerWidth - (borderWidth * 2);
+                const availableHeight = containerHeight - (borderWidth * 2);
+                const bestFitSize = calculateBestFitSize(
+                    originalImageDimensions.value.width,
+                    originalImageDimensions.value.height,
+                    availableWidth,
+                    availableHeight
+                );
+
+                // Update image size to best-fit dimensions
+                overlayImageSize.value = bestFitSize;
+
+                // Precalculate flexbox center position for full container with best-fit image
+                // Ensure image stays within bounds by using floor for positioning
+                const fullImageLeft = Math.floor((availableWidth - bestFitSize.width) / 2) + borderWidth;
+                const fullImageTop = Math.floor((availableHeight - bestFitSize.height) / 2) + borderWidth;
 
                 imageCenterPosition.value = {
                     top: fullImageTop,
@@ -307,8 +363,8 @@ defineExpose({
 <template>
     <!-- Click overlay -->
     <div v-if="overlayRect && overlayImage" :class="[
-        'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900',
-        overlayIsFilled && !overlayIsClosing ? '' : 'overflow-hidden pointer-events-none',
+        'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900 overflow-hidden',
+        overlayIsFilled && !overlayIsClosing ? '' : 'pointer-events-none',
         overlayIsAnimating || overlayIsClosing ? 'transition-all duration-500 ease-in-out' : ''
     ]" :style="{
         top: overlayRect.top + 'px',
@@ -328,16 +384,16 @@ defineExpose({
         <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt" :class="[
             'absolute select-none pointer-events-none',
             overlayIsFilled ? '' : 'object-cover',
-            (overlayIsAnimating || overlayIsClosing) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+            (overlayIsAnimating || overlayIsClosing || overlayIsFilled) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
         ]" :style="overlayImageSize && imageCenterPosition ? {
-                width: overlayImageSize.width + 'px',
-                height: overlayImageSize.height + 'px',
-                top: imageCenterPosition.top + 'px',
-                left: imageCenterPosition.left + 'px',
-            } : overlayImageSize ? {
-                width: overlayImageSize.width + 'px',
-                height: overlayImageSize.height + 'px',
-            } : undefined" draggable="false" />
+            width: overlayImageSize.width + 'px',
+            height: overlayImageSize.height + 'px',
+            top: imageCenterPosition.top + 'px',
+            left: imageCenterPosition.left + 'px',
+        } : overlayImageSize ? {
+            width: overlayImageSize.width + 'px',
+            height: overlayImageSize.height + 'px',
+        } : undefined" draggable="false" />
 
         <!-- Close button -->
         <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"

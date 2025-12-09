@@ -2508,16 +2508,16 @@ describe('Browse', () => {
             fileViewerVm.overlayIsClosing = false;
             await wrapper.vm.$nextTick();
 
-            // When filled and not closing, overflow-hidden should not be applied
+            // overflow-hidden should always be applied to prevent image overlap
             let overlay = wrapper.find('.border-smart-blue-500');
             expect(overlay.exists()).toBe(true);
-            expect(overlay.classes()).not.toContain('overflow-hidden');
+            expect(overlay.classes()).toContain('overflow-hidden');
 
             // Set overlay to closing
             fileViewerVm.overlayIsClosing = true;
             await wrapper.vm.$nextTick();
 
-            // When closing, overflow-hidden should be applied
+            // When closing, overflow-hidden should still be applied
             overlay = wrapper.find('.border-smart-blue-500');
             expect(overlay.exists()).toBe(true);
             expect(overlay.classes()).toContain('overflow-hidden');
