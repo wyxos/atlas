@@ -238,3 +238,145 @@ it('carousel navigation buttons work correctly', function () {
         ->assertNoJavascriptErrors();
 });
 
+it('hides empty boxes when near the end of items', function () {
+    $user = User::factory()->create();
+
+    Http::fake(function ($request) {
+        $url = $request->url();
+
+        if (str_contains($url, 'civitai.com/api/v1/images')) {
+            if (str_contains($url, 'limit=1')) {
+                return Http::response([
+                    'items' => [],
+                    'metadata' => ['nextCursor' => null],
+                ], 200);
+            }
+
+            // Return exactly 8 items to test empty box hiding
+            return Http::response([
+                'items' => collect(range(1, 8))->map(fn ($i) => [
+                    'id' => $i,
+                    'url' => "https://image.civitai.com/test/image{$i}.png",
+                    'meta' => ['width' => 640, 'height' => 640],
+                    'width' => 640,
+                    'height' => 640,
+                    'type' => 'image',
+                    'hash' => "hash{$i}",
+                ])->toArray(),
+                'metadata' => ['nextCursor' => null],
+            ], 200);
+        }
+
+        return Http::response(['items' => [], 'metadata' => ['nextCursor' => null]], 200);
+    });
+
+    $this->actingAs($user);
+
+    $page = visit('/browse')
+        ->click('@create-tab-button')
+        ->wait(2)
+        ->click('@service-select-trigger')
+        ->wait(1)
+        ->click('@service-select-item')
+        ->wait(0.5)
+        ->click('@apply-service-button')
+        ->wait(2)
+        ->click('[data-test^="masonry-item-"]')
+        ->wait(1)
+        ->assertPresent('[data-test="image-carousel"]');
+
+    // Navigate to 4th item before last (index 4 out of 8 items, so item 5)
+    // Should not show empty boxes
+    $page->click('[data-test="carousel-box-4"]')
+        ->wait(0.6);
+
+    // Navigate to 5th item before last (index 3 out of 8 items, so item 4)
+    // Should not show empty boxes
+    $page->click('[data-test="carousel-box-3"]')
+        ->wait(0.6)
+        ->assertNoJavascriptErrors();
+});
+
+it('only triggers loading when clicking on the last item', function () {
+    $user = User::factory()->create();
+    $loadMoreCalled = false;
+
+    Http::fake(function ($request) use (&$loadMoreCalled) {
+        $url = $request->url();
+
+        if (str_contains($url, 'civitai.com/api/v1/images')) {
+            if (str_contains($url, 'limit=1')) {
+                return Http::response([
+                    'items' => [],
+                    'metadata' => ['nextCursor' => null],
+                ], 200);
+            }
+
+            // First request - return 10 items with nextCursor
+            if (!str_contains($url, 'cursor-2')) {
+                return Http::response([
+                    'items' => collect(range(1, 10))->map(fn ($i) => [
+                        'id' => $i,
+                        'url' => "https://image.civitai.com/test/image{$i}.png",
+                        'meta' => ['width' => 640, 'height' => 640],
+                        'width' => 640,
+                        'height' => 640,
+                        'type' => 'image',
+                        'hash' => "hash{$i}",
+                    ])->toArray(),
+                    'metadata' => ['nextCursor' => 'cursor-2'],
+                ], 200);
+            }
+
+            // Second request - return more items
+            $loadMoreCalled = true;
+            return Http::response([
+                'items' => collect(range(11, 15))->map(fn ($i) => [
+                    'id' => $i,
+                    'url' => "https://image.civitai.com/test/image{$i}.png",
+                    'meta' => ['width' => 640, 'height' => 640],
+                    'width' => 640,
+                    'height' => 640,
+                    'type' => 'image',
+                    'hash' => "hash{$i}",
+                ])->toArray(),
+                'metadata' => ['nextCursor' => null],
+            ], 200);
+        }
+
+        return Http::response(['items' => [], 'metadata' => ['nextCursor' => null]], 200);
+    });
+
+    $this->actingAs($user);
+
+    $page = visit('/browse')
+        ->click('@create-tab-button')
+        ->wait(2)
+        ->click('@service-select-trigger')
+        ->wait(1)
+        ->click('@service-select-item')
+        ->wait(0.5)
+        ->click('@apply-service-button')
+        ->wait(2)
+        ->click('[data-test^="masonry-item-"]')
+        ->wait(1)
+        ->assertPresent('[data-test="image-carousel"]');
+
+    // Navigate to second-to-last item (index 8 out of 10 items)
+    // Should NOT trigger loading
+    $page->click('[data-test="carousel-box-8"]')
+        ->wait(1);
+
+    // Verify loading was NOT triggered
+    expect($loadMoreCalled)->toBeFalse();
+
+    // Navigate to last item (index 9 out of 10 items)
+    // Should trigger loading
+    $page->click('[data-test="carousel-box-9"]')
+        ->wait(2); // Wait for loading to complete
+
+    // Verify loading was triggered
+    expect($loadMoreCalled)->toBeTrue();
+
+    $page->assertNoJavascriptErrors();
+});
