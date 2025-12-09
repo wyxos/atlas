@@ -2766,9 +2766,10 @@ describe('Browse', () => {
             await wrapper.vm.$nextTick();
             await new Promise(resolve => setTimeout(resolve, 50));
 
-            // Verify navigation started (image should start shrinking)
+            // Verify navigation started (image should start sliding)
             expect(fileViewerVm.isNavigating).toBe(true);
-            expect(fileViewerVm.imageScale).toBe(0);
+            expect(fileViewerVm.imageTranslateX).not.toBe(0); // Should be sliding out
+            expect(fileViewerVm.navigationDirection).toBe('right');
             
             // Note: Full navigation completion requires image preloading which may fail in test environment
             // The important part is that navigation starts correctly when ArrowRight is pressed
@@ -2893,9 +2894,10 @@ describe('Browse', () => {
             await wrapper.vm.$nextTick();
             await new Promise(resolve => setTimeout(resolve, 50));
 
-            // Verify navigation started (image should start shrinking)
+            // Verify navigation started (image should start sliding)
             expect(fileViewerVm.isNavigating).toBe(true);
-            expect(fileViewerVm.imageScale).toBe(0);
+            expect(fileViewerVm.imageTranslateX).not.toBe(0); // Should be sliding out
+            expect(fileViewerVm.navigationDirection).toBe('left');
             
             // Note: Full navigation completion requires image preloading which may fail in test environment
             // The important part is that navigation starts correctly when ArrowLeft is pressed
