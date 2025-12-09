@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
-import { X, Loader2 } from 'lucide-vue-next';
+import { X, Loader2, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 
 interface Props {
@@ -33,6 +33,7 @@ const originalImageDimensions = ref<{ width: number; height: number } | null>(nu
 const currentItemIndex = ref<number | null>(null); // Track current item index in items array
 const imageScale = ref(1); // Scale factor for individual image (for scale-from-zero animation)
 const isNavigating = ref(false); // Track if we're navigating between images
+const isBottomPanelOpen = ref(false); // Track if bottom panel is open
 
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
@@ -139,6 +140,7 @@ function closeOverlay(): void {
             currentItemIndex.value = null;
             imageScale.value = 1;
             isNavigating.value = false;
+            isBottomPanelOpen.value = false;
             emit('close');
         }, 500); // Match transition duration
     } else {
@@ -156,10 +158,52 @@ function closeOverlay(): void {
         overlayBorderRadius.value = null;
         overlayIsLoading.value = false;
         overlayFullSizeImage.value = null;
+        isBottomPanelOpen.value = false;
         currentItemIndex.value = null;
         imageScale.value = 1;
         isNavigating.value = false;
+        isBottomPanelOpen.value = false;
         emit('close');
+    }
+}
+
+// Toggle bottom panel
+function toggleBottomPanel(): void {
+    if (!overlayFillComplete.value || overlayIsClosing.value) return;
+    isBottomPanelOpen.value = !isBottomPanelOpen.value;
+
+    // Recalculate image size and position when panel opens/closes
+    if (overlayRect.value && overlayImageSize.value && originalImageDimensions.value && props.containerRef) {
+        const tabContent = props.containerRef;
+        const tabContentBox = tabContent.getBoundingClientRect();
+        const containerWidth = tabContentBox.width;
+        const containerHeight = tabContentBox.height;
+        const borderWidth = 4;
+
+        // Reduce available height by 200px when panel is open
+        const panelHeight = isBottomPanelOpen.value ? 200 : 0;
+        const availableWidth = containerWidth - (borderWidth * 2);
+        const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
+
+        // Recalculate best-fit size for the image
+        const bestFitSize = calculateBestFitSize(
+            originalImageDimensions.value.width,
+            originalImageDimensions.value.height,
+            availableWidth,
+            availableHeight
+        );
+
+        // Update image size
+        overlayImageSize.value = bestFitSize;
+
+        // Recalculate center position
+        const fullImageLeft = Math.floor((availableWidth - bestFitSize.width) / 2) + borderWidth;
+        const fullImageTop = Math.floor((availableHeight - bestFitSize.height) / 2) + borderWidth;
+
+        imageCenterPosition.value = {
+            top: fullImageTop,
+            left: fullImageLeft,
+        };
     }
 }
 
@@ -581,7 +625,7 @@ defineExpose({
 <template>
     <!-- Click overlay -->
     <div v-if="overlayRect && overlayImage" :class="[
-        'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900 overflow-hidden',
+        'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900 overflow-hidden flex flex-col',
         overlayIsFilled && !overlayIsClosing ? '' : 'pointer-events-none',
         overlayIsAnimating || overlayIsClosing ? 'transition-all duration-500 ease-in-out' : ''
     ]" :style="{
@@ -593,54 +637,93 @@ defineExpose({
         transform: `scale(${overlayScale})`,
         transformOrigin: 'center center',
     }">
-        <!-- Preview image (shown immediately, behind spinner) -->
-        <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
-            :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
-                'absolute select-none pointer-events-none object-cover',
-                (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-            ]" :style="{
-                ...(overlayImageSize && imageCenterPosition ? {
-                    width: overlayImageSize.width + 'px',
-                    height: overlayImageSize.height + 'px',
-                    top: imageCenterPosition.top + 'px',
-                    left: imageCenterPosition.left + 'px',
-                } : overlayImageSize ? {
-                    width: overlayImageSize.width + 'px',
-                    height: overlayImageSize.height + 'px',
-                } : {}),
-                transform: `scale(${imageScale})`,
-                transformOrigin: 'center center',
-            }" draggable="false" />
+        <!-- Image container (flex-1 to take remaining space when panel is open) -->
+        <div :class="[
+            'relative overflow-hidden transition-all duration-500 ease-in-out',
+            isBottomPanelOpen ? 'flex-1 min-h-0' : 'flex-1 min-h-0'
+        ]">
+            <!-- Preview image (shown immediately, behind spinner) -->
+            <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
+                :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
+                    'absolute select-none pointer-events-none object-cover',
+                    (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                ]" :style="{
+                    ...(overlayImageSize && imageCenterPosition ? {
+                        width: overlayImageSize.width + 'px',
+                        height: overlayImageSize.height + 'px',
+                        top: imageCenterPosition.top + 'px',
+                        left: imageCenterPosition.left + 'px',
+                    } : overlayImageSize ? {
+                        width: overlayImageSize.width + 'px',
+                        height: overlayImageSize.height + 'px',
+                    } : {}),
+                    transform: `scale(${imageScale})`,
+                    transformOrigin: 'center center',
+                }" draggable="false" />
 
-        <!-- Spinner while loading full-size image -->
-        <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
-            <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
+            <!-- Spinner while loading full-size image -->
+            <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
+                <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
+            </div>
+
+            <!-- Full-size image (shown after preload) -->
+            <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt"
+                :class="[
+                    'absolute select-none',
+                    overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
+                    overlayIsFilled ? '' : 'object-cover',
+                    (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating || isBottomPanelOpen !== null) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                ]" :style="{
+                    ...(overlayImageSize && imageCenterPosition ? {
+                        width: overlayImageSize.width + 'px',
+                        height: overlayImageSize.height + 'px',
+                        top: imageCenterPosition.top + 'px',
+                        left: imageCenterPosition.left + 'px',
+                    } : overlayImageSize ? {
+                        width: overlayImageSize.width + 'px',
+                        height: overlayImageSize.height + 'px',
+                    } : {}),
+                    transform: `scale(${imageScale})`,
+                    transformOrigin: 'center center',
+                }" draggable="false" @click="toggleBottomPanel" />
+
+            <!-- Close button -->
+            <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
+                class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+                aria-label="Close overlay" data-test="close-overlay-button">
+                <X :size="20" />
+            </button>
         </div>
 
-        <!-- Full-size image (shown after preload) -->
-        <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt" :class="[
-            'absolute select-none pointer-events-none',
-            overlayIsFilled ? '' : 'object-cover',
-            (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-        ]" :style="{
-            ...(overlayImageSize && imageCenterPosition ? {
-                width: overlayImageSize.width + 'px',
-                height: overlayImageSize.height + 'px',
-                top: imageCenterPosition.top + 'px',
-                left: imageCenterPosition.left + 'px',
-            } : overlayImageSize ? {
-                width: overlayImageSize.width + 'px',
-                height: overlayImageSize.height + 'px',
-            } : {}),
-            transform: `scale(${imageScale})`,
-            transformOrigin: 'center center',
-        }" draggable="false" />
+        <!-- Bottom panel (slides up from bottom) -->
+        <div v-if="overlayFillComplete && !overlayIsClosing" :class="[
+            'bg-prussian-blue-900 border-t border-smart-blue-500 transition-all duration-500 ease-in-out overflow-hidden z-40 relative',
+            isBottomPanelOpen ? 'max-h-[200px] opacity-100' : 'max-h-0 opacity-0'
+        ]" data-test="bottom-panel" :style="{
+            height: isBottomPanelOpen ? '200px' : '0px',
+        }">
+            <!-- Previous button -->
+            <button
+                class="absolute left-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+                aria-label="Previous" data-test="drawer-previous-button">
+                <ChevronLeft :size="20" />
+            </button>
 
-        <!-- Close button -->
-        <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
-            class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
-            aria-label="Close overlay" data-test="close-overlay-button">
-            <X :size="20" />
-        </button>
+            <!-- Squares container -->
+            <div class="h-full p-4 flex items-center justify-center gap-4 overflow-x-auto px-16">
+                <div v-for="i in 11" :key="i"
+                    class="shrink-0 bg-smart-blue-500/20 border-2 border-smart-blue-500 rounded" :style="{
+                        width: '192px',
+                        height: '192px',
+                    }" :data-test="`square-${i}`" />
+            </div>
+
+            <!-- Next button -->
+            <button
+                class="absolute right-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+                aria-label="Next" data-test="drawer-next-button">
+                <ChevronRight :size="20" />
+            </button>
+        </div>
     </div>
 </template>
