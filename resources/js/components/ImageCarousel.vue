@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue';
+import { TransitionGroup } from 'vue';
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 
@@ -28,6 +29,8 @@ const CENTER_BOX_INDEX = 5; // 6th box (0-indexed)
 // Track scroll position for smooth sliding
 const scrollPosition = ref(0);
 const containerRef = ref<HTMLElement | null>(null);
+const isTransitioning = ref(false);
+const previousIndex = ref<number | null>(null);
 
 // Computed property to calculate which items to show in drawer boxes
 const drawerItems = computed(() => {
@@ -70,7 +73,7 @@ const drawerItems = computed(() => {
 });
 
 // Calculate scroll position to center the current item
-const calculateScrollPosition = (): void => {
+const calculateScrollPosition = (animateFromPrevious = false): void => {
     if (props.currentItemIndex === null || props.items.length === 0 || !containerRef.value) {
         scrollPosition.value = 0;
         return;
@@ -100,13 +103,52 @@ const calculateScrollPosition = (): void => {
 
     // Calculate scroll position: we want the target box center to align with container center
     // Account for the padding on the left side
-    scrollPosition.value = targetBoxCenter + paddingLeft - containerCenter;
+    const newScrollPosition = targetBoxCenter + paddingLeft - containerCenter;
+
+    // If we're moving forward/backward but ending at the same scroll position (items 7+),
+    // create a sliding effect by temporarily offsetting the position
+    if (animateFromPrevious && previousIndex.value !== null && previousIndex.value !== currentIndex) {
+        const direction = currentIndex > previousIndex.value ? 1 : -1;
+        const offset = direction * BOX_SIZE; // Slide one box width in the direction of movement
+
+        // Start from offset position
+        scrollPosition.value = newScrollPosition + offset;
+
+        // Then animate to final position
+        nextTick(() => {
+            requestAnimationFrame(() => {
+                scrollPosition.value = newScrollPosition;
+            });
+        });
+    } else {
+        // Normal case: just update the position
+        scrollPosition.value = newScrollPosition;
+    }
+
+    // Update previous index
+    previousIndex.value = currentIndex;
 };
 
 // Watch for changes in currentItemIndex and update scroll position
-watch(() => props.currentItemIndex, () => {
+watch(() => props.currentItemIndex, (newIndex, oldIndex) => {
+    // Enable transition for smooth sliding animation
+    isTransitioning.value = true;
+
+    // Check if we need to animate from previous position (when moving between items that both target center box)
+    const needsOffsetAnimation = oldIndex !== null &&
+        oldIndex !== undefined &&
+        ((oldIndex > 4 && newIndex !== null && newIndex > 4) ||
+            (oldIndex <= 4 && newIndex !== null && newIndex <= 4 && oldIndex !== newIndex));
+
     nextTick(() => {
-        calculateScrollPosition();
+        // Use requestAnimationFrame to ensure calculation happens after DOM updates
+        requestAnimationFrame(() => {
+            calculateScrollPosition(needsOffsetAnimation);
+            // Reset transitioning flag after transition completes
+            setTimeout(() => {
+                isTransitioning.value = false;
+            }, 500); // Match transition duration
+        });
     });
 }, { immediate: true });
 
@@ -159,24 +201,27 @@ function handleItemClick(item: MasonryItem): void {
 
         <!-- Squares container with sliding animation -->
         <div ref="containerRef" class="h-full overflow-hidden px-16 py-4 relative">
-            <div class="flex items-center gap-4 h-full transition-transform duration-500 ease-in-out" :style="{
-                transform: `translateX(${-scrollPosition}px)`,
-            }">
-                <div v-for="(item, boxIndex) in drawerItems" :key="`${boxIndex}-${item?.id || 'empty'}`" :class="[
-                    'shrink-0 rounded overflow-hidden',
-                    isSelectedItem(item, boxIndex) ? 'border-4 border-smart-blue-500' : 'border-2 border-smart-blue-500/50',
-                    item ? 'cursor-pointer' : 'bg-smart-blue-500/20'
-                ]" :style="{
+            <TransitionGroup tag="div" class="flex items-center gap-4 h-full" :class="{
+                'transition-transform duration-500 ease-in-out': isTransitioning
+            }" :style="{
+                    transform: `translateX(${-scrollPosition}px)`,
+                }" move-class="transition-transform duration-500 ease-in-out" name="carousel-item">
+                <div v-for="(item, boxIndex) in drawerItems" :key="item?.id ? `item-${item.id}` : `empty-${boxIndex}`"
+                    :class="[
+                        'shrink-0 rounded overflow-hidden carousel-item',
+                        isSelectedItem(item, boxIndex) ? 'border-4 border-smart-blue-500' : 'border-2 border-smart-blue-500/50',
+                        item ? 'cursor-pointer' : 'bg-smart-blue-500/20'
+                    ]" :style="{
                         width: '192px',
                         height: '192px',
                     }" :data-test="`carousel-box-${boxIndex}`"
                     @click="item && !isSelectedItem(item, boxIndex) ? handleItemClick(item) : null">
                     <img v-if="item" :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`" :class="[
-                        'w-full h-full object-cover transition-all duration-300',
+                        'w-full h-full object-cover transition-opacity duration-300',
                         isSelectedItem(item, boxIndex) ? '' : 'opacity-50'
                     ]" :data-test="`carousel-preview-${boxIndex}`" />
                 </div>
-            </div>
+            </TransitionGroup>
         </div>
 
         <!-- Next button -->
