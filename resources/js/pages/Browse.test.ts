@@ -1795,7 +1795,6 @@ describe('Browse', () => {
                 expect(vm.overlayRect).not.toBeNull();
                 expect(vm.overlayImage).not.toBeNull();
                 expect(vm.overlayImageSize).not.toBeNull();
-                expect(vm.backdropOpacity).toBeGreaterThan(0);
             }
         });
 
@@ -1846,7 +1845,6 @@ describe('Browse', () => {
             vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
             vm.overlayImageSize = { width: 300, height: 400 };
             vm.overlayIsFilled = true;
-            vm.backdropOpacity = 0.75;
             await wrapper.vm.$nextTick();
 
             // Find and click close button
@@ -1860,7 +1858,6 @@ describe('Browse', () => {
             expect(vm.overlayRect).toBeNull();
             expect(vm.overlayImage).toBeNull();
             expect(vm.overlayImageSize).toBeNull();
-            expect(vm.backdropOpacity).toBe(0);
             expect(vm.overlayIsFilled).toBe(false);
         });
 
@@ -1910,7 +1907,6 @@ describe('Browse', () => {
             vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
             vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
             vm.overlayImageSize = { width: 300, height: 400 };
-            vm.backdropOpacity = 0.75;
             await wrapper.vm.$nextTick();
 
             // Click outside masonry item (on container but not on item)
@@ -1925,7 +1921,6 @@ describe('Browse', () => {
                 // Verify overlay is closed
                 expect(vm.overlayRect).toBeNull();
                 expect(vm.overlayImage).toBeNull();
-                expect(vm.backdropOpacity).toBe(0);
             }
         });
 
@@ -2006,7 +2001,7 @@ describe('Browse', () => {
             }
         });
 
-        it('shows backdrop mask when overlay is visible', async () => {
+        it('overlay has dark blue background', async () => {
             mockAxios.get.mockImplementation((url: string) => {
                 if (url.includes('/api/browse-tabs')) {
                     return Promise.resolve({
@@ -2051,13 +2046,11 @@ describe('Browse', () => {
             // Set overlay state
             vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
             vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.backdropOpacity = 0.75;
             await wrapper.vm.$nextTick();
 
-            // Verify backdrop exists and has correct opacity
-            const backdrop = wrapper.find('.bg-black.z-40');
-            expect(backdrop.exists()).toBe(true);
-            expect(vm.backdropOpacity).toBe(0.75);
+            // Verify overlay has dark blue background
+            const overlay = wrapper.find('.bg-prussian-blue-900');
+            expect(overlay.exists()).toBe(true);
         });
 
         it('close button is only visible when overlay is filled', async () => {
@@ -2338,62 +2331,5 @@ describe('Browse', () => {
             }
         });
 
-        it('fades in backdrop when overlay appears', async () => {
-            mockAxios.get.mockImplementation((url: string) => {
-                if (url.includes('/api/browse-tabs')) {
-                    return Promise.resolve({
-                        data: [{
-                            id: 1,
-                            label: 'Test Tab',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
-                            items_data: [],
-                            position: 0,
-                        }],
-                    });
-                }
-                if (url.includes('/api/browse')) {
-                    return Promise.resolve({
-                        data: {
-                            items: [],
-                            nextPage: null,
-                            services: [
-                                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            ],
-                        },
-                    });
-                }
-                return Promise.resolve({ data: { items: [], nextPage: null } });
-            });
-
-            const router = await createTestRouter();
-            const wrapper = mount(Browse, {
-                global: {
-                    plugins: [router],
-                },
-            });
-
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const vm = wrapper.vm as any;
-
-            // Initially backdrop should be at 0
-            expect(vm.backdropOpacity).toBe(0);
-
-            // Set overlay state - backdrop should fade in
-            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.backdropOpacity = 0.75;
-            await wrapper.vm.$nextTick();
-
-            // Verify backdrop opacity increased
-            expect(vm.backdropOpacity).toBe(0.75);
-            const backdrop = wrapper.find('.bg-black.z-40');
-            expect(backdrop.exists()).toBe(true);
-            expect(backdrop.attributes('style')).toContain('opacity: 0.75');
-        });
     });
 });
