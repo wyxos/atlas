@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { computed, ref, watch, nextTick, TransitionGroup } from 'vue';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 
 interface Props {
@@ -36,6 +36,8 @@ const scrollPosition = ref(0);
 const isTransitioning = ref(false);
 const clickedItemId = ref<number | null>(null); // Track clicked item for immediate active state
 const clickedIndex = ref<number | null>(null); // Track clicked index for scroll calculation
+const previousItemsLength = ref(0); // Track previous items length to calculate stagger delay
+const STAGGER_DELAY = 100; // Delay between each item animation in ms
 
 // Calculate scroll position to center the current item
 function calculateScrollPosition(): void {
@@ -90,6 +92,12 @@ watch(() => props.visible, (newVal) => {
         }, 100);
     }
 });
+
+// Watch for new items being added - TransitionGroup will handle the animation
+watch(() => props.items.length, (newLength) => {
+    // Update previous length for calculating stagger delay
+    previousItemsLength.value = newLength;
+}, { immediate: true });
 
 function handlePrevious(): void {
     emit('previous');
@@ -163,15 +171,30 @@ function isCurrentItem(item: MasonryItem): boolean {
             }" :style="{
                 transform: `translateX(${-scrollPosition}px)`,
             }">
-                <div v-for="(item, index) in items" :key="item.id" :class="[
-                    'shrink-0 rounded overflow-hidden cursor-pointer border-2 transition-all duration-300',
-                    isCurrentItem(item) ? 'border-smart-blue-500 border-4 scale-110' : 'border-smart-blue-500/50 opacity-50'
+                <TransitionGroup name="slide-in-right" tag="div" class="contents">
+                    <div v-for="(item, index) in items" :key="item.id" :class="[
+                        'shrink-0 rounded overflow-hidden cursor-pointer border-2 transition-all duration-300',
+                        isCurrentItem(item) ? 'border-smart-blue-500 border-4 scale-110' : 'border-smart-blue-500/50 opacity-50',
+                        'slide-in-right-item'
+                    ]" :style="{
+                        width: `${ITEM_SIZE}px`,
+                        height: `${ITEM_SIZE}px`,
+                        '--stagger-delay': `${Math.max(0, index - previousItemsLength) * STAGGER_DELAY}ms`,
+                    }" :data-test="`carousel-item-${index}`" @click="handleItemClick(item)">
+                        <img :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`"
+                            class="w-full h-full object-cover" :data-test="`carousel-preview-${index}`" />
+                    </div>
+                </TransitionGroup>
+
+                <!-- Loading spinner next to last item -->
+                <div v-if="isLoading && items.length > 0" :class="[
+                    'shrink-0 rounded overflow-hidden border-2 border-smart-blue-500/50 bg-smart-blue-500/20 flex items-center justify-center',
+                    'carousel-loading-spinner'
                 ]" :style="{
                     width: `${ITEM_SIZE}px`,
                     height: `${ITEM_SIZE}px`,
-                }" :data-test="`carousel-item-${index}`" @click="handleItemClick(item)">
-                    <img :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`"
-                        class="w-full h-full object-cover" :data-test="`carousel-preview-${index}`" />
+                }" data-test="carousel-loading-spinner">
+                    <Loader2 class="w-8 h-8 text-smart-blue-500 animate-spin" />
                 </div>
             </div>
         </div>
@@ -184,3 +207,49 @@ function isCurrentItem(item: MasonryItem): boolean {
         </button>
     </div>
 </template>
+
+<style scoped>
+/* TransitionGroup slide-in animation (like FilterPanel) */
+.slide-in-right-enter-active {
+    transition: all 0.5s ease-out;
+    transition-delay: var(--stagger-delay, 0ms);
+}
+
+.slide-in-right-enter-from {
+    opacity: 0;
+    transform: translateX(100px);
+}
+
+.slide-in-right-enter-to {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.slide-in-right-leave-active {
+    transition: all 0.3s ease-in;
+}
+
+.slide-in-right-leave-from {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.slide-in-right-leave-to {
+    opacity: 0;
+    transform: translateX(-100px);
+}
+
+.carousel-loading-spinner {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+</style>
