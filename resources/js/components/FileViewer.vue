@@ -53,6 +53,15 @@ function calculateBestFitSize(
     containerWidth: number,
     containerHeight: number
 ): { width: number; height: number } {
+    // If image is smaller than container in both dimensions, use original size (will be centered)
+    if (originalWidth <= containerWidth && originalHeight <= containerHeight) {
+        return {
+            width: originalWidth,
+            height: originalHeight,
+        };
+    }
+
+    // Image is larger than container - scale down to fit while maintaining aspect ratio
     const aspectRatio = originalWidth / originalHeight;
     const containerAspectRatio = containerWidth / containerHeight;
 
