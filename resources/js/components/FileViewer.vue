@@ -213,8 +213,8 @@ function toggleBottomPanel(): void {
         overlayImageSize.value = bestFitSize;
 
         // Recalculate center position
-        const fullImageLeft = Math.floor((availableWidth - bestFitSize.width) / 2) + borderWidth;
-        const fullImageTop = Math.floor((availableHeight - bestFitSize.height) / 2) + borderWidth;
+        const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
+        const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
 
         imageCenterPosition.value = {
             top: fullImageTop,
@@ -327,13 +327,13 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     }
 
     // Precalculate flexbox center position for initial (small) container
-    // Flexbox centers within the content area (inside the border), so account for border-4 (4px each side)
+    // Image container is inside border, so position relative to container (not border)
     const borderWidth = 4; // border-4 = 4px
     const initialContentWidth = width - (borderWidth * 2);
     const initialContentHeight = height - (borderWidth * 2);
     // Initially image size equals container size (overlayImageSize is set to { width, height })
-    const initialImageLeft = Math.round((initialContentWidth - overlayImageSize.value.width) / 2) + borderWidth;
-    const initialImageTop = Math.round((initialContentHeight - overlayImageSize.value.height) / 2) + borderWidth;
+    const initialImageLeft = Math.round((initialContentWidth - overlayImageSize.value.width) / 2);
+    const initialImageTop = Math.round((initialContentHeight - overlayImageSize.value.height) / 2);
 
     imageCenterPosition.value = {
         top: initialImageTop,
@@ -359,13 +359,13 @@ async function openFromClick(e: MouseEvent): Promise<void> {
             const centerLeft = Math.round((containerWidth - width) / 2);
             const centerTop = Math.round((containerHeight - height) / 2);
 
-            // Precalculate flexbox center position for centered (small) container
-            // Flexbox centers within the content area (inside the border), so account for border-4 (4px each side)
+            // Precalculate center position for centered (small) container
+            // Image container is inside border, so position relative to container (not border)
             const borderWidth = 4; // border-4 = 4px
             const contentWidth = width - (borderWidth * 2);
             const contentHeight = height - (borderWidth * 2);
-            const centeredImageLeft = Math.round((contentWidth - overlayImageSize.value.width) / 2) + borderWidth;
-            const centeredImageTop = Math.round((contentHeight - overlayImageSize.value.height) / 2) + borderWidth;
+            const centeredImageLeft = Math.round((contentWidth - overlayImageSize.value.width) / 2);
+            const centeredImageTop = Math.round((contentHeight - overlayImageSize.value.height) / 2);
 
             imageCenterPosition.value = {
                 top: centeredImageTop,
@@ -399,10 +399,10 @@ async function openFromClick(e: MouseEvent): Promise<void> {
                 // Update image size to best-fit dimensions
                 overlayImageSize.value = bestFitSize;
 
-                // Precalculate flexbox center position for full container with best-fit image
-                // Ensure image stays within bounds by using floor for positioning
-                const fullImageLeft = Math.floor((availableWidth - bestFitSize.width) / 2) + borderWidth;
-                const fullImageTop = Math.floor((availableHeight - bestFitSize.height) / 2) + borderWidth;
+                // Precalculate center position for full container with best-fit image
+                // Image container is inside border, so position relative to container (not border)
+                const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
+                const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
 
                 imageCenterPosition.value = {
                     top: fullImageTop,
@@ -544,8 +544,8 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
 
         overlayImageSize.value = bestFitSize;
 
-        const fullImageLeft = Math.floor((availableWidth - bestFitSize.width) / 2) + borderWidth;
-        const fullImageTop = Math.floor((availableHeight - bestFitSize.height) / 2) + borderWidth;
+        const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
+        const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
 
         imageCenterPosition.value = {
             top: fullImageTop,
