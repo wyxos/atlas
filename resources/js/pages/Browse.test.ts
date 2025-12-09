@@ -2580,5 +2580,72 @@ describe('Browse', () => {
             expect(overlay.classes()).toContain('border-smart-blue-500');
         });
 
+        it('closes overlay when pressing Escape key', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            await wrapper.vm.$nextTick();
+
+            // Verify overlay is visible
+            expect(fileViewerVm.overlayRect).not.toBeNull();
+
+            // Simulate Escape key press
+            const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+            window.dispatchEvent(escapeEvent);
+
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 600)); // Wait for close animation
+
+            // Verify overlay is closed
+            expect(fileViewerVm.overlayRect).toBeNull();
+            expect(fileViewerVm.overlayImage).toBeNull();
+        });
+
     });
 });
