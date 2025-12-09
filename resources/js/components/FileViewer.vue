@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue';
-import { X } from 'lucide-vue-next';
+import { X, Loader2 } from 'lucide-vue-next';
+import type { MasonryItem } from '../composables/useBrowseTabs';
 
 interface Props {
     containerRef: HTMLElement | null;
     masonryContainerRef: HTMLElement | null;
+    items: MasonryItem[];
 }
 
 const props = defineProps<Props>();
@@ -25,6 +27,34 @@ const overlayFillComplete = ref(false); // Track if fill animation has completed
 const overlayIsClosing = ref(false); // Track if overlay is closing (shrinking animation)
 const overlayScale = ref(1); // Scale factor for closing animation (1 = normal, 0 = fully shrunk)
 const imageCenterPosition = ref<{ top: number; left: number } | null>(null); // Exact center position when filled
+const overlayIsLoading = ref(false); // Track if full-size image is loading
+const overlayFullSizeImage = ref<string | null>(null); // Full-size image URL once loaded
+
+function preloadImage(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+        img.src = url;
+    });
+}
+
+function findMasonryItemByImageSrc(imageSrc: string, itemElement: HTMLElement): MasonryItem | null {
+    // Try to find item by checking data attributes on the masonry item element
+    const itemId = itemElement.getAttribute('data-item-id');
+    if (itemId) {
+        const item = props.items.find(i => i.id === Number(itemId));
+        if (item) return item;
+    }
+
+    // Fallback: try to match by URL (compare src with item.src or thumbnail)
+    // Extract base URL without query params for comparison
+    const baseSrc = imageSrc.split('?')[0].split('#')[0];
+    return props.items.find(item => {
+        const itemSrc = (item.src || item.thumbnail || '').split('?')[0].split('#')[0];
+        return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
+    }) || null;
+}
 
 function closeOverlay(): void {
     if (!overlayRect.value) return;
@@ -67,6 +97,8 @@ function closeOverlay(): void {
             overlayRect.value = null;
             overlayImage.value = null;
             overlayBorderRadius.value = null;
+            overlayIsLoading.value = false;
+            overlayFullSizeImage.value = null;
             emit('close');
         }, 500); // Match transition duration
     } else {
@@ -82,6 +114,8 @@ function closeOverlay(): void {
         overlayRect.value = null;
         overlayImage.value = null;
         overlayBorderRadius.value = null;
+        overlayIsLoading.value = false;
+        overlayFullSizeImage.value = null;
         emit('close');
     }
 }
@@ -130,6 +164,10 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const computed = window.getComputedStyle(itemEl);
     const radius = computed.borderRadius || '';
 
+    // Find the masonry item data to get the full-size URL
+    const masonryItem = findMasonryItemByImageSrc(src, itemEl);
+    const fullSizeUrl = masonryItem?.originalUrl || src; // Fallback to current src if no originalUrl
+
     // Increment key to force image element recreation (prevents showing previous image)
     overlayKey.value++;
 
@@ -139,6 +177,35 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     overlayFillComplete.value = false;
     overlayIsClosing.value = false;
     overlayScale.value = 1; // Reset scale to normal
+    overlayIsLoading.value = true; // Show spinner
+    overlayFullSizeImage.value = null; // Reset full-size image
+
+    // Set initial position at clicked item location and show overlay with spinner
+    overlayRect.value = { top, left, width, height };
+    overlayImage.value = { src, srcset, sizes, alt };
+    overlayBorderRadius.value = radius || null;
+    overlayIsAnimating.value = false;
+
+    // Wait for DOM update
+    await nextTick();
+
+    // Preload the full-size image
+    try {
+        await preloadImage(fullSizeUrl);
+        // Once loaded, update to use full-size image
+        overlayFullSizeImage.value = fullSizeUrl;
+        overlayIsLoading.value = false;
+
+        // Wait for image to be displayed, then proceed with animations
+        await nextTick();
+        await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure image is rendered
+    } catch (error) {
+        // If preload fails, use the original image and continue
+        console.warn('Failed to preload full-size image, using original:', error);
+        overlayFullSizeImage.value = src;
+        overlayIsLoading.value = false;
+        await nextTick();
+    }
 
     // Precalculate flexbox center position for initial (small) container
     // Flexbox centers within the content area (inside the border), so account for border-4 (4px each side)
@@ -154,16 +221,11 @@ async function openFromClick(e: MouseEvent): Promise<void> {
         left: initialImageLeft,
     };
 
-    // Set initial position at clicked item location
-    overlayRect.value = { top, left, width, height };
-    overlayImage.value = { src, srcset, sizes, alt };
-    overlayBorderRadius.value = radius || null;
-    overlayIsAnimating.value = false;
-
-    // Animate to center after DOM update
+    // Wait for image to be displayed, then proceed with animations
     await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure image is rendered
 
-    // Use requestAnimationFrame to ensure initial render is complete
+    // Use requestAnimationFrame to ensure initial render is complete before starting animations
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             const tabContent = props.containerRef;
@@ -257,12 +319,17 @@ defineExpose({
         transform: `scale(${overlayScale})`,
         transformOrigin: 'center center',
     }">
-        <img :key="overlayKey" :src="overlayImage.src" :srcset="overlayImage.srcset"
-            :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
-                'absolute select-none pointer-events-none',
-                overlayIsFilled ? '' : 'object-cover',
-                (overlayIsAnimating || overlayIsClosing) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-            ]" :style="overlayImageSize && imageCenterPosition ? {
+        <!-- Spinner while loading full-size image -->
+        <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center">
+            <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
+        </div>
+
+        <!-- Full-size image (shown after preload) -->
+        <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt" :class="[
+            'absolute select-none pointer-events-none',
+            overlayIsFilled ? '' : 'object-cover',
+            (overlayIsAnimating || overlayIsClosing) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+        ]" :style="overlayImageSize && imageCenterPosition ? {
                 width: overlayImageSize.width + 'px',
                 height: overlayImageSize.height + 'px',
                 top: imageCenterPosition.top + 'px',
@@ -280,4 +347,3 @@ defineExpose({
         </button>
     </div>
 </template>
-
