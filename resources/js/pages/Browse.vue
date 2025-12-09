@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, reactive } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 import { Loader2, Plus } from 'lucide-vue-next';
 import Pill from '../components/ui/Pill.vue';
@@ -8,6 +8,7 @@ import BrowseTab from '../components/BrowseTab.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useBrowseTabs, type MasonryItem, type BrowseTabData } from '../composables/useBrowseTabs';
+import { useBackfill } from '../composables/useBackfill';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -28,23 +29,16 @@ const availableServices = ref<Array<{ key: string; label: string; defaults?: Rec
 const selectedService = ref<string>(''); // Service selected in UI (not yet applied)
 const isApplyingService = ref(false);
 
-// Backfill progress state driven by Masonry events
-const backfill = reactive({
-    active: false,
-    fetched: 0,
-    target: 0,
-    calls: 0,
-    // normal fill wait (between successive successful calls)
-    waiting: false,
-    waitTotalMs: 0,
-    waitRemainingMs: 0,
-    // retry wait state
-    retryActive: false,
-    retryAttempt: 0,
-    retryMax: 3,
-    retryWaitTotalMs: 0,
-    retryWaitRemainingMs: 0,
-});
+// Backfill state and handlers
+const {
+    backfill,
+    onBackfillStart,
+    onBackfillTick,
+    onBackfillStop,
+    onBackfillRetryStart,
+    onBackfillRetryTick,
+    onBackfillRetryStop,
+} = useBackfill();
 
 // Computed property to display page value (defaults to 1 if null)
 const displayPage = computed(() => currentPage.value ?? 1);
@@ -136,56 +130,6 @@ async function applyService(): Promise<void> {
         isApplyingService.value = false;
         selectedService.value = ''; // Clear selection after applying
     }
-}
-
-// Backfill event handlers
-function onBackfillStart(payload: { target: number; fetched: number; calls?: number }): void {
-    backfill.active = true;
-    backfill.target = payload.target;
-    backfill.fetched = payload.fetched;
-    backfill.calls = payload.calls ?? 0;
-    backfill.waiting = false;
-}
-
-function onBackfillTick(payload: { fetched: number; target: number; calls?: number; remainingMs: number; totalMs: number }): void {
-    backfill.active = true;
-    backfill.fetched = payload.fetched;
-    backfill.target = payload.target;
-    backfill.calls = payload.calls ?? backfill.calls;
-    backfill.waiting = true;
-    backfill.waitRemainingMs = payload.remainingMs;
-    backfill.waitTotalMs = payload.totalMs;
-}
-
-function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
-    backfill.active = false;
-    backfill.waiting = false;
-    if (payload.fetched != null) backfill.fetched = payload.fetched;
-    if (payload.calls != null) backfill.calls = payload.calls;
-    backfill.waitRemainingMs = 0;
-    backfill.waitTotalMs = 0;
-}
-
-function onBackfillRetryStart(payload: { attempt: number; max: number; totalMs: number }): void {
-    backfill.retryActive = true;
-    backfill.retryAttempt = payload.attempt;
-    backfill.retryMax = payload.max;
-    backfill.retryWaitTotalMs = payload.totalMs;
-    backfill.retryWaitRemainingMs = payload.totalMs;
-}
-
-function onBackfillRetryTick(payload: { attempt: number; remainingMs: number; totalMs: number }): void {
-    backfill.retryActive = true;
-    backfill.retryAttempt = payload.attempt;
-    backfill.retryWaitRemainingMs = payload.remainingMs;
-    backfill.retryWaitTotalMs = payload.totalMs;
-}
-
-function onBackfillRetryStop(): void {
-    backfill.retryActive = false;
-    backfill.retryAttempt = 0;
-    backfill.retryWaitTotalMs = 0;
-    backfill.retryWaitRemainingMs = 0;
 }
 
 // Tab switching function - needs to stay here as it interacts with masonry
@@ -484,7 +428,7 @@ onMounted(async () => {
                             <Select v-model="selectedService" :disabled="isApplyingService">
                                 <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
                                     <SelectValue
-                                        :placeholder="hasServiceSelected ? (availableServices.find(s => s.key === currentTabService)?.label || currentTabService) : 'Select a service...'" />
+                                        :placeholder="hasServiceSelected ? (availableServices.find(s => s.key === currentTabService)?.label || currentTabService || undefined) : 'Select a service...'" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem v-for="service in availableServices" :key="service.key"
@@ -535,42 +479,56 @@ onMounted(async () => {
                     <!-- Status Pill -->
                     <Pill :label="'Status'" :value="masonry?.isLoading ? 'Loading...' : 'Ready'"
                         :variant="masonry?.isLoading ? 'primary' : 'success'" reversed data-test="status-pill">
-                        <template #label>
-                            <span class="flex items-center gap-1.5">
-                                Status
-                            </span>
-                        </template>
                         <template #value>
                             <Loader2 v-if="masonry?.isLoading" :size="14" class="animate-spin" />
                             <span v-else>Ready</span>
                         </template>
                     </Pill>
                     <!-- Backfill Progress Pills -->
-                    <div v-if="backfill.active" class="flex items-center gap-2" data-test="backfill-active-pill">
-                        <Loader2 :size="16" class="animate-spin text-amber-500" />
-                        <span class="font-semibold">filling</span>
-                        <span class="font-medium text-foreground">{{ backfill.fetched }} / {{ backfill.target }} ({{
-                            backfill.calls }} calls)</span>
-                    </div>
-                    <div v-if="backfill.waiting" class="flex min-w-[220px] items-center gap-2"
+                    <span v-if="backfill.active"
+                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500 px-3 py-1 text-xs"
+                        data-test="backfill-active-pill">
+                        <span
+                            class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
+                            <Loader2 :size="14" class="animate-spin" />
+                            <span>Filling</span>
+                        </span>
+                        <span
+                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100">
+                            {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} calls)
+                        </span>
+                    </span>
+                    <span v-if="backfill.waiting"
+                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500 min-w-[220px]"
                         data-test="backfill-waiting-pill">
-                        <Loader2 :size="16" class="animate-spin text-amber-500" />
-                        <div class="flex w-40 flex-col gap-1">
+                        <span
+                            class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
+                            <Loader2 :size="14" class="animate-spin" />
+                            <span>Waiting</span>
+                        </span>
+                        <span
+                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex-1 flex flex-col gap-1">
                             <div class="h-2 w-full overflow-hidden rounded bg-muted">
-                                <div class="h-full bg-primary transition-[width] duration-100" :style="{
+                                <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
                                     width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
                                 }" />
                             </div>
-                            <div class="text-[11px] text-muted-foreground">next in {{ (backfill.waitRemainingMs /
+                            <div class="text-[11px] text-warning-100/70">next in {{ (backfill.waitRemainingMs /
                                 1000).toFixed(1) }}s</div>
-                        </div>
-                    </div>
-                    <div v-if="backfill.retryActive" class="flex min-w-[260px] items-center gap-2"
+                        </span>
+                    </span>
+                    <span v-if="backfill.retryActive"
+                        class="inline-flex items-stretch rounded overflow-hidden border border-warning-500 min-w-[260px]"
                         data-test="backfill-retry-pill">
-                        <Loader2 :size="16" class="animate-spin text-orange-500" />
-                        <div class="flex w-48 flex-col gap-1">
+                        <span
+                            class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
+                            <Loader2 :size="14" class="animate-spin" />
+                            <span>Retry</span>
+                        </span>
+                        <span
+                            class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex-1 flex flex-col gap-1">
                             <div class="h-2 w-full overflow-hidden rounded bg-muted">
-                                <div class="h-full bg-orange-500 transition-[width] duration-100" :style="{
+                                <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
                                     width:
                                         Math.max(
                                             0,
@@ -578,12 +536,12 @@ onMounted(async () => {
                                         ) + '%',
                                 }" />
                             </div>
-                            <div class="text-[11px] text-muted-foreground">
+                            <div class="text-[11px] text-warning-100/70">
                                 retry {{ backfill.retryAttempt }} / {{ backfill.retryMax }} in {{
                                     (backfill.retryWaitRemainingMs / 1000).toFixed(1) }}s
                             </div>
-                        </div>
-                    </div>
+                        </span>
+                    </span>
                 </div>
             </div>
         </div>
