@@ -8,6 +8,9 @@ interface Props {
     containerRef: HTMLElement | null;
     masonryContainerRef: HTMLElement | null;
     items: MasonryItem[];
+    hasMore?: boolean;
+    isLoading?: boolean;
+    onLoadMore?: () => Promise<void>;
 }
 
 const props = defineProps<Props>();
@@ -736,7 +739,8 @@ defineExpose({
 
         <!-- Image Carousel -->
         <ImageCarousel v-if="overlayFillComplete && !overlayIsClosing" :items="items"
-            :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" @next="navigateToNext"
+            :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" :has-more="hasMore"
+            :is-loading="isLoading" :on-load-more="onLoadMore" @next="navigateToNext"
             @previous="navigateToPrevious" @item-click="handleCarouselItemClick" />
     </div>
 </template>

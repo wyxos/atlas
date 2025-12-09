@@ -369,6 +369,17 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
     };
 }
 
+async function handleCarouselLoadMore(): Promise<void> {
+    // Load more items when carousel reaches the end
+    if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
+        const result = await getNextPage(nextCursor.value);
+        // Manually append items to the items array since we're bypassing masonry's scroll trigger
+        if (result.items.length > 0) {
+            items.value = [...items.value, ...result.items];
+        }
+    }
+}
+
 
 // Tab management function
 // Flow: Load tabs (without files) > Determine focus tab > If has files, load them > Restore query params
@@ -480,7 +491,8 @@ onMounted(async () => {
 
                 <!-- File Viewer -->
                 <FileViewer ref="fileViewer" :container-ref="tabContentContainer"
-                    :masonry-container-ref="masonryContainer" :items="items" @close="() => { }" />
+                    :masonry-container-ref="masonryContainer" :items="items" :has-more="nextCursor !== null"
+                    :is-loading="masonry?.isLoading ?? false" :on-load-more="handleCarouselLoadMore" @close="() => { }" />
 
                 <!-- Status/Pagination Info at Bottom -->
                 <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
