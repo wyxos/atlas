@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
-import { X, Loader2, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { X, Loader2 } from 'lucide-vue-next';
+import ImageCarousel from './ImageCarousel.vue';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 
 interface Props {
@@ -36,58 +37,6 @@ const isNavigating = ref(false); // Track if we're navigating between images
 const isBottomPanelOpen = ref(false); // Track if bottom panel is open
 const imageTranslateX = ref(0); // Translate X for slide animation
 const navigationDirection = ref<'left' | 'right' | null>(null); // Track navigation direction
-
-// Computed property to calculate which items to show in drawer boxes
-const drawerItems = computed(() => {
-    if (currentItemIndex.value === null || props.items.length === 0) {
-        return Array(11).fill(null);
-    }
-
-    const items = Array(11).fill(null);
-    const currentIndex = currentItemIndex.value;
-    const totalItems = props.items.length;
-
-    // Determine the center box index (6th box, index 5)
-    const centerBoxIndex = 5;
-
-    // Determine where to place the current item
-    let currentItemBoxIndex: number;
-    if (currentIndex > 4) {
-        // If index > 4, place in center (6th box)
-        currentItemBoxIndex = centerBoxIndex;
-    } else {
-        // If index <= 4, place at corresponding box index
-        currentItemBoxIndex = currentIndex;
-    }
-
-    // Place current item
-    items[currentItemBoxIndex] = props.items[currentIndex];
-
-    // Fill boxes before current item
-    let sourceIndex = currentIndex - 1;
-    for (let boxIndex = currentItemBoxIndex - 1; boxIndex >= 0 && sourceIndex >= 0; boxIndex--) {
-        items[boxIndex] = props.items[sourceIndex];
-        sourceIndex--;
-    }
-
-    // Fill boxes after current item
-    sourceIndex = currentIndex + 1;
-    for (let boxIndex = currentItemBoxIndex + 1; boxIndex < 11 && sourceIndex < totalItems; boxIndex++) {
-        items[boxIndex] = props.items[sourceIndex];
-        sourceIndex++;
-    }
-
-    return items;
-});
-
-// Helper to check if an item is the currently selected one
-function isSelectedItem(item: MasonryItem | null, boxIndex: number): boolean {
-    if (!item || currentItemIndex.value === null) return false;
-
-    // Check if this item is at the current index in the items array
-    const itemArrayIndex = props.items.indexOf(item);
-    return itemArrayIndex === currentItemIndex.value;
-}
 
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
@@ -225,21 +174,8 @@ function closeOverlay(): void {
     }
 }
 
-// Toggle bottom panel
-// Handle drawer previous button click
-function handleDrawerPrevious(): void {
-    if (currentItemIndex.value === null || currentItemIndex.value <= 0) return;
-    navigateToPrevious();
-}
-
-// Handle drawer next button click
-function handleDrawerNext(): void {
-    if (currentItemIndex.value === null || currentItemIndex.value >= props.items.length - 1) return;
-    navigateToNext();
-}
-
-// Handle drawer item click
-function handleDrawerItemClick(item: MasonryItem): void {
+// Handle carousel item click
+function handleCarouselItemClick(item: MasonryItem): void {
     const itemIndex = props.items.findIndex(i => i.id === item.id);
     if (itemIndex >= 0 && currentItemIndex.value !== null) {
         // Determine direction based on index comparison
@@ -789,45 +725,9 @@ defineExpose({
             </button>
         </div>
 
-        <!-- Bottom panel (slides up from bottom) -->
-        <div v-if="overlayFillComplete && !overlayIsClosing" :class="[
-            'bg-prussian-blue-900 border-t border-smart-blue-500 transition-all duration-500 ease-in-out overflow-hidden z-40 relative',
-            isBottomPanelOpen ? 'max-h-[200px] opacity-100' : 'max-h-0 opacity-0'
-        ]" data-test="bottom-panel" :style="{
-            height: isBottomPanelOpen ? '200px' : '0px',
-        }">
-            <!-- Previous button -->
-            <button @click="handleDrawerPrevious" :disabled="currentItemIndex === null || currentItemIndex <= 0"
-                class="absolute left-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Previous" data-test="drawer-previous-button">
-                <ChevronLeft :size="20" />
-            </button>
-
-            <!-- Squares container -->
-            <div class="h-full p-4 flex items-center justify-center gap-4 overflow-x-auto px-16">
-                <div v-for="(item, boxIndex) in drawerItems" :key="boxIndex" :class="[
-                    'shrink-0 rounded overflow-hidden',
-                    isSelectedItem(item, boxIndex) ? 'border-4 border-smart-blue-500' : 'border-2 border-smart-blue-500/50',
-                    item ? 'cursor-pointer' : 'bg-smart-blue-500/20'
-                ]" :style="{
-                    width: '192px',
-                    height: '192px',
-                }" :data-test="`drawer-box-${boxIndex}`"
-                    @click="item && !isSelectedItem(item, boxIndex) ? handleDrawerItemClick(item) : null">
-                    <img v-if="item" :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`" :class="[
-                        'w-full h-full object-cover transition-all duration-300',
-                        isSelectedItem(item, boxIndex) ? '' : 'opacity-50'
-                    ]" :data-test="`drawer-preview-${boxIndex}`" />
-                </div>
-            </div>
-
-            <!-- Next button -->
-            <button @click="handleDrawerNext"
-                :disabled="currentItemIndex === null || currentItemIndex >= props.items.length - 1"
-                class="absolute right-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Next" data-test="drawer-next-button">
-                <ChevronRight :size="20" />
-            </button>
-        </div>
+        <!-- Image Carousel -->
+        <ImageCarousel v-if="overlayFillComplete && !overlayIsClosing" :items="items"
+            :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" @next="navigateToNext"
+            @previous="navigateToPrevious" @item-click="handleCarouselItemClick" />
     </div>
 </template>

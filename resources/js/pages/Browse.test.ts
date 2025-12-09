@@ -3195,11 +3195,13 @@ describe('Browse', () => {
             fileViewerVm.isBottomPanelOpen = true;
             await wrapper.vm.$nextTick();
 
-            // Verify drawer items are computed
-            const drawerItems = fileViewerVm.drawerItems;
-            expect(drawerItems).toBeDefined();
-            expect(drawerItems.length).toBe(11);
-            expect(drawerItems[0]).not.toBeNull(); // First item should be displayed
+            // Verify carousel is rendered
+            const carousel = wrapper.find('[data-test="image-carousel"]');
+            expect(carousel.exists()).toBe(true);
+            
+            // Verify carousel has preview boxes
+            const previewBox = wrapper.find('[data-test="carousel-box-0"]');
+            expect(previewBox.exists()).toBe(true);
         });
 
         it('navigates when clicking drawer next button', async () => {
@@ -3264,8 +3266,8 @@ describe('Browse', () => {
             fileViewerVm.isBottomPanelOpen = true;
             await wrapper.vm.$nextTick();
 
-            // Click drawer next button
-            const nextButton = wrapper.find('[data-test="drawer-next-button"]');
+            // Click carousel next button
+            const nextButton = wrapper.find('[data-test="carousel-next-button"]');
             expect(nextButton.exists()).toBe(true);
             await nextButton.trigger('click');
 
@@ -3338,8 +3340,8 @@ describe('Browse', () => {
             fileViewerVm.isBottomPanelOpen = true;
             await wrapper.vm.$nextTick();
 
-            // Click drawer previous button
-            const prevButton = wrapper.find('[data-test="drawer-previous-button"]');
+            // Click carousel previous button
+            const prevButton = wrapper.find('[data-test="carousel-previous-button"]');
             expect(prevButton.exists()).toBe(true);
             await prevButton.trigger('click');
 
