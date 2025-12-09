@@ -30,6 +30,9 @@ const imageCenterPosition = ref<{ top: number; left: number } | null>(null); // 
 const overlayIsLoading = ref(false); // Track if full-size image is loading
 const overlayFullSizeImage = ref<string | null>(null); // Full-size image URL once loaded
 const originalImageDimensions = ref<{ width: number; height: number } | null>(null); // Original full-size image dimensions
+const currentItemIndex = ref<number | null>(null); // Track current item index in items array
+const imageScale = ref(1); // Scale factor for individual image (for scale-from-zero animation)
+const isNavigating = ref(false); // Track if we're navigating between images
 
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
@@ -133,6 +136,9 @@ function closeOverlay(): void {
             overlayIsLoading.value = false;
             overlayFullSizeImage.value = null;
             originalImageDimensions.value = null;
+            currentItemIndex.value = null;
+            imageScale.value = 1;
+            isNavigating.value = false;
             emit('close');
         }, 500); // Match transition duration
     } else {
@@ -150,6 +156,9 @@ function closeOverlay(): void {
         overlayBorderRadius.value = null;
         overlayIsLoading.value = false;
         overlayFullSizeImage.value = null;
+        currentItemIndex.value = null;
+        imageScale.value = 1;
+        isNavigating.value = false;
         emit('close');
     }
 }
@@ -202,8 +211,13 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const masonryItem = findMasonryItemByImageSrc(src, itemEl);
     const fullSizeUrl = masonryItem?.originalUrl || src; // Fallback to current src if no originalUrl
 
+    // Find and set the current item index
+    const itemIndex = masonryItem ? props.items.findIndex(item => item.id === masonryItem.id) : -1;
+    currentItemIndex.value = itemIndex >= 0 ? itemIndex : null;
+
     // Increment key to force image element recreation (prevents showing previous image)
     overlayKey.value++;
+    imageScale.value = 1; // Reset image scale
 
     // Store original image size to maintain it when container expands
     overlayImageSize.value = { width, height };
@@ -353,10 +367,193 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     });
 }
 
-// Keyboard event handler for Escape key
+// Navigate to next image
+async function navigateToNext(): Promise<void> {
+    if (!overlayRect.value || !overlayFillComplete.value || isNavigating.value || currentItemIndex.value === null) return;
+    if (currentItemIndex.value >= props.items.length - 1) return; // Already at last item
+
+    const nextIndex = currentItemIndex.value + 1;
+    await navigateToIndex(nextIndex);
+}
+
+// Navigate to previous image
+async function navigateToPrevious(): Promise<void> {
+    if (!overlayRect.value || !overlayFillComplete.value || isNavigating.value || currentItemIndex.value === null) return;
+    if (currentItemIndex.value <= 0) return; // Already at first item
+
+    const prevIndex = currentItemIndex.value - 1;
+    await navigateToIndex(prevIndex);
+}
+
+// Navigate to a specific index
+async function navigateToIndex(index: number): Promise<void> {
+    if (!overlayRect.value || !overlayFillComplete.value || isNavigating.value) return;
+    if (index < 0 || index >= props.items.length) return;
+
+    const tabContent = props.containerRef;
+    if (!tabContent) return;
+
+    isNavigating.value = true;
+
+    // Step 1: Shrink current image to 0
+    imageScale.value = 0;
+    overlayIsAnimating.value = true;
+
+    // Wait for shrink animation to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Step 2: Get next item and show spinner
+    const nextItem = props.items[index];
+    if (!nextItem) {
+        isNavigating.value = false;
+        return;
+    }
+
+    const nextImageSrc = nextItem.src || nextItem.thumbnail || '';
+    const nextFullSizeUrl = nextItem.originalUrl || nextImageSrc;
+
+    // Update overlay image to show spinner with preview
+    overlayImage.value = {
+        src: nextImageSrc,
+        srcset: undefined,
+        sizes: undefined,
+        alt: nextItem.id.toString(),
+    };
+    overlayIsLoading.value = true;
+    overlayFullSizeImage.value = null;
+    overlayKey.value++; // Force image element recreation
+
+    // Calculate preview image size and position (use current container size)
+    const tabContentBox = tabContent.getBoundingClientRect();
+    const containerWidth = tabContentBox.width;
+    const containerHeight = tabContentBox.height;
+    const borderWidth = 4;
+    const availableWidth = containerWidth - (borderWidth * 2);
+    const availableHeight = containerHeight - (borderWidth * 2);
+
+    // For preview, use container size (object-cover will handle aspect ratio)
+    overlayImageSize.value = {
+        width: availableWidth,
+        height: availableHeight,
+    };
+
+    const previewImageLeft = Math.floor((availableWidth - availableWidth) / 2) + borderWidth;
+    const previewImageTop = Math.floor((availableHeight - availableHeight) / 2) + borderWidth;
+
+    imageCenterPosition.value = {
+        top: previewImageTop,
+        left: previewImageLeft,
+    };
+
+    imageScale.value = 0; // Start new image at scale 0
+    await nextTick(); // Ensure DOM updates before continuing
+
+    // Step 3: Preload the full-size image
+    try {
+        const imageDimensions = await preloadImage(nextFullSizeUrl);
+        originalImageDimensions.value = imageDimensions;
+        overlayFullSizeImage.value = nextFullSizeUrl;
+
+        // Step 4: Calculate best-fit size BEFORE switching to full-size image
+        const tabContentBox = tabContent.getBoundingClientRect();
+        const containerWidth = tabContentBox.width;
+        const containerHeight = tabContentBox.height;
+        const borderWidth = 4;
+        const availableWidth = containerWidth - (borderWidth * 2);
+        const availableHeight = containerHeight - (borderWidth * 2);
+
+        const bestFitSize = calculateBestFitSize(
+            imageDimensions.width,
+            imageDimensions.height,
+            availableWidth,
+            availableHeight
+        );
+
+        overlayImageSize.value = bestFitSize;
+
+        const fullImageLeft = Math.floor((availableWidth - bestFitSize.width) / 2) + borderWidth;
+        const fullImageTop = Math.floor((availableHeight - bestFitSize.height) / 2) + borderWidth;
+
+        imageCenterPosition.value = {
+            top: fullImageTop,
+            left: fullImageLeft,
+        };
+
+        // Ensure imageScale is 0 before switching to full-size image
+        imageScale.value = 0;
+
+        // Wait for DOM to update with new image size/position
+        await nextTick();
+
+        // Use requestAnimationFrame to ensure the new image element is rendered at scale 0
+        // before we start the scale-up animation
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    resolve(void 0);
+                });
+            });
+        });
+
+        // Now switch to full-size image (still at scale 0)
+        overlayIsLoading.value = false;
+
+        // Wait for DOM to update with full-size image element
+        await nextTick();
+
+        // Use requestAnimationFrame again to ensure full-size image is rendered at scale 0
+        // and that Vue has applied the transition class
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    // Small delay to ensure transition class is applied
+                    setTimeout(() => {
+                        resolve(void 0);
+                    }, 10);
+                });
+            });
+        });
+
+        // Now scale image from 0 to 1 (exact reverse of shrink)
+        // This should be an exact reverse: same duration, same easing, same transform origin
+        imageScale.value = 1;
+
+        // Update current index
+        currentItemIndex.value = index;
+
+        // Wait for scale animation to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+        console.warn('Failed to preload next image:', error);
+        overlayFullSizeImage.value = nextImageSrc;
+        overlayIsLoading.value = false;
+        if (nextItem) {
+            originalImageDimensions.value = {
+                width: nextItem.width,
+                height: nextItem.height,
+            };
+        }
+        imageScale.value = 1;
+        currentItemIndex.value = index;
+        await nextTick();
+    }
+
+    isNavigating.value = false;
+    overlayIsAnimating.value = false;
+}
+
+// Keyboard event handler for Escape key and arrow keys
 function handleKeyDown(e: KeyboardEvent): void {
-    if (e.key === 'Escape' && overlayRect.value && !overlayIsClosing.value) {
+    if (!overlayRect.value || overlayIsClosing.value) return;
+
+    if (e.key === 'Escape') {
         closeOverlay();
+    } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigateToNext();
+    } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigateToPrevious();
     }
 }
 
@@ -400,15 +597,20 @@ defineExpose({
         <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
             :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
                 'absolute select-none pointer-events-none object-cover',
-            ]" :style="overlayImageSize && imageCenterPosition ? {
-                width: overlayImageSize.width + 'px',
-                height: overlayImageSize.height + 'px',
-                top: imageCenterPosition.top + 'px',
-                left: imageCenterPosition.left + 'px',
-            } : overlayImageSize ? {
-                width: overlayImageSize.width + 'px',
-                height: overlayImageSize.height + 'px',
-            } : undefined" draggable="false" />
+                (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+            ]" :style="{
+                ...(overlayImageSize && imageCenterPosition ? {
+                    width: overlayImageSize.width + 'px',
+                    height: overlayImageSize.height + 'px',
+                    top: imageCenterPosition.top + 'px',
+                    left: imageCenterPosition.left + 'px',
+                } : overlayImageSize ? {
+                    width: overlayImageSize.width + 'px',
+                    height: overlayImageSize.height + 'px',
+                } : {}),
+                transform: `scale(${imageScale})`,
+                transformOrigin: 'center center',
+            }" draggable="false" />
 
         <!-- Spinner while loading full-size image -->
         <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
@@ -419,16 +621,20 @@ defineExpose({
         <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt" :class="[
             'absolute select-none pointer-events-none',
             overlayIsFilled ? '' : 'object-cover',
-            (overlayIsAnimating || overlayIsClosing || overlayIsFilled) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-        ]" :style="overlayImageSize && imageCenterPosition ? {
-            width: overlayImageSize.width + 'px',
-            height: overlayImageSize.height + 'px',
-            top: imageCenterPosition.top + 'px',
-            left: imageCenterPosition.left + 'px',
-        } : overlayImageSize ? {
-            width: overlayImageSize.width + 'px',
-            height: overlayImageSize.height + 'px',
-        } : undefined" draggable="false" />
+            (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+        ]" :style="{
+            ...(overlayImageSize && imageCenterPosition ? {
+                width: overlayImageSize.width + 'px',
+                height: overlayImageSize.height + 'px',
+                top: imageCenterPosition.top + 'px',
+                left: imageCenterPosition.left + 'px',
+            } : overlayImageSize ? {
+                width: overlayImageSize.width + 'px',
+                height: overlayImageSize.height + 'px',
+            } : {}),
+            transform: `scale(${imageScale})`,
+            transformOrigin: 'center center',
+        }" draggable="false" />
 
         <!-- Close button -->
         <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
