@@ -7,10 +7,16 @@ interface Props {
     items: MasonryItem[];
     currentItemIndex: number | null;
     visible?: boolean;
+    hasMore?: boolean;
+    isLoading?: boolean;
+    onLoadMore?: () => Promise<void>;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     visible: false,
+    hasMore: false,
+    isLoading: false,
+    onLoadMore: undefined,
 });
 
 const emit = defineEmits<{
@@ -60,6 +66,16 @@ watch(() => props.currentItemIndex, (newIndex) => {
 
     calculateScrollPosition();
 
+    // Check if we're at the last item and should trigger loading
+    if (newIndex !== null && props.hasMore && !props.isLoading && props.onLoadMore) {
+        const totalItems = props.items.length;
+        // Trigger loading only when we're at the last item (totalItems - 1)
+        if (newIndex === totalItems - 1) {
+            // Don't await - let it load in background without blocking carousel animation
+            props.onLoadMore();
+        }
+    }
+
     // Reset transition flag after animation completes
     setTimeout(() => {
         isTransitioning.value = false;
@@ -101,6 +117,13 @@ function handleItemClick(item: MasonryItem): void {
         setTimeout(() => {
             isTransitioning.value = false;
         }, 500);
+
+        // Check if clicking on last item and should trigger loading
+        const totalItems = props.items.length;
+        if (itemIndex === totalItems - 1 && props.hasMore && !props.isLoading && props.onLoadMore) {
+            // Trigger loading when clicking on last item
+            props.onLoadMore();
+        }
 
         // Emit the event - parent will update currentItemIndex
         emit('item-click', item);
