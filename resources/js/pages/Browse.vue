@@ -34,19 +34,80 @@ const overlayKey = ref(0); // Key to force image element recreation on each clic
 const overlayIsAnimating = ref(false); // Track if overlay is animating to center
 const overlayImageSize = ref<{ width: number; height: number } | null>(null); // Store original image size
 const overlayIsFilled = ref(false); // Track if overlay has expanded to fill container
+const overlayFillComplete = ref(false); // Track if fill animation has completed (for close button visibility)
+const overlayIsClosing = ref(false); // Track if overlay is closing (shrinking animation)
 const backdropOpacity = ref(0); // Backdrop opacity for smooth fade-in
 const imageCenterPosition = ref<{ top: number; left: number } | null>(null); // Exact center position when filled
 
 function closeOverlay(): void {
-    overlayKey.value++;
-    overlayIsAnimating.value = false;
-    overlayIsFilled.value = false;
-    backdropOpacity.value = 0;
-    overlayImageSize.value = null;
-    imageCenterPosition.value = null;
-    overlayRect.value = null;
-    overlayImage.value = null;
-    overlayBorderRadius.value = null;
+    if (!overlayRect.value || !overlayImageSize.value) return;
+
+    // Start closing animation - shrink towards center
+    overlayIsClosing.value = true;
+    overlayIsAnimating.value = true;
+
+    // Calculate center position of the container
+    const tabContent = tabContentContainer.value;
+    if (tabContent) {
+        const tabContentBox = tabContent.getBoundingClientRect();
+        const containerWidth = tabContentBox.width;
+        const containerHeight = tabContentBox.height;
+
+        // Calculate center position
+        const centerLeft = Math.round(containerWidth / 2);
+        const centerTop = Math.round(containerHeight / 2);
+
+        // Shrink to center - animate to a small size at center
+        const shrinkSize = Math.min(overlayImageSize.value.width, overlayImageSize.value.height);
+
+        overlayRect.value = {
+            top: centerTop - shrinkSize / 2,
+            left: centerLeft - shrinkSize / 2,
+            width: shrinkSize,
+            height: shrinkSize,
+        };
+
+        // Update image position to center of shrinking container
+        // Account for border-2 (2px each side) - flexbox centers within content area
+        const borderWidth = 2; // border-2 = 2px
+        const shrinkContentWidth = shrinkSize - (borderWidth * 2);
+        const shrinkContentHeight = shrinkSize - (borderWidth * 2);
+        imageCenterPosition.value = {
+            top: Math.round((shrinkContentHeight - overlayImageSize.value.height) / 2) + borderWidth,
+            left: Math.round((shrinkContentWidth - overlayImageSize.value.width) / 2) + borderWidth,
+        };
+
+        // Fade out backdrop
+        backdropOpacity.value = 0;
+
+        // After animation completes, clear everything
+        setTimeout(() => {
+            overlayKey.value++;
+            overlayIsAnimating.value = false;
+            overlayIsClosing.value = false;
+            overlayIsFilled.value = false;
+            overlayFillComplete.value = false;
+            backdropOpacity.value = 0;
+            overlayImageSize.value = null;
+            imageCenterPosition.value = null;
+            overlayRect.value = null;
+            overlayImage.value = null;
+            overlayBorderRadius.value = null;
+        }, 500); // Match transition duration
+    } else {
+        // Fallback: immediate close if container not available
+        overlayKey.value++;
+        overlayIsAnimating.value = false;
+        overlayIsClosing.value = false;
+        overlayIsFilled.value = false;
+        overlayFillComplete.value = false;
+        backdropOpacity.value = 0;
+        overlayImageSize.value = null;
+        imageCenterPosition.value = null;
+        overlayRect.value = null;
+        overlayImage.value = null;
+        overlayBorderRadius.value = null;
+    }
 }
 
 async function onMasonryClick(e: MouseEvent) {
@@ -99,6 +160,22 @@ async function onMasonryClick(e: MouseEvent) {
     // Store original image size to maintain it when container expands
     overlayImageSize.value = { width, height };
     overlayIsFilled.value = false;
+    overlayFillComplete.value = false;
+    overlayIsClosing.value = false;
+
+    // Precalculate flexbox center position for initial (small) container
+    // Flexbox centers within the content area (inside the border), so account for border-2 (2px each side)
+    const borderWidth = 2; // border-2 = 2px
+    const initialContentWidth = width - (borderWidth * 2);
+    const initialContentHeight = height - (borderWidth * 2);
+    // Initially image size equals container size (overlayImageSize is set to { width, height })
+    const initialImageLeft = Math.round((initialContentWidth - overlayImageSize.value.width) / 2) + borderWidth;
+    const initialImageTop = Math.round((initialContentHeight - overlayImageSize.value.height) / 2) + borderWidth;
+
+    imageCenterPosition.value = {
+        top: initialImageTop,
+        left: initialImageLeft,
+    };
 
     // Set initial position at clicked item location
     overlayRect.value = { top, left, width, height };
@@ -119,7 +196,7 @@ async function onMasonryClick(e: MouseEvent) {
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             const tabContent = tabContentContainer.value;
-            if (!tabContent || !overlayRect.value) return;
+            if (!tabContent || !overlayRect.value || !overlayImageSize.value) return;
 
             const tabContentBox = tabContent.getBoundingClientRect();
             const containerWidth = tabContentBox.width;
@@ -130,8 +207,18 @@ async function onMasonryClick(e: MouseEvent) {
             const centerLeft = Math.round((containerWidth - width) / 2);
             const centerTop = Math.round((containerHeight - height) / 2);
 
-            // Don't set imageCenterPosition yet - wait until container is filled
-            // This prevents the image from switching positioning methods mid-animation
+            // Precalculate flexbox center position for centered (small) container
+            // Flexbox centers within the content area (inside the border), so account for border-2 (2px each side)
+            const borderWidth = 2; // border-2 = 2px
+            const contentWidth = width - (borderWidth * 2);
+            const contentHeight = height - (borderWidth * 2);
+            const centeredImageLeft = Math.round((contentWidth - overlayImageSize.value.width) / 2) + borderWidth;
+            const centeredImageTop = Math.round((contentHeight - overlayImageSize.value.height) / 2) + borderWidth;
+
+            imageCenterPosition.value = {
+                top: centeredImageTop,
+                left: centeredImageLeft,
+            };
 
             // Mark as animating and update to center position
             overlayIsAnimating.value = true;
@@ -146,8 +233,20 @@ async function onMasonryClick(e: MouseEvent) {
             setTimeout(() => {
                 if (!tabContent || !overlayRect.value || !overlayImageSize.value) return;
 
+                // Precalculate flexbox center position for full container
+                // Flexbox centers within the content area (inside the border), so account for border-2 (2px each side)
+                const borderWidth = 2; // border-2 = 2px
+                const fullContentWidth = containerWidth - (borderWidth * 2);
+                const fullContentHeight = containerHeight - (borderWidth * 2);
+                const fullImageLeft = Math.round((fullContentWidth - overlayImageSize.value.width) / 2) + borderWidth;
+                const fullImageTop = Math.round((fullContentHeight - overlayImageSize.value.height) / 2) + borderWidth;
+
+                imageCenterPosition.value = {
+                    top: fullImageTop,
+                    left: fullImageLeft,
+                };
+
                 // Mark as filled and update to fill entire tab content container
-                // Keep object-cover during fill animation - don't switch to absolute positioning yet
                 overlayIsFilled.value = true;
                 overlayRect.value = {
                     top: 0,
@@ -156,8 +255,10 @@ async function onMasonryClick(e: MouseEvent) {
                     height: containerHeight,
                 };
 
-                // Don't switch to absolute positioning - keep using flexbox centering
-                // This avoids any pixel glitches from switching positioning methods
+                // After fill animation completes (another 500ms), show close button
+                setTimeout(() => {
+                    overlayFillComplete.value = true;
+                }, 500); // Match the transition duration
             }, 500); // Match the transition duration
         });
     });
@@ -615,9 +716,9 @@ onMounted(async () => {
 
                 <!-- Click overlay -->
                 <div v-if="overlayRect && overlayImage" :class="[
-                    'absolute border-2 border-red-500 z-50',
-                    overlayIsFilled ? 'flex items-center justify-center' : 'overflow-hidden pointer-events-none',
-                    overlayIsAnimating ? 'transition-all duration-500 ease-in-out' : ''
+                    'absolute z-50 border-2 border-twilight-indigo-500',
+                    overlayIsFilled && !overlayIsClosing ? '' : 'overflow-hidden pointer-events-none',
+                    overlayIsAnimating || overlayIsClosing ? 'transition-all duration-500 ease-in-out' : ''
                 ]" :style="{
                     top: overlayRect.top + 'px',
                     left: overlayRect.left + 'px',
@@ -627,15 +728,21 @@ onMounted(async () => {
                 }">
                     <img :key="overlayKey" :src="overlayImage.src" :srcset="overlayImage.srcset"
                         :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
-                            'select-none pointer-events-none',
-                            overlayIsFilled ? '' : 'object-cover'
-                        ]" :style="overlayImageSize ? {
+                            'absolute select-none pointer-events-none',
+                            overlayIsFilled ? '' : 'object-cover',
+                            (overlayIsAnimating || overlayIsClosing) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                        ]" :style="overlayImageSize && imageCenterPosition ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                            top: imageCenterPosition.top + 'px',
+                            left: imageCenterPosition.left + 'px',
+                        } : overlayImageSize ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
                         } : undefined" draggable="false" />
 
                     <!-- Close button -->
-                    <button v-if="overlayIsFilled" @click="closeOverlay"
+                    <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
                         class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
                         aria-label="Close overlay" data-test="close-overlay-button">
                         <X :size="20" />
