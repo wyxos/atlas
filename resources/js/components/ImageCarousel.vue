@@ -42,8 +42,6 @@ const imageLoadingStates = ref<Record<number, boolean>>({}); // Track which imag
 const imageLoadedStates = ref<Record<number, boolean>>({}); // Track which images are loaded
 const newItemsAnimationDelay = ref<Record<number, number>>({}); // Track animation delays for new items
 
-// Threshold for when to hide empty boxes (when within 3 items of the end)
-const EMPTY_BOX_THRESHOLD = 3;
 const STAGGER_DELAY = 100; // Delay between each item animation in ms
 
 // Preload an image and update loading state
@@ -125,9 +123,6 @@ const drawerItems = computed(() => {
     const currentIndex = props.currentItemIndex;
     const totalItems = props.items.length;
 
-    // Check if we're near the end and should hide empty boxes
-    const isNearEnd = currentIndex >= totalItems - EMPTY_BOX_THRESHOLD;
-
     // Determine where to place the current item
     let currentItemBoxIndex: number;
     if (currentIndex > 4) {
@@ -152,19 +147,27 @@ const drawerItems = computed(() => {
     sourceIndex = currentIndex + 1;
     let nextBoxIndex = currentItemBoxIndex + 1;
 
-    // Fill remaining boxes with items or mark as hidden if near end
+    // Calculate how many items we have available after the current item
+    const itemsAfterCurrent = totalItems - (currentIndex + 1);
+    // Calculate how many boxes we need to fill (up to 11 total boxes)
+    const boxesAfterCurrent = 11 - (currentItemBoxIndex + 1);
+
+    // Only fill boxes if we have items, and hide empty boxes when near the end
     for (let boxIndex = nextBoxIndex; boxIndex < 11; boxIndex++) {
         if (sourceIndex < totalItems) {
             items[boxIndex] = props.items[sourceIndex];
             sourceIndex++;
-        } else if (isNearEnd) {
-            // Hide empty boxes when near the end
+        } else {
+            // Hide empty boxes when we don't have more items
             items[boxIndex] = 'hidden';
         }
     }
 
     return items;
 });
+
+// Track newly added item IDs to trigger animations
+const newlyAddedItemIds = ref<Set<number>>(new Set());
 
 // Watch for new items being added
 watch(() => props.items.length, (newLength, oldLength) => {
@@ -176,6 +179,24 @@ watch(() => props.items.length, (newLength, oldLength) => {
 
         // Preload new items with staggered delays
         preloadNewItems(newItems, startIndex);
+
+        // Mark items as newly added for animation after DOM updates
+        nextTick(() => {
+            // Force a reflow to ensure animation triggers
+            requestAnimationFrame(() => {
+                newItems.forEach(item => {
+                    newlyAddedItemIds.value.add(item.id);
+                });
+
+                // Clear the newly added flag after animations complete
+                const maxDelay = (newItems.length - 1) * STAGGER_DELAY;
+                setTimeout(() => {
+                    newItems.forEach(item => {
+                        newlyAddedItemIds.value.delete(item.id);
+                    });
+                }, 500 + maxDelay);
+            });
+        });
     }
 
     previousItemsCount.value = newLength;
@@ -252,8 +273,8 @@ watch(() => props.currentItemIndex, async (newIndex, oldIndex) => {
     // Check if we're near the end and should trigger loading
     if (newIndex !== null && props.hasMore && !props.isLoading && props.onLoadMore) {
         const totalItems = props.items.length;
-        // Trigger loading when we're within 2 items of the end
-        if (newIndex >= totalItems - 2) {
+        // Trigger loading only when we're at the last item (totalItems - 1)
+        if (newIndex === totalItems - 1) {
             await props.onLoadMore();
         }
     }
@@ -334,12 +355,14 @@ function handleItemClick(item: MasonryItem): void {
                     :class="[
                         'shrink-0 rounded overflow-hidden carousel-item relative',
                         item && item !== 'loading' && isSelectedItem(item, boxIndex) ? 'border-4 border-smart-blue-500' : 'border-2 border-smart-blue-500/50',
-                        item && item !== 'loading' ? 'cursor-pointer' : 'bg-smart-blue-500/20'
+                        item && item !== 'loading' ? 'cursor-pointer' : 'bg-smart-blue-500/20',
+                        item && item !== 'loading' && newlyAddedItemIds.has(item.id) ? 'carousel-item-new' : ''
                     ]" :style="{
                         width: '192px',
                         height: '192px',
-                        animationDelay: item && item !== 'loading' && newItemsAnimationDelay[item.id] !== undefined ? `${newItemsAnimationDelay[item.id]}ms` : '0ms',
-                        animation: item && item !== 'loading' && newItemsAnimationDelay[item.id] !== undefined ? 'slideInFromRight 0.5s ease-out forwards' : 'none'
+                        '--animation-delay': item && item !== 'loading' && newItemsAnimationDelay[item.id] !== undefined ? `${newItemsAnimationDelay[item.id]}ms` : '0ms',
+                        animation: item && item !== 'loading' && newlyAddedItemIds.has(item.id) ? `slideInFromRight 0.5s ease-out forwards` : 'none',
+                        animationDelay: item && item !== 'loading' && newlyAddedItemIds.has(item.id) && newItemsAnimationDelay[item.id] !== undefined ? `${newItemsAnimationDelay[item.id]}ms` : '0ms'
                     }" :data-test="`carousel-box-${boxIndex}`"
                     @click="item && item !== 'loading' && !isSelectedItem(item, boxIndex) ? handleItemClick(item) : null">
                     <!-- Loading spinner - show while image is preloading -->
@@ -376,12 +399,17 @@ function handleItemClick(item: MasonryItem): void {
 @keyframes slideInFromRight {
     from {
         opacity: 0;
-        transform: translateX(20px);
+        transform: translateX(30px);
     }
 
     to {
         opacity: 1;
         transform: translateX(0);
     }
+}
+
+.carousel-item-new {
+    animation: slideInFromRight 0.5s ease-out forwards !important;
+    animation-delay: var(--animation-delay, 0ms) !important;
 }
 </style>
