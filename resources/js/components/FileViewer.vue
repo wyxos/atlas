@@ -34,6 +34,8 @@ const currentItemIndex = ref<number | null>(null); // Track current item index i
 const imageScale = ref(1); // Scale factor for individual image (for scale-from-zero animation)
 const isNavigating = ref(false); // Track if we're navigating between images
 const isBottomPanelOpen = ref(false); // Track if bottom panel is open
+const imageTranslateX = ref(0); // Translate X for slide animation
+const navigationDirection = ref<'left' | 'right' | null>(null); // Track navigation direction
 
 // Computed property to calculate which items to show in drawer boxes
 const drawerItems = computed(() => {
@@ -191,6 +193,8 @@ function closeOverlay(): void {
             originalImageDimensions.value = null;
             currentItemIndex.value = null;
             imageScale.value = 1;
+            imageTranslateX.value = 0;
+            navigationDirection.value = null;
             isNavigating.value = false;
             isBottomPanelOpen.value = false;
             emit('close');
@@ -213,6 +217,8 @@ function closeOverlay(): void {
         isBottomPanelOpen.value = false;
         currentItemIndex.value = null;
         imageScale.value = 1;
+        imageTranslateX.value = 0;
+        navigationDirection.value = null;
         isNavigating.value = false;
         isBottomPanelOpen.value = false;
         emit('close');
@@ -235,8 +241,10 @@ function handleDrawerNext(): void {
 // Handle drawer item click
 function handleDrawerItemClick(item: MasonryItem): void {
     const itemIndex = props.items.findIndex(i => i.id === item.id);
-    if (itemIndex >= 0) {
-        navigateToIndex(itemIndex);
+    if (itemIndex >= 0 && currentItemIndex.value !== null) {
+        // Determine direction based on index comparison
+        const direction = itemIndex > currentItemIndex.value ? 'right' : 'left';
+        navigateToIndex(itemIndex, direction);
     }
 }
 
@@ -489,7 +497,7 @@ async function navigateToNext(): Promise<void> {
     if (currentItemIndex.value >= props.items.length - 1) return; // Already at last item
 
     const nextIndex = currentItemIndex.value + 1;
-    await navigateToIndex(nextIndex);
+    await navigateToIndex(nextIndex, 'right');
 }
 
 // Navigate to previous image
@@ -498,24 +506,31 @@ async function navigateToPrevious(): Promise<void> {
     if (currentItemIndex.value <= 0) return; // Already at first item
 
     const prevIndex = currentItemIndex.value - 1;
-    await navigateToIndex(prevIndex);
+    await navigateToIndex(prevIndex, 'left');
 }
 
 // Navigate to a specific index
-async function navigateToIndex(index: number): Promise<void> {
+async function navigateToIndex(index: number, direction?: 'left' | 'right'): Promise<void> {
     if (!overlayRect.value || !overlayFillComplete.value || isNavigating.value) return;
     if (index < 0 || index >= props.items.length) return;
 
     const tabContent = props.containerRef;
     if (!tabContent) return;
 
+    // Determine direction if not provided
+    if (!direction && currentItemIndex.value !== null) {
+        direction = index > currentItemIndex.value ? 'right' : 'left';
+    }
+    navigationDirection.value = direction || 'right';
+
     isNavigating.value = true;
 
-    // Step 1: Shrink current image to 0
-    imageScale.value = 0;
+    // Step 1: Slide current image out
+    const slideOutDistance = tabContent.getBoundingClientRect().width;
+    imageTranslateX.value = direction === 'right' ? -slideOutDistance : slideOutDistance;
     overlayIsAnimating.value = true;
 
-    // Wait for shrink animation to complete
+    // Wait for slide out animation to complete
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Step 2: Get next item and show spinner
@@ -561,7 +576,10 @@ async function navigateToIndex(index: number): Promise<void> {
         left: previewImageLeft,
     };
 
-    imageScale.value = 0; // Start new image at scale 0
+    // Start new image off-screen in the opposite direction
+    const slideInDistance = tabContent.getBoundingClientRect().width;
+    imageTranslateX.value = direction === 'right' ? slideInDistance : -slideInDistance;
+    imageScale.value = 1; // Keep scale at 1 for slide animation
     await nextTick(); // Ensure DOM updates before continuing
 
     // Step 3: Preload the full-size image
@@ -598,8 +616,9 @@ async function navigateToIndex(index: number): Promise<void> {
             left: fullImageLeft,
         };
 
-        // Ensure imageScale is 0 before switching to full-size image
-        imageScale.value = 0;
+        // Ensure imageTranslateX is set for slide-in animation
+        // (already set above, but keep scale at 1)
+        imageScale.value = 1;
 
         // Wait for DOM to update with new image size/position
         await nextTick();
@@ -633,9 +652,8 @@ async function navigateToIndex(index: number): Promise<void> {
             });
         });
 
-        // Now scale image from 0 to 1 (exact reverse of shrink)
-        // This should be an exact reverse: same duration, same easing, same transform origin
-        imageScale.value = 1;
+        // Now slide image in from the side
+        imageTranslateX.value = 0;
 
         // Update current index
         currentItemIndex.value = index;
@@ -653,6 +671,7 @@ async function navigateToIndex(index: number): Promise<void> {
             };
         }
         imageScale.value = 1;
+        imageTranslateX.value = 0;
         currentItemIndex.value = index;
         await nextTick();
     }
@@ -732,7 +751,7 @@ defineExpose({
                         width: overlayImageSize.width + 'px',
                         height: overlayImageSize.height + 'px',
                     } : {}),
-                    transform: `scale(${imageScale})`,
+                    transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
                     transformOrigin: 'center center',
                 }" draggable="false" />
 
@@ -758,7 +777,7 @@ defineExpose({
                         width: overlayImageSize.width + 'px',
                         height: overlayImageSize.height + 'px',
                     } : {}),
-                    transform: `scale(${imageScale})`,
+                    transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
                     transformOrigin: 'center center',
                 }" draggable="false" @click="toggleBottomPanel" />
 
