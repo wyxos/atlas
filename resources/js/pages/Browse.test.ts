@@ -3352,5 +3352,367 @@ describe('Browse', () => {
             expect(fileViewerVm.isNavigating).toBe(true);
         });
 
+        it('centers item in carousel when index > 4', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: Array.from({ length: 10 }, (_, i) => ({
+                                id: i + 1,
+                                width: 100,
+                                height: 100,
+                                src: `test${i + 1}.jpg`,
+                                page: 1,
+                                index: i,
+                            })),
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            vm.items = Array.from({ length: 10 }, (_, i) => ({
+                id: i + 1,
+                width: 100,
+                height: 100,
+                src: `test${i + 1}.jpg`,
+                page: 1,
+                index: i,
+            }));
+
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state with index 5 (should be centered in 6th box)
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test6.jpg', alt: 'Test 6' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 5;
+            fileViewerVm.isBottomPanelOpen = true;
+            await wrapper.vm.$nextTick();
+
+            // Verify item at index 5 is in center box (6th box, index 5)
+            const centerBox = wrapper.find('[data-test="carousel-box-5"]');
+            expect(centerBox.exists()).toBe(true);
+            const centerPreview = wrapper.find('[data-test="carousel-preview-5"]');
+            expect(centerPreview.exists()).toBe(true);
+            expect(centerPreview.attributes('alt')).toBe('Preview 6');
+        });
+
+        it('places item at corresponding index when index <= 4', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: Array.from({ length: 10 }, (_, i) => ({
+                                id: i + 1,
+                                width: 100,
+                                height: 100,
+                                src: `test${i + 1}.jpg`,
+                                page: 1,
+                                index: i,
+                            })),
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            vm.items = Array.from({ length: 10 }, (_, i) => ({
+                id: i + 1,
+                width: 100,
+                height: 100,
+                src: `test${i + 1}.jpg`,
+                page: 1,
+                index: i,
+            }));
+
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state with index 2 (should be at box index 2)
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test3.jpg', alt: 'Test 3' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 2;
+            fileViewerVm.isBottomPanelOpen = true;
+            await wrapper.vm.$nextTick();
+
+            // Verify item at index 2 is in box index 2
+            const box2 = wrapper.find('[data-test="carousel-box-2"]');
+            expect(box2.exists()).toBe(true);
+            const preview2 = wrapper.find('[data-test="carousel-preview-2"]');
+            expect(preview2.exists()).toBe(true);
+            expect(preview2.attributes('alt')).toBe('Preview 3');
+        });
+
+        it('navigates when clicking on carousel item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                                { id: 2, width: 200, height: 200, src: 'test2.jpg', page: 1, index: 1 },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            vm.items = [
+                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                { id: 2, width: 200, height: 200, src: 'test2.jpg', page: 1, index: 1 },
+            ];
+
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.isBottomPanelOpen = true;
+            await wrapper.vm.$nextTick();
+
+            // Click on carousel box 1 (should navigate to item at index 1)
+            const box1 = wrapper.find('[data-test="carousel-box-1"]');
+            expect(box1.exists()).toBe(true);
+            await box1.trigger('click');
+
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Verify navigation started
+            expect(fileViewerVm.isNavigating).toBe(true);
+        });
+
+        it('disables previous button when at first item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            vm.items = [
+                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+            ];
+
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state at first item
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.isBottomPanelOpen = true;
+            await wrapper.vm.$nextTick();
+
+            // Verify previous button is disabled
+            const prevButton = wrapper.find('[data-test="carousel-previous-button"]');
+            expect(prevButton.exists()).toBe(true);
+            expect(prevButton.attributes('disabled')).toBeDefined();
+        });
+
+        it('disables next button when at last item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            vm.items = [
+                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+            ];
+
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set overlay state at last item
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.isBottomPanelOpen = true;
+            await wrapper.vm.$nextTick();
+
+            // Verify next button is disabled
+            const nextButton = wrapper.find('[data-test="carousel-next-button"]');
+            expect(nextButton.exists()).toBe(true);
+            expect(nextButton.attributes('disabled')).toBeDefined();
+        });
+
     });
 });
