@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { X, Loader2 } from 'lucide-vue-next';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 
@@ -353,6 +353,27 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     });
 }
 
+// Keyboard event handler for Escape key
+function handleKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && overlayRect.value && !overlayIsClosing.value) {
+        closeOverlay();
+    }
+}
+
+// Watch overlay visibility and add/remove keyboard listener
+watch(() => overlayRect.value !== null, (isVisible) => {
+    if (isVisible) {
+        window.addEventListener('keydown', handleKeyDown);
+    } else {
+        window.removeEventListener('keydown', handleKeyDown);
+    }
+}, { immediate: true });
+
+// Cleanup on unmount
+onUnmounted(() => {
+    window.removeEventListener('keydown', handleKeyDown);
+});
+
 // Expose methods for parent component
 defineExpose({
     openFromClick,
@@ -375,8 +396,22 @@ defineExpose({
         transform: `scale(${overlayScale})`,
         transformOrigin: 'center center',
     }">
+        <!-- Preview image (shown immediately, behind spinner) -->
+        <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
+            :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
+                'absolute select-none pointer-events-none object-cover',
+            ]" :style="overlayImageSize && imageCenterPosition ? {
+                width: overlayImageSize.width + 'px',
+                height: overlayImageSize.height + 'px',
+                top: imageCenterPosition.top + 'px',
+                left: imageCenterPosition.left + 'px',
+            } : overlayImageSize ? {
+                width: overlayImageSize.width + 'px',
+                height: overlayImageSize.height + 'px',
+            } : undefined" draggable="false" />
+
         <!-- Spinner while loading full-size image -->
-        <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center">
+        <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
             <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
         </div>
 
