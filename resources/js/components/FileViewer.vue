@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { X, Loader2, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 
@@ -34,6 +34,58 @@ const currentItemIndex = ref<number | null>(null); // Track current item index i
 const imageScale = ref(1); // Scale factor for individual image (for scale-from-zero animation)
 const isNavigating = ref(false); // Track if we're navigating between images
 const isBottomPanelOpen = ref(false); // Track if bottom panel is open
+
+// Computed property to calculate which items to show in drawer boxes
+const drawerItems = computed(() => {
+    if (currentItemIndex.value === null || props.items.length === 0) {
+        return Array(11).fill(null);
+    }
+
+    const items = Array(11).fill(null);
+    const currentIndex = currentItemIndex.value;
+    const totalItems = props.items.length;
+
+    // Determine the center box index (6th box, index 5)
+    const centerBoxIndex = 5;
+
+    // Determine where to place the current item
+    let currentItemBoxIndex: number;
+    if (currentIndex > 4) {
+        // If index > 4, place in center (6th box)
+        currentItemBoxIndex = centerBoxIndex;
+    } else {
+        // If index <= 4, place at corresponding box index
+        currentItemBoxIndex = currentIndex;
+    }
+
+    // Place current item
+    items[currentItemBoxIndex] = props.items[currentIndex];
+
+    // Fill boxes before current item
+    let sourceIndex = currentIndex - 1;
+    for (let boxIndex = currentItemBoxIndex - 1; boxIndex >= 0 && sourceIndex >= 0; boxIndex--) {
+        items[boxIndex] = props.items[sourceIndex];
+        sourceIndex--;
+    }
+
+    // Fill boxes after current item
+    sourceIndex = currentIndex + 1;
+    for (let boxIndex = currentItemBoxIndex + 1; boxIndex < 11 && sourceIndex < totalItems; boxIndex++) {
+        items[boxIndex] = props.items[sourceIndex];
+        sourceIndex++;
+    }
+
+    return items;
+});
+
+// Helper to check if an item is the currently selected one
+function isSelectedItem(item: MasonryItem | null, boxIndex: number): boolean {
+    if (!item || currentItemIndex.value === null) return false;
+
+    // Check if this item is at the current index in the items array
+    const itemArrayIndex = props.items.indexOf(item);
+    return itemArrayIndex === currentItemIndex.value;
+}
 
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
@@ -503,8 +555,11 @@ async function navigateToIndex(index: number): Promise<void> {
         const containerWidth = tabContentBox.width;
         const containerHeight = tabContentBox.height;
         const borderWidth = 4;
+
+        // Reduce available height by 200px when drawer is open
+        const panelHeight = isBottomPanelOpen.value ? 200 : 0;
         const availableWidth = containerWidth - (borderWidth * 2);
-        const availableHeight = containerHeight - (borderWidth * 2);
+        const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
 
         const bestFitSize = calculateBestFitSize(
             imageDimensions.width,
@@ -711,11 +766,17 @@ defineExpose({
 
             <!-- Squares container -->
             <div class="h-full p-4 flex items-center justify-center gap-4 overflow-x-auto px-16">
-                <div v-for="i in 11" :key="i"
-                    class="shrink-0 bg-smart-blue-500/20 border-2 border-smart-blue-500 rounded" :style="{
-                        width: '192px',
-                        height: '192px',
-                    }" :data-test="`square-${i}`" />
+                <div v-for="(item, boxIndex) in drawerItems" :key="boxIndex" :class="[
+                    'shrink-0 rounded overflow-hidden',
+                    isSelectedItem(item, boxIndex) ? 'border-4 border-smart-blue-500' : 'border-2 border-smart-blue-500/50',
+                    item ? 'cursor-pointer' : 'bg-smart-blue-500/20'
+                ]" :style="{
+                    width: '192px',
+                    height: '192px',
+                }" :data-test="`drawer-box-${boxIndex}`">
+                    <img v-if="item" :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`"
+                        class="w-full h-full object-cover" :data-test="`drawer-preview-${boxIndex}`" />
+                </div>
             </div>
 
             <!-- Next button -->
