@@ -220,6 +220,26 @@ function closeOverlay(): void {
 }
 
 // Toggle bottom panel
+// Handle drawer previous button click
+function handleDrawerPrevious(): void {
+    if (currentItemIndex.value === null || currentItemIndex.value <= 0) return;
+    navigateToPrevious();
+}
+
+// Handle drawer next button click
+function handleDrawerNext(): void {
+    if (currentItemIndex.value === null || currentItemIndex.value >= props.items.length - 1) return;
+    navigateToNext();
+}
+
+// Handle drawer item click
+function handleDrawerItemClick(item: MasonryItem): void {
+    const itemIndex = props.items.findIndex(i => i.id === item.id);
+    if (itemIndex >= 0) {
+        navigateToIndex(itemIndex);
+    }
+}
+
 function toggleBottomPanel(): void {
     if (!overlayFillComplete.value || overlayIsClosing.value) return;
     isBottomPanelOpen.value = !isBottomPanelOpen.value;
@@ -758,8 +778,8 @@ defineExpose({
             height: isBottomPanelOpen ? '200px' : '0px',
         }">
             <!-- Previous button -->
-            <button
-                class="absolute left-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+            <button @click="handleDrawerPrevious" :disabled="currentItemIndex === null || currentItemIndex <= 0"
+                class="absolute left-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Previous" data-test="drawer-previous-button">
                 <ChevronLeft :size="20" />
             </button>
@@ -773,15 +793,19 @@ defineExpose({
                 ]" :style="{
                     width: '192px',
                     height: '192px',
-                }" :data-test="`drawer-box-${boxIndex}`">
-                    <img v-if="item" :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`"
-                        class="w-full h-full object-cover" :data-test="`drawer-preview-${boxIndex}`" />
+                }" :data-test="`drawer-box-${boxIndex}`"
+                    @click="item && !isSelectedItem(item, boxIndex) ? handleDrawerItemClick(item) : null">
+                    <img v-if="item" :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`" :class="[
+                        'w-full h-full object-cover transition-all duration-300',
+                        isSelectedItem(item, boxIndex) ? '' : 'opacity-50'
+                    ]" :data-test="`drawer-preview-${boxIndex}`" />
                 </div>
             </div>
 
             <!-- Next button -->
-            <button
-                class="absolute right-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+            <button @click="handleDrawerNext"
+                :disabled="currentItemIndex === null || currentItemIndex >= props.items.length - 1"
+                class="absolute right-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Next" data-test="drawer-next-button">
                 <ChevronRight :size="20" />
             </button>
