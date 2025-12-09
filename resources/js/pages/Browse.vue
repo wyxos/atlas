@@ -480,7 +480,7 @@ onMounted(async () => {
 
                 <!-- File Viewer -->
                 <FileViewer ref="fileViewer" :container-ref="tabContentContainer"
-                    :masonry-container-ref="masonryContainer" @close="() => { }" />
+                    :masonry-container-ref="masonryContainer" :items="items" @close="() => { }" />
 
                 <!-- Status/Pagination Info at Bottom -->
                 <div v-if="activeTabId !== null && hasServiceSelected"
