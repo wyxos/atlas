@@ -190,8 +190,12 @@ function closeOverlay(): void {
 function handleCarouselItemClick(item: MasonryItem): void {
     const itemIndex = props.items.findIndex(i => i.id === item.id);
     if (itemIndex >= 0 && currentItemIndex.value !== null) {
-        // Determine direction based on index comparison
+        // Determine direction based on index comparison BEFORE updating
         const direction = itemIndex > currentItemIndex.value ? 'right' : 'left';
+
+        // Update currentItemIndex immediately so carousel stays in sync
+        currentItemIndex.value = itemIndex;
+
         navigateToIndex(itemIndex, direction);
     }
 }
@@ -743,7 +747,7 @@ defineExpose({
         <!-- Image Carousel -->
         <ImageCarousel v-if="overlayFillComplete && !overlayIsClosing" :items="items"
             :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" :has-more="hasMore"
-            :is-loading="isLoading" :on-load-more="onLoadMore" @next="navigateToNext"
-            @previous="navigateToPrevious" @item-click="handleCarouselItemClick" />
+            :is-loading="isLoading" :on-load-more="onLoadMore" @next="navigateToNext" @previous="navigateToPrevious"
+            @item-click="handleCarouselItemClick" />
     </div>
 </template>

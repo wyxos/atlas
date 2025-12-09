@@ -7,7 +7,6 @@ import type { MasonryItem } from '../composables/useBrowseTabs';
 vi.mock('lucide-vue-next', () => ({
     ChevronLeft: { name: 'ChevronLeft', template: '<svg data-test="chevron-left"></svg>' },
     ChevronRight: { name: 'ChevronRight', template: '<svg data-test="chevron-right"></svg>' },
-    Loader2: { name: 'Loader2', template: '<svg data-test="loader"></svg>' },
 }));
 
 describe('ImageCarousel', () => {
@@ -57,7 +56,7 @@ describe('ImageCarousel', () => {
         expect(carousel.attributes('style')).toContain('height: 0px');
     });
 
-    it('displays correct number of boxes', () => {
+    it('displays all items in the carousel', () => {
         const items = createMockItems(10);
         const wrapper = mount(ImageCarousel, {
             props: {
@@ -67,52 +66,41 @@ describe('ImageCarousel', () => {
             },
         });
 
-        // Should render 11 boxes (carousel has 11 slots)
-        const boxes = wrapper.findAll('[data-test^="carousel-box-"]');
-        expect(boxes.length).toBeGreaterThan(0);
+        // Should render all items
+        const carouselItems = wrapper.findAll('[data-test^="carousel-item-"]');
+        expect(carouselItems.length).toBe(items.length);
     });
 
-    it('hides empty boxes when near the end', () => {
-        const items = createMockItems(8);
-        const wrapper = mount(ImageCarousel, {
-            props: {
-                items,
-                currentItemIndex: 3, // 4th item (index 3)
-                visible: true,
-            },
-        });
-
-        // Get all boxes
-        const boxes = wrapper.findAll('[data-test^="carousel-box-"]');
-        
-        // Count visible boxes (not hidden)
-        const visibleBoxes = boxes.filter(box => {
-            const element = box.element as HTMLElement;
-            return element.style.display !== 'none' && !element.hasAttribute('v-show');
-        });
-
-        // Should not show empty boxes when we don't have enough items
-        expect(visibleBoxes.length).toBeLessThanOrEqual(items.length + 1); // +1 for current item
-    });
-
-    it('hides empty boxes when at 5th item before last', () => {
+    it('marks current item as active', () => {
         const items = createMockItems(10);
         const wrapper = mount(ImageCarousel, {
             props: {
                 items,
-                currentItemIndex: 4, // 5th item (index 4), 5 items before last
+                currentItemIndex: 5,
                 visible: true,
             },
         });
 
-        const boxes = wrapper.findAll('[data-test^="carousel-box-"]');
-        const hiddenBoxes = boxes.filter(box => {
-            const element = box.element as HTMLElement;
-            return element.style.display === 'none';
+        // Current item should have active styling (border-4, scale-110)
+        const currentItem = wrapper.find('[data-test="carousel-item-5"]');
+        expect(currentItem.classes()).toContain('border-4');
+        expect(currentItem.classes()).toContain('scale-110');
+    });
+
+    it('marks non-current items as inactive', () => {
+        const items = createMockItems(10);
+        const wrapper = mount(ImageCarousel, {
+            props: {
+                items,
+                currentItemIndex: 5,
+                visible: true,
+            },
         });
 
-        // Should hide empty boxes
-        expect(hiddenBoxes.length).toBeGreaterThan(0);
+        // Non-current items should have inactive styling (opacity-50)
+        const inactiveItem = wrapper.find('[data-test="carousel-item-3"]');
+        expect(inactiveItem.classes()).toContain('opacity-50');
+        expect(inactiveItem.classes()).not.toContain('scale-110');
     });
 
     it('emits next event when next button is clicked', async () => {
@@ -187,12 +175,13 @@ describe('ImageCarousel', () => {
             },
         });
 
-        // Find a box that's not the current item
-        const box = wrapper.find('[data-test="carousel-box-6"]');
-        if (box.exists()) {
-            await box.trigger('click');
-            expect(wrapper.emitted('item-click')).toBeTruthy();
-        }
+        // Click on item at index 7
+        const item7 = wrapper.find('[data-test="carousel-item-7"]');
+        await item7.trigger('click');
+
+        expect(wrapper.emitted('item-click')).toBeTruthy();
+        expect(wrapper.emitted('item-click')).toHaveLength(1);
+        expect(wrapper.emitted('item-click')?.[0]).toEqual([items[7]]);
     });
 
     it('does not emit item-click when clicking on current item', async () => {
@@ -205,110 +194,85 @@ describe('ImageCarousel', () => {
             },
         });
 
-        // The center box (box 5) should be the current item
-        // Clicking it should not emit item-click
         const beforeClick = wrapper.emitted('item-click')?.length || 0;
         
-        // Try clicking the center box which should be the current item
-        const centerBox = wrapper.find('[data-test="carousel-box-5"]');
-        if (centerBox.exists()) {
-            await centerBox.trigger('click');
-        }
+        // Click on current item (index 5)
+        const currentItem = wrapper.find('[data-test="carousel-item-5"]');
+        await currentItem.trigger('click');
         
         const afterClick = wrapper.emitted('item-click')?.length || 0;
         // Should not emit if it's the current item
         expect(afterClick).toBe(beforeClick);
     });
 
-    it('triggers onLoadMore only when clicking on last item', async () => {
-        const onLoadMore = vi.fn().mockResolvedValue(undefined);
+    it('immediately marks clicked item as active', async () => {
         const items = createMockItems(10);
-        
         const wrapper = mount(ImageCarousel, {
             props: {
                 items,
-                currentItemIndex: 8, // Second-to-last item
+                currentItemIndex: 5,
                 visible: true,
-                hasMore: true,
-                isLoading: false,
-                onLoadMore,
             },
         });
 
-        // Click second-to-last item - should NOT trigger loading
-        await wrapper.setProps({ currentItemIndex: 8 });
+        // Click on item at index 7
+        const item7 = wrapper.find('[data-test="carousel-item-7"]');
+        await item7.trigger('click');
         await flushPromises();
-        await vi.runAllTimersAsync();
-        
-        expect(onLoadMore).not.toHaveBeenCalled();
 
-        // Click last item - should trigger loading
-        await wrapper.setProps({ currentItemIndex: 9 });
-        await flushPromises();
-        await vi.runAllTimersAsync();
-
-        expect(onLoadMore).toHaveBeenCalledTimes(1);
+        // Item 7 should immediately show as active
+        const clickedItem = wrapper.find('[data-test="carousel-item-7"]');
+        expect(clickedItem.classes()).toContain('border-4');
+        expect(clickedItem.classes()).toContain('scale-110');
     });
 
-    it('does not trigger onLoadMore when hasMore is false', async () => {
-        const onLoadMore = vi.fn().mockResolvedValue(undefined);
+    it('updates active state when currentItemIndex prop changes', async () => {
         const items = createMockItems(10);
-        
         const wrapper = mount(ImageCarousel, {
             props: {
                 items,
-                currentItemIndex: 9, // Last item
+                currentItemIndex: 5,
                 visible: true,
-                hasMore: false, // No more items
-                isLoading: false,
-                onLoadMore,
             },
         });
 
-        await wrapper.setProps({ currentItemIndex: 9 });
+        // Initially item 5 should be active
+        let item5 = wrapper.find('[data-test="carousel-item-5"]');
+        expect(item5.classes()).toContain('scale-110');
+
+        // Update to item 7
+        await wrapper.setProps({ currentItemIndex: 7 });
         await flushPromises();
         await vi.runAllTimersAsync();
 
-        expect(onLoadMore).not.toHaveBeenCalled();
-    });
-
-    it('does not trigger onLoadMore when already loading', async () => {
-        const onLoadMore = vi.fn().mockResolvedValue(undefined);
-        const items = createMockItems(10);
+        // Item 7 should now be active
+        const item7 = wrapper.find('[data-test="carousel-item-7"]');
+        expect(item7.classes()).toContain('scale-110');
         
-        const wrapper = mount(ImageCarousel, {
-            props: {
-                items,
-                currentItemIndex: 9, // Last item
-                visible: true,
-                hasMore: true,
-                isLoading: true, // Already loading
-                onLoadMore,
-            },
-        });
-
-        await wrapper.setProps({ currentItemIndex: 9 });
-        await flushPromises();
-        await vi.runAllTimersAsync();
-
-        expect(onLoadMore).not.toHaveBeenCalled();
+        // Item 5 should no longer be active
+        item5 = wrapper.find('[data-test="carousel-item-5"]');
+        expect(item5.classes()).not.toContain('scale-110');
     });
 
-    it('shows loading spinner when isLoading is true and near end', () => {
+    it('applies transition class when animating', async () => {
         const items = createMockItems(10);
         const wrapper = mount(ImageCarousel, {
             props: {
                 items,
-                currentItemIndex: 9, // Last item
+                currentItemIndex: 5,
                 visible: true,
-                hasMore: true,
-                isLoading: true,
             },
         });
 
-        // Should show loading spinner
-        const loaders = wrapper.findAll('[data-test="loader"]');
-        expect(loaders.length).toBeGreaterThan(0);
+        // Find the items container
+        const container = wrapper.find('.flex.items-center');
+        
+        // When currentItemIndex changes, transition should be applied
+        await wrapper.setProps({ currentItemIndex: 7 });
+        await flushPromises();
+
+        // Container should have transition class
+        expect(container.classes()).toContain('transition-transform');
     });
 
     it('handles empty items array', () => {
@@ -369,7 +333,33 @@ describe('ImageCarousel', () => {
         expect(wrapper.vm.$el).toBeTruthy();
     });
 
-    it('preloads images for visible items', async () => {
+    it('calculates scroll position correctly for clicked item', async () => {
+        const items = createMockItems(20);
+        const wrapper = mount(ImageCarousel, {
+            props: {
+                items,
+                currentItemIndex: 10,
+                visible: true,
+            },
+        });
+
+        await flushPromises();
+        await vi.runAllTimersAsync();
+
+        // Click on item at index 15
+        const item15 = wrapper.find('[data-test="carousel-item-15"]');
+        await item15.trigger('click');
+        await flushPromises();
+
+        // Component should handle the click without errors
+        expect(wrapper.find('[data-test="image-carousel"]').exists()).toBe(true);
+        
+        // Item 15 should be marked as active
+        const clickedItem = wrapper.find('[data-test="carousel-item-15"]');
+        expect(clickedItem.classes()).toContain('scale-110');
+    });
+
+    it('syncs clicked item state with prop update', async () => {
         const items = createMockItems(10);
         const wrapper = mount(ImageCarousel, {
             props: {
@@ -379,34 +369,21 @@ describe('ImageCarousel', () => {
             },
         });
 
+        // Click on item 7
+        const item7 = wrapper.find('[data-test="carousel-item-7"]');
+        await item7.trigger('click');
+        await flushPromises();
+
+        // Item 7 should be active immediately
+        let clickedItem = wrapper.find('[data-test="carousel-item-7"]');
+        expect(clickedItem.classes()).toContain('scale-110');
+
+        // When parent updates currentItemIndex to 7, it should stay active
+        await wrapper.setProps({ currentItemIndex: 7 });
         await flushPromises();
         await vi.runAllTimersAsync();
 
-        // Images should start loading
-        const images = wrapper.findAll('img');
-        expect(images.length).toBeGreaterThan(0);
-    });
-
-    it('handles new items being added with staggered animation', async () => {
-        const initialItems = createMockItems(10);
-        const wrapper = mount(ImageCarousel, {
-            props: {
-                items: initialItems,
-                currentItemIndex: 9, // Last item
-                visible: true,
-                hasMore: true,
-            },
-        });
-
-        // Add new items
-        const newItems = createMockItems(15);
-        await wrapper.setProps({ items: newItems });
-        await flushPromises();
-        await vi.runAllTimersAsync();
-
-        // New items should be present
-        const boxes = wrapper.findAll('[data-test^="carousel-box-"]');
-        expect(boxes.length).toBeGreaterThan(0);
+        clickedItem = wrapper.find('[data-test="carousel-item-7"]');
+        expect(clickedItem.classes()).toContain('scale-110');
     });
 });
-

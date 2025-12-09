@@ -2707,7 +2707,7 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
-            
+
             // Set items on Browse component (FileViewer receives this as prop)
             vm.items = [
                 {
@@ -2729,7 +2729,7 @@ describe('Browse', () => {
                     originalUrl: 'test2-full.jpg',
                 },
             ];
-            
+
             const fileViewer = wrapper.findComponent(FileViewer);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const fileViewerVm = fileViewer.vm as any;
@@ -2745,13 +2745,13 @@ describe('Browse', () => {
             fileViewerVm.overlayIsLoading = false;
             fileViewerVm.overlayImageSize = { width: 400, height: 400 };
             fileViewerVm.imageCenterPosition = { top: 100, left: 200 };
-            
+
             // Ensure containerRef is set (needed for navigation)
             const tabContentContainer = wrapper.find('[ref="tabContentContainer"]');
             if (tabContentContainer.exists()) {
                 fileViewerVm.containerRef = tabContentContainer.element;
             }
-            
+
             await wrapper.vm.$nextTick();
 
             // Verify initial state
@@ -2770,7 +2770,7 @@ describe('Browse', () => {
             expect(fileViewerVm.isNavigating).toBe(true);
             expect(fileViewerVm.imageTranslateX).not.toBe(0); // Should be sliding out
             expect(fileViewerVm.navigationDirection).toBe('right');
-            
+
             // Note: Full navigation completion requires image preloading which may fail in test environment
             // The important part is that navigation starts correctly when ArrowRight is pressed
         });
@@ -2835,7 +2835,7 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
-            
+
             // Set items on Browse component
             vm.items = [
                 {
@@ -2857,7 +2857,7 @@ describe('Browse', () => {
                     originalUrl: 'test2-full.jpg',
                 },
             ];
-            
+
             const fileViewer = wrapper.findComponent(FileViewer);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const fileViewerVm = fileViewer.vm as any;
@@ -2873,13 +2873,13 @@ describe('Browse', () => {
             fileViewerVm.overlayIsLoading = false;
             fileViewerVm.overlayImageSize = { width: 400, height: 400 };
             fileViewerVm.imageCenterPosition = { top: 100, left: 200 };
-            
+
             // Ensure containerRef is set
             const tabContentContainer = wrapper.find('[ref="tabContentContainer"]');
             if (tabContentContainer.exists()) {
                 fileViewerVm.containerRef = tabContentContainer.element;
             }
-            
+
             await wrapper.vm.$nextTick();
 
             // Verify initial state
@@ -2898,7 +2898,7 @@ describe('Browse', () => {
             expect(fileViewerVm.isNavigating).toBe(true);
             expect(fileViewerVm.imageTranslateX).not.toBe(0); // Should be sliding out
             expect(fileViewerVm.navigationDirection).toBe('left');
-            
+
             // Note: Full navigation completion requires image preloading which may fail in test environment
             // The important part is that navigation starts correctly when ArrowLeft is pressed
         });
@@ -3120,7 +3120,7 @@ describe('Browse', () => {
             // Find and click the full-size image to toggle drawer
             const overlayImage = fileViewer.find('img[alt="Test 1"]');
             expect(overlayImage.exists()).toBe(true);
-            
+
             // Click the image to toggle drawer
             await overlayImage.trigger('click');
 
@@ -3198,10 +3198,10 @@ describe('Browse', () => {
             // Verify carousel is rendered
             const carousel = wrapper.find('[data-test="image-carousel"]');
             expect(carousel.exists()).toBe(true);
-            
-            // Verify carousel has preview boxes
-            const previewBox = wrapper.find('[data-test="carousel-box-0"]');
-            expect(previewBox.exists()).toBe(true);
+
+            // Verify carousel displays items (new structure uses carousel-item-{index})
+            const previewItem = wrapper.find('[data-test="carousel-item-0"]');
+            expect(previewItem.exists()).toBe(true);
         });
 
         it('navigates when clicking drawer next button', async () => {
@@ -3352,7 +3352,7 @@ describe('Browse', () => {
             expect(fileViewerVm.isNavigating).toBe(true);
         });
 
-        it('centers item in carousel when index > 4', async () => {
+        it('displays item in carousel when index > 4', async () => {
             mockAxios.get.mockImplementation((url: string) => {
                 if (url.includes('/api/browse-tabs')) {
                     return Promise.resolve({
@@ -3422,15 +3422,15 @@ describe('Browse', () => {
             fileViewerVm.isBottomPanelOpen = true;
             await wrapper.vm.$nextTick();
 
-            // Verify item at index 5 is in center box (6th box, index 5)
-            const centerBox = wrapper.find('[data-test="carousel-box-5"]');
-            expect(centerBox.exists()).toBe(true);
-            const centerPreview = wrapper.find('[data-test="carousel-preview-5"]');
-            expect(centerPreview.exists()).toBe(true);
-            expect(centerPreview.attributes('alt')).toBe('Preview 6');
+            // Verify item at index 5 is displayed (new carousel shows all items)
+            const item5 = wrapper.find('[data-test="carousel-item-5"]');
+            expect(item5.exists()).toBe(true);
+            const preview5 = wrapper.find('[data-test="carousel-preview-5"]');
+            expect(preview5.exists()).toBe(true);
+            expect(preview5.attributes('alt')).toBe('Preview 6');
         });
 
-        it('places item at corresponding index when index <= 4', async () => {
+        it('displays item in carousel when index <= 4', async () => {
             mockAxios.get.mockImplementation((url: string) => {
                 if (url.includes('/api/browse-tabs')) {
                     return Promise.resolve({
@@ -3500,9 +3500,9 @@ describe('Browse', () => {
             fileViewerVm.isBottomPanelOpen = true;
             await wrapper.vm.$nextTick();
 
-            // Verify item at index 2 is in box index 2
-            const box2 = wrapper.find('[data-test="carousel-box-2"]');
-            expect(box2.exists()).toBe(true);
+            // Verify item at index 2 is displayed (new carousel shows all items)
+            const item2 = wrapper.find('[data-test="carousel-item-2"]');
+            expect(item2.exists()).toBe(true);
             const preview2 = wrapper.find('[data-test="carousel-preview-2"]');
             expect(preview2.exists()).toBe(true);
             expect(preview2.attributes('alt')).toBe('Preview 3');
@@ -3570,10 +3570,10 @@ describe('Browse', () => {
             fileViewerVm.isBottomPanelOpen = true;
             await wrapper.vm.$nextTick();
 
-            // Click on carousel box 1 (should navigate to item at index 1)
-            const box1 = wrapper.find('[data-test="carousel-box-1"]');
-            expect(box1.exists()).toBe(true);
-            await box1.trigger('click');
+            // Click on carousel item 1 (should navigate to item at index 1)
+            const item1 = wrapper.find('[data-test="carousel-item-1"]');
+            expect(item1.exists()).toBe(true);
+            await item1.trigger('click');
 
             await wrapper.vm.$nextTick();
             await new Promise(resolve => setTimeout(resolve, 50));
