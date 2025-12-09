@@ -445,6 +445,8 @@ async function navigateToNext(): Promise<void> {
     if (currentItemIndex.value >= props.items.length - 1) return; // Already at last item
 
     const nextIndex = currentItemIndex.value + 1;
+    // Update index immediately - both carousel and fileviewer animate together
+    currentItemIndex.value = nextIndex;
     await navigateToIndex(nextIndex, 'right');
 }
 
@@ -454,6 +456,8 @@ async function navigateToPrevious(): Promise<void> {
     if (currentItemIndex.value <= 0) return; // Already at first item
 
     const prevIndex = currentItemIndex.value - 1;
+    // Update index immediately - both carousel and fileviewer animate together
+    currentItemIndex.value = prevIndex;
     await navigateToIndex(prevIndex, 'left');
 }
 
@@ -472,6 +476,9 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     navigationDirection.value = direction || 'right';
 
     isNavigating.value = true;
+
+    // Note: currentItemIndex is already updated in navigateToNext/navigateToPrevious
+    // before this function is called, so carousel reacts immediately
 
     // Step 1: Slide current image out
     const slideOutDistance = tabContent.getBoundingClientRect().width;
@@ -603,9 +610,6 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         // Now slide image in from the side
         imageTranslateX.value = 0;
 
-        // Update current index
-        currentItemIndex.value = index;
-
         // Wait for scale animation to complete
         await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
@@ -620,7 +624,6 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         }
         imageScale.value = 1;
         imageTranslateX.value = 0;
-        currentItemIndex.value = index;
         await nextTick();
     }
 

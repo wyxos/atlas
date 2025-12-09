@@ -241,17 +241,15 @@ const calculateScrollPosition = (animateFromPrevious = false): void => {
         const direction = currentIndex > previousIndex.value ? 1 : -1;
         const offset = direction * BOX_SIZE; // Slide one box width in the direction of movement
 
-        // Start from offset position
+        // Start from offset position immediately
         scrollPosition.value = newScrollPosition + offset;
 
-        // Then animate to final position
+        // Then animate to final position - use nextTick to ensure offset is applied first (minimal delay)
         nextTick(() => {
-            requestAnimationFrame(() => {
-                scrollPosition.value = newScrollPosition;
-            });
+            scrollPosition.value = newScrollPosition;
         });
     } else {
-        // Normal case: just update the position
+        // Normal case: just update the position immediately
         scrollPosition.value = newScrollPosition;
     }
 
@@ -260,8 +258,8 @@ const calculateScrollPosition = (animateFromPrevious = false): void => {
 };
 
 // Watch for changes in currentItemIndex and update scroll position
-watch(() => props.currentItemIndex, async (newIndex, oldIndex) => {
-    // Enable transition for smooth sliding animation
+watch(() => props.currentItemIndex, (newIndex, oldIndex) => {
+    // Enable transition for smooth sliding animation immediately
     isTransitioning.value = true;
 
     // Check if we need to animate from previous position (when moving between items that both target center box)
@@ -270,28 +268,28 @@ watch(() => props.currentItemIndex, async (newIndex, oldIndex) => {
         ((oldIndex > 4 && newIndex !== null && newIndex > 4) ||
             (oldIndex <= 4 && newIndex !== null && newIndex <= 4 && oldIndex !== newIndex));
 
-    // Check if we're near the end and should trigger loading
+    // Calculate and apply scroll position IMMEDIATELY (synchronous)
+    // drawerItems computed updates synchronously, so we can calculate immediately
+    calculateScrollPosition(needsOffsetAnimation);
+
+    // Preload visible items in the background (non-blocking)
+    preloadVisibleItems();
+
+    // Check if we're near the end and should trigger loading (non-blocking)
     if (newIndex !== null && props.hasMore && !props.isLoading && props.onLoadMore) {
         const totalItems = props.items.length;
         // Trigger loading only when we're at the last item (totalItems - 1)
         if (newIndex === totalItems - 1) {
-            await props.onLoadMore();
+            // Don't await - let it load in background without blocking carousel animation
+            props.onLoadMore();
         }
     }
 
-    // Preload visible items when index changes
-    preloadVisibleItems();
-
-    nextTick(() => {
-        // Use requestAnimationFrame to ensure calculation happens after DOM updates
-        requestAnimationFrame(() => {
-            calculateScrollPosition(needsOffsetAnimation);
-            // Reset transitioning flag after transition completes
-            setTimeout(() => {
-                isTransitioning.value = false;
-            }, 500); // Match transition duration
-        });
-    });
+    // Emit transition complete event after animation (500ms)
+    // Reset transitioning flag after transition completes
+    setTimeout(() => {
+        isTransitioning.value = false;
+    }, 500); // Match transition duration
 }, { immediate: true });
 
 // Watch for visibility changes to recalculate when panel opens
