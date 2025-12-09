@@ -86,11 +86,12 @@ function handleItemClick(item: MasonryItem): void {
 
 <template>
     <!-- Bottom panel (slides up from bottom) -->
-    <div v-if="visible" :class="[
+    <div :class="[
         'bg-prussian-blue-900 border-t border-smart-blue-500 transition-all duration-500 ease-in-out overflow-hidden z-40 relative',
-        visible ? 'max-h-[200px] opacity-100' : 'max-h-0 opacity-0'
+        visible ? 'opacity-100' : 'opacity-0'
     ]" data-test="image-carousel" :style="{
         height: visible ? '200px' : '0px',
+        transform: visible ? 'translateY(0)' : 'translateY(100%)',
     }">
         <!-- Previous button -->
         <button
