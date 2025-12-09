@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
+import FileViewer from '../components/FileViewer.vue';
 
 // Mock fetch (no longer used, but keep for compatibility)
 global.fetch = vi.fn();
@@ -1791,10 +1792,13 @@ describe('Browse', () => {
                 await wrapper.vm.$nextTick();
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Verify overlay is shown
-                expect(vm.overlayRect).not.toBeNull();
-                expect(vm.overlayImage).not.toBeNull();
-                expect(vm.overlayImageSize).not.toBeNull();
+                // Verify overlay is shown - check FileViewer component state
+                const fileViewer = wrapper.findComponent(FileViewer);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const fileViewerVm = fileViewer.vm as any;
+                expect(fileViewerVm.overlayRect).not.toBeNull();
+                expect(fileViewerVm.overlayImage).not.toBeNull();
+                expect(fileViewerVm.overlayImageSize).not.toBeNull();
             }
         });
 
@@ -1839,12 +1843,16 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
-            // Set overlay state manually
-            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayImageSize = { width: 300, height: 400 };
-            vm.overlayIsFilled = true;
+            // Set overlay state manually on FileViewer component
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayImageSize = { width: 300, height: 400 };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
             await wrapper.vm.$nextTick();
 
             // Find and click close button
@@ -1854,11 +1862,14 @@ describe('Browse', () => {
             await closeButton.trigger('click');
             await wrapper.vm.$nextTick();
 
+            // Wait for close animation to complete (500ms + small buffer)
+            await new Promise(resolve => setTimeout(resolve, 600));
+
             // Verify overlay is closed
-            expect(vm.overlayRect).toBeNull();
-            expect(vm.overlayImage).toBeNull();
-            expect(vm.overlayImageSize).toBeNull();
-            expect(vm.overlayIsFilled).toBe(false);
+            expect(fileViewerVm.overlayRect).toBeNull();
+            expect(fileViewerVm.overlayImage).toBeNull();
+            expect(fileViewerVm.overlayImageSize).toBeNull();
+            expect(fileViewerVm.overlayIsFilled).toBe(false);
         });
 
         it('closes overlay when clicking outside masonry item', async () => {
@@ -1902,11 +1913,14 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Set overlay state manually
-            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayImageSize = { width: 300, height: 400 };
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayImageSize = { width: 300, height: 400 };
             await wrapper.vm.$nextTick();
 
             // Click outside masonry item (on container but not on item)
@@ -1919,8 +1933,8 @@ describe('Browse', () => {
                 await wrapper.vm.$nextTick();
 
                 // Verify overlay is closed
-                expect(vm.overlayRect).toBeNull();
-                expect(vm.overlayImage).toBeNull();
+                expect(fileViewerVm.overlayRect).toBeNull();
+                expect(fileViewerVm.overlayImage).toBeNull();
             }
         });
 
@@ -1965,29 +1979,32 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             const originalWidth = 300;
             const originalHeight = 400;
 
             // Set overlay state with original image size
-            vm.overlayRect = { top: 100, left: 200, width: originalWidth, height: originalHeight };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayImageSize = { width: originalWidth, height: originalHeight };
-            vm.overlayIsFilled = false;
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: originalWidth, height: originalHeight };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayImageSize = { width: originalWidth, height: originalHeight };
+            fileViewerVm.overlayIsFilled = false;
             await wrapper.vm.$nextTick();
 
             // Verify image size is stored
-            expect(vm.overlayImageSize.width).toBe(originalWidth);
-            expect(vm.overlayImageSize.height).toBe(originalHeight);
+            expect(fileViewerVm.overlayImageSize.width).toBe(originalWidth);
+            expect(fileViewerVm.overlayImageSize.height).toBe(originalHeight);
 
             // Simulate overlay expanding to fill container
-            vm.overlayIsFilled = true;
-            vm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 }; // Full container size
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 }; // Full container size
             await wrapper.vm.$nextTick();
 
             // Verify image size is still maintained
-            expect(vm.overlayImageSize.width).toBe(originalWidth);
-            expect(vm.overlayImageSize.height).toBe(originalHeight);
+            expect(fileViewerVm.overlayImageSize.width).toBe(originalWidth);
+            expect(fileViewerVm.overlayImageSize.height).toBe(originalHeight);
 
             // Check that image element has fixed size
             const overlay = wrapper.find('[data-test="close-overlay-button"]');
@@ -2042,10 +2059,13 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Set overlay state
-            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
             await wrapper.vm.$nextTick();
 
             // Verify overlay has dark blue background
@@ -2094,12 +2114,15 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Set overlay state but not filled
-            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayIsFilled = false;
-            vm.overlayFillComplete = false;
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayIsFilled = false;
+            fileViewerVm.overlayFillComplete = false;
             await wrapper.vm.$nextTick();
 
             // Close button should not be visible
@@ -2107,8 +2130,8 @@ describe('Browse', () => {
             expect(closeButton.exists()).toBe(false);
 
             // Set overlay to filled but not complete
-            vm.overlayIsFilled = true;
-            vm.overlayFillComplete = false;
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = false;
             await wrapper.vm.$nextTick();
 
             // Close button should still not be visible (fill not complete)
@@ -2116,8 +2139,8 @@ describe('Browse', () => {
             expect(closeButton.exists()).toBe(false);
 
             // Set overlay fill to complete
-            vm.overlayFillComplete = true;
-            vm.overlayIsClosing = false;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.overlayIsClosing = false;
             await wrapper.vm.$nextTick();
 
             // Close button should now be visible
@@ -2125,7 +2148,7 @@ describe('Browse', () => {
             expect(closeButton.exists()).toBe(true);
 
             // Set overlay to closing
-            vm.overlayIsClosing = true;
+            fileViewerVm.overlayIsClosing = true;
             await wrapper.vm.$nextTick();
 
             // Close button should be hidden during closing animation
@@ -2174,6 +2197,9 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Mock container dimensions
             const containerWidth = 1920;
@@ -2182,10 +2208,10 @@ describe('Browse', () => {
             const itemHeight = 400;
 
             // Set initial overlay state (at clicked position)
-            vm.overlayRect = { top: 100, left: 200, width: itemWidth, height: itemHeight };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayImageSize = { width: itemWidth, height: itemHeight };
-            vm.overlayIsAnimating = false;
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: itemWidth, height: itemHeight };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayImageSize = { width: itemWidth, height: itemHeight };
+            fileViewerVm.overlayIsAnimating = false;
             await wrapper.vm.$nextTick();
 
             // Mock tabContentContainer getBoundingClientRect
@@ -2204,16 +2230,16 @@ describe('Browse', () => {
                 }));
 
                 // Trigger animation to center
-                vm.overlayIsAnimating = true;
+                fileViewerVm.overlayIsAnimating = true;
                 const centerLeft = Math.round((containerWidth - itemWidth) / 2);
                 const centerTop = Math.round((containerHeight - itemHeight) / 2);
-                vm.overlayRect = { top: centerTop, left: centerLeft, width: itemWidth, height: itemHeight };
+                fileViewerVm.overlayRect = { top: centerTop, left: centerLeft, width: itemWidth, height: itemHeight };
                 await wrapper.vm.$nextTick();
 
                 // Verify overlay is centered
-                expect(vm.overlayRect.left).toBe(centerLeft);
-                expect(vm.overlayRect.top).toBe(centerTop);
-                expect(vm.overlayIsAnimating).toBe(true);
+                expect(fileViewerVm.overlayRect.left).toBe(centerLeft);
+                expect(fileViewerVm.overlayRect.top).toBe(centerTop);
+                expect(fileViewerVm.overlayIsAnimating).toBe(true);
             }
         });
 
@@ -2258,6 +2284,9 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             const containerWidth = 1920;
             const containerHeight = 1080;
@@ -2265,24 +2294,24 @@ describe('Browse', () => {
             const itemHeight = 400;
 
             // Set centered state
-            vm.overlayRect = { top: 340, left: 810, width: itemWidth, height: itemHeight };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayImageSize = { width: itemWidth, height: itemHeight };
-            vm.overlayIsAnimating = true;
-            vm.overlayIsFilled = false;
+            fileViewerVm.overlayRect = { top: 340, left: 810, width: itemWidth, height: itemHeight };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayImageSize = { width: itemWidth, height: itemHeight };
+            fileViewerVm.overlayIsAnimating = true;
+            fileViewerVm.overlayIsFilled = false;
             await wrapper.vm.$nextTick();
 
             // Simulate fill animation
-            vm.overlayIsFilled = true;
-            vm.overlayRect = { top: 0, left: 0, width: containerWidth, height: containerHeight };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: containerWidth, height: containerHeight };
             await wrapper.vm.$nextTick();
 
             // Verify overlay fills container
-            expect(vm.overlayRect.top).toBe(0);
-            expect(vm.overlayRect.left).toBe(0);
-            expect(vm.overlayRect.width).toBe(containerWidth);
-            expect(vm.overlayRect.height).toBe(containerHeight);
-            expect(vm.overlayIsFilled).toBe(true);
+            expect(fileViewerVm.overlayRect.top).toBe(0);
+            expect(fileViewerVm.overlayRect.left).toBe(0);
+            expect(fileViewerVm.overlayRect.width).toBe(containerWidth);
+            expect(fileViewerVm.overlayRect.height).toBe(containerHeight);
+            expect(fileViewerVm.overlayIsFilled).toBe(true);
         });
 
         it('uses flexbox centering when overlay is filled', async () => {
@@ -2326,12 +2355,15 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Set filled state
-            vm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayImageSize = { width: 300, height: 400 };
-            vm.overlayIsFilled = true;
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayImageSize = { width: 300, height: 400 };
+            fileViewerVm.overlayIsFilled = true;
             await wrapper.vm.$nextTick();
 
             // Verify overlay exists with correct border styling
@@ -2390,29 +2422,32 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Set overlay state
-            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayIsFilled = true;
-            vm.overlayFillComplete = true;
-            vm.overlayScale = 1;
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.overlayScale = 1;
             await wrapper.vm.$nextTick();
 
             // Verify initial scale
-            expect(vm.overlayScale).toBe(1);
+            expect(fileViewerVm.overlayScale).toBe(1);
             const overlay = wrapper.find('.border-smart-blue-500');
             expect(overlay.exists()).toBe(true);
             const overlayStyle = overlay.attributes('style') || '';
             expect(overlayStyle).toContain('scale(1)');
 
             // Trigger close
-            vm.closeOverlay();
+            fileViewerVm.closeOverlay();
             await wrapper.vm.$nextTick();
 
             // Verify scale is set to 0
-            expect(vm.overlayScale).toBe(0);
-            expect(vm.overlayIsClosing).toBe(true);
+            expect(fileViewerVm.overlayScale).toBe(0);
+            expect(fileViewerVm.overlayIsClosing).toBe(true);
             await wrapper.vm.$nextTick();
 
             // Verify transform style includes scale(0)
@@ -2462,12 +2497,15 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Set overlay state - filled but not closing
-            vm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-            vm.overlayIsFilled = true;
-            vm.overlayIsClosing = false;
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayIsClosing = false;
             await wrapper.vm.$nextTick();
 
             // When filled and not closing, overflow-hidden should not be applied
@@ -2476,7 +2514,7 @@ describe('Browse', () => {
             expect(overlay.classes()).not.toContain('overflow-hidden');
 
             // Set overlay to closing
-            vm.overlayIsClosing = true;
+            fileViewerVm.overlayIsClosing = true;
             await wrapper.vm.$nextTick();
 
             // When closing, overflow-hidden should be applied
@@ -2526,10 +2564,13 @@ describe('Browse', () => {
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
+            const fileViewer = wrapper.findComponent(FileViewer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
 
             // Set overlay state
-            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
             await wrapper.vm.$nextTick();
 
             // Verify border styling
