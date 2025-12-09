@@ -1694,4 +1694,706 @@ describe('Browse', () => {
         expect(vm.backfill.fetched).toBe(0);
         expect(vm.backfill.target).toBe(0);
     });
+
+    describe('Overlay functionality', () => {
+        beforeEach(() => {
+            // Mock getBoundingClientRect for overlay positioning
+            Element.prototype.getBoundingClientRect = vi.fn(() => ({
+                top: 100,
+                left: 200,
+                width: 300,
+                height: 400,
+                bottom: 500,
+                right: 500,
+                x: 200,
+                y: 100,
+                toJSON: vi.fn(),
+            }));
+        });
+
+        it('shows overlay when clicking on a masonry item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+            vm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            // Create a mock masonry item element
+            const masonryContainer = wrapper.find('[ref="masonryContainer"]');
+            if (masonryContainer.exists()) {
+                const mockItem = document.createElement('div');
+                mockItem.className = 'masonry-item';
+                const mockImg = document.createElement('img');
+                mockImg.src = 'test1.jpg';
+                mockImg.setAttribute('srcset', 'test1.jpg 1x');
+                mockImg.setAttribute('sizes', '(max-width: 300px) 300px');
+                mockImg.setAttribute('alt', 'Test image');
+                mockItem.appendChild(mockImg);
+                masonryContainer.element.appendChild(mockItem);
+
+                // Mock getBoundingClientRect for item
+                mockItem.getBoundingClientRect = vi.fn(() => ({
+                    top: 150,
+                    left: 250,
+                    width: 300,
+                    height: 400,
+                    bottom: 550,
+                    right: 550,
+                    x: 250,
+                    y: 150,
+                    toJSON: vi.fn(),
+                }));
+
+                // Click on the masonry item
+                const clickEvent = new MouseEvent('click', { bubbles: true });
+                Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+                masonryContainer.element.dispatchEvent(clickEvent);
+
+                await wrapper.vm.$nextTick();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify overlay is shown
+                expect(vm.overlayRect).not.toBeNull();
+                expect(vm.overlayImage).not.toBeNull();
+                expect(vm.overlayImageSize).not.toBeNull();
+                expect(vm.backdropOpacity).toBeGreaterThan(0);
+            }
+        });
+
+        it('closes overlay when clicking close button', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Set overlay state manually
+            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.overlayImageSize = { width: 300, height: 400 };
+            vm.overlayIsFilled = true;
+            vm.backdropOpacity = 0.75;
+            await wrapper.vm.$nextTick();
+
+            // Find and click close button
+            const closeButton = wrapper.find('[data-test="close-overlay-button"]');
+            expect(closeButton.exists()).toBe(true);
+
+            await closeButton.trigger('click');
+            await wrapper.vm.$nextTick();
+
+            // Verify overlay is closed
+            expect(vm.overlayRect).toBeNull();
+            expect(vm.overlayImage).toBeNull();
+            expect(vm.overlayImageSize).toBeNull();
+            expect(vm.backdropOpacity).toBe(0);
+            expect(vm.overlayIsFilled).toBe(false);
+        });
+
+        it('closes overlay when clicking outside masonry item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Set overlay state manually
+            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.overlayImageSize = { width: 300, height: 400 };
+            vm.backdropOpacity = 0.75;
+            await wrapper.vm.$nextTick();
+
+            // Click outside masonry item (on container but not on item)
+            const masonryContainer = wrapper.find('[ref="masonryContainer"]');
+            if (masonryContainer.exists()) {
+                const clickEvent = new MouseEvent('click', { bubbles: true });
+                Object.defineProperty(clickEvent, 'target', { value: masonryContainer.element, enumerable: true });
+                masonryContainer.element.dispatchEvent(clickEvent);
+
+                await wrapper.vm.$nextTick();
+
+                // Verify overlay is closed
+                expect(vm.overlayRect).toBeNull();
+                expect(vm.overlayImage).toBeNull();
+                expect(vm.backdropOpacity).toBe(0);
+            }
+        });
+
+        it('maintains image size when overlay expands', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const originalWidth = 300;
+            const originalHeight = 400;
+
+            // Set overlay state with original image size
+            vm.overlayRect = { top: 100, left: 200, width: originalWidth, height: originalHeight };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.overlayImageSize = { width: originalWidth, height: originalHeight };
+            vm.overlayIsFilled = false;
+            await wrapper.vm.$nextTick();
+
+            // Verify image size is stored
+            expect(vm.overlayImageSize.width).toBe(originalWidth);
+            expect(vm.overlayImageSize.height).toBe(originalHeight);
+
+            // Simulate overlay expanding to fill container
+            vm.overlayIsFilled = true;
+            vm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 }; // Full container size
+            await wrapper.vm.$nextTick();
+
+            // Verify image size is still maintained
+            expect(vm.overlayImageSize.width).toBe(originalWidth);
+            expect(vm.overlayImageSize.height).toBe(originalHeight);
+
+            // Check that image element has fixed size
+            const overlay = wrapper.find('[data-test="close-overlay-button"]');
+            if (overlay.exists()) {
+                const img = wrapper.find('img[src="test.jpg"]');
+                if (img.exists()) {
+                    const imgStyle = img.attributes('style') || '';
+                    expect(imgStyle).toContain(`width: ${originalWidth}px`);
+                    expect(imgStyle).toContain(`height: ${originalHeight}px`);
+                }
+            }
+        });
+
+        it('shows backdrop mask when overlay is visible', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Set overlay state
+            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.backdropOpacity = 0.75;
+            await wrapper.vm.$nextTick();
+
+            // Verify backdrop exists and has correct opacity
+            const backdrop = wrapper.find('.bg-black.z-40');
+            expect(backdrop.exists()).toBe(true);
+            expect(vm.backdropOpacity).toBe(0.75);
+        });
+
+        it('close button is only visible when overlay is filled', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Set overlay state but not filled
+            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.overlayIsFilled = false;
+            await wrapper.vm.$nextTick();
+
+            // Close button should not be visible
+            let closeButton = wrapper.find('[data-test="close-overlay-button"]');
+            expect(closeButton.exists()).toBe(false);
+
+            // Set overlay to filled
+            vm.overlayIsFilled = true;
+            await wrapper.vm.$nextTick();
+
+            // Close button should now be visible
+            closeButton = wrapper.find('[data-test="close-overlay-button"]');
+            expect(closeButton.exists()).toBe(true);
+        });
+
+        it('animates overlay to center position', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Mock container dimensions
+            const containerWidth = 1920;
+            const containerHeight = 1080;
+            const itemWidth = 300;
+            const itemHeight = 400;
+
+            // Set initial overlay state (at clicked position)
+            vm.overlayRect = { top: 100, left: 200, width: itemWidth, height: itemHeight };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.overlayImageSize = { width: itemWidth, height: itemHeight };
+            vm.overlayIsAnimating = false;
+            await wrapper.vm.$nextTick();
+
+            // Mock tabContentContainer getBoundingClientRect
+            const tabContentContainer = wrapper.find('[ref="tabContentContainer"]');
+            if (tabContentContainer.exists()) {
+                tabContentContainer.element.getBoundingClientRect = vi.fn(() => ({
+                    top: 0,
+                    left: 0,
+                    width: containerWidth,
+                    height: containerHeight,
+                    bottom: containerHeight,
+                    right: containerWidth,
+                    x: 0,
+                    y: 0,
+                    toJSON: vi.fn(),
+                }));
+
+                // Trigger animation to center
+                vm.overlayIsAnimating = true;
+                const centerLeft = Math.round((containerWidth - itemWidth) / 2);
+                const centerTop = Math.round((containerHeight - itemHeight) / 2);
+                vm.overlayRect = { top: centerTop, left: centerLeft, width: itemWidth, height: itemHeight };
+                await wrapper.vm.$nextTick();
+
+                // Verify overlay is centered
+                expect(vm.overlayRect.left).toBe(centerLeft);
+                expect(vm.overlayRect.top).toBe(centerTop);
+                expect(vm.overlayIsAnimating).toBe(true);
+            }
+        });
+
+        it('animates overlay to fill container after centering', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const containerWidth = 1920;
+            const containerHeight = 1080;
+            const itemWidth = 300;
+            const itemHeight = 400;
+
+            // Set centered state
+            vm.overlayRect = { top: 340, left: 810, width: itemWidth, height: itemHeight };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.overlayImageSize = { width: itemWidth, height: itemHeight };
+            vm.overlayIsAnimating = true;
+            vm.overlayIsFilled = false;
+            await wrapper.vm.$nextTick();
+
+            // Simulate fill animation
+            vm.overlayIsFilled = true;
+            vm.overlayRect = { top: 0, left: 0, width: containerWidth, height: containerHeight };
+            await wrapper.vm.$nextTick();
+
+            // Verify overlay fills container
+            expect(vm.overlayRect.top).toBe(0);
+            expect(vm.overlayRect.left).toBe(0);
+            expect(vm.overlayRect.width).toBe(containerWidth);
+            expect(vm.overlayRect.height).toBe(containerHeight);
+            expect(vm.overlayIsFilled).toBe(true);
+        });
+
+        it('uses flexbox centering when overlay is filled', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Set filled state
+            vm.overlayRect = { top: 0, left: 0, width: 1920, height: 1080 };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.overlayImageSize = { width: 300, height: 400 };
+            vm.overlayIsFilled = true;
+            await wrapper.vm.$nextTick();
+
+            // Verify container uses flexbox centering
+            const overlay = wrapper.find('.border-red-500');
+            expect(overlay.exists()).toBe(true);
+            expect(overlay.classes()).toContain('flex');
+            expect(overlay.classes()).toContain('items-center');
+            expect(overlay.classes()).toContain('justify-center');
+
+            // Verify image maintains its size
+            const img = wrapper.find('img[src="test.jpg"]');
+            if (img.exists()) {
+                const imgStyle = img.attributes('style') || '';
+                expect(imgStyle).toContain('width: 300px');
+                expect(imgStyle).toContain('height: 400px');
+            }
+        });
+
+        it('fades in backdrop when overlay appears', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Initially backdrop should be at 0
+            expect(vm.backdropOpacity).toBe(0);
+
+            // Set overlay state - backdrop should fade in
+            vm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+            vm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+            vm.backdropOpacity = 0.75;
+            await wrapper.vm.$nextTick();
+
+            // Verify backdrop opacity increased
+            expect(vm.backdropOpacity).toBe(0.75);
+            const backdrop = wrapper.find('.bg-black.z-40');
+            expect(backdrop.exists()).toBe(true);
+            expect(backdrop.attributes('style')).toContain('opacity: 0.75');
+        });
+    });
 });

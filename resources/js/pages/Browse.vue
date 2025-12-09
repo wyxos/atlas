@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { Masonry } from '@wyxos/vibe';
-import { Loader2, Plus } from 'lucide-vue-next';
+import { Loader2, Plus, X } from 'lucide-vue-next';
 import Pill from '../components/ui/Pill.vue';
 import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
@@ -23,6 +23,145 @@ const loadAtPage = ref<string | number | null>(null); // Initial page to load - 
 const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
 const pendingRestoreNextCursor = ref<string | number | null>(null); // Holds the saved cursor we should load first after restoring a tab
 const isPanelMinimized = ref(false);
+
+// Overlay state for highlighting a clicked masonry item
+const masonryContainer = ref<HTMLElement | null>(null);
+const tabContentContainer = ref<HTMLElement | null>(null); // Tab content container (includes header, masonry, footer)
+const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
+const overlayImage = ref<{ src: string; srcset?: string; sizes?: string; alt?: string } | null>(null);
+const overlayBorderRadius = ref<string | null>(null);
+const overlayKey = ref(0); // Key to force image element recreation on each click
+const overlayIsAnimating = ref(false); // Track if overlay is animating to center
+const overlayImageSize = ref<{ width: number; height: number } | null>(null); // Store original image size
+const overlayIsFilled = ref(false); // Track if overlay has expanded to fill container
+const backdropOpacity = ref(0); // Backdrop opacity for smooth fade-in
+const imageCenterPosition = ref<{ top: number; left: number } | null>(null); // Exact center position when filled
+
+function closeOverlay(): void {
+    overlayKey.value++;
+    overlayIsAnimating.value = false;
+    overlayIsFilled.value = false;
+    backdropOpacity.value = 0;
+    overlayImageSize.value = null;
+    imageCenterPosition.value = null;
+    overlayRect.value = null;
+    overlayImage.value = null;
+    overlayBorderRadius.value = null;
+}
+
+async function onMasonryClick(e: MouseEvent) {
+    const container = masonryContainer.value;
+    const tabContent = tabContentContainer.value;
+    if (!container || !tabContent) return;
+
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+
+    // Find the nearest masonry item element
+    const itemEl = target.closest('.masonry-item') as HTMLElement | null;
+
+    if (!itemEl || !container.contains(itemEl)) {
+        // Clicked outside an item → clear overlay
+        closeOverlay();
+        return;
+    }
+
+    // Compute position relative to the tab content container (not masonry container)
+    const itemBox = itemEl.getBoundingClientRect();
+    const tabContentBox = tabContent.getBoundingClientRect();
+
+    const top = itemBox.top - tabContentBox.top;
+    const left = itemBox.left - tabContentBox.left;
+    const width = itemBox.width;
+    const height = itemBox.height;
+
+    // Try to find an <img> inside the clicked masonry item
+    const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
+    if (!imgEl) {
+        // No image found -> clear overlay (requirement is to show the same image)
+        closeOverlay();
+        return;
+    }
+
+    // Copy image attributes
+    const src = imgEl.currentSrc || imgEl.getAttribute('src') || '';
+    const srcset = imgEl.getAttribute('srcset') || undefined;
+    const sizes = imgEl.getAttribute('sizes') || undefined;
+    const alt = imgEl.getAttribute('alt') || '';
+
+    // Compute the border radius from the masonry item so the overlay matches
+    const computed = window.getComputedStyle(itemEl);
+    const radius = computed.borderRadius || '';
+
+    // Increment key to force image element recreation (prevents showing previous image)
+    overlayKey.value++;
+
+    // Store original image size to maintain it when container expands
+    overlayImageSize.value = { width, height };
+    overlayIsFilled.value = false;
+
+    // Set initial position at clicked item location
+    overlayRect.value = { top, left, width, height };
+    overlayImage.value = { src, srcset, sizes, alt };
+    overlayBorderRadius.value = radius || null;
+    overlayIsAnimating.value = false;
+    backdropOpacity.value = 0; // Start at 0 for fade-in
+
+    // Animate to center after DOM update
+    await nextTick();
+
+    // Fade in backdrop smoothly
+    requestAnimationFrame(() => {
+        backdropOpacity.value = 0.75;
+    });
+
+    // Use requestAnimationFrame to ensure initial render is complete
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            const tabContent = tabContentContainer.value;
+            if (!tabContent || !overlayRect.value) return;
+
+            const tabContentBox = tabContent.getBoundingClientRect();
+            const containerWidth = tabContentBox.width;
+            const containerHeight = tabContentBox.height;
+
+            // Calculate center position (centered both horizontally and vertically)
+            // Round to avoid subpixel rendering issues
+            const centerLeft = Math.round((containerWidth - width) / 2);
+            const centerTop = Math.round((containerHeight - height) / 2);
+
+            // Don't set imageCenterPosition yet - wait until container is filled
+            // This prevents the image from switching positioning methods mid-animation
+
+            // Mark as animating and update to center position
+            overlayIsAnimating.value = true;
+            overlayRect.value = {
+                top: centerTop,
+                left: centerLeft,
+                width,
+                height,
+            };
+
+            // After center animation completes (500ms), animate to fill container
+            setTimeout(() => {
+                if (!tabContent || !overlayRect.value || !overlayImageSize.value) return;
+
+                // Mark as filled and update to fill entire tab content container
+                // Keep object-cover during fill animation - don't switch to absolute positioning yet
+                overlayIsFilled.value = true;
+                overlayRect.value = {
+                    top: 0,
+                    left: 0,
+                    width: containerWidth,
+                    height: containerHeight,
+                };
+
+                // Don't switch to absolute positioning - keep using flexbox centering
+                // This avoids any pixel glitches from switching positioning methods
+            }, 500); // Match the transition duration
+        });
+    });
+}
 
 // Service selection state
 const availableServices = ref<Array<{ key: string; label: string; defaults?: Record<string, any> }>>([]);
@@ -418,7 +557,7 @@ onMounted(async () => {
                     </Button>
                 </template>
             </TabPanel>
-            <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col">
+            <div ref="tabContentContainer" class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
                 <!-- Service Selection Header -->
                 <div v-if="activeTabId !== null"
                     class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
@@ -449,14 +588,16 @@ onMounted(async () => {
 
                 <!-- Masonry Content -->
                 <div class="flex-1 min-h-0">
-                    <Masonry v-if="activeTabId !== null && hasServiceSelected" :key="activeTabId" ref="masonry"
-                        v-model:items="items" :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout"
-                        layout-mode="auto" :mobile-breakpoint="768" :skip-initial-load="items.length > 0"
-                        :backfill-enabled="true" :backfill-delay-ms="2000" :backfill-max-calls="Infinity"
-                        @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
-                        @backfill:stop="onBackfillStop" @backfill:retry-start="onBackfillRetryStart"
-                        @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
-                        data-test="masonry-component" />
+                    <div v-if="activeTabId !== null && hasServiceSelected" class="relative h-full"
+                        ref="masonryContainer" @click="onMasonryClick">
+                        <Masonry :key="activeTabId" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
+                            :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
+                            :skip-initial-load="items.length > 0" :backfill-enabled="true" :backfill-delay-ms="2000"
+                            :backfill-max-calls="Infinity" @backfill:start="onBackfillStart"
+                            @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                            @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
+                            @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component" />
+                    </div>
                     <div v-else-if="activeTabId !== null && !hasServiceSelected"
                         class="flex items-center justify-center h-full" data-test="no-service-message">
                         <p class="text-twilight-indigo-300 text-lg">Select a service to start browsing</p>
@@ -464,6 +605,41 @@ onMounted(async () => {
                     <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
                         <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                     </div>
+                </div>
+
+                <!-- Modal backdrop/mask -->
+                <div v-if="overlayRect && overlayImage"
+                    class="absolute inset-0 bg-black z-40 transition-opacity duration-500 ease-in-out" :style="{
+                        opacity: backdropOpacity,
+                    }" />
+
+                <!-- Click overlay -->
+                <div v-if="overlayRect && overlayImage" :class="[
+                    'absolute border-2 border-red-500 z-50',
+                    overlayIsFilled ? 'flex items-center justify-center' : 'overflow-hidden pointer-events-none',
+                    overlayIsAnimating ? 'transition-all duration-500 ease-in-out' : ''
+                ]" :style="{
+                    top: overlayRect.top + 'px',
+                    left: overlayRect.left + 'px',
+                    width: overlayRect.width + 'px',
+                    height: overlayRect.height + 'px',
+                    borderRadius: overlayBorderRadius || undefined,
+                }">
+                    <img :key="overlayKey" :src="overlayImage.src" :srcset="overlayImage.srcset"
+                        :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
+                            'select-none pointer-events-none',
+                            overlayIsFilled ? '' : 'object-cover'
+                        ]" :style="overlayImageSize ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                        } : undefined" draggable="false" />
+
+                    <!-- Close button -->
+                    <button v-if="overlayIsFilled" @click="closeOverlay"
+                        class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+                        aria-label="Close overlay" data-test="close-overlay-button">
+                        <X :size="20" />
+                    </button>
                 </div>
 
                 <!-- Status/Pagination Info at Bottom -->
