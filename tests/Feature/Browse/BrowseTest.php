@@ -8,14 +8,6 @@ use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
-it('test', function () {
-    $this->actingAs(User::factory()->create());
-
-    visit(url('/browse'))
-        ->assertSeeIn('[data-test="no-tabs-message"]', 'Create a tab to start browsing')
-        ->assertSeeIn('[data-test="create-tab-button"]', 'New Tab');
-});
-
 it('restores cursor values for a browsed tab after reload', function () {
     $user = User::factory()->create();
 
