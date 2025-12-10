@@ -105,26 +105,29 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
     ]">
         <!-- Reaction Icons -->
         <div :class="[
-            'flex items-center',
-            variant === 'small' ? 'gap-2' : 'gap-2'
+            'flex items-center gap-2'
         ]">
             <!-- Favorite -->
-            <button @click="handleFavoriteClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Favorite">
+            <button @click="handleFavoriteClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
+                aria-label="Favorite">
                 <Heart :size="18" />
             </button>
 
             <!-- Like -->
-            <button @click="handleLikeClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Like">
+            <button @click="handleLikeClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
+                aria-label="Like">
                 <ThumbsUp :size="18" />
             </button>
 
             <!-- Dislike -->
-            <button @click="handleDislikeClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Dislike">
+            <button @click="handleDislikeClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
+                aria-label="Dislike">
                 <ThumbsDown :size="18" />
             </button>
 
             <!-- Funny -->
-            <button @click="handleFunnyClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Funny">
+            <button @click="handleFunnyClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
+                aria-label="Funny">
                 <Smile :size="18" />
             </button>
         </div>
@@ -141,24 +144,24 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             variant === 'small' ? 'gap-3' : 'gap-3'
         ]">
             <!-- Previewed Count -->
-            <div class="flex items-center text-white/70 gap-1.5">
+            <div class="flex items-center text-white gap-1.5">
                 <Eye :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ previewedCount
-                    }}</span>
+                }}</span>
             </div>
 
             <!-- Viewed Count -->
-            <div class="flex items-center text-white/70 gap-1.5">
+            <div class="flex items-center text-white gap-1.5">
                 <EyeOff :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ viewedCount
-                    }}</span>
+                }}</span>
             </div>
         </div>
 
         <!-- Index/Total -->
         <div v-if="indexDisplay" class="flex items-center">
             <span :class="[
-                'font-medium text-white/70',
+                'font-medium text-white',
                 variant === 'small' ? 'text-xs' : 'text-sm'
             ]">{{ indexDisplay }}</span>
         </div>
