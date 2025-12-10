@@ -55,7 +55,7 @@ class BrowseTabController extends Controller
         }
 
         $tab->load('files.metadata');
-        
+
         // Add file_ids to response for frontend compatibility
         $tab->file_ids = $tab->files->pluck('id')->toArray();
 
@@ -74,7 +74,7 @@ class BrowseTabController extends Controller
 
         $validated = $request->validated();
         $fileIds = $validated['file_ids'] ?? null;
-        
+
         // Remove file_ids from validated data before updating
         unset($validated['file_ids']);
 
@@ -95,7 +95,7 @@ class BrowseTabController extends Controller
         }
 
         $browseTab->load('files.metadata');
-        
+
         // Add file_ids to response for frontend compatibility
         $browseTab->file_ids = $browseTab->files->pluck('id')->toArray();
 
@@ -128,9 +128,24 @@ class BrowseTabController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $browseTab->load(['files.metadata']);
+        // Optimize query: only select columns we need and eager load metadata efficiently
+        // This prevents loading unnecessary data and reduces memory usage
+        // For tabs with many files, this significantly improves performance
+        $files = $browseTab->files()
+            ->select([
+                'files.id',
+                'files.url',
+                'files.thumbnail_url',
+                'files.mime_type',
+                'files.listing_metadata',
+            ])
+            ->with(['metadata' => function ($query) {
+                // Only load the payload column from metadata (longtext, but needed for dimensions)
+                $query->select('id', 'file_id', 'payload');
+            }])
+            ->orderByPivot('position')
+            ->get();
 
-        $files = $browseTab->files;
         $itemsData = [];
 
         if ($files->isNotEmpty()) {
