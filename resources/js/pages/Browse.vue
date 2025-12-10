@@ -1,131 +1,30 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
-import { Masonry } from '@wyxos/vibe';
-import { Loader2, Plus } from 'lucide-vue-next';
+import { ref, computed, onMounted } from 'vue';
+import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
-import FileViewer from '../components/FileViewer.vue';
-import BrowseStatusBar from '../components/BrowseStatusBar.vue';
-import FileReactions from '../components/FileReactions.vue';
+import BrowseTabContent from '../components/BrowseTabContent.vue';
 import ReactionQueue from '../components/ReactionQueue.vue';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { useBrowseTabs, type MasonryItem, type BrowseTabData } from '../composables/useBrowseTabs';
-import { useBackfill } from '../composables/useBackfill';
+import { useBrowseTabs, type MasonryItem } from '../composables/useBrowseTabs';
 import { useBrowseService } from '../composables/useBrowseService';
 import { useReactionQueue } from '../composables/useReactionQueue';
 
-type GetPageResult = {
-    items: MasonryItem[];
-    nextPage: string | number | null; // Can be cursor string or number
-};
-
-const items = ref<MasonryItem[]>([]);
-const masonry = ref<InstanceType<typeof Masonry> | null>(null);
-const currentPage = ref<string | number | null>(1); // Starts as 1, becomes cursor string, can be null
-const nextCursor = ref<string | number | null>(null); // The next page/cursor from API (service handles format)
-const loadAtPage = ref<string | number | null>(null); // Initial page to load - set to 1 only when needed, null prevents auto-load
-const isTabRestored = ref(false); // Track if we restored from a tab to prevent duplicate loading
-const pendingRestoreNextCursor = ref<string | number | null>(null); // Holds the saved cursor we should load first after restoring a tab
 const isPanelMinimized = ref(false);
 
-// Container refs for FileViewer
-const masonryContainer = ref<HTMLElement | null>(null);
-const tabContentContainer = ref<HTMLElement | null>(null); // Tab content container (includes header, masonry, footer)
-const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
+// Track masonry loading state per tab (for pill indicator)
+const tabMasonryLoadingStates = ref<Map<number, boolean>>(new Map());
 
-// Hover state for grid items
-const hoveredItemIndex = ref<number | null>(null);
+// Track tab data loading state per tab (for spinner in tab panel)
+const tabDataLoadingStates = ref<Map<number, boolean>>(new Map());
 
 // Reaction queue
 const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
 
-function onMasonryClick(e: MouseEvent): void {
-    fileViewer.value?.openFromClick(e);
-}
-
-// Handle reaction with queue
-async function handleReaction(
-    fileId: number,
-    type: 'love' | 'like' | 'dislike' | 'funny',
-    removeItem: (item: MasonryItem) => void
-): Promise<void> {
-    // Find the item to remove
-    const item = items.value.find((i) => i.id === fileId);
-    if (item && removeItem) {
-        // Immediately remove from masonry
-        removeItem(item);
-    }
-
-    // Queue the AJAX request
-    queueReaction(fileId, type, async (fId, t) => {
-        try {
-            await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
-            // File detachment from tabs is handled by the backend
-        } catch (error) {
-            console.error('Failed to update reaction:', error);
-            throw error;
-        }
-    });
-}
-
-
-// Service selection state
-const selectedService = ref<string>(''); // Service selected in UI (not yet applied)
-
-// Backfill state and handlers
-const {
-    backfill,
-    onBackfillStart,
-    onBackfillTick,
-    onBackfillStop,
-    onBackfillRetryStart,
-    onBackfillRetryTick,
-    onBackfillRetryStop,
-} = useBackfill();
-
-// Computed property to display page value (defaults to 1 if null)
-const displayPage = computed(() => currentPage.value ?? 1);
-
-// Get current tab's service
-const currentTabService = computed(() => {
-    if (!activeTabId.value) return null;
-    const tab = getActiveTab();
-    return tab?.queryParams?.service as string | null;
-});
-
-// Check if current tab has a service selected
-const hasServiceSelected = computed(() => {
-    const service = currentTabService.value;
-    return typeof service === 'string' && service.length > 0;
-});
-
-// Apply selected service to current tab
-async function applyService(): Promise<void> {
-    await applyServiceFromComposable(
-        selectedService,
-        activeTabId,
-        items,
-        currentPage,
-        nextCursor,
-        loadAtPage,
-        masonry as unknown as import('vue').Ref<{ isLoading: boolean; cancelLoad: () => void; destroy: () => void } | null>,
-        getActiveTab,
-        updateActiveTab,
-        nextTick
-    );
-}
-
-// Tab switching function - needs to stay here as it interacts with masonry
+// Simplified tab switching - just set active tab ID
 async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promise<void> {
-    // If clicking on already active tab, do nothing (unless skipActiveCheck is true for initial load)
     if (!skipActiveCheck && activeTabId.value === tabId) {
         return;
-    }
-
-    // Close fileviewer when switching tabs
-    if (fileViewer.value) {
-        fileViewer.value.close();
     }
 
     const tab = tabs.value.find(t => t.id === tabId);
@@ -133,133 +32,7 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
         return;
     }
 
-    // Destroy and re-initialize masonry instance for clean state
-    if (masonry.value) {
-        if (masonry.value.isLoading) {
-            masonry.value.cancelLoad();
-        }
-        // Destroy the instance to reset all internal state
-        masonry.value.destroy();
-    }
-
     activeTabId.value = tabId;
-    const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
-    isTabRestored.value = tabHasRestorableItems;
-
-    // Restore selected service for UI
-    const serviceFromQuery = tab.queryParams?.service as string | null;
-    selectedService.value = serviceFromQuery || '';
-
-    // Restore both page and next from queryParams (service handles format conversion)
-    // IMPORTANT: Always restore from saved queryParams - don't default to 1 if the tab has been scrolled
-    const pageFromQuery = tab.queryParams?.page;
-    const nextFromQuery = tab.queryParams?.next;
-    pendingRestoreNextCursor.value = tabHasRestorableItems ? (nextFromQuery ?? null) : null;
-
-    // Always reload items from database when switching tabs
-    // This ensures we have the latest state (e.g., after files are detached via reactions)
-    if (tab.fileIds && tab.fileIds.length > 0) {
-        // Load items for this tab (always reload, don't use cached itemsData)
-        try {
-            const loadedItems = await loadTabItems(tabId);
-            tab.itemsData = loadedItems;
-        } catch (error) {
-            console.error('Failed to load tab items:', error);
-            // Continue with empty items
-        }
-    } else {
-        // No fileIds, clear itemsData to ensure clean state
-        tab.itemsData = [];
-    }
-
-    // Restore currentPage from saved queryParams AFTER loading items
-    // Only default to 1 if page is truly missing (new tab that hasn't loaded anything yet)
-    if (pageFromQuery !== undefined && pageFromQuery !== null) {
-        currentPage.value = pageFromQuery;
-    } else {
-        // No page in queryParams - this is a new tab, start at page 1
-        currentPage.value = 1;
-    }
-
-    // Restore nextCursor from saved queryParams
-    if (nextFromQuery !== undefined && nextFromQuery !== null) {
-        nextCursor.value = nextFromQuery;
-    } else {
-        nextCursor.value = null;
-    }
-
-    // Set loadAtPage and prepare for masonry initialization
-    // IMPORTANT: Only auto-load if tab has a service selected
-    // Check if service exists and is a non-empty string
-    const serviceValue = tab.queryParams?.service;
-    const hasService = typeof serviceValue === 'string' && serviceValue.length > 0;
-
-    if (tab.itemsData && tab.itemsData.length > 0) {
-        // We have pre-loaded items - set loadAtPage to null to prevent auto-load
-        // We'll use masonry.init() to properly set up pagination state
-        loadAtPage.value = null;
-        // Clear items first - init() will add them back
-        items.value = [];
-    } else if (hasService) {
-        // Tab has service - check if we have query params to restore, otherwise start from beginning
-        // Note: currentPage and nextCursor are already set from query params above, don't reset them
-        if (pageFromQuery !== undefined && pageFromQuery !== null) {
-            // We have a page from query params, use it for loading
-            loadAtPage.value = pageFromQuery;
-        } else {
-            // No query params, start from beginning
-            loadAtPage.value = 1;
-            // currentPage is already set to 1 above if no query params, so no need to reset
-        }
-        items.value = [];
-    } else {
-        // No service selected - don't auto-load
-        loadAtPage.value = null;
-        items.value = [];
-    }
-
-    // Wait for next tick to ensure masonry component is ready
-    await nextTick();
-
-    // If we have pre-loaded items, use masonry.init() to properly initialize
-    // This sets up pagination history and prevents auto-loading
-    if (tab.itemsData && tab.itemsData.length > 0 && masonry.value) {
-        const pageValue = pageFromQuery !== undefined && pageFromQuery !== null ? pageFromQuery : 1;
-        const nextValue = nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;
-
-        // Ensure currentPage and nextCursor are set before init (they should already be set above, but double-check)
-        // This ensures displayPage computed shows the correct value
-        if (pageValue !== undefined && pageValue !== null) {
-            currentPage.value = pageValue;
-        }
-        if (nextValue !== undefined && nextValue !== null) {
-            nextCursor.value = nextValue;
-        }
-
-        // Initialize masonry with pre-loaded items, current page, and next page
-        // init() will add items to masonry and set up pagination history correctly
-        masonry.value.init(tab.itemsData, pageValue, nextValue);
-
-        // Wait for DOM to update
-        await nextTick();
-
-        // After init, the layout will be calculated, but container dimensions might not be final yet
-        // The masonry component's ResizeObserver will handle dimension changes automatically
-        // However, we need to ensure layout refreshes when container is ready
-        // Use requestAnimationFrame (not a timeout) to wait for browser render cycle
-        // This ensures container has final dimensions after tab panel animation completes
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                // Refresh layout after container dimensions have settled
-                if (masonry.value && items.value.length > 0) {
-                    masonry.value.refreshLayout(items.value);
-                }
-            });
-        });
-    }
-
-    // Reset the flag - masonry is now properly initialized
-    isTabRestored.value = false;
 }
 
 // Tab management using composable - pass switchTab callback for UI handling
@@ -275,45 +48,48 @@ const {
     loadTabItems,
 } = useBrowseTabs(switchTab);
 
-// Browse service composable - initialized after tab management and computed properties
+// Browse service composable - just for fetching available services
 const {
     availableServices,
-    isApplyingService,
     fetchServices: fetchServicesFromComposable,
-    getNextPage: getNextPageFromComposable,
-    applyService: applyServiceFromComposable,
-} = useBrowseService({
-    hasServiceSelected,
-    isTabRestored,
-    items,
-    nextCursor,
-    currentPage,
-    pendingRestoreNextCursor,
-    currentTabService,
-    activeTabId,
-    getActiveTab,
-    updateActiveTab,
-});
+} = useBrowseService();
 
-const layout = {
-    gutterX: 12,
-    gutterY: 12,
-    sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
-};
-
-async function getNextPage(page: number | string): Promise<GetPageResult> {
-    return await getNextPageFromComposable(page);
+// Handle reaction
+async function handleReaction(
+    fileId: number,
+    type: 'love' | 'like' | 'dislike' | 'funny'
+): Promise<void> {
+    queueReaction(fileId, type, async (fId, t) => {
+        try {
+            await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
+        } catch (error) {
+            console.error('Failed to update reaction:', error);
+            throw error;
+        }
+    });
 }
 
-async function handleCarouselLoadMore(): Promise<void> {
-    // Load more items when carousel reaches the end
-    // Use masonry's loadNext method which automatically calls getNextPage callback
-    // This ensures proper state management, layout updates, and database storage
-    if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
-        if (typeof masonry.value.loadNext === 'function') {
-            await masonry.value.loadNext();
-        }
+// Handle masonry loading state changes from tab content (for pill)
+function handleTabMasonryLoadingChange(tabId: number, isLoading: boolean): void {
+    if (isLoading) {
+        tabMasonryLoadingStates.value.set(tabId, true);
+    } else {
+        tabMasonryLoadingStates.value.delete(tabId);
     }
+}
+
+// Handle tab data loading state changes (for spinner in tab panel)
+function handleTabDataLoadingChange(tabId: number, isLoading: boolean): void {
+    if (isLoading) {
+        tabDataLoadingStates.value.set(tabId, true);
+    } else {
+        tabDataLoadingStates.value.delete(tabId);
+    }
+}
+
+// Get tab data loading state (for spinner)
+function isTabDataLoading(tabId: number): boolean {
+    return tabDataLoadingStates.value.get(tabId) ?? false;
 }
 
 
@@ -363,7 +139,9 @@ onMounted(async () => {
             <TabPanel :model-value="true" v-model:is-minimized="isPanelMinimized">
                 <template #tabs="{ isMinimized }">
                     <BrowseTab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label"
-                        :is-active="tab.id === activeTabId" :is-minimized="isMinimized" @click="switchTab(tab.id)"
+                        :is-active="tab.id === activeTabId" :is-minimized="isMinimized"
+                        :is-loading="isTabDataLoading(tab.id)"
+                        :is-masonry-loading="tabMasonryLoadingStates.get(tab.id) ?? false" @click="switchTab(tab.id)"
                         @close="closeTab(tab.id)" :data-test="`browse-tab-${tab.id}`" />
                 </template>
                 <template #footer="{ isMinimized }">
@@ -376,82 +154,17 @@ onMounted(async () => {
                     </Button>
                 </template>
             </TabPanel>
-            <div ref="tabContentContainer" class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
-                <!-- Service Selection Header -->
-                <div v-if="activeTabId !== null"
-                    class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
-                    data-test="service-selection-header">
-                    <div class="flex items-center gap-3">
-                        <div class="flex-1">
-                            <Select v-model="selectedService" :disabled="isApplyingService">
-                                <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
-                                    <SelectValue
-                                        :placeholder="hasServiceSelected ? (availableServices.find(s => s.key === currentTabService)?.label || currentTabService || undefined) : 'Select a service...'" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="service in availableServices" :key="service.key"
-                                        :value="service.key" data-test="service-select-item">
-                                        {{ service.label }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Button @click="applyService"
-                            :disabled="!selectedService || isApplyingService || selectedService === currentTabService"
-                            size="sm" data-test="apply-service-button">
-                            <Loader2 v-if="isApplyingService" :size="14" class="mr-2 animate-spin" />
-                            Apply
-                        </Button>
-                    </div>
+            <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
+                <template v-if="activeTabId !== null">
+                    <BrowseTabContent v-if="activeTabId !== null" :key="activeTabId" :tab="getActiveTab()!"
+                        :available-services="availableServices" :update-active-tab="updateActiveTab"
+                        :load-tab-items="loadTabItems" :on-reaction="handleReaction"
+                        :on-loading-change="(isLoading) => activeTabId !== null && handleTabMasonryLoadingChange(activeTabId, isLoading)"
+                        :on-tab-data-loading-change="(isLoading) => activeTabId !== null && handleTabDataLoadingChange(activeTabId, isLoading)" />
+                </template>
+                <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
+                    <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                 </div>
-
-                <!-- Masonry Content -->
-                <div class="flex-1 min-h-0">
-                    <div v-if="activeTabId !== null && hasServiceSelected" class="relative h-full masonry-container"
-                        ref="masonryContainer" @click="onMasonryClick">
-                        <Masonry :key="activeTabId" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
-                            :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
-                            :skip-initial-load="items.length > 0" :backfill-enabled="true" :backfill-delay-ms="2000"
-                            :backfill-max-calls="Infinity" @backfill:start="onBackfillStart"
-                            @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
-                            @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
-                            @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
-                            <template #default="{ item, index, remove }">
-                                <div class="relative w-full h-full overflow-hidden group"
-                                    @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
-                                    <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
-                                        class="w-full h-full object-cover" />
-                                    <div v-show="hoveredItemIndex === index"
-                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                        <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
-                                            :current-index="index" :total-items="items.length" variant="small"
-                                            :remove-item="() => remove(item)"
-                                            @reaction="(type) => handleReaction(item.id, type, remove)" />
-                                    </div>
-                                </div>
-                            </template>
-                        </Masonry>
-                    </div>
-                    <div v-else-if="activeTabId !== null && !hasServiceSelected"
-                        class="flex items-center justify-center h-full" data-test="no-service-message">
-                        <p class="text-twilight-indigo-300 text-lg">Select a service to start browsing</p>
-                    </div>
-                    <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
-                        <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
-                    </div>
-                </div>
-
-                <!-- File Viewer -->
-                <FileViewer ref="fileViewer" :container-ref="tabContentContainer"
-                    :masonry-container-ref="masonryContainer" :items="items" :has-more="nextCursor !== null"
-                    :is-loading="masonry?.isLoading ?? false" :on-load-more="handleCarouselLoadMore"
-                    @close="() => { }" />
-
-                <!-- Status/Pagination Info at Bottom -->
-                <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
-                    :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-                    :queued-reactions-count="queuedReactions.length"
-                    :visible="activeTabId !== null && hasServiceSelected" />
             </div>
         </div>
 
