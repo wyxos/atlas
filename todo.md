@@ -1,14 +1,10 @@
 - Browse
     - grouping by specific container
-    - reaction
     - preview/view count
     - download
     - blacklist
     - shortcuts
     - full size view
-        - reaction
-        - thumbnail carousel
-        - container carousel
         - detail panel
     
 
