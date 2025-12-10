@@ -133,46 +133,107 @@ function createMockBrowseResponse(
     };
 }
 
-describe('Browse', () => {
-    it('renders the Masonry component when tab exists', async () => {
-        // Mock tabs API to return a tab with service
-        mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({
-                    data: [{
-                        id: 1,
-                        label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: 1 },
-                        file_ids: [],
-                        items_data: [],
-                        position: 0,
-                    }],
-                });
-            }
-            if (url.includes('/api/browse')) {
+// Helper to create mock tab configuration
+function createMockTabConfig(tabId: number, overrides: Record<string, any> = {}) {
+    return {
+        id: tabId,
+        label: `Test Tab ${tabId}`,
+        query_params: { service: 'civit-ai-images', page: 1 },
+        file_ids: [],
+        items_data: [],
+        position: 0,
+        ...overrides,
+    };
+}
+
+// Helper to setup axios mocks for tabs and browse API
+function setupAxiosMocks(tabConfig: any | any[], browseResponse?: any) {
+    mockAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/api/browse-tabs')) {
+            return Promise.resolve({ data: Array.isArray(tabConfig) ? tabConfig : [tabConfig] });
+        }
+        if (url.includes('/api/browse-tabs/') && url.includes('/items')) {
+            const tabId = url.match(/\/api\/browse-tabs\/(\d+)\/items/)?.[1];
+            const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig;
+            if (tab && tab.items_data) {
                 return Promise.resolve({
                     data: {
-                        items: [],
-                        nextPage: null,
-                        services: [
-                            { key: 'civit-ai-images', label: 'CivitAI Images' },
-                        ],
+                        items_data: tab.items_data,
+                        file_ids: tab.file_ids || [],
                     },
                 });
             }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
+            return Promise.resolve({ data: { items_data: [], file_ids: [] } });
+        }
+        if (url.includes('/api/browse')) {
+            return Promise.resolve({
+                data: browseResponse || {
+                    items: [],
+                    nextPage: null,
+                    services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                },
+            });
+        }
+        return Promise.resolve({ data: { items: [], nextPage: null } });
+    });
+}
 
-        const router = await createTestRouter();
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
+// Helper to wait for tab content to be ready (replaces setTimeout patterns)
+async function waitForTabContent(wrapper: any, maxWait = 100): Promise<any> {
+    const start = Date.now();
+    while (Date.now() - start < maxWait) {
         await flushPromises();
         await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
+        const tabContent = getBrowseTabContent(wrapper);
+        if (tabContent) {
+            return tabContent;
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    return null;
+}
+
+// Helper to mount Browse component with tab configuration
+async function mountBrowseWithTab(tabConfig: any | any[], browseResponse?: any) {
+    setupAxiosMocks(tabConfig, browseResponse);
+    const router = await createTestRouter();
+    const wrapper = mount(Browse, {
+        global: {
+            plugins: [router],
+        },
+    });
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+    return { wrapper, router };
+}
+
+// Helper to wait for component to stabilize (replaces arbitrary setTimeout)
+async function waitForStable(wrapper: any, iterations = 2): Promise<void> {
+    for (let i = 0; i < iterations; i++) {
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+    }
+}
+
+// Helper to setup overlay test with common configuration
+async function setupOverlayTest() {
+    const tabConfig = createMockTabConfig(1);
+    const router = await createTestRouter();
+    setupAxiosMocks(tabConfig);
+    const wrapper = mount(Browse, {
+        global: {
+            plugins: [router],
+        },
+    });
+    await waitForStable(wrapper);
+    return { wrapper, router };
+}
+
+describe('Browse', () => {
+    it('renders the Masonry component when tab exists', async () => {
+        const tabConfig = createMockTabConfig(1);
+        const { wrapper } = await mountBrowseWithTab(tabConfig);
+        await waitForStable(wrapper);
 
         expect(wrapper.find('.masonry-mock').exists()).toBe(true);
     });
@@ -185,9 +246,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component if it exists
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -200,44 +259,9 @@ describe('Browse', () => {
     });
 
     it('passes correct props to Masonry component', async () => {
-        // Mock tabs API to return a tab with service
-        mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({
-                    data: [{
-                        id: 1,
-                        label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: 1 },
-                        file_ids: [],
-                        items_data: [],
-                        position: 0,
-                    }],
-                });
-            }
-            if (url.includes('/api/browse')) {
-                return Promise.resolve({
-                    data: {
-                        items: [],
-                        nextPage: null,
-                        services: [
-                            { key: 'civit-ai-images', label: 'CivitAI Images' },
-                        ],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
-
-        const router = await createTestRouter();
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 200)); // Wait for tab switching
+        const tabConfig = createMockTabConfig(1);
+        const { wrapper } = await mountBrowseWithTab(tabConfig);
+        await waitForStable(wrapper);
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
@@ -256,57 +280,21 @@ describe('Browse', () => {
     it('provides getNextPage function that fetches from API', async () => {
         const mockResponse = createMockBrowseResponse(2, 3);
         const tabId = 1;
+        const tabConfig = createMockTabConfig(tabId, { query_params: { service: 'civit-ai-images' } });
+        const browseResponse = {
+            ...mockResponse,
+            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+        };
 
-        // Mock tabs API to return a tab with service
-        mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({
-                    data: [{
-                        id: tabId,
-                        label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images' },
-                        file_ids: [],
-                        items_data: [],
-                        position: 0,
-                    }],
-                });
-            }
-            if (url.includes('/api/browse')) {
-                return Promise.resolve({
-                    data: {
-                        ...mockResponse,
-                        services: [
-                            { key: 'civit-ai-images', label: 'CivitAI Images' },
-                        ],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
-
-        const router = await createTestRouter();
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
+        const { wrapper } = await mountBrowseWithTab(tabConfig, browseResponse);
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (!tabContentVm) {
-            // If BrowseTabContent hasn't mounted, skip this test's assertions
             return;
         }
 
@@ -381,12 +369,10 @@ describe('Browse', () => {
         if (activeTab) {
             activeTab.queryParams.service = 'civit-ai-images';
         }
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -441,12 +427,10 @@ describe('Browse', () => {
         if (activeTab) {
             activeTab.queryParams.service = 'civit-ai-images';
         }
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -507,12 +491,10 @@ describe('Browse', () => {
         if (activeTab) {
             activeTab.queryParams.service = 'civit-ai-images';
         }
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -574,12 +556,10 @@ describe('Browse', () => {
         if (activeTab) {
             activeTab.queryParams.service = 'civit-ai-images';
         }
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -597,57 +577,33 @@ describe('Browse', () => {
         const tabId = 1;
         const pageParam = 'cursor-page-123';
         const nextParam = 'cursor-next-456';
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
 
-        // Mock tabs API to return a tab with the page/next in query_params and file_ids
-        mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({
-                    data: [{
-                        id: tabId,
-                        label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
-                        file_ids: [1, 2],
-                        position: 0,
-                    }],
-                });
-            }
-            if (url.includes('/api/browse-tabs/1/items')) {
-                return Promise.resolve({
-                    data: {
-                        items_data: [
-                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-                            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
-                        ],
-                        file_ids: [1, 2],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+            file_ids: [1, 2],
+            items_data: mockItems,
         });
 
         const router = await createTestRouter('/browse');
-
+        setupAxiosMocks(tabConfig);
         const wrapper = mount(Browse, {
             global: {
                 plugins: [router],
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for tab switching and restoration
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         expect(vm.activeTabId).toBe(tabId);
 
         // Wait for BrowseTabContent to mount and initialize
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (tabContentVm) {
             // Query params should be restored
             expect(tabContentVm.currentPage).toBe(pageParam);
@@ -716,17 +672,10 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for tab switching
+        await waitForStable(wrapper); // Wait for tab switching
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -761,12 +710,7 @@ describe('Browse', () => {
         await wrapper.vm.$nextTick();
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (tabContentVm) {
             tabContentVm.nextCursor = null;
             await wrapper.vm.$nextTick();
@@ -816,18 +760,14 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for tab switching and restoration
+        await waitForStable(wrapper); // Wait for tab switching and restoration
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
         expect(vm.activeTabId).toBe(tabId);
 
         // Wait for BrowseTabContent to mount and initialize
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -875,17 +815,13 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for tab switching and restoration
+        await waitForStable(wrapper); // Wait for tab switching and restoration
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
 
         // Wait for BrowseTabContent to mount and initialize
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -947,17 +883,13 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait for initial tab load
+        await waitForStable(wrapper); // Wait for initial tab load
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -971,9 +903,7 @@ describe('Browse', () => {
 
         // Switch to second tab
         await vm.switchTab(tab2Id);
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Verify cancelLoad and destroy were called (masonry is destroyed when switching tabs)
         expect(mockCancelLoad).toHaveBeenCalled();
@@ -1031,17 +961,13 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for initial tab load
+        await waitForStable(wrapper); // Wait for initial tab load
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -1059,9 +985,7 @@ describe('Browse', () => {
 
         // Switch to second tab
         await vm.switchTab(tab2Id);
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Verify destroy was called even when masonry is not loading
         // (destroy should always be called to reset state)
@@ -1122,9 +1046,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -1211,9 +1133,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -1288,9 +1208,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -1316,9 +1234,7 @@ describe('Browse', () => {
         // Switch to tab 2
         await vm.switchTab(tab2Id);
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Verify tab 2 is active
         expect(vm.activeTabId).toBe(tab2Id);
@@ -1382,9 +1298,7 @@ describe('Browse', () => {
 
         // Create a new tab
         await vm.createTab();
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 200)); // Wait for tab switching
+        await waitForStable(wrapper); // Wait for tab switching
 
         // Verify tab was created
         expect(vm.activeTabId).toBe(newTabId);
@@ -1397,7 +1311,7 @@ describe('Browse', () => {
         expect(masonry.exists()).toBe(false); // Masonry should not render without service
     });
 
-    it('restores tab with files and query params after refresh, initializes masonry correctly', async () => {
+    it('restores tab query params after refresh', async () => {
         const tabId = 1;
         const pageParam = 'cursor-page-123';
         const nextParam = 'cursor-next-456';
@@ -1406,201 +1320,196 @@ describe('Browse', () => {
             { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
         ];
 
-        // Mock tabs API to return a tab with query params and file_ids (simulating restored state)
-        mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({
-                    data: [{
-                        id: tabId,
-                        label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
-                        file_ids: [1, 2],
-                        position: 0,
-                    }],
-                });
-            }
-            if (url.includes('/api/browse-tabs/1/items')) {
-                return Promise.resolve({
-                    data: {
-                        items_data: mockItems,
-                        file_ids: [1, 2],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+            file_ids: [1, 2],
+            items_data: mockItems,
         });
 
         const router = await createTestRouter('/browse');
+        setupAxiosMocks(tabConfig);
         const wrapper = mount(Browse, {
             global: {
                 plugins: [router],
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tab switching, restoration, and item loading
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-
-        // Verify tab is active
         expect(vm.activeTabId).toBe(tabId);
 
-        // Wait for BrowseTabContent to mount and initialize
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = await waitForTabContent(wrapper);
         if (tabContentVm) {
-            // Verify query params are restored
             expect(tabContentVm.currentPage).toBe(pageParam);
             expect(tabContentVm.nextCursor).toBe(nextParam);
         }
-
-        // Verify items endpoint was called (this means the tab had fileIds and loadTabItems was triggered)
-        // The API call confirms that the condition `tab.fileIds && tab.fileIds.length > 0` was met
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
-
-        // Verify masonry component exists and is ready
-        const masonry = wrapper.findComponent({ name: 'Masonry' });
-        expect(masonry.exists()).toBe(true);
-
-        // The masonry should be initialized with items if they were loaded
-        // Note: In a real scenario, if items are loaded, masonry.init() would be called
-        // But in tests, we verify the API was called, which confirms the restoration flow works
-        // The actual masonry initialization with items would happen in the browser
-        // For now, we verify that skipInitialLoad would be true if items were pre-loaded
-        // (This is tested more thoroughly in browser tests)
     });
 
-    it('switches to tab with multiple pages loaded, restores files and query params, resumes from next value', async () => {
+    it('loads tab items when file_ids exist', async () => {
+        const tabId = 1;
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: 1 },
+            file_ids: [1, 2],
+            items_data: mockItems,
+        });
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(tabConfig);
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await waitForStable(wrapper);
+
+        // Verify items endpoint was called
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
+    });
+
+    it('initializes masonry with restored items', async () => {
+        const tabId = 1;
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: 1 },
+            file_ids: [1, 2],
+            items_data: mockItems,
+        });
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(tabConfig);
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await waitForStable(wrapper);
+
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+    });
+
+    it('switches to tab with saved query params', async () => {
         const tab1Id = 1;
         const tab2Id = 2;
         const pageParam = 'cursor-page-456';
         const nextParam = 'cursor-next-789';
+
+        const tabConfigs = [
+            createMockTabConfig(tab1Id, {
+                query_params: { service: 'civit-ai-images', page: 1 },
+            }),
+            createMockTabConfig(tab2Id, {
+                query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+                position: 1,
+            }),
+        ];
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(tabConfigs);
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await waitForStable(wrapper);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+        expect(vm.activeTabId).toBe(tab1Id);
+
+        await vm.switchTab(tab2Id);
+        await waitForStable(wrapper);
+
+        expect(vm.activeTabId).toBe(tab2Id);
+
+        const tabContentVm = await waitForTabContent(wrapper);
+        if (tabContentVm) {
+            expect(tabContentVm.currentPage).toBe(pageParam);
+            expect(tabContentVm.nextCursor).toBe(nextParam);
+        }
+    });
+
+    it('restores items when switching to tab with file_ids', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
         const mockItems = [
             { id: 3, width: 100, height: 100, src: 'test3.jpg', type: 'image', page: 2, index: 0, notFound: false },
             { id: 4, width: 200, height: 200, src: 'test4.jpg', type: 'image', page: 2, index: 1, notFound: false },
         ];
 
-        // Mock tabs API to return two tabs
-        mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
-                return Promise.resolve({
-                    data: [
-                        {
-                            id: tab1Id,
-                            label: 'Tab 1',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
-                            items_data: [],
-                            position: 0,
-                        },
-                        {
-                            id: tab2Id,
-                            label: 'Tab 2',
-                            query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
-                            file_ids: [3, 4],
-                            position: 1,
-                        },
-                    ],
-                });
-            }
-            if (url.includes('/api/browse-tabs/2/items')) {
-                return Promise.resolve({
-                    data: {
-                        items_data: mockItems,
-                        file_ids: [3, 4],
-                    },
-                });
-            }
-            if (url.includes('/api/browse')) {
-                // This simulates loading more pages when scrolling
-                return Promise.resolve({
-                    data: {
-                        ...createMockBrowseResponse(pageParam, nextParam),
-                        services: [
-                            { key: 'civit-ai-images', label: 'CivitAI Images' },
-                        ],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
+        const tabConfigs = [
+            createMockTabConfig(tab1Id, {
+                query_params: { service: 'civit-ai-images', page: 1 },
+            }),
+            createMockTabConfig(tab2Id, {
+                query_params: { service: 'civit-ai-images', page: 1 },
+                file_ids: [3, 4],
+                items_data: mockItems,
+                position: 1,
+            }),
+        ];
 
         const router = await createTestRouter('/browse');
+        setupAxiosMocks(tabConfigs);
         const wrapper = mount(Browse, {
             global: {
                 plugins: [router],
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 200)); // Wait for initial tab load
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
-
-        // Verify first tab is active initially
-        expect(vm.activeTabId).toBe(tab1Id);
-
-        // Clear previous mock calls
-        mockInit.mockClear();
         mockDestroy.mockClear();
 
-        // Switch to second tab
         await vm.switchTab(tab2Id);
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tab switching, restoration, and item loading
+        await waitForStable(wrapper);
 
-        // Verify second tab is active
-        expect(vm.activeTabId).toBe(tab2Id);
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/2/items');
+        expect(mockDestroy).toHaveBeenCalled();
+    });
 
-        // Wait for BrowseTabContent to mount and initialize
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+    it('resumes pagination from next cursor value', async () => {
+        const tabId = 1;
+        const nextParam = 'cursor-next-789';
+        const browseResponse = {
+            ...createMockBrowseResponse(nextParam, 'cursor-next-999'),
+            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+        };
 
-        // Access BrowseTabContent component
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: 1, next: nextParam },
+        });
+
+        const { wrapper } = await mountBrowseWithTab(tabConfig, browseResponse);
+        await waitForStable(wrapper);
+
+        const tabContentVm = await waitForTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
 
-        // Verify query params are restored
-        expect(tabContentVm.currentPage).toBe(pageParam);
-        expect(tabContentVm.nextCursor).toBe(nextParam);
-
-        // Verify items endpoint was called for tab 2 (this means the tab had fileIds and loadTabItems was triggered)
-        // The API call confirms that the condition `tab.fileIds && tab.fileIds.length > 0` was met
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/2/items');
-
-        // Verify masonry component exists and is ready
-        const masonry = wrapper.findComponent({ name: 'Masonry' });
-        expect(masonry.exists()).toBe(true);
-
-        // The masonry should be initialized with items if they were loaded
-        // Note: In a real scenario, if items are loaded, masonry.init() would be called
-        // But in tests, we verify the API was called, which confirms the restoration flow works
-        // The actual masonry initialization with items would happen in the browser
-
-        // Verify masonry was destroyed when switching tabs (to reset state)
-        expect(mockDestroy).toHaveBeenCalled();
-
-        // Verify masonry will resume from next value when scrolling
-        // This is verified by checking that nextCursor is set correctly
-        // When getNextPage is called with nextParam, it should use that value
-        tabContentVm.isTabRestored = false; // Reset flag to allow loading
-        tabContentVm.items = []; // Clear items to simulate scroll scenario
+        tabContentVm.isTabRestored = false;
+        tabContentVm.items = [];
+        tabContentVm.nextCursor = nextParam;
 
         const getNextPageResult = await tabContentVm.getNextPage(nextParam);
 
-        // Verify it uses the nextParam to load more items
         expect(mockAxios.get).toHaveBeenCalledWith(
             expect.stringContaining(`/api/browse?page=${nextParam}`)
         );
@@ -1655,9 +1564,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for tab switching and restoration
+        await waitForStable(wrapper); // Wait for tab switching and restoration
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -1666,9 +1573,7 @@ describe('Browse', () => {
         expect(vm.activeTabId).toBe(tabId);
 
         // Wait for BrowseTabContent to mount and initialize
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -1747,9 +1652,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -1757,23 +1660,17 @@ describe('Browse', () => {
         expect(vm.activeTabId).toBe(tabId);
 
         await vm.createTab();
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await waitForStable(wrapper);
 
         expect(vm.activeTabId).toBe(2);
 
         await vm.switchTab(tabId);
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await waitForStable(wrapper);
 
         expect(vm.activeTabId).toBe(tabId);
 
         // Wait for BrowseTabContent to mount and initialize
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -1830,25 +1727,19 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
 
         // Create a new tab
         await vm.createTab();
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait longer for tab switching
+        await waitForStable(wrapper); // Wait longer for tab switching
 
         expect(vm.activeTabId).toBe(1);
 
         // Wait for switchTab to complete
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for BrowseTabContent to mount
+        await waitForStable(wrapper); // Wait for BrowseTabContent to mount
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -1923,9 +1814,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -1933,9 +1822,7 @@ describe('Browse', () => {
         expect(vm.activeTabId).toBe(1);
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -1952,9 +1839,7 @@ describe('Browse', () => {
 
         // Apply service
         await tabContentVm.applyService();
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for masonry to render and trigger load
+        await waitForStable(wrapper); // Wait for masonry to render and trigger load
 
         // Verify service was applied
         const activeTab = vm.getActiveTab();
@@ -2040,9 +1925,7 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
@@ -2051,9 +1934,7 @@ describe('Browse', () => {
         expect(vm.activeTabId).toBe(tab1Id);
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         let tabContentVm = getBrowseTabContent(wrapper);
@@ -2064,9 +1945,7 @@ describe('Browse', () => {
 
         // Switch to second tab
         await vm.switchTab(tab2Id);
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for new BrowseTabContent to mount
+        await waitForStable(wrapper); // Wait for new BrowseTabContent to mount
 
         // Second tab should have its service restored
         expect(vm.activeTabId).toBe(tab2Id);
@@ -2116,17 +1995,13 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -2187,17 +2062,13 @@ describe('Browse', () => {
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vm = wrapper.vm as any;
 
         // Wait for BrowseTabContent to mount
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForStable(wrapper);
 
         // Access BrowseTabContent component
         const tabContentVm = getBrowseTabContent(wrapper);
@@ -2238,35 +2109,15 @@ describe('Browse', () => {
         });
 
         it('shows overlay when clicking on a masonry item', async () => {
-            mockAxios.get.mockImplementation((url: string) => {
-                if (url.includes('/api/browse-tabs')) {
-                    return Promise.resolve({
-                        data: [{
-                            id: 1,
-                            label: 'Test Tab',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
-                            items_data: [],
-                            position: 0,
-                        }],
-                    });
-                }
-                if (url.includes('/api/browse')) {
-                    return Promise.resolve({
-                        data: {
-                            items: [
-                                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-                            ],
-                            nextPage: null,
-                            services: [
-                                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            ],
-                        },
-                    });
-                }
-                return Promise.resolve({ data: { items: [], nextPage: null } });
-            });
-
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
             const router = await createTestRouter();
             const wrapper = mount(Browse, {
                 global: {
@@ -2274,20 +2125,9 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const vm = wrapper.vm as any;
-
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -2328,7 +2168,6 @@ describe('Browse', () => {
                 masonryContainer.element.dispatchEvent(clickEvent);
 
                 await wrapper.vm.$nextTick();
-                await new Promise(resolve => setTimeout(resolve, 100));
 
                 // Verify overlay is shown - check FileViewer component state
                 const fileViewer = wrapper.findComponent(FileViewer);
@@ -2341,43 +2180,7 @@ describe('Browse', () => {
         });
 
         it('closes overlay when clicking close button', async () => {
-            mockAxios.get.mockImplementation((url: string) => {
-                if (url.includes('/api/browse-tabs')) {
-                    return Promise.resolve({
-                        data: [{
-                            id: 1,
-                            label: 'Test Tab',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
-                            items_data: [],
-                            position: 0,
-                        }],
-                    });
-                }
-                if (url.includes('/api/browse')) {
-                    return Promise.resolve({
-                        data: {
-                            items: [],
-                            nextPage: null,
-                            services: [
-                                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            ],
-                        },
-                    });
-                }
-                return Promise.resolve({ data: { items: [], nextPage: null } });
-            });
-
-            const router = await createTestRouter();
-            const wrapper = mount(Browse, {
-                global: {
-                    plugins: [router],
-                },
-            });
-
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            const { wrapper } = await setupOverlayTest();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2399,7 +2202,6 @@ describe('Browse', () => {
 
             await closeButton.trigger('click');
             await wrapper.vm.$nextTick();
-
             // Wait for close animation to complete (500ms + small buffer)
             await new Promise(resolve => setTimeout(resolve, 600));
 
@@ -2411,43 +2213,7 @@ describe('Browse', () => {
         });
 
         it('closes overlay when clicking outside masonry item', async () => {
-            mockAxios.get.mockImplementation((url: string) => {
-                if (url.includes('/api/browse-tabs')) {
-                    return Promise.resolve({
-                        data: [{
-                            id: 1,
-                            label: 'Test Tab',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
-                            items_data: [],
-                            position: 0,
-                        }],
-                    });
-                }
-                if (url.includes('/api/browse')) {
-                    return Promise.resolve({
-                        data: {
-                            items: [],
-                            nextPage: null,
-                            services: [
-                                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            ],
-                        },
-                    });
-                }
-                return Promise.resolve({ data: { items: [], nextPage: null } });
-            });
-
-            const router = await createTestRouter();
-            const wrapper = mount(Browse, {
-                global: {
-                    plugins: [router],
-                },
-            });
-
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            const { wrapper } = await setupOverlayTest();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2477,43 +2243,7 @@ describe('Browse', () => {
         });
 
         it('maintains image size when overlay expands', async () => {
-            mockAxios.get.mockImplementation((url: string) => {
-                if (url.includes('/api/browse-tabs')) {
-                    return Promise.resolve({
-                        data: [{
-                            id: 1,
-                            label: 'Test Tab',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
-                            items_data: [],
-                            position: 0,
-                        }],
-                    });
-                }
-                if (url.includes('/api/browse')) {
-                    return Promise.resolve({
-                        data: {
-                            items: [],
-                            nextPage: null,
-                            services: [
-                                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            ],
-                        },
-                    });
-                }
-                return Promise.resolve({ data: { items: [], nextPage: null } });
-            });
-
-            const router = await createTestRouter();
-            const wrapper = mount(Browse, {
-                global: {
-                    plugins: [router],
-                },
-            });
-
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            const { wrapper } = await setupOverlayTest();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2557,43 +2287,7 @@ describe('Browse', () => {
         });
 
         it('overlay has dark blue background', async () => {
-            mockAxios.get.mockImplementation((url: string) => {
-                if (url.includes('/api/browse-tabs')) {
-                    return Promise.resolve({
-                        data: [{
-                            id: 1,
-                            label: 'Test Tab',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
-                            items_data: [],
-                            position: 0,
-                        }],
-                    });
-                }
-                if (url.includes('/api/browse')) {
-                    return Promise.resolve({
-                        data: {
-                            items: [],
-                            nextPage: null,
-                            services: [
-                                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            ],
-                        },
-                    });
-                }
-                return Promise.resolve({ data: { items: [], nextPage: null } });
-            });
-
-            const router = await createTestRouter();
-            const wrapper = mount(Browse, {
-                global: {
-                    plugins: [router],
-                },
-            });
-
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            const { wrapper } = await setupOverlayTest();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2646,9 +2340,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2729,9 +2421,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2816,9 +2506,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2887,9 +2575,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -2954,9 +2640,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3029,9 +2713,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3096,9 +2778,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3153,9 +2833,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3239,9 +2917,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3323,7 +2999,6 @@ describe('Browse', () => {
 
             // Wait for navigation to start (async function)
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 50));
 
             // Verify navigation started (image should start sliding)
             expect(fileViewerVm.isNavigating).toBe(true);
@@ -3388,9 +3063,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3467,7 +3140,6 @@ describe('Browse', () => {
 
             // Wait for navigation to start
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 50));
 
             // Verify navigation started (image should start sliding)
             expect(fileViewerVm.isNavigating).toBe(true);
@@ -3523,9 +3195,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3547,7 +3217,6 @@ describe('Browse', () => {
             window.dispatchEvent(arrowLeftEvent);
 
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Verify no navigation occurred (still at first item)
             expect(fileViewerVm.currentItemIndex).toBe(0);
@@ -3600,9 +3269,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3624,7 +3291,6 @@ describe('Browse', () => {
             window.dispatchEvent(arrowRightEvent);
 
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Verify no navigation occurred (still at last item)
             expect(fileViewerVm.currentItemIndex).toBe(0);
@@ -3669,9 +3335,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3716,7 +3380,6 @@ describe('Browse', () => {
             await overlayImage.trigger('click');
 
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Verify drawer is open
             expect(fileViewerVm.isBottomPanelOpen).toBe(true);
@@ -3761,9 +3424,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3850,9 +3511,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -3942,9 +3601,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4038,9 +3695,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4135,9 +3790,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4228,9 +3881,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4281,7 +3932,6 @@ describe('Browse', () => {
             }
 
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 50));
 
             // Verify navigation started
             expect(fileViewerVm.isNavigating).toBe(true);
@@ -4324,9 +3974,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4651,7 +4299,6 @@ describe('Browse', () => {
             await vm.handleReaction(1, 'like', removeSpy);
 
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Check if ReactionQueue component exists and shows queued reaction
             const reactionQueue = wrapper.findComponent({ name: 'ReactionQueue' });
@@ -4721,7 +4368,6 @@ describe('Browse', () => {
             await vm.handleReaction(1, 'dislike', removeSpy);
 
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Verify reaction is queued
             expect(vm.queuedReactions.length).toBe(1);
@@ -4772,9 +4418,7 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
