@@ -34,10 +34,20 @@ const mockInit = vi.fn();
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
-        template: '<div class="masonry-mock"><slot></slot></div>',
+        template: `
+            <div class="masonry-mock">
+                <slot 
+                    v-for="(item, index) in items" 
+                    :key="item.id || index"
+                    :item="item" 
+                    :remove="() => {}" 
+                    :index="index"
+                ></slot>
+            </div>
+        `,
         props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop'],
-        setup() {
+        setup(props: { items: any[] }) {
             return {
                 isLoading: mockIsLoading,
                 init: mockInit,

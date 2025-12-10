@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue';
 import { X, Loader2 } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
+import FileReactions from './FileReactions.vue';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 
 interface Props {
@@ -792,6 +793,20 @@ defineExpose({
                 aria-label="Close overlay" data-test="close-overlay-button">
                 <X :size="20" />
             </button>
+
+            <!-- File Reactions (centered under image) -->
+            <div v-if="overlayFillComplete && !overlayIsClosing" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+                <FileReactions
+                    :favorite="false"
+                    :like="false"
+                    :dislike="false"
+                    :funny="false"
+                    :previewed-count="0"
+                    :viewed-count="0"
+                    :current-index="currentItemIndex ?? undefined"
+                    :total-items="items.length"
+                />
+            </div>
         </div>
 
         <!-- Image Carousel -->

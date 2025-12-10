@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { Masonry } from '@wyxos/vibe';
 import { Loader2, Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
 import FileViewer from '../components/FileViewer.vue';
 import BrowseStatusBar from '../components/BrowseStatusBar.vue';
+import FileReactions from '../components/FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useBrowseTabs, type MasonryItem, type BrowseTabData } from '../composables/useBrowseTabs';
@@ -30,9 +31,13 @@ const masonryContainer = ref<HTMLElement | null>(null);
 const tabContentContainer = ref<HTMLElement | null>(null); // Tab content container (includes header, masonry, footer)
 const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
+// Hover state for grid items
+const hoveredItemIndex = ref<number | null>(null);
+
 function onMasonryClick(e: MouseEvent): void {
     fileViewer.value?.openFromClick(e);
 }
+
 
 // Service selection state
 const availableServices = ref<Array<{ key: string; label: string; defaults?: Record<string, any> }>>([]);
@@ -407,6 +412,8 @@ async function loadTabs(): Promise<void> {
 
 
 
+
+
 // Initialize on mount
 onMounted(async () => {
     // Fetch available services first (in parallel with tabs for faster loading)
@@ -470,7 +477,7 @@ onMounted(async () => {
 
                 <!-- Masonry Content -->
                 <div class="flex-1 min-h-0">
-                    <div v-if="activeTabId !== null && hasServiceSelected" class="relative h-full"
+                    <div v-if="activeTabId !== null && hasServiceSelected" class="relative h-full masonry-container"
                         ref="masonryContainer" @click="onMasonryClick">
                         <Masonry :key="activeTabId" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                             :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
@@ -478,7 +485,21 @@ onMounted(async () => {
                             :backfill-max-calls="Infinity" @backfill:start="onBackfillStart"
                             @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                             @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
-                            @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component" />
+                            @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
+                            <template #default="{ item, index }">
+                                <div class="relative w-full h-full overflow-hidden"
+                                    @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
+                                    <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
+                                        class="w-full h-full object-cover" />
+                                    <div v-show="hoveredItemIndex === index"
+                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50">
+                                        <FileReactions :favorite="false" :like="false" :dislike="false" :funny="false"
+                                            :previewed-count="0" :viewed-count="0" :current-index="index"
+                                            :total-items="items.length" />
+                                    </div>
+                                </div>
+                            </template>
+                        </Masonry>
                     </div>
                     <div v-else-if="activeTabId !== null && !hasServiceSelected"
                         class="flex items-center justify-center h-full" data-test="no-service-message">
@@ -503,3 +524,15 @@ onMounted(async () => {
         </div>
     </div>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease-in-out;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+</style>
