@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { X, Layers } from 'lucide-vue-next';
+import { X, Layers, Loader2 } from 'lucide-vue-next';
 
 interface Props {
     id: number | string;
     label: string;
     isActive?: boolean;
     isMinimized?: boolean;
+    isLoading?: boolean; // Tab data loading (spinner)
+    isMasonryLoading?: boolean; // Masonry loading (pill)
 }
 
 withDefaults(defineProps<Props>(), {
     isActive: false,
     isMinimized: false,
+    isLoading: false,
+    isMasonryLoading: false,
 });
 
 const emit = defineEmits<{
@@ -66,6 +70,23 @@ function handleMouseDown(event: MouseEvent): void {
             >
                 {{ label }}
             </span>
+            <!-- Tab data loading spinner (loading files associated with tab) -->
+            <Loader2
+                v-if="isLoading"
+                :size="12"
+                class="animate-spin shrink-0 transition-opacity duration-200"
+                :class="!isMinimized ? 'opacity-100' : 'opacity-0'"
+                data-test="tab-loading-indicator"
+            />
+            <!-- Masonry loading pill (loading more items from service) -->
+            <div
+                v-if="isMasonryLoading"
+                class="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-smart-blue-500/20 text-smart-blue-300 text-[10px] font-medium shrink-0"
+                :class="!isMinimized ? 'opacity-100' : 'opacity-0'"
+                data-test="tab-masonry-loading-indicator"
+            >
+                <Loader2 :size="10" class="animate-spin" />
+            </div>
         </div>
         <button
             v-show="!isMinimized"

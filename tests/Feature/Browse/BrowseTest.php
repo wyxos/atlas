@@ -35,6 +35,7 @@ it('restores cursor values for a browsed tab after reload', function () {
     $this->actingAs($user);
 
     $page = visit('/browse')
+        ->wait(2) // Wait for component initialization and tab data loading
         ->assertPresent('[data-test="pagination-info"]')
         ->assertSee('Scrolled Tab')
         ->assertNoJavascriptErrors();
