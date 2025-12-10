@@ -61,7 +61,7 @@ const indexDisplay = computed(() => {
 </script>
 
 <template>
-    <div :class="[
+    <div @click.stop :class="[
         'flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg',
         variant === 'small' ? 'gap-1.5 px-2 py-1' : 'gap-4 px-4 py-2'
     ]">
