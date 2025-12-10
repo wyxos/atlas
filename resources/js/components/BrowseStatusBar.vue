@@ -11,17 +11,22 @@ interface Props {
     isLoading?: boolean;
     backfill: BackfillState;
     visible?: boolean;
+    queuedReactionsCount?: number;
 }
 
 withDefaults(defineProps<Props>(), {
     isLoading: false,
     visible: true,
+    queuedReactionsCount: 0,
 });
 </script>
 
 <template>
     <div v-if="visible"
         class="my-2 flex flex-wrap items-center justify-center gap-3" data-test="pagination-info">
+        <!-- Queued Reactions Pill -->
+        <Pill v-if="queuedReactionsCount > 0" label="Queued" :value="queuedReactionsCount" variant="warning" reversed
+            data-test="queued-reactions-pill" />
         <!-- Count Pill -->
         <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
         <!-- Current Page Pill -->

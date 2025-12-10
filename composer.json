@@ -12,6 +12,7 @@
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
+        "laravel/wayfinder": "^0.1.12",
         "wyxos/harmonie": "1.6.13"
     },
     "require-dev": {
