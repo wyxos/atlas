@@ -262,10 +262,13 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const itemBox = itemEl.getBoundingClientRect();
     const tabContentBox = tabContent.getBoundingClientRect();
 
-    const top = itemBox.top - tabContentBox.top;
-    const left = itemBox.left - tabContentBox.left;
-    const width = itemBox.width;
-    const height = itemBox.height;
+    // Account for border-4 (4px border on all sides = 8px total width/height added)
+    // Adjust position and size so the image inside aligns perfectly with the clicked image
+    const overlayBorderWidth = 4;
+    const top = itemBox.top - tabContentBox.top - overlayBorderWidth;
+    const left = itemBox.left - tabContentBox.left - overlayBorderWidth;
+    const width = itemBox.width + (overlayBorderWidth * 2);
+    const height = itemBox.height + (overlayBorderWidth * 2);
 
     // Try to find an <img> inside the clicked masonry item
     const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
@@ -795,17 +798,10 @@ defineExpose({
             </button>
 
             <!-- File Reactions (centered under image) -->
-            <div v-if="overlayFillComplete && !overlayIsClosing" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
-                <FileReactions
-                    :favorite="false"
-                    :like="false"
-                    :dislike="false"
-                    :funny="false"
-                    :previewed-count="0"
-                    :viewed-count="0"
-                    :current-index="currentItemIndex ?? undefined"
-                    :total-items="items.length"
-                />
+            <div v-if="overlayFillComplete && !overlayIsClosing"
+                class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+                <FileReactions :favorite="false" :like="false" :dislike="false" :funny="false" :previewed-count="0"
+                    :viewed-count="0" :current-index="currentItemIndex ?? undefined" :total-items="items.length" />
             </div>
         </div>
 
