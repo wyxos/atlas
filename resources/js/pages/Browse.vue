@@ -380,8 +380,7 @@ onMounted(async () => {
                                     <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
                                         class="w-full h-full object-cover" />
                                     <div v-show="hoveredItemIndex === index"
-                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto"
-                                        @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
+                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
                                         <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
                                             :current-index="index" :total-items="items.length" variant="small" />
                                     </div>
