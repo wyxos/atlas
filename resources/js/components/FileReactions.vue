@@ -9,6 +9,7 @@ interface Props {
     currentIndex?: number;
     totalItems?: number;
     variant?: 'default' | 'small';
+    removeItem?: () => void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -18,7 +19,12 @@ const props = withDefaults(defineProps<Props>(), {
     currentIndex: undefined,
     totalItems: undefined,
     variant: 'default',
+    removeItem: undefined,
 });
+
+const emit = defineEmits<{
+    reaction: [type: 'love' | 'like' | 'dislike' | 'funny'];
+}>();
 
 // Reaction state
 const currentReaction = ref<string | null>(null);
@@ -52,19 +58,30 @@ async function handleReactionClick(type: 'love' | 'like' | 'dislike' | 'funny'):
         return;
     }
 
-    isUpdating.value = true;
-    try {
-        const response = await window.axios.post(`/api/files/${props.fileId}/reaction`, {
-            type, // Server handles toggle logic (removes if same type, replaces if different)
-        });
+    // If removeItem is provided, call it immediately (for masonry removal)
+    if (props.removeItem) {
+        props.removeItem();
+    }
 
-        // Update local state based on response
-        currentReaction.value = response.data.reaction?.type || null;
-    } catch (error) {
-        console.error('Failed to update reaction:', error);
-        // Optionally revert on error
-    } finally {
-        isUpdating.value = false;
+    // Emit reaction event (parent will handle queueing)
+    emit('reaction', type);
+
+    // If no removeItem, handle the reaction directly (for FileViewer)
+    if (!props.removeItem) {
+        isUpdating.value = true;
+        try {
+            const response = await window.axios.post(`/api/files/${props.fileId}/reaction`, {
+                type, // Server handles toggle logic (removes if same type, replaces if different)
+            });
+
+            // Update local state based on response
+            currentReaction.value = response.data.reaction?.type || null;
+        } catch (error) {
+            console.error('Failed to update reaction:', error);
+            // Optionally revert on error
+        } finally {
+            isUpdating.value = false;
+        }
     }
 }
 
@@ -159,14 +176,14 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <div class="flex items-center text-white gap-1.5">
                 <Eye :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ previewedCount
-                    }}</span>
+                }}</span>
             </div>
 
             <!-- Viewed Count -->
             <div class="flex items-center text-white gap-1.5">
                 <EyeOff :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ viewedCount
-                    }}</span>
+                }}</span>
             </div>
         </div>
 

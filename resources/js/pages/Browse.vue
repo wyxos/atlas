@@ -7,11 +7,13 @@ import BrowseTab from '../components/BrowseTab.vue';
 import FileViewer from '../components/FileViewer.vue';
 import BrowseStatusBar from '../components/BrowseStatusBar.vue';
 import FileReactions from '../components/FileReactions.vue';
+import ReactionQueue from '../components/ReactionQueue.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useBrowseTabs, type MasonryItem, type BrowseTabData } from '../composables/useBrowseTabs';
 import { useBackfill } from '../composables/useBackfill';
 import { useBrowseService } from '../composables/useBrowseService';
+import { useReactionQueue } from '../composables/useReactionQueue';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -35,8 +37,35 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 // Hover state for grid items
 const hoveredItemIndex = ref<number | null>(null);
 
+// Reaction queue
+const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
+
 function onMasonryClick(e: MouseEvent): void {
     fileViewer.value?.openFromClick(e);
+}
+
+// Handle reaction with queue
+async function handleReaction(
+    fileId: number,
+    type: 'love' | 'like' | 'dislike' | 'funny',
+    removeItem: (item: MasonryItem) => void
+): Promise<void> {
+    // Find the item to remove
+    const item = items.value.find((i) => i.id === fileId);
+    if (item && removeItem) {
+        // Immediately remove from masonry
+        removeItem(item);
+    }
+
+    // Queue the AJAX request
+    queueReaction(fileId, type, async (fId, t) => {
+        try {
+            await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
+        } catch (error) {
+            console.error('Failed to update reaction:', error);
+            throw error;
+        }
+    });
 }
 
 
@@ -87,9 +116,9 @@ async function applyService(): Promise<void> {
 }
 
 // Tab switching function - needs to stay here as it interacts with masonry
-async function switchTab(tabId: number): Promise<void> {
-    // If clicking on already active tab, do nothing
-    if (activeTabId.value === tabId) {
+async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promise<void> {
+    // If clicking on already active tab, do nothing (unless skipActiveCheck is true for initial load)
+    if (!skipActiveCheck && activeTabId.value === tabId) {
         return;
     }
 
@@ -294,11 +323,10 @@ async function loadTabs(): Promise<void> {
         // Step 2: Determine which tab to focus (default to first tab if tabs exist)
         if (tabs.value.length > 0 && activeTabId.value === null) {
             const firstTab = tabs.value[0];
-            activeTabId.value = firstTab.id;
-
             // Step 3: If tab has files, load items lazily
             // Step 4: Restore query params (handled in switchTab)
-            await switchTab(firstTab.id);
+            // Pass skipActiveCheck=true since activeTabId is null, so switchTab will set it
+            await switchTab(firstTab.id, true);
         }
         // If no tabs exist, render nothing until a tab is created
     } catch (error) {
@@ -384,15 +412,23 @@ onMounted(async () => {
                             @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                             @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                             @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
-                            <template #default="{ item, index }">
+                            <template #default="{ item, index, remove }">
                                 <div class="relative w-full h-full overflow-hidden group"
                                     @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
                                     <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
                                         class="w-full h-full object-cover" />
                                     <div v-show="hoveredItemIndex === index"
                                         class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                        <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
-                                            :current-index="index" :total-items="items.length" variant="small" />
+                                        <FileReactions
+                                            :file-id="item.id"
+                                            :previewed-count="0"
+                                            :viewed-count="0"
+                                            :current-index="index"
+                                            :total-items="items.length"
+                                            variant="small"
+                                            :remove-item="() => remove(item)"
+                                            @reaction="(type) => handleReaction(item.id, type, remove)"
+                                        />
                                     </div>
                                 </div>
                             </template>
@@ -419,6 +455,9 @@ onMounted(async () => {
                     :visible="activeTabId !== null && hasServiceSelected" />
             </div>
         </div>
+
+        <!-- Reaction Queue -->
+        <ReactionQueue :queued-reactions="queuedReactions" :on-cancel="cancelReaction" />
     </div>
 </template>
 

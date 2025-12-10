@@ -4054,6 +4054,240 @@ describe('Browse', () => {
             }
         });
 
+        it('queues reaction and removes item from masonry immediately', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                                { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                if (url.includes('/api/files') && url.includes('/reaction')) {
+                    return Promise.resolve({
+                        data: {
+                            reaction: null,
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            mockAxios.post.mockResolvedValue({
+                data: {
+                    reaction: { type: 'love' },
+                },
+            });
+
+            const router = await createTestRouter('/browse');
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Set items directly for testing
+            vm.items = [
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Verify initial items count
+            expect(vm.items.length).toBe(2);
+
+            // Mock the remove function
+            const removeSpy = vi.fn((item: any) => {
+                const index = vm.items.findIndex((i: any) => i.id === item.id);
+                if (index !== -1) {
+                    vm.items.splice(index, 1);
+                }
+            });
+
+            // Simulate handleReaction being called
+            const item = vm.items.find((i: any) => i.id === 1);
+            expect(item).toBeDefined();
+
+            await vm.handleReaction(1, 'love', removeSpy);
+            await wrapper.vm.$nextTick();
+
+            // Verify item was removed immediately
+            expect(removeSpy).toHaveBeenCalledWith(item);
+            expect(vm.items.length).toBe(1);
+            expect(vm.items.find((i: any) => i.id === 1)).toBeUndefined();
+
+            // Verify reaction was queued
+            expect(vm.queuedReactions.length).toBe(1);
+            expect(vm.queuedReactions[0].fileId).toBe(1);
+            expect(vm.queuedReactions[0].type).toBe('love');
+        });
+
+        it('displays reaction queue when reactions are queued', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                if (url.includes('/api/files') && url.includes('/reaction')) {
+                    return Promise.resolve({
+                        data: {
+                            reaction: null,
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter('/browse');
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Queue a reaction
+            const removeSpy = vi.fn();
+            await vm.handleReaction(1, 'like', removeSpy);
+
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Check if ReactionQueue component exists and shows queued reaction
+            const reactionQueue = wrapper.findComponent({ name: 'ReactionQueue' });
+            expect(reactionQueue.exists()).toBe(true);
+
+            // Verify queued reactions are present
+            expect(vm.queuedReactions.length).toBeGreaterThan(0);
+            const queued = vm.queuedReactions[0];
+            expect(queued.fileId).toBe(1);
+            expect(queued.type).toBe('like');
+            expect(queued.countdown).toBeGreaterThan(0);
+        });
+
+        it('cancels queued reaction when cancel button is clicked', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                if (url.includes('/api/files') && url.includes('/reaction')) {
+                    return Promise.resolve({
+                        data: {
+                            reaction: null,
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter('/browse');
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Queue a reaction
+            const removeSpy = vi.fn();
+            await vm.handleReaction(1, 'dislike', removeSpy);
+
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify reaction is queued
+            expect(vm.queuedReactions.length).toBe(1);
+
+            // Cancel the reaction
+            await vm.cancelReaction(1);
+
+            await wrapper.vm.$nextTick();
+
+            // Verify reaction was removed from queue
+            expect(vm.queuedReactions.length).toBe(0);
+        });
+
         it('disables next button when at last item', async () => {
             mockAxios.get.mockImplementation((url: string) => {
                 if (url.includes('/api/browse-tabs')) {
