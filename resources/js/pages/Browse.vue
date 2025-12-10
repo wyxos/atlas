@@ -375,15 +375,15 @@ onMounted(async () => {
                             @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                             @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
                             <template #default="{ item, index }">
-                                <div class="relative w-full h-full overflow-hidden"
+                                <div class="relative w-full h-full overflow-hidden group"
                                     @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
                                     <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
                                         class="w-full h-full object-cover" />
                                     <div v-show="hoveredItemIndex === index"
-                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50">
-                                        <FileReactions :favorite="false" :like="false" :dislike="false" :funny="false"
-                                            :previewed-count="0" :viewed-count="0" :current-index="index"
-                                            :total-items="items.length" variant="small" />
+                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto"
+                                        @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
+                                        <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
+                                            :current-index="index" :total-items="items.length" variant="small" />
                                     </div>
                                 </div>
                             </template>

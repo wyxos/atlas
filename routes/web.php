@@ -24,6 +24,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::delete('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'destroy'])->name('api.files.destroy');
+    Route::get('/api/files/{file}/reaction', [\App\Http\Controllers\FileReactionController::class, 'show'])->name('api.files.reaction.show');
+    Route::post('/api/files/{file}/reaction', [\App\Http\Controllers\FileReactionController::class, 'store'])->name('api.files.reaction.store');
     Route::get('/api/browse', [\App\Http\Controllers\BrowseController::class, 'index'])->name('api.browse.index');
     Route::get('/api/browse-tabs', [\App\Http\Controllers\BrowseTabController::class, 'index'])->name('api.browse-tabs.index');
     Route::get('/api/browse-tabs/{browseTab}/items', [\App\Http\Controllers\BrowseTabController::class, 'items'])->name('api.browse-tabs.items');

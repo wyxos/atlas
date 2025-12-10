@@ -3658,6 +3658,144 @@ describe('Browse', () => {
             expect(prevButton.attributes('disabled')).toBeDefined();
         });
 
+        it('shows FileReactions component on hover over masonry item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                                { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                if (url.includes('/api/files') && url.includes('/reaction')) {
+                    return Promise.resolve({
+                        data: {
+                            reaction: null,
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter('/browse');
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Trigger hover on first item
+            const masonryItems = wrapper.findAll('.masonry-mock > div');
+            if (masonryItems.length > 0) {
+                await masonryItems[0].trigger('mouseenter');
+                await wrapper.vm.$nextTick();
+
+                // FileReactions should be visible
+                const fileReactions = wrapper.findComponent({ name: 'FileReactions' });
+                expect(fileReactions.exists()).toBe(true);
+            }
+        });
+
+        it('hides FileReactions component when mouse leaves masonry item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                if (url.includes('/api/files') && url.includes('/reaction')) {
+                    return Promise.resolve({
+                        data: {
+                            reaction: null,
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter('/browse');
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Trigger hover on first item
+            const masonryItems = wrapper.findAll('.masonry-mock > div');
+            if (masonryItems.length > 0) {
+                await masonryItems[0].trigger('mouseenter');
+                await wrapper.vm.$nextTick();
+
+                // FileReactions should be visible
+                let fileReactions = wrapper.findComponent({ name: 'FileReactions' });
+                expect(fileReactions.exists()).toBe(true);
+
+                // Trigger mouse leave
+                await masonryItems[0].trigger('mouseleave');
+                await wrapper.vm.$nextTick();
+
+                // FileReactions should be hidden (v-show="false")
+                fileReactions = wrapper.findComponent({ name: 'FileReactions' });
+                // Component might still exist but be hidden
+                if (fileReactions.exists()) {
+                    expect(fileReactions.isVisible()).toBe(false);
+                }
+            }
+        });
+
         it('disables next button when at last item', async () => {
             mockAxios.get.mockImplementation((url: string) => {
                 if (url.includes('/api/browse-tabs')) {

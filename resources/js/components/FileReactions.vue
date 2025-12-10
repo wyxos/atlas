@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff } from 'lucide-vue-next';
 
 interface Props {
-    favorite?: boolean;
-    like?: boolean;
-    dislike?: boolean;
-    funny?: boolean;
+    fileId?: number;
     previewedCount?: number;
     viewedCount?: number;
     currentIndex?: number;
@@ -15,10 +12,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-    favorite: false,
-    like: false,
-    dislike: false,
-    funny: false,
+    fileId: undefined,
     previewedCount: 0,
     viewedCount: 0,
     currentIndex: undefined,
@@ -26,27 +20,68 @@ const props = withDefaults(defineProps<Props>(), {
     variant: 'default',
 });
 
-const emit = defineEmits<{
-    'favorite-click': [];
-    'like-click': [];
-    'dislike-click': [];
-    'funny-click': [];
-}>();
+// Reaction state
+const currentReaction = ref<string | null>(null);
+const isUpdating = ref(false);
+
+// Computed properties for each reaction type
+const favorite = computed(() => currentReaction.value === 'love');
+const like = computed(() => currentReaction.value === 'like');
+const dislike = computed(() => currentReaction.value === 'dislike');
+const funny = computed(() => currentReaction.value === 'funny');
+
+// Fetch current reaction when fileId changes
+async function fetchReaction(): Promise<void> {
+    if (!props.fileId) {
+        currentReaction.value = null;
+        return;
+    }
+
+    try {
+        const response = await window.axios.get(`/api/files/${props.fileId}/reaction`);
+        currentReaction.value = response.data.reaction?.type || null;
+    } catch (error) {
+        console.error('Failed to fetch reaction:', error);
+        currentReaction.value = null;
+    }
+}
+
+// Handle reaction click
+async function handleReactionClick(type: 'love' | 'like' | 'dislike' | 'funny'): Promise<void> {
+    if (!props.fileId || isUpdating.value) {
+        return;
+    }
+
+    isUpdating.value = true;
+    try {
+        const response = await window.axios.post(`/api/files/${props.fileId}/reaction`, {
+            type, // Server handles toggle logic (removes if same type, replaces if different)
+        });
+
+        // Update local state based on response
+        currentReaction.value = response.data.reaction?.type || null;
+    } catch (error) {
+        console.error('Failed to update reaction:', error);
+        // Optionally revert on error
+    } finally {
+        isUpdating.value = false;
+    }
+}
 
 function handleFavoriteClick(): void {
-    emit('favorite-click');
+    handleReactionClick('love');
 }
 
 function handleLikeClick(): void {
-    emit('like-click');
+    handleReactionClick('like');
 }
 
 function handleDislikeClick(): void {
-    emit('dislike-click');
+    handleReactionClick('dislike');
 }
 
 function handleFunnyClick(): void {
-    emit('funny-click');
+    handleReactionClick('funny');
 }
 
 const indexDisplay = computed(() => {
@@ -58,6 +93,9 @@ const indexDisplay = computed(() => {
     }
     return null;
 });
+
+// Watch fileId and fetch reaction when it changes
+watch(() => props.fileId, fetchReaction, { immediate: true });
 </script>
 
 <template>
@@ -71,39 +109,23 @@ const indexDisplay = computed(() => {
             variant === 'small' ? 'gap-2' : 'gap-2'
         ]">
             <!-- Favorite -->
-            <button @click="handleFavoriteClick" :class="[
-                'rounded-full transition-all duration-200 hover:scale-110',
-                variant === 'small' ? 'p-1' : 'p-2',
-                favorite ? 'text-red-500 bg-red-500/20' : 'text-white/70 hover:text-red-400 hover:bg-red-500/10'
-            ]" aria-label="Favorite">
-                <Heart :size="18" :fill="favorite ? 'currentColor' : 'none'" />
+            <button @click="handleFavoriteClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Favorite">
+                <Heart :size="18" />
             </button>
 
             <!-- Like -->
-            <button @click="handleLikeClick" :class="[
-                'rounded-full transition-all duration-200 hover:scale-110',
-                variant === 'small' ? 'p-1' : 'p-2',
-                like ? 'text-blue-500 bg-blue-500/20' : 'text-white/70 hover:text-blue-400 hover:bg-blue-500/10'
-            ]" aria-label="Like">
-                <ThumbsUp :size="18" :fill="like ? 'currentColor' : 'none'" />
+            <button @click="handleLikeClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Like">
+                <ThumbsUp :size="18" />
             </button>
 
             <!-- Dislike -->
-            <button @click="handleDislikeClick" :class="[
-                'rounded-full transition-all duration-200 hover:scale-110',
-                variant === 'small' ? 'p-1' : 'p-2',
-                dislike ? 'text-orange-500 bg-orange-500/20' : 'text-white/70 hover:text-orange-400 hover:bg-orange-500/10'
-            ]" aria-label="Dislike">
-                <ThumbsDown :size="18" :fill="dislike ? 'currentColor' : 'none'" />
+            <button @click="handleDislikeClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Dislike">
+                <ThumbsDown :size="18" />
             </button>
 
             <!-- Funny -->
-            <button @click="handleFunnyClick" :class="[
-                'rounded-full transition-all duration-200 hover:scale-110',
-                variant === 'small' ? 'p-1' : 'p-2',
-                funny ? 'text-yellow-500 bg-yellow-500/20' : 'text-white/70 hover:text-yellow-400 hover:bg-yellow-500/10'
-            ]" aria-label="Funny">
-                <Smile :size="18" :fill="funny ? 'currentColor' : 'none'" />
+            <button @click="handleFunnyClick" :disabled="isUpdating" class="rounded-full p-2" aria-label="Funny">
+                <Smile :size="18" />
             </button>
         </div>
 
@@ -119,21 +141,17 @@ const indexDisplay = computed(() => {
             variant === 'small' ? 'gap-3' : 'gap-3'
         ]">
             <!-- Previewed Count -->
-            <div :class="[
-                'flex items-center text-white/70 gap-1.5',
-            ]">
+            <div class="flex items-center text-white/70 gap-1.5">
                 <Eye :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ previewedCount
-                }}</span>
+                    }}</span>
             </div>
 
             <!-- Viewed Count -->
-            <div :class="[
-                'flex items-center text-white/70 gap-1.5',
-            ]">
+            <div class="flex items-center text-white/70 gap-1.5">
                 <EyeOff :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ viewedCount
-                }}</span>
+                    }}</span>
             </div>
         </div>
 

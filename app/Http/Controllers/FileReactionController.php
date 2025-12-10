@@ -1,0 +1,82 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\File;
+use App\Models\Reaction;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+
+class FileReactionController extends Controller
+{
+    /**
+     * Toggle a reaction on a file.
+     * Only one reaction can be active at a time - setting a new reaction removes the previous one.
+     */
+    public function store(Request $request, File $file): JsonResponse
+    {
+        Gate::authorize('view', $file);
+
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:love,like,dislike,funny'],
+        ]);
+
+        $user = Auth::user();
+
+        // Find existing reaction for this user and file
+        $existingReaction = Reaction::where('user_id', $user->id)
+            ->where('file_id', $file->id)
+            ->first();
+
+        // If clicking the same reaction type, remove it (toggle off)
+        if ($existingReaction && $existingReaction->type === $validated['type']) {
+            $existingReaction->delete();
+
+            return response()->json([
+                'message' => 'Reaction removed.',
+                'reaction' => null,
+            ]);
+        }
+
+        // Delete any existing reaction first (only one reaction allowed at a time)
+        if ($existingReaction) {
+            $existingReaction->delete();
+        }
+
+        // Create the new reaction
+        $reaction = Reaction::create([
+            'file_id' => $file->id,
+            'user_id' => $user->id,
+            'type' => $validated['type'],
+        ]);
+
+        return response()->json([
+            'message' => 'Reaction updated.',
+            'reaction' => [
+                'type' => $reaction->type,
+            ],
+        ]);
+    }
+
+    /**
+     * Get the current user's reaction for a file.
+     */
+    public function show(File $file): JsonResponse
+    {
+        Gate::authorize('view', $file);
+
+        $user = Auth::user();
+
+        $reaction = Reaction::where('user_id', $user->id)
+            ->where('file_id', $file->id)
+            ->first();
+
+        return response()->json([
+            'reaction' => $reaction ? [
+                'type' => $reaction->type,
+            ] : null,
+        ]);
+    }
+}
