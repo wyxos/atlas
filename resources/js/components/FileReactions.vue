@@ -101,33 +101,45 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
 <template>
     <div @click.stop :class="[
         'flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg',
-        variant === 'small' ? 'gap-1.5 px-2 py-1' : 'gap-4 px-4 py-2'
+        variant === 'small' ? 'gap-2 px-2 py-1' : 'gap-4 px-4 py-2'
     ]">
         <!-- Reaction Icons -->
         <div :class="[
             'flex items-center gap-2'
         ]">
             <!-- Favorite -->
-            <button @click="handleFavoriteClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
-                aria-label="Favorite">
+            <button @click="handleFavoriteClick" :disabled="isUpdating" :class="[
+                'rounded transition-colors',
+                variant === 'small' ? 'p-1' : 'p-2',
+                favorite ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+            ]" aria-label="Favorite">
                 <Heart :size="18" />
             </button>
 
             <!-- Like -->
-            <button @click="handleLikeClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
-                aria-label="Like">
+            <button @click="handleLikeClick" :disabled="isUpdating" :class="[
+                'rounded transition-colors',
+                variant === 'small' ? 'p-1' : 'p-2',
+                like ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+            ]" aria-label="Like">
                 <ThumbsUp :size="18" />
             </button>
 
             <!-- Dislike -->
-            <button @click="handleDislikeClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
-                aria-label="Dislike">
+            <button @click="handleDislikeClick" :disabled="isUpdating" :class="[
+                'rounded transition-colors',
+                variant === 'small' ? 'p-1' : 'p-2',
+                dislike ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+            ]" aria-label="Dislike">
                 <ThumbsDown :size="18" />
             </button>
 
             <!-- Funny -->
-            <button @click="handleFunnyClick" :disabled="isUpdating" class="rounded-full p-2 text-white"
-                aria-label="Funny">
+            <button @click="handleFunnyClick" :disabled="isUpdating" :class="[
+                'rounded transition-colors',
+                variant === 'small' ? 'p-1' : 'p-2',
+                funny ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+            ]" aria-label="Funny">
                 <Smile :size="18" />
             </button>
         </div>
@@ -147,14 +159,14 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <div class="flex items-center text-white gap-1.5">
                 <Eye :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ previewedCount
-                }}</span>
+                    }}</span>
             </div>
 
             <!-- Viewed Count -->
             <div class="flex items-center text-white gap-1.5">
                 <EyeOff :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ viewedCount
-                }}</span>
+                    }}</span>
             </div>
         </div>
 
