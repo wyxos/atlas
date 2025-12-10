@@ -296,6 +296,72 @@ describe('FileReactions', () => {
         expect(vm.like).toBe(true);
     });
 
+    it('calls removeItem and emits reaction event when removeItem prop is provided', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                reaction: null,
+            },
+        });
+
+        const removeItem = vi.fn();
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                removeItem,
+            },
+        });
+
+        await flushPromises();
+
+        const favoriteButton = wrapper.find('button[aria-label="Favorite"]');
+        await favoriteButton.trigger('click');
+        await wrapper.vm.$nextTick();
+
+        // Verify removeItem was called immediately
+        expect(removeItem).toHaveBeenCalled();
+
+        // Verify reaction event was emitted
+        expect(wrapper.emitted('reaction')).toBeTruthy();
+        expect(wrapper.emitted('reaction')?.[0]).toEqual(['love']);
+
+        // Verify API was NOT called directly (should be queued by parent)
+        expect(mockAxios.post).not.toHaveBeenCalled();
+    });
+
+    it('calls API directly when removeItem prop is not provided', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                reaction: null,
+            },
+        });
+
+        mockAxios.post.mockResolvedValueOnce({
+            data: {
+                reaction: {
+                    type: 'like',
+                },
+            },
+        });
+
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                // No removeItem prop
+            },
+        });
+
+        await flushPromises();
+
+        const likeButton = wrapper.find('button[aria-label="Like"]');
+        await likeButton.trigger('click');
+        await flushPromises();
+
+        // Verify API was called directly (for FileViewer usage)
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/reaction', {
+            type: 'like',
+        });
+    });
+
     it('toggles reaction off when clicking the same reaction', async () => {
         mockAxios.get.mockResolvedValueOnce({
             data: {
