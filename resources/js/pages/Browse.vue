@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useBrowseTabs, type MasonryItem, type BrowseTabData } from '../composables/useBrowseTabs';
 import { useBackfill } from '../composables/useBackfill';
+import { useBrowseService } from '../composables/useBrowseService';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -40,9 +41,7 @@ function onMasonryClick(e: MouseEvent): void {
 
 
 // Service selection state
-const availableServices = ref<Array<{ key: string; label: string; defaults?: Record<string, any> }>>([]);
 const selectedService = ref<string>(''); // Service selected in UI (not yet applied)
-const isApplyingService = ref(false);
 
 // Backfill state and handlers
 const {
@@ -71,80 +70,20 @@ const hasServiceSelected = computed(() => {
     return typeof service === 'string' && service.length > 0;
 });
 
-// Fetch available services
-async function fetchServices(): Promise<void> {
-    try {
-        // Fetch services from browse endpoint (will return services metadata)
-        const response = await window.axios.get('/api/browse?page=1&limit=1');
-        availableServices.value = response.data.services || [];
-
-        // Fallback to default services if none returned
-        if (availableServices.value.length === 0) {
-            availableServices.value = [
-                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                { key: 'wallhaven', label: 'Wallhaven' },
-            ];
-        }
-    } catch (error) {
-        console.error('Failed to fetch services:', error);
-        // Fallback to default services
-        availableServices.value = [
-            { key: 'civit-ai-images', label: 'CivitAI Images' },
-            { key: 'wallhaven', label: 'Wallhaven' },
-        ];
-    }
-}
-
 // Apply selected service to current tab
 async function applyService(): Promise<void> {
-    if (!activeTabId.value || !selectedService.value || isApplyingService.value) {
-        return;
-    }
-
-    isApplyingService.value = true;
-    try {
-        const tab = getActiveTab();
-        if (!tab) {
-            return;
-        }
-
-        // Update tab's queryParams with service
-        const updatedQueryParams = {
-            ...tab.queryParams,
-            service: selectedService.value,
-            page: 1, // Reset to page 1 when changing service
-            next: null,
-        };
-
-        // Clear existing items and reset pagination
-        items.value = [];
-        currentPage.value = 1;
-        nextCursor.value = null;
-        loadAtPage.value = 1;
-
-        // Update tab
-        updateActiveTab([], [], updatedQueryParams);
-
-        // Reset masonry and trigger load
-        if (masonry.value) {
-            if (masonry.value.isLoading) {
-                masonry.value.cancelLoad();
-            }
-            masonry.value.destroy();
-        }
-
-        await nextTick();
-
-        // Trigger initial load
-        if (masonry.value && loadAtPage.value !== null) {
-            // Masonry will auto-load when loadAtPage is set
-        }
-    } catch (error) {
-        console.error('Failed to apply service:', error);
-    } finally {
-        isApplyingService.value = false;
-        selectedService.value = ''; // Clear selection after applying
-    }
+    await applyServiceFromComposable(
+        selectedService,
+        activeTabId,
+        items,
+        currentPage,
+        nextCursor,
+        loadAtPage,
+        masonry as unknown as import('vue').Ref<{ isLoading: boolean; cancelLoad: () => void; destroy: () => void } | null>,
+        getActiveTab,
+        updateActiveTab,
+        nextTick
+    );
 }
 
 // Tab switching function - needs to stay here as it interacts with masonry
@@ -293,6 +232,26 @@ const {
     loadTabItems,
 } = useBrowseTabs(switchTab);
 
+// Browse service composable - initialized after tab management and computed properties
+const {
+    availableServices,
+    isApplyingService,
+    fetchServices: fetchServicesFromComposable,
+    getNextPage: getNextPageFromComposable,
+    applyService: applyServiceFromComposable,
+} = useBrowseService({
+    hasServiceSelected,
+    isTabRestored,
+    items,
+    nextCursor,
+    currentPage,
+    pendingRestoreNextCursor,
+    currentTabService,
+    activeTabId,
+    getActiveTab,
+    updateActiveTab,
+});
+
 const layout = {
     gutterX: 12,
     gutterY: 12,
@@ -300,78 +259,7 @@ const layout = {
 };
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
-    // IMPORTANT: Don't load if no service is selected
-    if (!hasServiceSelected.value) {
-        return {
-            items: [],
-            nextPage: null,
-        };
-    }
-
-    // If we're restoring a tab and already have items, and masonry is trying to load page 1,
-    // If we're restoring a tab and already have items, prevent any loading
-    // Masonry should only load when user scrolls to bottom, not during restoration
-    if (isTabRestored.value) {
-        // Return empty result to prevent loading during tab restoration
-        return {
-            items: [],
-            nextPage: nextCursor.value,
-        };
-    }
-
-    // Determine actual cursor/page to request. When restoring, Masonry may request page 1.
-    let pageToRequest: string | number = page;
-    if (pendingRestoreNextCursor.value !== null) {
-        pageToRequest = pendingRestoreNextCursor.value;
-        pendingRestoreNextCursor.value = null;
-    }
-
-    // Always pass as 'page' parameter - service will handle conversion
-    const url = new URL('/api/browse', window.location.origin);
-    url.searchParams.set('page', String(pageToRequest));
-
-    // Include service parameter if available
-    const currentService = currentTabService.value;
-    if (currentService) {
-        url.searchParams.set('source', currentService);
-    }
-
-    const response = await window.axios.get(url.toString());
-    const data = response.data;
-
-    // Update currentPage to the page we just loaded
-    // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
-    if (!isTabRestored.value || items.value.length === 0) {
-        // Update current page to the page/cursor we just used
-        currentPage.value = pageToRequest;
-    }
-
-    // Update next cursor from API response (for local state, used for loading more)
-    nextCursor.value = data.nextPage; // This is the cursor/page string from CivitAI
-
-    // Update active tab with new items - this is the single source of truth for tab updates
-    // Only update if we're not restoring a tab (to prevent overwriting restored state)
-    if (activeTabId.value && !isTabRestored.value) {
-        const activeTab = getActiveTab();
-        if (activeTab) {
-            // Append new items to existing items (masonry will update items.value separately)
-            const updatedItemsData = [...activeTab.itemsData, ...data.items];
-            // Extract database file IDs from all items in the tab
-            const updatedFileIds = updatedItemsData.map(item => item.id);
-            // Store both page and next in queryParams (service handles format conversion)
-            const updatedQueryParams = {
-                ...activeTab.queryParams,
-                page: pageToRequest,
-                next: data.nextPage,
-            };
-            updateActiveTab(updatedItemsData, updatedFileIds, updatedQueryParams);
-        }
-    }
-
-    return {
-        items: data.items,
-        nextPage: data.nextPage, // Pass cursor to Masonry for next request
-    };
+    return await getNextPageFromComposable(page);
 }
 
 async function handleCarouselLoadMore(): Promise<void> {
@@ -417,7 +305,7 @@ async function loadTabs(): Promise<void> {
 // Initialize on mount
 onMounted(async () => {
     // Fetch available services first (in parallel with tabs for faster loading)
-    const servicesPromise = fetchServices();
+    const servicesPromise = fetchServicesFromComposable();
 
     // Load tabs - loadTabs will set the first tab as active if tabs exist
     const tabsPromise = loadTabs();
@@ -495,7 +383,7 @@ onMounted(async () => {
                                         class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50">
                                         <FileReactions :favorite="false" :like="false" :dislike="false" :funny="false"
                                             :previewed-count="0" :viewed-count="0" :current-index="index"
-                                            :total-items="items.length" />
+                                            :total-items="items.length" variant="small" />
                                     </div>
                                 </div>
                             </template>
