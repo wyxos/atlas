@@ -111,7 +111,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <button @click="handleFavoriteClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
                 variant === 'small' ? 'p-1' : 'p-2',
-                favorite ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+                favorite ? 'bg-red-500 text-white' : 'text-white hover:text-red-400'
             ]" aria-label="Favorite">
                 <Heart :size="18" />
             </button>
@@ -120,7 +120,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <button @click="handleLikeClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
                 variant === 'small' ? 'p-1' : 'p-2',
-                like ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+                like ? 'bg-smart-blue-500 text-white' : 'text-white hover:text-smart-blue-400'
             ]" aria-label="Like">
                 <ThumbsUp :size="18" />
             </button>
@@ -129,7 +129,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <button @click="handleDislikeClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
                 variant === 'small' ? 'p-1' : 'p-2',
-                dislike ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+                dislike ? 'bg-gray-500 text-white' : 'text-white hover:text-gray-400'
             ]" aria-label="Dislike">
                 <ThumbsDown :size="18" />
             </button>
@@ -138,7 +138,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <button @click="handleFunnyClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
                 variant === 'small' ? 'p-1' : 'p-2',
-                funny ? 'bg-smart-blue-400 text-white' : 'text-white hover:text-smart-blue-400'
+                funny ? 'bg-yellow-500 text-white' : 'text-white hover:text-yellow-400'
             ]" aria-label="Funny">
                 <Smile :size="18" />
             </button>
