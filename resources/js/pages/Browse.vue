@@ -88,6 +88,16 @@ async function applyService(): Promise<void> {
 
 // Tab switching function - needs to stay here as it interacts with masonry
 async function switchTab(tabId: number): Promise<void> {
+    // If clicking on already active tab, do nothing
+    if (activeTabId.value === tabId) {
+        return;
+    }
+
+    // Close fileviewer when switching tabs
+    if (fileViewer.value) {
+        fileViewer.value.close();
+    }
+
     const tab = tabs.value.find(t => t.id === tabId);
     if (!tab) {
         return;
