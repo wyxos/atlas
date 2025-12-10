@@ -35,9 +35,9 @@ it('restores cursor values for a browsed tab after reload', function () {
     $this->actingAs($user);
 
     $page = visit('/browse')
-        ->wait(2) // Wait for component initialization and tab data loading
-        ->assertPresent('[data-test="pagination-info"]')
+        ->wait(3) // Wait for component initialization and tab data loading
         ->assertSee('Scrolled Tab')
+        ->assertPresent('[data-test="pagination-info"]')
         ->assertNoJavascriptErrors();
 
     // Expected behaviour: masonry pills should reflect the saved cursor state

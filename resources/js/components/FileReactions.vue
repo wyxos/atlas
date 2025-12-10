@@ -101,9 +101,31 @@ function handleFunnyClick(): void {
     handleReactionClick('funny');
 }
 
+// Computed properties for variant checks
+const isSmall = computed(() => props.variant === 'small');
+const isDefault = computed(() => props.variant === 'default');
+
+// Computed properties for styling classes
+const containerClasses = computed(() => [
+    'flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg',
+    isSmall.value ? 'gap-2 px-2 py-1' : 'gap-4 px-4 py-2'
+]);
+
+const buttonClasses = computed(() => (baseClasses: string, activeClasses: string, hoverClasses: string) => [
+    'rounded transition-colors',
+    isSmall.value ? 'p-1' : 'p-2',
+    baseClasses,
+    activeClasses,
+    hoverClasses
+]);
+
+const separatorHeight = computed(() => isSmall.value ? 'h-4' : 'h-6');
+
+const textSize = computed(() => isSmall.value ? 'text-xs' : 'text-sm');
+
 const indexDisplay = computed(() => {
     if (props.currentIndex !== undefined && props.totalItems !== undefined) {
-        if (props.variant === 'small') {
+        if (isSmall.value) {
             return `${props.currentIndex + 1}`;
         }
         return `${props.currentIndex + 1}/${props.totalItems}`;
@@ -116,18 +138,13 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
 </script>
 
 <template>
-    <div @click.stop :class="[
-        'flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg',
-        variant === 'small' ? 'gap-2 px-2 py-1' : 'gap-4 px-4 py-2'
-    ]">
+    <div @click.stop :class="containerClasses">
         <!-- Reaction Icons -->
-        <div :class="[
-            'flex items-center gap-2'
-        ]">
+        <div class="flex items-center gap-2">
             <!-- Favorite -->
             <button @click="handleFavoriteClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
-                variant === 'small' ? 'p-1' : 'p-2',
+                isSmall ? 'p-1' : 'p-2',
                 favorite ? 'bg-red-500 text-white' : 'text-white hover:text-red-400'
             ]" aria-label="Favorite">
                 <Heart :size="18" />
@@ -136,7 +153,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <!-- Like -->
             <button @click="handleLikeClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
-                variant === 'small' ? 'p-1' : 'p-2',
+                isSmall ? 'p-1' : 'p-2',
                 like ? 'bg-smart-blue-500 text-white' : 'text-white hover:text-smart-blue-400'
             ]" aria-label="Like">
                 <ThumbsUp :size="18" />
@@ -145,7 +162,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <!-- Dislike -->
             <button @click="handleDislikeClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
-                variant === 'small' ? 'p-1' : 'p-2',
+                isSmall ? 'p-1' : 'p-2',
                 dislike ? 'bg-gray-500 text-white' : 'text-white hover:text-gray-400'
             ]" aria-label="Dislike">
                 <ThumbsDown :size="18" />
@@ -154,7 +171,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <!-- Funny -->
             <button @click="handleFunnyClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
-                variant === 'small' ? 'p-1' : 'p-2',
+                isSmall ? 'p-1' : 'p-2',
                 funny ? 'bg-yellow-500 text-white' : 'text-white hover:text-yellow-400'
             ]" aria-label="Funny">
                 <Smile :size="18" />
@@ -162,37 +179,26 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
         </div>
 
         <!-- Separator -->
-        <div :class="[
-            'w-px bg-white/20',
-            variant === 'small' ? 'h-4' : 'h-6'
-        ]" />
+        <div :class="['w-px bg-white/20', separatorHeight]" />
 
         <!-- Count Icons -->
-        <div :class="[
-            'flex items-center',
-            variant === 'small' ? 'gap-3' : 'gap-3'
-        ]">
+        <div class="flex items-center gap-2">
             <!-- Previewed Count -->
-            <div class="flex items-center text-white gap-1.5">
+            <div v-if="isDefault" class="flex items-center text-white gap-1.5">
                 <Eye :size="18" />
-                <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ previewedCount
-                    }}</span>
+                <span :class="[textSize, 'font-medium']">{{ previewedCount }}</span>
             </div>
 
             <!-- Viewed Count -->
             <div class="flex items-center text-white gap-1.5">
                 <EyeOff :size="18" />
-                <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ viewedCount
-                    }}</span>
+                <span :class="[textSize, 'font-medium']">{{ viewedCount }}</span>
             </div>
         </div>
 
         <!-- Index/Total -->
         <div v-if="indexDisplay" class="flex items-center">
-            <span :class="[
-                'font-medium text-white',
-                variant === 'small' ? 'text-xs' : 'text-sm'
-            ]">{{ indexDisplay }}</span>
+            <span :class="['font-medium text-white', textSize]">{{ indexDisplay }}</span>
         </div>
     </div>
 </template>
