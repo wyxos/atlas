@@ -799,9 +799,10 @@ defineExpose({
 
             <!-- File Reactions (centered under image) -->
             <div v-if="overlayFillComplete && !overlayIsClosing"
-                class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
-                <FileReactions :favorite="false" :like="false" :dislike="false" :funny="false" :previewed-count="0"
-                    :viewed-count="0" :current-index="currentItemIndex ?? undefined" :total-items="items.length" />
+                class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+                <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
+                    :previewed-count="0" :viewed-count="0" :current-index="currentItemIndex ?? undefined"
+                    :total-items="items.length" />
             </div>
         </div>
 
