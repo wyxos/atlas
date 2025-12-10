@@ -61,6 +61,7 @@ async function handleReaction(
     queueReaction(fileId, type, async (fId, t) => {
         try {
             await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
+            // File detachment from tabs is handled by the backend
         } catch (error) {
             console.error('Failed to update reaction:', error);
             throw error;
@@ -155,10 +156,10 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
     const nextFromQuery = tab.queryParams?.next;
     pendingRestoreNextCursor.value = tabHasRestorableItems ? (nextFromQuery ?? null) : null;
 
-    // Check if tab has files - if so, load items lazily FIRST
-    // This ensures we have the full tab state before setting pagination
-    if (tab.fileIds && tab.fileIds.length > 0 && tab.itemsData.length === 0) {
-        // Load items for this tab
+    // Always reload items from database when switching tabs
+    // This ensures we have the latest state (e.g., after files are detached via reactions)
+    if (tab.fileIds && tab.fileIds.length > 0) {
+        // Load items for this tab (always reload, don't use cached itemsData)
         try {
             const loadedItems = await loadTabItems(tabId);
             tab.itemsData = loadedItems;
@@ -166,6 +167,9 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
             console.error('Failed to load tab items:', error);
             // Continue with empty items
         }
+    } else {
+        // No fileIds, clear itemsData to ensure clean state
+        tab.itemsData = [];
     }
 
     // Restore currentPage from saved queryParams AFTER loading items
@@ -419,16 +423,10 @@ onMounted(async () => {
                                         class="w-full h-full object-cover" />
                                     <div v-show="hoveredItemIndex === index"
                                         class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                        <FileReactions
-                                            :file-id="item.id"
-                                            :previewed-count="0"
-                                            :viewed-count="0"
-                                            :current-index="index"
-                                            :total-items="items.length"
-                                            variant="small"
+                                        <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
+                                            :current-index="index" :total-items="items.length" variant="small"
                                             :remove-item="() => remove(item)"
-                                            @reaction="(type) => handleReaction(item.id, type, remove)"
-                                        />
+                                            @reaction="(type) => handleReaction(item.id, type, remove)" />
                                     </div>
                                 </div>
                             </template>
@@ -452,6 +450,7 @@ onMounted(async () => {
                 <!-- Status/Pagination Info at Bottom -->
                 <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
                     :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
+                    :queued-reactions-count="queuedReactions.length"
                     :visible="activeTabId !== null && hasServiceSelected" />
             </div>
         </div>

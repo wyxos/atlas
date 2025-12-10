@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BrowseTab;
 use App\Models\File;
 use App\Models\Reaction;
 use Illuminate\Http\JsonResponse;
@@ -51,6 +52,13 @@ class FileReactionController extends Controller
             'user_id' => $user->id,
             'type' => $validated['type'],
         ]);
+
+        // Detach file from all tabs belonging to this user
+        // This removes the file from tabs when a reaction is applied
+        $userTabs = BrowseTab::forUser($user->id)->get();
+        foreach ($userTabs as $tab) {
+            $tab->files()->detach($file->id);
+        }
 
         return response()->json([
             'message' => 'Reaction updated.',

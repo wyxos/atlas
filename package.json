@@ -15,6 +15,7 @@
         "generate-favicons": "tsx scripts/generate-favicons.ts"
     },
     "devDependencies": {
+        "@laravel/vite-plugin-wayfinder": "^0.1.7",
         "@tailwindcss/vite": "^4.0.0",
         "@testing-library/jest-dom": "^6.9.1",
         "@types/node": "^24.10.1",
