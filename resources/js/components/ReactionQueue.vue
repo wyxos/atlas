@@ -39,21 +39,11 @@ function getProgress(queued: QueuedReaction): number {
 </script>
 
 <template>
-    <div
-        v-if="queuedReactions.length > 0"
-        class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm"
-    >
-        <div
-            v-for="queued in queuedReactions"
-            :key="queued.id"
-            class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm flex items-center gap-3"
-        >
+    <div v-if="queuedReactions.length > 0" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+        <div v-for="queued in queuedReactions" :key="queued.id"
+            class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm flex items-center gap-3">
             <!-- Reaction Icon -->
-            <component
-                :is="reactionIcons[queued.type]"
-                :size="20"
-                :class="reactionColors[queued.type]"
-            />
+            <component :is="reactionIcons[queued.type]" :size="20" :class="reactionColors[queued.type]" />
 
             <!-- File ID and Progress Bar -->
             <div class="flex-1 min-w-0">
@@ -62,22 +52,17 @@ function getProgress(queued: QueuedReaction): number {
                 </div>
                 <!-- Progress Bar -->
                 <div class="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                        class="h-full bg-smart-blue-400"
-                        :style="{ width: `${getProgress(queued)}%`, transition: 'width 0.05s linear' }"
-                    />
+                    <div class="h-full bg-smart-blue-400"
+                        :style="{ width: `${getProgress(queued)}%`, transition: 'width 0.05s linear' }" />
                 </div>
             </div>
 
             <!-- Cancel Button -->
-            <button
-                @click="handleCancel(queued.fileId)"
+            <button @click="handleCancel(queued.fileId)"
                 class="p-1 rounded hover:bg-black/20 text-white/70 hover:text-white transition-colors"
-                aria-label="Cancel reaction"
-            >
+                aria-label="Cancel reaction">
                 <X :size="16" />
             </button>
         </div>
     </div>
 </template>
-

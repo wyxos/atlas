@@ -176,14 +176,14 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             <div class="flex items-center text-white gap-1.5">
                 <Eye :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ previewedCount
-                }}</span>
+                    }}</span>
             </div>
 
             <!-- Viewed Count -->
             <div class="flex items-center text-white gap-1.5">
                 <EyeOff :size="18" />
                 <span :class="variant === 'small' ? 'text-xs font-medium' : 'text-sm font-medium'">{{ viewedCount
-                }}</span>
+                    }}</span>
             </div>
         </div>
 
