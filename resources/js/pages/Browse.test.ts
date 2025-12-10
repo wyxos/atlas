@@ -924,6 +924,264 @@ describe('Browse', () => {
         expect(vm.activeTabId).toBe(tab2Id);
     });
 
+    it('closes tab when middle clicked', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+
+        // Mock tabs API to return two tabs
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [
+                        {
+                            id: tab1Id,
+                            label: 'Tab 1',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        },
+                        {
+                            id: tab2Id,
+                            label: 'Tab 2',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 1,
+                        },
+                    ],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        mockAxios.delete.mockResolvedValue({ data: { success: true } });
+
+        const router = await createTestRouter('/browse');
+
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Verify both tabs exist
+        expect(vm.tabs.length).toBe(2);
+        expect(vm.activeTabId).toBe(tab1Id);
+
+        // Find the BrowseTab component for tab 2
+        const browseTabs = wrapper.findAllComponents({ name: 'BrowseTab' });
+        const tab2Component = browseTabs.find((tab: any) => tab.props().id === tab2Id);
+        expect(tab2Component).toBeDefined();
+
+        // Get the closeTab function call count before
+        const closeTabSpy = vi.spyOn(vm, 'closeTab');
+
+        // Simulate middle click on tab 2 by triggering mousedown and click events
+        const tab2Element = tab2Component?.element as HTMLElement;
+        
+        // Create a middle click event
+        const mouseDownEvent = new MouseEvent('mousedown', {
+            button: 1,
+            bubbles: true,
+            cancelable: true,
+        });
+        
+        const clickEvent = new MouseEvent('click', {
+            button: 1,
+            bubbles: true,
+            cancelable: true,
+        });
+
+        // Trigger mousedown first
+        tab2Element.dispatchEvent(mouseDownEvent);
+        
+        // Then trigger click
+        tab2Element.dispatchEvent(clickEvent);
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        // Verify closeTab was called
+        expect(closeTabSpy).toHaveBeenCalledWith(tab2Id);
+    });
+
+    it('does nothing when clicking on already active tab', async () => {
+        const tab1Id = 1;
+
+        // Mock tabs API to return one tab
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [
+                        {
+                            id: tab1Id,
+                            label: 'Tab 1',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        },
+                    ],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Verify tab 1 is active
+        expect(vm.activeTabId).toBe(tab1Id);
+
+        // Clear mock calls
+        mockDestroy.mockClear();
+        mockInit.mockClear();
+
+        // Try to switch to the same tab (clicking active tab)
+        await vm.switchTab(tab1Id);
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        // Verify tab is still active
+        expect(vm.activeTabId).toBe(tab1Id);
+
+        // Verify masonry was NOT destroyed (since we didn't actually switch)
+        expect(mockDestroy).not.toHaveBeenCalled();
+    });
+
+    it('closes fileviewer when switching tabs', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+
+        // Mock tabs API to return two tabs
+        mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [
+                        {
+                            id: tab1Id,
+                            label: 'Tab 1',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        },
+                        {
+                            id: tab2Id,
+                            label: 'Tab 2',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 1,
+                        },
+                    ],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        nextPage: null,
+                        services: [
+                            { key: 'civit-ai-images', label: 'CivitAI Images' },
+                        ],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+
+        const wrapper = mount(Browse, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const vm = wrapper.vm as any;
+
+        // Verify tab 1 is active
+        expect(vm.activeTabId).toBe(tab1Id);
+
+        // Open fileviewer in tab 1
+        const fileViewer = wrapper.findComponent(FileViewer);
+        const fileViewerVm = fileViewer.vm as any;
+
+        fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
+        fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+        fileViewerVm.overlayIsFilled = true;
+        fileViewerVm.overlayFillComplete = true;
+
+        // Verify fileviewer is open
+        expect(fileViewerVm.overlayRect).not.toBeNull();
+
+        // Access fileViewer ref through vm and spy on close method
+        const fileViewerRef = vm.fileViewer;
+        expect(fileViewerRef).not.toBeNull();
+        const closeSpy = vi.spyOn(fileViewerRef, 'close');
+
+        // Switch to tab 2
+        await vm.switchTab(tab2Id);
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        // Verify tab 2 is active
+        expect(vm.activeTabId).toBe(tab2Id);
+
+        // Verify fileviewer close was called
+        expect(closeSpy).toHaveBeenCalled();
+    });
+
     it('creates a new tab and does not auto-load until service is selected', async () => {
         // Mock tabs API to return empty array initially
         mockAxios.get.mockImplementation((url: string) => {

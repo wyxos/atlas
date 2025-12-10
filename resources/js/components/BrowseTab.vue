@@ -18,7 +18,14 @@ const emit = defineEmits<{
     close: [];
 }>();
 
-function handleClick(): void {
+function handleClick(event: MouseEvent | KeyboardEvent): void {
+    // Middle click (button 1) should close the tab
+    if (event instanceof MouseEvent && event.button === 1) {
+        event.preventDefault();
+        event.stopPropagation();
+        emit('close');
+        return;
+    }
     emit('click');
 }
 
@@ -26,11 +33,19 @@ function handleClose(event: MouseEvent): void {
     event.stopPropagation();
     emit('close');
 }
+
+function handleMouseDown(event: MouseEvent): void {
+    // Prevent default middle click behavior (opening link in new tab)
+    if (event.button === 1) {
+        event.preventDefault();
+    }
+}
 </script>
 
 <template>
     <div
         @click="handleClick"
+        @mousedown="handleMouseDown"
         :class="[
             'group flex items-center justify-between w-full px-2.5 py-1.5 h-8 rounded-md transition-all cursor-pointer select-none',
             isActive

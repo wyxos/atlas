@@ -1,5 +1,4 @@
 - Browse
-    - tab concept
     - grouping by specific container
     - reaction
     - preview/view count
