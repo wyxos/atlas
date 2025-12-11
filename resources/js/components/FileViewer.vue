@@ -334,6 +334,51 @@ function toggleBottomPanel(): void {
     }
 }
 
+// Handle ALT + mouse button combinations on overlay image
+function handleOverlayImageClick(e: MouseEvent): void {
+    if (e.altKey && currentItemIndex.value !== null) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const currentItem = items.value[currentItemIndex.value];
+        if (!currentItem) return;
+
+        let reactionType: 'love' | 'like' | 'dislike' | 'funny' | null = null;
+
+        // ALT + Left Click = Like
+        if (e.button === 0 || (e.type === 'click' && e.button === 0)) {
+            reactionType = 'like';
+        }
+        // ALT + Right Click = Dislike (handled via contextmenu event)
+        else if (e.button === 2 || e.type === 'contextmenu') {
+            reactionType = 'dislike';
+        }
+
+        if (reactionType) {
+            handleReaction(reactionType);
+        }
+        return;
+    }
+
+    // Normal click behavior - toggle bottom panel (only for left click without ALT)
+    if (!e.altKey && (e.button === 0 || (e.type === 'click' && e.button === 0))) {
+        toggleBottomPanel();
+    }
+}
+
+// Handle ALT + Middle Click (mousedown event needed for middle button)
+function handleOverlayImageMouseDown(e: MouseEvent): void {
+    if (e.altKey && e.button === 1 && currentItemIndex.value !== null) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const currentItem = items.value[currentItemIndex.value];
+        if (currentItem) {
+            handleReaction('love');
+        }
+    }
+}
+
 async function openFromClick(e: MouseEvent): Promise<void> {
     const container = props.masonryContainerRef;
     const tabContent = props.containerRef;
@@ -881,7 +926,7 @@ defineExpose({
                     } : {}),
                     transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
                     transformOrigin: 'center center',
-                }" draggable="false" @click="toggleBottomPanel" />
+                }" draggable="false" @click="handleOverlayImageClick" @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown" />
 
             <!-- Close button -->
             <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
