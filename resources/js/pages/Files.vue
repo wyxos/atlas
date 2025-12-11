@@ -21,32 +21,17 @@ import { Listing, ActiveFilters, ListingTable } from '@wyxos/listing';
 import Pill from '../components/ui/Pill.vue';
 import { DeletionHandler } from '../lib/DeletionHandler';
 import { formatDate } from '../utils/date';
+import { copyToClipboard } from '../utils/clipboard';
+import { formatFileSize, getMimeTypeCategory, getMimeTypeBadgeClasses } from '../utils/file';
+import type { File } from '../types/file';
 
 const route = useRoute();
 const router = useRouter();
 
-interface File extends Record<string, unknown> {
-    id: number;
-    source: string;
-    filename: string;
-    ext: string | null;
-    size: number | null;
-    mime_type: string | null;
-    title: string | null;
-    url: string | null;
-    referrer_url: string | null;
-    path: string | null;
-    absolute_path: string | null;
-    thumbnail_url: string | null;
-    downloaded: boolean;
-    not_found: boolean;
-    created_at: string;
-    updated_at: string;
-}
-
 // Create reactive listing instance (Listing.create returns a reactive Proxy)
 // Proxy provides dynamic filter properties (e.g., listing.search, listing.date_from)
 // TypeScript can't infer dynamic Proxy properties, so we cast to any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const listing = Listing.create<File>({
     filters: {
         search: '',
@@ -83,47 +68,6 @@ const deletionHandler = DeletionHandler.create<File>(listing, {
     genericErrorMessage: 'Failed to delete file. Please try again later.',
 });
 
-function formatFileSize(bytes: number | null): string {
-    if (bytes === null || bytes === 0) {
-        return '0 B';
-    }
-
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
-
-function getMimeTypeCategory(mimeType: string | null): string {
-    if (!mimeType) {
-        return 'unknown';
-    }
-    if (mimeType.startsWith('image/')) {
-        return 'image';
-    }
-    if (mimeType.startsWith('video/')) {
-        return 'video';
-    }
-    if (mimeType.startsWith('audio/')) {
-        return 'audio';
-    }
-    return 'other';
-}
-
-async function copyToClipboard(text: string, label: string): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(text);
-        toast.success(`${label} copied to clipboard`, {
-            description: text,
-        });
-    } catch (error) {
-        toast.error('Failed to copy to clipboard', {
-            description: 'Please try again or copy manually',
-        });
-        console.error('Error copying to clipboard:', error);
-    }
-}
 
 const hasActiveFilters = computed(() => listing.hasActiveFilters);
 
@@ -230,12 +174,7 @@ onMounted(async () => {
                         <o-table-column field="source" label="Source" width="120" />
                         <o-table-column field="mime_type" label="Type" width="120">
                             <template #default="{ row }">
-                                <span class="px-2 py-1 rounded text-xs font-medium" :class="{
-                                    'bg-blue-500/20 text-blue-300': getMimeTypeCategory(row.mime_type) === 'image',
-                                    'bg-purple-500/20 text-purple-300': getMimeTypeCategory(row.mime_type) === 'video',
-                                    'bg-green-500/20 text-green-300': getMimeTypeCategory(row.mime_type) === 'audio',
-                                    'bg-twilight-indigo-500/20 text-twilight-indigo-100': getMimeTypeCategory(row.mime_type) === 'other',
-                                }">
+                                <span class="px-2 py-1 rounded text-xs font-medium" :class="getMimeTypeBadgeClasses(row.mime_type)">
                                     {{ row.mime_type || 'Unknown' }}
                                 </span>
                             </template>

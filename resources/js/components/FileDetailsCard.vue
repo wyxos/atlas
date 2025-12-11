@@ -1,44 +1,11 @@
 <script setup lang="ts">
 import { Download, FileText, Copy, ExternalLink } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
-import { toast } from './ui/sonner';
 import { formatDate } from '../utils/date';
-
-interface File {
-    id: number;
-    source: string;
-    source_id: string | null;
-    filename: string;
-    ext: string | null;
-    size: number | null;
-    mime_type: string | null;
-    hash: string | null;
-    title: string | null;
-    description: string | null;
-    url: string | null;
-    referrer_url: string | null;
-    path: string | null;
-    absolute_path: string | null;
-    thumbnail_url: string | null;
-    thumbnail_path: string | null;
-    tags: string[] | null;
-    parent_id: number | null;
-    chapter: string | null;
-    previewed_at: string | null;
-    previewed_count: number;
-    seen_at: string | null;
-    seen_count: number;
-    blacklisted_at: string | null;
-    blacklist_reason: string | null;
-    downloaded: boolean;
-    downloaded_at: string | null;
-    download_progress: number;
-    not_found: boolean;
-    listing_metadata: Record<string, unknown> | null;
-    detail_metadata: Record<string, unknown> | null;
-    created_at: string;
-    updated_at: string;
-}
+import { copyToClipboard } from '../utils/clipboard';
+import { formatFileSize, getMimeTypeCategory, getMimeTypeBadgeClasses } from '../utils/file';
+import { openUrl } from '../utils/url';
+import type { File } from '../types/file';
 
 interface Props {
     file: File;
@@ -46,51 +13,6 @@ interface Props {
 
 const props = defineProps<Props>();
 
-function formatFileSize(bytes: number | null): string {
-    if (bytes === null || bytes === 0) {
-        return '0 B';
-    }
-
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
-
-function getMimeTypeCategory(mimeType: string | null): string {
-    if (!mimeType) {
-        return 'unknown';
-    }
-    if (mimeType.startsWith('image/')) {
-        return 'image';
-    }
-    if (mimeType.startsWith('video/')) {
-        return 'video';
-    }
-    if (mimeType.startsWith('audio/')) {
-        return 'audio';
-    }
-    return 'other';
-}
-
-async function copyToClipboard(text: string, label: string): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(text);
-        toast.success(`${label} copied to clipboard`, {
-            description: text,
-        });
-    } catch (err) {
-        toast.error('Failed to copy to clipboard', {
-            description: 'Please try again or copy manually',
-        });
-        console.error('Error copying to clipboard:', err);
-    }
-}
-
-function openUrl(url: string): void {
-    window.open(url, '_blank', 'noopener,noreferrer');
-}
 </script>
 
 <template>
@@ -145,12 +67,7 @@ function openUrl(url: string): void {
                     <label class="text-xs font-semibold text-smart-blue-300 uppercase tracking-wide mb-2 block">Type</label>
                     <span
                         class="px-3 py-1 rounded-sm text-xs font-medium inline-block"
-                        :class="{
-                            'bg-blue-500/20 text-blue-300': getMimeTypeCategory(file.mime_type) === 'image',
-                            'bg-purple-500/20 text-purple-300': getMimeTypeCategory(file.mime_type) === 'video',
-                            'bg-green-500/20 text-green-300': getMimeTypeCategory(file.mime_type) === 'audio',
-                            'bg-twilight-indigo-500/20 text-twilight-indigo-700': getMimeTypeCategory(file.mime_type) === 'other',
-                        }"
+                        :class="getMimeTypeBadgeClasses(file.mime_type)"
                     >
                         {{ file.mime_type || 'Unknown' }}
                     </span>

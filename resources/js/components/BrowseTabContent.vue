@@ -11,6 +11,7 @@ import type { MasonryItem, BrowseTabData } from '../composables/useBrowseTabs';
 import { useBackfill } from '../composables/useBackfill';
 import { useBrowseService } from '../composables/useBrowseService';
 import { useReactionQueue } from '../composables/useReactionQueue';
+import { createReactionCallback } from '../utils/reactions';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -131,14 +132,7 @@ async function handleMasonryReaction(
 
     // Queue the AJAX request
     const previewUrl = item?.src;
-    queueReaction(fileId, type, async (fId, t) => {
-        try {
-            await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
-        } catch (error) {
-            console.error('Failed to update reaction:', error);
-            throw error;
-        }
-    }, previewUrl);
+    queueReaction(fileId, type, createReactionCallback(), previewUrl);
 
     // Emit to parent
     props.onReaction(fileId, type);
@@ -442,7 +436,8 @@ onUnmounted(() => {
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-            :queued-reactions-count="queuedReactions.length" :visible="tab !== null && tab !== undefined && hasServiceSelected" />
+            :queued-reactions-count="queuedReactions.length"
+            :visible="tab !== null && tab !== undefined && hasServiceSelected" />
     </div>
     <div v-else class="flex items-center justify-center h-full" data-test="no-tab-message">
         <p class="text-twilight-indigo-300 text-lg">No tab selected</p>

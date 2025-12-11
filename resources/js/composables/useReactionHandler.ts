@@ -1,5 +1,6 @@
 import type { MasonryItem } from './useBrowseTabs';
 import { useReactionQueue } from './useReactionQueue';
+import { createReactionCallback } from '../utils/reactions';
 
 export interface ReactionHandlerOptions {
     items: import('vue').Ref<MasonryItem[]>;
@@ -23,14 +24,7 @@ export function useReactionHandler(options: ReactionHandlerOptions) {
 
         // Queue the AJAX request
         const previewUrl = item?.src;
-        queueReaction(fileId, type, async (fId, t) => {
-            try {
-                await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
-            } catch (error) {
-                console.error('Failed to update reaction:', error);
-                throw error;
-            }
-        }, previewUrl);
+        queueReaction(fileId, type, createReactionCallback(), previewUrl);
 
         // Emit to parent if callback provided
         if (options.onReaction) {

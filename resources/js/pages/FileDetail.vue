@@ -17,46 +17,13 @@ import {
     DialogClose,
 } from '../components/ui/dialog';
 import { formatDate } from '../utils/date';
+import { copyToClipboard } from '../utils/clipboard';
+import { formatFileSize, getMimeTypeCategory } from '../utils/file';
+import { openUrl } from '../utils/url';
+import type { File } from '../types/file';
 
 const route = useRoute();
 const router = useRouter();
-
-interface File {
-    id: number;
-    source: string;
-    source_id: string | null;
-    filename: string;
-    ext: string | null;
-    size: number | null;
-    mime_type: string | null;
-    hash: string | null;
-    title: string | null;
-    description: string | null;
-    url: string | null;
-    file_url: string | null;
-    referrer_url: string | null;
-    path: string | null;
-    absolute_path: string | null;
-    thumbnail_url: string | null;
-    thumbnail_path: string | null;
-    tags: string[] | null;
-    parent_id: number | null;
-    chapter: string | null;
-    previewed_at: string | null;
-    previewed_count: number;
-    seen_at: string | null;
-    seen_count: number;
-    blacklisted_at: string | null;
-    blacklist_reason: string | null;
-    downloaded: boolean;
-    downloaded_at: string | null;
-    download_progress: number;
-    not_found: boolean;
-    listing_metadata: Record<string, unknown> | null;
-    detail_metadata: Record<string, unknown> | null;
-    created_at: string;
-    updated_at: string;
-}
 
 const file = ref<File | null>(null);
 const loading = ref(true);
@@ -67,33 +34,6 @@ const canRetryDelete = ref(false);
 const deleting = ref(false);
 const detailsPanelOpen = ref(false);
 
-function formatFileSize(bytes: number | null): string {
-    if (bytes === null || bytes === 0) {
-        return '0 B';
-    }
-
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
-
-function getMimeTypeCategory(mimeType: string | null): string {
-    if (!mimeType) {
-        return 'unknown';
-    }
-    if (mimeType.startsWith('image/')) {
-        return 'image';
-    }
-    if (mimeType.startsWith('video/')) {
-        return 'video';
-    }
-    if (mimeType.startsWith('audio/')) {
-        return 'audio';
-    }
-    return 'other';
-}
 
 const fileUrl = computed(() => {
     if (!file.value) {
@@ -110,19 +50,6 @@ const fileType = computed(() => {
     return getMimeTypeCategory(file.value.mime_type);
 });
 
-async function copyToClipboard(text: string, label: string): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(text);
-        toast.success(`${label} copied to clipboard`, {
-            description: text,
-        });
-    } catch (err) {
-        toast.error('Failed to copy to clipboard', {
-            description: 'Please try again or copy manually',
-        });
-        console.error('Error copying to clipboard:', err);
-    }
-}
 
 async function loadFile(): Promise<void> {
     const fileId = route.params.id as string;
@@ -199,9 +126,6 @@ async function handleDeleteConfirm(): Promise<void> {
     }
 }
 
-function openUrl(url: string): void {
-    window.open(url, '_blank', 'noopener,noreferrer');
-}
 
 onMounted(() => {
     loadFile();

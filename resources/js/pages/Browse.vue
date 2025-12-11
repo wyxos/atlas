@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useBrowseTabs, type MasonryItem } from '../composables/useBrowseTabs';
 import { useBrowseService } from '../composables/useBrowseService';
 import { useReactionQueue } from '../composables/useReactionQueue';
+import { createReactionCallback } from '../utils/reactions';
 
 const isPanelMinimized = ref(false);
 
@@ -67,14 +68,7 @@ async function handleReaction(
     const item = activeTabData?.itemsData?.find((i: MasonryItem) => i.id === fileId);
     const previewUrl = item?.src;
 
-    queueReaction(fileId, type, async (fId, t) => {
-        try {
-            await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
-        } catch (error) {
-            console.error('Failed to update reaction:', error);
-            throw error;
-        }
-    }, previewUrl);
+    queueReaction(fileId, type, createReactionCallback(), previewUrl);
 }
 
 // Handle masonry loading state changes from tab content (for pill)
