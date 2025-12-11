@@ -5,6 +5,8 @@ import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 import { useReactionHandler } from '../composables/useReactionHandler';
+import { useReactionQueue } from '../composables/useReactionQueue';
+import { createReactionCallback } from '../utils/reactions';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -15,6 +17,9 @@ interface Props {
     onLoadMore?: () => Promise<void>;
     onReaction?: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void;
     removeFromMasonry?: (item: MasonryItem) => void;
+    restoreToMasonry?: (item: MasonryItem, index: number, masonryInstance?: any) => void;
+    tabId?: number;
+    masonryInstance?: any; // Masonry component instance for restore method
 }
 
 const props = defineProps<Props>();
@@ -243,8 +248,29 @@ async function handleReaction(type: 'love' | 'like' | 'dislike' | 'funny'): Prom
         props.removeFromMasonry(currentItem);
     }
 
+    // Create restore callback to add item back to masonry at original index
+    const restoreItem = props.restoreToMasonry && props.tabId !== undefined ? (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
+        // Only restore if the tab is active
+        if (!isTabActive(restoreTabId)) {
+            return;
+        }
+
+        if (props.restoreToMasonry) {
+            props.restoreToMasonry(currentItem, itemIndex, props.masonryInstance);
+        }
+    } : undefined;
+
     // Queue the reaction (this will also emit to parent)
-    await handleReactionBase(fileId, type);
+    // Note: handleReactionBase doesn't have access to restore callback since it removes from masonry directly
+    // We need to queue the reaction manually with restore callback
+    const { queueReaction } = useReactionQueue();
+    const previewUrl = currentItem.src;
+    queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, props.tabId, itemIndex, currentItem);
+    
+    // Emit to parent
+    if (props.onReaction) {
+        props.onReaction(fileId, type);
+    }
 
     // Remove from carousel (items array) AFTER masonry removal
     // Note: removeFromMasonry removes from BrowseTabContent's items, which should sync to FileViewer's props.items
