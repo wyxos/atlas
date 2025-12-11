@@ -62,6 +62,11 @@ async function handleReaction(
     fileId: number,
     type: 'love' | 'like' | 'dislike' | 'funny'
 ): Promise<void> {
+    // Try to find the item from the active tab to get preview URL
+    const activeTabData = activeTab.value;
+    const item = activeTabData?.itemsData?.find((i: MasonryItem) => i.id === fileId);
+    const previewUrl = item?.src;
+
     queueReaction(fileId, type, async (fId, t) => {
         try {
             await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
@@ -69,7 +74,7 @@ async function handleReaction(
             console.error('Failed to update reaction:', error);
             throw error;
         }
-    });
+    }, previewUrl);
 }
 
 // Handle masonry loading state changes from tab content (for pill)

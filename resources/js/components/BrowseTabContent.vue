@@ -130,6 +130,7 @@ async function handleMasonryReaction(
     }
 
     // Queue the AJAX request
+    const previewUrl = item?.src;
     queueReaction(fileId, type, async (fId, t) => {
         try {
             await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
@@ -137,7 +138,7 @@ async function handleMasonryReaction(
             console.error('Failed to update reaction:', error);
             throw error;
         }
-    });
+    }, previewUrl);
 
     // Emit to parent
     props.onReaction(fileId, type);

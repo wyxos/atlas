@@ -15,13 +15,14 @@ export function useReactionHandler(options: ReactionHandlerOptions) {
         type: 'love' | 'like' | 'dislike' | 'funny'
     ): Promise<void> {
         const item = options.items.value.find((i) => i.id === fileId);
-        
+
         // Remove from masonry if callback provided
         if (item && options.removeFromMasonry) {
             options.removeFromMasonry(item);
         }
 
         // Queue the AJAX request
+        const previewUrl = item?.src;
         queueReaction(fileId, type, async (fId, t) => {
             try {
                 await window.axios.post(`/api/files/${fId}/reaction`, { type: t });
@@ -29,7 +30,7 @@ export function useReactionHandler(options: ReactionHandlerOptions) {
                 console.error('Failed to update reaction:', error);
                 throw error;
             }
-        });
+        }, previewUrl);
 
         // Emit to parent if callback provided
         if (options.onReaction) {

@@ -42,6 +42,10 @@ function getProgress(queued: QueuedReaction): number {
     <div v-if="queuedReactions.length > 0" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
         <div v-for="queued in queuedReactions" :key="queued.id"
             class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm flex items-center gap-3">
+            <!-- Preview Image -->
+            <img v-if="queued.previewUrl" :src="queued.previewUrl" :alt="`File #${queued.fileId}`"
+                class="w-12 h-12 object-cover rounded border border-smart-blue-500/30 flex-shrink-0" />
+            
             <!-- Reaction Icon -->
             <component :is="reactionIcons[queued.type]" :size="20" :class="reactionColors[queued.type]" />
 
