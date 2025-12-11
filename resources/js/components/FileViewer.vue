@@ -34,11 +34,6 @@ const items = ref<MasonryItem[]>(props.items);
 // Watch props.items and sync to reactive items (only when props change externally)
 // Use a flag to prevent syncing when we're removing items internally
 const isRemovingItem = ref(false);
-watch(() => props.items, (newItems) => {
-    if (!isRemovingItem.value) {
-        items.value = newItems;
-    }
-}, { deep: true });
 
 // Overlay state
 const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -62,6 +57,14 @@ const isBottomPanelOpen = ref(false); // Track if bottom panel is open
 const imageTranslateX = ref(0); // Translate X for slide animation
 const navigationDirection = ref<'left' | 'right' | null>(null); // Track navigation direction
 const currentNavigationTarget = ref<number | null>(null); // Track current navigation target to cancel stale preloads
+
+// Watch props.items and sync to reactive items (only when props change externally)
+// Use a flag to prevent syncing when we're removing items internally
+watch(() => props.items, (newItems) => {
+    if (!isRemovingItem.value) {
+        items.value = newItems;
+    }
+}, { deep: true });
 
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
@@ -258,6 +261,20 @@ async function handleReaction(type: 'love' | 'like' | 'dislike' | 'funny'): Prom
 
         if (props.restoreToMasonry) {
             await props.restoreToMasonry(currentItem, itemIndex, props.masonryInstance);
+        }
+
+        // After restore, check if we need to navigate to the restored item
+        // Wait for nextTick to ensure items array is updated
+        await nextTick();
+
+        // Find the restored item's new index in the items array
+        const restoredItemIndex = items.value.findIndex(i => i.id === currentItem.id);
+
+        // If the restored item is at the current index, navigate to refresh the display
+        // This ensures FileViewer shows the restored file instead of whatever was at that index
+        if (restoredItemIndex >= 0 && currentItemIndex.value === restoredItemIndex && overlayRect.value && overlayFillComplete.value) {
+            // Navigate to the restored item to refresh the display
+            await navigateToIndex(restoredItemIndex, 'left');
         }
     } : undefined;
 

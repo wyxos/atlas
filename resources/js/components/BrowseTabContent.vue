@@ -262,6 +262,32 @@ async function handleMasonryReaction(
     props.onReaction(fileId, type);
 }
 
+// Restore item to masonry (used by FileViewer)
+async function restoreToMasonry(item: MasonryItem, index: number, masonryInstance?: any): Promise<void> {
+    // Restore item to masonry at original index
+    const existingIndex = items.value.findIndex((i) => i.id === item.id);
+    if (existingIndex === -1) {
+        // Try to use masonry's restore method if available
+        if (masonryInstance && typeof masonryInstance.restore === 'function') {
+            masonryInstance.restore(item, index);
+        } else if (masonryInstance && typeof masonryInstance.add === 'function') {
+            masonryInstance.add(item, index);
+        } else if (masonryInstance && typeof masonryInstance.insert === 'function') {
+            masonryInstance.insert(item, index);
+        } else {
+            // Fallback: manually insert at original index and refresh layout
+            const clampedIndex = Math.min(index, items.value.length);
+            items.value.splice(clampedIndex, 0, item);
+            // Trigger layout recalculation and animation
+            if (masonryInstance && typeof masonryInstance.refreshLayout === 'function') {
+                // Use nextTick to ensure Vue has processed the array change
+                await nextTick();
+                masonryInstance.refreshLayout(items.value);
+            }
+        }
+    }
+}
+
 // Apply selected service to current tab
 async function applyService(): Promise<void> {
     if (!props.tab) {
@@ -555,30 +581,8 @@ onUnmounted(() => {
                 if (itemIndex !== -1) {
                     items.splice(itemIndex, 1);
                 }
-            }" :restore-to-masonry="async (item, index, masonryInstance) => {
-                // Restore item to masonry at original index
-                const existingIndex = items.findIndex((i) => i.id === item.id);
-                if (existingIndex === -1) {
-                    // Try to use masonry's restore method if available
-                    if (masonryInstance && typeof masonryInstance.restore === 'function') {
-                        masonryInstance.restore(item, index);
-                    } else if (masonryInstance && typeof masonryInstance.add === 'function') {
-                        masonryInstance.add(item, index);
-                    } else if (masonryInstance && typeof masonryInstance.insert === 'function') {
-                        masonryInstance.insert(item, index);
-                    } else {
-                        // Fallback: manually insert at original index and refresh layout
-                        const clampedIndex = Math.min(index, items.length);
-                        items.splice(clampedIndex, 0, item);
-                        // Trigger layout recalculation and animation
-                        if (masonryInstance && typeof masonryInstance.refreshLayout === 'function') {
-                            // Use nextTick to ensure Vue has processed the array change
-                            await nextTick();
-                            masonryInstance.refreshLayout(items);
-                        }
-                    }
-                }
-            }" :tab-id="props.tab?.id" :masonry-instance="masonry" @close="() => { }" />
+            }" :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
+            @close="() => { }" />
 
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
