@@ -4,6 +4,7 @@ import { X, Loader2 } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
 import type { MasonryItem } from '../composables/useBrowseTabs';
+import { useReactionHandler } from '../composables/useReactionHandler';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -12,6 +13,8 @@ interface Props {
     hasMore?: boolean;
     isLoading?: boolean;
     onLoadMore?: () => Promise<void>;
+    onReaction?: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void;
+    removeFromMasonry?: (item: MasonryItem) => void;
 }
 
 const props = defineProps<Props>();
@@ -19,6 +22,18 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
     close: [];
 }>();
+
+// Make items reactive for carousel removal
+const items = ref<MasonryItem[]>(props.items);
+
+// Watch props.items and sync to reactive items (only when props change externally)
+// Use a flag to prevent syncing when we're removing items internally
+const isRemovingItem = ref(false);
+watch(() => props.items, (newItems) => {
+    if (!isRemovingItem.value) {
+        items.value = newItems;
+    }
+}, { deep: true });
 
 // Overlay state
 const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -97,14 +112,14 @@ function findMasonryItemByImageSrc(imageSrc: string, itemElement: HTMLElement): 
     // Try to find item by checking data attributes on the masonry item element
     const itemId = itemElement.getAttribute('data-item-id');
     if (itemId) {
-        const item = props.items.find(i => i.id === Number(itemId));
+        const item = items.value.find(i => i.id === Number(itemId));
         if (item) return item;
     }
 
     // Fallback: try to match by URL (compare src with item.src or thumbnail)
     // Extract base URL without query params for comparison
     const baseSrc = imageSrc.split('?')[0].split('#')[0];
-    return props.items.find(item => {
+    return items.value.find(item => {
         const itemSrc = (item.src || item.thumbnail || '').split('?')[0].split('#')[0];
         return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
     }) || null;
@@ -188,9 +203,80 @@ function closeOverlay(): void {
     }
 }
 
+// Reaction handler - we'll handle masonry removal separately to ensure correct item reference
+const { handleReaction: handleReactionBase } = useReactionHandler({
+    items,
+    onReaction: props.onReaction,
+    // Don't pass removeFromMasonry here - we'll call it directly with the correct item reference
+});
+
+// Handle reaction in FileViewer - removes from carousel and auto-navigates
+async function handleReaction(type: 'love' | 'like' | 'dislike' | 'funny'): Promise<void> {
+    if (currentItemIndex.value === null) return;
+
+    const currentItem = items.value[currentItemIndex.value];
+    if (!currentItem) return;
+
+    const fileId = currentItem.id;
+    const itemIndex = currentItemIndex.value;
+
+    // Determine next item to navigate to before removing
+    let nextIndex: number | null = null;
+    let nextDirection: 'left' | 'right' | null = null;
+
+    if (items.value.length > 1) {
+        // If we're not at the last item, navigate to next
+        if (itemIndex < items.value.length - 1) {
+            nextIndex = itemIndex; // After removal, this will be the next item
+            nextDirection = 'right';
+        } else if (itemIndex > 0) {
+            // If we're at the end, go to previous
+            nextIndex = itemIndex - 1;
+            nextDirection = 'left';
+        }
+    }
+
+    // IMPORTANT: Remove from masonry FIRST (before removing from carousel)
+    // This ensures masonry can find and properly remove the item
+    // Pass the item directly to removeFromMasonry to ensure correct reference
+    if (props.removeFromMasonry) {
+        props.removeFromMasonry(currentItem);
+    }
+
+    // Queue the reaction (this will also emit to parent)
+    await handleReactionBase(fileId, type);
+
+    // Remove from carousel (items array) AFTER masonry removal
+    isRemovingItem.value = true;
+    items.value.splice(itemIndex, 1);
+    await nextTick();
+    isRemovingItem.value = false;
+
+    // Update currentItemIndex
+    if (items.value.length === 0) {
+        // No items left, close overlay
+        closeOverlay();
+        return;
+    }
+
+    // Auto-navigate to next if available
+    if (nextIndex !== null && nextDirection !== null) {
+        currentItemIndex.value = nextIndex;
+        await navigateToIndex(nextIndex, nextDirection);
+    } else {
+        // Adjust index if we removed the last item
+        if (itemIndex >= items.value.length) {
+            currentItemIndex.value = items.value.length - 1;
+            if (currentItemIndex.value >= 0) {
+                await navigateToIndex(currentItemIndex.value, 'left');
+            }
+        }
+    }
+}
+
 // Handle carousel item click
 function handleCarouselItemClick(item: MasonryItem): void {
-    const itemIndex = props.items.findIndex(i => i.id === item.id);
+    const itemIndex = items.value.findIndex(i => i.id === item.id);
     if (itemIndex >= 0 && currentItemIndex.value !== null) {
         // Determine direction based on index comparison BEFORE updating
         const direction = itemIndex > currentItemIndex.value ? 'right' : 'left';
@@ -293,7 +379,7 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const fullSizeUrl = masonryItem?.originalUrl || src; // Fallback to current src if no originalUrl
 
     // Find and set the current item index
-    const itemIndex = masonryItem ? props.items.findIndex(item => item.id === masonryItem.id) : -1;
+    const itemIndex = masonryItem ? items.value.findIndex(item => item.id === masonryItem.id) : -1;
     currentItemIndex.value = itemIndex >= 0 ? itemIndex : null;
 
     // Increment key to force image element recreation (prevents showing previous image)
@@ -451,7 +537,7 @@ async function openFromClick(e: MouseEvent): Promise<void> {
 // Navigate to next image
 async function navigateToNext(): Promise<void> {
     if (!overlayRect.value || !overlayFillComplete.value || currentItemIndex.value === null) return;
-    if (currentItemIndex.value >= props.items.length - 1) return; // Already at last item
+    if (currentItemIndex.value >= items.value.length - 1) return; // Already at last item
 
     const nextIndex = currentItemIndex.value + 1;
     // Update index immediately - both carousel and fileviewer animate together
@@ -475,7 +561,7 @@ async function navigateToPrevious(): Promise<void> {
 // Navigate to a specific index
 async function navigateToIndex(index: number, direction?: 'left' | 'right'): Promise<void> {
     if (!overlayRect.value || !overlayFillComplete.value) return;
-    if (index < 0 || index >= props.items.length) return;
+    if (index < 0 || index >= items.value.length) return;
 
     const tabContent = props.containerRef;
     if (!tabContent) return;
@@ -502,7 +588,7 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Step 2: Get next item and show spinner
-    const nextItem = props.items[index];
+    const nextItem = items.value[index];
     if (!nextItem) {
         isNavigating.value = false;
         return;
@@ -802,7 +888,7 @@ defineExpose({
                 class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
                 <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
                     :previewed-count="0" :viewed-count="0" :current-index="currentItemIndex ?? undefined"
-                    :total-items="items.length" />
+                    :total-items="items.length" @reaction="handleReaction" />
             </div>
         </div>
 

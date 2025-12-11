@@ -43,6 +43,8 @@ const isTabRestored = ref(false);
 const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
+// Store remove function from masonry slot to use in FileViewer
+const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -109,8 +111,15 @@ function onMasonryClick(e: MouseEvent): void {
     fileViewer.value?.openFromClick(e);
 }
 
-// Handle reaction with queue
-async function handleReaction(
+// Function to capture remove function from masonry slot
+function captureRemoveFn(remove: (item: MasonryItem) => void): void {
+    if (!masonryRemoveFn.value) {
+        masonryRemoveFn.value = remove;
+    }
+}
+
+// Handle reaction with queue (wrapper for masonry removeItem callback)
+async function handleMasonryReaction(
     fileId: number,
     type: 'love' | 'like' | 'dislike' | 'funny',
     removeItem: (item: MasonryItem) => void
@@ -329,8 +338,7 @@ onUnmounted(() => {
 <template>
     <div ref="tabContentContainer" class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
         <!-- Service Selection Header -->
-        <div v-if="tab"
-            class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
+        <div v-if="tab" class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
             data-test="service-selection-header">
             <div class="flex items-center gap-3">
                 <div class="flex-1">
@@ -340,16 +348,16 @@ onUnmounted(() => {
                                 :placeholder="hasServiceSelected ? (availableServices.find(s => s.key === currentTabService)?.label || currentTabService || undefined) : 'Select a service...'" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem v-for="service in availableServices" :key="service.key"
-                                :value="service.key" data-test="service-select-item">
+                            <SelectItem v-for="service in availableServices" :key="service.key" :value="service.key"
+                                data-test="service-select-item">
                                 {{ service.label }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
                 <Button @click="applyService"
-                    :disabled="!selectedService || isApplyingService || selectedService === currentTabService"
-                    size="sm" data-test="apply-service-button">
+                    :disabled="!selectedService || isApplyingService || selectedService === currentTabService" size="sm"
+                    data-test="apply-service-button">
                     <Loader2 v-if="isApplyingService" :size="14" class="mr-2 animate-spin" />
                     Apply
                 </Button>
@@ -358,18 +366,20 @@ onUnmounted(() => {
 
         <!-- Masonry Content -->
         <div class="flex-1 min-h-0">
-            <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container"
-                ref="masonryContainer" @click="onMasonryClick">
+            <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
+                @click="onMasonryClick">
                 <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
                     :skip-initial-load="items.length > 0" :backfill-enabled="true" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" @backfill:start="onBackfillStart"
-                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
-                    @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
-                    @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
+                    :backfill-max-calls="Infinity" @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
+                    @backfill:stop="onBackfillStop" @backfill:retry-start="onBackfillRetryStart"
+                    @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
+                    data-test="masonry-component">
                     <template #default="{ item, index, remove }">
-                        <div class="relative w-full h-full overflow-hidden group"
-                            @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
+                        <!-- Capture remove function on first item render -->
+                        <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
+                        <div class="relative w-full h-full overflow-hidden group" @mouseenter="hoveredItemIndex = index"
+                            @mouseleave="hoveredItemIndex = null">
                             <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
                                 class="w-full h-full object-cover" />
                             <div v-show="hoveredItemIndex === index"
@@ -377,14 +387,14 @@ onUnmounted(() => {
                                 <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
                                     :current-index="index" :total-items="items.length" variant="small"
                                     :remove-item="() => remove(item)"
-                                    @reaction="(type) => handleReaction(item.id, type, remove)" />
+                                    @reaction="(type) => handleMasonryReaction(item.id, type, remove)" />
                             </div>
                         </div>
                     </template>
                 </Masonry>
             </div>
-            <div v-else-if="tab && !hasServiceSelected"
-                class="flex items-center justify-center h-full" data-test="no-service-message">
+            <div v-else-if="tab && !hasServiceSelected" class="flex items-center justify-center h-full"
+                data-test="no-service-message">
                 <p class="text-twilight-indigo-300 text-lg">Select a service to start browsing</p>
             </div>
             <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
@@ -393,16 +403,25 @@ onUnmounted(() => {
         </div>
 
         <!-- File Viewer -->
-        <FileViewer ref="fileViewer" :container-ref="tabContentContainer"
-            :masonry-container-ref="masonryContainer" :items="items" :has-more="nextCursor !== null"
-            :is-loading="masonry?.isLoading ?? false" :on-load-more="handleCarouselLoadMore"
-            @close="() => { }" />
+        <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
+            :items="items" :has-more="nextCursor !== null" :is-loading="masonry?.isLoading ?? false"
+            :on-load-more="handleCarouselLoadMore" :on-reaction="props.onReaction" :remove-from-masonry="(item) => {
+                // Use the remove function directly from masonry slot if available
+                // In template, Vue auto-unwraps refs, so masonryRemoveFn is the value
+                if (masonryRemoveFn) {
+                    masonryRemoveFn(item);
+                } else if (masonry.value) {
+                    // Fallback: find item and use masonry instance method
+                    const masonryItem = items.find((i) => i.id === item.id);
+                    if (masonryItem) {
+                        masonry.value.remove(masonryItem);
+                    }
+                }
+            }" @close="() => { }" />
 
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-            :queued-reactions-count="queuedReactions.length"
-            :visible="tab !== null && hasServiceSelected" />
+            :queued-reactions-count="queuedReactions.length" :visible="tab !== null && hasServiceSelected" />
     </div>
 </template>
-

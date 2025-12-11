@@ -4445,5 +4445,263 @@ describe('Browse', () => {
             expect(nextButton.attributes('disabled')).toBeDefined();
         });
 
+        it('removes item from carousel and masonry, queues reaction, and auto-navigates to next in FileViewer', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                                { id: 2, width: 200, height: 200, src: 'test2.jpg', page: 1, index: 1 },
+                                { id: 3, width: 300, height: 300, src: 'test3.jpg', page: 1, index: 2 },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                if (url.includes('/api/files') && url.includes('/reaction')) {
+                    return Promise.resolve({
+                        data: {
+                            reaction: null,
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            mockAxios.post.mockResolvedValue({
+                data: {
+                    reaction: { type: 'love' },
+                },
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Wait for BrowseTabContent to mount
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Access BrowseTabContent component
+            const tabContentVm = getBrowseTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            // Set items in BrowseTabContent
+            tabContentVm.items = [
+                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                { id: 2, width: 200, height: 200, src: 'test2.jpg', page: 1, index: 1 },
+                { id: 3, width: 300, height: 300, src: 'test3.jpg', page: 1, index: 2 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Get FileViewer component
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set up overlay state - viewing item at index 0
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            // Update items through the ref (items is a ref in FileViewer)
+            if (fileViewerVm.items && typeof fileViewerVm.items === 'object' && 'value' in fileViewerVm.items) {
+                fileViewerVm.items.value = [
+                    { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                    { id: 2, width: 200, height: 200, src: 'test2.jpg', page: 1, index: 1 },
+                    { id: 3, width: 300, height: 300, src: 'test3.jpg', page: 1, index: 2 },
+                ];
+            }
+            await wrapper.vm.$nextTick();
+
+            // Verify initial state
+            const initialItems = fileViewerVm.items?.value || fileViewerVm.items || [];
+            expect(initialItems.length).toBe(3);
+            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(tabContentVm.items.length).toBe(3);
+
+            // Verify props are set by BrowseTabContent
+            expect(fileViewerVm.onReaction).toBeDefined();
+            expect(fileViewerVm.removeFromMasonry).toBeDefined();
+
+            // Find FileReactions component and trigger reaction through it
+            const fileReactions = fileViewer.findComponent({ name: 'FileReactions' });
+            expect(fileReactions.exists()).toBe(true);
+
+            // Trigger reaction through FileReactions component
+            await fileReactions.vm.$emit('reaction', 'love');
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Verify item was removed from carousel (FileViewer's reactive items)
+            // items is a ref, access via .value
+            const fileViewerItems = fileViewerVm.items?.value || fileViewerVm.items || [];
+            expect(fileViewerItems.length).toBe(2);
+            expect(fileViewerItems.find((i: any) => i.id === 1)).toBeUndefined();
+
+            // Verify item was removed from masonry (BrowseTabContent items should be updated)
+            expect(tabContentVm.items.length).toBe(2);
+            expect(tabContentVm.items.find((i: any) => i.id === 1)).toBeUndefined();
+
+            // Verify reaction was queued
+            expect(vm.queuedReactions.length).toBe(1);
+            expect(vm.queuedReactions[0].fileId).toBe(1);
+            expect(vm.queuedReactions[0].type).toBe('love');
+
+            // Verify auto-navigation to next item (should now be at index 0, which is item id: 2)
+            const fileViewerItemsAfter = fileViewerVm.items?.value || fileViewerVm.items || [];
+            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerItemsAfter[0].id).toBe(2);
+        });
+
+        it('closes FileViewer when reacting to last item', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+                            ],
+                            nextPage: null,
+                            services: [
+                                { key: 'civit-ai-images', label: 'CivitAI Images' },
+                            ],
+                        },
+                    });
+                }
+                if (url.includes('/api/files') && url.includes('/reaction')) {
+                    return Promise.resolve({
+                        data: {
+                            reaction: null,
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            mockAxios.post.mockResolvedValue({
+                data: {
+                    reaction: { type: 'like' },
+                },
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            // Wait for BrowseTabContent to mount
+            await flushPromises();
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Access BrowseTabContent component
+            const tabContentVm = getBrowseTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            // Set items in BrowseTabContent
+            tabContentVm.items = [
+                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Get FileViewer component
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set up overlay state - viewing the only item
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.items = [
+                { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Verify props are set by BrowseTabContent
+            expect(fileViewerVm.onReaction).toBeDefined();
+            expect(fileViewerVm.removeFromMasonry).toBeDefined();
+
+            // Find FileReactions component and trigger reaction through it
+            const fileReactions = fileViewer.findComponent({ name: 'FileReactions' });
+            expect(fileReactions.exists()).toBe(true);
+
+            // Trigger reaction through FileReactions component
+            await fileReactions.vm.$emit('reaction', 'like');
+            await wrapper.vm.$nextTick();
+            await new Promise(resolve => setTimeout(resolve, 600)); // Wait for close animation
+
+            // Verify overlay was closed (overlayRect should be null)
+            expect(fileViewerVm.overlayRect).toBeNull();
+
+            // Verify item was removed from masonry (BrowseTabContent items should be empty)
+            expect(tabContentVm.items.length).toBe(0);
+
+            // Verify reaction was queued
+            expect(vm.queuedReactions.length).toBe(1);
+            expect(vm.queuedReactions[0].fileId).toBe(1);
+            expect(vm.queuedReactions[0].type).toBe('like');
+        });
+
     });
 });
