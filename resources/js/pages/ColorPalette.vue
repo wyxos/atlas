@@ -4,6 +4,7 @@ import { Check } from 'lucide-vue-next';
 import PageHeader from '../components/ui/PageHeader.vue';
 import Section from '../components/ui/Section.vue';
 import Heading from '../components/ui/Heading.vue';
+import { copyToClipboard as copyToClipboardUtil } from '../utils/clipboard';
 
 // Type definitions
 type ShadeValue = {
@@ -185,11 +186,13 @@ const shadeOrder: (keyof ColorPalette['shades'])[] = [100, 200, 300, 400, 500, 6
 const copiedState = ref<Record<string, boolean>>({});
 
 function copyToClipboard(text: string, key: string): void {
-    navigator.clipboard.writeText(text).then(() => {
+    copyToClipboardUtil(key, text, { showToast: false }).then(() => {
         copiedState.value[key] = true;
         setTimeout(() => {
             copiedState.value[key] = false;
         }, 2000);
+    }).catch(() => {
+        // Error already logged in utility
     });
 }
 
@@ -201,45 +204,44 @@ function getTextColor(shade: keyof ColorPalette['shades']): string {
 </script>
 
 <template>
-                <PageHeader title="Color Palette" subtitle="Design system color palette with click-to-copy functionality" />
+    <PageHeader title="Color Palette" subtitle="Design system color palette with click-to-copy functionality" />
 
-                <Section title="Color Palette">
-                    <div class="space-y-12">
-                        <p class="text-base text-twilight-indigo-100 mb-6">
-                            Click any color swatch to copy its hex value, or shift+click to copy the Tailwind class name.
-                        </p>
+    <Section title="Color Palette">
+        <div class="space-y-12">
+            <p class="text-base text-twilight-indigo-100 mb-6">
+                Click any color swatch to copy its hex value, or shift+click to copy the Tailwind class name.
+            </p>
 
-                        <!-- Main Color Palettes -->
-                        <div v-for="palette in colorPalettes" :key="palette.slug" class="space-y-3">
-                            <Heading as="h3" size="xl" weight="semibold" color="smart-blue">
-                                {{ palette.name }}
-                            </Heading>
-                            <div class="flex gap-1 overflow-x-auto pb-2 overflow-y-visible">
-                                <div v-for="shade in shadeOrder" :key="shade"
-                                    class="shrink-0 flex flex-col items-center group cursor-pointer py-1"
-                                    @click="copyToClipboard(palette.shades[shade].hex, `${palette.slug}-${shade}`)"
-                                    @click.shift="copyToClipboard(palette.shades[shade].class, `${palette.slug}-${shade}-class`)">
-                                    <div :class="[
-                                        'w-16 h-16 rounded transition-all hover:scale-105 hover:ring-2 hover:ring-smart-blue-400',
-                                        palette.shades[shade].class,
-                                    ]"></div>
-                                    <div class="mt-2 flex flex-col items-center gap-1">
-                                        <span :class="[
-                                            'text-xs font-medium',
-                                            getTextColor(shade),
-                                        ]">
-                                            {{ shade }}
-                                        </span>
-                                        <div v-if="copiedState[`${palette.slug}-${shade}`] || copiedState[`${palette.slug}-${shade}-class`]"
-                                            class="flex items-center gap-1 text-xs text-success-400">
-                                            <Check :size="12" />
-                                            <span>Copied!</span>
-                                        </div>
-                                    </div>
-                                </div>
+            <!-- Main Color Palettes -->
+            <div v-for="palette in colorPalettes" :key="palette.slug" class="space-y-3">
+                <Heading as="h3" size="xl" weight="semibold" color="smart-blue">
+                    {{ palette.name }}
+                </Heading>
+                <div class="flex gap-1 overflow-x-auto pb-2 overflow-y-visible">
+                    <div v-for="shade in shadeOrder" :key="shade"
+                        class="shrink-0 flex flex-col items-center group cursor-pointer py-1"
+                        @click="copyToClipboard(palette.shades[shade].hex, `${palette.slug}-${shade}`)"
+                        @click.shift="copyToClipboard(palette.shades[shade].class, `${palette.slug}-${shade}-class`)">
+                        <div :class="[
+                            'w-16 h-16 rounded transition-all hover:scale-105 hover:ring-2 hover:ring-smart-blue-400',
+                            palette.shades[shade].class,
+                        ]"></div>
+                        <div class="mt-2 flex flex-col items-center gap-1">
+                            <span :class="[
+                                'text-xs font-medium',
+                                getTextColor(shade),
+                            ]">
+                                {{ shade }}
+                            </span>
+                            <div v-if="copiedState[`${palette.slug}-${shade}`] || copiedState[`${palette.slug}-${shade}-class`]"
+                                class="flex items-center gap-1 text-xs text-success-400">
+                                <Check :size="12" />
+                                <span>Copied!</span>
                             </div>
                         </div>
                     </div>
-                </Section>
+                </div>
+            </div>
+        </div>
+    </Section>
 </template>
-
