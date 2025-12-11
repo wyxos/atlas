@@ -63,26 +63,8 @@ async function handleReactionClick(type: 'love' | 'like' | 'dislike' | 'funny'):
         props.removeItem();
     }
 
-    // Emit reaction event (parent will handle queueing)
+    // Emit reaction event (parent will handle queueing and API call)
     emit('reaction', type);
-
-    // If no removeItem, handle the reaction directly (for FileViewer)
-    if (!props.removeItem) {
-        isUpdating.value = true;
-        try {
-            const response = await window.axios.post(`/api/files/${props.fileId}/reaction`, {
-                type, // Server handles toggle logic (removes if same type, replaces if different)
-            });
-
-            // Update local state based on response
-            currentReaction.value = response.data.reaction?.type || null;
-        } catch (error) {
-            console.error('Failed to update reaction:', error);
-            // Optionally revert on error
-        } finally {
-            isUpdating.value = false;
-        }
-    }
 }
 
 function handleFavoriteClick(): void {
