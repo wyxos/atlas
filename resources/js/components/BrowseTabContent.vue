@@ -555,7 +555,7 @@ onUnmounted(() => {
                 if (itemIndex !== -1) {
                     items.splice(itemIndex, 1);
                 }
-            }" :restore-to-masonry="(item, index, masonryInstance) => {
+            }" :restore-to-masonry="async (item, index, masonryInstance) => {
                 // Restore item to masonry at original index
                 const existingIndex = items.findIndex((i) => i.id === item.id);
                 if (existingIndex === -1) {
@@ -567,9 +567,15 @@ onUnmounted(() => {
                     } else if (masonryInstance && typeof masonryInstance.insert === 'function') {
                         masonryInstance.insert(item, index);
                     } else {
-                        // Fallback: manually insert at original index
+                        // Fallback: manually insert at original index and refresh layout
                         const clampedIndex = Math.min(index, items.length);
                         items.splice(clampedIndex, 0, item);
+                        // Trigger layout recalculation and animation
+                        if (masonryInstance && typeof masonryInstance.refreshLayout === 'function') {
+                            // Use nextTick to ensure Vue has processed the array change
+                            await nextTick();
+                            masonryInstance.refreshLayout(items);
+                        }
                     }
                 }
             }" :tab-id="props.tab?.id" :masonry-instance="masonry" @close="() => { }" />
