@@ -6,6 +6,8 @@ import type { QueuedReaction } from '../composables/useReactionQueue';
 interface Props {
     queuedReactions: QueuedReaction[];
     onCancel?: (fileId: number) => void;
+    onPause?: () => void;
+    onResume?: () => void;
 }
 
 const props = defineProps<Props>();
@@ -36,10 +38,23 @@ function getProgress(queued: QueuedReaction): number {
     // Calculate progress percentage (0% at start, 100% at end - showing progress toward execution)
     return ((QUEUE_DELAY_SECONDS - queued.countdown) / QUEUE_DELAY_SECONDS) * 100;
 }
+
+function handleMouseEnter(): void {
+    if (props.onPause) {
+        props.onPause();
+    }
+}
+
+function handleMouseLeave(): void {
+    if (props.onResume) {
+        props.onResume();
+    }
+}
 </script>
 
 <template>
-    <div v-if="queuedReactions.length > 0" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+    <div v-if="queuedReactions.length > 0" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm"
+        @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
         <div v-for="queued in queuedReactions" :key="queued.id"
             class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm flex items-center gap-3">
             <!-- Preview Image -->
