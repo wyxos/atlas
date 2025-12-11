@@ -215,6 +215,51 @@ async function waitForStable(wrapper: any, iterations = 2): Promise<void> {
     }
 }
 
+// Helper to wait for overlay animation to complete by checking component state
+// This is better than setTimeout because it waits for actual state changes
+async function waitForOverlayAnimation(
+    fileViewerVm: any,
+    condition: () => boolean,
+    timeout = 1000
+): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        if (condition()) {
+            return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    // If condition not met, wait for animation duration anyway as fallback
+    await new Promise(resolve => setTimeout(resolve, 550));
+}
+
+// Helper to wait for overlay to close (checks overlayRect is null)
+async function waitForOverlayClose(fileViewerVm: any, timeout = 1000): Promise<void> {
+    await waitForOverlayAnimation(
+        fileViewerVm,
+        () => fileViewerVm.overlayRect === null,
+        timeout
+    );
+}
+
+// Helper to wait for overlay to be fully filled (checks overlayFillComplete)
+async function waitForOverlayFill(fileViewerVm: any, timeout = 1000): Promise<void> {
+    await waitForOverlayAnimation(
+        fileViewerVm,
+        () => fileViewerVm.overlayFillComplete === true,
+        timeout
+    );
+}
+
+// Helper to wait for navigation animation to complete (checks isNavigating state)
+async function waitForNavigation(fileViewerVm: any, timeout = 1000): Promise<void> {
+    await waitForOverlayAnimation(
+        fileViewerVm,
+        () => fileViewerVm.isNavigating === false,
+        timeout
+    );
+}
+
 // Helper to setup overlay test with common configuration
 async function setupOverlayTest() {
     const tabConfig = createMockTabConfig(1);
@@ -1065,14 +1110,14 @@ describe('Browse', () => {
 
         // Simulate middle click on tab 2 by triggering mousedown and click events
         const tab2Element = tab2Component?.element as HTMLElement;
-        
+
         // Create a middle click event
         const mouseDownEvent = new MouseEvent('mousedown', {
             button: 1,
             bubbles: true,
             cancelable: true,
         });
-        
+
         const clickEvent = new MouseEvent('click', {
             button: 1,
             bubbles: true,
@@ -1081,7 +1126,7 @@ describe('Browse', () => {
 
         // Trigger mousedown first
         tab2Element.dispatchEvent(mouseDownEvent);
-        
+
         // Then trigger click
         tab2Element.dispatchEvent(clickEvent);
 
@@ -2202,8 +2247,8 @@ describe('Browse', () => {
 
             await closeButton.trigger('click');
             await wrapper.vm.$nextTick();
-            // Wait for close animation to complete (500ms + small buffer)
-            await new Promise(resolve => setTimeout(resolve, 600));
+            // Wait for overlay to close by checking state instead of arbitrary timeout
+            await waitForOverlayClose(fileViewerVm);
 
             // Verify overlay is closed
             expect(fileViewerVm.overlayRect).toBeNull();
@@ -2856,7 +2901,8 @@ describe('Browse', () => {
             window.dispatchEvent(escapeEvent);
 
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 600)); // Wait for close animation
+            // Wait for overlay to close by checking state instead of arbitrary timeout
+            await waitForOverlayClose(fileViewerVm);
 
             // Verify overlay is closed
             expect(fileViewerVm.overlayRect).toBeNull();
@@ -2922,13 +2968,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 // If BrowseTabContent hasn't mounted, skip this test's assertions
                 return;
@@ -3068,13 +3109,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -3340,13 +3376,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -3429,13 +3460,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -3516,13 +3542,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -3555,8 +3576,8 @@ describe('Browse', () => {
             if (nextButton.exists()) {
                 await nextButton.trigger('click');
 
+                await flushPromises();
                 await wrapper.vm.$nextTick();
-                await new Promise(resolve => setTimeout(resolve, 50));
 
                 // Verify navigation started
                 expect(fileViewerVm.isNavigating).toBe(true);
@@ -3606,13 +3627,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -3645,8 +3661,8 @@ describe('Browse', () => {
             if (prevButton.exists()) {
                 await prevButton.trigger('click');
 
+                await flushPromises();
                 await wrapper.vm.$nextTick();
-                await new Promise(resolve => setTimeout(resolve, 50));
 
                 // Verify navigation started
                 expect(fileViewerVm.isNavigating).toBe(true);
@@ -3700,13 +3716,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -3795,13 +3806,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -3886,13 +3892,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -4046,9 +4047,8 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for component to be ready (no need for arbitrary timeout)
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4109,9 +4109,8 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for component to be ready (no need for arbitrary timeout)
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4190,20 +4189,10 @@ describe('Browse', () => {
                 },
             });
 
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
-
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 // If BrowseTabContent hasn't mounted, skip this test's assertions
                 return;
@@ -4288,8 +4277,8 @@ describe('Browse', () => {
             });
 
             await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for component to be ready (no need for arbitrary timeout)
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4357,8 +4346,8 @@ describe('Browse', () => {
             });
 
             await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Wait for component to be ready (no need for arbitrary timeout)
+            await waitForStable(wrapper);
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
@@ -4502,13 +4491,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -4562,8 +4546,8 @@ describe('Browse', () => {
 
             // Trigger reaction through FileReactions component
             await fileReactions.vm.$emit('reaction', 'love');
+            await flushPromises();
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 200));
 
             // Verify item was removed from carousel (FileViewer's reactive items)
             // items is a ref, access via .value
@@ -4641,13 +4625,8 @@ describe('Browse', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            // Wait for BrowseTabContent to mount
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Access BrowseTabContent component
-            const tabContentVm = getBrowseTabContent(wrapper);
+            // Wait for BrowseTabContent to mount (use helper instead of arbitrary timeout)
+            const tabContentVm = await waitForTabContent(wrapper);
             if (!tabContentVm) {
                 return;
             }
@@ -4689,7 +4668,8 @@ describe('Browse', () => {
             // Trigger reaction through FileReactions component
             await fileReactions.vm.$emit('reaction', 'like');
             await wrapper.vm.$nextTick();
-            await new Promise(resolve => setTimeout(resolve, 600)); // Wait for close animation
+            // Wait for overlay to close by checking state instead of arbitrary timeout
+            await waitForOverlayClose(fileViewerVm);
 
             // Verify overlay was closed (overlayRect should be null)
             expect(fileViewerVm.overlayRect).toBeNull();
