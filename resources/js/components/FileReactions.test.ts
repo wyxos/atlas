@@ -197,104 +197,6 @@ describe('FileReactions', () => {
         expect(vm.currentReaction).toBe('funny');
     });
 
-    it('calls API when favorite button is clicked', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: null,
-            },
-        });
-
-        mockAxios.post.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'love',
-                },
-            },
-        });
-
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-
-        const favoriteButton = wrapper.find('button[aria-label="Favorite"]');
-        await favoriteButton.trigger('click');
-        await flushPromises();
-
-        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/reaction', {
-            type: 'love',
-        });
-    });
-
-    it('calls API when like button is clicked', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: null,
-            },
-        });
-
-        mockAxios.post.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
-            },
-        });
-
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-
-        const likeButton = wrapper.find('button[aria-label="Like"]');
-        await likeButton.trigger('click');
-        await flushPromises();
-
-        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/reaction', {
-            type: 'like',
-        });
-    });
-
-    it('updates reaction state after successful API call', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: null,
-            },
-        });
-
-        mockAxios.post.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
-            },
-        });
-
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-
-        const likeButton = wrapper.find('button[aria-label="Like"]');
-        await likeButton.trigger('click');
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await wrapper.vm.$nextTick(); // Extra tick for reactivity
-
-        // Verify like button is now active
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vm = wrapper.vm as any;
-        expect(vm.like).toBe(true);
-    });
 
     it('calls removeItem and emits reaction event when removeItem prop is provided', async () => {
         mockAxios.get.mockResolvedValueOnce({
@@ -328,18 +230,10 @@ describe('FileReactions', () => {
         expect(mockAxios.post).not.toHaveBeenCalled();
     });
 
-    it('calls API directly when removeItem prop is not provided', async () => {
+    it('emits reaction event when removeItem prop is not provided', async () => {
         mockAxios.get.mockResolvedValueOnce({
             data: {
                 reaction: null,
-            },
-        });
-
-        mockAxios.post.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
             },
         });
 
@@ -356,131 +250,12 @@ describe('FileReactions', () => {
         await likeButton.trigger('click');
         await flushPromises();
 
-        // Verify API was called directly (for FileViewer usage)
-        expect(mockAxios.post).toHaveBeenCalledWith('/api/files/1/reaction', {
-            type: 'like',
-        });
-    });
+        // Verify reaction event was emitted (parent will handle API call)
+        expect(wrapper.emitted('reaction')).toBeTruthy();
+        expect(wrapper.emitted('reaction')?.[0]).toEqual(['like']);
 
-    it('toggles reaction off when clicking the same reaction', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
-            },
-        });
-
-        mockAxios.post.mockResolvedValueOnce({
-            data: {
-                reaction: null,
-            },
-        });
-
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-        const likeButton = wrapper.find('button[aria-label="Like"]');
-        await likeButton.trigger('click');
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await wrapper.vm.$nextTick(); // Extra tick for reactivity
-
-        // Verify like button is no longer active
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vm = wrapper.vm as any;
-        expect(vm.like).toBe(false);
-    });
-
-    it('replaces existing reaction when clicking a different reaction', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
-            },
-        });
-
-        mockAxios.post.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'dislike',
-                },
-            },
-        });
-
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-        const dislikeButton = wrapper.find('button[aria-label="Dislike"]');
-        await dislikeButton.trigger('click');
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-        await wrapper.vm.$nextTick(); // Extra tick for reactivity
-
-        // Verify dislike is now active
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vm = wrapper.vm as any;
-        expect(vm.dislike).toBe(true);
-        expect(vm.like).toBe(false);
-    });
-
-    it('disables buttons while updating', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: null,
-            },
-        });
-
-        // Create a promise that we can control
-        let resolvePost: (value: any) => void;
-        const postPromise = new Promise((resolve) => {
-            resolvePost = resolve;
-        });
-
-        mockAxios.post.mockReturnValueOnce(postPromise);
-
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-
-        const likeButton = wrapper.find('button[aria-label="Like"]');
-        await likeButton.trigger('click');
-        await wrapper.vm.$nextTick();
-
-        // Button should be disabled while updating
-        expect(likeButton.attributes('disabled')).toBeDefined();
-
-        // Resolve the promise
-        resolvePost!({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-        // Button should be enabled again
-        expect(likeButton.attributes('disabled')).toBeUndefined();
+        // Verify API was NOT called directly (parent handles it)
+        expect(mockAxios.post).not.toHaveBeenCalled();
     });
 
     it('does not call API when fileId is not provided', async () => {
