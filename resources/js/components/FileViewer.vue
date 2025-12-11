@@ -17,7 +17,7 @@ interface Props {
     onLoadMore?: () => Promise<void>;
     onReaction?: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void;
     removeFromMasonry?: (item: MasonryItem) => void;
-    restoreToMasonry?: (item: MasonryItem, index: number, masonryInstance?: any) => void;
+    restoreToMasonry?: (item: MasonryItem, index: number, masonryInstance?: any) => void | Promise<void>;
     tabId?: number;
     masonryInstance?: any; // Masonry component instance for restore method
 }
@@ -249,14 +249,15 @@ async function handleReaction(type: 'love' | 'like' | 'dislike' | 'funny'): Prom
     }
 
     // Create restore callback to add item back to masonry at original index
-    const restoreItem = props.restoreToMasonry && props.tabId !== undefined ? (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
+    const restoreItem = props.restoreToMasonry && props.tabId !== undefined ? async (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
         // Only restore if the tab is active
-        if (!isTabActive(restoreTabId)) {
+        const tabActive = isTabActive(restoreTabId);
+        if (!tabActive) {
             return;
         }
 
         if (props.restoreToMasonry) {
-            props.restoreToMasonry(currentItem, itemIndex, props.masonryInstance);
+            await props.restoreToMasonry(currentItem, itemIndex, props.masonryInstance);
         }
     } : undefined;
 
@@ -266,7 +267,7 @@ async function handleReaction(type: 'love' | 'like' | 'dislike' | 'funny'): Prom
     const { queueReaction } = useReactionQueue();
     const previewUrl = currentItem.src;
     queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, props.tabId, itemIndex, currentItem);
-    
+
     // Emit to parent
     if (props.onReaction) {
         props.onReaction(fileId, type);
@@ -952,7 +953,8 @@ defineExpose({
                     } : {}),
                     transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
                     transformOrigin: 'center center',
-                }" draggable="false" @click="handleOverlayImageClick" @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown" />
+                }" draggable="false" @click="handleOverlayImageClick" @contextmenu.prevent="handleOverlayImageClick"
+                @mousedown="handleOverlayImageMouseDown" />
 
             <!-- Close button -->
             <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
