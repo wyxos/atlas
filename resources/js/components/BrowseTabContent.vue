@@ -187,17 +187,16 @@ function handleAltClickReaction(e: MouseEvent, fileId: number): void {
     if (reactionType) {
         const item = items.value.find((i) => i.id === fileId);
         if (item) {
-            handleMasonryReaction(fileId, reactionType, (itemToRemove) => {
-                // Use the remove function from masonry if available
-                if (masonryRemoveFn.value) {
-                    masonryRemoveFn.value(itemToRemove);
-                } else if (masonry.value) {
+            // Find the remove function from masonry slot
+            const removeFn = masonryRemoveFn.value || ((itemToRemove: MasonryItem) => {
+                if (masonry.value) {
                     const masonryItem = items.value.find((i) => i.id === itemToRemove.id);
                     if (masonryItem) {
                         masonry.value.remove(masonryItem);
                     }
                 }
             });
+            handleMasonryReaction(fileId, reactionType, removeFn);
         }
     }
 }
@@ -216,13 +215,48 @@ async function handleMasonryReaction(
     removeItem: (item: MasonryItem) => void
 ): Promise<void> {
     const item = items.value.find((i) => i.id === fileId);
+    const itemIndex = item ? items.value.findIndex((i) => i.id === fileId) : -1;
+    const tabId = props.tab?.id;
+
+    // Create restore callback to add item back to masonry at original index
+    const restoreItem = item && tabId !== undefined && itemIndex !== -1 ? async (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
+        // Only restore if the tab is active
+        const tabActive = isTabActive(restoreTabId);
+        if (!tabActive) {
+            return;
+        }
+
+        // Check if item is already in the array (avoid duplicates)
+        const existingIndex = items.value.findIndex((i) => i.id === item.id);
+        if (existingIndex === -1) {
+            // Try to use masonry's restore method if available, otherwise insert at original index
+            if (masonry.value && typeof (masonry.value as any).restore === 'function') {
+                (masonry.value as any).restore(item, itemIndex);
+            } else if (masonry.value && typeof (masonry.value as any).add === 'function') {
+                (masonry.value as any).add(item, itemIndex);
+            } else if (masonry.value && typeof (masonry.value as any).insert === 'function') {
+                (masonry.value as any).insert(item, itemIndex);
+            } else {
+                // Fallback: manually insert at original index and refresh layout
+                const clampedIndex = Math.min(itemIndex, items.value.length);
+                items.value.splice(clampedIndex, 0, item);
+                // Trigger layout recalculation and animation
+                if (masonry.value && typeof masonry.value.refreshLayout === 'function') {
+                    // Use nextTick to ensure Vue has processed the array change
+                    await nextTick();
+                    masonry.value.refreshLayout(items.value);
+                }
+            }
+        }
+    } : undefined;
+
     if (item && removeItem) {
         removeItem(item);
     }
 
-    // Queue the AJAX request
+    // Queue the AJAX request with restore callback, tab ID, index, and item
     const previewUrl = item?.src;
-    queueReaction(fileId, type, createReactionCallback(), previewUrl);
+    queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, tabId, itemIndex, item);
 
     // Emit to parent
     props.onReaction(fileId, type);
@@ -521,7 +555,24 @@ onUnmounted(() => {
                 if (itemIndex !== -1) {
                     items.splice(itemIndex, 1);
                 }
-            }" @close="() => { }" />
+            }" :restore-to-masonry="(item, index, masonryInstance) => {
+                // Restore item to masonry at original index
+                const existingIndex = items.findIndex((i) => i.id === item.id);
+                if (existingIndex === -1) {
+                    // Try to use masonry's restore method if available
+                    if (masonryInstance && typeof masonryInstance.restore === 'function') {
+                        masonryInstance.restore(item, index);
+                    } else if (masonryInstance && typeof masonryInstance.add === 'function') {
+                        masonryInstance.add(item, index);
+                    } else if (masonryInstance && typeof masonryInstance.insert === 'function') {
+                        masonryInstance.insert(item, index);
+                    } else {
+                        // Fallback: manually insert at original index
+                        const clampedIndex = Math.min(index, items.length);
+                        items.splice(clampedIndex, 0, item);
+                    }
+                }
+            }" :tab-id="props.tab?.id" :masonry-instance="masonry" @close="() => { }" />
 
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"

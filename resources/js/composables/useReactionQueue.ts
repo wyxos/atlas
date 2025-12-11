@@ -12,6 +12,10 @@ export interface QueuedReaction {
     pausedAt: number | null; // Track when paused (null if not paused)
     pausedRemaining: number | null; // Remaining time when paused
     executeCallback: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => Promise<void>; // Store callback for resume
+    restoreItem?: (tabId: number, isTabActive: (tabId: number) => boolean) => void | Promise<void>; // Callback to restore item to masonry with tab check
+    tabId?: number; // Tab ID where the item was removed
+    itemIndex?: number; // Original index of the item in the masonry
+    item?: any; // Store the item data for restoration
 }
 
 const QUEUE_DELAY_MS = 5000; // 5 seconds
@@ -24,18 +28,40 @@ export function useReactionQueue() {
         fileId: number,
         type: 'love' | 'like' | 'dislike' | 'funny',
         executeCallback: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => Promise<void>,
-        previewUrl?: string
+        previewUrl?: string,
+        restoreItem?: (tabId: number, isTabActive: (tabId: number) => boolean) => void,
+        tabId?: number,
+        itemIndex?: number,
+        item?: any
     ): void {
         // Check if this reaction is already queued for this file
         const existingIndex = queuedReactions.value.findIndex(
             (q) => q.fileId === fileId
         );
 
-        // If already queued, cancel the previous one
+        // If already queued, preserve restore data from existing reaction if new call doesn't have it
+        let preservedRestoreItem = restoreItem;
+        let preservedTabId = tabId;
+        let preservedItemIndex = itemIndex;
+        let preservedItem = item;
+
         if (existingIndex !== -1) {
             const existing = queuedReactions.value[existingIndex];
             if (existing.timeoutId) {
                 clearTimeout(existing.timeoutId);
+            }
+            // Preserve restore data from existing reaction if new call doesn't provide it
+            if (!restoreItem && existing.restoreItem) {
+                preservedRestoreItem = existing.restoreItem;
+            }
+            if (tabId === undefined && existing.tabId !== undefined) {
+                preservedTabId = existing.tabId;
+            }
+            if (itemIndex === undefined && existing.itemIndex !== undefined) {
+                preservedItemIndex = existing.itemIndex;
+            }
+            if (!item && existing.item) {
+                preservedItem = existing.item;
             }
             queuedReactions.value.splice(existingIndex, 1);
         }
@@ -55,6 +81,10 @@ export function useReactionQueue() {
             pausedAt: null,
             pausedRemaining: null,
             executeCallback,
+            restoreItem: preservedRestoreItem,
+            tabId: preservedTabId,
+            itemIndex: preservedItemIndex,
+            item: preservedItem,
         };
 
         // Add to queue
@@ -69,7 +99,7 @@ export function useReactionQueue() {
             }
 
             const queued = queuedReactions.value[index];
-            
+
             // If paused, don't update countdown
             if (queued.pausedAt !== null) {
                 return;
@@ -78,7 +108,7 @@ export function useReactionQueue() {
             // Calculate elapsed time (accounting for any previous pauses)
             const elapsed = Date.now() - queued.startTime;
             const remaining = Math.max(0, QUEUE_DELAY_MS - elapsed);
-            
+
             queuedReactions.value[index].countdown = remaining / 1000;
 
             if (remaining <= 0) {
@@ -110,7 +140,7 @@ export function useReactionQueue() {
         queuedReaction.timeoutId = timeoutId;
     }
 
-    function cancelReaction(fileId: number): void {
+    async function cancelReaction(fileId: number, isTabActive?: (tabId: number) => boolean): Promise<void> {
         const index = queuedReactions.value.findIndex((q) => q.fileId === fileId);
         if (index !== -1) {
             const queued = queuedReactions.value[index];
@@ -120,6 +150,15 @@ export function useReactionQueue() {
             if (queued.intervalId) {
                 clearInterval(queued.intervalId);
             }
+
+            // Restore item to masonry if restore callback exists and tab is active
+            if (queued.restoreItem && queued.tabId !== undefined) {
+                const tabIsActive = isTabActive ? isTabActive(queued.tabId) : true;
+                if (tabIsActive) {
+                    await queued.restoreItem(queued.tabId, isTabActive || (() => true));
+                }
+            }
+
             queuedReactions.value.splice(index, 1);
         }
     }
@@ -184,7 +223,7 @@ export function useReactionQueue() {
 
             // Calculate how long we were paused
             const pauseDuration = now - queued.pausedAt;
-            
+
             // Adjust startTime to account for the pause
             queued.startTime = now - (QUEUE_DELAY_MS - queued.pausedRemaining);
 
@@ -202,7 +241,7 @@ export function useReactionQueue() {
                 }
 
                 const currentQueued = queuedReactions.value[index];
-                
+
                 // If paused again, don't update
                 if (currentQueued.pausedAt !== null) {
                     return;
@@ -210,7 +249,7 @@ export function useReactionQueue() {
 
                 const elapsed = Date.now() - currentQueued.startTime;
                 const currentRemaining = Math.max(0, QUEUE_DELAY_MS - elapsed);
-                
+
                 queuedReactions.value[index].countdown = currentRemaining / 1000;
 
                 if (currentRemaining <= 0) {

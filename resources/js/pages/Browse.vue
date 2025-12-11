@@ -169,7 +169,7 @@ onMounted(async () => {
         </div>
 
         <!-- Reaction Queue -->
-        <ReactionQueue :queued-reactions="queuedReactions" :on-cancel="cancelReaction" :on-pause="pauseAll" :on-resume="resumeAll" />
+        <ReactionQueue :queued-reactions="queuedReactions" :on-cancel="(fileId) => cancelReaction(fileId, (tabId) => activeTabId === tabId)" :on-pause="pauseAll" :on-resume="resumeAll" />
     </div>
 </template>
 

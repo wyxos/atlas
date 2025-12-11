@@ -179,7 +179,7 @@ function setupAxiosMocks(tabConfig: any | any[], browseResponse?: any) {
 }
 
 // Helper to wait for tab content to be ready (replaces setTimeout patterns)
-async function waitForTabContent(wrapper: any, maxWait = 100): Promise<any> {
+async function waitForTabContent(wrapper: any, maxWait = 50): Promise<any> {
     const start = Date.now();
     while (Date.now() - start < maxWait) {
         await flushPromises();
@@ -188,7 +188,8 @@ async function waitForTabContent(wrapper: any, maxWait = 100): Promise<any> {
         if (tabContent) {
             return tabContent;
         }
-        await new Promise(resolve => setTimeout(resolve, 10));
+        // Use shorter polling interval for faster response
+        await new Promise(resolve => setTimeout(resolve, 5));
     }
     return null;
 }
@@ -4931,13 +4932,17 @@ describe('Browse', () => {
                 },
             });
 
-            await waitForStable(wrapper);
+            await flushPromises();
+            await wrapper.vm.$nextTick();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            const tabContentVm = await waitForTabContent(wrapper);
+            // Get tab content directly without waiting - we're setting up state manually
+            const tabContentVm = getBrowseTabContent(wrapper);
             if (!tabContentVm) {
+                // If not available, wait briefly
+                await waitForTabContent(wrapper, 20);
                 return;
             }
 
@@ -4976,10 +4981,10 @@ describe('Browse', () => {
                 altKey: true,
                 button: 0,
             });
-            await overlayImage.element.dispatchEvent(clickEvent);
+            overlayImage.element.dispatchEvent(clickEvent);
 
-                await flushPromises();
-                await wrapper.vm.$nextTick();
+            await flushPromises();
+            await wrapper.vm.$nextTick();
 
                 // Verify reaction was queued with like type (check last reaction)
                 expect(vm.queuedReactions.length).toBeGreaterThan(0);
@@ -5029,13 +5034,17 @@ describe('Browse', () => {
                 },
             });
 
-            await waitForStable(wrapper);
+            await flushPromises();
+            await wrapper.vm.$nextTick();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            const tabContentVm = await waitForTabContent(wrapper);
+            // Get tab content directly without waiting - we're setting up state manually
+            const tabContentVm = getBrowseTabContent(wrapper);
             if (!tabContentVm) {
+                // If not available, wait briefly
+                await waitForTabContent(wrapper, 20);
                 return;
             }
 
@@ -5074,10 +5083,10 @@ describe('Browse', () => {
                 altKey: true,
                 button: 2,
             });
-            await overlayImage.element.dispatchEvent(contextMenuEvent);
+            overlayImage.element.dispatchEvent(contextMenuEvent);
 
-                await flushPromises();
-                await wrapper.vm.$nextTick();
+            await flushPromises();
+            await wrapper.vm.$nextTick();
 
                 // Verify reaction was queued with dislike type (check last reaction)
                 expect(vm.queuedReactions.length).toBeGreaterThan(0);
@@ -5127,13 +5136,17 @@ describe('Browse', () => {
                 },
             });
 
-            await waitForStable(wrapper);
+            await flushPromises();
+            await wrapper.vm.$nextTick();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            const tabContentVm = await waitForTabContent(wrapper);
+            // Get tab content directly without waiting - we're setting up state manually
+            const tabContentVm = getBrowseTabContent(wrapper);
             if (!tabContentVm) {
+                // If not available, wait briefly
+                await waitForTabContent(wrapper, 20);
                 return;
             }
 
@@ -5172,10 +5185,10 @@ describe('Browse', () => {
                 altKey: true,
                 button: 1,
             });
-            await overlayImage.element.dispatchEvent(mouseDownEvent);
+            overlayImage.element.dispatchEvent(mouseDownEvent);
 
-                await flushPromises();
-                await wrapper.vm.$nextTick();
+            await flushPromises();
+            await wrapper.vm.$nextTick();
 
                 // Verify reaction was queued with love type (check last reaction)
                 expect(vm.queuedReactions.length).toBeGreaterThan(0);
@@ -5201,13 +5214,17 @@ describe('Browse', () => {
                 },
             });
 
-            await waitForStable(wrapper);
+            await flushPromises();
+            await wrapper.vm.$nextTick();
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vm = wrapper.vm as any;
 
-            const tabContentVm = await waitForTabContent(wrapper);
+            // Get tab content directly without waiting - we're setting up state manually
+            const tabContentVm = getBrowseTabContent(wrapper);
             if (!tabContentVm) {
+                // If not available, wait briefly
+                await waitForTabContent(wrapper, 20);
                 return;
             }
 
