@@ -4,6 +4,7 @@ export interface QueuedReaction {
     id: string;
     fileId: number;
     type: 'love' | 'like' | 'dislike' | 'funny';
+    previewUrl?: string;
     countdown: number;
     timeoutId: ReturnType<typeof setTimeout> | null;
     intervalId: ReturnType<typeof setInterval> | null;
@@ -17,7 +18,8 @@ export function useReactionQueue() {
     function queueReaction(
         fileId: number,
         type: 'love' | 'like' | 'dislike' | 'funny',
-        executeCallback: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => Promise<void>
+        executeCallback: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => Promise<void>,
+        previewUrl?: string
     ): void {
         // Check if this reaction is already queued for this file
         const existingIndex = queuedReactions.value.findIndex(
@@ -39,6 +41,7 @@ export function useReactionQueue() {
             id: queueId,
             fileId,
             type,
+            previewUrl,
             countdown: QUEUE_DELAY_MS / 1000, // Start at 5 seconds
             timeoutId: null,
             intervalId: null,
