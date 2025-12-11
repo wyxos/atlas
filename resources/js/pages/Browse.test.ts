@@ -4684,4 +4684,563 @@ describe('Browse', () => {
         });
 
     });
+
+    describe('ALT + Mouse Button Shortcuts', () => {
+        beforeEach(() => {
+            // Mock getBoundingClientRect for overlay positioning
+            Element.prototype.getBoundingClientRect = vi.fn(() => ({
+                top: 100,
+                left: 200,
+                width: 300,
+                height: 400,
+                bottom: 500,
+                right: 500,
+                x: 200,
+                y: 100,
+                toJSON: vi.fn(),
+            }));
+        });
+
+        it('triggers like reaction when ALT + Left Click on masonry item', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            // Create a mock masonry item element
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
+            if (masonryContainer.exists()) {
+                const mockItem = document.createElement('div');
+                mockItem.className = 'masonry-item';
+                mockItem.setAttribute('data-item-id', '1');
+                const mockImg = document.createElement('img');
+                mockImg.src = 'test1.jpg';
+                mockItem.appendChild(mockImg);
+                masonryContainer.element.appendChild(mockItem);
+
+                // Create ALT + Left Click event
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    altKey: true,
+                    button: 0,
+                });
+                Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+                masonryContainer.element.dispatchEvent(clickEvent);
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify reaction was queued with like type
+                expect(vm.queuedReactions.length).toBe(1);
+                expect(vm.queuedReactions[0].fileId).toBe(1);
+                expect(vm.queuedReactions[0].type).toBe('like');
+
+                // Verify overlay was NOT opened (ALT click should not open overlay)
+                const fileViewer = wrapper.findComponent(FileViewer);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const fileViewerVm = fileViewer.vm as any;
+                expect(fileViewerVm.overlayRect).toBeNull();
+            }
+        });
+
+        it('triggers dislike reaction when ALT + Right Click on masonry item', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            // Create a mock masonry item element
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
+            if (masonryContainer.exists()) {
+                const mockItem = document.createElement('div');
+                mockItem.className = 'masonry-item';
+                mockItem.setAttribute('data-item-id', '2');
+                const mockImg = document.createElement('img');
+                mockImg.src = 'test2.jpg';
+                mockItem.appendChild(mockImg);
+                masonryContainer.element.appendChild(mockItem);
+
+                // Create ALT + Right Click event (contextmenu)
+                const contextMenuEvent = new MouseEvent('contextmenu', {
+                    bubbles: true,
+                    altKey: true,
+                    button: 2,
+                });
+                Object.defineProperty(contextMenuEvent, 'target', { value: mockImg, enumerable: true });
+                masonryContainer.element.dispatchEvent(contextMenuEvent);
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify reaction was queued with dislike type
+                expect(vm.queuedReactions.length).toBe(1);
+                expect(vm.queuedReactions[0].fileId).toBe(2);
+                expect(vm.queuedReactions[0].type).toBe('dislike');
+            }
+        });
+
+        it('triggers love reaction when ALT + Middle Click on masonry item', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 3, width: 300, height: 400, src: 'test3.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 3, width: 300, height: 400, src: 'test3.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            // Create a mock masonry item element
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
+            if (masonryContainer.exists()) {
+                const mockItem = document.createElement('div');
+                mockItem.className = 'masonry-item';
+                mockItem.setAttribute('data-item-id', '3');
+                const mockImg = document.createElement('img');
+                mockImg.src = 'test3.jpg';
+                mockItem.appendChild(mockImg);
+                masonryContainer.element.appendChild(mockItem);
+
+                // Create ALT + Middle Click event (mousedown)
+                const mouseDownEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    altKey: true,
+                    button: 1,
+                });
+                Object.defineProperty(mouseDownEvent, 'target', { value: mockImg, enumerable: true });
+                masonryContainer.element.dispatchEvent(mouseDownEvent);
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify reaction was queued with love type
+                expect(vm.queuedReactions.length).toBe(1);
+                expect(vm.queuedReactions[0].fileId).toBe(3);
+                expect(vm.queuedReactions[0].type).toBe('love');
+            }
+        });
+
+        it('triggers like reaction when ALT + Left Click on overlay image', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 4, width: 300, height: 400, src: 'test4.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            mockAxios.post.mockResolvedValue({
+                data: {
+                    reaction: { type: 'like' },
+                },
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [
+                { id: 4, width: 100, height: 100, src: 'test4.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Get FileViewer component
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set up overlay state - viewing the item
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test4.jpg', alt: 'Test 4' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.items = [
+                { id: 4, width: 100, height: 100, src: 'test4.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Find overlay image and trigger ALT + Left Click
+            const overlayImage = fileViewer.find('img[alt="Test 4"]');
+            expect(overlayImage.exists()).toBe(true);
+
+            // Create ALT + Left Click event
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                altKey: true,
+                button: 0,
+            });
+            await overlayImage.element.dispatchEvent(clickEvent);
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify reaction was queued with like type (check last reaction)
+                expect(vm.queuedReactions.length).toBeGreaterThan(0);
+                const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
+                expect(lastReaction.fileId).toBe(4);
+                expect(lastReaction.type).toBe('like');
+        });
+
+        it('triggers dislike reaction when ALT + Right Click on overlay image', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 5, width: 300, height: 400, src: 'test5.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            mockAxios.post.mockResolvedValue({
+                data: {
+                    reaction: { type: 'dislike' },
+                },
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [
+                { id: 5, width: 100, height: 100, src: 'test5.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Get FileViewer component
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set up overlay state - viewing the item
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test5.jpg', alt: 'Test 5' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.items = [
+                { id: 5, width: 100, height: 100, src: 'test5.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Find overlay image and trigger ALT + Right Click
+            const overlayImage = fileViewer.find('img[alt="Test 5"]');
+            expect(overlayImage.exists()).toBe(true);
+
+            // Create ALT + Right Click event (contextmenu)
+            const contextMenuEvent = new MouseEvent('contextmenu', {
+                bubbles: true,
+                altKey: true,
+                button: 2,
+            });
+            await overlayImage.element.dispatchEvent(contextMenuEvent);
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify reaction was queued with dislike type (check last reaction)
+                expect(vm.queuedReactions.length).toBeGreaterThan(0);
+                const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
+                expect(lastReaction.fileId).toBe(5);
+                expect(lastReaction.type).toBe('dislike');
+        });
+
+        it('triggers love reaction when ALT + Middle Click on overlay image', async () => {
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/browse-tabs')) {
+                    return Promise.resolve({
+                        data: [{
+                            id: 1,
+                            label: 'Test Tab',
+                            query_params: { service: 'civit-ai-images', page: 1 },
+                            file_ids: [],
+                            items_data: [],
+                            position: 0,
+                        }],
+                    });
+                }
+                if (url.includes('/api/browse')) {
+                    return Promise.resolve({
+                        data: {
+                            items: [
+                                { id: 6, width: 300, height: 400, src: 'test6.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                            ],
+                            nextPage: null,
+                            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            mockAxios.post.mockResolvedValue({
+                data: {
+                    reaction: { type: 'love' },
+                },
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [
+                { id: 6, width: 100, height: 100, src: 'test6.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Get FileViewer component
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Set up overlay state - viewing the item
+            fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
+            fileViewerVm.overlayImage = { src: 'test6.jpg', alt: 'Test 6' };
+            fileViewerVm.overlayIsFilled = true;
+            fileViewerVm.overlayFillComplete = true;
+            fileViewerVm.currentItemIndex = 0;
+            fileViewerVm.items = [
+                { id: 6, width: 100, height: 100, src: 'test6.jpg', page: 1, index: 0 },
+            ];
+            await wrapper.vm.$nextTick();
+
+            // Find overlay image and trigger ALT + Middle Click
+            const overlayImage = fileViewer.find('img[alt="Test 6"]');
+            expect(overlayImage.exists()).toBe(true);
+
+            // Create ALT + Middle Click event (mousedown)
+            const mouseDownEvent = new MouseEvent('mousedown', {
+                bubbles: true,
+                altKey: true,
+                button: 1,
+            });
+            await overlayImage.element.dispatchEvent(mouseDownEvent);
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify reaction was queued with love type (check last reaction)
+                expect(vm.queuedReactions.length).toBeGreaterThan(0);
+                const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
+                expect(lastReaction.fileId).toBe(6);
+                expect(lastReaction.type).toBe('love');
+        });
+
+        it('does not trigger reaction when clicking without ALT key', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 7, width: 300, height: 400, src: 'test7.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 7, width: 300, height: 400, src: 'test7.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            // Create a mock masonry item element
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
+            if (masonryContainer.exists()) {
+                const mockItem = document.createElement('div');
+                mockItem.className = 'masonry-item';
+                mockItem.setAttribute('data-item-id', '7');
+                const mockImg = document.createElement('img');
+                mockImg.src = 'test7.jpg';
+                mockItem.appendChild(mockImg);
+                masonryContainer.element.appendChild(mockItem);
+
+                // Create normal Left Click event (without ALT)
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    altKey: false,
+                    button: 0,
+                });
+                Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+                masonryContainer.element.dispatchEvent(clickEvent);
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify NO reaction was queued (normal click should open overlay, not react)
+                expect(vm.queuedReactions.length).toBe(0);
+            }
+        });
+    });
 });

@@ -109,7 +109,97 @@ async function getNextPage(page: number | string): Promise<GetPageResult> {
 }
 
 function onMasonryClick(e: MouseEvent): void {
-    fileViewer.value?.openFromClick(e);
+    // Check for ALT + mouse button combinations for quick reactions
+    if (e.altKey) {
+        handleAltClickOnMasonry(e);
+        return;
+    }
+
+    // Normal click behavior - open overlay (only for left click)
+    if (e.button === 0 || (e.type === 'click' && !e.button)) {
+        fileViewer.value?.openFromClick(e);
+    }
+}
+
+function onMasonryMouseDown(e: MouseEvent): void {
+    // Handle ALT + Middle Click (mousedown event needed for middle button)
+    if (e.altKey && e.button === 1) {
+        handleAltClickOnMasonry(e);
+    }
+}
+
+function handleAltClickOnMasonry(e: MouseEvent): void {
+    const container = masonryContainer.value;
+    if (!container) return;
+
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+
+    // Find the nearest masonry item element
+    const itemEl = target.closest('.masonry-item') as HTMLElement | null;
+    if (!itemEl || !container.contains(itemEl)) return;
+
+    // Find the masonry item data
+    const itemId = itemEl.getAttribute('data-item-id');
+    if (!itemId) {
+        // Fallback: try to find by image src
+        const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
+        if (imgEl) {
+            const src = imgEl.currentSrc || imgEl.getAttribute('src') || '';
+            const item = items.value.find(i => {
+                const itemSrc = (i.src || i.thumbnail || '').split('?')[0].split('#')[0];
+                const baseSrc = src.split('?')[0].split('#')[0];
+                return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
+            });
+            if (item) {
+                handleAltClickReaction(e, item.id);
+            }
+        }
+        return;
+    }
+
+    const fileId = Number(itemId);
+    if (!isNaN(fileId)) {
+        handleAltClickReaction(e, fileId);
+    }
+}
+
+function handleAltClickReaction(e: MouseEvent, fileId: number): void {
+    // Prevent default behavior and stop propagation
+    e.preventDefault();
+    e.stopPropagation();
+
+    let reactionType: 'love' | 'like' | 'dislike' | 'funny' | null = null;
+
+    // ALT + Left Click = Like
+    if (e.button === 0 || (e.type === 'click' && e.button === 0)) {
+        reactionType = 'like';
+    }
+    // ALT + Right Click = Dislike
+    else if (e.button === 2 || e.type === 'contextmenu') {
+        reactionType = 'dislike';
+    }
+    // ALT + Middle Click = Favorite (Love)
+    else if (e.button === 1) {
+        reactionType = 'love';
+    }
+
+    if (reactionType) {
+        const item = items.value.find((i) => i.id === fileId);
+        if (item) {
+            handleMasonryReaction(fileId, reactionType, (itemToRemove) => {
+                // Use the remove function from masonry if available
+                if (masonryRemoveFn.value) {
+                    masonryRemoveFn.value(itemToRemove);
+                } else if (masonry.value) {
+                    const masonryItem = items.value.find((i) => i.id === itemToRemove.id);
+                    if (masonryItem) {
+                        masonry.value.remove(masonryItem);
+                    }
+                }
+            });
+        }
+    }
 }
 
 // Function to capture remove function from masonry slot
@@ -370,7 +460,7 @@ onUnmounted(() => {
         <!-- Masonry Content -->
         <div class="flex-1 min-h-0">
             <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
-                @click="onMasonryClick">
+                @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
                     :skip-initial-load="items.length > 0" :backfill-enabled="true" :backfill-delay-ms="2000"
@@ -381,8 +471,8 @@ onUnmounted(() => {
                     <template #default="{ item, index, remove }">
                         <!-- Capture remove function on first item render -->
                         <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
-                        <div class="relative w-full h-full overflow-hidden group" @mouseenter="hoveredItemIndex = index"
-                            @mouseleave="hoveredItemIndex = null">
+                        <div class="relative w-full h-full overflow-hidden group masonry-item" :data-item-id="item.id"
+                            @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
                             <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
                                 class="w-full h-full object-cover" />
                             <div v-show="hoveredItemIndex === index"
