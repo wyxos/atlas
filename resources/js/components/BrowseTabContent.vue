@@ -18,7 +18,7 @@ type GetPageResult = {
 };
 
 interface Props {
-    tab: BrowseTabData;
+    tab?: BrowseTabData;
     availableServices: Array<{ key: string; label: string }>;
     onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void;
     onLoadingChange?: (isLoading: boolean) => void;
@@ -92,7 +92,7 @@ const {
     currentPage,
     pendingRestoreNextCursor,
     currentTabService,
-    activeTabId: computed(() => props.tab.id),
+    activeTabId: computed(() => props.tab?.id ?? null),
     getActiveTab: () => props.tab,
     updateActiveTab: props.updateActiveTab,
 });
@@ -145,6 +145,9 @@ async function handleMasonryReaction(
 
 // Apply selected service to current tab
 async function applyService(): Promise<void> {
+    if (!props.tab) {
+        return;
+    }
     await applyServiceFromComposable(
         selectedService,
         ref(props.tab.id),
@@ -180,15 +183,20 @@ watch(
 
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
-    await initializeTab();
+    if (props.tab) {
+        await initializeTab();
+    }
 });
 
 // Watch for tab ID changes to ensure re-initialization when switching to a different tab
 // This is a safety measure in case the component doesn't get destroyed/recreated
 watch(
-    () => props.tab.id,
-    async () => {
-        await initializeTab();
+    () => props.tab?.id,
+    async (newId, oldId) => {
+        // Only re-initialize if tab ID actually changed and tab exists
+        if (newId && newId !== oldId && props.tab) {
+            await initializeTab();
+        }
     }
 );
 
@@ -336,9 +344,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div ref="tabContentContainer" class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
+    <div v-if="tab" ref="tabContentContainer" class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
         <!-- Service Selection Header -->
-        <div v-if="tab" class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
+        <div class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
             data-test="service-selection-header">
             <div class="flex items-center gap-3">
                 <div class="flex-1">
@@ -368,7 +376,7 @@ onUnmounted(() => {
         <div class="flex-1 min-h-0">
             <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
                 @click="onMasonryClick">
-                <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
                     :skip-initial-load="items.length > 0" :backfill-enabled="true" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
@@ -433,6 +441,9 @@ onUnmounted(() => {
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-            :queued-reactions-count="queuedReactions.length" :visible="tab !== null && hasServiceSelected" />
+            :queued-reactions-count="queuedReactions.length" :visible="tab !== null && tab !== undefined && hasServiceSelected" />
+    </div>
+    <div v-else class="flex items-center justify-center h-full" data-test="no-tab-message">
+        <p class="text-twilight-indigo-300 text-lg">No tab selected</p>
     </div>
 </template>

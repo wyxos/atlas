@@ -48,6 +48,9 @@ const {
     loadTabItems,
 } = useBrowseTabs(switchTab);
 
+// Computed property for active tab to ensure proper reactivity
+const activeTab = computed(() => getActiveTab());
+
 // Browse service composable - just for fetching available services
 const {
     availableServices,
@@ -155,13 +158,11 @@ onMounted(async () => {
                 </template>
             </TabPanel>
             <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
-                <template v-if="activeTabId !== null">
-                    <BrowseTabContent v-if="activeTabId !== null" :key="activeTabId" :tab="getActiveTab()!"
-                        :available-services="availableServices" :update-active-tab="updateActiveTab"
-                        :load-tab-items="loadTabItems" :on-reaction="handleReaction"
-                        :on-loading-change="(isLoading) => activeTabId !== null && handleTabMasonryLoadingChange(activeTabId, isLoading)"
-                        :on-tab-data-loading-change="(isLoading) => activeTabId !== null && handleTabDataLoadingChange(activeTabId, isLoading)" />
-                </template>
+                <BrowseTabContent v-if="activeTab" :key="activeTab.id" :tab="activeTab"
+                    :available-services="availableServices" :update-active-tab="updateActiveTab"
+                    :load-tab-items="loadTabItems" :on-reaction="handleReaction"
+                    :on-loading-change="(isLoading) => activeTabId !== null && handleTabMasonryLoadingChange(activeTabId, isLoading)"
+                    :on-tab-data-loading-change="(isLoading) => activeTabId !== null && handleTabDataLoadingChange(activeTabId, isLoading)" />
                 <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
                     <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                 </div>
