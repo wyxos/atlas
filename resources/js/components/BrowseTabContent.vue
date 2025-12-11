@@ -410,12 +410,23 @@ onUnmounted(() => {
                 // In template, Vue auto-unwraps refs, so masonryRemoveFn is the value
                 if (masonryRemoveFn) {
                     masonryRemoveFn(item);
+                    // masonryRemoveFn handles removal via v-model, so items array is updated automatically
                 } else if (masonry.value) {
                     // Fallback: find item and use masonry instance method
                     const masonryItem = items.find((i) => i.id === item.id);
                     if (masonryItem) {
                         masonry.value.remove(masonryItem);
+                        // masonry.remove() handles removal via v-model, so items array is updated automatically
                     }
+                }
+
+                // Always ensure item is removed from items array as a backup
+                // masonry.remove() should handle this via v-model, but this ensures it works
+                // in test environments where masonry might not be fully initialized or v-model sync is delayed
+                // Check if item still exists before removing to avoid double removal
+                const itemIndex = items.findIndex((i) => i.id === item.id);
+                if (itemIndex !== -1) {
+                    items.splice(itemIndex, 1);
                 }
             }" @close="() => { }" />
 

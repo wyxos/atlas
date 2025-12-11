@@ -247,8 +247,15 @@ async function handleReaction(type: 'love' | 'like' | 'dislike' | 'funny'): Prom
     await handleReactionBase(fileId, type);
 
     // Remove from carousel (items array) AFTER masonry removal
+    // Note: removeFromMasonry removes from BrowseTabContent's items, which should sync to FileViewer's props.items
+    // via the watch. However, we need to remove from FileViewer's items directly for immediate carousel update.
+    // The watch is blocked by isRemovingItem flag to prevent double removal.
     isRemovingItem.value = true;
-    items.value.splice(itemIndex, 1);
+    // Check if item still exists before removing (it might have been removed by watch sync)
+    const itemStillExists = items.value.findIndex((i) => i.id === fileId) !== -1;
+    if (itemStillExists) {
+        items.value.splice(itemIndex, 1);
+    }
     await nextTick();
     isRemovingItem.value = false;
 
