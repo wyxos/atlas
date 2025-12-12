@@ -46,6 +46,12 @@ class FileReactionController extends Controller
             $existingReaction->delete();
         }
 
+        // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
+        // If user manually dislikes, keep auto_disliked flag
+        if (in_array($validated['type'], ['love', 'like', 'funny'])) {
+            $file->update(['auto_disliked' => false]);
+        }
+
         // Create the new reaction
         $reaction = Reaction::create([
             'file_id' => $file->id,

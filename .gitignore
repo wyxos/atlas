@@ -25,3 +25,6 @@ Thumbs.db
 /tests/Browser
 /.playwright-mcp
 .cursor/commands
+/resources/js/wayfinder
+/resources/js/actions
+/resources/js/routes

@@ -11,6 +11,15 @@ class File extends Model
     use HasFactory;
 
     /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'auto_disliked',
+    ];
+
+    /**
      * The attributes that should be cast.
      *
      * @return array<string, string>
@@ -27,6 +36,7 @@ class File extends Model
             'downloaded_at' => 'datetime',
             'not_found' => 'boolean',
             'downloaded' => 'boolean',
+            'auto_disliked' => 'boolean',
         ];
     }
 
