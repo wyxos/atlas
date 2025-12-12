@@ -130,8 +130,26 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             }
         }
 
+        // Merge new items from browse API with existing database items to preserve previewed_count
+        // If items come from browse API, they won't have previewed_count, but we should preserve
+        // previewed_count from existing items if they exist in the database
+        const mergedItems = data.items.map((newItem: MasonryItem) => {
+            // Check if this item already exists in the database (from tab.itemsData)
+            const existingItem = options?.getActiveTab()?.itemsData?.find(
+                (existing: MasonryItem) => existing.id === newItem.id
+            );
+            // If item exists in database, preserve its previewed_count
+            if (existingItem && existingItem.previewed_count !== undefined) {
+                return {
+                    ...newItem,
+                    previewed_count: existingItem.previewed_count,
+                };
+            }
+            return newItem;
+        });
+
         return {
-            items: data.items,
+            items: mergedItems,
             nextPage: data.nextPage, // Pass cursor to Masonry for next request
         };
     }

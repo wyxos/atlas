@@ -1,4 +1,5 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../wayfinder'
+import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\FileReactionController::show
  * @see app/Http/Controllers/FileReactionController.php:74
@@ -121,6 +122,11 @@ store.url = (args: { file: number | { id: number } } | [file: number | { id: num
  */
 store.post = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: store.url(args, options),
+    method: 'post',
+})
+const FileReactionController = { show, store }
+
+export default FileReactionControlleroptions),
     method: 'post',
 })
 const FileReactionController = { show, store }

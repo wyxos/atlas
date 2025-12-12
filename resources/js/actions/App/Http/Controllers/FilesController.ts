@@ -1,4 +1,6 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../wayfinder'
+import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../wayfinder'
+import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\FilesController::index
  * @see app/Http/Controllers/FilesController.php:15
@@ -233,6 +235,64 @@ destroy.delete = (args: { file: number | { id: number } } | [file: number | { id
     url: destroy.url(args, options),
     method: 'delete',
 })
-const FilesController = { index, show, serve, destroy }
+
+/**
+* @see \App\Http\Controllers\FilesController::incrementPreview
+ * @see app/Http/Controllers/FilesController.php:73
+ * @route '/api/files/{file}/preview'
+ */
+export const incrementPreview = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: incrementPreview.url(args, options),
+    method: 'post',
+})
+
+incrementPreview.definition = {
+    methods: ["post"],
+    url: '/api/files/{file}/preview',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\FilesController::incrementPreview
+ * @see app/Http/Controllers/FilesController.php:73
+ * @route '/api/files/{file}/preview'
+ */
+incrementPreview.url = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
+    if (typeof args === 'string' || typeof args === 'number') {
+        args = { file: args }
+    }
+
+            if (typeof args === 'object' && !Array.isArray(args) && 'id' in args) {
+            args = { file: args.id }
+        }
+    
+    if (Array.isArray(args)) {
+        args = {
+                    file: args[0],
+                }
+    }
+
+    args = applyUrlDefaults(args)
+
+    const parsedArgs = {
+                        file: typeof args.file === 'object'
+                ? args.file.id
+                : args.file,
+                }
+
+    return incrementPreview.definition.url
+            .replace('{file}', parsedArgs.file.toString())
+            .replace(/\/+$/, '') + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\FilesController::incrementPreview
+ * @see app/Http/Controllers/FilesController.php:73
+ * @route '/api/files/{file}/preview'
+ */
+incrementPreview.post = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: incrementPreview.url(args, options),
+    method: 'post',
+})
+const FilesController = { index, show, serve, destroy, incrementPreview }
 
 export default FilesController

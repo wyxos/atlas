@@ -7,11 +7,11 @@ import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import type { MasonryItem, BrowseTabData } from '../composables/useBrowseTabs';
-import { useBackfill } from '../composables/useBackfill';
-import { useBrowseService } from '../composables/useBrowseService';
-import { useReactionQueue } from '../composables/useReactionQueue';
-import { createReactionCallback } from '../utils/reactions';
+import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
+import { useBackfill } from '@/composables/useBackfill';
+import { useBrowseService } from '@/composables/useBrowseService';
+import { useReactionQueue } from '@/composables/useReactionQueue';
+import { createReactionCallback } from '@/utils/reactions';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -46,6 +46,8 @@ const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
 // Store remove function from masonry slot to use in FileViewer
 const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
+// Track which items have already had their preview count incremented (to avoid double-counting)
+const previewedItems = ref<Set<number>>(new Set());
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -209,6 +211,38 @@ function captureRemoveFn(remove: (item: MasonryItem) => void): void {
     }
 }
 
+// Increment preview count when item is preloaded
+async function handleItemPreload(fileId: number): Promise<void> {
+    // Skip if we've already incremented preview count for this item
+    if (previewedItems.value.has(fileId)) {
+        return;
+    }
+
+    try {
+        const response = await window.axios.post<{ previewed_count: number }>(`/api/files/${fileId}/preview`);
+
+        // Mark as previewed
+        previewedItems.value.add(fileId);
+
+        // Update local item state - update in both items.value and tab.itemsData
+        const item = items.value.find((i) => i.id === fileId);
+        if (item) {
+            item.previewed_count = response.data.previewed_count;
+        }
+
+        // Also update in tab.itemsData if it exists
+        if (props.tab?.itemsData) {
+            const tabItem = props.tab.itemsData.find((i) => i.id === fileId);
+            if (tabItem) {
+                tabItem.previewed_count = response.data.previewed_count;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to increment preview count:', error);
+        // Don't throw - preview count is not critical
+    }
+}
+
 // Handle reaction with queue (wrapper for masonry removeItem callback)
 async function handleMasonryReaction(
     fileId: number,
@@ -363,6 +397,9 @@ async function initializeTab(): Promise<void> {
         masonry.value.destroy();
     }
 
+    // Reset previewed items tracking when switching tabs
+    previewedItems.value.clear();
+
     const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
     isTabRestored.value = tabHasRestorableItems;
 
@@ -458,6 +495,12 @@ async function initializeTab(): Promise<void> {
 
             await nextTick();
 
+            // Ensure items.value is updated with the initialized items (masonry should sync via v-model)
+            // If masonry doesn't sync immediately, manually set items to preserve previewed_count
+            if (items.value.length === 0 && tab.itemsData.length > 0) {
+                items.value = [...tab.itemsData];
+            }
+
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     if (masonry.value && items.value.length > 0) {
@@ -533,7 +576,13 @@ onUnmounted(() => {
                         <!-- Capture remove function on first item render -->
                         <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
                         <VibeMasonryItem :item="item" :remove="remove" @mouseenter="hoveredItemIndex = index"
-                            @mouseleave="hoveredItemIndex = null">
+                            @mouseleave="hoveredItemIndex = null" @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
+                                // payload.item is the item passed to MasonryItem, which should have the id
+                                const itemId = payload.item?.id ?? item?.id;
+                                if (itemId) {
+                                    handleItemPreload(itemId);
+                                }
+                            }">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
                                 <div class="relative w-full h-full overflow-hidden group masonry-item"
@@ -565,7 +614,8 @@ onUnmounted(() => {
                                     <!-- Hover reactions overlay -->
                                     <div v-show="hoveredItemIndex === index && imageLoaded"
                                         class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                        <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
+                                        <FileReactions :file-id="item.id"
+                                            :previewed-count="(item.previewed_count as number) ?? 0" :viewed-count="0"
                                             :current-index="index" :total-items="items.length" variant="small"
                                             :remove-item="() => remove(item)"
                                             @reaction="(type) => handleMasonryReaction(item.id, type, remove)" />

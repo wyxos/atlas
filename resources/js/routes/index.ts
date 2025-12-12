@@ -116,7 +116,7 @@ logout.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 })
 
 /**
- * @see routes/web.php:41
+ * @see routes/web.php:42
  * @route '/{any}'
  */
 export const spa = (args: { any: string | number } | [any: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -130,7 +130,7 @@ spa.definition = {
 } satisfies RouteDefinition<["get","head"]>
 
 /**
- * @see routes/web.php:41
+ * @see routes/web.php:42
  * @route '/{any}'
  */
 spa.url = (args: { any: string | number } | [any: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -157,7 +157,7 @@ spa.url = (args: { any: string | number } | [any: string | number ] | string | n
 }
 
 /**
- * @see routes/web.php:41
+ * @see routes/web.php:42
  * @route '/{any}'
  */
 spa.get = (args: { any: string | number } | [any: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -165,7 +165,7 @@ spa.get = (args: { any: string | number } | [any: string | number ] | string | n
     method: 'get',
 })
 /**
- * @see routes/web.php:41
+ * @see routes/web.php:42
  * @route '/{any}'
  */
 spa.head = (args: { any: string | number } | [any: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
