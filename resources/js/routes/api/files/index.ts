@@ -234,12 +234,71 @@ destroy.delete = (args: { file: number | { id: number } } | [file: number | { id
     url: destroy.url(args, options),
     method: 'delete',
 })
+
+/**
+* @see \App\Http\Controllers\FilesController::preview
+ * @see app/Http/Controllers/FilesController.php:73
+ * @route '/api/files/{file}/preview'
+ */
+export const preview = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: preview.url(args, options),
+    method: 'post',
+})
+
+preview.definition = {
+    methods: ["post"],
+    url: '/api/files/{file}/preview',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\FilesController::preview
+ * @see app/Http/Controllers/FilesController.php:73
+ * @route '/api/files/{file}/preview'
+ */
+preview.url = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
+    if (typeof args === 'string' || typeof args === 'number') {
+        args = { file: args }
+    }
+
+            if (typeof args === 'object' && !Array.isArray(args) && 'id' in args) {
+            args = { file: args.id }
+        }
+    
+    if (Array.isArray(args)) {
+        args = {
+                    file: args[0],
+                }
+    }
+
+    args = applyUrlDefaults(args)
+
+    const parsedArgs = {
+                        file: typeof args.file === 'object'
+                ? args.file.id
+                : args.file,
+                }
+
+    return preview.definition.url
+            .replace('{file}', parsedArgs.file.toString())
+            .replace(/\/+$/, '') + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\FilesController::preview
+ * @see app/Http/Controllers/FilesController.php:73
+ * @route '/api/files/{file}/preview'
+ */
+preview.post = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: preview.url(args, options),
+    method: 'post',
+})
 const files = {
     index: Object.assign(index, index),
 show: Object.assign(show, show),
 serve: Object.assign(serve, serve),
 destroy: Object.assign(destroy, destroy),
 reaction: Object.assign(reaction, reaction),
+preview: Object.assign(preview, preview),
 }
 
 export default files

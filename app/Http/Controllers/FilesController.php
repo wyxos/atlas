@@ -66,4 +66,20 @@ class FilesController extends Controller
             'message' => 'File deleted successfully.',
         ]);
     }
+
+    /**
+     * Increment the preview count for a file.
+     */
+    public function incrementPreview(File $file): JsonResponse
+    {
+        Gate::authorize('view', $file);
+
+        $file->increment('previewed_count');
+        $file->touch('previewed_at');
+
+        return response()->json([
+            'message' => 'Preview count incremented.',
+            'previewed_count' => $file->previewed_count,
+        ]);
+    }
 }

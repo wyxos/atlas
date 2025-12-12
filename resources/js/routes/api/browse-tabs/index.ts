@@ -261,7 +261,7 @@ destroy.delete = (args: { browseTab: number | { id: number } } | [browseTab: num
 
 /**
 * @see \App\Http\Controllers\BrowseTabController::position
- * @see app/Http/Controllers/BrowseTabController.php:168
+ * @see app/Http/Controllers/BrowseTabController.php:169
  * @route '/api/browse-tabs/{browseTab}/position'
  */
 export const position = (args: { browseTab: number | { id: number } } | [browseTab: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -276,7 +276,7 @@ position.definition = {
 
 /**
 * @see \App\Http\Controllers\BrowseTabController::position
- * @see app/Http/Controllers/BrowseTabController.php:168
+ * @see app/Http/Controllers/BrowseTabController.php:169
  * @route '/api/browse-tabs/{browseTab}/position'
  */
 position.url = (args: { browseTab: number | { id: number } } | [browseTab: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -309,7 +309,7 @@ position.url = (args: { browseTab: number | { id: number } } | [browseTab: numbe
 
 /**
 * @see \App\Http\Controllers\BrowseTabController::position
- * @see app/Http/Controllers/BrowseTabController.php:168
+ * @see app/Http/Controllers/BrowseTabController.php:169
  * @route '/api/browse-tabs/{browseTab}/position'
  */
 position.patch = (args: { browseTab: number | { id: number } } | [browseTab: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'patch'> => ({

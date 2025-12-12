@@ -99,7 +99,6 @@ class BrowseTab extends Model
      * Format files into items structure for frontend (similar to Browser.php).
      *
      * @param  \Illuminate\Database\Eloquent\Collection<int, \App\Models\File>  $files
-     * @param  int  $page
      * @return array<int, array<string, mixed>>
      */
     public static function formatFilesToItems($files, int $page = 1): array
@@ -120,6 +119,7 @@ class BrowseTab extends Model
                 'key' => "{$page}-{$file->id}", // Combined key for unique identification
                 'index' => $index,
                 'notFound' => false,
+                'previewed_count' => $file->previewed_count ?? 0,
             ];
         })->values()->all();
     }

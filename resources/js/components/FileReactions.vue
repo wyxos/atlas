@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from 'vue';
-import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff } from 'lucide-vue-next';
+import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
 
 interface Props {
     fileId?: number;
@@ -166,20 +166,21 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
         <!-- Count Icons -->
         <div class="flex items-center gap-2">
             <!-- Previewed Count -->
-            <div v-if="isDefault" class="flex items-center text-white gap-1.5">
-                <Eye :size="18" />
+            <div class="flex items-center text-white gap-1.5">
                 <span :class="[textSize, 'font-medium']">{{ previewedCount }}</span>
+                <Eye :size="18" />
             </div>
 
             <!-- Viewed Count -->
-            <div class="flex items-center text-white gap-1.5">
-                <EyeOff :size="18" />
+            <div class="flex items-center text-white gap-1.5" v-if="!isSmall">
                 <span :class="[textSize, 'font-medium']">{{ viewedCount }}</span>
+                <EyeOff :size="18" />
             </div>
         </div>
 
         <!-- Index/Total -->
-        <div v-if="indexDisplay" class="flex items-center">
+        <div v-if="indexDisplay" class="flex items-center text-white gap-1.5">
+            <Hash :size="18" />
             <span :class="['font-medium text-white', textSize]">{{ indexDisplay }}</span>
         </div>
     </div>
