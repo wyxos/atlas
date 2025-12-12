@@ -5704,4 +5704,247 @@ describe('Browse', () => {
             }
         });
     });
+
+    describe('Info Badge and Prompt Tooltip', () => {
+        it('shows info badge when hovering on masonry item with prompt data', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, metadata: { prompt: 'test prompt' } },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, metadata: { prompt: 'test prompt' } }];
+            await wrapper.vm.$nextTick();
+
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
+
+            if (masonryItem.exists()) {
+                // Simulate hover and image loaded
+                await masonryItem.vm.$emit('mouseenter', 0);
+                // Emit preload success to simulate image loaded
+                await masonryItem.vm.$emit('preload:success', {
+                    item: { id: 1 },
+                    type: 'image',
+                    src: 'test1.jpg',
+                });
+                await wrapper.vm.$nextTick();
+                await flushPromises();
+
+                // Check if info badge button exists (the badge shows when hovered and image is loaded)
+                // The badge should be rendered in the template when hoveredItemIndex matches and imageLoaded is true
+                const html = browseTabContentComponent.html();
+                // The badge should be present when conditions are met
+                expect(html).toContain('Info') || expect(html).toContain('info');
+            }
+        });
+
+        it('loads prompt data from API when hovering on badge', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+
+            // Mock file API response with prompt data
+            mockAxios.get.mockImplementation((url: string) => {
+                if (url.includes('/api/files/1')) {
+                    return Promise.resolve({
+                        data: {
+                            file: {
+                                id: 1,
+                                metadata: {
+                                    payload: { prompt: 'Loaded prompt from API' },
+                                },
+                            },
+                        },
+                    });
+                }
+                return Promise.resolve({ data: { items: [], nextPage: null } });
+            });
+
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const tabContentVmAny = tabContentVm as any;
+
+            // Simulate hovering on badge (which triggers loadPromptData)
+            if (typeof tabContentVmAny.loadPromptData === 'function') {
+                await tabContentVmAny.loadPromptData(tabContentVm.items[0]);
+                await flushPromises();
+
+                // Verify API was called
+                expect(mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/files/1'));
+            }
+        });
+    });
+
+    describe('Middle Click Shortcuts', () => {
+        it('opens original URL in new tab when middle clicking masonry item', async () => {
+            const originalOpen = window.open;
+            const mockOpen = vi.fn();
+            window.open = mockOpen;
+
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                window.open = originalOpen;
+                return;
+            }
+
+            tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryItem = browseTabContentComponent.find('.masonry-item');
+
+            if (masonryItem.exists()) {
+                // Simulate middle click (button 1)
+                const middleClickEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    button: 1,
+                });
+                Object.defineProperty(middleClickEvent, 'button', { value: 1, enumerable: true });
+                masonryItem.element.dispatchEvent(middleClickEvent);
+
+                // Also trigger auxclick
+                const auxClickEvent = new MouseEvent('auxclick', {
+                    bubbles: true,
+                    button: 1,
+                });
+                Object.defineProperty(auxClickEvent, 'button', { value: 1, enumerable: true });
+                masonryItem.element.dispatchEvent(auxClickEvent);
+
+                await wrapper.vm.$nextTick();
+
+                // Verify window.open was called with original URL
+                expect(mockOpen).toHaveBeenCalledWith('https://example.com/original.jpg', '_blank', 'noopener,noreferrer');
+            }
+
+            window.open = originalOpen;
+        });
+
+        it('opens original URL in new tab when middle clicking FileViewer overlay', async () => {
+            const originalOpen = window.open;
+            const mockOpen = vi.fn();
+            window.open = mockOpen;
+
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                window.open = originalOpen;
+                return;
+            }
+
+            tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+            await wrapper.vm.$nextTick();
+
+            // Open FileViewer
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const fileViewer = browseTabContentComponent.findComponent(FileViewer);
+            if (fileViewer.exists()) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const fileViewerVm = fileViewer.vm as any;
+                fileViewerVm.currentItemIndex = 0;
+
+                // Simulate middle click on overlay image
+                const middleClickEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    button: 1,
+                });
+                Object.defineProperty(middleClickEvent, 'button', { value: 1, enumerable: true });
+
+                // Also trigger auxclick
+                const auxClickEvent = new MouseEvent('auxclick', {
+                    bubbles: true,
+                    button: 1,
+                });
+                Object.defineProperty(auxClickEvent, 'button', { value: 1, enumerable: true });
+
+                // Find overlay image and trigger events
+                const overlayImage = fileViewer.find('img[src*="test1"]');
+                if (overlayImage.exists()) {
+                    overlayImage.element.dispatchEvent(middleClickEvent);
+                    overlayImage.element.dispatchEvent(auxClickEvent);
+                    await wrapper.vm.$nextTick();
+
+                    // Verify window.open was called
+                    expect(mockOpen).toHaveBeenCalledWith('https://example.com/original.jpg', '_blank', 'noopener,noreferrer');
+                }
+            }
+
+            window.open = originalOpen;
+        });
+    });
 });

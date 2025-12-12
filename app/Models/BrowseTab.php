@@ -125,6 +125,7 @@ class BrowseTab extends Model
                 'previewed_count' => $file->previewed_count ?? 0,
                 'seen_count' => $file->seen_count ?? 0,
                 'auto_disliked' => $file->auto_disliked ?? false,
+                'metadata' => $metadata, // Include metadata for prompt data
             ];
         })->values()->all();
     }

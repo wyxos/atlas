@@ -29,6 +29,9 @@ class FilesController extends Controller
     {
         Gate::authorize('view', $file);
 
+        // Load metadata relationship for prompt data
+        $file->load('metadata');
+
         return response()->json([
             'file' => new \App\Http\Resources\FileResource($file),
         ]);
