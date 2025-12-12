@@ -12,7 +12,8 @@
         "check": "tsx scripts/check.ts",
         "check:js": "tsx scripts/check-js.ts",
         "check:php": "tsx scripts/check-php.ts",
-        "generate-favicons": "tsx scripts/generate-favicons.ts"
+        "generate-favicons": "tsx scripts/generate-favicons.ts",
+        "build:vibe": "cd ../../vue/vibe && npm run build:lib"
     },
     "devDependencies": {
         "@laravel/vite-plugin-wayfinder": "^0.1.7",
