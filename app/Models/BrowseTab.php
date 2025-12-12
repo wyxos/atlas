@@ -120,6 +120,7 @@ class BrowseTab extends Model
                 'index' => $index,
                 'notFound' => false,
                 'previewed_count' => $file->previewed_count ?? 0,
+                'seen_count' => $file->seen_count ?? 0,
             ];
         })->values()->all();
     }

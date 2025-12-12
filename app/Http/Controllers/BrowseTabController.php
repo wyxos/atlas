@@ -139,6 +139,7 @@ class BrowseTabController extends Controller
                 'files.mime_type',
                 'files.listing_metadata',
                 'files.previewed_count',
+                'files.seen_count',
             ])
             ->with(['metadata' => function ($query) {
                 // Only load the payload column from metadata (longtext, but needed for dimensions)

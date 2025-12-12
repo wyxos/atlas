@@ -291,6 +291,64 @@ incrementPreview.post = (args: { file: number | { id: number } } | [file: number
     url: incrementPreview.url(args, options),
     method: 'post',
 })
-const FilesController = { index, show, serve, destroy, incrementPreview }
+
+/**
+* @see \App\Http\Controllers\FilesController::incrementSeen
+ * @see app/Http/Controllers/FilesController.php:89
+ * @route '/api/files/{file}/seen'
+ */
+export const incrementSeen = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: incrementSeen.url(args, options),
+    method: 'post',
+})
+
+incrementSeen.definition = {
+    methods: ["post"],
+    url: '/api/files/{file}/seen',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\FilesController::incrementSeen
+ * @see app/Http/Controllers/FilesController.php:89
+ * @route '/api/files/{file}/seen'
+ */
+incrementSeen.url = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
+    if (typeof args === 'string' || typeof args === 'number') {
+        args = { file: args }
+    }
+
+            if (typeof args === 'object' && !Array.isArray(args) && 'id' in args) {
+            args = { file: args.id }
+        }
+    
+    if (Array.isArray(args)) {
+        args = {
+                    file: args[0],
+                }
+    }
+
+    args = applyUrlDefaults(args)
+
+    const parsedArgs = {
+                        file: typeof args.file === 'object'
+                ? args.file.id
+                : args.file,
+                }
+
+    return incrementSeen.definition.url
+            .replace('{file}', parsedArgs.file.toString())
+            .replace(/\/+$/, '') + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\FilesController::incrementSeen
+ * @see app/Http/Controllers/FilesController.php:89
+ * @route '/api/files/{file}/seen'
+ */
+incrementSeen.post = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: incrementSeen.url(args, options),
+    method: 'post',
+})
+const FilesController = { index, show, serve, destroy, incrementPreview, incrementSeen }
 
 export default FilesController
