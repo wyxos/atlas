@@ -17,6 +17,12 @@ class File extends Model
      */
     protected $fillable = [
         'auto_disliked',
+        'path',
+        'filename',
+        'downloaded',
+        'downloaded_at',
+        'blacklisted_at',
+        'blacklist_reason',
     ];
 
     /**

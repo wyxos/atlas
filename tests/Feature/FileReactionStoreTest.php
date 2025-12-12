@@ -64,3 +64,71 @@ test('keeps auto_disliked flag when user manually dislikes', function () {
     $file->refresh();
     expect($file->auto_disliked)->toBeTrue();
 });
+
+test('removes blacklist flags when user reacts with like on blacklisted file', function () {
+    $admin = User::factory()->admin()->create();
+    $file = File::factory()->create([
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'Test reason',
+    ]);
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
+        'type' => 'like',
+    ]);
+
+    $response->assertSuccessful();
+    $file->refresh();
+    expect($file->blacklisted_at)->toBeNull();
+    expect($file->blacklist_reason)->toBeNull();
+});
+
+test('removes blacklist flags when user reacts with love on blacklisted file', function () {
+    $admin = User::factory()->admin()->create();
+    $file = File::factory()->create([
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'Test reason',
+    ]);
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
+        'type' => 'love',
+    ]);
+
+    $response->assertSuccessful();
+    $file->refresh();
+    expect($file->blacklisted_at)->toBeNull();
+    expect($file->blacklist_reason)->toBeNull();
+});
+
+test('removes blacklist flags when user reacts with funny on blacklisted file', function () {
+    $admin = User::factory()->admin()->create();
+    $file = File::factory()->create([
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'Test reason',
+    ]);
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
+        'type' => 'funny',
+    ]);
+
+    $response->assertSuccessful();
+    $file->refresh();
+    expect($file->blacklisted_at)->toBeNull();
+    expect($file->blacklist_reason)->toBeNull();
+});
+
+test('keeps blacklist flags when user reacts with dislike on blacklisted file', function () {
+    $admin = User::factory()->admin()->create();
+    $file = File::factory()->create([
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'Test reason',
+    ]);
+
+    $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
+        'type' => 'dislike',
+    ]);
+
+    $response->assertSuccessful();
+    $file->refresh();
+    expect($file->blacklisted_at)->not->toBeNull();
+    expect($file->blacklist_reason)->toBe('Test reason');
+});
