@@ -148,8 +148,9 @@ test('determines extension from MIME type when URL has no extension', function (
     $file->refresh();
 
     expect($file->downloaded)->toBeTrue();
-    expect($file->filename)->toEndWith('.jpg');
-    expect($file->path)->toEndWith('.jpg');
+    // league/mime-type-detection returns 'jpeg' for 'image/jpeg', not 'jpg'
+    expect($file->filename)->toMatch('/\.(jpg|jpeg)$/');
+    expect($file->path)->toMatch('/\.(jpg|jpeg)$/');
     // Path should be segmented
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
 });
