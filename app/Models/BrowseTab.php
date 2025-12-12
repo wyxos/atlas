@@ -117,6 +117,7 @@ class BrowseTab extends Model
                 'thumbnail' => $file->thumbnail_url,
                 'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
                 'page' => $page,
+                'key' => "{$page}-{$file->id}", // Combined key for unique identification
                 'index' => $index,
                 'notFound' => false,
             ];

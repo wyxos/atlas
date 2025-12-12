@@ -14,10 +14,15 @@ class BrowseController extends Controller
     {
         $payload = Browser::handle();
 
-        // Set index for each item
+        // Set index and ensure key is set for each item
         $items = array_map(function ($item, $index) use ($payload) {
             $item['index'] = $index;
-            $item['page'] = (int) ($payload['filter']['page'] ?? 1);
+            $page = (int) ($payload['filter']['page'] ?? 1);
+            $item['page'] = $page;
+            // Ensure key is set (combines page and id)
+            if (!isset($item['key'])) {
+                $item['key'] = "{$page}-{$item['id']}";
+            }
 
             return $item;
         }, $payload['items'], array_keys($payload['items']));
