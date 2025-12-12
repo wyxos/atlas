@@ -7,6 +7,7 @@ const mockAxios = {
     post: vi.fn(),
     put: vi.fn(),
     delete: vi.fn(),
+    patch: vi.fn(),
 };
 
 vi.mock('axios', () => ({
@@ -46,6 +47,7 @@ describe('useBrowseTabs', () => {
                 query_params: { page: 1 },
                 file_ids: [],
                 position: 0,
+                is_active: false,
             },
             {
                 id: 2,
@@ -53,6 +55,7 @@ describe('useBrowseTabs', () => {
                 query_params: { page: 2 },
                 file_ids: [1, 2],
                 position: 1,
+                is_active: false,
             },
         ];
 
@@ -76,9 +79,9 @@ describe('useBrowseTabs', () => {
 
     it('sorts tabs by position', async () => {
         const mockTabs = [
-            { id: 3, label: 'Tab 3', query_params: {}, file_ids: [], items_data: [], position: 2 },
-            { id: 1, label: 'Tab 1', query_params: {}, file_ids: [], items_data: [], position: 0 },
-            { id: 2, label: 'Tab 2', query_params: {}, file_ids: [], items_data: [], position: 1 },
+            { id: 3, label: 'Tab 3', query_params: {}, file_ids: [], items_data: [], position: 2, is_active: false },
+            { id: 1, label: 'Tab 1', query_params: {}, file_ids: [], items_data: [], position: 0, is_active: false },
+            { id: 2, label: 'Tab 2', query_params: {}, file_ids: [], items_data: [], position: 1, is_active: false },
         ];
 
         mockAxios.get.mockResolvedValueOnce({ data: mockTabs });
@@ -101,6 +104,17 @@ describe('useBrowseTabs', () => {
                 query_params: {},
                 file_ids: [],
                 position: 0,
+                is_active: false,
+            },
+        });
+        mockAxios.patch.mockResolvedValueOnce({
+            data: {
+                id: 1,
+                label: 'Browse 1',
+                query_params: {},
+                file_ids: [],
+                position: 0,
+                is_active: true,
             },
         });
 
@@ -116,6 +130,7 @@ describe('useBrowseTabs', () => {
             file_ids: [],
             position: 0,
         });
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/browse-tabs/1/active');
         expect(newTab.id).toBe(1);
         expect(newTab.label).toBe('Browse 1');
         expect(tabs.value).toHaveLength(1);
@@ -129,16 +144,27 @@ describe('useBrowseTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0 },
-            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 1; // Set active tab to the one we're closing
 
         mockAxios.delete.mockResolvedValueOnce({});
+        mockAxios.patch.mockResolvedValueOnce({
+            data: {
+                id: 2,
+                label: 'Tab 2',
+                query_params: {},
+                file_ids: [],
+                position: 1,
+                is_active: true,
+            },
+        });
 
         await closeTab(1);
 
         expect(mockAxios.delete).toHaveBeenCalledWith('/api/browse-tabs/1');
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/browse-tabs/2/active');
         expect(tabs.value).toHaveLength(1);
         expect(tabs.value[0].id).toBe(2);
         expect(activeTabId.value).toBe(2); // Should switch to remaining tab
@@ -155,6 +181,17 @@ describe('useBrowseTabs', () => {
                 query_params: {},
                 file_ids: [],
                 position: 0,
+                is_active: false,
+            },
+        });
+        mockAxios.patch.mockResolvedValueOnce({
+            data: {
+                id: 1,
+                label: 'Browse 1',
+                query_params: {},
+                file_ids: [],
+                position: 0,
+                is_active: true,
             },
         });
 
@@ -162,7 +199,7 @@ describe('useBrowseTabs', () => {
 
         // Set up single tab
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
@@ -171,6 +208,7 @@ describe('useBrowseTabs', () => {
         await closeTab(1);
 
         expect(mockAxios.delete).toHaveBeenCalledWith('/api/browse-tabs/1');
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/browse-tabs/1/active');
         expect(tabs.value).toHaveLength(1); // New tab created
         expect(activeTabId.value).toBe(1); // New tab ID
         expect(onTabSwitch).toHaveBeenCalledWith(1); // Should switch to new tab
@@ -182,8 +220,8 @@ describe('useBrowseTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0 },
-            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 2; // Active tab is different from the one we're closing
 
@@ -202,8 +240,8 @@ describe('useBrowseTabs', () => {
         const { tabs, activeTabId, getActiveTab } = useBrowseTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0 },
-            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 2;
 
@@ -227,7 +265,7 @@ describe('useBrowseTabs', () => {
 
         // Set up tabs manually for this test (simulating loaded state)
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
@@ -263,7 +301,7 @@ describe('useBrowseTabs', () => {
 
         // Set up tabs manually
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1, 2], itemsData: [], position: 0 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1, 2], itemsData: [], position: 0, isActive: false },
         ];
 
         const mockItemsData = [
@@ -289,7 +327,7 @@ describe('useBrowseTabs', () => {
 
         expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
         expect(result).toEqual(mockItemsData);
-        
+
         const tab = tabs.value.find(t => t.id === 1);
         expect(tab?.itemsData).toEqual(mockItemsData);
         expect(tab?.fileIds).toEqual([1, 2]);
@@ -299,7 +337,7 @@ describe('useBrowseTabs', () => {
         const { tabs, loadTabItems } = useBrowseTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1], itemsData: [], position: 0 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1], itemsData: [], position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');
@@ -313,7 +351,7 @@ describe('useBrowseTabs', () => {
         });
 
         await expect(loadTabItems(1)).rejects.toThrow('Network error');
-        
+
         // Tab should remain unchanged on error
         const tab = tabs.value.find(t => t.id === 1);
         expect(tab?.itemsData).toEqual([]);
@@ -347,7 +385,7 @@ describe('useBrowseTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0 },
+            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');

@@ -34,6 +34,9 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
     }
 
     activeTabId.value = tabId;
+
+    // Set the tab as active in the backend
+    await setActiveTab(tabId);
 }
 
 // Tab management using composable - pass switchTab callback for UI handling
@@ -47,6 +50,7 @@ const {
     getActiveTab,
     updateActiveTab,
     loadTabItems,
+    setActiveTab,
 } = useBrowseTabs(switchTab);
 
 // Computed property for active tab to ensure proper reactivity
@@ -102,13 +106,16 @@ async function loadTabs(): Promise<void> {
         // Step 1: Load all tabs without files (items_data is not included)
         await loadTabsFromComposable();
 
-        // Step 2: Determine which tab to focus (default to first tab if tabs exist)
+        // Step 2: Determine which tab to focus (active tab if exists, otherwise first tab)
         if (tabs.value.length > 0 && activeTabId.value === null) {
-            const firstTab = tabs.value[0];
+            // Find the active tab, or fall back to the first tab
+            const activeTab = tabs.value.find(t => t.isActive);
+            const tabToFocus = activeTab || tabs.value[0];
+
             // Step 3: If tab has files, load items lazily
             // Step 4: Restore query params (handled in switchTab)
             // Pass skipActiveCheck=true since activeTabId is null, so switchTab will set it
-            await switchTab(firstTab.id, true);
+            await switchTab(tabToFocus.id, true);
         }
         // If no tabs exist, render nothing until a tab is created
     } catch (error) {
@@ -169,7 +176,9 @@ onMounted(async () => {
         </div>
 
         <!-- Reaction Queue -->
-        <ReactionQueue :queued-reactions="queuedReactions" :on-cancel="(fileId) => cancelReaction(fileId, (tabId) => activeTabId === tabId)" :on-pause="pauseAll" :on-resume="resumeAll" />
+        <ReactionQueue :queued-reactions="queuedReactions"
+            :on-cancel="(fileId) => cancelReaction(fileId, (tabId) => activeTabId === tabId)" :on-pause="pauseAll"
+            :on-resume="resumeAll" />
     </div>
 </template>
 

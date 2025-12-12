@@ -186,4 +186,26 @@ class BrowseTabController extends Controller
 
         return response()->json($browseTab);
     }
+
+    /**
+     * Set a tab as active.
+     * This will deactivate all other tabs for the user and activate the specified tab.
+     */
+    public function setActive(BrowseTab $browseTab): JsonResponse
+    {
+        // Ensure user owns this tab
+        if ($browseTab->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Deactivate all other tabs for this user
+        BrowseTab::forUser(auth()->id())
+            ->where('id', '!=', $browseTab->id)
+            ->update(['is_active' => false]);
+
+        // Activate this tab
+        $browseTab->update(['is_active' => true]);
+
+        return response()->json($browseTab);
+    }
 }

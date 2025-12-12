@@ -51,6 +51,12 @@ This application is a Laravel application and its main Laravel ecosystems packag
 ## Laravel Boost
 - Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
 
+## Powershell MCP
+- Powershell MCP allows you to run powershell commands on this Windows machine.
+
+## Context7
+- Context7 allows you to search for the latest or specific documentation for a package.
+
 ## Artisan
 - Use the `list-artisan-commands` tool when you need to call an Artisan command to double check the available parameters.
 

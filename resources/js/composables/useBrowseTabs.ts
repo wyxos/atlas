@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { index as browseTabsIndex, store as browseTabsStore, update as browseTabsUpdate, destroy as browseTabsDestroy, items as browseTabsItems } from '@/actions/App/Http/Controllers/BrowseTabController';
+import { index as browseTabsIndex, store as browseTabsStore, update as browseTabsUpdate, destroy as browseTabsDestroy, items as browseTabsItems, setActive as browseTabsSetActive } from '@/actions/App/Http/Controllers/BrowseTabController';
 
 export type MasonryItem = {
     id: number; // Database file ID
@@ -26,6 +26,7 @@ export type BrowseTabData = {
     fileIds: number[]; // Database file IDs
     itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
+    isActive: boolean;
 };
 
 export type OnTabSwitchCallback = (tabId: number) => Promise<void> | void;
@@ -48,6 +49,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
                 file_ids?: number[];
                 items_data?: MasonryItem[]; // Not included in initial load, but kept for backward compatibility
                 position?: number;
+                is_active?: boolean;
             }) => ({
                 id: tab.id,
                 label: tab.label,
@@ -55,6 +57,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
                 fileIds: tab.file_ids || [],
                 itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
                 position: tab.position || 0,
+                isActive: tab.is_active ?? false,
             }));
 
             // Sort by position
@@ -82,6 +85,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
             fileIds: [],
             itemsData: [],
             position: maxPosition + 1,
+            isActive: false,
         };
 
         try {
@@ -94,8 +98,12 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
 
             const data = response.data;
             newTab.id = data.id;
+            newTab.isActive = data.is_active ?? false;
             tabs.value.push(newTab);
             activeTabId.value = newTab.id;
+
+            // Set this tab as active
+            await setActiveTab(newTab.id);
 
             // Call callback if provided to handle UI switching
             if (onTabSwitch) {
@@ -122,13 +130,15 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
             const wasActiveTab = activeTabId.value === tabId;
             if (wasActiveTab) {
                 if (tabs.value.length > 0) {
-                    // Switch to first remaining tab
-                    activeTabId.value = tabs.value[0].id;
+                    // Switch to first remaining tab and set it as active
+                    const nextTab = tabs.value[0];
+                    activeTabId.value = nextTab.id;
+                    await setActiveTab(nextTab.id);
                     if (onTabSwitch) {
-                        await onTabSwitch(tabs.value[0].id);
+                        await onTabSwitch(nextTab.id);
                     }
                 } else {
-                    // No tabs left, create a new one
+                    // No tabs left, create a new one (which will be set as active automatically)
                     await createTab();
                 }
             }
@@ -208,6 +218,24 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
+    /**
+     * Set a tab as active.
+     * This will update the backend and sync the frontend state.
+     */
+    async function setActiveTab(tabId: number): Promise<void> {
+        try {
+            await window.axios.patch(browseTabsSetActive.url(tabId));
+
+            // Update local state: deactivate all tabs, then activate the specified one
+            tabs.value.forEach(tab => {
+                tab.isActive = tab.id === tabId;
+            });
+        } catch (error) {
+            console.error('Failed to set active tab:', error);
+            throw error;
+        }
+    }
+
     return {
         tabs,
         activeTabId,
@@ -218,6 +246,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         getActiveTab,
         updateActiveTab,
         loadTabItems,
+        setActiveTab,
     };
 }
 

@@ -35,6 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/api/browse-tabs/{browseTab}', [\App\Http\Controllers\BrowseTabController::class, 'update'])->name('api.browse-tabs.update');
     Route::delete('/api/browse-tabs/{browseTab}', [\App\Http\Controllers\BrowseTabController::class, 'destroy'])->name('api.browse-tabs.destroy');
     Route::patch('/api/browse-tabs/{browseTab}/position', [\App\Http\Controllers\BrowseTabController::class, 'updatePosition'])->name('api.browse-tabs.position');
+    Route::patch('/api/browse-tabs/{browseTab}/active', [\App\Http\Controllers\BrowseTabController::class, 'setActive'])->name('api.browse-tabs.active');
 
     // SPA catch-all - serves the dashboard view for all GET requests
     // Vue Router handles client-side routing, but Laravel needs to serve the view
