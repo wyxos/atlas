@@ -1,6 +1,4 @@
 - Browse
-    - tab focus per user
-    - 
     - grouping by specific container
     - filtering
     - blacklist
