@@ -1,12 +1,12 @@
 - Browse
     - grouping by specific container
     - filtering
-    - download
     - blacklist
       - auto blacklist from moderation rule
-    - shortcuts
+      - shortcuts
     - full size view
         - detail panel
+        - next/previous shortcut
     - local files
       - auto blacklist if preview count >= 5 while disliked
 

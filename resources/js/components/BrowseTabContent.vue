@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2 } from 'lucide-vue-next';
+import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogClose,
+} from './ui/dialog';
 import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
 import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService } from '@/composables/useBrowseService';
@@ -49,6 +58,8 @@ const hoveredItemIndex = ref<number | null>(null);
 const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
 // Track which items have already had their preview count incremented (to avoid double-counting)
 const previewedItems = ref<Set<number>>(new Set());
+// Dialog state for reset to first page warning
+const resetDialogOpen = ref(false);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -81,6 +92,16 @@ const currentTabService = computed(() => {
 const hasServiceSelected = computed(() => {
     const service = currentTabService.value;
     return typeof service === 'string' && service.length > 0;
+});
+
+// Computed property for apply button disabled state
+// Button should only be disabled when:
+// - No service is selected
+// - Service is currently being applied
+// - Selected service is already the current service
+// It should NOT be disabled when masonry is loading
+const isApplyButtonDisabled = computed(() => {
+    return !selectedService.value || isApplyingService.value || selectedService.value === currentTabService.value;
 });
 
 // Browse service composable
@@ -375,6 +396,59 @@ async function applyService(): Promise<void> {
     );
 }
 
+// Check if we're on the first page
+const isOnFirstPage = computed(() => {
+    return currentPage.value === 1 || currentPage.value === null;
+});
+
+// Open reset dialog
+function openResetDialog(): void {
+    resetDialogOpen.value = true;
+}
+
+// Close reset dialog
+function closeResetDialog(): void {
+    resetDialogOpen.value = false;
+}
+
+// Reset to first page
+async function resetToFirstPage(): Promise<void> {
+    if (!props.tab) {
+        return;
+    }
+
+    // Cancel any ongoing loads
+    if (masonry.value?.isLoading) {
+        masonry.value.cancelLoad();
+    }
+
+    // Reset state
+    currentPage.value = 1;
+    nextCursor.value = null;
+    loadAtPage.value = 1;
+    items.value = [];
+
+    // Update tab data
+    props.updateActiveTab([], [], {
+        ...props.tab.queryParams,
+        page: 1,
+        next: null,
+    });
+
+    // Close dialog
+    closeResetDialog();
+
+    // Destroy and reinitialize masonry to reload from page 1
+    if (masonry.value) {
+        masonry.value.destroy();
+    }
+
+    await nextTick();
+
+    // Reinitialize masonry - it will auto-load when loadAtPage is set
+    // The masonry component will detect loadAtPage.value === 1 and trigger initial load
+}
+
 async function handleCarouselLoadMore(): Promise<void> {
     if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
         if (typeof masonry.value.loadNext === 'function') {
@@ -585,11 +659,14 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <Button @click="applyService"
-                    :disabled="!selectedService || isApplyingService || selectedService === currentTabService" size="sm"
+                <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="rounded"
                     data-test="apply-service-button">
                     <Loader2 v-if="isApplyingService" :size="14" class="mr-2 animate-spin" />
                     Apply
+                </Button>
+                <Button v-if="hasServiceSelected && !isOnFirstPage" @click="openResetDialog" size="sm" variant="ghost"
+                    color="danger" class="rounded" data-test="reset-to-first-page-button">
+                    <AlertTriangle :size="14" />
                 </Button>
             </div>
         </div>
@@ -709,6 +786,30 @@ onUnmounted(() => {
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
             :queued-reactions-count="queuedReactions.length"
             :visible="tab !== null && tab !== undefined && hasServiceSelected" />
+
+        <!-- Reset to First Page Warning Dialog -->
+        <Dialog v-model="resetDialogOpen">
+            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
+                <DialogHeader>
+                    <DialogTitle class="text-danger-400">Reset to First Page</DialogTitle>
+                    <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
+                        Are you sure you want to go back to the first page? This will clear all currently loaded items
+                        and start
+                        from the beginning.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <DialogClose as-child>
+                        <Button variant="outline" @click="closeResetDialog">
+                            Cancel
+                        </Button>
+                    </DialogClose>
+                    <Button @click="resetToFirstPage" variant="destructive">
+                        Reset to First Page
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
     <div v-else class="flex items-center justify-center h-full" data-test="no-tab-message">
         <p class="text-twilight-indigo-300 text-lg">No tab selected</p>

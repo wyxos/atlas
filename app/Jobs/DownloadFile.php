@@ -8,6 +8,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use League\MimeTypeDetection\FinfoMimeTypeDetector;
 
 class DownloadFile implements ShouldQueue
 {
@@ -201,72 +202,18 @@ class DownloadFile implements ShouldQueue
     }
 
     /**
-     * Convert MIME type to file extension.
+     * Convert MIME type to file extension using league/mime-type-detection.
+     * This uses a comprehensive, maintained database of MIME types instead of hardcoded lists.
      */
     private function mimeTypeToExtension(string $mimeType): ?string
     {
-        $mimeToExt = [
-            // Images
-            'image/jpeg' => 'jpg',
-            'image/jpg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'image/svg+xml' => 'svg',
-            'image/bmp' => 'bmp',
-            'image/x-icon' => 'ico',
-            'image/tiff' => 'tiff',
-            'image/avif' => 'avif',
-            'image/heic' => 'heic',
-            'image/heif' => 'heif',
+        static $detector = null;
 
-            // Videos
-            'video/mp4' => 'mp4',
-            'video/mpeg' => 'mpeg',
-            'video/quicktime' => 'mov',
-            'video/x-msvideo' => 'avi',
-            'video/x-ms-wmv' => 'wmv',
-            'video/webm' => 'webm',
-            'video/ogg' => 'ogv',
-            'video/x-matroska' => 'mkv',
-            'video/x-flv' => 'flv',
+        if ($detector === null) {
+            $detector = new FinfoMimeTypeDetector;
+        }
 
-            // Audio
-            'audio/mpeg' => 'mp3',
-            'audio/mp4' => 'm4a',
-            'audio/x-m4a' => 'm4a',
-            'audio/ogg' => 'ogg',
-            'audio/wav' => 'wav',
-            'audio/x-wav' => 'wav',
-            'audio/webm' => 'weba',
-            'audio/flac' => 'flac',
-            'audio/aac' => 'aac',
-
-            // Documents
-            'application/pdf' => 'pdf',
-            'application/msword' => 'doc',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-            'application/vnd.ms-excel' => 'xls',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
-            'application/vnd.ms-powerpoint' => 'ppt',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
-            'application/zip' => 'zip',
-            'application/x-rar-compressed' => 'rar',
-            'application/x-7z-compressed' => '7z',
-            'application/x-tar' => 'tar',
-            'application/gzip' => 'gz',
-
-            // Text
-            'text/plain' => 'txt',
-            'text/html' => 'html',
-            'text/css' => 'css',
-            'text/javascript' => 'js',
-            'application/json' => 'json',
-            'application/xml' => 'xml',
-            'text/xml' => 'xml',
-        ];
-
-        return $mimeToExt[strtolower($mimeType)] ?? null;
+        return $detector->lookupExtension($mimeType);
     }
 
     /**
