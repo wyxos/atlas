@@ -48,6 +48,7 @@ const emit = defineEmits<{
 const items = ref<MasonryItem[]>([]);
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number | null>(1);
+const masonryResetKey = ref(0); // Used to force Masonry component re-render on reset
 const nextCursor = ref<string | number | null>(null);
 const loadAtPage = ref<string | number | null>(null);
 const isTabRestored = ref(false);
@@ -438,15 +439,20 @@ async function resetToFirstPage(): Promise<void> {
     // Close dialog
     closeResetDialog();
 
-    // Destroy and reinitialize masonry to reload from page 1
+    // Destroy masonry
     if (masonry.value) {
         masonry.value.destroy();
+        masonry.value = null;
     }
+
+    // Increment reset key to force Masonry component re-render
+    masonryResetKey.value++;
 
     await nextTick();
 
-    // Reinitialize masonry - it will auto-load when loadAtPage is set
-    // The masonry component will detect loadAtPage.value === 1 and trigger initial load
+    // After re-render, the Masonry component should auto-load since items.length === 0
+    // and loadAtPage === 1. Wait a bit more to ensure the component is mounted.
+    await nextTick();
 }
 
 async function handleCarouselLoadMore(): Promise<void> {
@@ -675,13 +681,13 @@ onUnmounted(() => {
         <div class="flex-1 min-h-0">
             <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
-                    :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
-                    :skip-initial-load="items.length > 0" :backfill-enabled="true" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
-                    @backfill:stop="onBackfillStop" @backfill:retry-start="onBackfillRetryStart"
-                    @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
-                    data-test="masonry-component">
+                <Masonry :key="`${tab?.id}-${masonryResetKey}`" ref="masonry" v-model:items="items"
+                    :get-next-page="getNextPage" :load-at-page="loadAtPage" :layout="layout" layout-mode="auto"
+                    :mobile-breakpoint="768" :skip-initial-load="items.length > 0" :backfill-enabled="true"
+                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
+                    @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
                     <template #default="{ item, index, remove }">
                         <!-- Capture remove function on first item render -->
                         <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
