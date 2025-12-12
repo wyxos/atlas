@@ -306,7 +306,7 @@ return [
                 'memory' => 192,
             ],
             'supervisor-downloads' => [
-                'maxProcesses' => 4,
+                'maxProcesses' => 12,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 5,
                 'memory' => 192,
@@ -320,7 +320,7 @@ return [
                 'memory' => 96,
             ],
             'supervisor-scout' => [
-                'maxProcesses' => 1,
+                'maxProcesses' => 4,
                 'memory' => 128,
             ],
         ],
@@ -333,7 +333,7 @@ return [
                 'maxProcesses' => 4,
             ],
             'supervisor-downloads' => [
-                'maxProcesses' => 4,
+                'maxProcesses' => 8,
             ],
             'supervisor-composer' => [
                 'maxProcesses' => 1,
@@ -342,7 +342,7 @@ return [
                 'maxProcesses' => 1,
             ],
             'supervisor-scout' => [
-                'maxProcesses' => 1,
+                'maxProcesses' => 2,
             ],
         ],
     ],
