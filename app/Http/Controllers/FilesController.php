@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Listings\FileListing;
+use App\Models\BrowseTab;
 use App\Models\File;
+use App\Models\Reaction;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 
 class FilesController extends Controller
@@ -76,10 +79,48 @@ class FilesController extends Controller
 
         $file->increment('previewed_count');
         $file->touch('previewed_at');
+        $file->refresh();
+
+        $autoDisliked = false;
+
+        // Check if we should auto-dislike: previewed_count >= 3, no reactions exist,
+        // source is not 'local', file has no path (not on disk), and file is not blacklisted
+        if ($file->previewed_count >= 3) {
+            $hasReactions = Reaction::where('file_id', $file->id)->exists();
+            $isNotLocal = $file->source !== 'local';
+            $hasNoPath = empty($file->path);
+            $isNotBlacklisted = $file->blacklisted_at === null;
+
+            if (! $hasReactions && $isNotLocal && $hasNoPath && $isNotBlacklisted) {
+                // Auto-dislike the file
+                $user = Auth::user();
+                $file->update(['auto_disliked' => true]);
+
+                // Create a dislike reaction
+                Reaction::updateOrCreate(
+                    [
+                        'file_id' => $file->id,
+                        'user_id' => $user->id,
+                    ],
+                    [
+                        'type' => 'dislike',
+                    ]
+                );
+
+                // De-associate from all tabs belonging to this user (but keep in masonry)
+                $userTabs = BrowseTab::forUser($user->id)->get();
+                foreach ($userTabs as $tab) {
+                    $tab->files()->detach($file->id);
+                }
+
+                $autoDisliked = true;
+            }
+        }
 
         return response()->json([
             'message' => 'Preview count incremented.',
             'previewed_count' => $file->previewed_count,
+            'auto_disliked' => $autoDisliked,
         ]);
     }
 

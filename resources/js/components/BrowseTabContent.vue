@@ -220,24 +220,36 @@ async function handleItemPreload(fileId: number): Promise<void> {
     }
 
     try {
-        const response = await window.axios.post<{ previewed_count: number }>(incrementPreview.url(fileId));
+        const response = await window.axios.post<{ previewed_count: number; auto_disliked: boolean }>(incrementPreview.url(fileId));
 
         // Mark as previewed
         previewedItems.value.add(fileId);
 
         // Update local item state - update in both items.value and tab.itemsData
-        const item = items.value.find((i) => i.id === fileId);
-        if (item) {
-            item.previewed_count = response.data.previewed_count;
+        const itemIndex = items.value.findIndex((i) => i.id === fileId);
+        if (itemIndex !== -1) {
+            // Update the item in place to maintain reactivity
+            // Use Object.assign to mutate in place, which Vue can track better
+            const currentItem = items.value[itemIndex];
+            if (response.data.auto_disliked) {
+                currentItem.auto_disliked = true;
+            }
+            currentItem.previewed_count = response.data.previewed_count;
         }
 
         // Also update in tab.itemsData if it exists
         if (props.tab?.itemsData) {
-            const tabItem = props.tab.itemsData.find((i) => i.id === fileId);
-            if (tabItem) {
-                tabItem.previewed_count = response.data.previewed_count;
+            const tabItemIndex = props.tab.itemsData.findIndex((i) => i.id === fileId);
+            if (tabItemIndex !== -1) {
+                Object.assign(props.tab.itemsData[tabItemIndex], {
+                    previewed_count: response.data.previewed_count,
+                    auto_disliked: response.data.auto_disliked ? true : props.tab.itemsData[tabItemIndex].auto_disliked ?? false,
+                });
             }
         }
+
+        // Force reactivity update
+        await nextTick();
     } catch (error) {
         console.error('Failed to increment preview count:', error);
         // Don't throw - preview count is not critical
@@ -288,6 +300,26 @@ async function handleMasonryReaction(
 
     if (item && removeItem) {
         removeItem(item);
+    }
+
+    // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
+    if (item && (type === 'love' || type === 'like' || type === 'funny')) {
+        const itemIndex = items.value.findIndex((i) => i.id === fileId);
+        if (itemIndex !== -1) {
+            Object.assign(items.value[itemIndex], {
+                auto_disliked: false,
+            });
+        }
+        // Also update in tab.itemsData if it exists
+        if (props.tab?.itemsData) {
+            const tabItemIndex = props.tab.itemsData.findIndex((i) => i.id === fileId);
+            if (tabItemIndex !== -1) {
+                Object.assign(props.tab.itemsData[tabItemIndex], {
+                    auto_disliked: false,
+                });
+            }
+        }
+        await nextTick();
     }
 
     // Queue the AJAX request with restore callback, tab ID, index, and item
@@ -586,8 +618,14 @@ onUnmounted(() => {
                             }">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
-                                <div class="relative w-full h-full overflow-hidden group masonry-item"
+                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item"
                                     :data-key="item.key">
+                                    <!-- Auto-disliked indicator overlay with smooth animation -->
+                                    <Transition name="ring-fade">
+                                        <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
+                                            class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active">
+                                        </div>
+                                    </Transition>
                                     <!-- Loading placeholder -->
                                     <div v-if="!imageLoaded && !imageError && isLoading"
                                         class="absolute inset-0 bg-slate-100 flex items-center justify-center">
@@ -676,3 +714,25 @@ onUnmounted(() => {
         <p class="text-twilight-indigo-300 text-lg">No tab selected</p>
     </div>
 </template>
+
+<style scoped>
+.ring-fade-enter-active {
+    animation: ringAppear 0.6s ease-out;
+}
+
+@keyframes ringAppear {
+    0% {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+</style>

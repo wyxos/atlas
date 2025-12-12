@@ -2,9 +2,9 @@
     - grouping by specific container
     - download
     - blacklist
-      - auto dislike if preview count >= 3 + no reaction
+      - auto dislike if preview count >= 3 + no reaction + not local
       - auto blacklist if preview count >= 5 while disliked
-      - auto dislike from moderation rule
+      - auto blacklist from moderation rule
     - shortcuts
     - full size view
         - detail panel
