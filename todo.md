@@ -1,6 +1,5 @@
 - Browse
     - grouping by specific container
-    - preview/view count
     - download
     - blacklist
       - auto dislike if preview count >= 3 + no reaction

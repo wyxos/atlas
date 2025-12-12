@@ -292,6 +292,64 @@ preview.post = (args: { file: number | { id: number } } | [file: number | { id: 
     url: preview.url(args, options),
     method: 'post',
 })
+
+/**
+* @see \App\Http\Controllers\FilesController::seen
+ * @see app/Http/Controllers/FilesController.php:89
+ * @route '/api/files/{file}/seen'
+ */
+export const seen = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: seen.url(args, options),
+    method: 'post',
+})
+
+seen.definition = {
+    methods: ["post"],
+    url: '/api/files/{file}/seen',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\FilesController::seen
+ * @see app/Http/Controllers/FilesController.php:89
+ * @route '/api/files/{file}/seen'
+ */
+seen.url = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
+    if (typeof args === 'string' || typeof args === 'number') {
+        args = { file: args }
+    }
+
+            if (typeof args === 'object' && !Array.isArray(args) && 'id' in args) {
+            args = { file: args.id }
+        }
+    
+    if (Array.isArray(args)) {
+        args = {
+                    file: args[0],
+                }
+    }
+
+    args = applyUrlDefaults(args)
+
+    const parsedArgs = {
+                        file: typeof args.file === 'object'
+                ? args.file.id
+                : args.file,
+                }
+
+    return seen.definition.url
+            .replace('{file}', parsedArgs.file.toString())
+            .replace(/\/+$/, '') + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\FilesController::seen
+ * @see app/Http/Controllers/FilesController.php:89
+ * @route '/api/files/{file}/seen'
+ */
+seen.post = (args: { file: number | { id: number } } | [file: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: seen.url(args, options),
+    method: 'post',
+})
 const files = {
     index: Object.assign(index, index),
 show: Object.assign(show, show),
@@ -299,6 +357,7 @@ serve: Object.assign(serve, serve),
 destroy: Object.assign(destroy, destroy),
 reaction: Object.assign(reaction, reaction),
 preview: Object.assign(preview, preview),
+seen: Object.assign(seen, seen),
 }
 
 export default files

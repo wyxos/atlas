@@ -616,8 +616,9 @@ onUnmounted(() => {
                                     <div v-show="hoveredItemIndex === index && imageLoaded"
                                         class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
                                         <FileReactions :file-id="item.id"
-                                            :previewed-count="(item.previewed_count as number) ?? 0" :viewed-count="0"
-                                            :current-index="index" :total-items="items.length" variant="small"
+                                            :previewed-count="(item.previewed_count as number) ?? 0"
+                                            :viewed-count="(item.seen_count as number) ?? 0" :current-index="index"
+                                            :total-items="items.length" variant="small"
                                             :remove-item="() => remove(item)"
                                             @reaction="(type) => handleMasonryReaction(item.id, type, remove)" />
                                     </div>

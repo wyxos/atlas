@@ -13,6 +13,8 @@ export type MasonryItem = {
     thumbnail?: string; // Thumbnail URL (may be same as src)
     type?: 'image' | 'video';
     notFound?: boolean;
+    previewed_count?: number;
+    seen_count?: number;
     [key: string]: unknown;
 };
 

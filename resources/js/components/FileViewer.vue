@@ -7,6 +7,7 @@ import type { MasonryItem } from '../composables/useBrowseTabs';
 import { useReactionHandler } from '../composables/useReactionHandler';
 import { useReactionQueue } from '../composables/useReactionQueue';
 import { createReactionCallback } from '../utils/reactions';
+import { incrementSeen } from '@/actions/App/Http/Controllers/FilesController';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -73,6 +74,23 @@ function preloadImage(url: string): Promise<{ width: number; height: number }> {
         img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
         img.src = url;
     });
+}
+
+// Increment seen count when file is loaded in FileViewer
+// This increments every time a file comes into view (including when navigating back to it)
+async function handleItemSeen(fileId: number): Promise<void> {
+    try {
+        const response = await window.axios.post<{ seen_count: number }>(incrementSeen.url(fileId));
+
+        // Update local item state
+        const item = items.value.find((i) => i.id === fileId);
+        if (item) {
+            item.seen_count = response.data.seen_count;
+        }
+    } catch (error) {
+        console.error('Failed to increment seen count:', error);
+        // Don't throw - seen count is not critical
+    }
 }
 
 function calculateBestFitSize(
@@ -518,6 +536,11 @@ async function openFromClick(e: MouseEvent): Promise<void> {
         overlayFullSizeImage.value = fullSizeUrl;
         overlayIsLoading.value = false;
 
+        // Increment seen count when file is fully loaded
+        if (masonryItem?.id) {
+            await handleItemSeen(masonryItem.id);
+        }
+
         // Wait for image to be displayed, then proceed with animations
         await nextTick();
         await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure image is rendered
@@ -757,6 +780,11 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         originalImageDimensions.value = imageDimensions;
         overlayFullSizeImage.value = nextFullSizeUrl;
 
+        // Increment seen count when navigating to a new file
+        if (nextItem?.id) {
+            await handleItemSeen(nextItem.id);
+        }
+
         // Step 4: Calculate best-fit size BEFORE switching to full-size image
         // Check again if navigation target changed
         if (currentNavigationTarget.value !== preloadTarget) {
@@ -993,8 +1021,10 @@ defineExpose({
             <div v-if="overlayFillComplete && !overlayIsClosing"
                 class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
                 <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
-                    :previewed-count="0" :viewed-count="0" :current-index="currentItemIndex ?? undefined"
-                    :total-items="items.length" @reaction="handleReaction" />
+                    :previewed-count="(items[currentItemIndex]?.previewed_count as number) ?? 0"
+                    :viewed-count="(items[currentItemIndex]?.seen_count as number) ?? 0"
+                    :current-index="currentItemIndex ?? undefined" :total-items="items.length"
+                    @reaction="handleReaction" />
             </div>
         </div>
 

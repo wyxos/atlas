@@ -82,4 +82,20 @@ class FilesController extends Controller
             'previewed_count' => $file->previewed_count,
         ]);
     }
+
+    /**
+     * Increment the seen count for a file.
+     */
+    public function incrementSeen(File $file): JsonResponse
+    {
+        Gate::authorize('view', $file);
+
+        $file->increment('seen_count');
+        $file->touch('seen_at');
+
+        return response()->json([
+            'message' => 'Seen count incremented.',
+            'seen_count' => $file->seen_count,
+        ]);
+    }
 }
