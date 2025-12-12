@@ -2,13 +2,12 @@
     - grouping by specific container
     - download
     - blacklist
-      - auto dislike if preview count >= 3 + no reaction + not local
-      - auto blacklist if preview count >= 5 while disliked
       - auto blacklist from moderation rule
     - shortcuts
     - full size view
         - detail panel
-    
+    - local files
+      - auto blacklist if preview count >= 5 while disliked
 
 
 - implement file listing
