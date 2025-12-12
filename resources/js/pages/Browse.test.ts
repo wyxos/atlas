@@ -57,6 +57,27 @@ vi.mock('@wyxos/vibe', () => ({
             };
         },
     },
+    MasonryItem: {
+        name: 'MasonryItem',
+        template: `
+            <div @mouseenter="$emit('mouseenter', $event)" @mouseleave="$emit('mouseleave', $event)">
+                <slot 
+                    :item="item"
+                    :remove="remove"
+                    :imageLoaded="true"
+                    :imageError="false"
+                    :videoLoaded="false"
+                    :videoError="false"
+                    :isLoading="false"
+                    :showMedia="true"
+                    :imageSrc="item?.src || item?.thumbnail || ''"
+                    :videoSrc="null"
+                ></slot>
+            </div>
+        `,
+        props: ['item', 'remove'],
+        emits: ['mouseenter', 'mouseleave'],
+    },
 }));
 
 beforeEach(() => {
@@ -4521,7 +4542,7 @@ describe('Browse', () => {
             // Verify the restored item is at the correct index
             const restoredItemIndex = itemsAfterCancel.findIndex((i: any) => i.id === 2);
             expect(restoredItemIndex).toBe(1);
-            
+
             // Verify currentItemIndex points to the restored item
             // This is the key fix: when item is restored at currentItemIndex, 
             // FileViewer should navigate to show it (handled by restoreItem callback)
@@ -5144,11 +5165,11 @@ describe('Browse', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-                // Verify reaction was queued with like type (check last reaction)
-                expect(vm.queuedReactions.length).toBeGreaterThan(0);
-                const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
-                expect(lastReaction.fileId).toBe(4);
-                expect(lastReaction.type).toBe('like');
+            // Verify reaction was queued with like type (check last reaction)
+            expect(vm.queuedReactions.length).toBeGreaterThan(0);
+            const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
+            expect(lastReaction.fileId).toBe(4);
+            expect(lastReaction.type).toBe('like');
         });
 
         it('triggers dislike reaction when ALT + Right Click on overlay image', async () => {
@@ -5246,11 +5267,11 @@ describe('Browse', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-                // Verify reaction was queued with dislike type (check last reaction)
-                expect(vm.queuedReactions.length).toBeGreaterThan(0);
-                const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
-                expect(lastReaction.fileId).toBe(5);
-                expect(lastReaction.type).toBe('dislike');
+            // Verify reaction was queued with dislike type (check last reaction)
+            expect(vm.queuedReactions.length).toBeGreaterThan(0);
+            const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
+            expect(lastReaction.fileId).toBe(5);
+            expect(lastReaction.type).toBe('dislike');
         });
 
         it('triggers love reaction when ALT + Middle Click on overlay image', async () => {
@@ -5348,11 +5369,11 @@ describe('Browse', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-                // Verify reaction was queued with love type (check last reaction)
-                expect(vm.queuedReactions.length).toBeGreaterThan(0);
-                const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
-                expect(lastReaction.fileId).toBe(6);
-                expect(lastReaction.type).toBe('love');
+            // Verify reaction was queued with love type (check last reaction)
+            expect(vm.queuedReactions.length).toBeGreaterThan(0);
+            const lastReaction = vm.queuedReactions[vm.queuedReactions.length - 1];
+            expect(lastReaction.fileId).toBe(6);
+            expect(lastReaction.type).toBe('love');
         });
 
         it('does not trigger reaction when clicking without ALT key', async () => {
