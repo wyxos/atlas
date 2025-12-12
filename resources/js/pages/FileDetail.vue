@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { show, destroy } from '@/actions/App/Http/Controllers/FilesController';
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Download, FileText, Copy, ExternalLink, Trash2, Eye, Info } from 'lucide-vue-next';
-import { toast } from '../components/ui/sonner';
-import PageLayout from '../components/PageLayout.vue';
+import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import FileDetailsCard from '../components/FileDetailsCard.vue';
 import FileDetailsPanel from '../components/ui/FileDetailsPanel.vue';
@@ -16,11 +16,8 @@ import {
     DialogTitle,
     DialogClose,
 } from '../components/ui/dialog';
-import { formatDate } from '../utils/date';
-import { copyToClipboard } from '../utils/clipboard';
-import { formatFileSize, getMimeTypeCategory } from '../utils/file';
-import { openUrl } from '../utils/url';
-import type { File } from '../types/file';
+import { formatFileSize, getMimeTypeCategory } from '@/utils/file';
+import type { File } from '@/types/file';
 
 const route = useRoute();
 const router = useRouter();
@@ -52,12 +49,13 @@ const fileType = computed(() => {
 
 
 async function loadFile(): Promise<void> {
-    const fileId = route.params.id as string;
+    const fileIdParam = route.params.id as string;
+    const fileId = Number.parseInt(fileIdParam, 10);
     loading.value = true;
     error.value = null;
 
     try {
-        const response = await window.axios.get<{ file: File }>(`/api/files/${fileId}`);
+        const response = await window.axios.get<{ file: File }>(show.url(fileId));
         file.value = response.data.file;
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number; data?: { message?: string } } };
@@ -233,7 +231,7 @@ onMounted(() => {
                     <DialogTitle class="text-danger-400">Delete File</DialogTitle>
                     <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
                         Are you sure you want to delete <span class="font-semibold text-danger-400">{{ file?.filename
-                            }}</span>? This action cannot be undone.
+                        }}</span>? This action cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
                 <div v-if="deleteError"

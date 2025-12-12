@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { index as browseTabsIndex, store as browseTabsStore, update as browseTabsUpdate, destroy as browseTabsDestroy, items as browseTabsItems } from '@/actions/App/Http/Controllers/BrowseTabController';
 
 export type MasonryItem = {
     id: number; // Database file ID
@@ -35,7 +36,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
     async function loadTabs(): Promise<void> {
         isLoadingTabs.value = true;
         try {
-            const response = await window.axios.get('/api/browse-tabs');
+            const response = await window.axios.get(browseTabsIndex.url());
             const data = response.data;
             tabs.value = data.map((tab: {
                 id: number;
@@ -81,7 +82,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         };
 
         try {
-            const response = await window.axios.post('/api/browse-tabs', {
+            const response = await window.axios.post(browseTabsStore.url(), {
                 label: newTab.label,
                 query_params: newTab.queryParams,
                 file_ids: newTab.fileIds,
@@ -107,7 +108,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
 
     async function closeTab(tabId: number): Promise<void> {
         try {
-            await window.axios.delete(`/api/browse-tabs/${tabId}`);
+            await window.axios.delete(browseTabsDestroy.url(tabId));
 
             const index = tabs.value.findIndex(t => t.id === tabId);
             if (index !== -1) {
@@ -169,7 +170,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
 
     async function saveTab(tab: BrowseTabData): Promise<void> {
         try {
-            await window.axios.put(`/api/browse-tabs/${tab.id}`, {
+            await window.axios.put(browseTabsUpdate.url(tab.id), {
                 label: tab.label,
                 query_params: tab.queryParams,
                 file_ids: tab.fileIds,
@@ -187,7 +188,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
      */
     async function loadTabItems(tabId: number): Promise<MasonryItem[]> {
         try {
-            const response = await window.axios.get(`/api/browse-tabs/${tabId}/items`);
+            const response = await window.axios.get(browseTabsItems.url(tabId));
             const data = response.data;
 
             // Update the tab with loaded items

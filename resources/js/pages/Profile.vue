@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { updatePassword, deleteAccount } from '@/actions/App/Http/Controllers/ProfileController';
 import PageLayout from '../components/PageLayout.vue';
 import FormInput from '../components/ui/FormInput.vue';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,7 @@ async function handlePasswordUpdate(): Promise<void> {
     passwordLoading.value = true;
 
     try {
-        const response = await window.axios.post('/profile/password', passwordForm.value);
+        const response = await window.axios.post(updatePassword.url(), passwordForm.value);
 
         passwordSuccess.value = response.data.message || 'Password updated successfully.';
         passwordForm.value = {
@@ -67,7 +68,7 @@ async function handleAccountDeletion(): Promise<void> {
     deleteLoading.value = true;
 
     try {
-        await window.axios.delete('/profile/account', {
+        await window.axios.delete(deleteAccount.url(), {
             data: deleteForm.value,
         });
 

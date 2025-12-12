@@ -12,6 +12,7 @@ import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
+import { incrementPreview } from '@/actions/App/Http/Controllers/FilesController';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -219,7 +220,7 @@ async function handleItemPreload(fileId: number): Promise<void> {
     }
 
     try {
-        const response = await window.axios.post<{ previewed_count: number }>(`/api/files/${fileId}/preview`);
+        const response = await window.axios.post<{ previewed_count: number }>(incrementPreview.url(fileId));
 
         // Mark as previewed
         previewedItems.value.add(fileId);
