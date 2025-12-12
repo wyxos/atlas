@@ -76,7 +76,7 @@ vi.mock('@wyxos/vibe', () => ({
             </div>
         `,
         props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave'],
+        emits: ['mouseenter', 'mouseleave', 'preload:success'],
     },
 }));
 
@@ -5436,6 +5436,151 @@ describe('Browse', () => {
 
                 // Verify NO reaction was queued (normal click should open overlay, not react)
                 expect(vm.queuedReactions.length).toBe(0);
+            }
+        });
+    });
+
+    describe('Preview and Seen Count Tracking', () => {
+        it('increments preview count when item is preloaded', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 0 },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 0 }];
+            await wrapper.vm.$nextTick();
+
+            // Mock the preview API response
+            mockAxios.post.mockResolvedValueOnce({
+                data: { previewed_count: 1 },
+            });
+
+            // Find the MasonryItem component and emit preload:success event
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
+
+            if (masonryItem.exists()) {
+                // Emit preload:success event
+                await masonryItem.vm.$emit('preload:success', {
+                    item: { id: 1 },
+                    type: 'image',
+                    src: 'test1.jpg',
+                });
+
+                await flushPromises();
+                await wrapper.vm.$nextTick();
+
+                // Verify API was called
+                expect(mockAxios.post).toHaveBeenCalled();
+                const previewCall = mockAxios.post.mock.calls.find((call: any[]) =>
+                    call[0]?.includes('/api/files/1/preview')
+                );
+                expect(previewCall).toBeDefined();
+
+                // Verify item's previewed_count was updated
+                const updatedItem = tabContentVm.items.find((i: any) => i.id === 1);
+                expect(updatedItem?.previewed_count).toBe(1);
+            }
+        });
+
+        it('increments seen count when file is loaded in FileViewer', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, seen_count: 0 },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vm = wrapper.vm as any;
+
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, seen_count: 0 }];
+            await wrapper.vm.$nextTick();
+
+            // Mock the seen API response
+            mockAxios.post.mockResolvedValueOnce({
+                data: { seen_count: 1 },
+            });
+
+            // Open FileViewer by clicking on a masonry item
+            const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+            const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
+
+            if (masonryContainer.exists()) {
+                const mockItem = document.createElement('div');
+                mockItem.className = 'masonry-item';
+                const mockImg = document.createElement('img');
+                mockImg.src = 'test1.jpg';
+                mockItem.appendChild(mockImg);
+                masonryContainer.element.appendChild(mockItem);
+
+                // Mock getBoundingClientRect for overlay positioning
+                mockItem.getBoundingClientRect = vi.fn(() => ({
+                    top: 150,
+                    left: 250,
+                    width: 300,
+                    height: 400,
+                    bottom: 550,
+                    right: 550,
+                    x: 250,
+                    y: 150,
+                    toJSON: vi.fn(),
+                }));
+
+                // Click on the masonry item to open FileViewer
+                const clickEvent = new MouseEvent('click', { bubbles: true });
+                Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+                masonryContainer.element.dispatchEvent(clickEvent);
+
+                await wrapper.vm.$nextTick();
+                await flushPromises();
+
+                // Wait for FileViewer to load the image (which triggers seen count increment)
+                await new Promise(resolve => setTimeout(resolve, 100));
+                await flushPromises();
+
+                // Verify seen API was called
+                const seenCall = mockAxios.post.mock.calls.find((call: any[]) =>
+                    call[0]?.includes('/api/files/1/seen')
+                );
+                expect(seenCall).toBeDefined();
             }
         });
     });
