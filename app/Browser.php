@@ -126,6 +126,8 @@ class Browser
             $listingMetadataRaw = $file->listing_metadata ?? '{}';
             $listingMetadata = is_string($listingMetadataRaw) ? json_decode($listingMetadataRaw, true) : $listingMetadataRaw;
 
+            $page = (int) (request()->input('page', 1));
+            
             return [
                 'id' => $file->id, // Database file ID
                 'width' => (int) ($metadata['width'] ?? 500),
@@ -134,7 +136,8 @@ class Browser
                 'originalUrl' => $file->url, // Keep original URL for full-size viewing
                 'thumbnail' => $file->thumbnail_url,
                 'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
-                'page' => (int) (request()->input('page', 1)),
+                'page' => $page,
+                'key' => "{$page}-{$file->id}", // Combined key for unique identification
                 'index' => 0, // Will be set by controller
                 'notFound' => false,
             ];

@@ -118,10 +118,19 @@ function calculateBestFitSize(
 
 function findMasonryItemByImageSrc(imageSrc: string, itemElement: HTMLElement): MasonryItem | null {
     // Try to find item by checking data attributes on the masonry item element
-    const itemId = itemElement.getAttribute('data-item-id');
-    if (itemId) {
-        const item = items.value.find(i => i.id === Number(itemId));
-        if (item) return item;
+    const itemKeyAttr = itemElement.getAttribute('data-key');
+    if (itemKeyAttr) {
+        // Match by key (provided by backend)
+        const itemByKey = items.value.find(i => i.key === itemKeyAttr);
+        if (itemByKey) return itemByKey;
+
+        // Fallback: parse and match by id only (for backward compatibility with old data)
+        const parts = itemKeyAttr.split('-');
+        const fileId = parts.length > 1 ? Number(parts[parts.length - 1]) : Number(itemKeyAttr);
+        if (!isNaN(fileId)) {
+            const item = items.value.find(i => i.id === fileId);
+            if (item) return item;
+        }
     }
 
     // Fallback: try to match by URL (compare src with item.src or thumbnail)

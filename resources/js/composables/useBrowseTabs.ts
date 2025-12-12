@@ -5,6 +5,7 @@ export type MasonryItem = {
     width: number;
     height: number;
     page: number;
+    key: string; // Combined key from backend: "page-id"
     index: number;
     src: string; // Preview/thumbnail URL for masonry grid
     originalUrl?: string; // Original full-size URL

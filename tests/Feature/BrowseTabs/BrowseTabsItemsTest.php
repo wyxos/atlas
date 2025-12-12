@@ -52,7 +52,9 @@ test('items are formatted correctly', function () {
     expect($item)->toHaveKey('width');
     expect($item)->toHaveKey('height');
     expect($item)->toHaveKey('page');
+    expect($item)->toHaveKey('key');
     expect($item)->toHaveKey('index');
+    expect($item['key'])->toBe("{$item['page']}-{$item['id']}");
 });
 
 test('items use correct page number from query_params', function () {

@@ -139,28 +139,29 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
     const itemEl = target.closest('.masonry-item') as HTMLElement | null;
     if (!itemEl || !container.contains(itemEl)) return;
 
-    // Find the masonry item data
-    const itemId = itemEl.getAttribute('data-item-id');
-    if (!itemId) {
-        // Fallback: try to find by image src
-        const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
-        if (imgEl) {
-            const src = imgEl.currentSrc || imgEl.getAttribute('src') || '';
-            const item = items.value.find(i => {
-                const itemSrc = (i.src || i.thumbnail || '').split('?')[0].split('#')[0];
-                const baseSrc = src.split('?')[0].split('#')[0];
-                return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
-            });
-            if (item) {
-                handleAltClickReaction(e, item.id);
-            }
+    // Find the masonry item data using the key
+    const itemKeyAttr = itemEl.getAttribute('data-key');
+    if (itemKeyAttr) {
+        // Match by key (provided by backend)
+        const item = items.value.find(i => i.key === itemKeyAttr);
+        if (item) {
+            handleAltClickReaction(e, item.id);
+            return;
         }
-        return;
     }
 
-    const fileId = Number(itemId);
-    if (!isNaN(fileId)) {
-        handleAltClickReaction(e, fileId);
+    // Fallback: try to find by image src
+    const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
+    if (imgEl) {
+        const src = imgEl.currentSrc || imgEl.getAttribute('src') || '';
+        const item = items.value.find(i => {
+            const itemSrc = (i.src || i.thumbnail || '').split('?')[0].split('#')[0];
+            const baseSrc = src.split('?')[0].split('#')[0];
+            return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
+        });
+        if (item) {
+            handleAltClickReaction(e, item.id);
+        }
     }
 }
 
@@ -531,7 +532,7 @@ onUnmounted(() => {
                     <template #default="{ item, index, remove }">
                         <!-- Capture remove function on first item render -->
                         <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
-                        <div class="relative w-full h-full overflow-hidden group masonry-item" :data-item-id="item.id"
+                        <div class="relative w-full h-full overflow-hidden group masonry-item" :data-key="item.key"
                             @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
                             <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
                                 class="w-full h-full object-cover" />

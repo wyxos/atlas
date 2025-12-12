@@ -116,16 +116,21 @@ function createMockBrowseResponse(
     page: number | string,
     nextPageValue: number | string | null = null
 ) {
-    const items = Array.from({ length: 40 }, (_, i) => ({
-        id: `item-${page}-${i}`,
-        width: 300 + (i % 100),
-        height: 200 + (i % 100),
-        src: `https://picsum.photos/id/${i}/300/200`,
-        type: i % 10 === 0 ? 'video' : 'image',
-        page: typeof page === 'number' ? page : 1,
-        index: i,
-        notFound: false,
-    }));
+    const pageNum = typeof page === 'number' ? page : 1;
+    const items = Array.from({ length: 40 }, (_, i) => {
+        const itemId = typeof page === 'number' ? i + 1 : parseInt(`item-${page}-${i}`) || i + 1;
+        return {
+            id: itemId,
+            width: 300 + (i % 100),
+            height: 200 + (i % 100),
+            src: `https://picsum.photos/id/${i}/300/200`,
+            type: i % 10 === 0 ? 'video' : 'image',
+            page: pageNum,
+            key: `${pageNum}-${itemId}`, // Combined key from backend
+            index: i,
+            notFound: false,
+        };
+    });
 
     return {
         items,
@@ -4891,7 +4896,7 @@ describe('Browse', () => {
             if (masonryContainer.exists()) {
                 const mockItem = document.createElement('div');
                 mockItem.className = 'masonry-item';
-                mockItem.setAttribute('data-item-id', '1');
+                mockItem.setAttribute('data-key', '1');
                 const mockImg = document.createElement('img');
                 mockImg.src = 'test1.jpg';
                 mockItem.appendChild(mockImg);
@@ -4958,7 +4963,7 @@ describe('Browse', () => {
             if (masonryContainer.exists()) {
                 const mockItem = document.createElement('div');
                 mockItem.className = 'masonry-item';
-                mockItem.setAttribute('data-item-id', '2');
+                mockItem.setAttribute('data-key', '2');
                 const mockImg = document.createElement('img');
                 mockImg.src = 'test2.jpg';
                 mockItem.appendChild(mockImg);
@@ -5019,7 +5024,7 @@ describe('Browse', () => {
             if (masonryContainer.exists()) {
                 const mockItem = document.createElement('div');
                 mockItem.className = 'masonry-item';
-                mockItem.setAttribute('data-item-id', '3');
+                mockItem.setAttribute('data-key', '3');
                 const mockImg = document.createElement('img');
                 mockImg.src = 'test3.jpg';
                 mockItem.appendChild(mockImg);
@@ -5390,7 +5395,7 @@ describe('Browse', () => {
             if (masonryContainer.exists()) {
                 const mockItem = document.createElement('div');
                 mockItem.className = 'masonry-item';
-                mockItem.setAttribute('data-item-id', '7');
+                mockItem.setAttribute('data-key', '7');
                 const mockImg = document.createElement('img');
                 mockImg.src = 'test7.jpg';
                 mockItem.appendChild(mockImg);
