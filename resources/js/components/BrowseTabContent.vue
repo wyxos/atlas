@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { Masonry } from '@wyxos/vibe';
+import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
 import { Loader2 } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
@@ -532,18 +532,47 @@ onUnmounted(() => {
                     <template #default="{ item, index, remove }">
                         <!-- Capture remove function on first item render -->
                         <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
-                        <div class="relative w-full h-full overflow-hidden group masonry-item" :data-key="item.key"
-                            @mouseenter="hoveredItemIndex = index" @mouseleave="hoveredItemIndex = null">
-                            <img :src="item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
-                                class="w-full h-full object-cover" />
-                            <div v-show="hoveredItemIndex === index"
-                                class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
-                                    :current-index="index" :total-items="items.length" variant="small"
-                                    :remove-item="() => remove(item)"
-                                    @reaction="(type) => handleMasonryReaction(item.id, type, remove)" />
-                            </div>
-                        </div>
+                        <VibeMasonryItem :item="item" :remove="remove" @mouseenter="hoveredItemIndex = index"
+                            @mouseleave="hoveredItemIndex = null">
+                            <template
+                                #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
+                                <div class="relative w-full h-full overflow-hidden group masonry-item"
+                                    :data-key="item.key">
+                                    <!-- Loading placeholder -->
+                                    <div v-if="!imageLoaded && !imageError && isLoading"
+                                        class="absolute inset-0 bg-slate-100 flex items-center justify-center">
+                                        <div
+                                            class="w-12 h-12 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-sm">
+                                            <i class="fas fa-image text-xl text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <!-- Error state -->
+                                    <div v-if="imageError"
+                                        class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400 text-sm p-4 text-center">
+                                        <i class="fas fa-image text-2xl mb-2 opacity-50"></i>
+                                        <span>Failed to load image</span>
+                                    </div>
+
+                                    <!-- Image (uses imageSrc from MasonryItem when available for lazy loading) -->
+                                    <img v-if="!imageError && (imageSrc || item.src || item.thumbnail)"
+                                        :src="imageSrc || item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
+                                        :class="[
+                                            'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
+                                            imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
+                                        ]" />
+
+                                    <!-- Hover reactions overlay -->
+                                    <div v-show="hoveredItemIndex === index && imageLoaded"
+                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
+                                        <FileReactions :file-id="item.id" :previewed-count="0" :viewed-count="0"
+                                            :current-index="index" :total-items="items.length" variant="small"
+                                            :remove-item="() => remove(item)"
+                                            @reaction="(type) => handleMasonryReaction(item.id, type, remove)" />
+                                    </div>
+                                </div>
+                            </template>
+                        </VibeMasonryItem>
                     </template>
                 </Masonry>
             </div>
