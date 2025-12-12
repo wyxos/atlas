@@ -1,5 +1,6 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
+import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 
 export type GetPageResult = {
     items: MasonryItem[];
@@ -35,7 +36,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
     async function fetchServices(): Promise<void> {
         try {
             // Fetch services from browse endpoint (will return services metadata)
-            const response = await window.axios.get('/api/browse?page=1&limit=1');
+            const response = await window.axios.get(browseIndex.url({ query: { page: 1, limit: 1 } }));
             availableServices.value = response.data.services || [];
 
             // Fallback to default services if none returned
@@ -89,16 +90,17 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         }
 
         // Always pass as 'page' parameter - service will handle conversion
-        const url = new URL('/api/browse', window.location.origin);
-        url.searchParams.set('page', String(pageToRequest));
+        const queryParams: Record<string, string | number> = {
+            page: String(pageToRequest),
+        };
 
         // Include service parameter if available
         const currentService = options.currentTabService.value;
         if (currentService) {
-            url.searchParams.set('source', currentService);
+            queryParams.source = currentService;
         }
 
-        const response = await window.axios.get(url.toString());
+        const response = await window.axios.get(browseIndex.url({ query: queryParams }));
         const data = response.data;
 
         // Update currentPage to the page we just loaded

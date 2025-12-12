@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from 'vue';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
+import { show as getReaction } from '@/actions/App/Http/Controllers/FileReactionController';
 
 interface Props {
     fileId?: number;
@@ -44,7 +45,7 @@ async function fetchReaction(): Promise<void> {
     }
 
     try {
-        const response = await window.axios.get(`/api/files/${props.fileId}/reaction`);
+        const response = await window.axios.get(getReaction.url(props.fileId));
         currentReaction.value = response.data.reaction?.type || null;
     } catch (error) {
         console.error('Failed to fetch reaction:', error);
