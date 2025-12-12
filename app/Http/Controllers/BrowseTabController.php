@@ -143,7 +143,7 @@ class BrowseTabController extends Controller
                 'files.auto_disliked',
             ])
             ->with(['metadata' => function ($query) {
-                // Only load the payload column from metadata (longtext, but needed for dimensions)
+                // Load the payload column from metadata (longtext, needed for dimensions and prompt)
                 $query->select('id', 'file_id', 'payload');
             }])
             ->orderByPivot('position')

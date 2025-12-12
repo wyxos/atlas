@@ -71,6 +71,7 @@ class FileResource extends JsonResource
             'not_found' => $this->not_found,
             'listing_metadata' => $this->listing_metadata,
             'detail_metadata' => $this->detail_metadata,
+            'metadata' => $this->metadata ? ['payload' => $this->metadata->payload] : null,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
         ];

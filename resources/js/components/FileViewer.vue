@@ -439,6 +439,15 @@ function handleOverlayImageClick(e: MouseEvent): void {
 
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
+    // Middle click without ALT - open original URL (prevent default to avoid browser scroll)
+    if (!e.altKey && e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Actual opening will be handled in auxclick
+        return;
+    }
+
+    // ALT + Middle Click = Favorite
     if (e.altKey && e.button === 1 && currentItemIndex.value !== null) {
         e.preventDefault();
         e.stopPropagation();
@@ -446,6 +455,27 @@ function handleOverlayImageMouseDown(e: MouseEvent): void {
         const currentItem = items.value[currentItemIndex.value];
         if (currentItem) {
             handleReaction('love');
+        }
+    }
+}
+
+// Handle middle click (auxclick) to open original URL
+function handleOverlayImageAuxClick(e: MouseEvent): void {
+    // Middle click without ALT - open original URL
+    if (!e.altKey && e.button === 1 && currentItemIndex.value !== null) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const currentItem = items.value[currentItemIndex.value];
+        if (currentItem) {
+            const url = currentItem.originalUrl || currentItem.src;
+            if (url) {
+                try {
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                } catch {
+                    // ignore
+                }
+            }
         }
     }
 }
@@ -1008,7 +1038,7 @@ defineExpose({
                     transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
                     transformOrigin: 'center center',
                 }" draggable="false" @click="handleOverlayImageClick" @contextmenu.prevent="handleOverlayImageClick"
-                @mousedown="handleOverlayImageMouseDown" />
+                @mousedown="handleOverlayImageMouseDown" @auxclick="handleOverlayImageAuxClick" />
 
             <!-- Close button -->
             <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -60,6 +60,12 @@ const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
 const previewedItems = ref<Set<number>>(new Set());
 // Dialog state for reset to first page warning
 const resetDialogOpen = ref(false);
+// Track prompt data loading state per item
+const promptDataLoading = ref<Map<number, boolean>>(new Map());
+const promptDataCache = ref<Map<number, string>>(new Map());
+// Dialog state for prompt display
+const promptDialogOpen = ref<boolean>(false);
+const promptDialogItemId = ref<number | null>(null);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -150,6 +156,11 @@ function onMasonryMouseDown(e: MouseEvent): void {
     if (e.altKey && e.button === 1) {
         handleAltClickOnMasonry(e);
     }
+    // Prevent browser scroll for middle click (without ALT) - actual opening happens on auxclick
+    if (!e.altKey && e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
 }
 
 function handleAltClickOnMasonry(e: MouseEvent): void {
@@ -232,6 +243,136 @@ function captureRemoveFn(remove: (item: MasonryItem) => void): void {
         masonryRemoveFn.value = remove;
     }
 }
+
+// Load prompt data for an item (from metadata or API)
+async function loadPromptData(item: MasonryItem): Promise<string | null> {
+    // Check cache first
+    if (promptDataCache.value.has(item.id)) {
+        return promptDataCache.value.get(item.id) ?? null;
+    }
+
+    // Check if prompt is already in metadata
+    const metadata = (item as any).metadata;
+    if (metadata?.prompt) {
+        const prompt = String(metadata.prompt);
+        promptDataCache.value.set(item.id, prompt);
+        return prompt;
+    }
+
+    // Load from API if not in metadata
+    if (promptDataLoading.value.get(item.id)) {
+        return null; // Already loading
+    }
+
+    promptDataLoading.value.set(item.id, true);
+    try {
+        const response = await window.axios.get(`/api/files/${item.id}`);
+        const file = response.data?.file;
+        // Check metadata payload (JSON) or detail_metadata
+        const metadataPayload = file?.metadata?.payload;
+        const prompt = (typeof metadataPayload === 'object' && metadataPayload?.prompt)
+            ? String(metadataPayload.prompt)
+            : (file?.detail_metadata?.prompt ? String(file.detail_metadata.prompt) : null);
+        if (prompt) {
+            promptDataCache.value.set(item.id, prompt);
+            return prompt;
+        }
+        return null;
+    } catch (error) {
+        console.error('Failed to load prompt data:', error);
+        return null;
+    } finally {
+        promptDataLoading.value.set(item.id, false);
+    }
+}
+
+// Get prompt data for display (from cache or metadata)
+function getPromptData(item: MasonryItem): string | null {
+    const metadata = (item as any).metadata;
+    return promptDataCache.value.get(item.id) || metadata?.prompt || null;
+}
+
+// Get current prompt dialog item
+const currentPromptItem = computed(() => {
+    if (promptDialogItemId.value === null) return null;
+    return items.value.find(item => item.id === promptDialogItemId.value) || null;
+});
+
+// Get prompt data for current dialog item
+const currentPromptData = computed(() => {
+    const item = currentPromptItem.value;
+    if (!item) return null;
+    return getPromptData(item);
+});
+
+// Open prompt dialog for an item
+async function openPromptDialog(item: MasonryItem): Promise<void> {
+    promptDialogItemId.value = item.id;
+    promptDialogOpen.value = true;
+    // Load prompt data if not already loaded
+    if (!getPromptData(item) && !promptDataLoading.value.get(item.id)) {
+        await loadPromptData(item);
+    }
+}
+
+// Close prompt dialog
+function closePromptDialog(): void {
+    promptDialogOpen.value = false;
+    // Keep itemId for a moment to allow dialog to close smoothly
+    setTimeout(() => {
+        promptDialogItemId.value = null;
+    }, 200);
+}
+
+// Copy prompt to clipboard
+async function copyPromptToClipboard(prompt: string): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(prompt);
+    } catch (error) {
+        console.error('Failed to copy prompt:', error);
+    }
+}
+
+// Open original URL in new tab (matching atlas implementation)
+function openOriginalUrl(item: MasonryItem): void {
+    const url = item.originalUrl || item.src;
+    if (url) {
+        try {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch {
+            // ignore
+        }
+    }
+}
+
+// Handle middle click mousedown on masonry item (prevent default to avoid browser scroll)
+function handleMasonryItemMouseDown(e: MouseEvent, item: MasonryItem): void {
+    // Middle click without ALT - prevent default to avoid browser scroll
+    // Actual opening will be handled in auxclick
+    if (!e.altKey && e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}
+
+// Handle middle click (auxclick) on masonry item to open original URL
+function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
+    // Middle click without ALT - open original URL
+    if (!e.altKey && e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const url = item.originalUrl || item.src;
+        if (url) {
+            try {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            } catch {
+                // ignore
+            }
+        }
+    }
+}
+
 
 // Increment preview count when item is preloaded
 async function handleItemPreload(fileId: number): Promise<void> {
@@ -696,7 +837,9 @@ onUnmounted(() => {
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item"
-                                    :data-key="item.key">
+                                    :data-key="item.key"
+                                    @mousedown="(e: MouseEvent) => handleMasonryItemMouseDown(e, item)"
+                                    @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item)">
                                     <!-- Auto-disliked indicator overlay with smooth animation -->
                                     <Transition name="ring-fade">
                                         <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
@@ -726,6 +869,16 @@ onUnmounted(() => {
                                             'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
                                             imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
                                         ]" />
+
+                                    <!-- Info badge (shows on hover, opens dialog on click) -->
+                                    <div v-if="hoveredItemIndex === index && imageLoaded"
+                                        class="absolute top-2 right-2 z-50 pointer-events-auto">
+                                        <Button variant="ghost" size="sm"
+                                            class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
+                                            @click.stop="() => openPromptDialog(item)" aria-label="Show prompt">
+                                            <Info :size="14" />
+                                        </Button>
+                                    </div>
 
                                     <!-- Hover reactions overlay -->
                                     <div v-show="hoveredItemIndex === index && imageLoaded"
@@ -807,6 +960,45 @@ onUnmounted(() => {
                     <Button @click="resetToFirstPage" variant="destructive">
                         Reset to First Page
                     </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Prompt Dialog -->
+        <Dialog v-model="promptDialogOpen" @update:model-value="(val) => { if (!val) closePromptDialog(); }">
+            <DialogContent class="sm:max-w-[600px] bg-prussian-blue-600">
+                <DialogHeader>
+                    <DialogTitle class="text-twilight-indigo-100">Prompt</DialogTitle>
+                </DialogHeader>
+                <div class="space-y-4">
+                    <div v-if="promptDialogItemId !== null && promptDataLoading.get(promptDialogItemId)"
+                        class="flex items-center gap-2 text-sm text-twilight-indigo-100">
+                        <Loader2 :size="16" class="animate-spin" />
+                        <span>Loading prompt...</span>
+                    </div>
+                    <div v-else-if="currentPromptData" class="space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <div
+                                class="flex-1 whitespace-pre-wrap wrap-break-word text-sm text-twilight-indigo-100 max-h-[60vh] overflow-y-auto">
+                                {{ currentPromptData }}
+                            </div>
+                            <Button variant="ghost" size="sm" class="h-8 w-8 p-0 shrink-0"
+                                @click="() => { if (currentPromptData) copyPromptToClipboard(currentPromptData); }"
+                                aria-label="Copy prompt">
+                                <Copy :size="16" />
+                            </Button>
+                        </div>
+                    </div>
+                    <div v-else class="text-sm text-twilight-indigo-300">
+                        No prompt data available
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose as-child>
+                        <Button variant="outline" @click="closePromptDialog">
+                            Close
+                        </Button>
+                    </DialogClose>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
