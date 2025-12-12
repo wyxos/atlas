@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\DownloadFile;
 use App\Models\BrowseTab;
 use App\Models\File;
 use App\Models\Reaction;
@@ -48,8 +49,17 @@ class FileReactionController extends Controller
 
         // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
         // If user manually dislikes, keep auto_disliked flag
+        // Also remove blacklist flags if file was blacklisted and user is reacting positively
         if (in_array($validated['type'], ['love', 'like', 'funny'])) {
-            $file->update(['auto_disliked' => false]);
+            $updates = ['auto_disliked' => false];
+
+            // Clear blacklist if file was blacklisted
+            if ($file->blacklisted_at !== null) {
+                $updates['blacklisted_at'] = null;
+                $updates['blacklist_reason'] = null;
+            }
+
+            $file->update($updates);
         }
 
         // Create the new reaction
@@ -58,6 +68,11 @@ class FileReactionController extends Controller
             'user_id' => $user->id,
             'type' => $validated['type'],
         ]);
+
+        // Dispatch download job if reaction is not dislike
+        if ($validated['type'] !== 'dislike') {
+            DownloadFile::dispatch($file->id);
+        }
 
         // Detach file from all tabs belonging to this user
         // This removes the file from tabs when a reaction is applied

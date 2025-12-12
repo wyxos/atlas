@@ -1,5 +1,6 @@
 - Browse
     - grouping by specific container
+    - filtering
     - download
     - blacklist
       - auto blacklist from moderation rule

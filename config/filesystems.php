@@ -60,6 +60,22 @@ return [
             'report' => false,
         ],
 
+        'atlas' => [
+            'driver' => 'local',
+            'root' => storage_path('app/atlas'),
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'atlas-app' => [
+            'driver' => 'local',
+            'root' => storage_path('app/atlas/.app'),
+            'serve' => true,
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
