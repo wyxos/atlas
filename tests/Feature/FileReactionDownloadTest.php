@@ -85,7 +85,8 @@ test('does not dispatch download job when removing reaction', function () {
         'type' => 'like',
     ]);
 
-    Queue::fake(); // Reset queue fake
+    // Clear any jobs from the first request
+    Queue::fake();
 
     // Then remove it by clicking the same reaction again
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/reaction", [
@@ -93,6 +94,10 @@ test('does not dispatch download job when removing reaction', function () {
     ]);
 
     $response->assertSuccessful();
+
+    // Wait a moment for afterResponse jobs to be dispatched (if any)
+    // Since the method returns early when removing, no job should be dispatched
+    sleep(1);
 
     // No job should be dispatched when removing a reaction
     Queue::assertNotPushed(DownloadFile::class);
