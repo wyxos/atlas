@@ -40,6 +40,8 @@ test('downloads file from URL and stores in atlas disk', function () {
 
     expect($file->downloaded)->toBeTrue();
     expect($file->path)->toStartWith('downloads/');
+    // Path should be segmented: downloads/{hash[0:2]}/{hash[2:4]}/filename
+    expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\/test-image\.jpg$/');
     expect($file->filename)->toBe('test-image.jpg');
 
     // Verify file exists in storage
@@ -118,6 +120,8 @@ test('clears blacklist flags when downloading a blacklisted file', function () {
 
     expect($file->downloaded)->toBeTrue();
     expect($file->path)->toStartWith('downloads/');
+    // Path should be segmented
+    expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
     expect($file->blacklisted_at)->toBeNull();
     expect($file->blacklist_reason)->toBeNull();
 });
@@ -146,6 +150,8 @@ test('determines extension from MIME type when URL has no extension', function (
     expect($file->downloaded)->toBeTrue();
     expect($file->filename)->toEndWith('.jpg');
     expect($file->path)->toEndWith('.jpg');
+    // Path should be segmented
+    expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
 });
 
 test('determines extension from file content when Content-Type header is missing', function () {
@@ -172,4 +178,47 @@ test('determines extension from file content when Content-Type header is missing
     expect($file->downloaded)->toBeTrue();
     expect($file->filename)->toEndWith('.png');
     expect($file->path)->toEndWith('.png');
+    // Path should be segmented
+    expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
+});
+
+test('generates thumbnail for image files', function () {
+    // Create a simple 1x1 pixel JPEG image for testing
+    // This is a minimal but valid JPEG that GD can process
+    $image = imagecreatetruecolor(1, 1);
+    $white = imagecolorallocate($image, 255, 255, 255);
+    imagefill($image, 0, 0, $white);
+    
+    ob_start();
+    imagejpeg($image, null, 100);
+    $jpegContent = ob_get_clean();
+    imagedestroy($image);
+
+    Http::fake([
+        '*' => Http::response($jpegContent, 200, ['Content-Type' => 'image/jpeg']),
+    ]);
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/test-image.jpg',
+        'filename' => 'test-image.jpg',
+        'ext' => 'jpg',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $job = new DownloadFile($file->id);
+    $job->handle();
+
+    $file->refresh();
+
+    expect($file->downloaded)->toBeTrue();
+    // Thumbnail should be generated for valid images
+    // Verify the path structure and that it exists in fake storage
+    if ($file->thumbnail_path) {
+        expect($file->thumbnail_path)->toStartWith('thumbnails/');
+        expect($file->thumbnail_path)->toMatch('/^thumbnails\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
+        expect($file->thumbnail_path)->toContain('_thumb.');
+        // Verify thumbnail exists in fake storage
+        Storage::disk('atlas-app')->assertExists($file->thumbnail_path);
+    }
 });

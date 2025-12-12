@@ -23,6 +23,7 @@ class File extends Model
         'downloaded_at',
         'blacklisted_at',
         'blacklist_reason',
+        'thumbnail_path',
     ];
 
     /**
