@@ -14,6 +14,7 @@ const mockAxios = {
     post: vi.fn(),
     put: vi.fn(),
     delete: vi.fn(),
+    patch: vi.fn(),
 };
 
 vi.mock('axios', () => ({
@@ -97,6 +98,9 @@ beforeEach(() => {
         // For other URLs, return a default response
         return Promise.resolve({ data: { items: [], nextPage: null } });
     });
+
+    // Default mock for patch (setActive) - resolves successfully
+    mockAxios.patch.mockResolvedValue({ data: {} });
 });
 
 async function createTestRouter(initialPath = '/browse') {
@@ -168,6 +172,7 @@ function createMockTabConfig(tabId: number, overrides: Record<string, any> = {})
         file_ids: [],
         items_data: [],
         position: 0,
+        is_active: false,
         ...overrides,
     };
 }
@@ -430,6 +435,7 @@ describe('Browse', () => {
                 query_params: {},
                 file_ids: [],
                 position: 0,
+                is_active: false,
             },
         });
 
@@ -488,6 +494,7 @@ describe('Browse', () => {
                 query_params: {},
                 file_ids: [],
                 position: 0,
+                is_active: false,
             },
         });
 
@@ -552,6 +559,7 @@ describe('Browse', () => {
                 query_params: {},
                 file_ids: [],
                 position: 0,
+                is_active: false,
             },
         });
 
@@ -617,6 +625,7 @@ describe('Browse', () => {
                 query_params: {},
                 file_ids: [],
                 position: 0,
+                is_active: false,
             },
         });
 
@@ -1352,6 +1361,7 @@ describe('Browse', () => {
                 query_params: {}, // No service - should not auto-load
                 file_ids: [],
                 position: 0,
+                is_active: false,
             },
         });
 
@@ -1789,6 +1799,7 @@ describe('Browse', () => {
                 query_params: {},
                 file_ids: [],
                 position: 0,
+                is_active: false,
             },
         });
 

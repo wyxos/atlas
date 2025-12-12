@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string label
  * @property array|null query_params
  * @property int position
+ * @property bool is_active
  * @property Carbon|null created_at
  * @property Carbon|null updated_at
  *
@@ -46,6 +47,7 @@ class BrowseTab extends Model
         'label',
         'query_params',
         'position',
+        'is_active',
     ];
 
     /**
@@ -58,6 +60,7 @@ class BrowseTab extends Model
         return [
             'query_params' => 'array',
             'position' => 'integer',
+            'is_active' => 'boolean',
         ];
     }
 
