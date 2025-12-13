@@ -26,10 +26,25 @@ export function useMasonryRestore(
         // Try to use masonry's restore method if available
         if (typeof instance.restore === 'function') {
             instance.restore(item, index);
+            // Trigger layout recalculation for proper animation
+            if (typeof instance.refreshLayout === 'function') {
+                await nextTick();
+                instance.refreshLayout(items.value);
+            }
         } else if (typeof instance.add === 'function') {
             instance.add(item, index);
+            // Trigger layout recalculation for proper animation
+            if (typeof instance.refreshLayout === 'function') {
+                await nextTick();
+                instance.refreshLayout(items.value);
+            }
         } else if (typeof instance.insert === 'function') {
             instance.insert(item, index);
+            // Trigger layout recalculation for proper animation
+            if (typeof instance.refreshLayout === 'function') {
+                await nextTick();
+                instance.refreshLayout(items.value);
+            }
         } else {
             // Fallback: manually insert at original index and refresh layout
             const clampedIndex = Math.min(index, items.value.length);
@@ -69,28 +84,24 @@ export function useMasonryRestore(
             return; // All items already exist
         }
 
-        // Try to use masonry's restoreMany method if available
-        if (typeof instance.restoreMany === 'function') {
-            const sortedItems = itemsToAdd.map(({ item }) => item);
-            const sortedIndices = itemsToAdd.map(({ index }) => index);
-            instance.restoreMany(sortedItems, sortedIndices);
-        } else if (typeof instance.addMany === 'function') {
-            const sortedItems = itemsToAdd.map(({ item }) => item);
-            const sortedIndices = itemsToAdd.map(({ index }) => index);
-            instance.addMany(sortedItems, sortedIndices);
-        } else {
-            // Fallback: restore items one by one in order
-            // We need to restore in reverse order to maintain correct indices
-            // (restoring from highest index to lowest prevents index shifting issues)
-            const reverseOrder = [...itemsToAdd].reverse();
-            for (const { item, index } of reverseOrder) {
-                await restoreToMasonry(item, index, instance);
-            }
-            // Trigger layout recalculation after all items are restored
-            if (typeof instance.refreshLayout === 'function') {
-                await nextTick();
-                instance.refreshLayout(items.value);
-            }
+        // Manually splice items into array at their original indices (like atlas does)
+        // This ensures proper animation when refreshLayout is called
+        itemsToAdd.forEach(({ item, index }) => {
+            const clampedIndex = Math.max(0, Math.min(index, items.value.length));
+            items.value.splice(clampedIndex, 0, item);
+        });
+
+        // Trigger layout recalculation using requestAnimationFrame for smooth animation
+        // (matching atlas implementation pattern)
+        if (typeof instance.refreshLayout === 'function') {
+            await nextTick();
+            requestAnimationFrame(() => {
+                try {
+                    instance.refreshLayout(items.value);
+                } catch {
+                    // ignore errors
+                }
+            });
         }
     }
 

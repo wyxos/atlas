@@ -109,18 +109,20 @@ function handleMouseLeave(): void {
                     </div>
                 </div>
 
-                <!-- Reaction Icon -->
-                <component :is="reactionIcons[batch.type]" :size="20" :class="reactionColors[batch.type]" />
+                <div class="flex-1 flex gap-4 min-w-0">
+                    <!-- Reaction Icon -->
+                    <component :is="reactionIcons[batch.type]" :size="20" :class="reactionColors[batch.type]" />
 
-                <!-- Batch Info and Progress Bar -->
-                <div class="flex-1 min-w-0">
-                    <div class="text-sm text-white font-medium truncate mb-1">
-                        {{ batch.reactions.length }} files
-                    </div>
-                    <!-- Progress Bar -->
-                    <div class="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div class="h-full bg-smart-blue-400"
-                            :style="{ width: `${getProgress(batch)}%`, transition: 'width 0.05s linear' }" />
+                    <!-- Batch Info and Progress Bar -->
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm text-white font-medium truncate mb-1">
+                            {{ batch.reactions.length }} files
+                        </div>
+                        <!-- Progress Bar -->
+                        <div class="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div class="h-full bg-smart-blue-400"
+                                 :style="{ width: `${getProgress(batch)}%`, transition: 'width 0.05s linear' }" />
+                        </div>
                     </div>
                 </div>
 
