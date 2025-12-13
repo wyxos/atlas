@@ -9,8 +9,8 @@ type PillVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 
 export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     const hoveredContainerId = ref<number | null>(null);
 
-    // Get containers for a specific item
-    function getContainersForItem(item: MasonryItem): Array<{ id: number; type: string }> {
+    // Get containers for a specific item (returns full container data including referrer)
+    function getContainersForItem(item: MasonryItem): Array<{ id: number; type: string; source?: string; source_id?: string; referrer?: string }> {
         const containers = (item as any).containers || [];
         return containers.filter((container: { id?: number; type?: string }) => container?.id && container?.type);
     }
