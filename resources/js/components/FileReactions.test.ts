@@ -8,13 +8,23 @@ const mockAxios = {
     post: vi.fn(() => Promise.resolve({ data: { reaction: null } })),
 };
 
+// Mock useReactionBatch composable
+const mockQueueReactionFetch = vi.fn();
+vi.mock('@/composables/useReactionBatch', () => ({
+    useReactionBatch: () => ({
+        queueReactionFetch: mockQueueReactionFetch,
+    }),
+}));
+
 beforeEach(() => {
     vi.clearAllMocks();
     mockAxios.get.mockReset();
     mockAxios.post.mockReset();
+    mockQueueReactionFetch.mockReset();
     // Reset default mock
     mockAxios.get.mockImplementation(() => Promise.resolve({ data: { reaction: null } }));
     mockAxios.post.mockImplementation(() => Promise.resolve({ data: { reaction: null } }));
+    mockQueueReactionFetch.mockResolvedValue({ reaction: null });
 });
 
 // Mock window.axios
@@ -68,11 +78,9 @@ describe('FileReactions', () => {
     });
 
     it('fetches reaction on mount when fileId is provided', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
+        mockQueueReactionFetch.mockResolvedValueOnce({
+            reaction: {
+                type: 'like',
             },
         });
 
@@ -84,7 +92,7 @@ describe('FileReactions', () => {
 
         await flushPromises();
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/files/1/reaction');
+        expect(mockQueueReactionFetch).toHaveBeenCalledWith(1);
     });
 
     it('does not fetch reaction when fileId is not provided', async () => {
@@ -98,11 +106,9 @@ describe('FileReactions', () => {
     });
 
     it('displays favorite reaction as active', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: {
-                    type: 'love',
-                },
+        mockQueueReactionFetch.mockResolvedValueOnce({
+            reaction: {
+                type: 'love',
             },
         });
 
@@ -120,17 +126,15 @@ describe('FileReactions', () => {
         // Wait for watch to complete
         await new Promise(resolve => setTimeout(resolve, 50));
         await wrapper.vm.$nextTick();
-        
+
         expect(vm.favorite).toBe(true);
         expect(vm.currentReaction).toBe('love');
     });
 
     it('displays like reaction as active', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                reaction: {
-                    type: 'like',
-                },
+        mockQueueReactionFetch.mockResolvedValue({
+            reaction: {
+                type: 'like',
             },
         });
 
@@ -150,11 +154,9 @@ describe('FileReactions', () => {
     });
 
     it('displays dislike reaction as active', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                reaction: {
-                    type: 'dislike',
-                },
+        mockQueueReactionFetch.mockResolvedValue({
+            reaction: {
+                type: 'dislike',
             },
         });
 
@@ -174,11 +176,9 @@ describe('FileReactions', () => {
     });
 
     it('displays funny reaction as active', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                reaction: {
-                    type: 'funny',
-                },
+        mockQueueReactionFetch.mockResolvedValue({
+            reaction: {
+                type: 'funny',
             },
         });
 
@@ -199,11 +199,7 @@ describe('FileReactions', () => {
 
 
     it('calls removeItem and emits reaction event when removeItem prop is provided', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: null,
-            },
-        });
+        mockQueueReactionFetch.mockResolvedValueOnce({ reaction: null });
 
         const removeItem = vi.fn();
         const wrapper = mount(FileReactions, {
@@ -231,11 +227,7 @@ describe('FileReactions', () => {
     });
 
     it('emits reaction event when removeItem prop is not provided', async () => {
-        mockAxios.get.mockResolvedValueOnce({
-            data: {
-                reaction: null,
-            },
-        });
+        mockQueueReactionFetch.mockResolvedValueOnce({ reaction: null });
 
         const wrapper = mount(FileReactions, {
             props: {
@@ -273,11 +265,7 @@ describe('FileReactions', () => {
     });
 
     it('fetches reaction when fileId changes', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                reaction: null,
-            },
-        });
+        mockQueueReactionFetch.mockResolvedValue({ reaction: null });
 
         const wrapper = mount(FileReactions, {
             props: {
@@ -287,21 +275,17 @@ describe('FileReactions', () => {
 
         await flushPromises();
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/files/1/reaction');
+        expect(mockQueueReactionFetch).toHaveBeenCalledWith(1);
 
         // Change fileId
         await wrapper.setProps({ fileId: 2 });
         await flushPromises();
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/files/2/reaction');
+        expect(mockQueueReactionFetch).toHaveBeenCalledWith(2);
     });
 
     it('stops click event propagation', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                reaction: null,
-            },
-        });
+        mockQueueReactionFetch.mockResolvedValue({ reaction: null });
 
         const wrapper = mount(FileReactions, {
             props: {
