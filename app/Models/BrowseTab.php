@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Model;
+use App\Services\FileItemFormatter;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -99,34 +100,13 @@ class BrowseTab extends Model
     }
 
     /**
-     * Format files into items structure for frontend (similar to Browser.php).
+     * Format files into items structure for frontend.
      *
      * @param  \Illuminate\Database\Eloquent\Collection<int, \App\Models\File>  $files
      * @return array<int, array<string, mixed>>
      */
     public static function formatFilesToItems($files, int $page = 1): array
     {
-        return $files->map(function (File $file, int $index) use ($page) {
-            $metadata = $file->metadata?->payload ?? [];
-            $listingMetadata = $file->listing_metadata ?? [];
-
-            return [
-                'id' => $file->id, // Database file ID
-                'width' => (int) ($metadata['width'] ?? 500),
-                'height' => (int) ($metadata['height'] ?? 500),
-                'src' => $file->thumbnail_url ?? $file->url, // Use thumbnail for masonry grid, fallback to original
-                'originalUrl' => $file->url, // Keep original URL for full-size viewing
-                'thumbnail' => $file->thumbnail_url,
-                'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
-                'page' => $page,
-                'key' => "{$page}-{$file->id}", // Combined key for unique identification
-                'index' => $index,
-                'notFound' => false,
-                'previewed_count' => $file->previewed_count ?? 0,
-                'seen_count' => $file->seen_count ?? 0,
-                'auto_disliked' => $file->auto_disliked ?? false,
-                'metadata' => $metadata, // Include metadata for prompt data
-            ];
-        })->values()->all();
+        return FileItemFormatter::format($files, $page);
     }
 }
