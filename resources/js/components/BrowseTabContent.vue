@@ -26,6 +26,9 @@ import { useContainerBadges } from '@/composables/useContainerBadges';
 import { usePromptData } from '@/composables/usePromptData';
 import { useMasonryInteractions } from '@/composables/useMasonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
+import { useMasonryRestore } from '@/composables/useMasonryRestore';
+import { useResetDialog } from '@/composables/useResetDialog';
+import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -60,8 +63,6 @@ const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
 // Store remove function from masonry slot to use in FileViewer
 const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
-// Dialog state for reset to first page warning
-const resetDialogOpen = ref(false);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -73,6 +74,20 @@ const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
 
 // Item preview composable (needs to be initialized early)
 const itemPreview = useItemPreview(items, computed(() => props.tab));
+
+// Masonry restore composable
+const { restoreToMasonry } = useMasonryRestore(items, masonry);
+
+// Reset dialog composable
+const resetDialog = useResetDialog(
+    items,
+    masonry,
+    currentPage,
+    nextCursor,
+    loadAtPage,
+    computed(() => props.tab),
+    props.updateActiveTab
+);
 
 // Backfill state and handlers
 const {
@@ -209,88 +224,22 @@ function captureRemoveFn(remove: (item: MasonryItem) => void): void {
 
 
 
-// Increment preview count when item is preloaded (batched)
-
-// Handle reaction with queue (wrapper for masonry removeItem callback)
-async function handleMasonryReaction(
-    fileId: number,
-    type: 'love' | 'like' | 'dislike' | 'funny',
-    removeItem: (item: MasonryItem) => void
-): Promise<void> {
-    const item = items.value.find((i) => i.id === fileId);
-    const itemIndex = item ? items.value.findIndex((i) => i.id === fileId) : -1;
-    const tabId = props.tab?.id;
-
-    // Create restore callback to add item back to masonry at original index
-    const restoreItem = item && tabId !== undefined && itemIndex !== -1 ? async (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
-        // Only restore if the tab is active
-        const tabActive = isTabActive(restoreTabId);
-        if (!tabActive) {
-            return;
-        }
-
-        // Check if item is already in the array (avoid duplicates)
-        const existingIndex = items.value.findIndex((i) => i.id === item.id);
-        if (existingIndex === -1) {
-            // Try to use masonry's restore method if available, otherwise insert at original index
-            if (masonry.value && typeof (masonry.value as any).restore === 'function') {
-                (masonry.value as any).restore(item, itemIndex);
-            } else if (masonry.value && typeof (masonry.value as any).add === 'function') {
-                (masonry.value as any).add(item, itemIndex);
-            } else if (masonry.value && typeof (masonry.value as any).insert === 'function') {
-                (masonry.value as any).insert(item, itemIndex);
-            } else {
-                // Fallback: manually insert at original index and refresh layout
-                const clampedIndex = Math.min(itemIndex, items.value.length);
-                items.value.splice(clampedIndex, 0, item);
-                // Trigger layout recalculation and animation
-                if (masonry.value && typeof masonry.value.refreshLayout === 'function') {
-                    // Use nextTick to ensure Vue has processed the array change
-                    await nextTick();
-                    masonry.value.refreshLayout(items.value);
-                }
-            }
-        }
-    } : undefined;
-
-    if (item && removeItem) {
-        removeItem(item);
-    }
-
-    // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
-    if (item && (type === 'love' || type === 'like' || type === 'funny')) {
-        const itemIndex = items.value.findIndex((i) => i.id === fileId);
-        if (itemIndex !== -1) {
-            Object.assign(items.value[itemIndex], {
-                auto_disliked: false,
-            });
-        }
-        // Also update in tab.itemsData if it exists
-        if (props.tab?.itemsData) {
-            const tabItemIndex = props.tab.itemsData.findIndex((i) => i.id === fileId);
-            if (tabItemIndex !== -1) {
-                Object.assign(props.tab.itemsData[tabItemIndex], {
-                    auto_disliked: false,
-                });
-            }
-        }
-        await nextTick();
-    }
-
-    // Queue the AJAX request with restore callback, tab ID, index, and item
-    const previewUrl = item?.src;
-    queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, tabId, itemIndex, item);
-
-    // Emit to parent
-    props.onReaction(fileId, type);
-}
-
-// Initialize composables that depend on handleMasonryReaction
+// Initialize composables
 // Container badges composable
 const containerBadges = useContainerBadges(items);
 
 // Prompt data composable
 const promptData = usePromptData(items);
+
+// Masonry reaction handler composable (needs restoreToMasonry)
+const { handleMasonryReaction } = useMasonryReactionHandler(
+    items,
+    masonry,
+    masonryRemoveFn,
+    computed(() => props.tab),
+    props.onReaction,
+    restoreToMasonry
+);
 
 // Masonry interactions composable (needs handleMasonryReaction)
 const masonryInteractions = useMasonryInteractions(
@@ -300,31 +249,6 @@ const masonryInteractions = useMasonryInteractions(
     handleMasonryReaction
 );
 
-// Restore item to masonry (used by FileViewer)
-async function restoreToMasonry(item: MasonryItem, index: number, masonryInstance?: any): Promise<void> {
-    // Restore item to masonry at original index
-    const existingIndex = items.value.findIndex((i) => i.id === item.id);
-    if (existingIndex === -1) {
-        // Try to use masonry's restore method if available
-        if (masonryInstance && typeof masonryInstance.restore === 'function') {
-            masonryInstance.restore(item, index);
-        } else if (masonryInstance && typeof masonryInstance.add === 'function') {
-            masonryInstance.add(item, index);
-        } else if (masonryInstance && typeof masonryInstance.insert === 'function') {
-            masonryInstance.insert(item, index);
-        } else {
-            // Fallback: manually insert at original index and refresh layout
-            const clampedIndex = Math.min(index, items.value.length);
-            items.value.splice(clampedIndex, 0, item);
-            // Trigger layout recalculation and animation
-            if (masonryInstance && typeof masonryInstance.refreshLayout === 'function') {
-                // Use nextTick to ensure Vue has processed the array change
-                await nextTick();
-                masonryInstance.refreshLayout(items.value);
-            }
-        }
-    }
-}
 
 // Apply selected service to current tab
 async function applyService(): Promise<void> {
@@ -345,58 +269,6 @@ async function applyService(): Promise<void> {
     );
 }
 
-// Check if we're on the first page
-const isOnFirstPage = computed(() => {
-    return currentPage.value === 1 || currentPage.value === null;
-});
-
-// Open reset dialog
-function openResetDialog(): void {
-    resetDialogOpen.value = true;
-}
-
-// Close reset dialog
-function closeResetDialog(): void {
-    resetDialogOpen.value = false;
-}
-
-// Reset to first page
-async function resetToFirstPage(): Promise<void> {
-    if (!props.tab) {
-        return;
-    }
-
-    // Reset state first
-    currentPage.value = 1;
-    nextCursor.value = null;
-    loadAtPage.value = 1;
-
-    // Update tab data
-    props.updateActiveTab([], [], {
-        ...props.tab.queryParams,
-        page: 1,
-        next: null,
-    });
-
-    // Close dialog
-    closeResetDialog();
-
-    // Use Masonry's built-in reset() method which properly handles animations
-    if (masonry.value && typeof masonry.value.reset === 'function') {
-        masonry.value.reset();
-
-        // After reset, load page 1 to populate content
-        await nextTick();
-
-        if (masonry.value && typeof masonry.value.loadPage === 'function') {
-            await masonry.value.loadPage(1);
-        }
-    } else {
-        // Fallback: manually clear items if reset() is not available
-        items.value = [];
-        await nextTick();
-    }
-}
 
 async function handleCarouselLoadMore(): Promise<void> {
     if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
@@ -608,8 +480,8 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <Button v-if="hasServiceSelected && !isOnFirstPage" @click="openResetDialog" size="sm" variant="ghost"
-                    class="h-10 w-10" color="danger" data-test="reset-to-first-page-button">
+                <Button v-if="hasServiceSelected && !resetDialog.isOnFirstPage" @click="resetDialog.openResetDialog"
+                    size="sm" variant="ghost" class="h-10 w-10" color="danger" data-test="reset-to-first-page-button">
                     fast backward lucide icon
 
                 </Button>
@@ -774,7 +646,7 @@ onUnmounted(() => {
             :visible="tab !== null && tab !== undefined && hasServiceSelected" />
 
         <!-- Reset to First Page Warning Dialog -->
-        <Dialog v-model="resetDialogOpen">
+        <Dialog v-model="resetDialog.resetDialogOpen.value">
             <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
                 <DialogHeader>
                     <DialogTitle class="text-danger-400">Reset to First Page</DialogTitle>
@@ -786,11 +658,11 @@ onUnmounted(() => {
                 </DialogHeader>
                 <DialogFooter>
                     <DialogClose as-child>
-                        <Button variant="outline" @click="closeResetDialog">
+                        <Button variant="outline" @click="resetDialog.closeResetDialog">
                             Cancel
                         </Button>
                     </DialogClose>
-                    <Button @click="resetToFirstPage" variant="destructive">
+                    <Button @click="resetDialog.resetToFirstPage" variant="destructive">
                         Reset to First Page
                     </Button>
                 </DialogFooter>
