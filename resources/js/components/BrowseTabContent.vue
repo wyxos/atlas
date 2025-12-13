@@ -324,6 +324,30 @@ function getItemCountForContainerId(containerId: number): number {
     return count;
 }
 
+// Get color variant for a container type (deterministic mapping)
+function getVariantForContainerType(containerType: string): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
+    const variants: Array<'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = [
+        'primary',
+        'secondary',
+        'success',
+        'warning',
+        'danger',
+        'info',
+        'neutral',
+    ];
+
+    // Simple hash function to deterministically assign variant based on container type
+    let hash = 0;
+    for (let i = 0; i < containerType.length; i++) {
+        hash = ((hash << 5) - hash) + containerType.charCodeAt(i);
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+
+    // Use absolute value and modulo to get index
+    const index = Math.abs(hash) % variants.length;
+    return variants[index];
+}
+
 // Open prompt dialog for an item
 async function openPromptDialog(item: MasonryItem): Promise<void> {
     promptDialogItemId.value = item.id;
@@ -892,8 +916,10 @@ onUnmounted(() => {
                                     <!-- Container badges (shows on hover with type and count) -->
                                     <div v-if="hoveredItemIndex === index && imageLoaded && getContainersForItem(item).length > 0"
                                         class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
-                                        <Pill v-for="container in getContainersForItem(item)" :key="container.id" class="w-full"
-                                            :label="container.type" :value="getItemCountForContainerId(container.id)" variant="primary" />
+                                        <Pill v-for="container in getContainersForItem(item)" :key="container.id"
+                                            class="w-full" :label="container.type"
+                                            :value="getItemCountForContainerId(container.id)"
+                                            :variant="getVariantForContainerType(container.type)" />
                                     </div>
 
                                     <!-- Info badge (shows on hover, opens dialog on click) -->
