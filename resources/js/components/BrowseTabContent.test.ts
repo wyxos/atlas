@@ -149,7 +149,9 @@ vi.mock('@wyxos/vibe', () => ({
                 loadNext: mockLoadNext,
                 reset: mockReset,
             });
-            return {};
+            return {
+                remove: mockRemove,
+            };
         },
     },
     MasonryItem: {
@@ -305,6 +307,7 @@ vi.mock('lucide-vue-next', () => ({
     Info: { name: 'Info', template: '<div class="info-icon"></div>', props: ['size'] },
     Copy: { name: 'Copy', template: '<div class="copy-icon"></div>', props: ['size', 'class'] },
     RefreshCcw: { name: 'RefreshCcw', template: '<div class="refresh-icon"></div>', props: ['size'] },
+    ChevronsLeft: { name: 'ChevronsLeft', template: '<div class="chevrons-left-icon"></div>', props: ['size'] },
 }));
 
 // Mock composables
@@ -333,6 +336,11 @@ vi.mock('@/composables/useReactionQueue', () => ({
         queuedReactions: ref([]),
         queueReaction: vi.fn(),
         cancelReaction: vi.fn(),
+        cancelBatch: vi.fn(),
+        cancelAll: vi.fn(),
+        pauseAll: vi.fn(),
+        resumeAll: vi.fn(),
+        isPaused: ref(false),
     }),
 }));
 
