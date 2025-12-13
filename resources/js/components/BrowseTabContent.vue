@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -887,14 +887,14 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="rounded"
+                <Button v-if="hasServiceSelected && !isOnFirstPage" @click="openResetDialog" size="sm" variant="ghost" class="h-10 w-10"
+                    color="danger" data-test="reset-to-first-page-button">
+                    <ChevronsLeft :size="14" />
+                </Button>
+                <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="h-10 w-10"
                     data-test="apply-service-button">
                     <Loader2 v-if="isApplyingService" :size="14" class="mr-2 animate-spin" />
-                    Apply
-                </Button>
-                <Button v-if="hasServiceSelected && !isOnFirstPage" @click="openResetDialog" size="sm" variant="ghost"
-                    color="danger" class="rounded" data-test="reset-to-first-page-button">
-                    <AlertTriangle :size="14" />
+                    <RefreshCcw :size="14" v-else />
                 </Button>
             </div>
         </div>
