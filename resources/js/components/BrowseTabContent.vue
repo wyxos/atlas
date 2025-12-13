@@ -78,7 +78,7 @@ const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
 const itemPreview = useItemPreview(items, computed(() => props.tab));
 
 // Masonry restore composable
-const { restoreToMasonry } = useMasonryRestore(items, masonry);
+const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(items, masonry);
 
 // Reset dialog composable
 const resetDialog = useResetDialog(
@@ -236,7 +236,8 @@ const containerPillInteractions = useContainerPillInteractions(
     masonryRemoveFn,
     masonry,
     props.tab?.id,
-    props.onReaction
+    props.onReaction,
+    restoreManyToMasonry
 );
 
 // Prompt data composable

@@ -20,7 +20,7 @@ const tabMasonryLoadingStates = ref<Map<number, boolean>>(new Map());
 const tabDataLoadingStates = ref<Map<number, boolean>>(new Map());
 
 // Reaction queue
-const { queuedReactions, queueReaction, cancelReaction, pauseAll, resumeAll } = useReactionQueue();
+const { queuedReactions, queueReaction, cancelReaction, cancelBatch, pauseAll, resumeAll } = useReactionQueue();
 
 // Simplified tab switching - just set active tab ID
 async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promise<void> {
@@ -177,7 +177,8 @@ onMounted(async () => {
 
         <!-- Reaction Queue -->
         <ReactionQueue :queued-reactions="queuedReactions"
-            :on-cancel="(fileId) => cancelReaction(fileId, (tabId) => activeTabId === tabId)" :on-pause="pauseAll"
+            :on-cancel="(fileId) => cancelReaction(fileId, (tabId) => activeTabId === tabId)"
+            :on-cancel-batch="(batchId) => cancelBatch(batchId, (tabId) => activeTabId === tabId)" :on-pause="pauseAll"
             :on-resume="resumeAll" />
     </div>
 </template>
