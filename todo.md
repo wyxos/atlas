@@ -7,6 +7,7 @@
         - detail panel
     - local files
       - auto blacklist if preview count >= 5 while disliked
+    - handle video
 
 
 - implement file listing
@@ -16,6 +17,3 @@
     - image
     - audio
     - video
-- implement browse
-    - masonry
-    - single view
