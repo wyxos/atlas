@@ -162,30 +162,59 @@ class FilesController extends Controller
                 && $file->blacklisted_at === null;
         });
 
-        foreach ($candidates as $file) {
-            $hasReactions = Reaction::where('file_id', $file->id)->exists();
-            if (! $hasReactions) {
-                // Auto-dislike the file
-                $file->update(['auto_disliked' => true]);
+        if ($candidates->isNotEmpty()) {
+            $candidateIds = $candidates->pluck('id')->toArray();
 
-                // Create a dislike reaction
-                Reaction::updateOrCreate(
-                    [
-                        'file_id' => $file->id,
+            // Batch check which files have reactions (single query instead of N queries)
+            $filesWithReactions = Reaction::whereIn('file_id', $candidateIds)
+                ->pluck('file_id')
+                ->toArray();
+
+            // Filter candidates that don't have reactions
+            $filesToAutoDislike = array_diff($candidateIds, $filesWithReactions);
+
+            if (! empty($filesToAutoDislike)) {
+                // Batch update files with auto_disliked = true
+                File::whereIn('id', $filesToAutoDislike)->update(['auto_disliked' => true]);
+
+                // Batch insert dislike reactions
+                $reactionsToInsert = array_map(function ($fileId) use ($user) {
+                    return [
+                        'file_id' => $fileId,
                         'user_id' => $user->id,
-                    ],
-                    [
                         'type' => 'dislike',
-                    ]
-                );
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }, $filesToAutoDislike);
 
-                // De-associate from all tabs belonging to this user
-                $userTabs = BrowseTab::forUser($user->id)->get();
-                foreach ($userTabs as $tab) {
-                    $tab->files()->detach($file->id);
+                // Batch insert reactions (using insertOrIgnore to avoid duplicates)
+                // Note: insertOrIgnore doesn't support upsert, so we check for existing reactions first
+                // and only insert new ones
+                $existingReactions = Reaction::whereIn('file_id', $filesToAutoDislike)
+                    ->where('user_id', $user->id)
+                    ->pluck('file_id')
+                    ->toArray();
+
+                $newReactionsToInsert = array_filter($reactionsToInsert, function ($reaction) use ($existingReactions) {
+                    return ! in_array($reaction['file_id'], $existingReactions);
+                });
+
+                if (! empty($newReactionsToInsert)) {
+                    Reaction::insert($newReactionsToInsert);
                 }
 
-                $autoDislikedFileIds[] = $file->id;
+                // Fetch user tabs once (outside the loop)
+                $userTabs = BrowseTab::forUser($user->id)->get();
+
+                // Batch detach files from all user tabs
+                if ($userTabs->isNotEmpty()) {
+                    foreach ($userTabs as $tab) {
+                        $tab->files()->detach($filesToAutoDislike);
+                    }
+                }
+
+                $autoDislikedFileIds = $filesToAutoDislike;
             }
         }
 
