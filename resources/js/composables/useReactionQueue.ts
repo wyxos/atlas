@@ -13,9 +13,11 @@ export interface QueuedReaction {
     pausedRemaining: number | null; // Remaining time when paused
     executeCallback: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => Promise<void>; // Store callback for resume
     restoreItem?: (tabId: number, isTabActive: (tabId: number) => boolean) => void | Promise<void>; // Callback to restore item to masonry with tab check
+    restoreBatch?: (tabId: number, isTabActive: (tabId: number) => boolean) => void | Promise<void>; // Callback to restore entire batch to masonry with tab check
     tabId?: number; // Tab ID where the item was removed
     itemIndex?: number; // Original index of the item in the masonry
     item?: any; // Store the item data for restoration
+    batchId?: string; // Optional batch identifier for grouping batch reactions (e.g., containerId)
 }
 
 const QUEUE_DELAY_MS = 5000; // 5 seconds
@@ -32,7 +34,9 @@ export function useReactionQueue() {
         restoreItem?: (tabId: number, isTabActive: (tabId: number) => boolean) => void,
         tabId?: number,
         itemIndex?: number,
-        item?: any
+        item?: any,
+        batchId?: string,
+        restoreBatch?: (tabId: number, isTabActive: (tabId: number) => boolean) => void | Promise<void>
     ): void {
         // Check if this reaction is already queued for this file
         const existingIndex = queuedReactions.value.findIndex(
@@ -41,9 +45,11 @@ export function useReactionQueue() {
 
         // If already queued, preserve restore data from existing reaction if new call doesn't have it
         let preservedRestoreItem = restoreItem;
+        let preservedRestoreBatch = restoreBatch;
         let preservedTabId = tabId;
         let preservedItemIndex = itemIndex;
         let preservedItem = item;
+        let preservedBatchId = batchId;
 
         if (existingIndex !== -1) {
             const existing = queuedReactions.value[existingIndex];
@@ -54,6 +60,9 @@ export function useReactionQueue() {
             if (!restoreItem && existing.restoreItem) {
                 preservedRestoreItem = existing.restoreItem;
             }
+            if (!restoreBatch && existing.restoreBatch) {
+                preservedRestoreBatch = existing.restoreBatch;
+            }
             if (tabId === undefined && existing.tabId !== undefined) {
                 preservedTabId = existing.tabId;
             }
@@ -62,6 +71,12 @@ export function useReactionQueue() {
             }
             if (!item && existing.item) {
                 preservedItem = existing.item;
+            }
+            // Use new batchId if provided, otherwise preserve existing batchId
+            if (batchId !== undefined) {
+                preservedBatchId = batchId; // Always use new batchId if provided
+            } else if (existing.batchId) {
+                preservedBatchId = existing.batchId; // Preserve existing batchId if new call doesn't provide one
             }
             queuedReactions.value.splice(existingIndex, 1);
         }
@@ -82,9 +97,11 @@ export function useReactionQueue() {
             pausedRemaining: null,
             executeCallback,
             restoreItem: preservedRestoreItem,
+            restoreBatch: preservedRestoreBatch,
             tabId: preservedTabId,
             itemIndex: preservedItemIndex,
             item: preservedItem,
+            batchId: preservedBatchId,
         };
 
         // Add to queue
@@ -161,6 +178,46 @@ export function useReactionQueue() {
 
             queuedReactions.value.splice(index, 1);
         }
+    }
+
+    async function cancelBatch(batchId: string, isTabActive?: (tabId: number) => boolean): Promise<void> {
+        const batchReactions = queuedReactions.value.filter((q) => q.batchId === batchId);
+        
+        if (batchReactions.length === 0) {
+            return;
+        }
+
+        // Clear all timers first
+        for (const queued of batchReactions) {
+            if (queued.timeoutId) {
+                clearTimeout(queued.timeoutId);
+            }
+            if (queued.intervalId) {
+                clearInterval(queued.intervalId);
+            }
+        }
+
+        // Try to use batch restore callback if available (more efficient)
+        const firstReaction = batchReactions[0];
+        if (firstReaction.restoreBatch && firstReaction.tabId !== undefined) {
+            const tabIsActive = isTabActive ? isTabActive(firstReaction.tabId) : true;
+            if (tabIsActive) {
+                await firstReaction.restoreBatch(firstReaction.tabId, isTabActive || (() => true));
+            }
+        } else {
+            // Fallback: restore items individually if no batch restore callback
+            for (const queued of batchReactions) {
+                if (queued.restoreItem && queued.tabId !== undefined) {
+                    const tabIsActive = isTabActive ? isTabActive(queued.tabId) : true;
+                    if (tabIsActive) {
+                        await queued.restoreItem(queued.tabId, isTabActive || (() => true));
+                    }
+                }
+            }
+        }
+
+        // Remove all batch reactions
+        queuedReactions.value = queuedReactions.value.filter((q) => q.batchId !== batchId);
     }
 
     function cancelAll(): void {
@@ -290,6 +347,7 @@ export function useReactionQueue() {
         queuedReactions: computed(() => queuedReactions.value),
         queueReaction,
         cancelReaction,
+        cancelBatch,
         cancelAll,
         pauseAll,
         resumeAll,

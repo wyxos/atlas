@@ -19,7 +19,11 @@ export function useContainerPillInteractions(
     masonryRemoveFn: Ref<((item: MasonryItem) => void) | null>,
     masonry: Ref<{ removeMany?: (items: MasonryItem[]) => Promise<void> } | null>,
     tabId: number | undefined,
-    onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void
+    onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void,
+    restoreManyToMasonry?: (
+        itemsToRestore: Array<{ item: MasonryItem; index: number }>,
+        masonryInstance?: any
+    ) => Promise<void>
 ) {
     const { queueReaction } = useReactionQueue();
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
@@ -94,7 +98,30 @@ export function useContainerPillInteractions(
             }
         }
 
-        // Queue reactions for all siblings
+        // Create a batch ID for grouping these reactions
+        const batchId = `batch-${containerId}-${reactionType}-${Date.now()}`;
+
+        // Collect items with their indices for batch restore
+        const itemsToRestore = siblings.map((item) => {
+            const itemIndex = items.value.findIndex((i) => i.id === item.id);
+            return { item, index: itemIndex !== -1 ? itemIndex : items.value.length };
+        });
+
+        // Create batch restore callback if restoreManyToMasonry is available
+        const batchRestoreCallback = restoreManyToMasonry && tabId !== undefined
+            ? async (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
+                // Only restore if the tab is active
+                const tabActive = isTabActive(restoreTabId);
+                if (!tabActive) {
+                    return;
+                }
+
+                // Restore all items in the batch using restoreManyToMasonry
+                await restoreManyToMasonry(itemsToRestore, masonry.value);
+            }
+            : undefined;
+
+        // Queue reactions for all siblings with the same batchId and batch restore callback
         for (const item of siblings) {
             const itemIndex = items.value.findIndex((i) => i.id === item.id);
             const previewUrl = item.src;
@@ -103,10 +130,12 @@ export function useContainerPillInteractions(
                 reactionType,
                 createReactionCallback(),
                 previewUrl,
-                undefined, // No restore callback for batch reactions
+                undefined, // No individual restore callback for batch reactions
                 tabId,
                 itemIndex,
-                item
+                item,
+                batchId, // Pass batchId to group these reactions
+                batchRestoreCallback // Pass batch restore callback
             );
 
             // Emit to parent
