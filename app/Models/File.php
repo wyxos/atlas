@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class File extends Model
@@ -102,5 +103,13 @@ class File extends Model
     public function metadata(): HasOne
     {
         return $this->hasOne(FileMetadata::class);
+    }
+
+    /**
+     * Get the containers that this file belongs to.
+     */
+    public function containers(): BelongsToMany
+    {
+        return $this->belongsToMany(Container::class);
     }
 }
