@@ -3236,6 +3236,65 @@ describe('Browse', () => {
             // The important part is that navigation starts correctly when ArrowLeft is pressed
         });
 
+        it('does not navigate when at first item and pressing mouse button 4 (back)', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                    { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer || !fileViewer.exists()) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Click on first masonry item to open overlay
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            const masonryItem = wrapper.find('.masonry-item');
+            if (masonryItem.exists()) {
+                await masonryItem.trigger('click');
+                await waitForOverlayFill(fileViewerVm);
+
+                // Verify we're on the first item
+                expect(fileViewerVm.currentItemIndex).toBe(0);
+
+                // Simulate mouse button 4 (back) press
+                const mouseButton4Event = new MouseEvent('mousedown', {
+                    button: 3, // Button 4 = back
+                    bubbles: true,
+                    cancelable: true,
+                });
+                window.dispatchEvent(mouseButton4Event);
+
+                // Wait a bit to ensure no navigation occurred
+                await waitForStable(wrapper);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify we're still on the first item
+                expect(fileViewerVm.currentItemIndex).toBe(0);
+            }
+        });
+
         it('does not navigate when at first item and pressing ArrowLeft', async () => {
             mockAxios.get.mockImplementation((url: string) => {
                 if (url.includes('/api/browse-tabs')) {
@@ -3308,6 +3367,377 @@ describe('Browse', () => {
             expect(fileViewerVm.currentItemIndex).toBe(0);
             expect(fileViewerVm.isNavigating).toBe(false);
             expect(fileViewerVm.imageScale).toBe(1);
+        });
+
+        it('navigates to next image when pressing mouse button 5 (forward)', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                    { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                    { id: 3, width: 300, height: 400, src: 'test3.jpg', type: 'image', page: 1, index: 2, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer || !fileViewer.exists()) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Click on first masonry item to open overlay
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            const masonryItem = wrapper.find('.masonry-item');
+            if (masonryItem.exists()) {
+                await masonryItem.trigger('click');
+                await waitForOverlayFill(fileViewerVm);
+
+                // Verify we're on the first item
+                expect(fileViewerVm.currentItemIndex).toBe(0);
+
+                // Simulate mouse button 5 (forward) press
+                const mouseButton5Event = new MouseEvent('mousedown', {
+                    button: 4, // Button 5 = forward
+                    bubbles: true,
+                    cancelable: true,
+                });
+                window.dispatchEvent(mouseButton5Event);
+
+                // Wait for navigation
+                await waitForStable(wrapper);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify we navigated to the next item
+                expect(fileViewerVm.currentItemIndex).toBe(1);
+            }
+        });
+
+        it('prevents browser navigation when pressing mouse button 4 (back)', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                    { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer || !fileViewer.exists()) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Click on second masonry item to open overlay
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            const masonryItems = wrapper.findAll('.masonry-item');
+            if (masonryItems.length > 1) {
+                await masonryItems[1].trigger('click');
+                await waitForOverlayFill(fileViewerVm);
+
+                // Verify we're on the second item
+                expect(fileViewerVm.currentItemIndex).toBe(1);
+
+                // Create a mock event to verify preventDefault is called
+                let preventDefaultCalled = false;
+                let stopPropagationCalled = false;
+                let stopImmediatePropagationCalled = false;
+
+                // Simulate mouse button 4 (back) press - test both mousedown and auxclick
+                const mouseButton4Mousedown = new MouseEvent('mousedown', {
+                    button: 3, // Button 4 = back
+                    bubbles: true,
+                    cancelable: true,
+                });
+                Object.defineProperty(mouseButton4Mousedown, 'preventDefault', {
+                    value: () => { preventDefaultCalled = true; },
+                });
+                Object.defineProperty(mouseButton4Mousedown, 'stopPropagation', {
+                    value: () => { stopPropagationCalled = true; },
+                });
+                Object.defineProperty(mouseButton4Mousedown, 'stopImmediatePropagation', {
+                    value: () => { stopImmediatePropagationCalled = true; },
+                });
+
+                const mouseButton4Auxclick = new MouseEvent('auxclick', {
+                    button: 3, // Button 4 = back
+                    bubbles: true,
+                    cancelable: true,
+                });
+                Object.defineProperty(mouseButton4Auxclick, 'preventDefault', {
+                    value: () => { preventDefaultCalled = true; },
+                });
+                Object.defineProperty(mouseButton4Auxclick, 'stopPropagation', {
+                    value: () => { stopPropagationCalled = true; },
+                });
+                Object.defineProperty(mouseButton4Auxclick, 'stopImmediatePropagation', {
+                    value: () => { stopImmediatePropagationCalled = true; },
+                });
+
+                // Dispatch both events (browser fires both for button 4/5)
+                window.dispatchEvent(mouseButton4Mousedown);
+                window.dispatchEvent(mouseButton4Auxclick);
+
+                // Wait for navigation
+                await waitForStable(wrapper);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify preventDefault was called to prevent browser navigation
+                expect(preventDefaultCalled).toBe(true);
+                expect(stopPropagationCalled).toBe(true);
+                expect(stopImmediatePropagationCalled).toBe(true);
+
+                // Verify we navigated to the previous item
+                expect(fileViewerVm.currentItemIndex).toBe(0);
+            }
+        });
+
+        it('prevents browser navigation when pressing mouse button 5 (forward)', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                    { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer || !fileViewer.exists()) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Click on first masonry item to open overlay
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            const masonryItem = wrapper.find('.masonry-item');
+            if (masonryItem.exists()) {
+                await masonryItem.trigger('click');
+                await waitForOverlayFill(fileViewerVm);
+
+                // Verify we're on the first item
+                expect(fileViewerVm.currentItemIndex).toBe(0);
+
+                // Create a mock event to verify preventDefault is called
+                let preventDefaultCalled = false;
+                let stopPropagationCalled = false;
+                let stopImmediatePropagationCalled = false;
+
+                // Simulate mouse button 5 (forward) press - test both mousedown and auxclick
+                const mouseButton5Mousedown = new MouseEvent('mousedown', {
+                    button: 4, // Button 5 = forward
+                    bubbles: true,
+                    cancelable: true,
+                });
+                Object.defineProperty(mouseButton5Mousedown, 'preventDefault', {
+                    value: () => { preventDefaultCalled = true; },
+                });
+                Object.defineProperty(mouseButton5Mousedown, 'stopPropagation', {
+                    value: () => { stopPropagationCalled = true; },
+                });
+                Object.defineProperty(mouseButton5Mousedown, 'stopImmediatePropagation', {
+                    value: () => { stopImmediatePropagationCalled = true; },
+                });
+
+                const mouseButton5Auxclick = new MouseEvent('auxclick', {
+                    button: 4, // Button 5 = forward
+                    bubbles: true,
+                    cancelable: true,
+                });
+                Object.defineProperty(mouseButton5Auxclick, 'preventDefault', {
+                    value: () => { preventDefaultCalled = true; },
+                });
+                Object.defineProperty(mouseButton5Auxclick, 'stopPropagation', {
+                    value: () => { stopPropagationCalled = true; },
+                });
+                Object.defineProperty(mouseButton5Auxclick, 'stopImmediatePropagation', {
+                    value: () => { stopImmediatePropagationCalled = true; },
+                });
+
+                // Dispatch both events (browser fires both for button 4/5)
+                window.dispatchEvent(mouseButton5Mousedown);
+                window.dispatchEvent(mouseButton5Auxclick);
+
+                // Wait for navigation
+                await waitForStable(wrapper);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify preventDefault was called to prevent browser navigation
+                expect(preventDefaultCalled).toBe(true);
+                expect(stopPropagationCalled).toBe(true);
+                expect(stopImmediatePropagationCalled).toBe(true);
+
+                // Verify we navigated to the next item
+                expect(fileViewerVm.currentItemIndex).toBe(1);
+            }
+        });
+
+        it('navigates to previous image when pressing mouse button 4 (back)', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                    { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                    { id: 3, width: 300, height: 400, src: 'test3.jpg', type: 'image', page: 1, index: 2, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer || !fileViewer.exists()) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Click on second masonry item to open overlay
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            const masonryItems = wrapper.findAll('.masonry-item');
+            if (masonryItems.length > 1) {
+                await masonryItems[1].trigger('click');
+                await waitForOverlayFill(fileViewerVm);
+
+                // Verify we're on the second item
+                expect(fileViewerVm.currentItemIndex).toBe(1);
+
+                // Simulate mouse button 4 (back) press
+                const mouseButton4Event = new MouseEvent('mousedown', {
+                    button: 3, // Button 4 = back
+                    bubbles: true,
+                    cancelable: true,
+                });
+                window.dispatchEvent(mouseButton4Event);
+
+                // Wait for navigation
+                await waitForStable(wrapper);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify we navigated to the previous item
+                expect(fileViewerVm.currentItemIndex).toBe(0);
+            }
+        });
+
+        it('does not navigate when at last item and pressing mouse button 5 (forward)', async () => {
+            const browseResponse = {
+                items: [
+                    { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                    { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+                ],
+                nextPage: null,
+                services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+            };
+            const tabConfig = createMockTabConfig(1);
+            setupAxiosMocks(tabConfig, browseResponse);
+            const router = await createTestRouter();
+            const wrapper = mount(Browse, {
+                global: {
+                    plugins: [router],
+                },
+            });
+
+            await waitForStable(wrapper);
+
+            const fileViewer = getFileViewer(wrapper);
+            if (!fileViewer || !fileViewer.exists()) {
+                return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileViewerVm = fileViewer.vm as any;
+
+            // Click on last masonry item to open overlay
+            const tabContentVm = await waitForTabContent(wrapper);
+            if (!tabContentVm) {
+                return;
+            }
+
+            const masonryItems = wrapper.findAll('.masonry-item');
+            if (masonryItems.length > 0) {
+                await masonryItems[masonryItems.length - 1].trigger('click');
+                await waitForOverlayFill(fileViewerVm);
+
+                // Verify we're on the last item
+                expect(fileViewerVm.currentItemIndex).toBe(masonryItems.length - 1);
+
+                // Simulate mouse button 5 (forward) press
+                const mouseButton5Event = new MouseEvent('mousedown', {
+                    button: 4, // Button 5 = forward
+                    bubbles: true,
+                    cancelable: true,
+                });
+                window.dispatchEvent(mouseButton5Event);
+
+                // Wait a bit to ensure no navigation occurred
+                await waitForStable(wrapper);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify we're still on the last item
+                expect(fileViewerVm.currentItemIndex).toBe(masonryItems.length - 1);
+            }
         });
 
         it('does not navigate when at last item and pressing ArrowRight', async () => {
