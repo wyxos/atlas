@@ -1772,9 +1772,13 @@ describe('Browse', () => {
 
         await tabContentVm.getNextPage(1);
 
+        // Filter for /api/browse calls (but not /api/browse-tabs which is used for loading tab items)
         const browseCalls = mockAxios.get.mock.calls
             .map(call => call[0])
-            .filter((callUrl: string) => callUrl.includes('/api/browse'));
+            .filter((callUrl: string) => {
+                // Match /api/browse but not /api/browse-tabs
+                return callUrl.includes('/api/browse?') || callUrl === '/api/browse';
+            });
 
         expect(browseCalls[browseCalls.length - 1]).toContain(`/api/browse?page=${cursorY}`);
         expect(tabContentVm.currentPage).toBe(cursorY);

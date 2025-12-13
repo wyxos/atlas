@@ -29,6 +29,7 @@ import { useItemPreview } from '@/composables/useItemPreview';
 import { useMasonryRestore } from '@/composables/useMasonryRestore';
 import { useResetDialog } from '@/composables/useResetDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
+import { useTabInitialization } from '@/composables/useTabInitialization';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -249,6 +250,22 @@ const masonryInteractions = useMasonryInteractions(
     handleMasonryReaction
 );
 
+// Tab initialization composable
+const { initializeTab } = useTabInitialization({
+    fileViewer,
+    masonry,
+    items,
+    currentPage,
+    nextCursor,
+    loadAtPage,
+    isTabRestored,
+    pendingRestoreNextCursor,
+    selectedService,
+    clearPreviewedItems: itemPreview.clearPreviewedItems,
+    onTabDataLoadingChange: props.onTabDataLoadingChange,
+    loadTabItems: props.loadTabItems,
+});
+
 
 // Apply selected service to current tab
 async function applyService(): Promise<void> {
@@ -292,7 +309,7 @@ watch(
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
     if (props.tab) {
-        await initializeTab();
+        await initializeTab(props.tab);
     }
 });
 
@@ -303,144 +320,11 @@ watch(
     async (newId, oldId) => {
         // Only re-initialize if tab ID actually changed and tab exists
         if (newId && newId !== oldId && props.tab) {
-            await initializeTab();
+            await initializeTab(props.tab);
         }
     }
 );
 
-async function initializeTab(): Promise<void> {
-    const tab = props.tab;
-    if (!tab) return;
-
-    // Close fileviewer
-    if (fileViewer.value) {
-        fileViewer.value.close();
-    }
-
-    // Destroy existing masonry instance
-    if (masonry.value) {
-        if (masonry.value.isLoading) {
-            masonry.value.cancelLoad();
-        }
-        masonry.value.destroy();
-    }
-
-    // Reset previewed items tracking when switching tabs
-    itemPreview.clearPreviewedItems();
-
-    const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
-    isTabRestored.value = tabHasRestorableItems;
-
-    // Restore selected service for UI
-    const serviceFromQuery = tab.queryParams?.service as string | null;
-    selectedService.value = serviceFromQuery || '';
-
-    // Restore both page and next from queryParams
-    const pageFromQuery = tab.queryParams?.page;
-    const nextFromQuery = tab.queryParams?.next;
-    pendingRestoreNextCursor.value = tabHasRestorableItems ? (nextFromQuery ?? null) : null;
-
-    // Always reload items from database when initializing
-    if (tab.fileIds && tab.fileIds.length > 0) {
-        try {
-            // Notify parent that we're loading tab data
-            if (props.onTabDataLoadingChange) {
-                props.onTabDataLoadingChange(true);
-            }
-            const loadedItems = await props.loadTabItems(tab.id);
-            tab.itemsData = loadedItems;
-        } catch (error) {
-            console.error('Failed to load tab items:', error);
-            tab.itemsData = [];
-        } finally {
-            // Notify parent that tab data loading is complete
-            if (props.onTabDataLoadingChange) {
-                props.onTabDataLoadingChange(false);
-            }
-        }
-    } else {
-        tab.itemsData = [];
-    }
-
-    // Restore currentPage from saved queryParams
-    if (pageFromQuery !== undefined && pageFromQuery !== null) {
-        currentPage.value = pageFromQuery;
-    } else {
-        currentPage.value = 1;
-    }
-
-    // Restore nextCursor from saved queryParams
-    if (nextFromQuery !== undefined && nextFromQuery !== null) {
-        nextCursor.value = nextFromQuery;
-    } else {
-        nextCursor.value = null;
-    }
-
-    // Set loadAtPage and prepare for masonry initialization
-    const serviceValue = tab.queryParams?.service;
-    const hasService = typeof serviceValue === 'string' && serviceValue.length > 0;
-
-    if (tab.itemsData && tab.itemsData.length > 0) {
-        loadAtPage.value = null;
-        items.value = [];
-    } else if (hasService) {
-        if (pageFromQuery !== undefined && pageFromQuery !== null) {
-            loadAtPage.value = pageFromQuery;
-        } else {
-            loadAtPage.value = 1;
-        }
-        items.value = [];
-    } else {
-        loadAtPage.value = null;
-        items.value = [];
-    }
-
-    await nextTick();
-
-    // Wait for masonry component to be ready - it might not be available immediately
-    // Only wait if we have items to initialize with
-    if (tab.itemsData && tab.itemsData.length > 0) {
-        let retries = 0;
-        while (!masonry.value && retries < 20) {
-            await nextTick();
-            await new Promise(resolve => setTimeout(resolve, 50));
-            retries++;
-        }
-
-        // If we have pre-loaded items, use masonry.init() to properly initialize
-        if (masonry.value) {
-            const pageValue = pageFromQuery !== undefined && pageFromQuery !== null ? pageFromQuery : 1;
-            const nextValue = nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;
-
-            if (pageValue !== undefined && pageValue !== null) {
-                currentPage.value = pageValue;
-            }
-            if (nextValue !== undefined && nextValue !== null) {
-                nextCursor.value = nextValue;
-            }
-
-            masonry.value.init(tab.itemsData, pageValue, nextValue);
-
-            await nextTick();
-
-            // Ensure items.value is updated with the initialized items (masonry should sync via v-model)
-            // If masonry doesn't sync immediately, manually set items to preserve previewed_count
-            if (items.value.length === 0 && tab.itemsData.length > 0) {
-                items.value = [...tab.itemsData];
-            }
-
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (masonry.value && items.value.length > 0) {
-                        masonry.value.refreshLayout(items.value);
-                    }
-                });
-            });
-        }
-    }
-
-    isTabRestored.value = false;
-}
 
 // Cleanup on unmount
 onUnmounted(() => {
