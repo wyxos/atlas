@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -377,8 +377,7 @@ onUnmounted(() => {
                 <Button :disabled="(!hasServiceSelected && !resetDialog.isOnFirstPage)"
                     @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                     data-test="reset-to-first-page-button">
-                    fast backward lucide icon
-
+                    <ChevronsLeft :size="14"></ChevronsLeft>
                 </Button>
                 <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="h-10 w-10"
                     data-test="apply-service-button">
