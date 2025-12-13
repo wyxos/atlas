@@ -55,6 +55,7 @@ const isTabRestored = ref(false);
 const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
+const hoveredContainerId = ref<number | null>(null);
 // Store remove function from masonry slot to use in FileViewer
 const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
 // Track which items have already had their preview count incremented (to avoid double-counting)
@@ -346,6 +347,45 @@ function getVariantForContainerType(containerType: string): 'primary' | 'seconda
     // Use absolute value and modulo to get index
     const index = Math.abs(hash) % variants.length;
     return variants[index];
+}
+
+// Get border color class for a container type variant (matches Pill border colors)
+function getBorderColorClassForVariant(variant: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'): string {
+    const borderColors: Record<string, string> = {
+        primary: 'border-smart-blue-500',
+        secondary: 'border-sapphire-500',
+        success: 'border-success-500',
+        warning: 'border-warning-500',
+        danger: 'border-danger-500',
+        info: 'border-info-500',
+        neutral: 'border-twilight-indigo-500',
+    };
+    return borderColors[variant] || 'border-smart-blue-500';
+}
+
+// Check if an item is a sibling (has the same container ID as the hovered one)
+function isSiblingItem(item: MasonryItem, hoveredContainerId: number | null): boolean {
+    if (hoveredContainerId === null) {
+        return false;
+    }
+    const containers = getContainersForItem(item);
+    return containers.some((container) => container.id === hoveredContainerId);
+}
+
+// Get the variant for the hovered container type
+function getHoveredContainerVariant(): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' | null {
+    if (hoveredContainerId.value === null) {
+        return null;
+    }
+    // Find the container type for the hovered container ID
+    for (const item of items.value) {
+        const containers = getContainersForItem(item);
+        const container = containers.find((c) => c.id === hoveredContainerId.value);
+        if (container) {
+            return getVariantForContainerType(container.type);
+        }
+    }
+    return null;
 }
 
 // Open prompt dialog for an item
@@ -870,7 +910,7 @@ onUnmounted(() => {
                         <!-- Capture remove function on first item render -->
                         <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
                         <VibeMasonryItem :item="item" :remove="remove" @mouseenter="hoveredItemIndex = index"
-                            @mouseleave="hoveredItemIndex = null" @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
+                            @mouseleave="hoveredItemIndex = null; hoveredContainerId = null" @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
                                 // payload.item is the item passed to MasonryItem, which should have the id
                                 const itemId = payload.item?.id ?? item?.id;
                                 if (itemId) {
@@ -879,9 +919,15 @@ onUnmounted(() => {
                             }">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
-                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item"
-                                    :data-key="item.key"
-                                    @mousedown="(e: MouseEvent) => handleMasonryItemMouseDown(e, item)"
+                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item transition-all duration-300"
+                                    :data-key="item.key" :class="[
+                                        hoveredContainerId !== null && isSiblingItem(item, hoveredContainerId)
+                                            ? `border-2 ${getBorderColorClassForVariant(getHoveredContainerVariant() || 'primary')}`
+                                            : 'border-2 border-transparent',
+                                        hoveredContainerId !== null && !isSiblingItem(item, hoveredContainerId)
+                                            ? 'opacity-50'
+                                            : 'opacity-100',
+                                    ]" @mousedown="(e: MouseEvent) => handleMasonryItemMouseDown(e, item)"
                                     @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item)">
                                     <!-- Auto-disliked indicator overlay with smooth animation -->
                                     <Transition name="ring-fade">
@@ -925,10 +971,13 @@ onUnmounted(() => {
                                     <!-- Container badges (shows on hover with type and count) -->
                                     <div v-if="hoveredItemIndex === index && imageLoaded && getContainersForItem(item).length > 0"
                                         class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
-                                        <Pill v-for="container in getContainersForItem(item)" :key="container.id"
-                                            class="w-full" :label="container.type"
-                                            :value="getItemCountForContainerId(container.id)"
-                                            :variant="getVariantForContainerType(container.type)" />
+                                        <div v-for="container in getContainersForItem(item)" :key="container.id"
+                                            @mouseenter="hoveredContainerId = container.id"
+                                            @mouseleave="hoveredContainerId = null">
+                                            <Pill class="w-full" :label="container.type"
+                                                :value="getItemCountForContainerId(container.id)"
+                                                :variant="getVariantForContainerType(container.type)" />
+                                        </div>
                                     </div>
 
                                     <!-- Info badge (shows on hover, opens dialog on click) -->
