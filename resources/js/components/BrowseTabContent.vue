@@ -889,12 +889,23 @@ onUnmounted(() => {
                                             class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active">
                                         </div>
                                     </Transition>
-                                    <!-- Loading placeholder -->
-                                    <div v-if="!imageLoaded && !imageError && isLoading"
-                                        class="absolute inset-0 bg-slate-100 flex items-center justify-center">
+                                    <!-- Placeholder background - icon by default (before preloading starts) -->
+                                    <div v-if="!imageLoaded && !imageError" :class="[
+                                        'absolute inset-0 bg-slate-100 flex items-center justify-center transition-opacity duration-500',
+                                        showMedia ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                                    ]">
+                                        <!-- Media type indicator badge - shown BEFORE preloading starts -->
                                         <div
                                             class="w-12 h-12 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-sm">
                                             <i class="fas fa-image text-xl text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <!-- Spinner (only shown when loading/preloading) -->
+                                    <div v-if="isLoading"
+                                        class="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-center justify-center z-10">
+                                        <div class="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
+                                            <Loader2 class="w-4 h-4 text-smart-blue-500 animate-spin" />
                                         </div>
                                     </div>
 
@@ -905,13 +916,11 @@ onUnmounted(() => {
                                         <span>Failed to load image</span>
                                     </div>
 
-                                    <!-- Image (uses imageSrc from MasonryItem when available for lazy loading) -->
-                                    <img v-if="!imageError && (imageSrc || item.src || item.thumbnail)"
-                                        :src="imageSrc || item.src || item.thumbnail || ''" :alt="`Item ${item.id}`"
-                                        :class="[
-                                            'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
-                                            imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
-                                        ]" />
+                                    <!-- Image (only render when imageSrc is available from Vibe's preloading) -->
+                                    <img v-if="imageSrc && !imageError" :src="imageSrc" :alt="`Item ${item.id}`" :class="[
+                                        'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
+                                        imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
+                                    ]" />
 
                                     <!-- Container badges (shows on hover with type and count) -->
                                     <div v-if="hoveredItemIndex === index && imageLoaded && getContainersForItem(item).length > 0"
