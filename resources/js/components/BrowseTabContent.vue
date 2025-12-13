@@ -22,7 +22,7 @@ import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
-import { incrementPreview } from '@/actions/App/Http/Controllers/FilesController';
+import { usePreviewBatch } from '@/composables/usePreviewBatch';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -76,6 +76,9 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Reaction queue
 const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
+
+// Preview batch queue
+const { queuePreviewIncrement } = usePreviewBatch();
 
 // Backfill state and handlers
 const {
@@ -457,7 +460,7 @@ function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
 }
 
 
-// Increment preview count when item is preloaded
+// Increment preview count when item is preloaded (batched)
 async function handleItemPreload(fileId: number): Promise<void> {
     // Skip if we've already incremented preview count for this item
     if (previewedItems.value.has(fileId)) {
@@ -465,7 +468,8 @@ async function handleItemPreload(fileId: number): Promise<void> {
     }
 
     try {
-        const response = await window.axios.post<{ previewed_count: number; auto_disliked: boolean }>(incrementPreview.url(fileId));
+        // Queue the preview increment (will be batched with other requests)
+        const response = await queuePreviewIncrement(fileId);
 
         // Mark as previewed
         previewedItems.value.add(fileId);
@@ -476,10 +480,10 @@ async function handleItemPreload(fileId: number): Promise<void> {
             // Update the item in place to maintain reactivity
             // Use Object.assign to mutate in place, which Vue can track better
             const currentItem = items.value[itemIndex];
-            if (response.data.auto_disliked) {
+            if (response.auto_disliked) {
                 currentItem.auto_disliked = true;
             }
-            currentItem.previewed_count = response.data.previewed_count;
+            currentItem.previewed_count = response.previewed_count;
         }
 
         // Also update in tab.itemsData if it exists
@@ -487,8 +491,8 @@ async function handleItemPreload(fileId: number): Promise<void> {
             const tabItemIndex = props.tab.itemsData.findIndex((i) => i.id === fileId);
             if (tabItemIndex !== -1) {
                 Object.assign(props.tab.itemsData[tabItemIndex], {
-                    previewed_count: response.data.previewed_count,
-                    auto_disliked: response.data.auto_disliked ? true : props.tab.itemsData[tabItemIndex].auto_disliked ?? false,
+                    previewed_count: response.previewed_count,
+                    auto_disliked: response.auto_disliked ? true : props.tab.itemsData[tabItemIndex].auto_disliked ?? false,
                 });
             }
         }

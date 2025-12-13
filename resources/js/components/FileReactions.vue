@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from 'vue';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
-import { show as getReaction } from '@/actions/App/Http/Controllers/FileReactionController';
+import { useReactionBatch } from '@/composables/useReactionBatch';
 
 interface Props {
     fileId?: number;
@@ -27,6 +27,9 @@ const emit = defineEmits<{
     reaction: [type: 'love' | 'like' | 'dislike' | 'funny'];
 }>();
 
+// Reaction batch queue
+const { queueReactionFetch } = useReactionBatch();
+
 // Reaction state
 const currentReaction = ref<string | null>(null);
 const isUpdating = ref(false);
@@ -37,7 +40,7 @@ const like = computed(() => currentReaction.value === 'like');
 const dislike = computed(() => currentReaction.value === 'dislike');
 const funny = computed(() => currentReaction.value === 'funny');
 
-// Fetch current reaction when fileId changes
+// Fetch current reaction when fileId changes (batched)
 async function fetchReaction(): Promise<void> {
     if (!props.fileId) {
         currentReaction.value = null;
@@ -45,8 +48,8 @@ async function fetchReaction(): Promise<void> {
     }
 
     try {
-        const response = await window.axios.get(getReaction.url(props.fileId));
-        currentReaction.value = response.data.reaction?.type || null;
+        const response = await queueReactionFetch(props.fileId);
+        currentReaction.value = response.reaction?.type || null;
     } catch (error) {
         console.error('Failed to fetch reaction:', error);
         currentReaction.value = null;

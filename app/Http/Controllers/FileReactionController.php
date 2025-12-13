@@ -108,4 +108,46 @@ class FileReactionController extends Controller
             ] : null,
         ]);
     }
+
+    /**
+     * Batch get reactions for multiple files.
+     */
+    public function batchShow(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file_ids' => 'required|array',
+            'file_ids.*' => 'required|integer|exists:files,id',
+        ]);
+
+        $fileIds = $request->input('file_ids');
+        $user = Auth::user();
+
+        // Load files and authorize
+        $files = File::whereIn('id', $fileIds)->get();
+        foreach ($files as $file) {
+            Gate::authorize('view', $file);
+        }
+
+        // Fetch all reactions for these files and this user
+        $reactions = Reaction::where('user_id', $user->id)
+            ->whereIn('file_id', $fileIds)
+            ->get()
+            ->keyBy('file_id');
+
+        // Build response with reactions for each file
+        $results = collect($fileIds)->map(function ($fileId) use ($reactions) {
+            $reaction = $reactions->get($fileId);
+
+            return [
+                'file_id' => $fileId,
+                'reaction' => $reaction ? [
+                    'type' => $reaction->type,
+                ] : null,
+            ];
+        });
+
+        return response()->json([
+            'reactions' => $results,
+        ]);
+    }
 }

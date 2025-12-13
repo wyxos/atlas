@@ -128,6 +128,83 @@ class FilesController extends Controller
     }
 
     /**
+     * Batch increment preview counts for multiple files.
+     */
+    public function batchIncrementPreview(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $request->validate([
+            'file_ids' => 'required|array',
+            'file_ids.*' => 'required|integer|exists:files,id',
+        ]);
+
+        $fileIds = $request->input('file_ids');
+        $user = Auth::user();
+
+        // Load files and authorize
+        $files = File::whereIn('id', $fileIds)->get();
+        foreach ($files as $file) {
+            Gate::authorize('view', $file);
+        }
+
+        // Batch increment preview counts
+        File::whereIn('id', $fileIds)->increment('previewed_count');
+        File::whereIn('id', $fileIds)->update(['previewed_at' => now()]);
+
+        // Refresh files to get updated counts
+        $files->each->refresh();
+
+        // Check for auto-dislike candidates (previewed_count >= 3, no reactions, etc.)
+        $autoDislikedFileIds = [];
+        $candidates = $files->filter(function ($file) {
+            return $file->previewed_count >= 3
+                && $file->source !== 'local'
+                && empty($file->path)
+                && $file->blacklisted_at === null;
+        });
+
+        foreach ($candidates as $file) {
+            $hasReactions = Reaction::where('file_id', $file->id)->exists();
+            if (! $hasReactions) {
+                // Auto-dislike the file
+                $file->update(['auto_disliked' => true]);
+
+                // Create a dislike reaction
+                Reaction::updateOrCreate(
+                    [
+                        'file_id' => $file->id,
+                        'user_id' => $user->id,
+                    ],
+                    [
+                        'type' => 'dislike',
+                    ]
+                );
+
+                // De-associate from all tabs belonging to this user
+                $userTabs = BrowseTab::forUser($user->id)->get();
+                foreach ($userTabs as $tab) {
+                    $tab->files()->detach($file->id);
+                }
+
+                $autoDislikedFileIds[] = $file->id;
+            }
+        }
+
+        // Build response with updated counts and auto-disliked status
+        $results = $files->map(function ($file) use ($autoDislikedFileIds) {
+            return [
+                'id' => $file->id,
+                'previewed_count' => $file->previewed_count,
+                'auto_disliked' => in_array($file->id, $autoDislikedFileIds) ? true : ($file->auto_disliked ?? false),
+            ];
+        });
+
+        return response()->json([
+            'message' => 'Preview counts incremented.',
+            'results' => $results,
+        ]);
+    }
+
+    /**
      * Increment the seen count for a file.
      */
     public function incrementSeen(File $file): JsonResponse
