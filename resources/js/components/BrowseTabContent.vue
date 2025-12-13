@@ -870,6 +870,15 @@ onUnmounted(() => {
                                             imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
                                         ]" />
 
+                                    <!-- Container badge (shows on hover with dummy text) -->
+                                    <div v-if="hoveredItemIndex === index && imageLoaded"
+                                        class="absolute top-2 left-2 z-50 pointer-events-auto">
+                                        <div
+                                            class="px-2 py-1 rounded-sm text-xs font-medium bg-black/70 text-white backdrop-blur-sm border border-white/20">
+                                            Container
+                                        </div>
+                                    </div>
+
                                     <!-- Info badge (shows on hover, opens dialog on click) -->
                                     <div v-if="hoveredItemIndex === index && imageLoaded"
                                         class="absolute top-2 right-2 z-50 pointer-events-auto">
@@ -970,23 +979,16 @@ onUnmounted(() => {
                 <DialogHeader>
                     <DialogTitle class="text-twilight-indigo-100">Prompt</DialogTitle>
                 </DialogHeader>
-                <div class="space-y-4">
+                <div class="space-y-4 mt-4">
                     <div v-if="promptDialogItemId !== null && promptDataLoading.get(promptDialogItemId)"
                         class="flex items-center gap-2 text-sm text-twilight-indigo-100">
                         <Loader2 :size="16" class="animate-spin" />
                         <span>Loading prompt...</span>
                     </div>
                     <div v-else-if="currentPromptData" class="space-y-2">
-                        <div class="flex items-start justify-between gap-2">
-                            <div
-                                class="flex-1 whitespace-pre-wrap wrap-break-word text-sm text-twilight-indigo-100 max-h-[60vh] overflow-y-auto">
-                                {{ currentPromptData }}
-                            </div>
-                            <Button variant="ghost" size="sm" class="h-8 w-8 p-0 shrink-0"
-                                @click="() => { if (currentPromptData) copyPromptToClipboard(currentPromptData); }"
-                                aria-label="Copy prompt">
-                                <Copy :size="16" />
-                            </Button>
+                        <div
+                            class="flex-1 whitespace-pre-wrap wrap-break-word text-sm text-twilight-indigo-100 max-h-[60vh] overflow-y-auto">
+                            {{ currentPromptData }}
                         </div>
                     </div>
                     <div v-else class="text-sm text-twilight-indigo-300">
@@ -994,8 +996,14 @@ onUnmounted(() => {
                     </div>
                 </div>
                 <DialogFooter>
+                    <Button variant="outline" size="sm"
+                        @click="() => { if (currentPromptData) copyPromptToClipboard(currentPromptData); }"
+                        aria-label="Copy prompt">
+                        <Copy :size="16" class="mr-2" />
+                        Copy
+                    </Button>
                     <DialogClose as-child>
-                        <Button variant="outline" @click="closePromptDialog">
+                        <Button variant="outline" size="sm" @click="closePromptDialog">
                             Close
                         </Button>
                     </DialogClose>

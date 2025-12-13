@@ -2,10 +2,10 @@
 
 namespace App;
 
-use App\Models\File;
 use App\Services\BaseService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
+use App\Services\FileItemFormatter;
 use App\Services\Wallhaven;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Storage;
@@ -120,28 +120,8 @@ class Browser
         $persisted = app(BrowsePersister::class)->persist($filesPayload);
 
         // Transform persisted files to items format for frontend
-        $items = collect($persisted)->map(function (File $file) {
-            $metadataPayload = $file->metadata?->payload ?? '{}';
-            $metadata = is_string($metadataPayload) ? json_decode($metadataPayload, true) : $metadataPayload;
-            $listingMetadataRaw = $file->listing_metadata ?? '{}';
-            $listingMetadata = is_string($listingMetadataRaw) ? json_decode($listingMetadataRaw, true) : $listingMetadataRaw;
-
-            $page = (int) (request()->input('page', 1));
-            
-            return [
-                'id' => $file->id, // Database file ID
-                'width' => (int) ($metadata['width'] ?? 500),
-                'height' => (int) ($metadata['height'] ?? 500),
-                'src' => $file->thumbnail_url ?? $file->url, // Use thumbnail for masonry grid, fallback to original
-                'originalUrl' => $file->url, // Keep original URL for full-size viewing
-                'thumbnail' => $file->thumbnail_url,
-                'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
-                'page' => $page,
-                'key' => "{$page}-{$file->id}", // Combined key for unique identification
-                'index' => 0, // Will be set by controller
-                'notFound' => false,
-            ];
-        })->values()->all();
+        $page = (int) (request()->input('page', 1));
+        $items = FileItemFormatter::format($persisted, $page);
 
         return [
             'items' => $items,
