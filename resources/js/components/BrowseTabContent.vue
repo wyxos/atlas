@@ -452,7 +452,7 @@ onUnmounted(() => {
                                             :key="container.id"
                                             @mouseenter="() => { containerBadges.hoveredContainerId.value = container.id; }"
                                             @mouseleave="() => { containerBadges.hoveredContainerId.value = null; }">
-                                            <Pill class="w-full" :label="container.type"
+                                            <Pill :label="container.type"
                                                 :value="containerBadges.getItemCountForContainerId(container.id)"
                                                 :variant="containerBadges.getVariantForContainerType(container.type)" />
                                         </div>
