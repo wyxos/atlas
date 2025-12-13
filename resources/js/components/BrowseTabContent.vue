@@ -7,6 +7,7 @@ import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import Pill from './ui/Pill.vue';
 import {
     Dialog,
     DialogContent,
@@ -304,6 +305,24 @@ const currentPromptData = computed(() => {
     if (!item) return null;
     return getPromptData(item);
 });
+
+// Get containers for a specific item
+function getContainersForItem(item: MasonryItem): Array<{ id: number; type: string }> {
+    const containers = (item as any).containers || [];
+    return containers.filter((container: { id?: number; type?: string }) => container?.id && container?.type);
+}
+
+// Count items that have a container with the same container ID
+function getItemCountForContainerId(containerId: number): number {
+    let count = 0;
+    items.value.forEach((item) => {
+        const containers = (item as any).containers || [];
+        if (containers.some((container: { id?: number }) => container?.id === containerId)) {
+            count++;
+        }
+    });
+    return count;
+}
 
 // Open prompt dialog for an item
 async function openPromptDialog(item: MasonryItem): Promise<void> {
@@ -870,13 +889,11 @@ onUnmounted(() => {
                                             imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
                                         ]" />
 
-                                    <!-- Container badge (shows on hover with dummy text) -->
-                                    <div v-if="hoveredItemIndex === index && imageLoaded"
-                                        class="absolute top-2 left-2 z-50 pointer-events-auto">
-                                        <div
-                                            class="px-2 py-1 rounded-sm text-xs font-medium bg-black/70 text-white backdrop-blur-sm border border-white/20">
-                                            Container
-                                        </div>
+                                    <!-- Container badges (shows on hover with type and count) -->
+                                    <div v-if="hoveredItemIndex === index && imageLoaded && getContainersForItem(item).length > 0"
+                                        class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
+                                        <Pill v-for="container in getContainersForItem(item)" :key="container.id" class="w-full"
+                                            :label="container.type" :value="getItemCountForContainerId(container.id)" variant="primary" />
                                     </div>
 
                                     <!-- Info badge (shows on hover, opens dialog on click) -->
