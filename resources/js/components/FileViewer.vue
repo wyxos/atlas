@@ -953,18 +953,84 @@ function handleKeyDown(e: KeyboardEvent): void {
     }
 }
 
-// Watch overlay visibility and add/remove keyboard listener
-watch(() => overlayRect.value !== null, (isVisible) => {
+// Track if we're handling mouse navigation to prevent browser navigation
+let isHandlingMouseNavigation = false;
+let overlayStatePushed = false;
+
+// Mouse button handler for MX Master 3s navigation buttons (button 4 = back, button 5 = forward)
+// Handle mousedown, mouseup, and auxclick events to prevent browser navigation
+function handleMouseButton(e: MouseEvent): void {
+    // Only handle when overlay is open and filled
+    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
+
+    // Button 4 = browser back (navigate to previous image)
+    if (e.button === 3) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        isHandlingMouseNavigation = true;
+        navigateToPrevious();
+        // Reset flag after a short delay
+        setTimeout(() => {
+            isHandlingMouseNavigation = false;
+        }, 100);
+    }
+    // Button 5 = browser forward (navigate to next image)
+    else if (e.button === 4) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        isHandlingMouseNavigation = true;
+        navigateToNext();
+        // Reset flag after a short delay
+        setTimeout(() => {
+            isHandlingMouseNavigation = false;
+        }, 100);
+    }
+}
+
+// Handle popstate event to prevent browser navigation when we're handling mouse navigation
+function handlePopState(e: PopStateEvent): void {
+    // If we're handling mouse navigation or overlay is open, prevent browser navigation
+    if (isHandlingMouseNavigation || (overlayRect.value && overlayFillComplete.value && !overlayIsClosing.value)) {
+        // Push current state back to prevent navigation
+        history.pushState({ preventBack: true }, '', window.location.href);
+    }
+}
+
+// Watch overlay visibility and add/remove keyboard and mouse button listeners
+watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible) => {
     if (isVisible) {
+        // Push a state entry when overlay opens to intercept back button
+        if (!overlayStatePushed) {
+            history.pushState({ fileViewerOpen: true }, '', window.location.href);
+            overlayStatePushed = true;
+        }
         window.addEventListener('keydown', handleKeyDown);
+        // Listen to mousedown, mouseup, and auxclick to catch mouse button 4/5 events
+        // Use capture phase and handle on document for better interception
+        document.addEventListener('mousedown', handleMouseButton, true);
+        document.addEventListener('mouseup', handleMouseButton, true);
+        document.addEventListener('auxclick', handleMouseButton, true);
+        // Handle popstate to prevent browser navigation
+        window.addEventListener('popstate', handlePopState);
     } else {
+        overlayStatePushed = false;
         window.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('mousedown', handleMouseButton, true);
+        document.removeEventListener('mouseup', handleMouseButton, true);
+        document.removeEventListener('auxclick', handleMouseButton, true);
+        window.removeEventListener('popstate', handlePopState);
     }
 }, { immediate: true });
 
 // Cleanup on unmount
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('mousedown', handleMouseButton, true);
+    document.removeEventListener('mouseup', handleMouseButton, true);
+    document.removeEventListener('auxclick', handleMouseButton, true);
+    window.removeEventListener('popstate', handlePopState);
 });
 
 // Expose methods for parent component
