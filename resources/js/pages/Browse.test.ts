@@ -103,6 +103,14 @@ beforeEach(() => {
     mockAxios.patch.mockResolvedValue({ data: {} });
 });
 
+// Mock usePreviewBatch composable (useItemPreview will use this)
+const mockQueuePreviewIncrement = vi.fn();
+vi.mock('@/composables/usePreviewBatch', () => ({
+    usePreviewBatch: () => ({
+        queuePreviewIncrement: mockQueuePreviewIncrement,
+    }),
+}));
+
 async function createTestRouter(initialPath = '/browse') {
     const router = createRouter({
         history: createMemoryHistory(),
@@ -5482,9 +5490,11 @@ describe('Browse', () => {
             tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 0 }];
             await wrapper.vm.$nextTick();
 
-            // Mock the preview API response
-            mockAxios.post.mockResolvedValueOnce({
-                data: { previewed_count: 1 },
+            // Mock the batch queue response BEFORE emitting the event
+            mockQueuePreviewIncrement.mockResolvedValueOnce({
+                file_id: 1,
+                previewed_count: 1,
+                auto_disliked: false,
             });
 
             // Find the MasonryItem component and emit preload:success event
@@ -5502,12 +5512,12 @@ describe('Browse', () => {
                 await flushPromises();
                 await wrapper.vm.$nextTick();
 
-                // Verify API was called
-                expect(mockAxios.post).toHaveBeenCalled();
-                const previewCall = mockAxios.post.mock.calls.find((call: any[]) =>
-                    call[0]?.includes('/api/files/1/preview')
-                );
-                expect(previewCall).toBeDefined();
+                // Verify the batch queue was called (handleItemPreload calls it internally)
+                expect(mockQueuePreviewIncrement).toHaveBeenCalledWith(1);
+
+                // Wait for the batch queue to process
+                await flushPromises();
+                await wrapper.vm.$nextTick();
 
                 // Verify item's previewed_count was updated
                 const updatedItem = tabContentVm.items.find((i: any) => i.id === 1);
@@ -5623,9 +5633,11 @@ describe('Browse', () => {
             tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 2, auto_disliked: false }];
             await wrapper.vm.$nextTick();
 
-            // Mock the preview API response with auto_disliked: true (previewed_count reached 3)
-            mockAxios.post.mockResolvedValueOnce({
-                data: { previewed_count: 3, auto_disliked: true },
+            // Mock the batch queue response with auto_disliked: true (previewed_count reached 3)
+            mockQueuePreviewIncrement.mockResolvedValueOnce({
+                file_id: 1,
+                previewed_count: 3,
+                auto_disliked: true,
             });
 
             const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
@@ -5641,18 +5653,13 @@ describe('Browse', () => {
                 await flushPromises();
                 await wrapper.vm.$nextTick();
 
-                // Verify API was called with correct endpoint
-                expect(mockAxios.post).toHaveBeenCalled();
-                const previewCall = mockAxios.post.mock.calls.find((call: any[]) =>
-                    call[0]?.includes('/api/files/1/preview')
-                );
-                expect(previewCall).toBeDefined();
+                // Verify the batch queue was used (handleItemPreload calls it internally)
+                expect(mockQueuePreviewIncrement).toHaveBeenCalledWith(1);
 
                 // Verify the API response included auto_disliked: true
                 // The actual item update is tested in PHP feature tests
-                // This test verifies the frontend calls the API correctly
-                const callArgs = previewCall?.[1] || {};
-                expect(previewCall).toBeDefined();
+                // This test verifies the frontend uses the batch queue correctly
+                // The batch queue response was already mocked above
             }
         });
 
@@ -5752,7 +5759,7 @@ describe('Browse', () => {
                 // The badge should be rendered in the template when hoveredItemIndex matches and imageLoaded is true
                 const html = browseTabContentComponent.html();
                 // The badge should be present when conditions are met
-                expect(html).toContain('Info') || expect(html).toContain('info');
+                expect(html.includes('Info') || html.includes('info')).toBe(true);
             }
         });
 

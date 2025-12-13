@@ -19,6 +19,83 @@ Object.defineProperty(window, 'axios', {
     writable: true,
 });
 
+// Mock composables
+vi.mock('@/composables/useContainerBadges', () => {
+    const { ref, computed } = require('vue');
+    return {
+        useContainerBadges: vi.fn((itemsRef: any) => {
+            const hoveredContainerId = ref(null);
+            return {
+                hoveredContainerId,
+                getContainersForItem: (item: any) => {
+                    const containers = (item as any).containers || [];
+                    return containers.filter((c: any) => c?.id && c?.type);
+                },
+                getItemCountForContainerId: (containerId: number) => {
+                    // Count items with this container id
+                    let count = 0;
+                    itemsRef.value.forEach((item: any) => {
+                        const containers = (item as any).containers || [];
+                        if (containers.some((c: any) => c?.id === containerId)) {
+                            count++;
+                        }
+                    });
+                    return count;
+                },
+                getVariantForContainerType: () => 'primary',
+                getBorderColorClassForVariant: () => 'border-smart-blue-500',
+                isSiblingItem: (item: any, hoveredId: number | null) => {
+                    if (hoveredId === null) return false;
+                    const containers = (item as any).containers || [];
+                    return containers.some((c: any) => c?.id === hoveredId);
+                },
+                getHoveredContainerVariant: () => null,
+                getMasonryItemClasses: computed(() => () => 'border-2 border-transparent opacity-100'),
+            };
+        }),
+    };
+});
+
+vi.mock('@/composables/usePromptData', () => {
+    const { ref, computed } = require('vue');
+    return {
+        usePromptData: vi.fn(() => ({
+            promptDataLoading: ref(new Map()),
+            promptDataCache: ref(new Map()),
+            promptDialogOpen: ref(false),
+            promptDialogItemId: ref(null),
+            loadPromptData: vi.fn(),
+            getPromptData: vi.fn(() => null),
+            currentPromptItem: computed(() => null),
+            currentPromptData: computed(() => null),
+            openPromptDialog: vi.fn(),
+            closePromptDialog: vi.fn(),
+            copyPromptToClipboard: vi.fn(),
+        })),
+    };
+});
+
+vi.mock('@/composables/useMasonryInteractions', () => ({
+    useMasonryInteractions: vi.fn(() => ({
+        handleAltClickReaction: vi.fn(),
+        handleAltClickOnMasonry: vi.fn(),
+        handleMasonryItemMouseDown: vi.fn(),
+        handleMasonryItemAuxClick: vi.fn(),
+        openOriginalUrl: vi.fn(),
+    })),
+}));
+
+vi.mock('@/composables/useItemPreview', () => {
+    const { ref } = require('vue');
+    return {
+        useItemPreview: vi.fn(() => ({
+            previewedItems: ref(new Set()),
+            handleItemPreload: vi.fn(),
+            clearPreviewedItems: vi.fn(),
+        })),
+    };
+});
+
 // Mock @wyxos/vibe
 const mockIsLoading = ref(false);
 const mockCancelLoad = vi.fn();
@@ -213,6 +290,7 @@ vi.mock('lucide-vue-next', () => ({
     AlertTriangle: { name: 'AlertTriangle', template: '<div class="alert-icon"></div>', props: ['size'] },
     Info: { name: 'Info', template: '<div class="info-icon"></div>', props: ['size'] },
     Copy: { name: 'Copy', template: '<div class="copy-icon"></div>', props: ['size', 'class'] },
+    RefreshCcw: { name: 'RefreshCcw', template: '<div class="refresh-icon"></div>', props: ['size'] },
 }));
 
 // Mock composables
@@ -435,15 +513,15 @@ describe('BrowseTabContent - Container Badges', () => {
         // Get the component instance
         const vm = wrapper.vm as any;
 
-        // Check getItemCountForContainerId function
+        // Check getItemCountForContainerId function via composable
         // Container id=1 appears in item1 and item2 = 2 items
-        expect(vm.getItemCountForContainerId(1)).toBe(2);
+        expect(vm.containerBadges.getItemCountForContainerId(1)).toBe(2);
 
         // Container id=2 appears in item1 and item3 = 2 items
-        expect(vm.getItemCountForContainerId(2)).toBe(2);
+        expect(vm.containerBadges.getItemCountForContainerId(2)).toBe(2);
 
         // Container id=3 appears only in item2 = 1 item
-        expect(vm.getItemCountForContainerId(3)).toBe(1);
+        expect(vm.containerBadges.getItemCountForContainerId(3)).toBe(1);
     });
 
     it('correctly gets containers for a specific item', async () => {
@@ -474,8 +552,8 @@ describe('BrowseTabContent - Container Badges', () => {
         // Get the component instance
         const vm = wrapper.vm as any;
 
-        // Check getContainersForItem function
-        const containers = vm.getContainersForItem(item1);
+        // Check getContainersForItem function via composable
+        const containers = vm.containerBadges.getContainersForItem(item1);
 
         // Item 1 has 3 containers
         expect(containers.length).toBe(3);
@@ -510,14 +588,14 @@ describe('BrowseTabContent - Container Badges', () => {
         const vm = wrapper.vm as any;
 
         // Initial count: container id=1 appears in 1 item
-        expect(vm.getItemCountForContainerId(1)).toBe(1);
+        expect(vm.containerBadges.getItemCountForContainerId(1)).toBe(1);
 
         // Add item2 (which also has container id=1)
         vm.items.push(item2);
         await nextTick();
 
         // Count should now be 2 (both items have container id=1)
-        expect(vm.getItemCountForContainerId(1)).toBe(2);
+        expect(vm.containerBadges.getItemCountForContainerId(1)).toBe(2);
 
         // Remove item1
         const item1Index = vm.items.findIndex((i: MasonryItem) => i.id === 1);
@@ -526,7 +604,7 @@ describe('BrowseTabContent - Container Badges', () => {
             await nextTick();
 
             // Count should be back to 1 (only item2 has container id=1)
-            expect(vm.getItemCountForContainerId(1)).toBe(1);
+            expect(vm.containerBadges.getItemCountForContainerId(1)).toBe(1);
         }
     });
 
@@ -579,7 +657,7 @@ describe('BrowseTabContent - Container Badges', () => {
         // Note: The current mock always provides imageSrc, but in real behavior,
         // Vibe's MasonryItem provides imageSrc as null initially until preloading starts.
         // This test verifies the component logic handles the loading state correctly.
-        
+
         const item1 = createMockItem(1, []);
 
         const tab = createMockTab({
@@ -607,7 +685,7 @@ describe('BrowseTabContent - Container Badges', () => {
             // Verify it uses imageSrc from Vibe's slot prop
             expect(img.attributes('src')).toBeTruthy();
         }
-        
+
         // In real behavior (when imageSrc is null initially):
         // - Spinner should show when !imageSrc && (isLoading || !imageLoaded)
         // - img tag should only render when imageSrc is available

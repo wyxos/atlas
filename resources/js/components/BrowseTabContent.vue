@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -22,7 +22,10 @@ import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
-import { usePreviewBatch } from '@/composables/usePreviewBatch';
+import { useContainerBadges } from '@/composables/useContainerBadges';
+import { usePromptData } from '@/composables/usePromptData';
+import { useMasonryInteractions } from '@/composables/useMasonryInteractions';
+import { useItemPreview } from '@/composables/useItemPreview';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -55,19 +58,10 @@ const isTabRestored = ref(false);
 const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
-const hoveredContainerId = ref<number | null>(null);
 // Store remove function from masonry slot to use in FileViewer
 const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
-// Track which items have already had their preview count incremented (to avoid double-counting)
-const previewedItems = ref<Set<number>>(new Set());
 // Dialog state for reset to first page warning
 const resetDialogOpen = ref(false);
-// Track prompt data loading state per item
-const promptDataLoading = ref<Map<number, boolean>>(new Map());
-const promptDataCache = ref<Map<number, string>>(new Map());
-// Dialog state for prompt display
-const promptDialogOpen = ref<boolean>(false);
-const promptDialogItemId = ref<number | null>(null);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -77,8 +71,8 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 // Reaction queue
 const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
 
-// Preview batch queue
-const { queuePreviewIncrement } = usePreviewBatch();
+// Item preview composable (needs to be initialized early)
+const itemPreview = useItemPreview(items, computed(() => props.tab));
 
 // Backfill state and handlers
 const {
@@ -168,6 +162,7 @@ function onMasonryMouseDown(e: MouseEvent): void {
     }
 }
 
+// Wrapper for handleAltClickOnMasonry that finds the item from the DOM
 function handleAltClickOnMasonry(e: MouseEvent): void {
     const container = masonryContainer.value;
     if (!container) return;
@@ -185,7 +180,7 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
         // Match by key (provided by backend)
         const item = items.value.find(i => i.key === itemKeyAttr);
         if (item) {
-            handleAltClickReaction(e, item.id);
+            masonryInteractions.handleAltClickReaction(e, item.id);
             return;
         }
     }
@@ -200,44 +195,7 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
             return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
         });
         if (item) {
-            handleAltClickReaction(e, item.id);
-        }
-    }
-}
-
-function handleAltClickReaction(e: MouseEvent, fileId: number): void {
-    // Prevent default behavior and stop propagation
-    e.preventDefault();
-    e.stopPropagation();
-
-    let reactionType: 'love' | 'like' | 'dislike' | 'funny' | null = null;
-
-    // ALT + Left Click = Like
-    if (e.button === 0 || (e.type === 'click' && e.button === 0)) {
-        reactionType = 'like';
-    }
-    // ALT + Right Click = Dislike
-    else if (e.button === 2 || e.type === 'contextmenu') {
-        reactionType = 'dislike';
-    }
-    // ALT + Middle Click = Favorite (Love)
-    else if (e.button === 1) {
-        reactionType = 'love';
-    }
-
-    if (reactionType) {
-        const item = items.value.find((i) => i.id === fileId);
-        if (item) {
-            // Find the remove function from masonry slot
-            const removeFn = masonryRemoveFn.value || ((itemToRemove: MasonryItem) => {
-                if (masonry.value) {
-                    const masonryItem = items.value.find((i) => i.id === itemToRemove.id);
-                    if (masonryItem) {
-                        masonry.value.remove(masonryItem);
-                    }
-                }
-            });
-            handleMasonryReaction(fileId, reactionType, removeFn);
+            masonryInteractions.handleAltClickReaction(e, item.id);
         }
     }
 }
@@ -249,261 +207,9 @@ function captureRemoveFn(remove: (item: MasonryItem) => void): void {
     }
 }
 
-// Load prompt data for an item (from metadata or API)
-async function loadPromptData(item: MasonryItem): Promise<string | null> {
-    // Check cache first
-    if (promptDataCache.value.has(item.id)) {
-        return promptDataCache.value.get(item.id) ?? null;
-    }
-
-    // Check if prompt is already in metadata
-    const metadata = (item as any).metadata;
-    if (metadata?.prompt) {
-        const prompt = String(metadata.prompt);
-        promptDataCache.value.set(item.id, prompt);
-        return prompt;
-    }
-
-    // Load from API if not in metadata
-    if (promptDataLoading.value.get(item.id)) {
-        return null; // Already loading
-    }
-
-    promptDataLoading.value.set(item.id, true);
-    try {
-        const response = await window.axios.get(`/api/files/${item.id}`);
-        const file = response.data?.file;
-        // Check metadata payload (JSON) or detail_metadata
-        const metadataPayload = file?.metadata?.payload;
-        const prompt = (typeof metadataPayload === 'object' && metadataPayload?.prompt)
-            ? String(metadataPayload.prompt)
-            : (file?.detail_metadata?.prompt ? String(file.detail_metadata.prompt) : null);
-        if (prompt) {
-            promptDataCache.value.set(item.id, prompt);
-            return prompt;
-        }
-        return null;
-    } catch (error) {
-        console.error('Failed to load prompt data:', error);
-        return null;
-    } finally {
-        promptDataLoading.value.set(item.id, false);
-    }
-}
-
-// Get prompt data for display (from cache or metadata)
-function getPromptData(item: MasonryItem): string | null {
-    const metadata = (item as any).metadata;
-    return promptDataCache.value.get(item.id) || metadata?.prompt || null;
-}
-
-// Get current prompt dialog item
-const currentPromptItem = computed(() => {
-    if (promptDialogItemId.value === null) return null;
-    return items.value.find(item => item.id === promptDialogItemId.value) || null;
-});
-
-// Get prompt data for current dialog item
-const currentPromptData = computed(() => {
-    const item = currentPromptItem.value;
-    if (!item) return null;
-    return getPromptData(item);
-});
-
-// Get containers for a specific item
-function getContainersForItem(item: MasonryItem): Array<{ id: number; type: string }> {
-    const containers = (item as any).containers || [];
-    return containers.filter((container: { id?: number; type?: string }) => container?.id && container?.type);
-}
-
-// Count items that have a container with the same container ID
-function getItemCountForContainerId(containerId: number): number {
-    let count = 0;
-    items.value.forEach((item) => {
-        const containers = (item as any).containers || [];
-        if (containers.some((container: { id?: number }) => container?.id === containerId)) {
-            count++;
-        }
-    });
-    return count;
-}
-
-// Get color variant for a container type (deterministic mapping)
-function getVariantForContainerType(containerType: string): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
-    const variants: Array<'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = [
-        'primary',
-        'secondary',
-        'success',
-        'warning',
-        'danger',
-        'info',
-        'neutral',
-    ];
-
-    // Simple hash function to deterministically assign variant based on container type
-    let hash = 0;
-    for (let i = 0; i < containerType.length; i++) {
-        hash = ((hash << 5) - hash) + containerType.charCodeAt(i);
-        hash = hash & hash; // Convert to 32-bit integer
-    }
-
-    // Use absolute value and modulo to get index
-    const index = Math.abs(hash) % variants.length;
-    return variants[index];
-}
-
-// Get border color class for a container type variant (matches Pill border colors)
-function getBorderColorClassForVariant(variant: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'): string {
-    const borderColors: Record<string, string> = {
-        primary: 'border-smart-blue-500',
-        secondary: 'border-sapphire-500',
-        success: 'border-success-500',
-        warning: 'border-warning-500',
-        danger: 'border-danger-500',
-        info: 'border-info-500',
-        neutral: 'border-twilight-indigo-500',
-    };
-    return borderColors[variant] || 'border-smart-blue-500';
-}
-
-// Check if an item is a sibling (has the same container ID as the hovered one)
-function isSiblingItem(item: MasonryItem, hoveredContainerId: number | null): boolean {
-    if (hoveredContainerId === null) {
-        return false;
-    }
-    const containers = getContainersForItem(item);
-    return containers.some((container) => container.id === hoveredContainerId);
-}
-
-// Get the variant for the hovered container type
-function getHoveredContainerVariant(): 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' | null {
-    if (hoveredContainerId.value === null) {
-        return null;
-    }
-    // Find the container type for the hovered container ID
-    for (const item of items.value) {
-        const containers = getContainersForItem(item);
-        const container = containers.find((c) => c.id === hoveredContainerId.value);
-        if (container) {
-            return getVariantForContainerType(container.type);
-        }
-    }
-    return null;
-}
-
-// Open prompt dialog for an item
-async function openPromptDialog(item: MasonryItem): Promise<void> {
-    promptDialogItemId.value = item.id;
-    promptDialogOpen.value = true;
-    // Load prompt data if not already loaded
-    if (!getPromptData(item) && !promptDataLoading.value.get(item.id)) {
-        await loadPromptData(item);
-    }
-}
-
-// Close prompt dialog
-function closePromptDialog(): void {
-    promptDialogOpen.value = false;
-    // Keep itemId for a moment to allow dialog to close smoothly
-    setTimeout(() => {
-        promptDialogItemId.value = null;
-    }, 200);
-}
-
-// Copy prompt to clipboard
-async function copyPromptToClipboard(prompt: string): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(prompt);
-    } catch (error) {
-        console.error('Failed to copy prompt:', error);
-    }
-}
-
-// Open original URL in new tab (matching atlas implementation)
-function openOriginalUrl(item: MasonryItem): void {
-    const url = item.originalUrl || item.src;
-    if (url) {
-        try {
-            window.open(url, '_blank', 'noopener,noreferrer');
-        } catch {
-            // ignore
-        }
-    }
-}
-
-// Handle middle click mousedown on masonry item (prevent default to avoid browser scroll)
-function handleMasonryItemMouseDown(e: MouseEvent, item: MasonryItem): void {
-    // Middle click without ALT - prevent default to avoid browser scroll
-    // Actual opening will be handled in auxclick
-    if (!e.altKey && e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-}
-
-// Handle middle click (auxclick) on masonry item to open original URL
-function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
-    // Middle click without ALT - open original URL
-    if (!e.altKey && e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const url = item.originalUrl || item.src;
-        if (url) {
-            try {
-                window.open(url, '_blank', 'noopener,noreferrer');
-            } catch {
-                // ignore
-            }
-        }
-    }
-}
 
 
 // Increment preview count when item is preloaded (batched)
-async function handleItemPreload(fileId: number): Promise<void> {
-    // Skip if we've already incremented preview count for this item
-    if (previewedItems.value.has(fileId)) {
-        return;
-    }
-
-    try {
-        // Queue the preview increment (will be batched with other requests)
-        const response = await queuePreviewIncrement(fileId);
-
-        // Mark as previewed
-        previewedItems.value.add(fileId);
-
-        // Update local item state - update in both items.value and tab.itemsData
-        const itemIndex = items.value.findIndex((i) => i.id === fileId);
-        if (itemIndex !== -1) {
-            // Update the item in place to maintain reactivity
-            // Use Object.assign to mutate in place, which Vue can track better
-            const currentItem = items.value[itemIndex];
-            if (response.auto_disliked) {
-                currentItem.auto_disliked = true;
-            }
-            currentItem.previewed_count = response.previewed_count;
-        }
-
-        // Also update in tab.itemsData if it exists
-        if (props.tab?.itemsData) {
-            const tabItemIndex = props.tab.itemsData.findIndex((i) => i.id === fileId);
-            if (tabItemIndex !== -1) {
-                Object.assign(props.tab.itemsData[tabItemIndex], {
-                    previewed_count: response.previewed_count,
-                    auto_disliked: response.auto_disliked ? true : props.tab.itemsData[tabItemIndex].auto_disliked ?? false,
-                });
-            }
-        }
-
-        // Force reactivity update
-        await nextTick();
-    } catch (error) {
-        console.error('Failed to increment preview count:', error);
-        // Don't throw - preview count is not critical
-    }
-}
 
 // Handle reaction with queue (wrapper for masonry removeItem callback)
 async function handleMasonryReaction(
@@ -578,6 +284,21 @@ async function handleMasonryReaction(
     // Emit to parent
     props.onReaction(fileId, type);
 }
+
+// Initialize composables that depend on handleMasonryReaction
+// Container badges composable
+const containerBadges = useContainerBadges(items);
+
+// Prompt data composable
+const promptData = usePromptData(items);
+
+// Masonry interactions composable (needs handleMasonryReaction)
+const masonryInteractions = useMasonryInteractions(
+    items,
+    masonry,
+    masonryRemoveFn,
+    handleMasonryReaction
+);
 
 // Restore item to masonry (used by FileViewer)
 async function restoreToMasonry(item: MasonryItem, index: number, masonryInstance?: any): Promise<void> {
@@ -733,7 +454,7 @@ async function initializeTab(): Promise<void> {
     }
 
     // Reset previewed items tracking when switching tabs
-    previewedItems.value.clear();
+    itemPreview.clearPreviewedItems();
 
     const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
     isTabRestored.value = tabHasRestorableItems;
@@ -887,9 +608,10 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <Button v-if="hasServiceSelected && !isOnFirstPage" @click="openResetDialog" size="sm" variant="ghost" class="h-10 w-10"
-                    color="danger" data-test="reset-to-first-page-button">
-                    <ChevronsLeft :size="14" />
+                <Button v-if="hasServiceSelected && !isOnFirstPage" @click="openResetDialog" size="sm" variant="ghost"
+                    class="h-10 w-10" color="danger" data-test="reset-to-first-page-button">
+                    fast backward lucide icon
+
                 </Button>
                 <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="h-10 w-10"
                     data-test="apply-service-button">
@@ -914,25 +636,20 @@ onUnmounted(() => {
                         <!-- Capture remove function on first item render -->
                         <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
                         <VibeMasonryItem :item="item" :remove="remove" @mouseenter="hoveredItemIndex = index"
-                            @mouseleave="hoveredItemIndex = null; hoveredContainerId = null" @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
+                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.hoveredContainerId.value = null; }"
+                            @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
                                 // payload.item is the item passed to MasonryItem, which should have the id
                                 const itemId = payload.item?.id ?? item?.id;
                                 if (itemId) {
-                                    handleItemPreload(itemId);
+                                    itemPreview.handleItemPreload(itemId);
                                 }
                             }">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item transition-all duration-300"
-                                    :data-key="item.key" :class="[
-                                        hoveredContainerId !== null && isSiblingItem(item, hoveredContainerId)
-                                            ? `border-2 ${getBorderColorClassForVariant(getHoveredContainerVariant() || 'primary')}`
-                                            : 'border-2 border-transparent',
-                                        hoveredContainerId !== null && !isSiblingItem(item, hoveredContainerId)
-                                            ? 'opacity-50'
-                                            : 'opacity-100',
-                                    ]" @mousedown="(e: MouseEvent) => handleMasonryItemMouseDown(e, item)"
-                                    @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item)">
+                                    :data-key="item.key" :class="containerBadges.getMasonryItemClasses.value(item)"
+                                    @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
+                                    @auxclick="(e: MouseEvent) => masonryInteractions.handleMasonryItemAuxClick(e, item)">
                                     <!-- Auto-disliked indicator overlay with smooth animation -->
                                     <Transition name="ring-fade">
                                         <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
@@ -973,14 +690,15 @@ onUnmounted(() => {
                                     ]" />
 
                                     <!-- Container badges (shows on hover with type and count) -->
-                                    <div v-if="hoveredItemIndex === index && imageLoaded && getContainersForItem(item).length > 0"
+                                    <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(item).length > 0"
                                         class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
-                                        <div v-for="container in getContainersForItem(item)" :key="container.id"
-                                            @mouseenter="hoveredContainerId = container.id"
-                                            @mouseleave="hoveredContainerId = null">
+                                        <div v-for="container in containerBadges.getContainersForItem(item)"
+                                            :key="container.id"
+                                            @mouseenter="() => { containerBadges.hoveredContainerId.value = container.id; }"
+                                            @mouseleave="() => { containerBadges.hoveredContainerId.value = null; }">
                                             <Pill class="w-full" :label="container.type"
-                                                :value="getItemCountForContainerId(container.id)"
-                                                :variant="getVariantForContainerType(container.type)" />
+                                                :value="containerBadges.getItemCountForContainerId(container.id)"
+                                                :variant="containerBadges.getVariantForContainerType(container.type)" />
                                         </div>
                                     </div>
 
@@ -989,7 +707,8 @@ onUnmounted(() => {
                                         class="absolute top-2 right-2 z-50 pointer-events-auto">
                                         <Button variant="ghost" size="sm"
                                             class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
-                                            @click.stop="() => openPromptDialog(item)" aria-label="Show prompt">
+                                            @click.stop="() => promptData.openPromptDialog(item)"
+                                            aria-label="Show prompt">
                                             <Info :size="14" />
                                         </Button>
                                     </div>
@@ -1079,21 +798,22 @@ onUnmounted(() => {
         </Dialog>
 
         <!-- Prompt Dialog -->
-        <Dialog v-model="promptDialogOpen" @update:model-value="(val) => { if (!val) closePromptDialog(); }">
+        <Dialog v-model="promptData.promptDialogOpen.value"
+            @update:model-value="(val) => { if (!val) promptData.closePromptDialog(); }">
             <DialogContent class="sm:max-w-[600px] bg-prussian-blue-600">
                 <DialogHeader>
                     <DialogTitle class="text-twilight-indigo-100">Prompt</DialogTitle>
                 </DialogHeader>
                 <div class="space-y-4 mt-4">
-                    <div v-if="promptDialogItemId !== null && promptDataLoading.get(promptDialogItemId)"
+                    <div v-if="promptData.promptDialogItemId.value !== null && promptData.promptDataLoading.value.get(promptData.promptDialogItemId.value)"
                         class="flex items-center gap-2 text-sm text-twilight-indigo-100">
                         <Loader2 :size="16" class="animate-spin" />
                         <span>Loading prompt...</span>
                     </div>
-                    <div v-else-if="currentPromptData" class="space-y-2">
+                    <div v-else-if="promptData.currentPromptData.value" class="space-y-2">
                         <div
                             class="flex-1 whitespace-pre-wrap wrap-break-word text-sm text-twilight-indigo-100 max-h-[60vh] overflow-y-auto">
-                            {{ currentPromptData }}
+                            {{ promptData.currentPromptData.value }}
                         </div>
                     </div>
                     <div v-else class="text-sm text-twilight-indigo-300">
@@ -1102,13 +822,13 @@ onUnmounted(() => {
                 </div>
                 <DialogFooter>
                     <Button variant="outline" size="sm"
-                        @click="() => { if (currentPromptData) copyPromptToClipboard(currentPromptData); }"
+                        @click="() => { if (promptData.currentPromptData.value) promptData.copyPromptToClipboard(promptData.currentPromptData.value); }"
                         aria-label="Copy prompt">
                         <Copy :size="16" class="mr-2" />
                         Copy
                     </Button>
                     <DialogClose as-child>
-                        <Button variant="outline" size="sm" @click="closePromptDialog">
+                        <Button variant="outline" size="sm" @click="promptData.closePromptDialog()">
                             Close
                         </Button>
                     </DialogClose>
