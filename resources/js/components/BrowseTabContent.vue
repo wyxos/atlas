@@ -23,6 +23,7 @@ import { useBrowseService } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import { useContainerBadges } from '@/composables/useContainerBadges';
+import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
 import { usePromptData } from '@/composables/usePromptData';
 import { useMasonryInteractions } from '@/composables/useMasonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
@@ -229,6 +230,15 @@ function captureRemoveFn(remove: (item: MasonryItem) => void): void {
 // Container badges composable
 const containerBadges = useContainerBadges(items);
 
+// Container pill interactions composable
+const containerPillInteractions = useContainerPillInteractions(
+    items,
+    masonryRemoveFn,
+    masonry,
+    props.tab?.id,
+    props.onReaction
+);
+
 // Prompt data composable
 const promptData = usePromptData(items);
 
@@ -364,8 +374,9 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <Button v-if="hasServiceSelected && !resetDialog.isOnFirstPage" @click="resetDialog.openResetDialog"
-                    size="sm" variant="ghost" class="h-10 w-10" color="danger" data-test="reset-to-first-page-button">
+                <Button :disabled="(!hasServiceSelected && !resetDialog.isOnFirstPage)"
+                    @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
+                    data-test="reset-to-first-page-button">
                     fast backward lucide icon
 
                 </Button>
@@ -449,9 +460,14 @@ onUnmounted(() => {
                                     <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(item).length > 0"
                                         class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
                                         <div v-for="container in containerBadges.getContainersForItem(item)"
-                                            :key="container.id"
+                                            :key="container.id" class="cursor-pointer"
                                             @mouseenter="() => { containerBadges.hoveredContainerId.value = container.id; }"
-                                            @mouseleave="() => { containerBadges.hoveredContainerId.value = null; }">
+                                            @mouseleave="() => { containerBadges.hoveredContainerId.value = null; }"
+                                            @click.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e)"
+                                            @dblclick.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e, true)"
+                                            @contextmenu.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e)"
+                                            @auxclick.stop="(e: MouseEvent) => containerPillInteractions.handlePillAuxClick(container.id, e)"
+                                            @mousedown.stop="(e: MouseEvent) => { if (e.button === 1) e.preventDefault(); }">
                                             <Pill :label="container.type"
                                                 :value="containerBadges.getItemCountForContainerId(container.id)"
                                                 :variant="containerBadges.getVariantForContainerType(container.type)" />
