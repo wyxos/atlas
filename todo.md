@@ -3,9 +3,13 @@
       - moderation when browsing
       - ban by container
     - local files
+      - render local files
+      - handle refresh page instead of backfill
       - auto blacklist if preview count >= 5 while disliked
     - handle video
-
+    - restore scout
+    - restore horizon
+    - download manager
 
 - implement file listing
     - view
