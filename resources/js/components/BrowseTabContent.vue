@@ -85,12 +85,16 @@ const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
 
 // Handle auto-dislike queue expiration - perform auto-dislike in batch
 async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
+    console.log('[AutoDislike] handleAutoDislikeExpire called with:', expiredIds);
+
     if (expiredIds.length === 0) {
+        console.log('[AutoDislike] No expired IDs, returning');
         return;
     }
 
     // Batch perform auto-dislike (backend handles de-association from tabs)
     try {
+        console.log('[AutoDislike] Sending batch request to backend...');
         const response = await window.axios.post<{
             message: string;
             auto_disliked_count: number;
@@ -99,6 +103,7 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
             file_ids: expiredIds,
         });
 
+        console.log('[AutoDislike] Backend response:', response.data);
         const autoDislikedIds = response.data.file_ids;
 
         // Remove from masonry
@@ -109,17 +114,24 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
                 itemsToRemove.push(item);
             }
         }
+        console.log('[AutoDislike] Items to remove from masonry:', itemsToRemove.map((i) => i.id));
 
         // Remove from masonry using removeMany for batch removal
         // Masonry component manages items array through v-model, so no manual array manipulation needed
         if (masonry.value?.removeMany) {
+            console.log('[AutoDislike] Calling masonry.removeMany...');
             await masonry.value.removeMany(itemsToRemove);
         } else if (masonry.value?.remove) {
+            console.log('[AutoDislike] Calling masonry.remove (fallback)...');
             // Fallback to individual removal if removeMany is not available
             for (const item of itemsToRemove) {
                 masonry.value.remove(item);
             }
+        } else {
+            console.error('[AutoDislike] masonry.value has no remove methods!', masonry.value);
         }
+
+        console.log('[AutoDislike] Items remaining in masonry:', items.value.length);
 
         // Update tab (remove from fileIds and itemsData)
         // Note: Backend already de-associated from tabs, we just update local state
@@ -127,9 +139,10 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
             const updatedFileIds = props.tab.fileIds.filter((id) => !autoDislikedIds.includes(id));
             const updatedItemsData = props.tab.itemsData.filter((item) => !autoDislikedIds.includes(item.id));
             props.updateActiveTab(updatedItemsData, updatedFileIds, props.tab.queryParams);
+            console.log('[AutoDislike] Tab updated');
         }
     } catch (error) {
-        console.error('Failed to batch perform auto-dislike:', error);
+        console.error('[AutoDislike] Failed to batch perform auto-dislike:', error);
     }
 }
 
@@ -560,10 +573,12 @@ watch(
             if (item.will_auto_dislike && !oldMap.get(item.id)) {
                 // Start active if preview already loaded, otherwise inactive (frozen until loads)
                 const isAlreadyLoaded = loadedItemIds.value.has(item.id);
+                console.log('[AutoDislike] Adding to queue:', item.id, 'startActive:', isAlreadyLoaded);
                 autoDislikeQueue.addToQueue(item.id, isAlreadyLoaded);
             }
             // Remove from queue if will_auto_dislike is false and was true before
             else if (!item.will_auto_dislike && oldMap.get(item.id)) {
+                console.log('[AutoDislike] Removing from queue:', item.id);
                 autoDislikeQueue.removeFromQueue(item.id);
             }
         });
@@ -673,6 +688,7 @@ onUnmounted(() => {
                                     loadedItemIds.add(itemId);
                                     // Activate auto-dislike countdown when preview loads
                                     if (autoDislikeQueue.isQueued(itemId)) {
+                                        console.log('[AutoDislike] Activating item on preload:', itemId);
                                         autoDislikeQueue.activateItem(itemId);
                                     }
                                 }
