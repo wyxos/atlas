@@ -163,6 +163,7 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
 export function setupBrowseTestMocks(mocks: BrowseMocks): void {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => { });
+    vi.spyOn(console, 'warn').mockImplementation(() => { });
     mocks.mockIsLoading.value = false;
     mocks.mockCancelLoad.mockClear();
     mocks.mockDestroy.mockClear();
