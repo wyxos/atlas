@@ -10,9 +10,10 @@ export function useMasonryRestore(
 ) {
     /**
      * Restore item to masonry at original index.
+     * Delegates to Vibe's restore method which handles all index calculation and layout internally.
      */
     async function restoreToMasonry(item: MasonryItem, index: number, masonryInstance?: any): Promise<void> {
-        // Restore item to masonry at original index
+        // Check if item already exists
         const existingIndex = items.value.findIndex((i) => i.id === item.id);
         if (existingIndex !== -1) {
             return; // Item already exists
@@ -23,44 +24,18 @@ export function useMasonryRestore(
             return;
         }
 
-        // Try to use masonry's restore method if available
+        // Use Vibe's restore - it handles all index calculation and layout internally
         if (typeof instance.restore === 'function') {
-            instance.restore(item, index);
-            // Trigger layout recalculation for proper animation
-            if (typeof instance.refreshLayout === 'function') {
-                await nextTick();
-                instance.refreshLayout(items.value);
-            }
-        } else if (typeof instance.add === 'function') {
-            instance.add(item, index);
-            // Trigger layout recalculation for proper animation
-            if (typeof instance.refreshLayout === 'function') {
-                await nextTick();
-                instance.refreshLayout(items.value);
-            }
-        } else if (typeof instance.insert === 'function') {
-            instance.insert(item, index);
-            // Trigger layout recalculation for proper animation
-            if (typeof instance.refreshLayout === 'function') {
-                await nextTick();
-                instance.refreshLayout(items.value);
-            }
+            await instance.restore(item, index);
         } else {
-            // Fallback: manually insert at original index and refresh layout
-            const clampedIndex = Math.min(index, items.value.length);
-            items.value.splice(clampedIndex, 0, item);
-            // Trigger layout recalculation and animation
-            if (typeof instance.refreshLayout === 'function') {
-                // Use nextTick to ensure Vue has processed the array change
-                await nextTick();
-                instance.refreshLayout(items.value);
-            }
+            // Fallback if restore doesn't exist (shouldn't happen with Vibe)
+            console.warn('[useMasonryRestore] restore not available on masonry instance');
         }
     }
 
     /**
      * Restore multiple items to masonry at their original indices.
-     * Items are restored in order of their original index to maintain layout.
+     * Delegates to Vibe's restoreMany method which handles all index calculation and layout internally.
      */
     async function restoreManyToMasonry(
         itemsToRestore: Array<{ item: MasonryItem; index: number }>,
@@ -75,33 +50,23 @@ export function useMasonryRestore(
             return;
         }
 
-        // Filter out items that already exist and sort by original index
-        const itemsToAdd = itemsToRestore
-            .filter(({ item }) => items.value.findIndex((i) => i.id === item.id) === -1)
-            .sort((a, b) => a.index - b.index); // Sort by original index
+        // Filter out items that already exist
+        const itemsToAdd = itemsToRestore.filter(
+            ({ item }) => items.value.findIndex((i) => i.id === item.id) === -1
+        );
 
         if (itemsToAdd.length === 0) {
             return; // All items already exist
         }
 
-        // Manually splice items into array at their original indices (like atlas does)
-        // This ensures proper animation when refreshLayout is called
-        itemsToAdd.forEach(({ item, index }) => {
-            const clampedIndex = Math.max(0, Math.min(index, items.value.length));
-            items.value.splice(clampedIndex, 0, item);
-        });
-
-        // Trigger layout recalculation using requestAnimationFrame for smooth animation
-        // (matching atlas implementation pattern)
-        if (typeof instance.refreshLayout === 'function') {
-            await nextTick();
-            requestAnimationFrame(() => {
-                try {
-                    instance.refreshLayout(items.value);
-                } catch {
-                    // ignore errors
-                }
-            });
+        // Use Vibe's restoreMany - it handles all index calculation and layout internally
+        if (typeof instance.restoreMany === 'function') {
+            const sortedItems = itemsToAdd.map(({ item }) => item);
+            const sortedIndices = itemsToAdd.map(({ index }) => index);
+            await instance.restoreMany(sortedItems, sortedIndices);
+        } else {
+            // Fallback if restoreMany doesn't exist (shouldn't happen with Vibe)
+            console.warn('[useMasonryRestore] restoreMany not available on masonry instance');
         }
     }
 
