@@ -9,7 +9,6 @@ import { createReactionCallback } from '@/utils/reactions';
 export function useMasonryReactionHandler(
     items: Ref<MasonryItem[]>,
     masonry: Ref<any>,
-    masonryRemoveFn: Ref<((item: MasonryItem) => void) | null>,
     tab: Ref<BrowseTabData | undefined>,
     onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void,
     restoreToMasonry: (item: MasonryItem, index: number, masonryInstance?: any) => Promise<void>

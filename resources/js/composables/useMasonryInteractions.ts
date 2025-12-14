@@ -6,7 +6,6 @@ import type { MasonryItem } from './useBrowseTabs';
 export function useMasonryInteractions(
     items: import('vue').Ref<MasonryItem[]>,
     masonry: import('vue').Ref<any>,
-    masonryRemoveFn: import('vue').Ref<((item: MasonryItem) => void) | null>,
     handleMasonryReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny', removeItem: (item: MasonryItem) => void) => Promise<void>
 ) {
     // Handle ALT + mouse button combinations for quick reactions
@@ -32,16 +31,14 @@ export function useMasonryInteractions(
 
         if (reactionType) {
             const item = items.value.find((i) => i.id === fileId);
-            if (item) {
-                // Find the remove function from masonry slot
-                const removeFn = masonryRemoveFn.value || ((itemToRemove: MasonryItem) => {
-                    if (masonry.value) {
-                        const masonryItem = items.value.find((i) => i.id === itemToRemove.id);
-                        if (masonryItem) {
-                            masonry.value.remove(masonryItem);
-                        }
+            if (item && masonry.value?.remove) {
+                // Use masonry's remove method directly
+                const removeFn = (itemToRemove: MasonryItem) => {
+                    const masonryItem = items.value.find((i) => i.id === itemToRemove.id);
+                    if (masonryItem) {
+                        masonry.value.remove(masonryItem);
                     }
-                });
+                };
                 handleMasonryReaction(fileId, reactionType, removeFn);
             }
         }

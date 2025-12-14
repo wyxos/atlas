@@ -63,8 +63,6 @@ const isTabRestored = ref(false);
 const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
-// Store remove function from masonry slot to use in FileViewer
-const masonryRemoveFn = ref<((item: MasonryItem) => void) | null>(null);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -217,12 +215,6 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
     }
 }
 
-// Function to capture remove function from masonry slot
-function captureRemoveFn(remove: (item: MasonryItem) => void): void {
-    if (!masonryRemoveFn.value) {
-        masonryRemoveFn.value = remove;
-    }
-}
 
 
 
@@ -246,7 +238,6 @@ const promptData = usePromptData(items);
 const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
     masonry,
-    masonryRemoveFn,
     computed(() => props.tab),
     props.onReaction,
     restoreToMasonry
@@ -256,7 +247,6 @@ const { handleMasonryReaction } = useMasonryReactionHandler(
 const masonryInteractions = useMasonryInteractions(
     items,
     masonry,
-    masonryRemoveFn,
     handleMasonryReaction
 );
 
@@ -399,8 +389,6 @@ onUnmounted(() => {
                     @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
                     data-test="masonry-component">
                     <template #default="{ item, index, remove }">
-                        <!-- Capture remove function on first item render -->
-                        <div v-if="index === 0" style="display: none;" :ref="() => captureRemoveFn(remove)" />
                         <VibeMasonryItem :item="item" :remove="remove" @mouseenter="hoveredItemIndex = index"
                             @mouseleave="() => { hoveredItemIndex = null; containerBadges.hoveredContainerId.value = null; }"
                             @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
@@ -513,27 +501,12 @@ onUnmounted(() => {
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :has-more="nextCursor !== null" :is-loading="masonry?.isLoading ?? false"
             :on-load-more="handleCarouselLoadMore" :on-reaction="props.onReaction" :remove-from-masonry="(item) => {
-                // Use the remove function directly from masonry slot if available
-                // In template, Vue auto-unwraps refs, so masonryRemoveFn is the value
-                if (masonryRemoveFn) {
-                    masonryRemoveFn(item);
-                    // masonryRemoveFn handles removal via v-model, so items array is updated automatically
-                } else if (masonry.value) {
-                    // Fallback: find item and use masonry instance method
+                // Use masonry's remove method directly
+                if (masonry.value?.remove) {
                     const masonryItem = items.find((i) => i.id === item.id);
                     if (masonryItem) {
                         masonry.value.remove(masonryItem);
-                        // masonry.remove() handles removal via v-model, so items array is updated automatically
                     }
-                }
-
-                // Always ensure item is removed from items array as a backup
-                // masonry.remove() should handle this via v-model, but this ensures it works
-                // in test environments where masonry might not be fully initialized or v-model sync is delayed
-                // Check if item still exists before removing to avoid double removal
-                const itemIndex = items.findIndex((i) => i.id === item.id);
-                if (itemIndex !== -1) {
-                    items.splice(itemIndex, 1);
                 }
             }" :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
             @close="() => { }" />
