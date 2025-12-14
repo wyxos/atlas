@@ -27,6 +27,41 @@ Object.defineProperty(window, 'axios', {
     writable: true,
 });
 
+// Mock lucide-vue-next icons
+vi.mock('lucide-vue-next', () => ({
+    Loader2: { name: 'Loader2', template: '<div class="loader-icon"></div>', props: ['size', 'class'] },
+    AlertTriangle: { name: 'AlertTriangle', template: '<div class="alert-icon"></div>', props: ['size'] },
+    Info: { name: 'Info', template: '<div class="info-icon"></div>', props: ['size'] },
+    Copy: { name: 'Copy', template: '<div class="copy-icon"></div>', props: ['size', 'class'] },
+    RefreshCcw: { name: 'RefreshCcw', template: '<div class="refresh-icon"></div>', props: ['size'] },
+    ChevronsLeft: { name: 'ChevronsLeft', template: '<div class="chevrons-left-icon"></div>', props: ['size'] },
+    SlidersHorizontal: { name: 'SlidersHorizontal', template: '<div class="sliders-icon"></div>', props: ['size'] },
+    X: { name: 'X', template: '<div class="x-icon"></div>', props: ['size', 'class'] },
+    Check: { name: 'Check', template: '<div class="check-icon"></div>', props: ['size', 'class'] },
+    ChevronDown: { name: 'ChevronDown', template: '<div class="chevron-down-icon"></div>', props: ['size', 'class'] },
+    ChevronUp: { name: 'ChevronUp', template: '<div class="chevron-up-icon"></div>', props: ['size', 'class'] },
+    ChevronLeft: { name: 'ChevronLeft', template: '<div class="chevron-left-icon"></div>', props: ['size', 'class'] },
+    ChevronRight: { name: 'ChevronRight', template: '<div class="chevron-right-icon"></div>', props: ['size', 'class'] },
+    Play: { name: 'Play', template: '<div class="play-icon"></div>', props: ['size', 'class'] },
+    RotateCw: { name: 'RotateCw', template: '<div class="rotate-cw-icon"></div>', props: ['size', 'class'] },
+    ThumbsDown: { name: 'ThumbsDown', template: '<div class="thumbs-down-icon"></div>', props: ['size', 'class'] },
+    ThumbsUp: { name: 'ThumbsUp', template: '<div class="thumbs-up-icon"></div>', props: ['size', 'class'] },
+    Heart: { name: 'Heart', template: '<div class="heart-icon"></div>', props: ['size', 'class'] },
+    Laugh: { name: 'Laugh', template: '<div class="laugh-icon"></div>', props: ['size', 'class'] },
+    Star: { name: 'Star', template: '<div class="star-icon"></div>', props: ['size', 'class'] },
+    Shield: { name: 'Shield', template: '<div class="shield-icon"></div>', props: ['size', 'class'] },
+    Plus: { name: 'Plus', template: '<div class="plus-icon"></div>', props: ['size', 'class'] },
+    Trash2: { name: 'Trash2', template: '<div class="trash-icon"></div>', props: ['size', 'class'] },
+    GripVertical: { name: 'GripVertical', template: '<div class="grip-icon"></div>', props: ['size', 'class'] },
+    Save: { name: 'Save', template: '<div class="save-icon"></div>', props: ['size', 'class'] },
+    Download: { name: 'Download', template: '<div class="download-icon"></div>', props: ['size', 'class'] },
+    Maximize2: { name: 'Maximize2', template: '<div class="maximize-icon"></div>', props: ['size', 'class'] },
+    Minimize2: { name: 'Minimize2', template: '<div class="minimize-icon"></div>', props: ['size', 'class'] },
+    ExternalLink: { name: 'ExternalLink', template: '<div class="external-link-icon"></div>', props: ['size', 'class'] },
+    MoreHorizontal: { name: 'MoreHorizontal', template: '<div class="more-icon"></div>', props: ['size', 'class'] },
+    Undo2: { name: 'Undo2', template: '<div class="undo-icon"></div>', props: ['size', 'class'] },
+}));
+
 // Mock @wyxos/vibe
 export const mockIsLoading = ref(false);
 export const mockCancelLoad = vi.fn();

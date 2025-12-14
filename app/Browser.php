@@ -122,18 +122,14 @@ class Browser
 
         $persisted = app(BrowsePersister::class)->persist($filesPayload);
 
-        // Moderation: evaluate prompts and auto-dislike matches using shared trait
+        // Moderation: identify files that should be flagged for auto-dislike (UI handles countdown)
         $moderationResult = $this->moderateFiles(collect($persisted));
-        $matchedIds = $moderationResult['removedIds'];
-        $previewBag = $moderationResult['previewBag'];
-        $newlyAutoDislikedCount = $moderationResult['newlyAutoDislikedCount'];
-
-        // Filter out auto-disliked files and update ids array
-        $persisted = $moderationResult['filtered']->all();
+        $flaggedIds = $moderationResult['flaggedIds'];
 
         // Transform persisted files to items format for frontend
+        // Pass flagged IDs so they get will_auto_dislike = true
         $page = (int) (request()->input('page', 1));
-        $items = FileItemFormatter::format($persisted, $page);
+        $items = FileItemFormatter::format($persisted, $page, $flaggedIds);
 
         return [
             'items' => $items,
@@ -144,9 +140,8 @@ class Browser
                 'next' => $filter['next'] ?? null,
             ],
             'moderation' => [
-                'auto_disliked_count' => (int) $newlyAutoDislikedCount,
-                'previews' => array_slice($previewBag, 0, 4),
-                'ids' => $matchedIds,
+                'flagged_count' => count($flaggedIds),
+                'flagged_ids' => $flaggedIds,
             ],
             'error' => $serviceError,
             'services' => $servicesMeta,

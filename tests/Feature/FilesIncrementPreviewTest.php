@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\BrowseTab;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -17,14 +16,14 @@ test('increments preview count', function () {
     $response->assertSuccessful();
     $response->assertJson([
         'previewed_count' => 1,
-        'auto_disliked' => false,
+        'will_auto_dislike' => false,
     ]);
 
     $file->refresh();
     expect($file->previewed_count)->toBe(1);
 });
 
-test('auto-dislikes file when previewed_count reaches 3 and no reactions exist', function () {
+test('returns will_auto_dislike flag when previewed_count reaches 3 and no reactions exist', function () {
     $admin = User::factory()->admin()->create();
     $file = File::factory()->create([
         'previewed_count' => 2,
@@ -32,33 +31,22 @@ test('auto-dislikes file when previewed_count reaches 3 and no reactions exist',
         'path' => null, // No path (not on disk)
         'blacklisted_at' => null, // Not blacklisted
     ]);
-    $tab = BrowseTab::factory()->for($admin)->create();
-    $tab->files()->attach($file->id, ['position' => 0]);
 
     $response = $this->actingAs($admin)->postJson("/api/files/{$file->id}/preview");
 
     $response->assertSuccessful();
     $response->assertJson([
         'previewed_count' => 3,
-        'auto_disliked' => true,
+        'will_auto_dislike' => true,
     ]);
 
     $file->refresh();
-    expect($file->auto_disliked)->toBeTrue();
     expect($file->previewed_count)->toBe(3);
-
-    // Verify dislike reaction was created
-    $reaction = Reaction::where('file_id', $file->id)
-        ->where('user_id', $admin->id)
-        ->where('type', 'dislike')
-        ->first();
-    expect($reaction)->not->toBeNull();
-
-    // Verify file was detached from tab
-    expect($tab->files()->where('files.id', $file->id)->exists())->toBeFalse();
+    // File is NOT auto-disliked immediately - UI handles countdown
+    expect($file->auto_disliked)->toBeFalse();
 });
 
-test('does not auto-dislike when file already has reactions', function () {
+test('does not return will_auto_dislike when file already has reactions', function () {
     $admin = User::factory()->admin()->create();
     $file = File::factory()->create(['previewed_count' => 2]);
     Reaction::create([
@@ -72,14 +60,14 @@ test('does not auto-dislike when file already has reactions', function () {
     $response->assertSuccessful();
     $response->assertJson([
         'previewed_count' => 3,
-        'auto_disliked' => false,
+        'will_auto_dislike' => false,
     ]);
 
     $file->refresh();
     expect($file->auto_disliked)->toBeFalse();
 });
 
-test('does not auto-dislike when previewed_count is less than 3', function () {
+test('does not return will_auto_dislike when previewed_count is less than 3', function () {
     $admin = User::factory()->admin()->create();
     $file = File::factory()->create(['previewed_count' => 1]);
 
@@ -88,14 +76,14 @@ test('does not auto-dislike when previewed_count is less than 3', function () {
     $response->assertSuccessful();
     $response->assertJson([
         'previewed_count' => 2,
-        'auto_disliked' => false,
+        'will_auto_dislike' => false,
     ]);
 
     $file->refresh();
     expect($file->auto_disliked)->toBeFalse();
 });
 
-test('does not auto-dislike when file source is local', function () {
+test('does not return will_auto_dislike when file source is local', function () {
     $admin = User::factory()->admin()->create();
     $file = File::factory()->create([
         'previewed_count' => 2,
@@ -108,14 +96,14 @@ test('does not auto-dislike when file source is local', function () {
     $response->assertSuccessful();
     $response->assertJson([
         'previewed_count' => 3,
-        'auto_disliked' => false,
+        'will_auto_dislike' => false,
     ]);
 
     $file->refresh();
     expect($file->auto_disliked)->toBeFalse();
 });
 
-test('does not auto-dislike when file has a path', function () {
+test('does not return will_auto_dislike when file has a path', function () {
     $admin = User::factory()->admin()->create();
     $file = File::factory()->create([
         'previewed_count' => 2,
@@ -128,14 +116,14 @@ test('does not auto-dislike when file has a path', function () {
     $response->assertSuccessful();
     $response->assertJson([
         'previewed_count' => 3,
-        'auto_disliked' => false,
+        'will_auto_dislike' => false,
     ]);
 
     $file->refresh();
     expect($file->auto_disliked)->toBeFalse();
 });
 
-test('does not auto-dislike when file is blacklisted', function () {
+test('does not return will_auto_dislike when file is blacklisted', function () {
     $admin = User::factory()->admin()->create();
     $file = File::factory()->create([
         'previewed_count' => 2,
@@ -149,7 +137,7 @@ test('does not auto-dislike when file is blacklisted', function () {
     $response->assertSuccessful();
     $response->assertJson([
         'previewed_count' => 3,
-        'auto_disliked' => false,
+        'will_auto_dislike' => false,
     ]);
 
     $file->refresh();

@@ -1118,6 +1118,34 @@ onUnmounted(() => {
 defineExpose({
     openFromClick,
     close: closeOverlay,
+    // Expose state for testing
+    overlayRect,
+    overlayImage,
+    overlayIsFilled,
+    overlayFillComplete,
+    overlayIsClosing,
+    overlayScale,
+    overlayFullSizeImage,
+    overlayIsLoading,
+    imageCenterPosition,
+    currentItemIndex,
+    imageScale,
+    isNavigating,
+    imageSize: computed(() => ({
+        overlayImageSize,
+    })),
+    overlay: computed(() => ({
+        overlayRect,
+        overlayImage,
+        overlayIsFilled,
+        overlayFillComplete,
+        overlayIsClosing,
+        overlayScale,
+        overlayFullSizeImage,
+        overlayIsLoading,
+    })),
+    isBottomPanelOpen,
+    items,
 });
 </script>
 

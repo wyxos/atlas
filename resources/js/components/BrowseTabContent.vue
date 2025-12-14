@@ -547,6 +547,9 @@ watch(
     }
 );
 
+// Track loaded item IDs to handle timing between preload:success and watch
+const loadedItemIds = ref<Set<number>>(new Set());
+
 // Watch for will_auto_dislike flag and add to queue
 watch(
     () => items.value.map((item) => ({ id: item.id, will_auto_dislike: item.will_auto_dislike })),
@@ -555,7 +558,9 @@ watch(
         newItems.forEach((item) => {
             // Add to queue if will_auto_dislike is true and wasn't before
             if (item.will_auto_dislike && !oldMap.get(item.id)) {
-                autoDislikeQueue.addToQueue(item.id);
+                // Start active if preview already loaded, otherwise inactive (frozen until loads)
+                const isAlreadyLoaded = loadedItemIds.value.has(item.id);
+                autoDislikeQueue.addToQueue(item.id, isAlreadyLoaded);
             }
             // Remove from queue if will_auto_dislike is false and was true before
             else if (!item.will_auto_dislike && oldMap.get(item.id)) {
@@ -664,6 +669,12 @@ onUnmounted(() => {
                                 const itemId = payload.item?.id ?? item?.id;
                                 if (itemId) {
                                     itemPreview.handleItemPreload(itemId);
+                                    // Track that this item has loaded (refs are auto-unwrapped in templates)
+                                    loadedItemIds.add(itemId);
+                                    // Activate auto-dislike countdown when preview loads
+                                    if (autoDislikeQueue.isQueued(itemId)) {
+                                        autoDislikeQueue.activateItem(itemId);
+                                    }
                                 }
                             }">
                             <template
@@ -678,31 +689,38 @@ onUnmounted(() => {
                                             class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active">
                                         </div>
                                     </Transition>
-                                    <!-- Per-item auto-dislike countdown pill (bottom center) -->
+                                    <!-- Per-item auto-dislike countdown pill (bottom center): icon | progress with timer overlay -->
                                     <Transition name="countdown-fade">
                                         <div v-if="autoDislikeQueue.isQueued(item.id)"
-                                            class="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
+                                            class="absolute inset-x-0 bottom-2 flex justify-center z-20 pointer-events-none">
                                             <span
                                                 class="inline-flex items-stretch rounded overflow-hidden border border-danger-500 shadow-lg">
                                                 <!-- Dislike icon -->
                                                 <span
-                                                    class="px-2 py-1 text-xs font-medium bg-danger-600 text-white hover:bg-danger-500 transition-colors flex items-center justify-center">
+                                                    class="px-2 py-1 text-xs font-medium bg-danger-600 text-white flex items-center justify-center">
                                                     <ThumbsDown :size="12" />
                                                 </span>
-                                                <!-- Horizontal progress bar -->
+                                                <!-- Progress bar with timer overlay (shows paused state if not active) -->
                                                 <span
-                                                    class="bg-prussian-blue-700 border-l border-twilight-indigo-500 flex items-center relative overflow-hidden"
-                                                    style="width: 40px;">
-                                                    <div class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-all duration-100"
+                                                    class="bg-prussian-blue-700 border-l border-twilight-indigo-500 flex items-center justify-center relative overflow-hidden min-w-12">
+                                                    <!-- Progress fill (only shows when active) -->
+                                                    <div v-if="autoDislikeQueue.isActive(item.id)"
+                                                        class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-all duration-100"
                                                         :style="{ width: `${autoDislikeQueue.getProgress(item.id) * 100}%` }">
                                                     </div>
-                                                </span>
-                                                <!-- Countdown timer (seconds:centiseconds) -->
-                                                <span
-                                                    class="px-2 py-1 text-xs font-semibold bg-prussian-blue-700 text-danger-100 border-l border-twilight-indigo-500 tabular-nums">
-                                                    {{ Math.floor(autoDislikeQueue.getRemaining(item.id) / 1000) }}:{{
-                                                        String(Math.floor((autoDislikeQueue.getRemaining(item.id) % 1000) /
-                                                    10)).padStart(2, '0') }}
+                                                    <!-- Timer text overlay or paused indicator -->
+                                                    <span
+                                                        class="relative z-10 px-2 py-1 text-xs font-semibold text-white tabular-nums drop-shadow-sm">
+                                                        <template v-if="autoDislikeQueue.isActive(item.id)">
+                                                            {{ Math.floor(autoDislikeQueue.getRemaining(item.id) / 1000)
+                                                            }}:{{
+                                                                String(Math.floor((autoDislikeQueue.getRemaining(item.id) %
+                                                                    1000) / 10)).padStart(2, '0') }}
+                                                        </template>
+                                                        <template v-else>
+                                                            <i class="fas fa-pause text-[10px]"></i>
+                                                        </template>
+                                                    </span>
                                                 </span>
                                             </span>
                                         </div>

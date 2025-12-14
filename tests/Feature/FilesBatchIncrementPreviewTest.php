@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\BrowseTab;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -22,7 +21,7 @@ test('batch increments preview count for multiple files', function () {
     $response->assertJsonStructure([
         'message',
         'results' => [
-            '*' => ['id', 'previewed_count', 'auto_disliked'],
+            '*' => ['id', 'previewed_count', 'will_auto_dislike'],
         ],
     ]);
 
@@ -35,7 +34,7 @@ test('batch increments preview count for multiple files', function () {
     expect($file3->previewed_count)->toBe(3);
 });
 
-test('batch auto-dislikes multiple files when previewed_count reaches 3', function () {
+test('batch returns will_auto_dislike flag for files reaching threshold', function () {
     $admin = User::factory()->admin()->create();
     $file1 = File::factory()->create([
         'previewed_count' => 2,
@@ -49,8 +48,6 @@ test('batch auto-dislikes multiple files when previewed_count reaches 3', functi
         'path' => null,
         'blacklisted_at' => null,
     ]);
-    $tab = BrowseTab::factory()->for($admin)->create();
-    $tab->files()->attach([$file1->id, $file2->id], ['position' => 0]);
 
     $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
         'file_ids' => [$file1->id, $file2->id],
@@ -58,33 +55,24 @@ test('batch auto-dislikes multiple files when previewed_count reaches 3', functi
 
     $response->assertSuccessful();
 
+    $results = $response->json('results');
+    $file1Result = collect($results)->firstWhere('id', $file1->id);
+    $file2Result = collect($results)->firstWhere('id', $file2->id);
+
+    expect($file1Result['will_auto_dislike'])->toBeTrue();
+    expect($file2Result['will_auto_dislike'])->toBeTrue();
+
     $file1->refresh();
     $file2->refresh();
 
-    expect($file1->auto_disliked)->toBeTrue();
-    expect($file2->auto_disliked)->toBeTrue();
     expect($file1->previewed_count)->toBe(3);
     expect($file2->previewed_count)->toBe(3);
-
-    // Verify dislike reactions were created
-    $reaction1 = Reaction::where('file_id', $file1->id)
-        ->where('user_id', $admin->id)
-        ->where('type', 'dislike')
-        ->first();
-    $reaction2 = Reaction::where('file_id', $file2->id)
-        ->where('user_id', $admin->id)
-        ->where('type', 'dislike')
-        ->first();
-
-    expect($reaction1)->not->toBeNull();
-    expect($reaction2)->not->toBeNull();
-
-    // Verify files were detached from tab
-    expect($tab->files()->where('files.id', $file1->id)->exists())->toBeFalse();
-    expect($tab->files()->where('files.id', $file2->id)->exists())->toBeFalse();
+    // Files are NOT auto-disliked immediately - UI handles countdown
+    expect($file1->auto_disliked)->toBeFalse();
+    expect($file2->auto_disliked)->toBeFalse();
 });
 
-test('batch does not auto-dislike files that already have reactions', function () {
+test('batch does not return will_auto_dislike for files that already have reactions', function () {
     $admin = User::factory()->admin()->create();
     $file1 = File::factory()->create([
         'previewed_count' => 2,
@@ -112,13 +100,14 @@ test('batch does not auto-dislike files that already have reactions', function (
 
     $response->assertSuccessful();
 
-    $file1->refresh();
-    $file2->refresh();
+    $results = $response->json('results');
+    $file1Result = collect($results)->firstWhere('id', $file1->id);
+    $file2Result = collect($results)->firstWhere('id', $file2->id);
 
-    // File1 should not be auto-disliked (has reaction)
-    expect($file1->auto_disliked)->toBeFalse();
-    // File2 should be auto-disliked (no reaction)
-    expect($file2->auto_disliked)->toBeTrue();
+    // File1 should not be flagged (has reaction)
+    expect($file1Result['will_auto_dislike'])->toBeFalse();
+    // File2 should be flagged (no reaction)
+    expect($file2Result['will_auto_dislike'])->toBeTrue();
 });
 
 test('batch handles mixed candidates correctly', function () {
@@ -130,7 +119,7 @@ test('batch handles mixed candidates correctly', function () {
         'blacklisted_at' => null,
     ]);
     $file2 = File::factory()->create([
-        'previewed_count' => 1, // Not a candidate (previewed_count < 3)
+        'previewed_count' => 1, // Not a candidate (previewed_count < 3 after increment)
         'source' => 'wallhaven',
         'path' => null,
         'blacklisted_at' => null,
@@ -148,47 +137,15 @@ test('batch handles mixed candidates correctly', function () {
 
     $response->assertSuccessful();
 
-    $file1->refresh();
-    $file2->refresh();
-    $file3->refresh();
+    $results = $response->json('results');
+    $file1Result = collect($results)->firstWhere('id', $file1->id);
+    $file2Result = collect($results)->firstWhere('id', $file2->id);
+    $file3Result = collect($results)->firstWhere('id', $file3->id);
 
-    // Only file1 should be auto-disliked (meets all criteria)
-    expect($file1->auto_disliked)->toBeTrue();
-    expect($file2->auto_disliked)->toBeFalse();
-    expect($file3->auto_disliked)->toBeFalse();
-});
-
-test('batch detaches files from multiple tabs', function () {
-    $admin = User::factory()->admin()->create();
-    $file1 = File::factory()->create([
-        'previewed_count' => 2,
-        'source' => 'wallhaven',
-        'path' => null,
-        'blacklisted_at' => null,
-    ]);
-    $file2 = File::factory()->create([
-        'previewed_count' => 2,
-        'source' => 'wallhaven',
-        'path' => null,
-        'blacklisted_at' => null,
-    ]);
-
-    $tab1 = BrowseTab::factory()->for($admin)->create();
-    $tab2 = BrowseTab::factory()->for($admin)->create();
-    $tab1->files()->attach([$file1->id, $file2->id], ['position' => 0]);
-    $tab2->files()->attach([$file1->id, $file2->id], ['position' => 0]);
-
-    $response = $this->actingAs($admin)->postJson('/api/files/preview/batch', [
-        'file_ids' => [$file1->id, $file2->id],
-    ]);
-
-    $response->assertSuccessful();
-
-    // Verify files were detached from both tabs
-    expect($tab1->files()->where('files.id', $file1->id)->exists())->toBeFalse();
-    expect($tab1->files()->where('files.id', $file2->id)->exists())->toBeFalse();
-    expect($tab2->files()->where('files.id', $file1->id)->exists())->toBeFalse();
-    expect($tab2->files()->where('files.id', $file2->id)->exists())->toBeFalse();
+    // Only file1 should be flagged (meets all criteria)
+    expect($file1Result['will_auto_dislike'])->toBeTrue();
+    expect($file2Result['will_auto_dislike'])->toBeFalse();
+    expect($file3Result['will_auto_dislike'])->toBeFalse();
 });
 
 test('batch validates file_ids array', function () {
