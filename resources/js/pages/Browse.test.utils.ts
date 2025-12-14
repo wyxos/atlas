@@ -60,6 +60,8 @@ vi.mock('lucide-vue-next', () => ({
     ExternalLink: { name: 'ExternalLink', template: '<div class="external-link-icon"></div>', props: ['size', 'class'] },
     MoreHorizontal: { name: 'MoreHorizontal', template: '<div class="more-icon"></div>', props: ['size', 'class'] },
     Undo2: { name: 'Undo2', template: '<div class="undo-icon"></div>', props: ['size', 'class'] },
+    Pause: { name: 'Pause', template: '<div class="pause-icon"></div>', props: ['size', 'class'] },
+    Menu: { name: 'Menu', template: '<div class="menu-icon"></div>', props: ['size', 'class'] },
 }));
 
 // Mock @wyxos/vibe
