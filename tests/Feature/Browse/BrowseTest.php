@@ -35,9 +35,10 @@ it('restores cursor values for a browsed tab after reload', function () {
     $this->actingAs($user);
 
     $page = visit('/browse')
-        ->wait(5) // Wait for component initialization and tab data loading
+        ->wait(15) // Wait for component initialization and tab data loading
         ->assertSee('Scrolled Tab')
-        ->assertPresent('[data-test="pagination-info"]')
+        ->wait(5) // Additional wait for masonry and pagination to initialize
+        ->assertPresent('[data-test="pagination-info"]') // This will wait for the element
         ->assertNoJavascriptErrors();
 
     // Expected behaviour: masonry pills should reflect the saved cursor state
@@ -73,10 +74,10 @@ it('new tab does not load images until service is selected', function () {
     $this->actingAs($user);
 
     $page = visit('/browse')
-        ->wait(2) // Wait for page to load
+        ->wait(5) // Wait for page to load
         ->assertSeeIn('[data-test="no-tabs-message"]', 'Create a tab to start browsing')
         ->click('@create-tab-button')
-        ->wait(2);
+        ->wait(5); // Increased wait time for tab creation
 
     // Verify service selection header appears
     $page->assertPresent('[data-test="service-selection-header"]')

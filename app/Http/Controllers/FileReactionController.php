@@ -150,4 +150,88 @@ class FileReactionController extends Controller
             'reactions' => $results,
         ]);
     }
+
+    /**
+     * Batch store reactions for multiple files.
+     */
+    public function batchStore(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'reactions' => 'required|array',
+            'reactions.*.file_id' => 'required|integer|exists:files,id',
+            'reactions.*.type' => 'required|string|in:love,like,dislike,funny',
+        ]);
+
+        $user = Auth::user();
+        $results = [];
+
+        foreach ($validated['reactions'] as $reactionData) {
+            $file = File::findOrFail($reactionData['file_id']);
+            Gate::authorize('view', $file);
+
+            // Find existing reaction for this user and file
+            $existingReaction = Reaction::where('user_id', $user->id)
+                ->where('file_id', $file->id)
+                ->first();
+
+            // If clicking the same reaction type, remove it (toggle off)
+            if ($existingReaction && $existingReaction->type === $reactionData['type']) {
+                $existingReaction->delete();
+                $results[] = [
+                    'file_id' => $file->id,
+                    'reaction' => null,
+                ];
+                continue;
+            }
+
+            // Delete any existing reaction first (only one reaction allowed at a time)
+            if ($existingReaction) {
+                $existingReaction->delete();
+            }
+
+            // Remove auto_disliked flag if user is reacting (like, funny, love - not dislike)
+            // Also remove blacklist flags if file was blacklisted and user is reacting positively
+            if (in_array($reactionData['type'], ['love', 'like', 'funny'])) {
+                $updates = ['auto_disliked' => false];
+
+                // Clear blacklist if file was blacklisted
+                if ($file->blacklisted_at !== null) {
+                    $updates['blacklisted_at'] = null;
+                    $updates['blacklist_reason'] = null;
+                }
+
+                $file->update($updates);
+            }
+
+            // Create the new reaction
+            $reaction = Reaction::create([
+                'file_id' => $file->id,
+                'user_id' => $user->id,
+                'type' => $reactionData['type'],
+            ]);
+
+            // Dispatch download job if reaction is not dislike
+            if ($reactionData['type'] !== 'dislike') {
+                DownloadFile::dispatch($file->id);
+            }
+
+            // Detach file from all tabs belonging to this user
+            $userTabs = BrowseTab::forUser($user->id)->get();
+            foreach ($userTabs as $tab) {
+                $tab->files()->detach($file->id);
+            }
+
+            $results[] = [
+                'file_id' => $file->id,
+                'reaction' => [
+                    'type' => $reaction->type,
+                ],
+            ];
+        }
+
+        return response()->json([
+            'message' => 'Reactions updated.',
+            'reactions' => $results,
+        ]);
+    }
 }
