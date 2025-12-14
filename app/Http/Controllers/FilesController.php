@@ -189,15 +189,20 @@ class FilesController extends Controller
         }
 
         // Filter files that still meet conditions
+        // Files can be auto-disliked via:
+        // 1. Moderation rules (flagged at load time)
+        // 2. Preview count >= 3 (flagged after previewing)
+        // We don't require preview count here since moderation-flagged files
+        // may not have been previewed 3 times yet
         $validFileIds = [];
         foreach ($files as $file) {
             $hasReactions = Reaction::where('file_id', $file->id)->exists();
             $isNotLocal = $file->source !== 'local';
             $hasNoPath = empty($file->path);
             $isNotBlacklisted = $file->blacklisted_at === null;
-            $previewCountMet = $file->previewed_count >= 3;
+            $isNotAlreadyAutoDisliked = ! $file->auto_disliked;
 
-            if ($previewCountMet && ! $hasReactions && $isNotLocal && $hasNoPath && $isNotBlacklisted) {
+            if (! $hasReactions && $isNotLocal && $hasNoPath && $isNotBlacklisted && $isNotAlreadyAutoDisliked) {
                 $validFileIds[] = $file->id;
             }
         }

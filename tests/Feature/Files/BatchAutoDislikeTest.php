@@ -139,13 +139,13 @@ test('batch auto-dislike skips files that do not meet conditions', function () {
         'previewed_count' => 5,
     ]);
 
-    // Low preview count - should be skipped
-    $lowPreviewFile = File::factory()->create([
+    // Already auto-disliked file - should be skipped
+    $alreadyAutoDislikedFile = File::factory()->create([
         'source' => 'civit-ai',
         'path' => null,
         'blacklisted_at' => null,
-        'auto_disliked' => false,
-        'previewed_count' => 2,
+        'auto_disliked' => true,
+        'previewed_count' => 5,
     ]);
 
     $response = $this->postJson('/api/files/auto-dislike/batch', [
@@ -154,7 +154,7 @@ test('batch auto-dislike skips files that do not meet conditions', function () {
             $localFile->id,
             $fileWithPath->id,
             $blacklistedFile->id,
-            $lowPreviewFile->id,
+            $alreadyAutoDislikedFile->id,
         ],
     ]);
 
@@ -168,7 +168,7 @@ test('batch auto-dislike skips files that do not meet conditions', function () {
         ->and($localFile->fresh()->auto_disliked)->toBeFalse()
         ->and($fileWithPath->fresh()->auto_disliked)->toBeFalse()
         ->and($blacklistedFile->fresh()->auto_disliked)->toBeFalse()
-        ->and($lowPreviewFile->fresh()->auto_disliked)->toBeFalse();
+        ->and($alreadyAutoDislikedFile->fresh()->auto_disliked)->toBeTrue(); // Still true (wasn't changed)
 });
 
 test('batch auto-dislike requires authentication', function () {
