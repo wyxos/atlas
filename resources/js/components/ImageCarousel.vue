@@ -10,7 +10,7 @@ interface Props {
     hasMore?: boolean;
     isLoading?: boolean;
     onLoadMore?: () => Promise<void>;
-    containerKey?: number | string; // Key to trigger recalculation when container size changes
+    sheetOpen?: boolean; // Whether the sheet is open (to calculate container width)
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
     hasMore: false,
     isLoading: false,
     onLoadMore: undefined,
-    containerKey: undefined,
+    sheetOpen: false,
 });
 
 const emit = defineEmits<{
@@ -41,14 +41,19 @@ const clickedIndex = ref<number | null>(null); // Track clicked index for scroll
 const previousItemsLength = ref(0); // Track previous items length to calculate stagger delay
 const STAGGER_DELAY = 100; // Delay between each item animation in ms
 
+// Sheet and taskbar dimensions (matches FileViewer)
+const SHEET_WIDTH = 320; // w-80 = 320px
+const TASKBAR_WIDTH = 64; // w-16 = 64px
+
 // Calculate scroll position to center the current item
-function calculateScrollPosition(): void {
+function calculateScrollPosition(containerWidthOverride?: number): void {
     if (props.currentItemIndex === null || props.items.length === 0 || !containerRef.value) {
         scrollPosition.value = 0;
         return;
     }
 
-    const containerWidth = containerRef.value.clientWidth;
+    // Use override width if provided (for pre-calculated width), otherwise use actual width
+    const containerWidth = containerWidthOverride ?? containerRef.value.clientWidth;
     const containerCenter = containerWidth / 2;
 
     // Position of current item's center
@@ -95,13 +100,24 @@ watch(() => props.visible, (newVal) => {
     }
 });
 
-// Watch for container key changes (e.g., when sheet opens/closes and container width changes)
-watch(() => props.containerKey, () => {
-    if (props.visible && containerRef.value) {
-        // Wait for layout to settle after transition
+// Watch for sheet open/close to recalculate with known width change
+watch(() => props.sheetOpen, (isOpen, wasOpen) => {
+    if (props.visible && containerRef.value && wasOpen !== undefined) {
+        // Enable transition for smooth animation (300ms matches sheet transition)
+        isTransitioning.value = true;
+
+        // Calculate the width change: sheet (320px) - taskbar (64px) = 256px
+        const widthChange = isOpen ? -(SHEET_WIDTH - TASKBAR_WIDTH) : (SHEET_WIDTH - TASKBAR_WIDTH);
+        const currentWidth = containerRef.value.clientWidth;
+        const newWidth = currentWidth + widthChange;
+
+        // Recalculate immediately with the new width
+        calculateScrollPosition(newWidth);
+
+        // Reset transition flag after animation completes (300ms matches sheet transition)
         setTimeout(() => {
-            calculateScrollPosition();
-        }, 350); // Slightly longer than sheet transition (300ms) to ensure layout is complete
+            isTransitioning.value = false;
+        }, 300);
     }
 });
 

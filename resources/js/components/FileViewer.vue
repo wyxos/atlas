@@ -61,7 +61,6 @@ const currentNavigationTarget = ref<number | null>(null); // Track current navig
 const isSheetOpen = ref(false); // Track if the sheet is open
 const fileData = ref<any>(null); // Store file data from API
 const isLoadingFileData = ref(false); // Track if file data is loading
-const carouselContainerKey = ref(0); // Key to trigger carousel recalculation when container size changes
 
 // Watch props.items and sync to reactive items (only when props change externally)
 // Use a flag to prevent syncing when we're removing items internally
@@ -1037,7 +1036,7 @@ watch(() => currentItemIndex.value, async (newIndex) => {
     }
 });
 
-// Watch sheet open to fetch file data and trigger carousel recalculation
+// Watch sheet open to fetch file data
 watch(() => isSheetOpen.value, async (isOpen) => {
     if (isOpen && currentItemIndex.value !== null && overlayFillComplete.value) {
         const currentItem = items.value[currentItemIndex.value];
@@ -1047,21 +1046,11 @@ watch(() => isSheetOpen.value, async (isOpen) => {
     } else if (!isOpen) {
         fileData.value = null; // Clear data when sheet closes
     }
-
-    // Trigger carousel recalculation after sheet transition completes
-    await nextTick();
-    setTimeout(() => {
-        carouselContainerKey.value++;
-    }, 350); // Wait for sheet transition (300ms) plus a small buffer
 });
 
-// Watch sheet open/close to recalculate image size and trigger carousel resize
-watch(() => isSheetOpen.value, async () => {
+// Watch sheet open/close to recalculate image size immediately
+watch(() => isSheetOpen.value, () => {
     if (overlayRect.value && overlayImageSize.value && originalImageDimensions.value && props.containerRef && overlayFillComplete.value) {
-        // Wait for layout to settle after sheet animation
-        await nextTick();
-        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for transition duration
-
         const tabContent = props.containerRef;
         const tabContentBox = tabContent.getBoundingClientRect();
         const containerWidth = tabContentBox.width;
@@ -1087,9 +1076,6 @@ watch(() => isSheetOpen.value, async () => {
             top: fullImageTop,
             left: fullImageLeft,
         };
-
-        // Trigger resize event so carousel can recalculate
-        window.dispatchEvent(new Event('resize'));
     }
 });
 
@@ -1227,8 +1213,8 @@ defineExpose({
             <div class="shrink-0 min-w-0 overflow-hidden">
                 <ImageCarousel v-if="overlayFillComplete && !overlayIsClosing" :items="items"
                     :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" :has-more="hasMore"
-                    :is-loading="isLoading" :on-load-more="onLoadMore" :container-key="carouselContainerKey"
-                    @next="navigateToNext" @previous="navigateToPrevious" @item-click="handleCarouselItemClick" />
+                    :is-loading="isLoading" :on-load-more="onLoadMore" :sheet-open="isSheetOpen" @next="navigateToNext"
+                    @previous="navigateToPrevious" @item-click="handleCarouselItemClick" />
             </div>
         </div>
 
