@@ -1,0 +1,476 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mount, flushPromises } from '@vue/test-utils';
+import { ref } from 'vue';
+import Browse from './Browse.vue';
+import {
+    setupBrowseTestMocks,
+    createTestRouter,
+    getBrowseTabContent,
+    waitForStable,
+    waitForTabContent,
+    createMockTabConfig,
+    setupAxiosMocks,
+    createMockBrowseResponse,
+    type BrowseMocks,
+} from '../test/browse-test-utils';
+
+// Define mocks using vi.hoisted so they're available for vi.mock factories
+const {
+    mockAxios,
+    mockIsLoading,
+    mockCancelLoad,
+    mockDestroy,
+    mockInit,
+    mockRemove,
+    mockRemoveMany,
+    mockRestore,
+    mockRestoreMany,
+    mockQueuePreviewIncrement,
+} = vi.hoisted(() => ({
+    mockAxios: {
+        get: vi.fn(),
+        post: vi.fn(),
+        put: vi.fn(),
+        delete: vi.fn(),
+        patch: vi.fn(),
+    },
+    mockIsLoading: { value: false },
+    mockCancelLoad: vi.fn(),
+    mockDestroy: vi.fn(),
+    mockInit: vi.fn(),
+    mockRemove: vi.fn(),
+    mockRemoveMany: vi.fn(),
+    mockRestore: vi.fn(),
+    mockRestoreMany: vi.fn(),
+    mockQueuePreviewIncrement: vi.fn(),
+}));
+
+// Create mocks object for helper functions
+const mocks: BrowseMocks = {
+    mockAxios,
+    mockIsLoading: ref(false),
+    mockCancelLoad,
+    mockDestroy,
+    mockInit,
+    mockRemove,
+    mockRemoveMany,
+    mockRestore,
+    mockRestoreMany,
+    mockQueuePreviewIncrement,
+};
+
+// Mock fetch
+global.fetch = vi.fn();
+
+// Mock axios
+vi.mock('axios', () => ({
+    default: mockAxios,
+}));
+
+// Mock window.axios
+Object.defineProperty(window, 'axios', {
+    value: mockAxios,
+    writable: true,
+});
+
+// Mock @wyxos/vibe with inline factory
+vi.mock('@wyxos/vibe', () => ({
+    Masonry: {
+        name: 'Masonry',
+        template: `
+            <div class="masonry-mock">
+                <slot
+                    v-for="(item, index) in items"
+                    :key="item.id || index"
+                    :item="item"
+                    :remove="() => {}"
+                    :index="index"
+                ></slot>
+            </div>
+        `,
+        props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
+        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        setup() {
+            return {
+                isLoading: mockIsLoading,
+                init: mockInit,
+                refreshLayout: vi.fn(),
+                cancelLoad: mockCancelLoad,
+                destroy: mockDestroy,
+                remove: mockRemove,
+                removeMany: mockRemoveMany,
+                restore: mockRestore,
+                restoreMany: mockRestoreMany,
+            };
+        },
+    },
+    MasonryItem: {
+        name: 'MasonryItem',
+        template: `
+            <div @mouseenter="$emit('mouseenter', $event)" @mouseleave="$emit('mouseleave', $event)">
+                <slot
+                    :item="item"
+                    :remove="remove"
+                    :imageLoaded="true"
+                    :imageError="false"
+                    :videoLoaded="false"
+                    :videoError="false"
+                    :isLoading="false"
+                    :showMedia="true"
+                    :imageSrc="item?.src || item?.thumbnail || ''"
+                    :videoSrc="null"
+                ></slot>
+            </div>
+        `,
+        props: ['item', 'remove'],
+        emits: ['mouseenter', 'mouseleave', 'preload:success'],
+    },
+}));
+
+// Mock usePreviewBatch
+vi.mock('@/composables/usePreviewBatch', () => ({
+    usePreviewBatch: () => ({
+        queuePreviewIncrement: mockQueuePreviewIncrement,
+    }),
+}));
+
+beforeEach(() => {
+    setupBrowseTestMocks(mocks);
+});
+
+describe('Browse - Tab Restoration', () => {
+    it('restores tab query params after refresh', async () => {
+        const tabId = 1;
+        const pageParam = 'cursor-page-123';
+        const nextParam = 'cursor-next-456';
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+            file_ids: [1, 2],
+            items_data: mockItems,
+        });
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(mocks, tabConfig);
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const vm = wrapper.vm as any;
+        expect(vm.activeTabId).toBe(tabId);
+
+        const tabContentVm = await waitForTabContent(wrapper);
+        if (tabContentVm) {
+            expect(tabContentVm.currentPage).toBe(pageParam);
+            expect(tabContentVm.nextCursor).toBe(nextParam);
+        }
+    });
+
+    it('loads tab items when file_ids exist', async () => {
+        const tabId = 1;
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: 1 },
+            file_ids: [1, 2],
+            items_data: mockItems,
+        });
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(mocks, tabConfig);
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
+    });
+
+    it('initializes masonry with restored items', async () => {
+        const tabId = 1;
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: 1 },
+            file_ids: [1, 2],
+            items_data: mockItems,
+        });
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(mocks, tabConfig);
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+    });
+
+    it('switches to tab with saved query params', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+        const pageParam = 'cursor-page-456';
+        const nextParam = 'cursor-next-789';
+
+        const tabConfigs = [
+            createMockTabConfig(tab1Id, {
+                query_params: { service: 'civit-ai-images', page: 1 },
+            }),
+            createMockTabConfig(tab2Id, {
+                query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+                position: 1,
+            }),
+        ];
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(mocks, tabConfigs);
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const vm = wrapper.vm as any;
+        expect(vm.activeTabId).toBe(tab1Id);
+
+        await vm.switchTab(tab2Id);
+        await waitForStable(wrapper);
+
+        expect(vm.activeTabId).toBe(tab2Id);
+
+        const tabContentVm = await waitForTabContent(wrapper);
+        if (tabContentVm) {
+            expect(tabContentVm.currentPage).toBe(pageParam);
+            expect(tabContentVm.nextCursor).toBe(nextParam);
+        }
+    });
+
+    it('restores items when switching to tab with file_ids', async () => {
+        const tab1Id = 1;
+        const tab2Id = 2;
+        const mockItems = [
+            { id: 3, width: 100, height: 100, src: 'test3.jpg', type: 'image', page: 2, index: 0, notFound: false },
+            { id: 4, width: 200, height: 200, src: 'test4.jpg', type: 'image', page: 2, index: 1, notFound: false },
+        ];
+
+        const tabConfigs = [
+            createMockTabConfig(tab1Id, {
+                query_params: { service: 'civit-ai-images', page: 1 },
+            }),
+            createMockTabConfig(tab2Id, {
+                query_params: { service: 'civit-ai-images', page: 1 },
+                file_ids: [3, 4],
+                items_data: mockItems,
+                position: 1,
+            }),
+        ];
+
+        const router = await createTestRouter('/browse');
+        setupAxiosMocks(mocks, tabConfigs);
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const vm = wrapper.vm as any;
+        mocks.mockDestroy.mockClear();
+
+        await vm.switchTab(tab2Id);
+        await waitForStable(wrapper);
+
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/2/items');
+        expect(mocks.mockDestroy).toHaveBeenCalled();
+    });
+
+    it('resumes pagination from next cursor value', async () => {
+        const tabId = 1;
+        const nextParam = 'cursor-next-789';
+        const browseResponse = {
+            ...createMockBrowseResponse(nextParam, 'cursor-next-999'),
+            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+        };
+
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: 1, next: nextParam },
+        });
+
+        setupAxiosMocks(mocks, tabConfig, browseResponse);
+        const router = await createTestRouter();
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+        await waitForStable(wrapper);
+
+        const tabContentVm = await waitForTabContent(wrapper);
+        if (!tabContentVm) {
+            return;
+        }
+
+        tabContentVm.isTabRestored = false;
+        tabContentVm.items = [];
+        tabContentVm.nextCursor = nextParam;
+
+        const getNextPageResult = await tabContentVm.getNextPage(nextParam);
+
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(
+            expect.stringContaining(`/api/browse?page=${nextParam}`)
+        );
+        expect(getNextPageResult.nextPage).toBeDefined();
+    });
+
+    it('preserves cursor values on page reload instead of resetting to page 1', async () => {
+        const tabId = 1;
+        const cursorX = 'cursor-x';
+        const cursorY = 'cursor-y';
+        const mockItems = Array.from({ length: 139 }, (_, i) => ({
+            id: i + 1,
+            width: 100,
+            height: 100,
+            src: `test${i}.jpg`,
+            type: 'image' as const,
+            page: 1,
+            index: i,
+            notFound: false,
+        }));
+
+        mocks.mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Scrolled Tab',
+                        query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
+                        file_ids: mockItems.map(item => item.id),
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: mockItems,
+                        file_ids: mockItems.map(item => item.id),
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const vm = wrapper.vm as any;
+        expect(vm.activeTabId).toBe(tabId);
+
+        await waitForStable(wrapper);
+
+        const tabContentVm = getBrowseTabContent(wrapper);
+        if (tabContentVm) {
+            expect(tabContentVm.currentPage).toBe(cursorX);
+            expect(tabContentVm.nextCursor).toBe(cursorY);
+            expect(tabContentVm.displayPage).toBe(cursorX);
+        }
+    });
+
+    it('continues saved cursor after creating a new tab and switching back', async () => {
+        const tabId = 1;
+        const cursorX = 'cursor-x';
+        const cursorY = 'cursor-y';
+        const mockItems = [
+            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
+            { id: 2, width: 120, height: 120, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
+        ];
+
+        mocks.mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/browse-tabs/1/items')) {
+                return Promise.resolve({
+                    data: {
+                        items_data: mockItems,
+                        file_ids: mockItems.map(item => item.id),
+                    },
+                });
+            }
+            if (url.includes('/api/browse-tabs')) {
+                return Promise.resolve({
+                    data: [{
+                        id: tabId,
+                        label: 'Scrolled Tab',
+                        query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
+                        file_ids: mockItems.map(item => item.id),
+                        position: 0,
+                    }],
+                });
+            }
+            if (url.includes('/api/browse')) {
+                const parsed = new URL(url, 'http://localhost');
+                const requestedPage = parsed.searchParams.get('page') ?? '1';
+                const nextValue = requestedPage === cursorY ? 'cursor-z' : cursorY;
+                return Promise.resolve({
+                    data: {
+                        ...createMockBrowseResponse(requestedPage, nextValue),
+                        services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                    },
+                });
+            }
+            return Promise.resolve({ data: { items: [], nextPage: null } });
+        });
+
+        mocks.mockAxios.post.mockResolvedValue({
+            data: {
+                id: 2,
+                label: 'Browse 2',
+                query_params: { page: 1 },
+                file_ids: [],
+                position: 1,
+            },
+        });
+
+        mocks.mockAxios.put.mockResolvedValue({});
+
+        const router = await createTestRouter('/browse');
+        const wrapper = mount(Browse, { global: { plugins: [router] } });
+
+        await waitForStable(wrapper);
+
+        const vm = wrapper.vm as any;
+        expect(vm.activeTabId).toBe(tabId);
+
+        await vm.createTab();
+        await waitForStable(wrapper);
+
+        expect(vm.activeTabId).toBe(2);
+
+        await vm.switchTab(tabId);
+        await waitForStable(wrapper);
+
+        expect(vm.activeTabId).toBe(tabId);
+        await waitForStable(wrapper);
+
+        const tabContentVm = getBrowseTabContent(wrapper);
+        if (!tabContentVm) {
+            return;
+        }
+
+        expect(tabContentVm.pendingRestoreNextCursor).toBe(cursorY);
+
+        await tabContentVm.getNextPage(1);
+
+        const browseCalls = mocks.mockAxios.get.mock.calls
+            .map(call => call[0])
+            .filter((callUrl: string) => {
+                return callUrl.includes('/api/browse?') || callUrl === '/api/browse';
+            });
+
+        expect(browseCalls[browseCalls.length - 1]).toContain(`/api/browse?page=${cursorY}`);
+        expect(tabContentVm.currentPage).toBe(cursorY);
+    });
+});
