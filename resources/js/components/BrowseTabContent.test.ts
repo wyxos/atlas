@@ -308,6 +308,7 @@ vi.mock('lucide-vue-next', () => ({
     Copy: { name: 'Copy', template: '<div class="copy-icon"></div>', props: ['size', 'class'] },
     RefreshCcw: { name: 'RefreshCcw', template: '<div class="refresh-icon"></div>', props: ['size'] },
     ChevronsLeft: { name: 'ChevronsLeft', template: '<div class="chevrons-left-icon"></div>', props: ['size'] },
+    SlidersHorizontal: { name: 'SlidersHorizontal', template: '<div class="sliders-icon"></div>', props: ['size'] },
 }));
 
 // Mock composables
