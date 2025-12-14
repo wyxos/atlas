@@ -94,8 +94,7 @@ vi.mock('@wyxos/vibe', () => ({
         props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
         setup() {
-            return {
-                isLoading: mockIsLoading,
+            const exposed = {
                 init: mockInit,
                 refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
@@ -105,6 +104,8 @@ vi.mock('@wyxos/vibe', () => ({
                 restore: mockRestore,
                 restoreMany: mockRestoreMany,
             };
+            Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
+            return exposed;
         },
     },
     MasonryItem: {
@@ -193,7 +194,7 @@ describe('Browse - Tab Management', () => {
         }
 
         mockIsLoading.value = true;
-        expect(tabContentVm.masonry?.isLoading.value).toBe(true);
+        expect(tabContentVm.masonry?.isLoading).toBe(true);
 
         await vm.switchTab(tab2Id);
         await waitForStable(wrapper);
@@ -254,7 +255,7 @@ describe('Browse - Tab Management', () => {
         }
 
         mockIsLoading.value = false;
-        expect(tabContentVm.masonry?.isLoading.value).toBe(false);
+        expect(tabContentVm.masonry?.isLoading).toBe(false);
 
         mocks.mockCancelLoad.mockClear();
         mocks.mockDestroy.mockClear();
