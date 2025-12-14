@@ -202,7 +202,6 @@ function resetFilters(): void {
                     Reset
                 </Button>
                 <Button variant="default" @click="applyFilters" :disabled="!filterForm.service">
-                    <Check :size="14" class="mr-2" />
                     Apply
                 </Button>
             </SheetFooter>
