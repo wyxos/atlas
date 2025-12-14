@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -32,6 +32,7 @@ import { useResetDialog } from '@/composables/useResetDialog';
 import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
+import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 
@@ -78,6 +79,59 @@ const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
 
 // Item preview composable (needs to be initialized early)
 const itemPreview = useItemPreview(items, computed(() => props.tab));
+
+// Auto-dislike queue composable with expiration handler
+const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
+
+// Handle auto-dislike queue expiration - perform auto-dislike in batch
+async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
+    if (expiredIds.length === 0) {
+        return;
+    }
+
+    // Batch perform auto-dislike (backend handles de-association from tabs)
+    try {
+        const response = await window.axios.post<{
+            message: string;
+            auto_disliked_count: number;
+            file_ids: number[];
+        }>('/api/files/auto-dislike/batch', {
+            file_ids: expiredIds,
+        });
+
+        const autoDislikedIds = response.data.file_ids;
+
+        // Remove from masonry
+        const itemsToRemove: MasonryItem[] = [];
+        for (const fileId of autoDislikedIds) {
+            const item = items.value.find((i) => i.id === fileId);
+            if (item) {
+                itemsToRemove.push(item);
+            }
+        }
+
+        // Remove from masonry using removeMany for batch removal
+        // Masonry component manages items array through v-model, so no manual array manipulation needed
+        if (masonry.value?.removeMany) {
+            await masonry.value.removeMany(itemsToRemove);
+        } else if (masonry.value?.remove) {
+            // Fallback to individual removal if removeMany is not available
+            for (const item of itemsToRemove) {
+                masonry.value.remove(item);
+            }
+        }
+
+        // Update tab (remove from fileIds and itemsData)
+        // Note: Backend already de-associated from tabs, we just update local state
+        if (props.tab && autoDislikedIds.length > 0) {
+            const updatedFileIds = props.tab.fileIds.filter((id) => !autoDislikedIds.includes(id));
+            const updatedItemsData = props.tab.itemsData.filter((item) => !autoDislikedIds.includes(item.id));
+            props.updateActiveTab(updatedItemsData, updatedFileIds, props.tab.queryParams);
+        }
+    } catch (error) {
+        console.error('Failed to batch perform auto-dislike:', error);
+    }
+}
 
 // Masonry restore composable
 const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(items, masonry);
@@ -303,7 +357,17 @@ const containerPillInteractions = useContainerPillInteractions(
     items,
     masonry,
     props.tab?.id,
-    props.onReaction,
+    (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
+        // Remove from auto-dislike queue if user reacts (any reaction cancels auto-dislike)
+        if (autoDislikeQueue.isQueued(fileId)) {
+            autoDislikeQueue.removeFromQueue(fileId);
+            const itemIndex = items.value.findIndex((i) => i.id === fileId);
+            if (itemIndex !== -1) {
+                items.value[itemIndex].will_auto_dislike = false;
+            }
+        }
+        props.onReaction(fileId, type);
+    },
     restoreManyToMasonry
 );
 
@@ -315,7 +379,17 @@ const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
     masonry,
     computed(() => props.tab),
-    props.onReaction,
+    (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
+        // Remove from auto-dislike queue if user reacts (any reaction cancels auto-dislike)
+        if (autoDislikeQueue.isQueued(fileId)) {
+            autoDislikeQueue.removeFromQueue(fileId);
+            const itemIndex = items.value.findIndex((i) => i.id === fileId);
+            if (itemIndex !== -1) {
+                items.value[itemIndex].will_auto_dislike = false;
+            }
+        }
+        props.onReaction(fileId, type);
+    },
     restoreToMasonry
 );
 
@@ -473,6 +547,24 @@ watch(
     }
 );
 
+// Watch for will_auto_dislike flag and add to queue
+watch(
+    () => items.value.map((item) => ({ id: item.id, will_auto_dislike: item.will_auto_dislike })),
+    (newItems, oldItems) => {
+        const oldMap = new Map(oldItems?.map((i) => [i.id, i.will_auto_dislike]) ?? []);
+        newItems.forEach((item) => {
+            // Add to queue if will_auto_dislike is true and wasn't before
+            if (item.will_auto_dislike && !oldMap.get(item.id)) {
+                autoDislikeQueue.addToQueue(item.id);
+            }
+            // Remove from queue if will_auto_dislike is false and was true before
+            else if (!item.will_auto_dislike && oldMap.get(item.id)) {
+                autoDislikeQueue.removeFromQueue(item.id);
+            }
+        });
+    },
+    { deep: true }
+);
 
 // Cleanup on unmount
 onUnmounted(() => {
@@ -512,20 +604,12 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <BrowseFiltersSheet
-                    v-model:open="isFilterSheetOpen"
-                    :available-services="availableServices"
-                    :tab="tab"
-                    :masonry="masonry"
-                    :is-masonry-loading="masonry?.isLoading ?? false"
-                    @apply="handleApplyFilters"
-                />
+                <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
+                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" @apply="handleApplyFilters" />
 
                 <!-- Moderation Rules -->
-                <ModerationRulesManager
-                    :disabled="masonry?.isLoading ?? false"
-                    @rules-changed="handleModerationRulesChanged"
-                />
+                <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
+                    @rules-changed="handleModerationRulesChanged" />
 
                 <!-- Cancel Loading Button -->
                 <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
@@ -572,8 +656,9 @@ onUnmounted(() => {
                     @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
                     data-test="masonry-component">
                     <template #default="{ item, index, remove }">
-                        <VibeMasonryItem :item="item" :remove="remove" @mouseenter="hoveredItemIndex = index"
-                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.hoveredContainerId.value = null; }"
+                        <VibeMasonryItem :item="item" :remove="remove"
+                            @mouseenter="() => { hoveredItemIndex = index; if (autoDislikeQueue.hasQueuedItems.value) { autoDislikeQueue.freeze(); } }"
+                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.hoveredContainerId.value = null; if (autoDislikeQueue.hasQueuedItems.value) { autoDislikeQueue.unfreeze(); } }"
                             @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
                                 // payload.item is the item passed to MasonryItem, which should have the id
                                 const itemId = payload.item?.id ?? item?.id;
@@ -591,6 +676,35 @@ onUnmounted(() => {
                                     <Transition name="ring-fade">
                                         <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
                                             class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active">
+                                        </div>
+                                    </Transition>
+                                    <!-- Per-item auto-dislike countdown pill (bottom center) -->
+                                    <Transition name="countdown-fade">
+                                        <div v-if="autoDislikeQueue.isQueued(item.id)"
+                                            class="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
+                                            <span
+                                                class="inline-flex items-stretch rounded overflow-hidden border border-danger-500 shadow-lg">
+                                                <!-- Dislike icon -->
+                                                <span
+                                                    class="px-2 py-1 text-xs font-medium bg-danger-600 text-white hover:bg-danger-500 transition-colors flex items-center justify-center">
+                                                    <ThumbsDown :size="12" />
+                                                </span>
+                                                <!-- Horizontal progress bar -->
+                                                <span
+                                                    class="bg-prussian-blue-700 border-l border-twilight-indigo-500 flex items-center relative overflow-hidden"
+                                                    style="width: 40px;">
+                                                    <div class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-all duration-100"
+                                                        :style="{ width: `${autoDislikeQueue.getProgress(item.id) * 100}%` }">
+                                                    </div>
+                                                </span>
+                                                <!-- Countdown timer (seconds:centiseconds) -->
+                                                <span
+                                                    class="px-2 py-1 text-xs font-semibold bg-prussian-blue-700 text-danger-100 border-l border-twilight-indigo-500 tabular-nums">
+                                                    {{ Math.floor(autoDislikeQueue.getRemaining(item.id) / 1000) }}:{{
+                                                        String(Math.floor((autoDislikeQueue.getRemaining(item.id) % 1000) /
+                                                    10)).padStart(2, '0') }}
+                                                </span>
+                                            </span>
                                         </div>
                                     </Transition>
                                     <!-- Placeholder background - icon by default (before preloading starts) -->
@@ -811,5 +925,15 @@ onUnmounted(() => {
         opacity: 1;
         transform: scale(1);
     }
+}
+
+.countdown-fade-enter-active,
+.countdown-fade-leave-active {
+    transition: opacity 0.3s ease;
+}
+
+.countdown-fade-enter-from,
+.countdown-fade-leave-to {
+    opacity: 0;
 }
 </style>

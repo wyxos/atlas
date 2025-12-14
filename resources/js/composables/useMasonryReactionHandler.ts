@@ -45,12 +45,13 @@ export function useMasonryReactionHandler(
             removeItem(item);
         }
 
-        // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
+        // Remove auto_disliked and will_auto_dislike flags if user is reacting (like, funny, favorite - not dislike)
         if (item && (type === 'love' || type === 'like' || type === 'funny')) {
             const itemIndex = items.value.findIndex((i) => i.id === fileId);
             if (itemIndex !== -1) {
                 Object.assign(items.value[itemIndex], {
                     auto_disliked: false,
+                    will_auto_dislike: false,
                 });
             }
             // Also update in tab.itemsData if it exists
@@ -59,6 +60,7 @@ export function useMasonryReactionHandler(
                 if (tabItemIndex !== -1) {
                     Object.assign(tab.value.itemsData[tabItemIndex], {
                         auto_disliked: false,
+                        will_auto_dislike: false,
                     });
                 }
             }

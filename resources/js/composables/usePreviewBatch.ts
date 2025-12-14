@@ -2,7 +2,7 @@ import { ref, onUnmounted } from 'vue';
 
 interface PendingPreview {
     fileId: number;
-    resolve: (value: { previewed_count: number; auto_disliked: boolean }) => void;
+    resolve: (value: { previewed_count: number; will_auto_dislike: boolean }) => void;
     reject: (error: any) => void;
 }
 
@@ -17,11 +17,11 @@ let batchTimeout: ReturnType<typeof setTimeout> | null = null;
  * Collects requests for a short period and sends them together.
  */
 export function usePreviewBatch() {
-    async function batchIncrementPreview(fileIds: number[]): Promise<Array<{ id: number; previewed_count: number; auto_disliked: boolean }>> {
+    async function batchIncrementPreview(fileIds: number[]): Promise<Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>> {
         try {
             const response = await window.axios.post<{
                 message: string;
-                results: Array<{ id: number; previewed_count: number; auto_disliked: boolean }>;
+                results: Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>;
             }>('/api/files/preview/batch', {
                 file_ids: fileIds,
             });
@@ -67,7 +67,7 @@ export function usePreviewBatch() {
                         if (result) {
                             pending.resolve({
                                 previewed_count: result.previewed_count,
-                                auto_disliked: result.auto_disliked,
+                                will_auto_dislike: result.will_auto_dislike,
                             });
                         } else {
                             // If result not found, reject
@@ -101,7 +101,7 @@ export function usePreviewBatch() {
      * Queue a preview increment request.
      * Returns a promise that resolves when the batch request completes.
      */
-    function queuePreviewIncrement(fileId: number): Promise<{ previewed_count: number; auto_disliked: boolean }> {
+    function queuePreviewIncrement(fileId: number): Promise<{ previewed_count: number; will_auto_dislike: boolean }> {
         return new Promise((resolve, reject) => {
             // If already pending, reject the new request (shouldn't happen, but safety check)
             if (pendingPreviews.value.has(fileId)) {
