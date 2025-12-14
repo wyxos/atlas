@@ -7,6 +7,7 @@ interface QueuedItem {
     fileId: number;
     addedAt: number;
     remaining: number;
+    isActive: boolean; // Only active items have countdown ticking (preview loaded)
 }
 
 type OnExpireCallback = (expiredIds: number[]) => void;
@@ -14,6 +15,7 @@ type OnExpireCallback = (expiredIds: number[]) => void;
 /**
  * Composable for managing auto-dislike queue.
  * Collects items flagged for auto-dislike and batches them when countdowns expire.
+ * Items are queued immediately but countdown only starts when activated (preview loaded).
  */
 export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
     const queue = ref<Map<number, QueuedItem>>(new Map());
@@ -23,6 +25,7 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
     const queuedItems = computed(() => Array.from(queue.value.values()));
     const queueSize = computed(() => queue.value.size);
     const hasQueuedItems = computed(() => queue.value.size > 0);
+    const activeQueueSize = computed(() => Array.from(queue.value.values()).filter((i) => i.isActive).length);
 
     // Get the minimum remaining time across all queued items
     const minRemaining = computed(() => {
@@ -43,9 +46,10 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
     });
 
     /**
-     * Add an item to the auto-dislike queue.
+     * Add an item to the auto-dislike queue (paused until activated).
+     * @param startActive If true, countdown starts immediately (preview already loaded)
      */
-    function addToQueue(fileId: number): void {
+    function addToQueue(fileId: number, startActive: boolean = false): void {
         if (queue.value.has(fileId)) {
             return; // Already queued
         }
@@ -54,6 +58,7 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
             fileId,
             addedAt: Date.now(),
             remaining: COUNTDOWN_DURATION,
+            isActive: startActive,
         });
 
         // Start tick interval if not already running
@@ -62,6 +67,24 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
                 tick();
             }, TICK_INTERVAL);
         }
+    }
+
+    /**
+     * Activate an item's countdown (called when preview loads).
+     */
+    function activateItem(fileId: number): void {
+        const item = queue.value.get(fileId);
+        if (item && !item.isActive) {
+            item.isActive = true;
+        }
+    }
+
+    /**
+     * Check if an item is active (countdown running).
+     */
+    function isActive(fileId: number): boolean {
+        const item = queue.value.get(fileId);
+        return item ? item.isActive : false;
     }
 
     /**
@@ -115,7 +138,7 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
     }
 
     /**
-     * Tick function that decrements all countdowns.
+     * Tick function that decrements countdowns for active items only.
      */
     function tick(): void {
         if (isFrozen.value) {
@@ -125,6 +148,11 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
         const expired: number[] = [];
 
         queue.value.forEach((item, fileId) => {
+            // Only tick active items (preview loaded)
+            if (!item.isActive) {
+                return;
+            }
+
             item.remaining -= TICK_INTERVAL;
             if (item.remaining <= 0) {
                 expired.push(fileId);
@@ -179,12 +207,15 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
         queuedItems,
         queueSize,
         hasQueuedItems,
+        activeQueueSize,
         minRemaining,
         progress,
         isFrozen: computed(() => isFrozen.value),
         addToQueue,
+        activateItem,
         removeFromQueue,
         isQueued,
+        isActive,
         freeze,
         unfreeze,
         getRemaining,

@@ -17,6 +17,33 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     });
 }
 
+// Mock IntersectionObserver for @wyxos/vibe and other components
+if (typeof window !== 'undefined' && !window.IntersectionObserver) {
+    class MockIntersectionObserver {
+        root: Element | null = null;
+        rootMargin: string = '';
+        thresholds: ReadonlyArray<number> = [];
+        callback: IntersectionObserverCallback;
+
+        constructor(callback: IntersectionObserverCallback) {
+            this.callback = callback;
+        }
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        takeRecords = vi.fn(() => []);
+    }
+    Object.defineProperty(window, 'IntersectionObserver', {
+        writable: true,
+        value: MockIntersectionObserver,
+    });
+}
+
+// Mock Element.scrollTo for @wyxos/vibe masonry component
+if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
+    Element.prototype.scrollTo = vi.fn();
+}
+
 // Suppress Vue Router warnings in tests
 beforeEach(() => {
     const originalWarn = console.warn;

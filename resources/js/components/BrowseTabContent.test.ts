@@ -369,6 +369,13 @@ vi.mock('lucide-vue-next', () => ({
     ChevronDown: { name: 'ChevronDown', template: '<div class="chevron-down-icon"></div>', props: ['size', 'class'] },
     Play: { name: 'Play', template: '<div class="play-icon"></div>', props: ['size', 'class'] },
     RotateCw: { name: 'RotateCw', template: '<div class="rotate-cw-icon"></div>', props: ['size', 'class'] },
+    ThumbsDown: { name: 'ThumbsDown', template: '<div class="thumbs-down-icon"></div>', props: ['size', 'class'] },
+    Shield: { name: 'Shield', template: '<div class="shield-icon"></div>', props: ['size', 'class'] },
+    Plus: { name: 'Plus', template: '<div class="plus-icon"></div>', props: ['size', 'class'] },
+    Trash2: { name: 'Trash2', template: '<div class="trash-icon"></div>', props: ['size', 'class'] },
+    GripVertical: { name: 'GripVertical', template: '<div class="grip-icon"></div>', props: ['size', 'class'] },
+    ChevronRight: { name: 'ChevronRight', template: '<div class="chevron-right-icon"></div>', props: ['size', 'class'] },
+    Save: { name: 'Save', template: '<div class="save-icon"></div>', props: ['size', 'class'] },
 }));
 
 // Mock composables

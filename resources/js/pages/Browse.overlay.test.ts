@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import Browse from './Browse.vue';
 import FileViewer from '../components/FileViewer.vue';
 import {
@@ -901,12 +901,18 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test1.jpg', alt: 'Test 1' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
-        fileViewerVm.imageScale = 1;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 0;
+        }
+        if (fileViewerVm.imageScale && typeof fileViewerVm.imageScale === 'object' && 'value' in fileViewerVm.imageScale) {
+            fileViewerVm.imageScale.value = 1;
+        }
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFullSizeImage.value = 'test1-full.jpg';
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsLoading.value = false;
         if (fileViewerVm.imageSize) fileViewerVm.imageSize.overlayImageSize.value = { width: 400, height: 400 };
-        fileViewerVm.imageCenterPosition = { top: 100, left: 200 };
+        if (fileViewerVm.imageCenterPosition && typeof fileViewerVm.imageCenterPosition === 'object' && 'value' in fileViewerVm.imageCenterPosition) {
+            fileViewerVm.imageCenterPosition.value = { top: 100, left: 200 };
+        }
 
         // Ensure containerRef is set (needed for navigation)
         if (browseTabContentComponent.exists()) {
@@ -919,7 +925,7 @@ describe('Browse - Overlay functionality', () => {
         await wrapper.vm.$nextTick();
 
         // Verify initial state
-        expect(fileViewerVm.currentItemIndex).toBe(0);
+        expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
         expect(fileViewerVm.imageScale).toBe(1);
 
         // Simulate ArrowRight key press
@@ -1039,12 +1045,18 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test2.jpg', alt: 'Test 2' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 1;
-        fileViewerVm.imageScale = 1;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 1;
+        }
+        if (fileViewerVm.imageScale && typeof fileViewerVm.imageScale === 'object' && 'value' in fileViewerVm.imageScale) {
+            fileViewerVm.imageScale.value = 1;
+        }
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFullSizeImage.value = 'test2-full.jpg';
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsLoading.value = false;
         if (fileViewerVm.imageSize) fileViewerVm.imageSize.overlayImageSize.value = { width: 400, height: 400 };
-        fileViewerVm.imageCenterPosition = { top: 100, left: 200 };
+        if (fileViewerVm.imageCenterPosition && typeof fileViewerVm.imageCenterPosition === 'object' && 'value' in fileViewerVm.imageCenterPosition) {
+            fileViewerVm.imageCenterPosition.value = { top: 100, left: 200 };
+        }
 
         // Ensure containerRef is set
         const tabContentContainer = wrapper.find('[ref="tabContentContainer"]');
@@ -1055,7 +1067,7 @@ describe('Browse - Overlay functionality', () => {
         await wrapper.vm.$nextTick();
 
         // Verify initial state
-        expect(fileViewerVm.currentItemIndex).toBe(1);
+        expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(1);
         expect(fileViewerVm.imageScale).toBe(1);
 
         // Simulate ArrowLeft key press
@@ -1114,7 +1126,7 @@ describe('Browse - Overlay functionality', () => {
             await waitForOverlayFill(fileViewerVm);
 
             // Verify we're on the first item
-            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
 
             // Simulate mouse button 4 (back) press
             const mouseButton4Event = new MouseEvent('mousedown', {
@@ -1129,7 +1141,7 @@ describe('Browse - Overlay functionality', () => {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             // Verify we're still on the first item
-            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
         }
     });
 
@@ -1191,8 +1203,12 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test1.jpg', alt: 'Test 1' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
-        fileViewerVm.imageScale = 1;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 0;
+        }
+        if (fileViewerVm.imageScale && typeof fileViewerVm.imageScale === 'object' && 'value' in fileViewerVm.imageScale) {
+            fileViewerVm.imageScale.value = 1;
+        }
         await wrapper.vm.$nextTick();
 
         // Simulate ArrowLeft key press
@@ -1202,7 +1218,7 @@ describe('Browse - Overlay functionality', () => {
         await wrapper.vm.$nextTick();
 
         // Verify no navigation occurred (still at first item)
-        expect(fileViewerVm.currentItemIndex).toBe(0);
+        expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
         expect(fileViewerVm.isNavigating).toBe(false);
         expect(fileViewerVm.imageScale).toBe(1);
     });
@@ -1248,7 +1264,7 @@ describe('Browse - Overlay functionality', () => {
             await waitForOverlayFill(fileViewerVm);
 
             // Verify we're on the first item
-            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
 
             // Simulate mouse button 5 (forward) press
             const mouseButton5Event = new MouseEvent('mousedown', {
@@ -1307,7 +1323,7 @@ describe('Browse - Overlay functionality', () => {
             await waitForOverlayFill(fileViewerVm);
 
             // Verify we're on the second item
-            expect(fileViewerVm.currentItemIndex).toBe(1);
+            expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(1);
 
             // Create a mock event to verify preventDefault is called
             let preventDefaultCalled = false;
@@ -1403,7 +1419,7 @@ describe('Browse - Overlay functionality', () => {
             await waitForOverlayFill(fileViewerVm);
 
             // Verify we're on the first item
-            expect(fileViewerVm.currentItemIndex).toBe(0);
+            expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
 
             // Create a mock event to verify preventDefault is called
             let preventDefaultCalled = false;
@@ -1500,7 +1516,7 @@ describe('Browse - Overlay functionality', () => {
             await waitForOverlayFill(fileViewerVm);
 
             // Verify we're on the second item
-            expect(fileViewerVm.currentItemIndex).toBe(1);
+            expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(1);
 
             // Simulate mouse button 4 (back) press
             const mouseButton4Event = new MouseEvent('mousedown', {
@@ -1559,7 +1575,7 @@ describe('Browse - Overlay functionality', () => {
             await waitForOverlayFill(fileViewerVm);
 
             // Verify we're on the last item
-            expect(fileViewerVm.currentItemIndex).toBe(masonryItems.length - 1);
+            expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(masonryItems.length - 1);
 
             // Simulate mouse button 5 (forward) press
             const mouseButton5Event = new MouseEvent('mousedown', {
@@ -1636,8 +1652,12 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test1.jpg', alt: 'Test 1' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0; // Last item (only one item in array)
-        fileViewerVm.imageScale = 1;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 0; // Last item (only one item in array)
+        }
+        if (fileViewerVm.imageScale && typeof fileViewerVm.imageScale === 'object' && 'value' in fileViewerVm.imageScale) {
+            fileViewerVm.imageScale.value = 1;
+        }
         await wrapper.vm.$nextTick();
 
         // Simulate ArrowRight key press
@@ -1647,7 +1667,7 @@ describe('Browse - Overlay functionality', () => {
         await wrapper.vm.$nextTick();
 
         // Verify no navigation occurred (still at last item)
-        expect(fileViewerVm.currentItemIndex).toBe(0);
+        expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
         expect(fileViewerVm.isNavigating).toBe(false);
         expect(fileViewerVm.imageScale).toBe(1);
     });
@@ -1731,7 +1751,7 @@ describe('Browse - Overlay functionality', () => {
         await wrapper.vm.$nextTick();
 
         // Verify drawer is open
-        expect(fileViewerVm.isBottomPanelOpen).toBe(true);
+        expect(fileViewerVm.isBottomPanelOpen?.value ?? fileViewerVm.isBottomPanelOpen).toBe(true);
     });
 
     it('displays preview images in drawer boxes', async () => {
@@ -1805,7 +1825,9 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
         if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Verify carousel is rendered (inside FileViewer)
@@ -1886,7 +1908,9 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
         if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Click carousel next button
@@ -1898,7 +1922,7 @@ describe('Browse - Overlay functionality', () => {
             await wrapper.vm.$nextTick();
 
             // Verify navigation started
-            expect(fileViewerVm.isNavigating).toBe(true);
+            expect(fileViewerVm.isNavigating?.value ?? fileViewerVm.isNavigating).toBe(true);
         }
     });
 
@@ -1970,8 +1994,12 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test2.jpg', alt: 'Test 2' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 1;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 1;
+        }
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Click carousel previous button
@@ -1983,7 +2011,7 @@ describe('Browse - Overlay functionality', () => {
             await wrapper.vm.$nextTick();
 
             // Verify navigation started
-            expect(fileViewerVm.isNavigating).toBe(true);
+            expect(fileViewerVm.isNavigating?.value ?? fileViewerVm.isNavigating).toBe(true);
         }
     });
 
@@ -2063,8 +2091,12 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test6.jpg', alt: 'Test 6' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 5;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 5;
+        }
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Verify item at index 5 is displayed (new carousel shows all items)
@@ -2153,8 +2185,12 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test3.jpg', alt: 'Test 3' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 2;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 2;
+        }
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Verify item at index 2 is displayed (new carousel shows all items)
@@ -2236,7 +2272,9 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
         if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Click on carousel item 1 (should navigate to item at index 1)
@@ -2311,7 +2349,9 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
         if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Verify previous button is disabled
@@ -2896,7 +2936,9 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
         if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
-        if (fileViewerVm.isBottomPanelOpen) fileViewerVm.isBottomPanelOpen.value = true;
+        if (fileViewerVm.isBottomPanelOpen && typeof fileViewerVm.isBottomPanelOpen === 'object' && 'value' in fileViewerVm.isBottomPanelOpen) {
+            fileViewerVm.isBottomPanelOpen.value = true;
+        }
         await wrapper.vm.$nextTick();
 
         // Verify next button is disabled
@@ -2990,7 +3032,6 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test1.jpg', alt: 'Test 1' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
         // Update items through the ref (items is a ref in FileViewer)
         if (fileViewerVm.items && typeof fileViewerVm.items === 'object' && 'value' in fileViewerVm.items) {
             fileViewerVm.items.value = [
@@ -2999,12 +3040,16 @@ describe('Browse - Overlay functionality', () => {
                 { id: 3, width: 300, height: 300, src: 'test3.jpg', page: 1, index: 2 },
             ];
         }
+        // Set currentItemIndex after items are set
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 0;
+        }
         await wrapper.vm.$nextTick();
 
         // Verify initial state
         const initialItems = fileViewerVm.items?.value || fileViewerVm.items || [];
         expect(initialItems.length).toBe(3);
-        expect(fileViewerVm.currentItemIndex).toBe(0);
+        expect(fileViewerVm.currentItemIndex?.value ?? fileViewerVm.currentItemIndex).toBe(0);
         expect(tabContentVm.items.length).toBe(3);
 
         // Verify props are set by BrowseTabContent
@@ -3130,7 +3175,9 @@ describe('Browse - Overlay functionality', () => {
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayImage.value = { src: 'test1.jpg', alt: 'Test 1' };
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayIsFilled.value = true;
         if (fileViewerVm.overlay) fileViewerVm.overlay.overlayFillComplete.value = true;
-        if (fileViewerVm.currentItemIndex) fileViewerVm.currentItemIndex.value = 0;
+        if (fileViewerVm.currentItemIndex && typeof fileViewerVm.currentItemIndex === 'object' && 'value' in fileViewerVm.currentItemIndex) {
+            fileViewerVm.currentItemIndex.value = 0;
+        }
         fileViewerVm.items = [
             { id: 1, width: 100, height: 100, src: 'test1.jpg', page: 1, index: 0 },
         ];
@@ -3178,3 +3225,4 @@ describe('Browse - Overlay functionality', () => {
 
 
 });
+
