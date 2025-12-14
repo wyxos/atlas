@@ -39,40 +39,15 @@ export function useRefreshDialog(
             masonry.value.cancelLoad();
         }
 
-        // Reset to page 1 and reload
-        currentPage.value = 1;
-        nextCursor.value = null;
-        loadAtPage.value = 1;
-        items.value = [];
-
-        // Update tab query params
-        const updatedQueryParams: Record<string, string | number | null> = {
-            ...currentTab.queryParams,
-            page: 1,
-            next: null,
-        };
-
-        updateActiveTab([], [], updatedQueryParams);
-
         // Close dialog
         closeRefreshDialog();
 
-        // Reset masonry and reload
-        if (masonry.value) {
-            if (typeof masonry.value.reset === 'function') {
-                masonry.value.reset();
-                await nextTick();
-                if (typeof masonry.value.loadPage === 'function') {
-                    await masonry.value.loadPage(1);
-                }
-            } else {
-                masonry.value.destroy();
-                await nextTick();
-                await initializeTab(currentTab);
-            }
-        } else {
-            await initializeTab(currentTab);
-        }
+        // Refresh the tab by re-initializing it (as if switching to it for the first time)
+        // This will:
+        // - Reload items from database if they exist
+        // - Preserve all query params (service, filters, etc.)
+        // - Restore the tab state properly
+        await initializeTab(currentTab);
     }
 
     return {

@@ -29,6 +29,42 @@ const emits = defineEmits<DialogContentEmits>()
 const delegatedProps = reactiveOmit(props, "class", "side")
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
+
+function handlePointerDownOutside(event: Event): void {
+  const target = event.target as Element | null
+  if (!target) {
+    return
+  }
+  
+  // Check if the click is inside a Popover (Select dropdown)
+  const clickedInsidePopover = target.closest('[data-slot="popover-content"]') !== null
+    || target.closest('[role="listbox"]') !== null
+    || target.closest('[data-test="select-item"]') !== null
+  
+  // Prevent closing if clicking inside a popover
+  if (clickedInsidePopover) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+}
+
+function handleInteractOutside(event: Event): void {
+  const target = event.target as Element | null
+  if (!target) {
+    return
+  }
+  
+  // Check if the interaction is inside a Popover (Select dropdown)
+  const clickedInsidePopover = target.closest('[data-slot="popover-content"]') !== null
+    || target.closest('[role="listbox"]') !== null
+    || target.closest('[data-test="select-item"]') !== null
+  
+  // Prevent closing if interacting inside a popover
+  if (clickedInsidePopover) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+}
 </script>
 
 <template>
@@ -48,6 +84,8 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
           && 'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t-2 border-twilight-indigo-500',
         props.class)"
       v-bind="{ ...$attrs, ...forwarded }"
+      @pointer-down-outside="handlePointerDownOutside"
+      @interact-outside="handleInteractOutside"
     >
       <slot />
 
