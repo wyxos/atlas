@@ -72,7 +72,9 @@ vi.mock('@wyxos/vibe', () => ({
         props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
         setup() {
-            return { isLoading: mockIsLoading, init: mockInit, refreshLayout: vi.fn(), cancelLoad: mockCancelLoad, destroy: mockDestroy, remove: mockRemove, removeMany: mockRemoveMany, restore: mockRestore, restoreMany: mockRestoreMany };
+            const exposed = { init: mockInit, refreshLayout: vi.fn(), cancelLoad: mockCancelLoad, destroy: mockDestroy, remove: mockRemove, removeMany: mockRemoveMany, restore: mockRestore, restoreMany: mockRestoreMany };
+            Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
+            return exposed;
         },
     },
     MasonryItem: {
