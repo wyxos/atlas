@@ -120,8 +120,9 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                     emit('update:items', props.items);
                 };
 
-                return {
-                    isLoading: mocks.mockIsLoading,
+                // Use getter to mimic Vue's ref auto-unwrapping behavior
+                // When accessing masonry.value.isLoading, it returns boolean, not ref
+                const exposed = {
                     init: mocks.mockInit,
                     refreshLayout: vi.fn(),
                     cancelLoad: mocks.mockCancelLoad,
@@ -131,6 +132,12 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                     restore,
                     restoreMany,
                 };
+                Object.defineProperty(exposed, 'isLoading', {
+                    get() { return mocks.mockIsLoading.value; },
+                    set(val: boolean) { mocks.mockIsLoading.value = val; },
+                    enumerable: true,
+                });
+                return exposed;
             },
         },
         MasonryItem: {
@@ -163,7 +170,6 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
 export function setupBrowseTestMocks(mocks: BrowseMocks): void {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => { });
-    vi.spyOn(console, 'warn').mockImplementation(() => { });
     mocks.mockIsLoading.value = false;
     mocks.mockCancelLoad.mockClear();
     mocks.mockDestroy.mockClear();
