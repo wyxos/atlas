@@ -1,6 +1,5 @@
 - Browse
     - moderation
-      - moderation builder
       - moderation when browsing
       - ban by container
     - local files
