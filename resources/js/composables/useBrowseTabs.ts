@@ -16,6 +16,7 @@ export type MasonryItem = {
     previewed_count?: number;
     seen_count?: number;
     auto_disliked?: boolean;
+    will_auto_dislike?: boolean;
     [key: string]: unknown;
 };
 

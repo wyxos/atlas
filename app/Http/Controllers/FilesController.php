@@ -84,7 +84,7 @@ class FilesController extends Controller
         $file->touch('previewed_at');
         $file->refresh();
 
-        $autoDisliked = false;
+        $willAutoDislike = false;
 
         // Check if we should auto-dislike: previewed_count >= 3, no reactions exist,
         // source is not 'local', file has no path (not on disk), and file is not blacklisted
@@ -95,35 +95,15 @@ class FilesController extends Controller
             $isNotBlacklisted = $file->blacklisted_at === null;
 
             if (! $hasReactions && $isNotLocal && $hasNoPath && $isNotBlacklisted) {
-                // Auto-dislike the file
-                $user = Auth::user();
-                $file->update(['auto_disliked' => true]);
-
-                // Create a dislike reaction
-                Reaction::updateOrCreate(
-                    [
-                        'file_id' => $file->id,
-                        'user_id' => $user->id,
-                    ],
-                    [
-                        'type' => 'dislike',
-                    ]
-                );
-
-                // De-associate from all tabs belonging to this user (but keep in masonry)
-                $userTabs = BrowseTab::forUser($user->id)->get();
-                foreach ($userTabs as $tab) {
-                    $tab->files()->detach($file->id);
-                }
-
-                $autoDisliked = true;
+                // Flag that we will auto-dislike (UI will show countdown)
+                $willAutoDislike = true;
             }
         }
 
         return response()->json([
             'message' => 'Preview count incremented.',
             'previewed_count' => $file->previewed_count,
-            'auto_disliked' => $autoDisliked,
+            'will_auto_dislike' => $willAutoDislike,
         ]);
     }
 
@@ -153,8 +133,8 @@ class FilesController extends Controller
         // Refresh files to get updated counts
         $files->each->refresh();
 
-        // Check for auto-dislike candidates (previewed_count >= 3, no reactions, etc.)
-        $autoDislikedFileIds = [];
+        // Check for will-auto-dislike candidates (previewed_count >= 3, no reactions, etc.)
+        $willAutoDislikeFileIds = [];
         $candidates = $files->filter(function ($file) {
             return $file->previewed_count >= 3
                 && $file->source !== 'local'
@@ -171,65 +151,105 @@ class FilesController extends Controller
                 ->toArray();
 
             // Filter candidates that don't have reactions
-            $filesToAutoDislike = array_diff($candidateIds, $filesWithReactions);
-
-            if (! empty($filesToAutoDislike)) {
-                // Batch update files with auto_disliked = true
-                File::whereIn('id', $filesToAutoDislike)->update(['auto_disliked' => true]);
-
-                // Batch insert dislike reactions
-                $reactionsToInsert = array_map(function ($fileId) use ($user) {
-                    return [
-                        'file_id' => $fileId,
-                        'user_id' => $user->id,
-                        'type' => 'dislike',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }, $filesToAutoDislike);
-
-                // Batch insert reactions (using insertOrIgnore to avoid duplicates)
-                // Note: insertOrIgnore doesn't support upsert, so we check for existing reactions first
-                // and only insert new ones
-                $existingReactions = Reaction::whereIn('file_id', $filesToAutoDislike)
-                    ->where('user_id', $user->id)
-                    ->pluck('file_id')
-                    ->toArray();
-
-                $newReactionsToInsert = array_filter($reactionsToInsert, function ($reaction) use ($existingReactions) {
-                    return ! in_array($reaction['file_id'], $existingReactions);
-                });
-
-                if (! empty($newReactionsToInsert)) {
-                    Reaction::insert($newReactionsToInsert);
-                }
-
-                // Fetch user tabs once (outside the loop)
-                $userTabs = BrowseTab::forUser($user->id)->get();
-
-                // Batch detach files from all user tabs
-                if ($userTabs->isNotEmpty()) {
-                    foreach ($userTabs as $tab) {
-                        $tab->files()->detach($filesToAutoDislike);
-                    }
-                }
-
-                $autoDislikedFileIds = $filesToAutoDislike;
-            }
+            $willAutoDislikeFileIds = array_diff($candidateIds, $filesWithReactions);
         }
 
-        // Build response with updated counts and auto-disliked status
-        $results = $files->map(function ($file) use ($autoDislikedFileIds) {
+        // Build response with updated counts and will-auto-dislike status
+        $results = $files->map(function ($file) use ($willAutoDislikeFileIds) {
             return [
                 'id' => $file->id,
                 'previewed_count' => $file->previewed_count,
-                'auto_disliked' => in_array($file->id, $autoDislikedFileIds) ? true : ($file->auto_disliked ?? false),
+                'will_auto_dislike' => in_array($file->id, $willAutoDislikeFileIds),
             ];
         });
 
         return response()->json([
             'message' => 'Preview counts incremented.',
             'results' => $results,
+        ]);
+    }
+
+    /**
+     * Perform auto-dislike on multiple files (called after countdown expires).
+     */
+    public function batchPerformAutoDislike(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $request->validate([
+            'file_ids' => 'required|array',
+            'file_ids.*' => 'required|integer|exists:files,id',
+        ]);
+
+        $fileIds = $request->input('file_ids');
+        $user = Auth::user();
+
+        // Load files and authorize
+        $files = File::whereIn('id', $fileIds)->get();
+        foreach ($files as $file) {
+            Gate::authorize('view', $file);
+        }
+
+        // Filter files that still meet conditions
+        $validFileIds = [];
+        foreach ($files as $file) {
+            $hasReactions = Reaction::where('file_id', $file->id)->exists();
+            $isNotLocal = $file->source !== 'local';
+            $hasNoPath = empty($file->path);
+            $isNotBlacklisted = $file->blacklisted_at === null;
+            $previewCountMet = $file->previewed_count >= 3;
+
+            if ($previewCountMet && ! $hasReactions && $isNotLocal && $hasNoPath && $isNotBlacklisted) {
+                $validFileIds[] = $file->id;
+            }
+        }
+
+        if (empty($validFileIds)) {
+            return response()->json([
+                'message' => 'No files meet auto-dislike conditions.',
+                'auto_disliked_count' => 0,
+                'file_ids' => [],
+            ]);
+        }
+
+        // Batch update files with auto_disliked = true
+        File::whereIn('id', $validFileIds)->update(['auto_disliked' => true]);
+
+        // Batch insert dislike reactions
+        $reactionsToInsert = array_map(function ($fileId) use ($user) {
+            return [
+                'file_id' => $fileId,
+                'user_id' => $user->id,
+                'type' => 'dislike',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }, $validFileIds);
+
+        // Check for existing reactions to avoid duplicates
+        $existingReactions = Reaction::whereIn('file_id', $validFileIds)
+            ->where('user_id', $user->id)
+            ->pluck('file_id')
+            ->toArray();
+
+        $newReactionsToInsert = array_filter($reactionsToInsert, function ($reaction) use ($existingReactions) {
+            return ! in_array($reaction['file_id'], $existingReactions);
+        });
+
+        if (! empty($newReactionsToInsert)) {
+            Reaction::insert($newReactionsToInsert);
+        }
+
+        // De-associate from all tabs belonging to this user
+        $userTabs = BrowseTab::forUser($user->id)->get();
+        if ($userTabs->isNotEmpty()) {
+            foreach ($userTabs as $tab) {
+                $tab->files()->detach($validFileIds);
+            }
+        }
+
+        return response()->json([
+            'message' => 'Files auto-disliked successfully.',
+            'auto_disliked_count' => count($validFileIds),
+            'file_ids' => $validFileIds,
         ]);
     }
 

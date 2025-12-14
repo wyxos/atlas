@@ -32,8 +32,8 @@ export function useItemPreview(
                 // Update the item in place to maintain reactivity
                 // Use Object.assign to mutate in place, which Vue can track better
                 const currentItem = items.value[itemIndex];
-                if (response.auto_disliked) {
-                    currentItem.auto_disliked = true;
+                if (response.will_auto_dislike) {
+                    currentItem.will_auto_dislike = true;
                 }
                 currentItem.previewed_count = response.previewed_count;
             }
@@ -44,7 +44,7 @@ export function useItemPreview(
                 if (tabItemIndex !== -1) {
                     Object.assign(tab.value.itemsData[tabItemIndex], {
                         previewed_count: response.previewed_count,
-                        auto_disliked: response.auto_disliked ? true : tab.value.itemsData[tabItemIndex].auto_disliked ?? false,
+                        will_auto_dislike: response.will_auto_dislike ? true : tab.value.itemsData[tabItemIndex].will_auto_dislike ?? false,
                     });
                 }
             }
