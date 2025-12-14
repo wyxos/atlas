@@ -233,7 +233,6 @@ const containerBadges = useContainerBadges(items);
 // Container pill interactions composable
 const containerPillInteractions = useContainerPillInteractions(
     items,
-    masonryRemoveFn,
     masonry,
     props.tab?.id,
     props.onReaction,

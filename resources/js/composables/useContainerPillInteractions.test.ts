@@ -17,7 +17,6 @@ vi.mock('@/utils/reactions', () => ({
 describe('useContainerPillInteractions', () => {
     const mockQueueReaction = vi.fn();
     const mockOnReaction = vi.fn();
-    const mockMasonryRemoveFn = vi.fn();
     const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
 
     beforeEach(() => {
@@ -63,11 +62,8 @@ describe('useContainerPillInteractions', () => {
             removeMany: mockRemoveMany,
         });
 
-        const masonryRemoveFn = ref(mockMasonryRemoveFn);
-
         const { batchReactToSiblings } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
@@ -112,11 +108,8 @@ describe('useContainerPillInteractions', () => {
             // No removeMany method
         });
 
-        const masonryRemoveFn = ref(mockMasonryRemoveFn);
-
         const { batchReactToSiblings } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
@@ -124,10 +117,8 @@ describe('useContainerPillInteractions', () => {
 
         await batchReactToSiblings(1, 'like');
 
-        // Verify individual remove was called for each item
-        expect(mockMasonryRemoveFn).toHaveBeenCalledTimes(2);
-        expect(mockMasonryRemoveFn).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
-        expect(mockMasonryRemoveFn).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
+        // Since removeMany is not available, nothing should happen (we just log a warning)
+        // The test verifies that the function doesn't crash when removeMany is unavailable
     });
 
     it('handles alt + middle click to favorite all siblings', async () => {
@@ -159,11 +150,8 @@ describe('useContainerPillInteractions', () => {
             removeMany: mockRemoveMany,
         });
 
-        const masonryRemoveFn = ref(vi.fn());
-
         const { handlePillAuxClick, batchReactToSiblings } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
@@ -206,7 +194,6 @@ describe('useContainerPillInteractions', () => {
         ]);
 
         const masonry = ref({});
-        const masonryRemoveFn = ref(vi.fn());
 
         // Mock window.open
         const mockOpen = vi.fn();
@@ -215,7 +202,6 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillAuxClick } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
@@ -267,11 +253,8 @@ describe('useContainerPillInteractions', () => {
             removeMany: mockRemoveMany,
         });
 
-        const masonryRemoveFn = ref(vi.fn());
-
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
@@ -325,11 +308,8 @@ describe('useContainerPillInteractions', () => {
             removeMany: mockRemoveMany,
         });
 
-        const masonryRemoveFn = ref(vi.fn());
-
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
@@ -383,11 +363,8 @@ describe('useContainerPillInteractions', () => {
             removeMany: mockRemoveMany,
         });
 
-        const masonryRemoveFn = ref(vi.fn());
-
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
@@ -449,11 +426,8 @@ describe('useContainerPillInteractions', () => {
             removeMany: mockRemoveMany,
         });
 
-        const masonryRemoveFn = ref(vi.fn());
-
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            masonryRemoveFn,
             masonry,
             1,
             mockOnReaction
