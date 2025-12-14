@@ -40,6 +40,13 @@ Route::middleware('auth')->group(function () {
     Route::patch('/api/browse-tabs/{browseTab}/position', [\App\Http\Controllers\BrowseTabController::class, 'updatePosition'])->name('api.browse-tabs.position');
     Route::patch('/api/browse-tabs/{browseTab}/active', [\App\Http\Controllers\BrowseTabController::class, 'setActive'])->name('api.browse-tabs.active');
 
+    // Moderation Rules
+    Route::get('/api/moderation-rules', [\App\Http\Controllers\ModerationRuleController::class, 'index'])->name('api.moderation-rules.index');
+    Route::post('/api/moderation-rules', [\App\Http\Controllers\ModerationRuleController::class, 'store'])->name('api.moderation-rules.store');
+    Route::get('/api/moderation-rules/{moderationRule}', [\App\Http\Controllers\ModerationRuleController::class, 'show'])->name('api.moderation-rules.show');
+    Route::put('/api/moderation-rules/{moderationRule}', [\App\Http\Controllers\ModerationRuleController::class, 'update'])->name('api.moderation-rules.update');
+    Route::delete('/api/moderation-rules/{moderationRule}', [\App\Http\Controllers\ModerationRuleController::class, 'destroy'])->name('api.moderation-rules.destroy');
+
     // SPA catch-all - serves the dashboard view for all GET requests
     // Vue Router handles client-side routing, but Laravel needs to serve the view
     // for direct navigation (e.g., refreshing the page or typing the URL)

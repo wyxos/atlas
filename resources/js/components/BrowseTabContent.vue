@@ -33,6 +33,7 @@ import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
+import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -175,6 +176,12 @@ async function handleApplyFilters(filters: {
         // If masonry doesn't exist yet, just initialize the tab
         await initializeTab(props.tab);
     }
+}
+
+// Handle moderation rules changes (e.g., reload to apply new rules)
+function handleModerationRulesChanged(): void {
+    // For now, just log the change. Future: could reload items with new moderation filters
+    console.log('Moderation rules changed');
 }
 
 // Check if current tab has a service selected
@@ -512,6 +519,12 @@ onUnmounted(() => {
                     :masonry="masonry"
                     :is-masonry-loading="masonry?.isLoading ?? false"
                     @apply="handleApplyFilters"
+                />
+
+                <!-- Moderation Rules -->
+                <ModerationRulesManager
+                    :disabled="masonry?.isLoading ?? false"
+                    @rules-changed="handleModerationRulesChanged"
                 />
 
                 <!-- Cancel Loading Button -->

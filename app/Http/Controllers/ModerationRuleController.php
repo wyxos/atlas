@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\ModerationRule;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class ModerationRuleController extends Controller
+{
+    /**
+     * Get all moderation rules.
+     */
+    public function index(): JsonResponse
+    {
+        $rules = ModerationRule::orderBy('name')->get();
+
+        return response()->json($rules);
+    }
+
+    /**
+     * Create a new moderation rule.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'active' => ['boolean'],
+            'nsfw' => ['boolean'],
+            'op' => ['required', 'string', 'in:any,all,not_any,at_least,and,or'],
+            'terms' => ['nullable', 'array'],
+            'terms.*' => ['string'],
+            'min' => ['nullable', 'integer', 'min:1'],
+            'options' => ['nullable', 'array'],
+            'options.case_sensitive' => ['boolean'],
+            'options.whole_word' => ['boolean'],
+            'children' => ['nullable', 'array'],
+        ]);
+
+        $rule = ModerationRule::create([
+            'name' => $validated['name'] ?? null,
+            'active' => $validated['active'] ?? true,
+            'nsfw' => $validated['nsfw'] ?? false,
+            'op' => $validated['op'],
+            'terms' => $validated['terms'] ?? null,
+            'min' => $validated['min'] ?? null,
+            'options' => $validated['options'] ?? null,
+            'children' => $validated['children'] ?? null,
+        ]);
+
+        return response()->json($rule, 201);
+    }
+
+    /**
+     * Get a specific moderation rule.
+     */
+    public function show(ModerationRule $moderationRule): JsonResponse
+    {
+        return response()->json($moderationRule);
+    }
+
+    /**
+     * Update an existing moderation rule.
+     */
+    public function update(Request $request, ModerationRule $moderationRule): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'active' => ['boolean'],
+            'nsfw' => ['boolean'],
+            'op' => ['string', 'in:any,all,not_any,at_least,and,or'],
+            'terms' => ['nullable', 'array'],
+            'terms.*' => ['string'],
+            'min' => ['nullable', 'integer', 'min:1'],
+            'options' => ['nullable', 'array'],
+            'options.case_sensitive' => ['boolean'],
+            'options.whole_word' => ['boolean'],
+            'children' => ['nullable', 'array'],
+        ]);
+
+        $moderationRule->update($validated);
+
+        return response()->json($moderationRule);
+    }
+
+    /**
+     * Delete a moderation rule.
+     */
+    public function destroy(ModerationRule $moderationRule): JsonResponse
+    {
+        $moderationRule->delete();
+
+        return response()->json(['message' => 'Moderation rule deleted successfully']);
+    }
+}
