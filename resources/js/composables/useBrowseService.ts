@@ -219,8 +219,15 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             nextCursor.value = null;
             loadAtPage.value = 1;
 
-            // Update tab
-            updateActiveTab([], [], updatedQueryParams);
+            // Update tab - this persists the changes (same as getNextPage does)
+            // Use the same pattern as getNextPage: check activeTabId and get active tab before updating
+            if (activeTabId.value) {
+                const activeTab = getActiveTab();
+                if (activeTab) {
+                    // Update tab with new queryParams, same pattern as getNextPage
+                    updateActiveTab([], [], updatedQueryParams);
+                }
+            }
 
             // Reset masonry and trigger load
             if (masonry.value) {
