@@ -404,3 +404,20 @@ export async function waitForNavigation(fileViewerVm: any, timeout = 1000): Prom
         timeout
     );
 }
+
+/**
+ * Setup getBoundingClientRect mock for overlay positioning tests
+ */
+export function setupBoundingClientRectMock(): void {
+    Element.prototype.getBoundingClientRect = vi.fn(() => ({
+        top: 100,
+        left: 200,
+        width: 300,
+        height: 400,
+        bottom: 500,
+        right: 500,
+        x: 200,
+        y: 100,
+        toJSON: vi.fn(),
+    }));
+}
