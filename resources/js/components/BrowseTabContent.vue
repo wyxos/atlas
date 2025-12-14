@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, SlidersHorizontal, Check, X, ChevronDown, RotateCw, Play } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -32,9 +32,7 @@ import { useResetDialog } from '@/composables/useResetDialog';
 import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -68,15 +66,6 @@ const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
-
-// Reactive form to track all filter query params
-const filterForm = reactive({
-    service: '',
-    nsfw: false,
-    type: 'all',
-    limit: '20',
-    sort: 'Newest',
-});
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -122,50 +111,30 @@ const currentTabService = computed(() => {
     return props.tab?.queryParams?.service as string | null;
 });
 
-// Initialize filter form from tab's queryParams
-watch(() => props.tab?.queryParams, (queryParams) => {
-    if (queryParams) {
-        filterForm.service = (queryParams.service as string) || '';
-        const nsfwValue = queryParams.nsfw;
-        filterForm.nsfw = Boolean(nsfwValue && (nsfwValue === 1 || nsfwValue === '1' || nsfwValue === 'true'));
-        filterForm.type = (queryParams.type as string) || 'all';
-        filterForm.limit = String(queryParams.limit || '20');
-        filterForm.sort = (queryParams.sort as string) || 'Newest';
-    } else {
-        // Reset to defaults if no queryParams
-        filterForm.service = '';
-        filterForm.nsfw = false;
-        filterForm.type = 'all';
-        filterForm.limit = '20';
-        filterForm.sort = 'Newest';
-    }
-    // Sync selectedService with filterForm.service
-    selectedService.value = filterForm.service;
-}, { immediate: true });
-
-// Sync selectedService with filterForm.service when it changes
-watch(() => filterForm.service, (service) => {
-    selectedService.value = service;
-});
-
-// Apply filters
-async function applyFilters(): Promise<void> {
+// Handle filter apply from BrowseFiltersSheet
+async function handleApplyFilters(filters: {
+    service: string;
+    nsfw: boolean;
+    type: string;
+    limit: string;
+    sort: string;
+}): Promise<void> {
     if (!props.tab) {
         return;
     }
 
-    if (!filterForm.service) {
+    if (!filters.service) {
         // Service is required
         return;
     }
 
     const updatedQueryParams: Record<string, string | number | null> = {
         ...props.tab.queryParams,
-        service: filterForm.service || null,
-        nsfw: filterForm.nsfw ? 1 : null,
-        type: filterForm.type !== 'all' ? filterForm.type : null,
-        limit: filterForm.limit ? Number(filterForm.limit) : null,
-        sort: filterForm.sort !== 'Newest' ? filterForm.sort : null,
+        service: filters.service || null,
+        nsfw: filters.nsfw ? 1 : null,
+        type: filters.type !== 'all' ? filters.type : null,
+        limit: filters.limit ? Number(filters.limit) : null,
+        sort: filters.sort !== 'Newest' ? filters.sort : null,
         page: 1, // Reset to page 1 when applying filters
         next: null,
     };
@@ -175,13 +144,10 @@ async function applyFilters(): Promise<void> {
     currentPage.value = 1;
     nextCursor.value = null;
     loadAtPage.value = 1;
-    selectedService.value = filterForm.service;
+    selectedService.value = filters.service;
 
     // Update tab with all filter params
     props.updateActiveTab([], [], updatedQueryParams);
-
-    // Close the sheet first
-    isFilterSheetOpen.value = false;
 
     // Use the same approach as reset button: reset() and loadPage(1)
     if (masonry.value) {
@@ -209,25 +175,6 @@ async function applyFilters(): Promise<void> {
         // If masonry doesn't exist yet, just initialize the tab
         await initializeTab(props.tab);
     }
-}
-
-// Reset filters
-function resetFilters(): void {
-    if (props.tab?.queryParams) {
-        filterForm.service = (props.tab.queryParams.service as string) || '';
-        const nsfwValue = props.tab.queryParams.nsfw;
-        filterForm.nsfw = Boolean(nsfwValue && (nsfwValue === 1 || nsfwValue === '1' || nsfwValue === 'true'));
-        filterForm.type = (props.tab.queryParams.type as string) || 'all';
-        filterForm.limit = String(props.tab.queryParams.limit || '20');
-        filterForm.sort = (props.tab.queryParams.sort as string) || 'Newest';
-    } else {
-        filterForm.service = '';
-        filterForm.nsfw = false;
-        filterForm.type = 'all';
-        filterForm.limit = '20';
-        filterForm.sort = 'Newest';
-    }
-    isFilterSheetOpen.value = false;
 }
 
 // Check if current tab has a service selected
@@ -558,108 +505,14 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <Sheet v-model:open="isFilterSheetOpen">
-                    <SheetTrigger as-child>
-                        <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button">
-                            <SlidersHorizontal :size="14" />
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="right" class="w-full sm:max-w-lg">
-                        <SheetHeader>
-                            <SheetTitle>Advanced Filters</SheetTitle>
-                        </SheetHeader>
-                        <div class="flex-1 p-6 overflow-y-auto space-y-6">
-                            <!-- Service Filter -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-regal-navy-100">Service</label>
-                                <Select v-model="filterForm.service">
-                                    <SelectTrigger class="w-full">
-                                        <SelectValue placeholder="Select a service..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem v-for="service in availableServices" :key="service.key"
-                                            :value="service.key">
-                                            {{ service.label }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <!-- NSFW Toggle -->
-                            <div class="flex items-center justify-between">
-                                <label class="text-sm font-medium text-regal-navy-100">NSFW</label>
-                                <Switch v-model="filterForm.nsfw" />
-                            </div>
-
-                            <!-- Type Radio Group -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-regal-navy-100 mb-4">Type</label>
-                                <RadioGroup v-model="filterForm.type" class="flex gap-4">
-                                    <div class="flex items-center gap-2">
-                                        <RadioGroupItem value="all" id="type-all" />
-                                        <label for="type-all"
-                                            class="text-sm text-twilight-indigo-200 cursor-pointer">All</label>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <RadioGroupItem value="image" id="type-image" />
-                                        <label for="type-image"
-                                            class="text-sm text-twilight-indigo-200 cursor-pointer">Image</label>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <RadioGroupItem value="video" id="type-video" />
-                                        <label for="type-video"
-                                            class="text-sm text-twilight-indigo-200 cursor-pointer">Video</label>
-                                    </div>
-                                </RadioGroup>
-                            </div>
-
-                            <!-- Limit Dropdown -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-regal-navy-100">Limit</label>
-                                <Select v-model="filterForm.limit">
-                                    <SelectTrigger class="w-full">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="20">20</SelectItem>
-                                        <SelectItem value="40">40</SelectItem>
-                                        <SelectItem value="60">60</SelectItem>
-                                        <SelectItem value="80">80</SelectItem>
-                                        <SelectItem value="100">100</SelectItem>
-                                        <SelectItem value="200">200</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <!-- Sort Dropdown -->
-                            <div class="space-y-2">
-                                <label class="text-sm font-medium text-regal-navy-100">Sort</label>
-                                <Select v-model="filterForm.sort">
-                                    <SelectTrigger class="w-full">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Newest">Newest</SelectItem>
-                                        <SelectItem value="Most Reactions">Most Reactions</SelectItem>
-                                        <SelectItem value="Most Comments">Most Comments</SelectItem>
-                                        <SelectItem value="Most Collected">Most Collected</SelectItem>
-                                        <SelectItem value="Top Rated">Top Rated</SelectItem>
-                                        <SelectItem value="Oldest">Oldest</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <SheetFooter>
-                            <Button variant="destructive" @click="resetFilters">
-                                Reset
-                            </Button>
-                            <Button variant="default" @click="applyFilters" :disabled="!filterForm.service">
-                                <Check :size="14" class="mr-2" />
-                                Apply
-                            </Button>
-                        </SheetFooter>
-                    </SheetContent>
-                </Sheet>
+                <BrowseFiltersSheet
+                    v-model:open="isFilterSheetOpen"
+                    :available-services="availableServices"
+                    :tab="tab"
+                    :masonry="masonry"
+                    :is-masonry-loading="masonry?.isLoading ?? false"
+                    @apply="handleApplyFilters"
+                />
 
                 <!-- Cancel Loading Button -->
                 <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
