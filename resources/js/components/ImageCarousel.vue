@@ -10,6 +10,7 @@ interface Props {
     hasMore?: boolean;
     isLoading?: boolean;
     onLoadMore?: () => Promise<void>;
+    containerKey?: number | string; // Key to trigger recalculation when container size changes
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -17,6 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
     hasMore: false,
     isLoading: false,
     onLoadMore: undefined,
+    containerKey: undefined,
 });
 
 const emit = defineEmits<{
@@ -90,6 +92,16 @@ watch(() => props.visible, (newVal) => {
         setTimeout(() => {
             calculateScrollPosition();
         }, 100);
+    }
+});
+
+// Watch for container key changes (e.g., when sheet opens/closes and container width changes)
+watch(() => props.containerKey, () => {
+    if (props.visible && containerRef.value) {
+        // Wait for layout to settle after transition
+        setTimeout(() => {
+            calculateScrollPosition();
+        }, 350); // Slightly longer than sheet transition (300ms) to ensure layout is complete
     }
 });
 

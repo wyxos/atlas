@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue';
-import { X, Loader2 } from 'lucide-vue-next';
+import { X, Loader2, Menu } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
-import type { MasonryItem } from '../composables/useBrowseTabs';
-import { useReactionHandler } from '../composables/useReactionHandler';
-import { useReactionQueue } from '../composables/useReactionQueue';
-import { createReactionCallback } from '../utils/reactions';
-import { incrementSeen } from '@/actions/App/Http/Controllers/FilesController';
+import type { MasonryItem } from '@/composables/useBrowseTabs';
+import { useReactionHandler } from '@/composables/useReactionHandler';
+import { useReactionQueue } from '@/composables/useReactionQueue';
+import { createReactionCallback } from '@/utils/reactions';
+import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -58,6 +58,10 @@ const isBottomPanelOpen = ref(false); // Track if bottom panel is open
 const imageTranslateX = ref(0); // Translate X for slide animation
 const navigationDirection = ref<'left' | 'right' | null>(null); // Track navigation direction
 const currentNavigationTarget = ref<number | null>(null); // Track current navigation target to cancel stale preloads
+const isSheetOpen = ref(false); // Track if the sheet is open
+const fileData = ref<any>(null); // Store file data from API
+const isLoadingFileData = ref(false); // Track if file data is loading
+const carouselContainerKey = ref(0); // Key to trigger carousel recalculation when container size changes
 
 // Watch props.items and sync to reactive items (only when props change externally)
 // Use a flag to prevent syncing when we're removing items internally
@@ -91,6 +95,13 @@ async function handleItemSeen(fileId: number): Promise<void> {
         console.error('Failed to increment seen count:', error);
         // Don't throw - seen count is not critical
     }
+}
+
+// Calculate available width accounting for taskbar and sheet
+function getAvailableWidth(containerWidth: number, borderWidth: number): number {
+    const taskbarWidth = overlayIsFilled.value && overlayFillComplete.value && !overlayIsClosing.value && !isSheetOpen.value ? 64 : 0; // w-16 = 64px
+    const sheetWidth = overlayIsFilled.value && overlayFillComplete.value && !overlayIsClosing.value && isSheetOpen.value ? 320 : 0; // w-80 = 320px
+    return containerWidth - (borderWidth * 2) - taskbarWidth - sheetWidth;
 }
 
 function calculateBestFitSize(
@@ -210,6 +221,7 @@ function closeOverlay(): void {
             navigationDirection.value = null;
             isNavigating.value = false;
             isBottomPanelOpen.value = false;
+            isSheetOpen.value = false;
             emit('close');
         }, 500); // Match transition duration
     } else {
@@ -234,6 +246,7 @@ function closeOverlay(): void {
         navigationDirection.value = null;
         isNavigating.value = false;
         isBottomPanelOpen.value = false;
+        isSheetOpen.value = false;
         emit('close');
     }
 }
@@ -380,7 +393,7 @@ function toggleBottomPanel(): void {
 
         // Reduce available height by 200px when panel is open
         const panelHeight = isBottomPanelOpen.value ? 200 : 0;
-        const availableWidth = containerWidth - (borderWidth * 2);
+        const availableWidth = getAvailableWidth(containerWidth, borderWidth);
         const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
 
         // Recalculate best-fit size for the image
@@ -652,7 +665,7 @@ async function openFromClick(e: MouseEvent): Promise<void> {
 
                 // Calculate best-fit size for the image within the expanded container
                 const borderWidth = 4; // border-4 = 4px
-                const availableWidth = containerWidth - (borderWidth * 2);
+                const availableWidth = getAvailableWidth(containerWidth, borderWidth);
                 const availableHeight = containerHeight - (borderWidth * 2);
                 const bestFitSize = calculateBestFitSize(
                     originalImageDimensions.value.width,
@@ -771,7 +784,7 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     const containerWidth = tabContentBox.width;
     const containerHeight = tabContentBox.height;
     const borderWidth = 4;
-    const availableWidth = containerWidth - (borderWidth * 2);
+    const availableWidth = getAvailableWidth(containerWidth, borderWidth);
     const availableHeight = containerHeight - (borderWidth * 2);
 
     // For preview, use container size (object-cover will handle aspect ratio)
@@ -830,7 +843,7 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
 
         // Reduce available height by 200px when drawer is open
         const panelHeight = isBottomPanelOpen.value ? 200 : 0;
-        const availableWidth = containerWidth - (borderWidth * 2);
+        const availableWidth = getAvailableWidth(containerWidth, borderWidth);
         const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
 
         const bestFitSize = calculateBestFitSize(
@@ -998,6 +1011,88 @@ function handlePopState(e: PopStateEvent): void {
     }
 }
 
+// Fetch file data when sheet opens or current item changes
+async function fetchFileData(fileId: number): Promise<void> {
+    if (!fileId) return;
+
+    isLoadingFileData.value = true;
+    try {
+        const response = await window.axios.get(getFile.url(fileId));
+        fileData.value = response.data.file;
+    } catch (error) {
+        console.error('Failed to fetch file data:', error);
+        fileData.value = null;
+    } finally {
+        isLoadingFileData.value = false;
+    }
+}
+
+// Watch current item index to fetch file data when it changes
+watch(() => currentItemIndex.value, async (newIndex) => {
+    if (newIndex !== null && isSheetOpen.value && overlayFillComplete.value) {
+        const currentItem = items.value[newIndex];
+        if (currentItem?.id) {
+            await fetchFileData(currentItem.id);
+        }
+    }
+});
+
+// Watch sheet open to fetch file data and trigger carousel recalculation
+watch(() => isSheetOpen.value, async (isOpen) => {
+    if (isOpen && currentItemIndex.value !== null && overlayFillComplete.value) {
+        const currentItem = items.value[currentItemIndex.value];
+        if (currentItem?.id) {
+            await fetchFileData(currentItem.id);
+        }
+    } else if (!isOpen) {
+        fileData.value = null; // Clear data when sheet closes
+    }
+
+    // Trigger carousel recalculation after sheet transition completes
+    await nextTick();
+    setTimeout(() => {
+        carouselContainerKey.value++;
+    }, 350); // Wait for sheet transition (300ms) plus a small buffer
+});
+
+// Watch sheet open/close to recalculate image size and trigger carousel resize
+watch(() => isSheetOpen.value, async () => {
+    if (overlayRect.value && overlayImageSize.value && originalImageDimensions.value && props.containerRef && overlayFillComplete.value) {
+        // Wait for layout to settle after sheet animation
+        await nextTick();
+        await new Promise(resolve => setTimeout(resolve, 300)); // Wait for transition duration
+
+        const tabContent = props.containerRef;
+        const tabContentBox = tabContent.getBoundingClientRect();
+        const containerWidth = tabContentBox.width;
+        const containerHeight = tabContentBox.height;
+        const borderWidth = 4;
+        const panelHeight = isBottomPanelOpen.value ? 200 : 0;
+        const availableWidth = getAvailableWidth(containerWidth, borderWidth);
+        const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
+
+        const bestFitSize = calculateBestFitSize(
+            originalImageDimensions.value.width,
+            originalImageDimensions.value.height,
+            availableWidth,
+            availableHeight
+        );
+
+        overlayImageSize.value = bestFitSize;
+
+        const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
+        const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
+
+        imageCenterPosition.value = {
+            top: fullImageTop,
+            left: fullImageLeft,
+        };
+
+        // Trigger resize event so carousel can recalculate
+        window.dispatchEvent(new Event('resize'));
+    }
+});
+
 // Watch overlay visibility and add/remove keyboard and mouse button listeners
 watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible) => {
     if (isVisible) {
@@ -1043,7 +1138,8 @@ defineExpose({
 <template>
     <!-- Click overlay -->
     <div v-if="overlayRect && overlayImage" :class="[
-        'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900 overflow-hidden flex flex-col',
+        'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900 overflow-hidden',
+        overlayIsFilled ? 'flex' : 'flex flex-col',
         overlayIsFilled && !overlayIsClosing ? '' : 'pointer-events-none',
         overlayIsAnimating || overlayIsClosing ? 'transition-all duration-500 ease-in-out' : ''
     ]" :style="{
@@ -1051,83 +1147,186 @@ defineExpose({
         left: overlayRect.left + 'px',
         width: overlayRect.width + 'px',
         height: overlayRect.height + 'px',
-        borderRadius: overlayBorderRadius || undefined,
+        borderRadius: overlayIsFilled ? undefined : (overlayBorderRadius || undefined),
         transform: `scale(${overlayScale})`,
         transformOrigin: 'center center',
     }">
-        <!-- Image container (flex-1 to take remaining space when panel is open) -->
+        <!-- Main content area -->
         <div :class="[
             'relative overflow-hidden transition-all duration-500 ease-in-out',
-            isBottomPanelOpen ? 'flex-1 min-h-0' : 'flex-1 min-h-0'
+            overlayIsFilled ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-1 min-h-0'
         ]">
-            <!-- Preview image (shown immediately, behind spinner) -->
-            <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
-                :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
-                    'absolute select-none pointer-events-none object-cover',
-                    (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-                ]" :style="{
-                    ...(overlayImageSize && imageCenterPosition ? {
-                        width: overlayImageSize.width + 'px',
-                        height: overlayImageSize.height + 'px',
-                        top: imageCenterPosition.top + 'px',
-                        left: imageCenterPosition.left + 'px',
-                    } : overlayImageSize ? {
-                        width: overlayImageSize.width + 'px',
-                        height: overlayImageSize.height + 'px',
-                    } : {}),
-                    transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
-                    transformOrigin: 'center center',
-                }" draggable="false" />
+            <!-- Image container -->
+            <div class="relative flex-1 min-h-0 overflow-hidden">
+                <!-- Preview image (shown immediately, behind spinner) -->
+                <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
+                    :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
+                        'absolute select-none pointer-events-none object-cover',
+                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                    ]" :style="{
+                        ...(overlayImageSize && imageCenterPosition ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                            top: imageCenterPosition.top + 'px',
+                            left: imageCenterPosition.left + 'px',
+                        } : overlayImageSize ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                        } : {}),
+                        transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        transformOrigin: 'center center',
+                    }" draggable="false" />
 
-            <!-- Spinner while loading full-size image -->
-            <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
-                <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
+                <!-- Spinner while loading full-size image -->
+                <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
+                    <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
+                </div>
+
+                <!-- Full-size image (shown after preload) -->
+                <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt"
+                    :class="[
+                        'absolute select-none',
+                        overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
+                        overlayIsFilled ? '' : 'object-cover',
+                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating || isBottomPanelOpen !== null) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                    ]" :style="{
+                        ...(overlayImageSize && imageCenterPosition ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                            top: imageCenterPosition.top + 'px',
+                            left: imageCenterPosition.left + 'px',
+                        } : overlayImageSize ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                        } : {}),
+                        transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        transformOrigin: 'center center',
+                    }" draggable="false" @click="handleOverlayImageClick"
+                    @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
+                    @auxclick="handleOverlayImageAuxClick" />
+
+                <!-- Close button -->
+                <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
+                    class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+                    aria-label="Close overlay" data-test="close-overlay-button">
+                    <X :size="20" />
+                </button>
+
+                <!-- File Reactions (centered under image) -->
+                <div v-if="overlayFillComplete && !overlayIsClosing"
+                    class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+                    <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
+                        :previewed-count="(items[currentItemIndex]?.previewed_count as number) ?? 0"
+                        :viewed-count="(items[currentItemIndex]?.seen_count as number) ?? 0"
+                        :current-index="currentItemIndex ?? undefined" :total-items="items.length"
+                        @reaction="handleReaction" />
+                </div>
             </div>
 
-            <!-- Full-size image (shown after preload) -->
-            <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt"
-                :class="[
-                    'absolute select-none',
-                    overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
-                    overlayIsFilled ? '' : 'object-cover',
-                    (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating || isBottomPanelOpen !== null) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-                ]" :style="{
-                    ...(overlayImageSize && imageCenterPosition ? {
-                        width: overlayImageSize.width + 'px',
-                        height: overlayImageSize.height + 'px',
-                        top: imageCenterPosition.top + 'px',
-                        left: imageCenterPosition.left + 'px',
-                    } : overlayImageSize ? {
-                        width: overlayImageSize.width + 'px',
-                        height: overlayImageSize.height + 'px',
-                    } : {}),
-                    transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
-                    transformOrigin: 'center center',
-                }" draggable="false" @click="handleOverlayImageClick" @contextmenu.prevent="handleOverlayImageClick"
-                @mousedown="handleOverlayImageMouseDown" @auxclick="handleOverlayImageAuxClick" />
-
-            <!-- Close button -->
-            <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
-                class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
-                aria-label="Close overlay" data-test="close-overlay-button">
-                <X :size="20" />
-            </button>
-
-            <!-- File Reactions (centered under image) -->
-            <div v-if="overlayFillComplete && !overlayIsClosing"
-                class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
-                <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
-                    :previewed-count="(items[currentItemIndex]?.previewed_count as number) ?? 0"
-                    :viewed-count="(items[currentItemIndex]?.seen_count as number) ?? 0"
-                    :current-index="currentItemIndex ?? undefined" :total-items="items.length"
-                    @reaction="handleReaction" />
+            <!-- Image Carousel -->
+            <div class="shrink-0 min-w-0 overflow-hidden">
+                <ImageCarousel v-if="overlayFillComplete && !overlayIsClosing" :items="items"
+                    :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" :has-more="hasMore"
+                    :is-loading="isLoading" :on-load-more="onLoadMore" :container-key="carouselContainerKey"
+                    @next="navigateToNext" @previous="navigateToPrevious" @item-click="handleCarouselItemClick" />
             </div>
         </div>
 
-        <!-- Image Carousel -->
-        <ImageCarousel v-if="overlayFillComplete && !overlayIsClosing" :items="items"
-            :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" :has-more="hasMore"
-            :is-loading="isLoading" :on-load-more="onLoadMore" @next="navigateToNext" @previous="navigateToPrevious"
-            @item-click="handleCarouselItemClick" />
+        <!-- Vertical Taskbar (only shown when filled) -->
+        <div v-if="overlayIsFilled && overlayFillComplete && !overlayIsClosing && !isSheetOpen"
+            class="flex flex-col items-center justify-center gap-4 p-4 bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out w-16">
+            <!-- CTA Button to open sheet -->
+            <button @click="isSheetOpen = true"
+                class="p-3 rounded-lg bg-smart-blue-500 hover:bg-smart-blue-600 text-white transition-colors"
+                aria-label="Open sheet">
+                <Menu :size="20" />
+            </button>
+        </div>
+
+        <!-- Sheet (slides in from right, pushes content) -->
+        <div v-if="overlayIsFilled && overlayFillComplete && !overlayIsClosing"
+            class="flex flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden"
+            :class="isSheetOpen ? 'w-80 max-w-80' : 'w-0 max-w-0'">
+            <div class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap"
+                :class="isSheetOpen ? '' : 'opacity-0 pointer-events-none'">
+                <h2 class="text-lg font-semibold text-white">
+                    # {{ currentItemIndex !== null && items[currentItemIndex] ? items[currentItemIndex].id : '' }}
+                </h2>
+                <button @click="isSheetOpen = false"
+                    class="p-2 rounded-lg hover:bg-prussian-blue-700 text-white transition-colors"
+                    aria-label="Close sheet">
+                    <X :size="20" />
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 min-w-0" :class="isSheetOpen ? '' : 'opacity-0 pointer-events-none'">
+                <div v-if="isLoadingFileData" class="flex items-center justify-center py-8">
+                    <Loader2 :size="24" class="animate-spin text-smart-blue-500" />
+                </div>
+                <div v-else-if="fileData" class="space-y-4 text-sm text-twilight-indigo-200">
+                    <div>
+                        <div class="font-semibold text-white mb-1">Source</div>
+                        <div>{{ fileData.source || 'N/A' }}</div>
+                    </div>
+                    <div v-if="fileData.filename">
+                        <div class="font-semibold text-white mb-1">Filename</div>
+                        <div class="wrap-break-word">{{ fileData.filename }}</div>
+                    </div>
+                    <div v-if="fileData.mime_type">
+                        <div class="font-semibold text-white mb-1">MIME Type</div>
+                        <div>{{ fileData.mime_type }}</div>
+                    </div>
+                    <div v-if="fileData.size">
+                        <div class="font-semibold text-white mb-1">Size</div>
+                        <div>{{ (fileData.size / 1024 / 1024).toFixed(2) }} MB</div>
+                    </div>
+                    <div v-if="fileData.title">
+                        <div class="font-semibold text-white mb-1">Title</div>
+                        <div class="wrap-break-word">{{ fileData.title }}</div>
+                    </div>
+                    <div v-if="fileData.description">
+                        <div class="font-semibold text-white mb-1">Description</div>
+                        <div class="wrap-break-word">{{ fileData.description }}</div>
+                    </div>
+                    <div v-if="fileData.url">
+                        <div class="font-semibold text-white mb-1">URL</div>
+                        <a :href="fileData.url" target="_blank" rel="noopener noreferrer"
+                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
+                            {{ fileData.url }}
+                        </a>
+                    </div>
+                    <div v-if="fileData.referrer_url">
+                        <div class="font-semibold text-white mb-1">Referrer</div>
+                        <a :href="fileData.referrer_url" target="_blank" rel="noopener noreferrer"
+                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
+                            {{ fileData.referrer_url }}
+                        </a>
+                    </div>
+                    <div v-if="fileData.tags && Array.isArray(fileData.tags) && fileData.tags.length > 0">
+                        <div class="font-semibold text-white mb-1">Tags</div>
+                        <div class="flex flex-wrap gap-2">
+                            <span v-for="tag in fileData.tags" :key="tag"
+                                class="px-2 py-1 bg-smart-blue-500/20 rounded text-xs">
+                                {{ tag }}
+                            </span>
+                        </div>
+                    </div>
+                    <div v-if="fileData.previewed_count !== undefined">
+                        <div class="font-semibold text-white mb-1">Previewed</div>
+                        <div>{{ fileData.previewed_count }} times</div>
+                    </div>
+                    <div v-if="fileData.seen_count !== undefined">
+                        <div class="font-semibold text-white mb-1">Seen</div>
+                        <div>{{ fileData.seen_count }} times</div>
+                    </div>
+                    <div v-if="fileData.created_at">
+                        <div class="font-semibold text-white mb-1">Created</div>
+                        <div>{{ new Date(fileData.created_at).toLocaleString() }}</div>
+                    </div>
+                </div>
+                <div v-else class="text-twilight-indigo-400 text-center py-8">
+                    No file data available
+                </div>
+            </div>
+        </div>
     </div>
 </template>
