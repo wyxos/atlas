@@ -1,5 +1,4 @@
 - Browse
-    - filtering
     - moderation
       - moderation builder
       - moderation when browsing
