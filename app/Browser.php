@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Http\Controllers\Concerns\ModeratesFiles;
 use App\Services\BaseService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Storage;
 
 class Browser
 {
+    use ModeratesFiles;
+
     /**
      * Resolve a source key and return the service transform result.
      *
@@ -119,6 +122,15 @@ class Browser
 
         $persisted = app(BrowsePersister::class)->persist($filesPayload);
 
+        // Moderation: evaluate prompts and auto-dislike matches using shared trait
+        $moderationResult = $this->moderateFiles(collect($persisted));
+        $matchedIds = $moderationResult['removedIds'];
+        $previewBag = $moderationResult['previewBag'];
+        $newlyAutoDislikedCount = $moderationResult['newlyAutoDislikedCount'];
+
+        // Filter out auto-disliked files and update ids array
+        $persisted = $moderationResult['filtered']->all();
+
         // Transform persisted files to items format for frontend
         $page = (int) (request()->input('page', 1));
         $items = FileItemFormatter::format($persisted, $page);
@@ -130,6 +142,11 @@ class Browser
                 ...$filter,
                 'page' => request()->input('page', 1),
                 'next' => $filter['next'] ?? null,
+            ],
+            'moderation' => [
+                'auto_disliked_count' => (int) $newlyAutoDislikedCount,
+                'previews' => array_slice($previewBag, 0, 4),
+                'ids' => $matchedIds,
             ],
             'error' => $serviceError,
             'services' => $servicesMeta,
