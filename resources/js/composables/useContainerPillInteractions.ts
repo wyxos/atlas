@@ -74,6 +74,13 @@ export function useContainerPillInteractions(
             return;
         }
 
+        // IMPORTANT: Capture indices BEFORE removing items
+        // Collect items with their original indices for batch restore (before removal)
+        const itemsToRestore = siblings.map((item) => {
+            const itemIndex = items.value.findIndex((i) => i.id === item.id);
+            return { item, index: itemIndex !== -1 ? itemIndex : items.value.length };
+        });
+
         // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
         if (reactionType === 'love' || reactionType === 'like' || reactionType === 'funny') {
             for (const item of siblings) {
@@ -100,12 +107,6 @@ export function useContainerPillInteractions(
 
         // Create a batch ID for grouping these reactions
         const batchId = `batch-${containerId}-${reactionType}-${Date.now()}`;
-
-        // Collect items with their indices for batch restore
-        const itemsToRestore = siblings.map((item) => {
-            const itemIndex = items.value.findIndex((i) => i.id === item.id);
-            return { item, index: itemIndex !== -1 ? itemIndex : items.value.length };
-        });
 
         // Create batch restore callback if restoreManyToMasonry is available
         const batchRestoreCallback = restoreManyToMasonry && tabId !== undefined
