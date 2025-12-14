@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, SlidersHorizontal } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, SlidersHorizontal, Check, X, ChevronDown, RotateCw, Play } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -29,6 +29,7 @@ import { useMasonryInteractions } from '@/composables/useMasonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { useMasonryRestore } from '@/composables/useMasonryRestore';
 import { useResetDialog } from '@/composables/useResetDialog';
+import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
@@ -387,6 +388,18 @@ const { initializeTab } = useTabInitialization({
     loadTabItems: props.loadTabItems,
 });
 
+// Refresh dialog composable
+const refreshDialog = useRefreshDialog(
+    items,
+    masonry,
+    currentPage,
+    nextCursor,
+    loadAtPage,
+    computed(() => props.tab),
+    props.updateActiveTab,
+    initializeTab
+);
+
 
 // Apply selected service to current tab
 async function applyService(): Promise<void> {
@@ -413,6 +426,66 @@ async function handleCarouselLoadMore(): Promise<void> {
         if (typeof masonry.value.loadNext === 'function') {
             await masonry.value.loadNext();
         }
+    }
+}
+
+// Cancel masonry loading
+function cancelMasonryLoad(): void {
+    if (masonry.value?.isLoading && typeof masonry.value.cancelLoad === 'function') {
+        masonry.value.cancelLoad();
+    }
+}
+
+// Load next page manually
+async function loadNextPage(): Promise<void> {
+    if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
+        if (typeof masonry.value.loadNext === 'function') {
+            await masonry.value.loadNext();
+        }
+    }
+}
+
+// Refresh/reload the tab
+async function refreshTab(): Promise<void> {
+    if (!props.tab) {
+        return;
+    }
+
+    // Cancel any ongoing load
+    if (masonry.value?.isLoading) {
+        cancelMasonryLoad();
+    }
+
+    // Reset to page 1 and reload
+    currentPage.value = 1;
+    nextCursor.value = null;
+    loadAtPage.value = 1;
+    items.value = [];
+
+    // Update tab query params
+    const updatedQueryParams: Record<string, string | number | null> = {
+        ...props.tab.queryParams,
+        page: 1,
+        next: null,
+    };
+
+    props.updateActiveTab([], [], updatedQueryParams);
+
+    // Reset masonry and reload
+    if (masonry.value) {
+        if (typeof masonry.value.reset === 'function') {
+            masonry.value.reset();
+            await nextTick();
+            if (typeof masonry.value.loadPage === 'function') {
+                await masonry.value.loadPage(1);
+            }
+        } else {
+            masonry.value.destroy();
+            await nextTick();
+            await initializeTab(props.tab);
+        }
+    } else {
+        await initializeTab(props.tab);
     }
 }
 
@@ -581,11 +654,33 @@ onUnmounted(() => {
                                 Reset
                             </Button>
                             <Button variant="default" @click="applyFilters" :disabled="!filterForm.service">
+                                <Check :size="14" class="mr-2" />
                                 Apply
                             </Button>
                         </SheetFooter>
                     </SheetContent>
                 </Sheet>
+
+                <!-- Cancel Loading Button -->
+                <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
+                    data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
+                    <X :size="14" />
+                </Button>
+
+                <!-- Load Next Page Button -->
+                <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
+                    data-test="load-next-page-button" title="Load next page"
+                    :disabled="masonry?.isLoading || nextCursor === null || !hasServiceSelected">
+                    <ChevronDown :size="14" />
+                </Button>
+
+                <!-- Refresh Tab Button -->
+                <Button @click="refreshDialog.openRefreshDialog" size="sm" variant="ghost" class="h-10 w-10"
+                    color="danger" data-test="refresh-tab-button" title="Refresh tab"
+                    :disabled="masonry?.isLoading ?? false">
+                    <RefreshCcw :size="14" />
+                </Button>
+
                 <Button :disabled="(!hasServiceSelected && !resetDialog.isOnFirstPage)"
                     @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                     data-test="reset-to-first-page-button">
@@ -594,7 +689,7 @@ onUnmounted(() => {
                 <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="h-10 w-10"
                     data-test="apply-service-button">
                     <Loader2 v-if="isApplyingService" :size="14" class="mr-2 animate-spin" />
-                    <RefreshCcw :size="14" v-else />
+                    <Play :size="14" v-else />
                 </Button>
             </div>
         </div>
@@ -798,6 +893,30 @@ onUnmounted(() => {
                             Close
                         </Button>
                     </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Refresh Tab Warning Dialog -->
+        <Dialog v-model="refreshDialog.refreshDialogOpen.value">
+            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
+                <DialogHeader>
+                    <DialogTitle class="text-danger-400">Refresh Tab</DialogTitle>
+                    <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
+                        Are you sure you want to refresh this tab? This will clear all currently loaded items and reload
+                        from
+                        the beginning.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <DialogClose as-child>
+                        <Button variant="outline" @click="refreshDialog.closeRefreshDialog">
+                            Cancel
+                        </Button>
+                    </DialogClose>
+                    <Button @click="refreshDialog.confirmRefreshTab" variant="destructive">
+                        Refresh Tab
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
