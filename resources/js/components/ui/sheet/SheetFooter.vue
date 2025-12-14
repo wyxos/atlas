@@ -8,8 +8,7 @@ const props = defineProps<{ class?: HTMLAttributes["class"] }>()
 <template>
   <div
     data-slot="sheet-footer"
-    :class="cn('mt-auto flex flex-col gap-2 p-4', props.class)
-    "
+    :class="cn('mt-auto flex items-center justify-end gap-4 p-6 border-t-2 border-twilight-indigo-500', props.class)"
   >
     <slot />
   </div>

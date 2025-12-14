@@ -26,6 +26,12 @@ const isMinimized = computed({
     get: () => props.isMinimized,
     set: (value: boolean) => emit('update:isMinimized', value),
 });
+
+// Inverted switch state: switch is "on" when panel is expanded (not minimized)
+const switchState = computed({
+    get: () => !props.isMinimized,
+    set: (value: boolean) => emit('update:isMinimized', !value),
+});
 </script>
 
 <template>
@@ -36,7 +42,7 @@ const isMinimized = computed({
     ]">
         <!-- Switch Button (Centered at top) -->
         <div class="flex justify-center pt-4">
-            <Switch v-model="isMinimized" :aria-label="isMinimized ? 'Open panel' : 'Minimize panel'" />
+            <Switch v-model="switchState" :aria-label="isMinimized ? 'Expand panel' : 'Minimize panel'" />
         </div>
 
         <!-- Tabs List (Scrollable) -->

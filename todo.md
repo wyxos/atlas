@@ -1,8 +1,8 @@
 - Browse
     - filtering
-    - blacklist
-      - auto blacklist from moderation rule
-      - shortcuts
+    - moderation
+      - moderation builder
+      - moderation when browsing
     - full size view
         - detail panel
     - local files

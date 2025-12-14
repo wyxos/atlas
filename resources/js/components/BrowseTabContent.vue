@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, SlidersHorizontal } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -31,6 +31,7 @@ import { useMasonryRestore } from '@/composables/useMasonryRestore';
 import { useResetDialog } from '@/composables/useResetDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -63,6 +64,7 @@ const isTabRestored = ref(false);
 const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
+const isFilterSheetOpen = ref(false);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -364,6 +366,30 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
+                <Sheet v-model:open="isFilterSheetOpen">
+                    <SheetTrigger as-child>
+                        <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button">
+                            <SlidersHorizontal :size="14" />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" class="w-full sm:max-w-lg">
+                        <SheetHeader>
+                            <SheetTitle>Advanced Filters</SheetTitle>
+                        </SheetHeader>
+                        <div class="flex-1 p-6 overflow-y-auto">
+                            <!-- Filter content will go here -->
+                            <p class="text-sm text-twilight-indigo-300">Filter options coming soon...</p>
+                        </div>
+                        <SheetFooter>
+                            <Button variant="destructive" @click="isFilterSheetOpen = false">
+                                Reset
+                            </Button>
+                            <Button variant="default" @click="isFilterSheetOpen = false">
+                                Apply
+                            </Button>
+                        </SheetFooter>
+                    </SheetContent>
+                </Sheet>
                 <Button :disabled="(!hasServiceSelected && !resetDialog.isOnFirstPage)"
                     @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                     data-test="reset-to-first-page-button">
