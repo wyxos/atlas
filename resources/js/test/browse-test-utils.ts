@@ -338,3 +338,69 @@ export async function mountBrowseWithTab(
     await wrapper.vm.$nextTick();
     return { wrapper, router };
 }
+
+/**
+ * Get FileViewer component from wrapper (through BrowseTabContent)
+ */
+export function getFileViewer(wrapper: any, FileViewerComponent: any) {
+    const browseTabContent = wrapper.findComponent({ name: 'BrowseTabContent' });
+    if (browseTabContent.exists()) {
+        const fileViewer = browseTabContent.findComponent(FileViewerComponent);
+        if (fileViewer.exists()) {
+            return fileViewer;
+        }
+    }
+    return null;
+}
+
+/**
+ * Wait for overlay animation to complete by checking component state
+ */
+export async function waitForOverlayAnimation(
+    fileViewerVm: any,
+    condition: () => boolean,
+    timeout = 1000
+): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        if (condition()) {
+            return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    // If condition not met, wait for animation duration anyway as fallback
+    await new Promise(resolve => setTimeout(resolve, 550));
+}
+
+/**
+ * Wait for overlay to close (checks overlayRect is null)
+ */
+export async function waitForOverlayClose(fileViewerVm: any, timeout = 1000): Promise<void> {
+    await waitForOverlayAnimation(
+        fileViewerVm,
+        () => fileViewerVm.overlayRect === null,
+        timeout
+    );
+}
+
+/**
+ * Wait for overlay to be fully filled (checks overlayFillComplete)
+ */
+export async function waitForOverlayFill(fileViewerVm: any, timeout = 1000): Promise<void> {
+    await waitForOverlayAnimation(
+        fileViewerVm,
+        () => fileViewerVm.overlayFillComplete === true,
+        timeout
+    );
+}
+
+/**
+ * Wait for navigation animation to complete (checks isNavigating state)
+ */
+export async function waitForNavigation(fileViewerVm: any, timeout = 1000): Promise<void> {
+    await waitForOverlayAnimation(
+        fileViewerVm,
+        () => fileViewerVm.isNavigating === false,
+        timeout
+    );
+}
