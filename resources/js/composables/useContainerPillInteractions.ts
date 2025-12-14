@@ -16,7 +16,6 @@ type Container = {
  */
 export function useContainerPillInteractions(
     items: Ref<MasonryItem[]>,
-    masonryRemoveFn: Ref<((item: MasonryItem) => void) | null>,
     masonry: Ref<{ removeMany?: (items: MasonryItem[]) => Promise<void> } | null>,
     tabId: number | undefined,
     onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void,
@@ -93,16 +92,11 @@ export function useContainerPillInteractions(
             }
         }
 
-        // Use removeMany if available for efficient batch removal
+        // Use removeMany for efficient batch removal
         if (masonry.value?.removeMany) {
             await masonry.value.removeMany(siblings);
         } else {
-            // Fallback: remove items one by one
-            for (const item of siblings) {
-                if (masonryRemoveFn.value) {
-                    masonryRemoveFn.value(item);
-                }
-            }
+            console.warn('[useContainerPillInteractions] removeMany not available on masonry instance');
         }
 
         // Create a batch ID for grouping these reactions
