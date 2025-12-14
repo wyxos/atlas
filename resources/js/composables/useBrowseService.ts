@@ -100,6 +100,23 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             queryParams.source = currentService;
         }
 
+        // Include filter parameters from tab's queryParams
+        const activeTab = options.getActiveTab();
+        if (activeTab?.queryParams) {
+            if (activeTab.queryParams.nsfw !== undefined && activeTab.queryParams.nsfw !== null) {
+                queryParams.nsfw = activeTab.queryParams.nsfw;
+            }
+            if (activeTab.queryParams.type && activeTab.queryParams.type !== 'all') {
+                queryParams.type = activeTab.queryParams.type;
+            }
+            if (activeTab.queryParams.limit) {
+                queryParams.limit = Number(activeTab.queryParams.limit);
+            }
+            if (activeTab.queryParams.sort && activeTab.queryParams.sort !== 'Newest') {
+                queryParams.sort = activeTab.queryParams.sort;
+            }
+        }
+
         const response = await window.axios.get(browseIndex.url({ query: queryParams }));
         const data = response.data;
 
@@ -183,12 +200,17 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
                 return;
             }
 
-            // Update tab's queryParams with service
+            // Update tab's queryParams with service, preserving all other params
             const updatedQueryParams = {
                 ...tab.queryParams,
                 service: selectedService.value,
                 page: 1, // Reset to page 1 when changing service
                 next: null,
+                // Preserve filter params if they exist
+                ...(tab.queryParams.nsfw !== undefined && { nsfw: tab.queryParams.nsfw }),
+                ...(tab.queryParams.type && { type: tab.queryParams.type }),
+                ...(tab.queryParams.limit && { limit: tab.queryParams.limit }),
+                ...(tab.queryParams.sort && { sort: tab.queryParams.sort }),
             };
 
             // Clear existing items and reset pagination

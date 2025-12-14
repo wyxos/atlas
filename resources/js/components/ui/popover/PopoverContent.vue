@@ -210,13 +210,15 @@ onUnmounted(() => {
                 v-if="isOpen"
                 ref="contentRef"
                 :class="cn(
-                    'fixed z-[70] min-w-[8rem] max-w-[90vw] rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-1 shadow-lg',
+                    'fixed z-[100] min-w-[8rem] max-w-[90vw] rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-1 shadow-lg pointer-events-auto',
                     props.class
                 )"
                 v-bind="attrs"
                 :style="popoverStyle"
                 @click.stop
                 @touchend.stop
+                @mousedown.stop
+                @mouseup.stop
             >
                 <slot />
             </div>

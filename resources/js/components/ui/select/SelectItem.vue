@@ -33,7 +33,7 @@ function handleClick() {
             isSelected ? 'bg-smart-blue-500/30 text-smart-blue-200' : 'text-twilight-indigo-100',
             props.disabled && 'pointer-events-none opacity-50',
         ]"
-        @click="handleClick"
+        @click.stop="handleClick"
         data-test="select-item"
     >
         <slot />
