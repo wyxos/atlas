@@ -44,15 +44,15 @@ function handleClickOutside(event: MouseEvent | TouchEvent): void {
     if (!isOpen.value) {
         return;
     }
-    
+
     const target = event.target as Node | null;
     if (!target) {
         return;
     }
-    
+
     const clickedInsideContent = contentRef.value?.contains(target);
     const clickedInsideTrigger = triggerRef && 'value' in triggerRef ? triggerRef.value?.contains(target) : false;
-    
+
     // Close if clicked outside both content and trigger
     // Use setTimeout to ensure this runs after other click handlers (like trigger toggle)
     if (!clickedInsideContent && !clickedInsideTrigger) {
@@ -71,20 +71,20 @@ function updatePosition(): void {
     if (!isOpen.value || !contentRef.value) {
         return;
     }
-    
+
     const trigger = triggerRef && 'value' in triggerRef ? triggerRef.value : null;
     if (!trigger) {
         return;
     }
-    
+
     const triggerRect = trigger.getBoundingClientRect();
     const contentRect = contentRef.value.getBoundingClientRect();
     const align = props.align === 'start' ? 'left' : 'right';
-    
+
     let top = triggerRect.bottom + 8;
     let left: number | undefined;
     let right: number | undefined;
-    
+
     if (align === 'left') {
         left = triggerRect.left;
         // Ensure it doesn't go off screen
@@ -104,7 +104,7 @@ function updatePosition(): void {
             right = 16;
         }
     }
-    
+
     // Ensure it doesn't go off bottom of screen
     if (top + contentRect.height > window.innerHeight) {
         top = triggerRect.top - contentRect.height - 8;
@@ -112,7 +112,7 @@ function updatePosition(): void {
             top = 16;
         }
     }
-    
+
     popoverStyle.value = {
         top: `${top}px`,
         ...(left !== undefined ? { left: `${left}px` } : {}),
@@ -131,11 +131,11 @@ watch(isOpen, (isOpenValue) => {
         const handleTouchEnd = (e: TouchEvent) => {
             handleClickOutside(e);
         };
-        
+
         // Store handlers so we can remove them later
         mouseDownHandlerRef.value = handleMouseDown;
         touchEndHandlerRef.value = handleTouchEnd;
-        
+
         document.addEventListener('mousedown', handleMouseDown);
         document.addEventListener('touchend', handleTouchEnd);
         updatePosition();
@@ -170,10 +170,10 @@ onMounted(() => {
         const handleTouchEnd = (e: TouchEvent) => {
             handleClickOutside(e);
         };
-        
+
         mouseDownHandlerRef.value = handleMouseDown;
         touchEndHandlerRef.value = handleTouchEnd;
-        
+
         document.addEventListener('mousedown', handleMouseDown);
         document.addEventListener('touchend', handleTouchEnd);
         updatePosition();
@@ -198,28 +198,13 @@ onUnmounted(() => {
 
 <template>
     <Teleport to="body">
-        <Transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 translate-y-1"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 translate-y-1"
-        >
-            <div
-                v-if="isOpen"
-                ref="contentRef"
-                :class="cn(
-                    'fixed z-[100] min-w-[8rem] max-w-[90vw] rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-1 shadow-lg pointer-events-auto',
-                    props.class
-                )"
-                v-bind="attrs"
-                :style="popoverStyle"
-                @click.stop
-                @touchend.stop
-                @mousedown.stop
-                @mouseup.stop
-            >
+        <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-y-1"
+            enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150"
+            leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-1">
+            <div v-if="isOpen" ref="contentRef" data-slot="popover-content" :class="cn(
+                'fixed z-[100] min-w-[8rem] max-w-[90vw] rounded-lg border-2 border-twilight-indigo-500 bg-prussian-blue-600 p-1 shadow-lg pointer-events-auto',
+                props.class
+            )" v-bind="attrs" :style="popoverStyle" @click.stop @touchend.stop @mousedown.stop @mouseup.stop>
                 <slot />
             </div>
         </Transition>
