@@ -646,7 +646,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div v-if="tab" ref="tabContentContainer" class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
+    <div v-if="tab" ref="tabContentContainer" class="flex-1 min-h-0 flex flex-col relative">
         <!-- Service Selection Header -->
         <div class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
             data-test="service-selection-header">
@@ -735,20 +735,22 @@ onUnmounted(() => {
                             }">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
-                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item transition-all duration-300"
+                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item"
                                     :data-key="item.key" :class="containerBadges.getMasonryItemClasses.value(item)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
                                     @auxclick="(e: MouseEvent) => masonryInteractions.handleMasonryItemAuxClick(e, item)">
                                     <!-- Auto-disliked indicator overlay with smooth animation -->
                                     <Transition name="ring-fade">
                                         <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
-                                            class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active">
+                                            class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active"
+                                            style="will-change: transform, opacity;">
                                         </div>
                                     </Transition>
                                     <!-- Per-item auto-dislike countdown pill (bottom center): icon | progress with timer overlay -->
                                     <Transition name="countdown-fade">
                                         <div v-if="autoDislikeQueue.isQueued(item.id)"
-                                            class="absolute inset-x-0 bottom-2 flex justify-center z-20 pointer-events-none">
+                                            class="absolute inset-x-0 bottom-2 flex justify-center z-20 pointer-events-none"
+                                            style="will-change: opacity;">
                                             <span
                                                 class="inline-flex items-stretch rounded overflow-hidden border border-danger-500 shadow-lg">
                                                 <!-- Dislike icon -->
@@ -759,10 +761,10 @@ onUnmounted(() => {
                                                 <!-- Progress bar with timer overlay (shows paused state if not active) -->
                                                 <span
                                                     class="bg-prussian-blue-700 border-l border-twilight-indigo-500 flex items-center justify-center relative overflow-hidden min-w-12">
-                                                    <!-- Progress fill (only shows when active) -->
+                                                    <!-- Progress fill (only shows when active) - use transform for width animation -->
                                                     <div v-if="autoDislikeQueue.isActive(item.id)"
-                                                        class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-all duration-100"
-                                                        :style="{ width: `${autoDislikeQueue.getProgress(item.id) * 100}%` }">
+                                                        class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-transform duration-100"
+                                                        :style="{ transform: `scaleX(${autoDislikeQueue.getProgress(item.id)})`, transformOrigin: 'left' }">
                                                     </div>
                                                     <!-- Timer text overlay or paused indicator -->
                                                     <span
@@ -975,8 +977,20 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Optimized transitions using only transform and opacity (compositor-friendly) */
 .ring-fade-enter-active {
     animation: ringAppear 0.6s ease-out;
+    will-change: transform, opacity;
+}
+
+.ring-fade-leave-active {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    will-change: transform, opacity;
+}
+
+.ring-fade-leave-to {
+    opacity: 0;
+    transform: scale(0.98);
 }
 
 @keyframes ringAppear {
@@ -998,6 +1012,7 @@ onUnmounted(() => {
 .fade-enter-active,
 .fade-leave-active {
     transition: opacity 0.2s ease;
+    will-change: opacity;
 }
 
 .fade-enter-from,
@@ -1008,6 +1023,7 @@ onUnmounted(() => {
 .countdown-fade-enter-active,
 .countdown-fade-leave-active {
     transition: opacity 0.3s ease;
+    will-change: opacity;
 }
 
 .countdown-fade-enter-from,

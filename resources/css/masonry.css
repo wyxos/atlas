@@ -1,42 +1,69 @@
 /**
  * Masonry/Browse page specific overrides for @wyxos/vibe package
  * These overrides adapt the vibe package's default light theme to our dark theme
+ * 
+ * Performance optimizations are handled by Vibe's CSS - we only override visual styles
+ * 
+ * TEMPORARILY COMMENTED OUT FOR PERFORMANCE TESTING
+ * Uncomment sections below to restore dark theme overrides
  */
 
+/* Performance: Vibe already applies performance hints via scoped styles */
+/* We only override visual styles (colors) - never performance properties */
+/* 
+ * Vibe applies (via scoped attribute selector):
+ * - will-change: transform, opacity
+ * - contain: layout paint
+ * - backface-visibility: hidden
+ * - optimized transitions (transform/opacity only)
+ * 
+ * DO NOT override these in this file - they're critical for performance with large item counts
+ */
+
+/* ============================================
+ * ALL OVERRIDES COMMENTED OUT FOR TESTING
+ * ============================================ */
+
 /* Override vibe package's light background placeholders to match dark theme */
+/*
 .masonry-item [class*="bg-slate-100"],
 .masonry-item [class*="bg-slate-50"],
 .masonry-item [class*="bg-white"] {
-    background-color: rgb(0 14 41) !important; /* prussian-blue-700 / darker shade */
+    background-color: rgb(0 14 41) !important;
 }
+*/
 
 /* Override the container's white background that creates the rounded border effect */
+/*
 .masonry-item div.rounded-xl.bg-white,
 .masonry-item div[class*="rounded-xl"][class*="bg-white"] {
-    background-color: rgb(0 14 41) !important; /* prussian-blue-700 / darker shade */
+    background-color: rgb(0 14 41) !important;
 }
+*/
 
 /* Ensure fade-in opacity transitions work correctly for images and videos */
-/* The vibe package uses transition-opacity duration-700 ease-in-out classes */
-/* We need to ensure these transitions aren't blocked by our overrides */
+/*
 .masonry-item img[class*="transition-opacity"],
 .masonry-item video[class*="transition-opacity"] {
     transition-property: opacity !important;
     transition-duration: 700ms !important;
     transition-timing-function: ease-in-out !important;
 }
+*/
 
 /* Ensure placeholder background fades out correctly */
+/*
 .masonry-item div[class*="bg-slate-100"][class*="transition-opacity"],
 .masonry-item div[class*="bg-slate-50"][class*="transition-opacity"] {
     transition-property: opacity !important;
     transition-duration: 500ms !important;
 }
+*/
 
 /* Fix spinner positioning - center it both vertically and horizontally */
-/* Target the spinner container that has animate-spin child */
+/*
 .masonry-item div.absolute:has(.animate-spin),
-.masonry-item > div > div > div.absolute:has(.animate-spin) {
+.masonry-item>div>div>div.absolute:has(.animate-spin) {
     left: 50% !important;
     top: 50% !important;
     transform: translate(-50%, -50%) !important;
@@ -45,14 +72,18 @@
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    will-change: auto;
 }
+*/
 
 /* Fallback for browsers that don't support :has() */
+/*
 .masonry-item div.absolute.bottom-2.left-1\/2 {
     left: 50% !important;
     top: 50% !important;
     transform: translate(-50%, -50%) !important;
     right: auto !important;
     bottom: auto !important;
+    will-change: auto;
 }
-
+*/
