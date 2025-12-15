@@ -855,6 +855,7 @@ onUnmounted(() => {
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
             :queued-reactions-count="queuedReactions.length"
+            :queued-auto-dislike-count="autoDislikeQueue.queueSize.value"
             :visible="tab !== null && tab !== undefined && hasServiceSelected" />
 
         <!-- Reset to First Page Warning Dialog -->
@@ -968,6 +969,16 @@ onUnmounted(() => {
         opacity: 1;
         transform: scale(1);
     }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
 }
 
 .countdown-fade-enter-active,

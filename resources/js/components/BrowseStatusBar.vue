@@ -12,12 +12,14 @@ interface Props {
     backfill: BackfillState;
     visible?: boolean;
     queuedReactionsCount?: number;
+    queuedAutoDislikeCount?: number;
 }
 
 withDefaults(defineProps<Props>(), {
     isLoading: false,
     visible: true,
     queuedReactionsCount: 0,
+    queuedAutoDislikeCount: 0,
 });
 </script>
 
@@ -27,6 +29,9 @@ withDefaults(defineProps<Props>(), {
         <!-- Queued Reactions Pill -->
         <Pill v-if="queuedReactionsCount > 0" label="Queued" :value="queuedReactionsCount" variant="warning" reversed
             data-test="queued-reactions-pill" />
+        <!-- Auto-Dislike Queue Pill -->
+        <Pill v-if="queuedAutoDislikeCount > 0" label="Dislike" :value="queuedAutoDislikeCount" variant="danger" reversed
+            data-test="auto-dislike-queue-pill" />
         <!-- Count Pill -->
         <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
         <!-- Current Page Pill -->
