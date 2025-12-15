@@ -373,3 +373,63 @@
         color: inherit !important;
     }
 }
+
+/* Vue Toastification Custom Styling for Reaction Queue */
+.reaction-toast-container {
+    max-width: 24rem !important; /* max-w-sm */
+    z-index: 50 !important;
+    gap: 0.5rem !important; /* gap-2 */
+}
+
+.reaction-toast-container.bottom-right {
+    bottom: 1rem !important; /* bottom-4 */
+    right: 1rem !important; /* right-4 */
+}
+
+/* Remove Vue Toastification default styling and match app theme */
+.reaction-toast {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    min-height: auto !important;
+}
+
+.reaction-toast .Vue-Toastification__toast-body {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Hide Vue Toastification default progress bar (we use our own) */
+.reaction-toast .Vue-Toastification__progress-bar {
+    display: none !important;
+}
+
+/* Hide Vue Toastification default icon */
+.reaction-toast .Vue-Toastification__icon {
+    display: none !important;
+}
+
+/* Hide Vue Toastification default close button (we use our own) */
+.reaction-toast .Vue-Toastification__close-button {
+    display: none !important;
+}
+
+/* Remove any default borders or outlines */
+.reaction-toast-container .Vue-Toastification__toast {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+/* Ensure no blue edges or default styling */
+.reaction-toast-container .Vue-Toastification__toast--default {
+    background: transparent !important;
+    border: none !important;
+}
+
+.reaction-toast-container .Vue-Toastification__toast--default::before {
+    display: none !important;
+}

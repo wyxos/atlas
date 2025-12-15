@@ -1,4 +1,7 @@
 import { ref, computed, onUnmounted } from 'vue';
+import { useToast } from 'vue-toastification';
+import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
+import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
 
 export interface QueuedReaction {
     id: string;
@@ -18,14 +21,104 @@ export interface QueuedReaction {
     itemIndex?: number; // Original index of the item in the masonry
     item?: any; // Store the item data for restoration
     batchId?: string; // Optional batch identifier for grouping batch reactions (e.g., containerId)
+    toastId?: string | number; // Toast ID for Vue Toastification
 }
 
 const QUEUE_DELAY_MS = 5000; // 5 seconds
 
 const queuedReactions = ref<QueuedReaction[]>([]);
 const isPaused = ref(false); // Global pause state for all reactions
+const batchToastIds = ref<Map<string, string | number>>(new Map()); // Track batch toast IDs
 
 export function useReactionQueue() {
+    const toast = useToast();
+
+    // Define cancel functions first so they're available in queueReaction callbacks
+    async function cancelReaction(fileId: number, isTabActive?: (tabId: number) => boolean): Promise<void> {
+        const index = queuedReactions.value.findIndex((q) => q.fileId === fileId);
+        if (index !== -1) {
+            const queued = queuedReactions.value[index];
+            if (queued.timeoutId) {
+                clearTimeout(queued.timeoutId);
+            }
+            if (queued.intervalId) {
+                clearInterval(queued.intervalId);
+            }
+
+            // Dismiss toast
+            if (queued.batchId) {
+                const batchToastId = batchToastIds.value.get(queued.batchId);
+                if (batchToastId) {
+                    // Check if this is the last reaction in the batch
+                    const remainingBatchReactions = queuedReactions.value.filter((q) => q.batchId === queued.batchId && q.id !== queued.id);
+                    if (remainingBatchReactions.length === 0) {
+                        toast.dismiss(batchToastId);
+                        batchToastIds.value.delete(queued.batchId);
+                    }
+                }
+            } else if (queued.toastId) {
+                toast.dismiss(queued.toastId);
+            }
+
+            // Restore item to masonry if restore callback exists and tab is active
+            if (queued.restoreItem && queued.tabId !== undefined) {
+                const tabIsActive = isTabActive ? isTabActive(queued.tabId) : true;
+                if (tabIsActive) {
+                    await queued.restoreItem(queued.tabId, isTabActive || (() => true));
+                }
+            }
+
+            queuedReactions.value.splice(index, 1);
+        }
+    }
+
+    async function cancelBatch(batchId: string, isTabActive?: (tabId: number) => boolean): Promise<void> {
+        const batchReactions = queuedReactions.value.filter((q) => q.batchId === batchId);
+
+        if (batchReactions.length === 0) {
+            return;
+        }
+
+        // Clear all timers first
+        for (const queued of batchReactions) {
+            if (queued.timeoutId) {
+                clearTimeout(queued.timeoutId);
+            }
+            if (queued.intervalId) {
+                clearInterval(queued.intervalId);
+            }
+        }
+
+        // Dismiss batch toast
+        const batchToastId = batchToastIds.value.get(batchId);
+        if (batchToastId) {
+            toast.dismiss(batchToastId);
+            batchToastIds.value.delete(batchId);
+        }
+
+        // Try to use batch restore callback if available (more efficient)
+        const firstReaction = batchReactions[0];
+        if (firstReaction.restoreBatch && firstReaction.tabId !== undefined) {
+            const tabIsActive = isTabActive ? isTabActive(firstReaction.tabId) : true;
+            if (tabIsActive) {
+                await firstReaction.restoreBatch(firstReaction.tabId, isTabActive || (() => true));
+            }
+        } else {
+            // Fallback: restore items individually if no batch restore callback
+            for (const queued of batchReactions) {
+                if (queued.restoreItem && queued.tabId !== undefined) {
+                    const tabIsActive = isTabActive ? isTabActive(queued.tabId) : true;
+                    if (tabIsActive) {
+                        await queued.restoreItem(queued.tabId, isTabActive || (() => true));
+                    }
+                }
+            }
+        }
+
+        // Remove all batch reactions
+        queuedReactions.value = queuedReactions.value.filter((q) => q.batchId !== batchId);
+    }
+
     function queueReaction(
         fileId: number,
         type: 'love' | 'like' | 'dislike' | 'funny',
@@ -56,6 +149,25 @@ export function useReactionQueue() {
             if (existing.timeoutId) {
                 clearTimeout(existing.timeoutId);
             }
+            if (existing.intervalId) {
+                clearInterval(existing.intervalId);
+            }
+
+            // Dismiss existing toast before creating a new one
+            if (existing.batchId) {
+                const batchToastId = batchToastIds.value.get(existing.batchId);
+                if (batchToastId) {
+                    // Check if this is the last reaction in the batch
+                    const remainingBatchReactions = queuedReactions.value.filter((q) => q.batchId === existing.batchId && q.id !== existing.id);
+                    if (remainingBatchReactions.length === 0) {
+                        toast.dismiss(batchToastId);
+                        batchToastIds.value.delete(existing.batchId);
+                    }
+                }
+            } else if (existing.toastId) {
+                toast.dismiss(existing.toastId);
+            }
+
             // Preserve restore data from existing reaction if new call doesn't provide it
             if (!restoreItem && existing.restoreItem) {
                 preservedRestoreItem = existing.restoreItem;
@@ -107,6 +219,75 @@ export function useReactionQueue() {
         // Add to queue
         queuedReactions.value.push(queuedReaction);
 
+        // Create toast for this reaction
+        if (preservedBatchId) {
+            // Batch reaction - create or update batch toast
+            const existingBatchToastId = batchToastIds.value.get(preservedBatchId);
+            const batchReactions = queuedReactions.value.filter((q) => q.batchId === preservedBatchId);
+
+            if (existingBatchToastId) {
+                // Update existing batch toast
+                const firstReaction = batchReactions[0];
+                toast.update(existingBatchToastId, {
+                    content: {
+                        component: BatchReactionToast,
+                        props: {
+                            batchId: preservedBatchId,
+                            reactions: batchReactions,
+                            type: firstReaction?.type || 'like',
+                            countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                            onCancelBatch: (batchId: string) => {
+                                cancelBatch(batchId);
+                            },
+                        },
+                    },
+                });
+            } else {
+                // Create new batch toast
+                const firstReaction = batchReactions[0];
+                const toastId = toast({
+                    content: {
+                        component: BatchReactionToast,
+                        props: {
+                            batchId: preservedBatchId,
+                            reactions: batchReactions,
+                            type: firstReaction?.type || 'like',
+                            countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                            onCancelBatch: (batchId: string) => {
+                                cancelBatch(batchId);
+                            },
+                        },
+                    },
+                    timeout: false, // We'll manage timeout manually
+                    closeOnClick: false,
+                });
+                batchToastIds.value.set(preservedBatchId, toastId);
+                // Store toastId in all batch reactions
+                batchReactions.forEach((r) => {
+                    r.toastId = toastId;
+                });
+            }
+        } else {
+            // Single reaction - create individual toast
+            const toastId = toast({
+                content: {
+                    component: SingleReactionToast,
+                    props: {
+                        fileId,
+                        type,
+                        previewUrl,
+                        countdown: QUEUE_DELAY_MS / 1000,
+                        onCancel: (fileId: number) => {
+                            cancelReaction(fileId);
+                        },
+                    },
+                },
+                timeout: false, // We'll manage timeout manually
+                closeOnClick: false,
+            });
+            queuedReaction.toastId = toastId;
+        }
+
         // Start countdown timer
         const countdownInterval = setInterval(() => {
             const index = queuedReactions.value.findIndex((q) => q.id === queueId);
@@ -127,6 +308,46 @@ export function useReactionQueue() {
             const remaining = Math.max(0, QUEUE_DELAY_MS - elapsed);
 
             queuedReactions.value[index].countdown = remaining / 1000;
+
+            // Update toast with new countdown
+            if (queued.batchId) {
+                // Update batch toast
+                const batchToastId = batchToastIds.value.get(queued.batchId);
+                if (batchToastId) {
+                    const batchReactions = queuedReactions.value.filter((q) => q.batchId === queued.batchId);
+                    const firstReaction = batchReactions[0];
+                    toast.update(batchToastId, {
+                        content: {
+                            component: BatchReactionToast,
+                            props: {
+                                batchId: queued.batchId,
+                                reactions: batchReactions,
+                                type: firstReaction?.type || 'like',
+                                countdown: firstReaction?.countdown || 0,
+                                onCancelBatch: (batchId: string) => {
+                                    cancelBatch(batchId);
+                                },
+                            },
+                        },
+                    });
+                }
+            } else if (queued.toastId) {
+                // Update single reaction toast
+                toast.update(queued.toastId, {
+                    content: {
+                        component: SingleReactionToast,
+                        props: {
+                            fileId: queued.fileId,
+                            type: queued.type,
+                            previewUrl: queued.previewUrl,
+                            countdown: remaining / 1000,
+                            onCancel: (fileId: number) => {
+                                cancelReaction(fileId);
+                            },
+                        },
+                    },
+                });
+            }
 
             if (remaining <= 0) {
                 clearInterval(countdownInterval);
@@ -150,74 +371,27 @@ export function useReactionQueue() {
                     if (queued.intervalId) {
                         clearInterval(queued.intervalId);
                     }
+
+                    // Dismiss toast
+                    if (queued.batchId) {
+                        const batchToastId = batchToastIds.value.get(queued.batchId);
+                        if (batchToastId) {
+                            // Check if this is the last reaction in the batch
+                            const remainingBatchReactions = queuedReactions.value.filter((q) => q.batchId === queued.batchId && q.id !== queueId);
+                            if (remainingBatchReactions.length === 0) {
+                                toast.dismiss(batchToastId);
+                                batchToastIds.value.delete(queued.batchId);
+                            }
+                        }
+                    } else if (queued.toastId) {
+                        toast.dismiss(queued.toastId);
+                    }
+
                     queuedReactions.value.splice(index, 1);
                 }
             }
         }, QUEUE_DELAY_MS);
         queuedReaction.timeoutId = timeoutId;
-    }
-
-    async function cancelReaction(fileId: number, isTabActive?: (tabId: number) => boolean): Promise<void> {
-        const index = queuedReactions.value.findIndex((q) => q.fileId === fileId);
-        if (index !== -1) {
-            const queued = queuedReactions.value[index];
-            if (queued.timeoutId) {
-                clearTimeout(queued.timeoutId);
-            }
-            if (queued.intervalId) {
-                clearInterval(queued.intervalId);
-            }
-
-            // Restore item to masonry if restore callback exists and tab is active
-            if (queued.restoreItem && queued.tabId !== undefined) {
-                const tabIsActive = isTabActive ? isTabActive(queued.tabId) : true;
-                if (tabIsActive) {
-                    await queued.restoreItem(queued.tabId, isTabActive || (() => true));
-                }
-            }
-
-            queuedReactions.value.splice(index, 1);
-        }
-    }
-
-    async function cancelBatch(batchId: string, isTabActive?: (tabId: number) => boolean): Promise<void> {
-        const batchReactions = queuedReactions.value.filter((q) => q.batchId === batchId);
-        
-        if (batchReactions.length === 0) {
-            return;
-        }
-
-        // Clear all timers first
-        for (const queued of batchReactions) {
-            if (queued.timeoutId) {
-                clearTimeout(queued.timeoutId);
-            }
-            if (queued.intervalId) {
-                clearInterval(queued.intervalId);
-            }
-        }
-
-        // Try to use batch restore callback if available (more efficient)
-        const firstReaction = batchReactions[0];
-        if (firstReaction.restoreBatch && firstReaction.tabId !== undefined) {
-            const tabIsActive = isTabActive ? isTabActive(firstReaction.tabId) : true;
-            if (tabIsActive) {
-                await firstReaction.restoreBatch(firstReaction.tabId, isTabActive || (() => true));
-            }
-        } else {
-            // Fallback: restore items individually if no batch restore callback
-            for (const queued of batchReactions) {
-                if (queued.restoreItem && queued.tabId !== undefined) {
-                    const tabIsActive = isTabActive ? isTabActive(queued.tabId) : true;
-                    if (tabIsActive) {
-                        await queued.restoreItem(queued.tabId, isTabActive || (() => true));
-                    }
-                }
-            }
-        }
-
-        // Remove all batch reactions
-        queuedReactions.value = queuedReactions.value.filter((q) => q.batchId !== batchId);
     }
 
     function cancelAll(): void {
@@ -229,6 +403,20 @@ export function useReactionQueue() {
                 clearInterval(queued.intervalId);
             }
         });
+
+        // Dismiss all toasts
+        queuedReactions.value.forEach((queued) => {
+            if (queued.batchId) {
+                const batchToastId = batchToastIds.value.get(queued.batchId);
+                if (batchToastId) {
+                    toast.dismiss(batchToastId);
+                }
+            } else if (queued.toastId) {
+                toast.dismiss(queued.toastId);
+            }
+        });
+
+        batchToastIds.value.clear();
         queuedReactions.value = [];
     }
 
@@ -309,6 +497,46 @@ export function useReactionQueue() {
 
                 queuedReactions.value[index].countdown = currentRemaining / 1000;
 
+                // Update toast with new countdown
+                if (currentQueued.batchId) {
+                    // Update batch toast
+                    const batchToastId = batchToastIds.value.get(currentQueued.batchId);
+                    if (batchToastId) {
+                        const batchReactions = queuedReactions.value.filter((q) => q.batchId === currentQueued.batchId);
+                        const firstReaction = batchReactions[0];
+                        toast.update(batchToastId, {
+                            content: {
+                                component: BatchReactionToast,
+                                props: {
+                                    batchId: currentQueued.batchId,
+                                    reactions: batchReactions,
+                                    type: firstReaction?.type || 'like',
+                                    countdown: firstReaction?.countdown || 0,
+                                    onCancelBatch: (batchId: string) => {
+                                        cancelBatch(batchId);
+                                    },
+                                },
+                            },
+                        });
+                    }
+                } else if (currentQueued.toastId) {
+                    // Update single reaction toast
+                    toast.update(currentQueued.toastId, {
+                        content: {
+                            component: SingleReactionToast,
+                            props: {
+                                fileId: currentQueued.fileId,
+                                type: currentQueued.type,
+                                previewUrl: currentQueued.previewUrl,
+                                countdown: currentRemaining / 1000,
+                                onCancel: (fileId: number) => {
+                                    cancelReaction(fileId);
+                                },
+                            },
+                        },
+                    });
+                }
+
                 if (currentRemaining <= 0) {
                     clearInterval(countdownInterval);
                     queuedReactions.value[index].intervalId = null;
@@ -330,12 +558,35 @@ export function useReactionQueue() {
                         if (finalQueued.intervalId) {
                             clearInterval(finalQueued.intervalId);
                         }
+
+                        // Dismiss toast
+                        if (finalQueued.batchId) {
+                            const batchToastId = batchToastIds.value.get(finalQueued.batchId);
+                            if (batchToastId) {
+                                // Check if this is the last reaction in the batch
+                                const remainingBatchReactions = queuedReactions.value.filter((q) => q.batchId === finalQueued.batchId && q.id !== queued.id);
+                                if (remainingBatchReactions.length === 0) {
+                                    toast.dismiss(batchToastId);
+                                    batchToastIds.value.delete(finalQueued.batchId);
+                                }
+                            }
+                        } else if (finalQueued.toastId) {
+                            toast.dismiss(finalQueued.toastId);
+                        }
+
                         queuedReactions.value.splice(index, 1);
                     }
                 }
             }, remaining);
             queued.timeoutId = timeoutId;
         });
+    }
+
+    // Register pause/resume functions globally for toast container hover events
+    if (typeof window !== 'undefined') {
+        const win = window as any;
+        win.__reactionQueuePauseAll = pauseAll;
+        win.__reactionQueueResumeAll = resumeAll;
     }
 
     // Cleanup on unmount

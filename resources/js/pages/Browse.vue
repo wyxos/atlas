@@ -4,7 +4,6 @@ import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
 import BrowseTabContent from '../components/BrowseTabContent.vue';
-import ReactionQueue from '../components/ReactionQueue.vue';
 import { Button } from '@/components/ui/button';
 import { useBrowseTabs, type MasonryItem } from '../composables/useBrowseTabs';
 import { useBrowseService } from '../composables/useBrowseService';
@@ -20,7 +19,7 @@ const tabMasonryLoadingStates = ref<Map<number, boolean>>(new Map());
 const tabDataLoadingStates = ref<Map<number, boolean>>(new Map());
 
 // Reaction queue
-const { queuedReactions, queueReaction, cancelReaction, cancelBatch, pauseAll, resumeAll } = useReactionQueue();
+const { queueReaction } = useReactionQueue();
 
 // Simplified tab switching - just set active tab ID
 async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promise<void> {
@@ -174,12 +173,6 @@ onMounted(async () => {
                 </div>
             </div>
         </div>
-
-        <!-- Reaction Queue -->
-        <ReactionQueue :queued-reactions="queuedReactions"
-            :on-cancel="(fileId) => cancelReaction(fileId, (tabId) => activeTabId === tabId)"
-            :on-cancel-batch="(batchId) => cancelBatch(batchId, (tabId) => activeTabId === tabId)" :on-pause="pauseAll"
-            :on-resume="resumeAll" />
     </div>
 </template>
 
