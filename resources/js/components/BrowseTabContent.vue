@@ -687,8 +687,8 @@ onUnmounted(() => {
                     data-test="masonry-component">
                     <template #default="{ item, index, remove }">
                         <VibeMasonryItem :item="item" :remove="remove"
-                            @mouseenter="() => { hoveredItemIndex = index; if (autoDislikeQueue.hasQueuedItems.value) { autoDislikeQueue.freeze(); } }"
-                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.hoveredContainerId.value = null; if (autoDislikeQueue.hasQueuedItems.value) { autoDislikeQueue.unfreeze(); } }"
+                            @mouseenter="() => { hoveredItemIndex = index; if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.freeze(); } }"
+                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.hoveredContainerId.value = null; if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.unfreeze(); } }"
                             @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
                                 // payload.item is the item passed to MasonryItem, which should have the id
                                 const itemId = payload.item?.id ?? item?.id;
