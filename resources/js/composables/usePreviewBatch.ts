@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue';
+import { ref } from 'vue';
 
 interface PendingPreview {
     fileId: number;
@@ -114,17 +114,10 @@ export function usePreviewBatch() {
         });
     }
 
-    // Cleanup on unmount
-    onUnmounted(() => {
-        if (batchTimeout) {
-            clearTimeout(batchTimeout);
-        }
-        // Reject all pending requests
-        pendingPreviews.value.forEach((pending) => {
-            pending.reject(new Error('Component unmounted'));
-        });
-        pendingPreviews.value.clear();
-    });
+    // Note: This is a shared batching service, so we don't use onUnmounted cleanup.
+    // Requests will complete naturally, and if a component unmounts, it simply won't
+    // handle the result (which is fine - the promise resolves but nothing listens).
+    // The timeout is already cleared in flushBatch() when requests are processed.
 
     return {
         queuePreviewIncrement,
