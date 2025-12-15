@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted } from 'vue';
+import { ref, computed, onUnmounted, h } from 'vue';
 import { useToast } from 'vue-toastification';
 import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
 import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
@@ -229,35 +229,29 @@ export function useReactionQueue() {
                 // Update existing batch toast
                 const firstReaction = batchReactions[0];
                 toast.update(existingBatchToastId, {
-                    content: {
-                        component: BatchReactionToast,
-                        props: {
-                            batchId: preservedBatchId,
-                            reactions: batchReactions,
-                            type: firstReaction?.type || 'like',
-                            countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
-                            onCancelBatch: (batchId: string) => {
-                                cancelBatch(batchId);
-                            },
+                    content: h(BatchReactionToast, {
+                        batchId: preservedBatchId,
+                        reactions: batchReactions,
+                        type: firstReaction?.type || 'like',
+                        countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                        onCancelBatch: (batchId: string) => {
+                            cancelBatch(batchId);
                         },
-                    },
+                    }),
                 });
             } else {
                 // Create new batch toast
                 const firstReaction = batchReactions[0];
                 const toastId = toast({
-                    content: {
-                        component: BatchReactionToast,
-                        props: {
-                            batchId: preservedBatchId,
-                            reactions: batchReactions,
-                            type: firstReaction?.type || 'like',
-                            countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
-                            onCancelBatch: (batchId: string) => {
-                                cancelBatch(batchId);
-                            },
+                    content: h(BatchReactionToast, {
+                        batchId: preservedBatchId,
+                        reactions: batchReactions,
+                        type: firstReaction?.type || 'like',
+                        countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                        onCancelBatch: (batchId: string) => {
+                            cancelBatch(batchId);
                         },
-                    },
+                    }),
                     timeout: false, // We'll manage timeout manually
                     closeOnClick: false,
                 });
@@ -270,18 +264,15 @@ export function useReactionQueue() {
         } else {
             // Single reaction - create individual toast
             const toastId = toast({
-                content: {
-                    component: SingleReactionToast,
-                    props: {
-                        fileId,
-                        type,
-                        previewUrl,
-                        countdown: QUEUE_DELAY_MS / 1000,
-                        onCancel: (fileId: number) => {
-                            cancelReaction(fileId);
-                        },
+                content: h(SingleReactionToast, {
+                    fileId,
+                    type,
+                    previewUrl,
+                    countdown: QUEUE_DELAY_MS / 1000,
+                    onCancel: (fileId: number) => {
+                        cancelReaction(fileId);
                     },
-                },
+                }),
                 timeout: false, // We'll manage timeout manually
                 closeOnClick: false,
             });
@@ -317,35 +308,29 @@ export function useReactionQueue() {
                     const batchReactions = queuedReactions.value.filter((q) => q.batchId === queued.batchId);
                     const firstReaction = batchReactions[0];
                     toast.update(batchToastId, {
-                        content: {
-                            component: BatchReactionToast,
-                            props: {
-                                batchId: queued.batchId,
-                                reactions: batchReactions,
-                                type: firstReaction?.type || 'like',
-                                countdown: firstReaction?.countdown || 0,
-                                onCancelBatch: (batchId: string) => {
-                                    cancelBatch(batchId);
-                                },
+                        content: h(BatchReactionToast, {
+                            batchId: queued.batchId,
+                            reactions: batchReactions,
+                            type: firstReaction?.type || 'like',
+                            countdown: firstReaction?.countdown || 0,
+                            onCancelBatch: (batchId: string) => {
+                                cancelBatch(batchId);
                             },
-                        },
+                        }),
                     });
                 }
             } else if (queued.toastId) {
                 // Update single reaction toast
                 toast.update(queued.toastId, {
-                    content: {
-                        component: SingleReactionToast,
-                        props: {
-                            fileId: queued.fileId,
-                            type: queued.type,
-                            previewUrl: queued.previewUrl,
-                            countdown: remaining / 1000,
-                            onCancel: (fileId: number) => {
-                                cancelReaction(fileId);
-                            },
+                    content: h(SingleReactionToast, {
+                        fileId: queued.fileId,
+                        type: queued.type,
+                        previewUrl: queued.previewUrl,
+                        countdown: remaining / 1000,
+                        onCancel: (fileId: number) => {
+                            cancelReaction(fileId);
                         },
-                    },
+                    }),
                 });
             }
 
@@ -505,35 +490,29 @@ export function useReactionQueue() {
                         const batchReactions = queuedReactions.value.filter((q) => q.batchId === currentQueued.batchId);
                         const firstReaction = batchReactions[0];
                         toast.update(batchToastId, {
-                            content: {
-                                component: BatchReactionToast,
-                                props: {
-                                    batchId: currentQueued.batchId,
-                                    reactions: batchReactions,
-                                    type: firstReaction?.type || 'like',
-                                    countdown: firstReaction?.countdown || 0,
-                                    onCancelBatch: (batchId: string) => {
-                                        cancelBatch(batchId);
-                                    },
+                            content: h(BatchReactionToast, {
+                                batchId: currentQueued.batchId,
+                                reactions: batchReactions,
+                                type: firstReaction?.type || 'like',
+                                countdown: firstReaction?.countdown || 0,
+                                onCancelBatch: (batchId: string) => {
+                                    cancelBatch(batchId);
                                 },
-                            },
+                            }),
                         });
                     }
                 } else if (currentQueued.toastId) {
                     // Update single reaction toast
                     toast.update(currentQueued.toastId, {
-                        content: {
-                            component: SingleReactionToast,
-                            props: {
-                                fileId: currentQueued.fileId,
-                                type: currentQueued.type,
-                                previewUrl: currentQueued.previewUrl,
-                                countdown: currentRemaining / 1000,
-                                onCancel: (fileId: number) => {
-                                    cancelReaction(fileId);
-                                },
+                        content: h(SingleReactionToast, {
+                            fileId: currentQueued.fileId,
+                            type: currentQueued.type,
+                            previewUrl: currentQueued.previewUrl,
+                            countdown: currentRemaining / 1000,
+                            onCancel: (fileId: number) => {
+                                cancelReaction(fileId);
                             },
-                        },
+                        }),
                     });
                 }
 
