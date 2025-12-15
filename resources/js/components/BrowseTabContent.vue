@@ -59,6 +59,22 @@ const emit = defineEmits<{
 
 // Local state for this tab
 const items = ref<MasonryItem[]>([]);
+// Map-based lookup for O(1) item access instead of O(n) find() operations
+const itemsMap = ref<Map<number, MasonryItem>>(new Map());
+
+// Sync itemsMap whenever items array changes
+watch(
+    () => items.value,
+    (newItems) => {
+        const newMap = new Map<number, MasonryItem>();
+        for (const item of newItems) {
+            newMap.set(item.id, item);
+        }
+        itemsMap.value = newMap;
+    },
+    { immediate: true, deep: false }
+);
+
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number | null>(1);
 const nextCursor = ref<string | number | null>(null);
@@ -114,10 +130,10 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
 
         const autoDislikedIds = response.data.file_ids;
 
-        // Remove from masonry
+        // Remove from masonry - use Map for O(1) lookup
         const itemsToRemove: MasonryItem[] = [];
         for (const fileId of autoDislikedIds) {
-            const item = items.value.find((i) => i.id === fileId);
+            const item = itemsMap.value.get(fileId);
             if (item) {
                 itemsToRemove.push(item);
             }
@@ -340,25 +356,28 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
     // Find the masonry item data using the key
     const itemKeyAttr = itemEl.getAttribute('data-key');
     if (itemKeyAttr) {
-        // Match by key (provided by backend)
-        const item = items.value.find(i => i.key === itemKeyAttr);
-        if (item) {
-            masonryInteractions.handleAltClickReaction(e, item.id);
-            return;
+        // Match by key (provided by backend) - iterate items array for key lookup (key not in Map)
+        // This is less common than id lookup, so O(n) is acceptable here
+        for (const item of items.value) {
+            if (item.key === itemKeyAttr) {
+                masonryInteractions.handleAltClickReaction(e, item.id);
+                return;
+            }
         }
     }
 
-    // Fallback: try to find by image src
+    // Fallback: try to find by image src - iterate items array for src lookup
+    // This is less common than id lookup, so O(n) is acceptable here
     const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
     if (imgEl) {
         const src = imgEl.currentSrc || imgEl.getAttribute('src') || '';
-        const item = items.value.find(i => {
-            const itemSrc = (i.src || i.thumbnail || '').split('?')[0].split('#')[0];
+        for (const item of items.value) {
+            const itemSrc = (item.src || item.thumbnail || '').split('?')[0].split('#')[0];
             const baseSrc = src.split('?')[0].split('#')[0];
-            return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
-        });
-        if (item) {
-            masonryInteractions.handleAltClickReaction(e, item.id);
+            if (baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc)) {
+                masonryInteractions.handleAltClickReaction(e, item.id);
+                break;
+            }
         }
     }
 }
@@ -377,11 +396,12 @@ const containerPillInteractions = useContainerPillInteractions(
     props.tab?.id,
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
         // Remove from auto-dislike queue if user reacts (any reaction cancels auto-dislike)
+        // Use Map for O(1) lookup instead of O(n) findIndex
         if (autoDislikeQueue.isQueued(fileId)) {
             autoDislikeQueue.removeFromQueue(fileId);
-            const itemIndex = items.value.findIndex((i) => i.id === fileId);
-            if (itemIndex !== -1) {
-                items.value[itemIndex].will_auto_dislike = false;
+            const item = itemsMap.value.get(fileId);
+            if (item) {
+                item.will_auto_dislike = false;
             }
         }
         props.onReaction(fileId, type);
@@ -399,11 +419,12 @@ const { handleMasonryReaction } = useMasonryReactionHandler(
     computed(() => props.tab),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
         // Remove from auto-dislike queue if user reacts (any reaction cancels auto-dislike)
+        // Use Map for O(1) lookup instead of O(n) findIndex
         if (autoDislikeQueue.isQueued(fileId)) {
             autoDislikeQueue.removeFromQueue(fileId);
-            const itemIndex = items.value.findIndex((i) => i.id === fileId);
-            if (itemIndex !== -1) {
-                items.value[itemIndex].will_auto_dislike = false;
+            const item = itemsMap.value.get(fileId);
+            if (item) {
+                item.will_auto_dislike = false;
             }
         }
         props.onReaction(fileId, type);
@@ -840,10 +861,10 @@ onUnmounted(() => {
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :has-more="nextCursor !== null" :is-loading="masonry?.isLoading ?? false"
-            :on-load-more="handleCarouselLoadMore" :on-reaction="props.onReaction" :remove-from-masonry="(item) => {
-                // Use masonry's remove method directly
+            :on-load-more="handleCarouselLoadMore" :on-reaction="props.onReaction"             :remove-from-masonry="(item) => {
+                // Use masonry's remove method directly - use Map for O(1) lookup
                 if (masonry.value?.remove) {
-                    const masonryItem = items.find((i) => i.id === item.id);
+                    const masonryItem = itemsMap.value.get(item.id);
                     if (masonryItem) {
                         masonry.value.remove(masonryItem);
                     }
