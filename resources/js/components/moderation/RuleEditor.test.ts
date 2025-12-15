@@ -89,7 +89,7 @@ describe('RuleEditor', () => {
         it('shows terms section for term-based operations', () => {
             const wrapper = mount(RuleEditor, {
                 props: {
-                    modelValue: { op: 'any', terms: ['test'], options: {} },
+                    modelValue: { op: 'any', terms: [{ term: 'test', allow_digit_prefix: false }], options: {} },
                 },
             });
 
@@ -137,33 +137,42 @@ describe('RuleEditor', () => {
             expect(emitted).toBeTruthy();
             expect(emitted![0][0]).toEqual({
                 ...node,
-                terms: [''],
+                terms: [{ term: '', allow_digit_prefix: false }],
             });
         });
 
         it('emits update when updating a term value', async () => {
             const node: ModerationRuleNode = {
                 op: 'any',
-                terms: ['original'],
+                terms: [{ term: 'original', allow_digit_prefix: false }],
                 options: { case_sensitive: false, whole_word: true },
             };
             const wrapper = mount(RuleEditor, {
                 props: { modelValue: node },
             });
 
-            const input = wrapper.find('input');
-            await input.setValue('updated');
+            const inputs = wrapper.findAll('input');
+            const termInput = inputs.find(i => i.attributes('type') !== 'number');
+            expect(termInput).toBeDefined();
+            await termInput!.setValue('updated');
 
             const emitted = wrapper.emitted('update:modelValue');
             expect(emitted).toBeTruthy();
             const lastEmit = emitted![emitted!.length - 1][0] as ModerationRuleNode;
-            expect(lastEmit.terms).toContain('updated');
+            expect(lastEmit.terms).toBeDefined();
+            expect(lastEmit.terms!.some(t => {
+                const term = typeof t === 'string' ? t : t.term;
+                return term === 'updated';
+            })).toBe(true);
         });
 
         it('emits update when removing a term', async () => {
             const node: ModerationRuleNode = {
                 op: 'any',
-                terms: ['term1', 'term2'],
+                terms: [
+                    { term: 'term1', allow_digit_prefix: false },
+                    { term: 'term2', allow_digit_prefix: false },
+                ],
                 options: {},
             };
             const wrapper = mount(RuleEditor, {
@@ -190,7 +199,7 @@ describe('RuleEditor', () => {
         it('clears children when switching to term-based operation', async () => {
             const node: ModerationRuleNode = {
                 op: 'and',
-                children: [{ op: 'any', terms: ['test'] }],
+                children: [{ op: 'any', terms: [{ term: 'test', allow_digit_prefix: false }] }],
                 options: {},
             };
             const wrapper = mount(RuleEditor, {
@@ -211,7 +220,10 @@ describe('RuleEditor', () => {
         it('clears terms when switching to children-based operation', async () => {
             const node: ModerationRuleNode = {
                 op: 'any',
-                terms: ['test1', 'test2'],
+                terms: [
+                    { term: 'test1', allow_digit_prefix: false },
+                    { term: 'test2', allow_digit_prefix: false },
+                ],
                 options: {},
             };
             const wrapper = mount(RuleEditor, {
@@ -254,18 +266,23 @@ describe('RuleEditor', () => {
         it('updates case_sensitive option', async () => {
             const node: ModerationRuleNode = {
                 op: 'any',
-                terms: ['test'],
+                terms: [{ term: 'test', allow_digit_prefix: false }],
                 options: { case_sensitive: false, whole_word: true },
             };
             const wrapper = mount(RuleEditor, {
                 props: { modelValue: node },
             });
 
-            // Find the case sensitive switch
+            // Find the case sensitive switch - it's the first switch in the options section
+            // (there may be switches for allow_digit_prefix per term, so we need to find the right one)
             const switches = wrapper.findAllComponents({ name: 'Switch' });
-            const caseSensitiveSwitch = switches[0]; // First switch is case_sensitive
+            // The case_sensitive switch should be in the "Match Options" section, before whole_word
+            // Count switches: per-term switches come first, then case_sensitive, then whole_word
+            // For 1 term: switches[0] = allow_digit_prefix, switches[1] = case_sensitive, switches[2] = whole_word
+            const caseSensitiveSwitch = switches[1]; // Second switch is case_sensitive (after term's allow_digit_prefix)
             
             await caseSensitiveSwitch.vm.$emit('update:modelValue', true);
+            await nextTick();
 
             const emitted = wrapper.emitted('update:modelValue');
             expect(emitted).toBeTruthy();
@@ -276,7 +293,7 @@ describe('RuleEditor', () => {
         it('updates whole_word option', async () => {
             const node: ModerationRuleNode = {
                 op: 'any',
-                terms: ['test'],
+                terms: [{ term: 'test', allow_digit_prefix: false }],
                 options: { case_sensitive: false, whole_word: true },
             };
             const wrapper = mount(RuleEditor, {
@@ -284,9 +301,11 @@ describe('RuleEditor', () => {
             });
 
             const switches = wrapper.findAllComponents({ name: 'Switch' });
-            const wholeWordSwitch = switches[1]; // Second switch is whole_word
+            // For 1 term: switches[0] = allow_digit_prefix, switches[1] = case_sensitive, switches[2] = whole_word
+            const wholeWordSwitch = switches[2]; // Third switch is whole_word
             
             await wholeWordSwitch.vm.$emit('update:modelValue', false);
+            await nextTick();
 
             const emitted = wrapper.emitted('update:modelValue');
             expect(emitted).toBeTruthy();
@@ -323,8 +342,8 @@ describe('RuleEditor', () => {
             const node: ModerationRuleNode = {
                 op: 'and',
                 children: [
-                    { op: 'any', terms: ['test1'] },
-                    { op: 'all', terms: ['test2'] },
+                    { op: 'any', terms: [{ term: 'test1', allow_digit_prefix: false }] },
+                    { op: 'all', terms: [{ term: 'test2', allow_digit_prefix: false }] },
                 ],
                 options: {},
             };
@@ -353,7 +372,11 @@ describe('RuleEditor', () => {
         it('updates min value', async () => {
             const node: ModerationRuleNode = {
                 op: 'at_least',
-                terms: ['a', 'b', 'c'],
+                terms: [
+                    { term: 'a', allow_digit_prefix: false },
+                    { term: 'b', allow_digit_prefix: false },
+                    { term: 'c', allow_digit_prefix: false },
+                ],
                 min: 1,
                 options: {},
             };

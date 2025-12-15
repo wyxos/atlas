@@ -18,8 +18,15 @@ class ModerationRule extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'name', 'active', 'nsfw', 'op', 'terms', 'min', 'options', 'children',
+        'name', 'active', 'nsfw', 'action_type', 'op', 'terms', 'min', 'options', 'children',
     ];
+
+    /**
+     * Action type constants.
+     */
+    public const ACTION_UI_COUNTDOWN = 'ui_countdown';
+    public const ACTION_AUTO_DISLIKE = 'auto_dislike';
+    public const ACTION_BLACKLIST = 'blacklist';
 
     /**
      * Get the attributes that should be cast.

@@ -10,7 +10,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Delete local file after it has been auto-disliked by moderation rules.
+ * Delete local file from disk after it has been auto-disliked or blacklisted.
+ * Only deletes files that have a local path (downloaded files).
+ * File records are preserved in the database.
  *
  * This job runs asynchronously to avoid blocking the browse response.
  */

@@ -122,9 +122,18 @@ class Browser
 
         $persisted = app(BrowsePersister::class)->persist($filesPayload);
 
-        // Moderation: identify files that should be flagged for auto-dislike (UI handles countdown)
+        // Moderation: apply rules based on action_type
+        // - ui_countdown: flagged for UI countdown
+        // - auto_dislike: immediately auto-disliked
+        // - blacklist: immediately blacklisted
         $moderationResult = $this->moderateFiles(collect($persisted));
         $flaggedIds = $moderationResult['flaggedIds'];
+        $processedIds = $moderationResult['processedIds']; // Files immediately auto-disliked or blacklisted
+
+        // Filter out processed files (auto-disliked or blacklisted) from response
+        $persisted = collect($persisted)->reject(function ($file) use ($processedIds) {
+            return in_array($file->id, $processedIds, true);
+        })->values()->all();
 
         // Transform persisted files to items format for frontend
         // Pass flagged IDs so they get will_auto_dislike = true
@@ -142,6 +151,8 @@ class Browser
             'moderation' => [
                 'flagged_count' => count($flaggedIds),
                 'flagged_ids' => $flaggedIds,
+                'processed_count' => count($processedIds),
+                'processed_ids' => $processedIds,
             ],
             'error' => $serviceError,
             'services' => $servicesMeta,
