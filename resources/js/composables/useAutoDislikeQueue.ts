@@ -161,17 +161,13 @@ export function useAutoDislikeQueue(onExpire?: OnExpireCallback) {
 
         // Remove expired items and trigger callback
         if (expired.length > 0) {
-            console.log('[AutoDislikeQueue] Items expired:', expired);
             expired.forEach((fileId) => {
                 queue.value.delete(fileId);
             });
 
             // Call the onExpire callback with all expired file IDs
             if (onExpire) {
-                console.log('[AutoDislikeQueue] Calling onExpire callback...');
                 onExpire(expired);
-            } else {
-                console.warn('[AutoDislikeQueue] No onExpire callback registered!');
             }
         }
 
