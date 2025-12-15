@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
 import FileViewer from '../components/FileViewer.vue';
+import { useReactionQueue } from '../composables/useReactionQueue';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -134,9 +135,10 @@ describe('Browse - ALT + Click Reactions', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            expect(vm.queuedReactions.length).toBe(1);
-            expect(vm.queuedReactions[0].fileId).toBe(1);
-            expect(vm.queuedReactions[0].type).toBe('like');
+            const { queuedReactions } = useReactionQueue();
+            expect(queuedReactions.value.length).toBe(1);
+            expect(queuedReactions.value[0].fileId).toBe(1);
+            expect(queuedReactions.value[0].type).toBe('like');
 
             const fileViewer = wrapper.findComponent(FileViewer);
             const fileViewerVm = fileViewer.vm as any;
@@ -184,9 +186,10 @@ describe('Browse - ALT + Click Reactions', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            expect(vm.queuedReactions.length).toBe(1);
-            expect(vm.queuedReactions[0].fileId).toBe(2);
-            expect(vm.queuedReactions[0].type).toBe('dislike');
+            const { queuedReactions } = useReactionQueue();
+            expect(queuedReactions.value.length).toBe(1);
+            expect(queuedReactions.value[0].fileId).toBe(2);
+            expect(queuedReactions.value[0].type).toBe('dislike');
         }
     });
 
@@ -230,9 +233,10 @@ describe('Browse - ALT + Click Reactions', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            expect(vm.queuedReactions.length).toBe(1);
-            expect(vm.queuedReactions[0].fileId).toBe(3);
-            expect(vm.queuedReactions[0].type).toBe('love');
+            const { queuedReactions } = useReactionQueue();
+            expect(queuedReactions.value.length).toBe(1);
+            expect(queuedReactions.value[0].fileId).toBe(3);
+            expect(queuedReactions.value[0].type).toBe('love');
         }
     });
 
@@ -279,9 +283,10 @@ describe('Browse - ALT + Click Reactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        expect(vm.queuedReactions.length).toBe(1);
-        expect(vm.queuedReactions[0].fileId).toBe(1);
-        expect(vm.queuedReactions[0].type).toBe('like');
+        const { queuedReactions } = useReactionQueue();
+        expect(queuedReactions.value.length).toBe(1);
+        expect(queuedReactions.value[0].fileId).toBe(1);
+        expect(queuedReactions.value[0].type).toBe('like');
     });
 
     it('triggers dislike reaction when ALT + Right Click on overlay image', async () => {
@@ -327,9 +332,10 @@ describe('Browse - ALT + Click Reactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        expect(vm.queuedReactions.length).toBe(1);
-        expect(vm.queuedReactions[0].fileId).toBe(1);
-        expect(vm.queuedReactions[0].type).toBe('dislike');
+        const { queuedReactions } = useReactionQueue();
+        expect(queuedReactions.value.length).toBe(1);
+        expect(queuedReactions.value[0].fileId).toBe(1);
+        expect(queuedReactions.value[0].type).toBe('dislike');
     });
 
     it('triggers love reaction when ALT + Middle Click on overlay image', async () => {
@@ -375,9 +381,10 @@ describe('Browse - ALT + Click Reactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        expect(vm.queuedReactions.length).toBe(1);
-        expect(vm.queuedReactions[0].fileId).toBe(1);
-        expect(vm.queuedReactions[0].type).toBe('love');
+        const { queuedReactions } = useReactionQueue();
+        expect(queuedReactions.value.length).toBe(1);
+        expect(queuedReactions.value[0].fileId).toBe(1);
+        expect(queuedReactions.value[0].type).toBe('love');
     });
 
     it('does not trigger reaction when clicking without ALT key', async () => {
@@ -422,7 +429,8 @@ describe('Browse - ALT + Click Reactions', () => {
             await wrapper.vm.$nextTick();
 
             // No reaction should be queued when ALT key is not pressed
-            expect(vm.queuedReactions.length).toBe(0);
+            const { queuedReactions } = useReactionQueue();
+            expect(queuedReactions.value.length).toBe(0);
         }
     });
 });

@@ -1,38 +1,53 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { useReactionQueue } from '../composables/useReactionQueue';
-import SingleReactionToast from './toasts/SingleReactionToast.vue';
-import BatchReactionToast from './toasts/BatchReactionToast.vue';
 
-// Mock vue-toastification
+// Mock vue-toastification - must be hoisted before imports
 vi.mock('vue-toastification', () => {
     const toastIds = new Map();
     let nextId = 1;
-    
+
+    const toastFn = vi.fn((options: any) => {
+        const id = nextId++;
+        toastIds.set(id, options);
+        return id;
+    });
+
+    const updateFn = vi.fn((id: number | string, options: any) => {
+        if (toastIds.has(id)) {
+            toastIds.set(id, { ...toastIds.get(id), ...options });
+        }
+    });
+
+    const dismissFn = vi.fn((id: number | string) => {
+        toastIds.delete(id);
+    });
+
+    const clearFn = vi.fn(() => {
+        toastIds.clear();
+    });
+
+    // useToast returns a function that can be called directly (toast({...}))
+    // but also has methods like update, dismiss, clear
+    const useToastReturn = Object.assign(
+        toastFn,
+        {
+            update: updateFn,
+            dismiss: dismissFn,
+            clear: clearFn,
+        }
+    );
+
     return {
-        useToast: () => ({
-            toast: vi.fn((options: any) => {
-                const id = nextId++;
-                toastIds.set(id, options);
-                return id;
-            }),
-            update: vi.fn((id: number | string, options: any) => {
-                if (toastIds.has(id)) {
-                    toastIds.set(id, { ...toastIds.get(id), ...options });
-                }
-            }),
-            dismiss: vi.fn((id: number | string) => {
-                toastIds.delete(id);
-            }),
-            clear: vi.fn(() => {
-                toastIds.clear();
-            }),
-        }),
+        useToast: vi.fn(() => useToastReturn),
         POSITION: {
             BOTTOM_RIGHT: 'bottom-right',
         },
     };
 });
+
+import { useReactionQueue } from '../composables/useReactionQueue';
+import SingleReactionToast from './toasts/SingleReactionToast.vue';
+import BatchReactionToast from './toasts/BatchReactionToast.vue';
 
 describe('ReactionQueue Toast Integration', () => {
     beforeEach(() => {
@@ -152,6 +167,10 @@ describe('BatchReactionToast', () => {
                 countdown: 5,
                 timeoutId: null,
                 intervalId: null,
+                startTime: Date.now(),
+                pausedAt: null,
+                pausedRemaining: null,
+                executeCallback: async () => { },
             },
             {
                 id: '2-456',
@@ -161,6 +180,10 @@ describe('BatchReactionToast', () => {
                 countdown: 5,
                 timeoutId: null,
                 intervalId: null,
+                startTime: Date.now(),
+                pausedAt: null,
+                pausedRemaining: null,
+                executeCallback: async () => { },
             },
         ];
 
@@ -188,6 +211,10 @@ describe('BatchReactionToast', () => {
             countdown: 5,
             timeoutId: null,
             intervalId: null,
+            startTime: Date.now(),
+            pausedAt: null,
+            pausedRemaining: null,
+            executeCallback: async () => { },
         }));
 
         const wrapper = mount(BatchReactionToast, {
@@ -200,7 +227,9 @@ describe('BatchReactionToast', () => {
         });
 
         expect(wrapper.findAll('img')).toHaveLength(5);
-        expect(wrapper.html()).toContain('Plus');
+        // Check for the Plus icon component (lucide-vue-next renders it as an SVG with class containing "lucide-plus" or "lucide-plus-icon")
+        const plusIcon = wrapper.find('.lucide-plus, .lucide-plus-icon');
+        expect(plusIcon.exists()).toBe(true);
     });
 
     it('calls onCancelBatch when cancel button is clicked', async () => {
@@ -212,6 +241,10 @@ describe('BatchReactionToast', () => {
                 countdown: 5,
                 timeoutId: null,
                 intervalId: null,
+                startTime: Date.now(),
+                pausedAt: null,
+                pausedRemaining: null,
+                executeCallback: async () => { },
             },
         ];
 
