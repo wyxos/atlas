@@ -9,13 +9,18 @@ type PillVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 
  */
 export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     const hoveredContainerId = ref<number | null>(null);
+    const debouncedHoveredContainerId = ref<number | null>(null);
+
+    // Debounce hover state changes to reduce rapid recalculations (50ms delay)
+    let hoverDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const HOVER_DEBOUNCE_MS = 50;
 
     // Cache: Map<containerId, count> - O(1) lookup instead of O(n) iteration
     const containerCountCache = ref<Map<number, number>>(new Map());
-    
+
     // Cache: Map<containerId, containerType> - O(1) lookup for container type
     const containerTypeCache = ref<Map<number, string>>(new Map());
-    
+
     // Cache: Map<itemId, Set<containerId>> - O(1) lookup for item's containers
     const itemContainersCache = ref<Map<number, Set<number>>>(new Map());
 
@@ -33,12 +38,12 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
                 if (container?.id && container?.type) {
                     // Update count cache
                     countMap.set(container.id, (countMap.get(container.id) || 0) + 1);
-                    
+
                     // Update type cache (only store first occurrence, all should be same type)
                     if (!typeMap.has(container.id)) {
                         typeMap.set(container.id, container.type);
                     }
-                    
+
                     // Track this container for this item
                     itemContainerIds.add(container.id);
                 }
@@ -131,29 +136,55 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     }
 
     // Get the variant for the hovered container type - O(1) lookup from cache
+    // Uses debounced value to avoid rapid recalculations
     function getHoveredContainerVariant(): PillVariant | null {
-        if (hoveredContainerId.value === null) {
+        const hoveredId = debouncedHoveredContainerId.value;
+        if (hoveredId === null) {
             return null;
         }
-        const containerType = containerTypeCache.value.get(hoveredContainerId.value);
+        const containerType = containerTypeCache.value.get(hoveredId);
         if (containerType) {
             return getVariantForContainerType(containerType);
         }
         return null;
     }
 
-    // Get classes for masonry item based on hover state
+    // Debounced setter for hovered container ID
+    function setHoveredContainerId(containerId: number | null): void {
+        hoveredContainerId.value = containerId;
+
+        // Clear existing timer
+        if (hoverDebounceTimer) {
+            clearTimeout(hoverDebounceTimer);
+        }
+
+        // If setting to null, update immediately (no debounce for clearing)
+        if (containerId === null) {
+            debouncedHoveredContainerId.value = null;
+            hoverDebounceTimer = null;
+            return;
+        }
+
+        // Debounce setting a container ID
+        hoverDebounceTimer = setTimeout(() => {
+            debouncedHoveredContainerId.value = containerId;
+            hoverDebounceTimer = null;
+        }, HOVER_DEBOUNCE_MS);
+    }
+
+    // Get classes for masonry item based on hover state (uses debounced value)
     const getMasonryItemClasses = computed(() => (item: MasonryItem) => {
         const classes: string[] = [];
+        const hoveredId = debouncedHoveredContainerId.value;
 
-        if (hoveredContainerId.value !== null && isSiblingItem(item, hoveredContainerId.value)) {
+        if (hoveredId !== null && isSiblingItem(item, hoveredId)) {
             const variant = getHoveredContainerVariant() || 'primary';
             classes.push(`border-2 ${getBorderColorClassForVariant(variant)}`);
         } else {
             classes.push('border-2 border-transparent');
         }
 
-        if (hoveredContainerId.value !== null && !isSiblingItem(item, hoveredContainerId.value)) {
+        if (hoveredId !== null && !isSiblingItem(item, hoveredId)) {
             classes.push('opacity-50');
         } else {
             classes.push('opacity-100');
@@ -164,6 +195,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
 
     return {
         hoveredContainerId,
+        setHoveredContainerId,
         getContainersForItem,
         getItemCountForContainerId,
         getVariantForContainerType,
