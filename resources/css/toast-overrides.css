@@ -1,0 +1,30 @@
+/* Override vue-toastification styles to ensure custom components render properly */
+.Vue-Toastification__toast-component-body {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100%;
+    display: block;
+}
+
+.Vue-Toastification__toast.p-0 {
+    padding: 0 !important;
+}
+
+.Vue-Toastification__toast.m-0 {
+    margin: 0 !important;
+}
+
+.Vue-Toastification__toast-body.p-0 {
+    padding: 0 !important;
+}
+
+.Vue-Toastification__toast-body.m-0 {
+    margin: 0 !important;
+}
+
+/* Ensure custom component content is visible */
+.Vue-Toastification__toast-component-body > * {
+    display: block;
+    width: 100%;
+}
+

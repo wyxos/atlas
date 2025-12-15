@@ -173,10 +173,13 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     }
 
     // Get classes for masonry item based on hover state (uses debounced value)
+    // Optimized: Only changes opacity (compositor-friendly) and border (instant, no transition)
     const getMasonryItemClasses = computed(() => (item: MasonryItem) => {
         const classes: string[] = [];
         const hoveredId = debouncedHoveredContainerId.value;
 
+        // Border changes are instant (no transition) for performance
+        // Using border instead of box-shadow to avoid additional rendering cost
         if (hoveredId !== null && isSiblingItem(item, hoveredId)) {
             const variant = getHoveredContainerVariant() || 'primary';
             classes.push(`border-2 ${getBorderColorClassForVariant(variant)}`);
@@ -184,6 +187,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
             classes.push('border-2 border-transparent');
         }
 
+        // Opacity changes are smooth (compositor-friendly transition)
         if (hoveredId !== null && !isSiblingItem(item, hoveredId)) {
             classes.push('opacity-50');
         } else {
