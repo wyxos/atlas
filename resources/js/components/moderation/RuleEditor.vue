@@ -68,15 +68,45 @@ function updateOp(newOp: ModerationRuleOp): void {
 }
 
 // Terms management
+// Terms can be strings or objects with {term: string, allow_digit_prefix: boolean}
+function normalizeTerm(term: any): { term: string; allow_digit_prefix: boolean } {
+    if (typeof term === 'string') {
+        return { term, allow_digit_prefix: false };
+    }
+    if (typeof term === 'object' && term !== null && 'term' in term) {
+        return {
+            term: String(term.term ?? ''),
+            allow_digit_prefix: Boolean(term.allow_digit_prefix ?? false),
+        };
+    }
+    return { term: '', allow_digit_prefix: false };
+}
+
+function getTermValue(term: any): string {
+    return normalizeTerm(term).term;
+}
+
+function getTermAllowDigitPrefix(term: any): boolean {
+    return normalizeTerm(term).allow_digit_prefix;
+}
+
 function addTerm(): void {
     const terms = Array.isArray(node.value.terms) ? [...node.value.terms] : [];
-    terms.push('');
+    terms.push({ term: '', allow_digit_prefix: false });
     update('terms', terms);
 }
 
 function updateTerm(idx: number, value: string): void {
     const terms = Array.isArray(node.value.terms) ? [...node.value.terms] : [];
-    terms[idx] = value;
+    const current = normalizeTerm(terms[idx]);
+    terms[idx] = { term: value, allow_digit_prefix: current.allow_digit_prefix };
+    update('terms', terms);
+}
+
+function updateTermAllowDigitPrefix(idx: number, checked: boolean): void {
+    const terms = Array.isArray(node.value.terms) ? [...node.value.terms] : [];
+    const current = normalizeTerm(terms[idx]);
+    terms[idx] = { term: current.term, allow_digit_prefix: checked };
     update('terms', terms);
 }
 
@@ -172,11 +202,20 @@ function removeChild(idx: number): void {
                     class="flex items-center gap-2"
                 >
                     <Input
-                        :model-value="term"
+                        :model-value="getTermValue(term)"
                         @update:model-value="(v) => updateTerm(idx, String(v ?? ''))"
                         placeholder="Enter term..."
                         class="flex-1 bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100 placeholder:text-twilight-indigo-400"
                     />
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer shrink-0">
+                        <Switch
+                            :model-value="getTermAllowDigitPrefix(term)"
+                            @update:model-value="(v) => updateTermAllowDigitPrefix(idx, v)"
+                        />
+                        <span class="text-xs text-twilight-indigo-300 whitespace-nowrap" title="Allow digit prefix (e.g., '2cars', '3cars' matches 'car')">
+                            # prefix
+                        </span>
+                    </label>
                     <Button
                         type="button"
                         variant="destructive"

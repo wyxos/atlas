@@ -18,15 +18,25 @@ export interface ModerationRuleOptions {
 }
 
 /**
+ * Term can be a string or an object with term and allow_digit_prefix flag.
+ */
+export type ModerationRuleTerm = string | { term: string; allow_digit_prefix?: boolean };
+
+/**
  * A node structure for nested rule logic (used in 'and'/'or' operations).
  */
 export interface ModerationRuleNode {
     op: ModerationRuleOp;
-    terms?: string[];
+    terms?: ModerationRuleTerm[];
     min?: number;
     options?: ModerationRuleOptions;
     children?: ModerationRuleNode[];
 }
+
+/**
+ * Action type for moderation rules.
+ */
+export type ModerationRuleActionType = 'ui_countdown' | 'auto_dislike' | 'blacklist';
 
 /**
  * The main ModerationRule interface representing a database record.
@@ -36,8 +46,9 @@ export interface ModerationRule {
     name: string | null;
     active: boolean;
     nsfw: boolean;
+    action_type: ModerationRuleActionType;
     op: ModerationRuleOp;
-    terms: string[] | null;
+    terms: ModerationRuleTerm[] | null;
     min: number | null;
     options: ModerationRuleOptions | null;
     children: ModerationRuleNode[] | null;
@@ -52,8 +63,9 @@ export interface CreateModerationRulePayload {
     name?: string | null;
     active?: boolean;
     nsfw?: boolean;
+    action_type?: ModerationRuleActionType;
     op: ModerationRuleOp;
-    terms?: string[] | null;
+    terms?: ModerationRuleTerm[] | null;
     min?: number | null;
     options?: ModerationRuleOptions | null;
     children?: ModerationRuleNode[] | null;
@@ -66,8 +78,9 @@ export interface UpdateModerationRulePayload {
     name?: string | null;
     active?: boolean;
     nsfw?: boolean;
+    action_type?: ModerationRuleActionType;
     op?: ModerationRuleOp;
-    terms?: string[] | null;
+    terms?: ModerationRuleTerm[] | null;
     min?: number | null;
     options?: ModerationRuleOptions | null;
     children?: ModerationRuleNode[] | null;

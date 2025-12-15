@@ -4,6 +4,7 @@ import { Shield, Plus, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
@@ -17,6 +18,7 @@ import type {
     ModerationRule,
     ModerationRuleNode,
     ModerationRuleOp,
+    ModerationRuleActionType,
     CreateModerationRulePayload,
 } from '@/types/moderation';
 
@@ -56,8 +58,9 @@ interface ModerationRuleForm {
     name: string;
     active: boolean;
     nsfw: boolean;
+    action_type: ModerationRuleActionType;
     op: ModerationRuleOp;
-    terms: string[];
+    terms: ModerationRuleTerm[];
     min: number | null;
     options: { case_sensitive: boolean; whole_word: boolean };
     children: ModerationRuleNode[];
@@ -68,6 +71,7 @@ function defaultRuleForm(): ModerationRuleForm {
         name: '',
         active: true,
         nsfw: false,
+        action_type: 'ui_countdown',
         op: 'any',
         terms: [],
         min: null,
@@ -82,6 +86,7 @@ function ruleToForm(rule: ModerationRule): ModerationRuleForm {
         name: rule.name ?? '',
         active: rule.active,
         nsfw: rule.nsfw,
+        action_type: rule.action_type ?? 'ui_countdown',
         op: rule.op,
         terms: rule.terms ?? [],
         min: rule.min,
@@ -144,6 +149,7 @@ async function saveRule(): Promise<void> {
             name: ruleForm.value.name || null,
             active: ruleForm.value.active,
             nsfw: ruleForm.value.nsfw,
+            action_type: ruleForm.value.action_type,
             op: ruleForm.value.op,
             terms: ['any', 'all', 'not_any', 'at_least'].includes(ruleForm.value.op)
                 ? ruleForm.value.terms
@@ -279,6 +285,38 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
                                         <Switch v-model="ruleForm.nsfw" />
                                         <span class="text-sm text-twilight-indigo-200">NSFW</span>
                                     </label>
+                                </div>
+
+                                <!-- Action Type -->
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium text-regal-navy-100">Action Type</label>
+                                    <Select v-model="ruleForm.action_type">
+                                        <SelectTrigger class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ui_countdown">
+                                                UI Countdown (5s delay)
+                                            </SelectItem>
+                                            <SelectItem value="auto_dislike">
+                                                Immediate Auto-Dislike
+                                            </SelectItem>
+                                            <SelectItem value="blacklist">
+                                                Immediate Blacklist
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p class="text-xs text-twilight-indigo-400">
+                                        <span v-if="ruleForm.action_type === 'ui_countdown'">
+                                            Files matching this rule will show a 5-second countdown before being auto-disliked.
+                                        </span>
+                                        <span v-else-if="ruleForm.action_type === 'auto_dislike'">
+                                            Files matching this rule will be immediately auto-disliked and removed from results.
+                                        </span>
+                                        <span v-else>
+                                            Files matching this rule will be immediately blacklisted and removed from results.
+                                        </span>
+                                    </p>
                                 </div>
 
                                 <!-- Rule Editor -->
