@@ -25,8 +25,12 @@ vi.mock('@/composables/useContainerBadges', () => {
     return {
         useContainerBadges: vi.fn((itemsRef: any) => {
             const hoveredContainerId = ref(null);
+            const setHoveredContainerId = vi.fn((id: number | null) => {
+                hoveredContainerId.value = id;
+            });
             return {
                 hoveredContainerId,
+                setHoveredContainerId,
                 getContainersForItem: (item: any) => {
                     const containers = (item as any).containers || [];
                     return containers.filter((c: any) => c?.id && c?.type);

@@ -512,6 +512,16 @@ async function loadNextPage(): Promise<void> {
     }
 }
 
+// Remove item from masonry using Map lookup
+function removeItemFromMasonry(item: MasonryItem): void {
+    if (masonry.value?.remove) {
+        const masonryItem = itemsMap.value.get(item.id);
+        if (masonryItem) {
+            masonry.value.remove(masonryItem);
+        }
+    }
+}
+
 // Refresh/reload the tab
 async function refreshTab(): Promise<void> {
     if (!props.tab) {
@@ -709,7 +719,7 @@ onUnmounted(() => {
                     <template #default="{ item, index, remove }">
                         <VibeMasonryItem :item="item" :remove="remove"
                             @mouseenter="() => { hoveredItemIndex = index; if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.freeze(); } }"
-                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.hoveredContainerId.value = null; if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.unfreeze(); } }"
+                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.setHoveredContainerId(null); if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.unfreeze(); } }"
                             @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
                                 // payload.item is the item passed to MasonryItem, which should have the id
                                 const itemId = payload.item?.id ?? item?.id;
@@ -809,8 +819,8 @@ onUnmounted(() => {
                                         class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
                                         <div v-for="container in containerBadges.getContainersForItem(item)"
                                             :key="container.id" class="cursor-pointer"
-                                            @mouseenter="() => { containerBadges.hoveredContainerId.value = container.id; }"
-                                            @mouseleave="() => { containerBadges.hoveredContainerId.value = null; }"
+                                            @mouseenter="() => { containerBadges.setHoveredContainerId(container.id); }"
+                                            @mouseleave="() => { containerBadges.setHoveredContainerId(null); }"
                                             @click.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e)"
                                             @dblclick.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e, true)"
                                             @contextmenu.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e)"
@@ -861,16 +871,9 @@ onUnmounted(() => {
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :has-more="nextCursor !== null" :is-loading="masonry?.isLoading ?? false"
-            :on-load-more="handleCarouselLoadMore" :on-reaction="props.onReaction"             :remove-from-masonry="(item) => {
-                // Use masonry's remove method directly - use Map for O(1) lookup
-                if (masonry.value?.remove) {
-                    const masonryItem = itemsMap.value.get(item.id);
-                    if (masonryItem) {
-                        masonry.value.remove(masonryItem);
-                    }
-                }
-            }" :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
-            @close="() => { }" />
+            :on-load-more="handleCarouselLoadMore" :on-reaction="props.onReaction"
+            :remove-from-masonry="removeItemFromMasonry" :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id"
+            :masonry-instance="masonry" @close="() => { }" />
 
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
