@@ -26,11 +26,11 @@ withDefaults(defineProps<Props>(), {
 <template>
     <div v-if="visible"
         class="my-2 flex flex-wrap items-center justify-center gap-3" data-test="pagination-info">
-        <!-- Queued Reactions Pill -->
-        <Pill v-if="queuedReactionsCount > 0" label="Queued" :value="queuedReactionsCount" variant="warning" reversed
+        <!-- User Reactions Queue Pill (user-initiated: love, like, dislike, funny) -->
+        <Pill label="Reactions" :value="queuedReactionsCount || 'None'" :variant="queuedReactionsCount > 0 ? 'warning' : 'neutral'" reversed
             data-test="queued-reactions-pill" />
-        <!-- Auto-Dislike Queue Pill (includes both moderation rules and container blacklists) -->
-        <Pill v-if="queuedAutoDislikeCount > 0" label="Dislike" :value="queuedAutoDislikeCount" variant="danger" reversed
+        <!-- Auto-Dislike Queue Pill (automatic from moderation rules and container blacklists) -->
+        <Pill label="Auto-Dislike" :value="queuedAutoDislikeCount || 'None'" :variant="queuedAutoDislikeCount > 0 ? 'danger' : 'neutral'" reversed
             data-test="auto-dislike-queue-pill" />
         <!-- Count Pill -->
         <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
@@ -51,53 +51,65 @@ withDefaults(defineProps<Props>(), {
             </template>
         </Pill>
         <!-- Backfill Progress Pills -->
-        <span v-if="backfill.active"
-            class="inline-flex items-stretch rounded overflow-hidden border border-warning-500"
+        <span
+            class="inline-flex items-stretch rounded overflow-hidden border"
+            :class="backfill.active ? 'border-warning-500' : 'border-twilight-indigo-500/30'"
             data-test="backfill-active-pill">
             <span
-                class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
-                <Loader2 :size="14" class="animate-spin" />
-                <span>{{ backfill.waiting ? 'Waiting' : 'Filling' }}</span>
+                class="px-3 py-1 text-xs font-medium transition-colors flex items-center gap-2"
+                :class="backfill.active ? 'bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500' : 'bg-prussian-blue-700/50 text-twilight-indigo-400 border-r border-twilight-indigo-500/30'">
+                <Loader2 v-if="backfill.active" :size="14" class="animate-spin" />
+                <span>{{ backfill.active ? (backfill.waiting ? 'Waiting' : 'Filling') : 'Backfill' }}</span>
             </span>
             <span
-                class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex items-center gap-3">
-                <span v-if="!backfill.waiting">
-                    {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} calls)
-                </span>
-                <template v-else>
-                    <div class="h-2 w-20 overflow-hidden rounded bg-muted">
-                        <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
-                            width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
-                        }" />
-                    </div>
-                    <span class="text-xs text-warning-100">next in {{ (backfill.waitRemainingMs /
-                        1000).toFixed(1) }}s</span>
+                class="px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-3"
+                :class="backfill.active ? 'bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100' : 'bg-prussian-blue-700/30 text-twilight-indigo-400'">
+                <template v-if="backfill.active">
+                    <span v-if="!backfill.waiting">
+                        {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} calls)
+                    </span>
+                    <template v-else>
+                        <div class="h-2 w-20 overflow-hidden rounded bg-muted">
+                            <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
+                                width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
+                            }" />
+                        </div>
+                        <span class="text-xs text-warning-100">next in {{ (backfill.waitRemainingMs /
+                            1000).toFixed(1) }}s</span>
+                    </template>
                 </template>
+                <span v-else class="text-xs">Inactive</span>
             </span>
         </span>
-        <span v-if="backfill.retryActive"
-            class="inline-flex items-stretch rounded overflow-hidden border border-warning-500"
+        <span
+            class="inline-flex items-stretch rounded overflow-hidden border"
+            :class="backfill.retryActive ? 'border-warning-500' : 'border-twilight-indigo-500/30'"
             data-test="backfill-retry-pill">
             <span
-                class="px-3 py-1 text-xs font-medium transition-colors bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500 flex items-center gap-2">
-                <Loader2 :size="14" class="animate-spin" />
+                class="px-3 py-1 text-xs font-medium transition-colors flex items-center gap-2"
+                :class="backfill.retryActive ? 'bg-warning-600 hover:bg-warning-500 text-black border-r border-warning-500' : 'bg-prussian-blue-700/50 text-twilight-indigo-400 border-r border-twilight-indigo-500/30'">
+                <Loader2 v-if="backfill.retryActive" :size="14" class="animate-spin" />
                 <span>Retry</span>
             </span>
             <span
-                class="px-3 py-1 text-xs font-semibold transition-colors bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100 flex items-center gap-3">
-                <div class="h-2 w-20 overflow-hidden rounded bg-muted">
-                    <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
-                        width:
-                            Math.max(
-                                0,
-                                100 - Math.round((backfill.retryWaitRemainingMs / Math.max(1, backfill.retryWaitTotalMs)) * 100),
-                            ) + '%',
-                    }" />
-                </div>
-                <span class="text-xs text-warning-100">
-                    retry {{ backfill.retryAttempt }} / {{ backfill.retryMax }} in {{
-                        (backfill.retryWaitRemainingMs / 1000).toFixed(1) }}s
-                </span>
+                class="px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-3"
+                :class="backfill.retryActive ? 'bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100' : 'bg-prussian-blue-700/30 text-twilight-indigo-400'">
+                <template v-if="backfill.retryActive">
+                    <div class="h-2 w-20 overflow-hidden rounded bg-muted">
+                        <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
+                            width:
+                                Math.max(
+                                    0,
+                                    100 - Math.round((backfill.retryWaitRemainingMs / Math.max(1, backfill.retryWaitTotalMs)) * 100),
+                                ) + '%',
+                        }" />
+                    </div>
+                    <span class="text-xs text-warning-100">
+                        retry {{ backfill.retryAttempt }} / {{ backfill.retryMax }} in {{
+                            (backfill.retryWaitRemainingMs / 1000).toFixed(1) }}s
+                    </span>
+                </template>
+                <span v-else class="text-xs">Inactive</span>
             </span>
         </span>
     </div>
