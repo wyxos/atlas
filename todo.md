@@ -6,9 +6,12 @@
       - handle refresh page instead of backfill
       - auto blacklist if preview count >= 5 while disliked
     - handle video
+    - preload next items in fileviewer
     - restore scout
     - restore horizon
     - download manager
+    - filter dynamic/defined by service class
+    - 
 
 - implement file listing
     - view
