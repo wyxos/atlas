@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { X } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
 
 type PillVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 type PillSize = 'sm' | 'default' | 'lg';
+
+type DismissStyle = 'default' | 'danger';
 
 const props = withDefaults(
     defineProps<{
@@ -12,7 +16,7 @@ const props = withDefaults(
         variant?: PillVariant;
         size?: PillSize;
         reversed?: boolean;
-        dismissible?: boolean;
+        dismissible?: boolean | DismissStyle;
     }>(),
     {
         variant: 'primary',
@@ -139,18 +143,43 @@ const valueClasses = computed(() => {
     return `${base} ${bg} ${hover} ${text} ${border}`;
 });
 
-const dismissHoverClasses = {
-    primary: 'hover:bg-smart-blue-600/40',
-    secondary: 'hover:bg-sapphire-600/40',
-    success: 'hover:bg-success-600/40',
-    warning: 'hover:bg-warning-600/40',
-    danger: 'hover:bg-danger-600/40',
-    info: 'hover:bg-info-600/40',
-    neutral: 'hover:bg-prussian-blue-600/60',
-};
+const isDismissible = computed(() => {
+    return props.dismissible !== false;
+});
 
-const dismissClasses = computed(() => {
-    return `px-2 ${size.value.text} font-bold border-l ${variant.value.borderSide} bg-transparent text-twilight-indigo-300 ${dismissHoverClasses[props.variant]} hover:text-twilight-indigo-100 transition-colors`;
+const dismissStyle = computed(() => {
+    return props.dismissible === true ? 'default' : (props.dismissible as DismissStyle);
+});
+
+const dismissButtonVariant = computed(() => {
+    return dismissStyle.value === 'danger' ? 'destructive' : 'ghost';
+});
+
+const dismissButtonSize = computed(() => {
+    if (props.size === 'sm') return 'icon-sm';
+    if (props.size === 'lg') return 'icon-lg';
+    return 'icon';
+});
+
+const dismissButtonClasses = computed(() => {
+    // Override Button component's fixed icon sizes to stretch with pill
+    const base = `${size.value.text} font-bold border-l transition-colors rounded-none h-auto self-stretch flex items-center justify-center`;
+    
+    if (dismissStyle.value === 'danger') {
+        return `${base} border-danger-500 px-2`;
+    }
+    
+    const hoverClasses = {
+        primary: 'hover:bg-smart-blue-600/40',
+        secondary: 'hover:bg-sapphire-600/40',
+        success: 'hover:bg-success-600/40',
+        warning: 'hover:bg-warning-600/40',
+        danger: 'hover:bg-danger-600/40',
+        info: 'hover:bg-info-600/40',
+        neutral: 'hover:bg-prussian-blue-600/60',
+    };
+    
+    return `${base} ${variant.value.borderSide} ${hoverClasses[props.variant]} hover:text-twilight-indigo-100 px-2`;
 });
 
 function handleDismiss(): void {
@@ -171,15 +200,17 @@ function handleDismiss(): void {
         </span>
 
         <!-- Dismiss button -->
-        <button
-            v-if="dismissible"
-            type="button"
-            aria-label="Remove"
-            :class="dismissClasses"
-            @click="handleDismiss"
+        <Button
+            v-if="isDismissible"
+            :variant="dismissButtonVariant"
+            :size="dismissButtonSize"
+            :class="dismissButtonClasses"
+            :aria-label="dismissStyle === 'danger' ? 'Ban container' : 'Remove'"
+            @click.stop="handleDismiss"
         >
-            ×
-        </button>
+            <X v-if="dismissStyle === 'danger'" :size="12" />
+            <span v-else>×</span>
+        </Button>
     </span>
 </template>
 

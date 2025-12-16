@@ -73,5 +73,16 @@ abstract class BaseService
     {
         return true;
     }
-}
 
+    /**
+     * Get the container types that are eligible for blacklisting.
+     * Services should override this to define which container types can be blacklisted.
+     * For example, users and models can be blacklisted, but posts cannot.
+     *
+     * @return array<string> Array of container type strings (e.g., ['user', 'model'])
+     */
+    public function getBlacklistableContainerTypes(): array
+    {
+        return [];
+    }
+}

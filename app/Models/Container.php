@@ -15,10 +15,24 @@ class Container extends Model
         'source',
         'source_id',
         'referrer',
+        'action_type',
+        'blacklisted_at',
     ];
 
     public function files(): BelongsToMany
     {
         return $this->belongsToMany(File::class);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'blacklisted_at' => 'datetime',
+        ];
     }
 }
