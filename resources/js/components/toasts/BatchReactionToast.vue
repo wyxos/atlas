@@ -67,16 +67,49 @@ const emit = defineEmits<{
         @mouseleave="handleMouseLeave"
         class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm">
         <div class="flex items-center gap-3 mb-2">
-            <!-- Multiple Preview Images (up to 5, then plus icon) -->
-            <div class="flex items-center gap-1 shrink-0">
-                <div v-for="(reaction, index) in reactions.slice(0, 5)" :key="reaction.id"
-                    class="relative">
-                    <img v-if="reaction.previewUrl" :src="reaction.previewUrl"
-                        :alt="`File #${reaction.fileId}`"
+            <!-- Multiple Preview Images (up to 5, then plus icon) - stacked with overlapping effect -->
+            <div class="relative shrink-0" style="width: 40px; height: 40px;">
+                <!-- Fifth preview (10% visible, behind everything) - offset by 90% (36px) -->
+                <div v-if="reactions.length > 4 && reactions[4].previewUrl"
+                    class="absolute top-0 left-0 z-[1]"
+                    style="transform: translateX(36px);">
+                    <img :src="reactions[4].previewUrl"
+                        :alt="`File #${reactions[4].fileId}`"
                         class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
                 </div>
+                <!-- Fourth preview (30% visible, behind third) - offset by 70% (28px) -->
+                <div v-if="reactions.length > 3 && reactions[3].previewUrl"
+                    class="absolute top-0 left-0 z-[2]"
+                    style="transform: translateX(28px);">
+                    <img :src="reactions[3].previewUrl"
+                        :alt="`File #${reactions[3].fileId}`"
+                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                </div>
+                <!-- Third preview (50% visible, behind second) - offset by 50% (20px) -->
+                <div v-if="reactions.length > 2 && reactions[2].previewUrl"
+                    class="absolute top-0 left-0 z-[3]"
+                    style="transform: translateX(20px);">
+                    <img :src="reactions[2].previewUrl"
+                        :alt="`File #${reactions[2].fileId}`"
+                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                </div>
+                <!-- Second preview (70% visible, behind first) - offset by 30% (12px) -->
+                <div v-if="reactions.length > 1 && reactions[1].previewUrl"
+                    class="absolute top-0 left-0 z-[4]"
+                    style="transform: translateX(12px);">
+                    <img :src="reactions[1].previewUrl"
+                        :alt="`File #${reactions[1].fileId}`"
+                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                </div>
+                <!-- First preview (100% visible, on top) - no offset -->
+                <div v-if="reactions.length > 0 && reactions[0].previewUrl" class="relative z-[5]">
+                    <img :src="reactions[0].previewUrl"
+                        :alt="`File #${reactions[0].fileId}`"
+                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                </div>
+                <!-- Plus icon for additional items (if more than 5) -->
                 <div v-if="reactions.length > 5"
-                    class="w-10 h-10 rounded border border-smart-blue-500/30 bg-smart-blue-500/20 flex items-center justify-center">
+                    class="absolute top-0 left-0 z-0 w-10 h-10 rounded border border-smart-blue-500/30 bg-smart-blue-500/20 flex items-center justify-center">
                     <Plus :size="16" class="text-smart-blue-400" />
                 </div>
             </div>
