@@ -66,20 +66,20 @@ const emit = defineEmits<{
         class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm">
         <div class="flex items-center gap-3 mb-2">
             <!-- Multiple Preview Images (up to 5, then plus icon) - stacked with overlapping effect -->
-           <div class="flex gap-2 items-center">
-               <div class="stacked-images">
-                   <template v-for="(reaction, index) in reactions.slice(0, 5)" :key="reaction.fileId">
-                       <div v-if="reaction.previewUrl" class="stacked-image">
-                           <img :src="reaction.previewUrl" :alt="`File #${reaction.fileId}`" />
-                       </div>
-                   </template>
-               </div>
+            <div class="flex gap-2 items-center">
+                <div class="stacked-images">
+                    <template v-for="(reaction, index) in reactions.slice(0, 5)" :key="reaction.fileId">
+                        <div v-if="reaction.previewUrl" class="stacked-image">
+                            <img :src="reaction.previewUrl" :alt="`File #${reaction.fileId}`" />
+                        </div>
+                    </template>
+                </div>
 
-               <!-- Plus icon for additional items (if more than 5) -->
-               <div v-if="reactions.length > 5" class="stacked-image-plus">
-                   <Plus :size="16" class="text-smart-blue-400" />
-               </div>
-           </div>
+                <!-- Plus icon for additional items (if more than 5) -->
+                <div v-if="reactions.length > 5" class="stacked-image-plus">
+                    <Plus :size="16" class="text-smart-blue-400" />
+                </div>
+            </div>
 
             <div class="flex-1 flex gap-4 min-w-0">
                 <!-- Reaction Icon -->
@@ -109,103 +109,75 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
+@reference "../../../css/app.css";
+
 .stacked-images {
     --s: 64px;
     /* image size (w-16 = 4rem = 64px) */
-    display: flex;
-    align-items: center;
-    position: relative;
+    @apply flex items-center relative;
 }
 
 .stacked-image {
-    position: relative;
-    flex-shrink: 0;
+    @apply relative shrink-0;
 }
 
 .stacked-image img {
     width: var(--s);
     height: var(--s);
-    object-fit: cover;
-    border-radius: 0.25rem;
-    display: block;
+    @apply object-cover rounded block;
 }
 
 /* First image (100% visible) - on top */
 .stacked-image:first-child {
-    z-index: 5;
+    @apply z-[5];
 }
 
 .stacked-image:first-child img {
-    border: 2px solid rgb(59 130 246 / 1);
-    /* border-smart-blue-500 */
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    /* shadow-lg */
+    @apply border-2 border-smart-blue-500 shadow-lg;
 }
 
 /* Second image (70% visible) - translate back 30% */
 .stacked-image:nth-child(2) {
-    z-index: 4;
+    @apply z-[4];
     margin-left: calc(var(--s) * -0.3);
 }
 
 .stacked-image:nth-child(2) img {
-    border: 1px solid rgb(59 130 246 / 0.5);
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    /* shadow-md */
-    opacity: 0.9;
+    @apply border border-smart-blue-500/50 shadow-md opacity-90;
 }
 
 /* Third image (50% visible) - translate back 50% */
 .stacked-image:nth-child(3) {
-    z-index: 3;
+    @apply z-[3];
     margin-left: calc(var(--s) * -0.5);
 }
 
 .stacked-image:nth-child(3) img {
-    border: 1px solid rgb(59 130 246 / 0.4);
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    /* shadow */
-    opacity: 0.8;
+    @apply border border-smart-blue-500/40 shadow opacity-80;
 }
 
 /* Fourth image (30% visible) - translate back 70% */
 .stacked-image:nth-child(4) {
-    z-index: 2;
+    @apply z-[2];
     margin-left: calc(var(--s) * -0.7);
 }
 
 .stacked-image:nth-child(4) img {
-    border: 1px solid rgb(59 130 246 / 0.3);
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    /* shadow-sm */
-    opacity: 0.7;
+    @apply border border-smart-blue-500/30 shadow-sm opacity-70;
 }
 
 /* Fifth image (10% visible) - translate back 90% */
 .stacked-image:nth-child(5) {
-    z-index: 1;
+    @apply z-[1];
     margin-left: calc(var(--s) * -0.9);
 }
 
 .stacked-image:nth-child(5) img {
-    border: 1px solid rgb(59 130 246 / 0.2);
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    /* shadow-sm */
-    opacity: 0.6;
+    @apply border border-smart-blue-500/20 shadow-sm opacity-60;
 }
 
 /* Plus icon */
 .stacked-image-plus {
-    position: relative;
-    z-index: 0;
-    width: 80px;
-    height: 80px;
-    border-radius: 0.25rem;
-    border: 1px solid rgb(59 130 246 / 0.3);
-    background-color: rgb(59 130 246 / 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: calc(var(--s) * -0.9);
+    @apply relative z-0 rounded border border-smart-blue-500/30 bg-smart-blue-500/20 flex items-center justify-center w-10 h-10;
 }
 </style>
