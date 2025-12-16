@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
+import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
 import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
@@ -17,7 +18,6 @@ import {
     DialogTitle,
     DialogClose,
 } from './ui/dialog';
-import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
 import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
@@ -36,6 +36,7 @@ import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useItemVirtualization } from '@/composables/useItemVirtualization';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
+import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import { analyzeItemSizes, logItemSizeDiagnostics, createMinimalItems, compareItemPerformance } from '@/utils/itemSizeDiagnostics';
 
 type GetPageResult = {
@@ -113,6 +114,7 @@ const itemPreview = useItemPreview(items, computed(() => props.tab));
 const isMounted = ref(false);
 
 // Auto-dislike queue composable with expiration handler
+// This handles both moderation rules and container blacklists (both flag files for countdown)
 const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
 
 // Item virtualization composable - loads minimal items initially, then full data on-demand
@@ -146,18 +148,13 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
 
         const autoDislikedIds = response.data.file_ids;
 
-        // Remove from masonry - use Map for O(1) lookup
-        const itemsToRemove: MasonryItem[] = [];
-        for (const fileId of autoDislikedIds) {
-            const item = itemsMap.value.get(fileId);
-            if (item) {
-                itemsToRemove.push(item);
-            }
-        }
+        // Remove from masonry - get items directly from items array (not itemsMap) to ensure correct references
+        // This matches the pattern used in container pill interactions for correct FLIP animations
+        const itemsToRemove: MasonryItem[] = items.value.filter((item) => autoDislikedIds.includes(item.id));
 
         // Remove from masonry using removeMany for batch removal
         // Masonry component manages items array through v-model, so no manual array manipulation needed
-        if (masonry.value?.removeMany) {
+        if (masonry.value?.removeMany && itemsToRemove.length > 0) {
             await masonry.value.removeMany(itemsToRemove);
         } else if (masonry.value?.remove) {
             // Fallback to individual removal if removeMany is not available
@@ -182,6 +179,7 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
         console.error('Failed to batch perform auto-dislike:', error);
     }
 }
+
 
 // Masonry restore composable
 const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(items, masonry);
@@ -406,6 +404,28 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
 // Container badges composable
 const containerBadges = useContainerBadges(items);
 
+// Container blacklist manager ref
+const containerBlacklistManager = ref<InstanceType<typeof ContainerBlacklistManager> | null>(null);
+
+// Check if a container type is blacklistable for the current service
+function isContainerBlacklistable(container: { type: string; source: string }): boolean {
+    // Hardcoded mapping for now - in the future, this could come from service metadata
+    // CivitAI: only 'User' type is blacklistable (case-sensitive match)
+    if (container.source === 'CivitAI' || currentTabService.value === 'civit-ai-images') {
+        return container.type === 'User';
+    }
+    // Wallhaven: no containers are blacklistable yet
+    // Add other services as needed
+    return false;
+}
+
+// Handle container ban button click
+function handleContainerBan(container: { id: number; type: string; source: string; source_id: string; referrer?: string | null }): void {
+    if (containerBlacklistManager.value) {
+        containerBlacklistManager.value.openBlacklistDialog(container);
+    }
+}
+
 // Container pill interactions composable
 const containerPillInteractions = useContainerPillInteractions(
     items,
@@ -621,6 +641,15 @@ watch(
 // Track loaded item IDs to handle timing between preload:success and watch
 const loadedItemIds = ref<Set<number>>(new Set());
 
+// Computed to track queue changes for reactivity (forces re-render when queue updates)
+// Accessing queuedItems ensures Vue tracks Map mutations
+const queueUpdateTrigger = computed(() => {
+    // Access queuedItems to ensure Vue tracks queue changes
+    const items = autoDislikeQueue.queuedItems.value;
+    // Return a value that changes when queue updates
+    return items.length > 0 ? items.map(i => `${i.id}-${i.remaining}`).join(',') : '';
+});
+
 // Watch for will_auto_dislike flag and add to queue
 watch(
     () => items.value.map((item) => ({ id: item.id, will_auto_dislike: item.will_auto_dislike })),
@@ -639,8 +668,9 @@ watch(
             }
         });
     },
-    { deep: true }
+    { deep: true, immediate: true }
 );
+
 
 // Cleanup on unmount
 onUnmounted(() => {
@@ -693,6 +723,13 @@ onUnmounted(() => {
                 <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
                     @rules-changed="handleModerationRulesChanged" />
 
+                <!-- Container Blacklists -->
+                <ContainerBlacklistManager
+                    ref="containerBlacklistManager"
+                    :disabled="masonry?.isLoading ?? false"
+                    @blacklists-changed="handleModerationRulesChanged"
+                />
+
                 <!-- Cancel Loading Button -->
                 <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                     data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
@@ -741,19 +778,28 @@ onUnmounted(() => {
                         <VibeMasonryItem :item="item" :remove="remove"
                             @mouseenter="() => { hoveredItemIndex = index; if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.freeze(); } }"
                             @mouseleave="() => { hoveredItemIndex = null; containerBadges.setHoveredContainerId(null); if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.unfreeze(); } }"
-                            @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => {
-                                // payload.item is the item passed to MasonryItem, which should have the id
-                                const itemId = payload.item?.id ?? item?.id;
-                                if (itemId) {
-                                    itemPreview.handleItemPreload(itemId);
-                                    // Track that this item has loaded (refs are auto-unwrapped in templates)
-                                    loadedItemIds.add(itemId);
-                                    // Activate auto-dislike countdown when preview loads
-                                    if (autoDislikeQueue.isQueued(itemId)) {
-                                        autoDislikeQueue.activateItem(itemId);
+                                @preload:success="async (payload: { item: any; type: 'image' | 'video'; src: string }) => {
+                                    // payload.item is the item passed to MasonryItem, which should have the id
+                                    const itemId = payload.item?.id ?? item?.id;
+                                    if (itemId) {
+                                        // Track that this item has loaded (refs are auto-unwrapped in templates)
+                                        loadedItemIds.add(itemId);
+                                        
+                                        // Handle preview increment
+                                        const result = await itemPreview.handleItemPreload(itemId);
+                                        
+                                        // If will_auto_dislike was newly set, add to queue
+                                        if (result?.will_auto_dislike) {
+                                            autoDislikeQueue.addToQueue(itemId, true); // Start active since preview just loaded
+                                        }
+                                        
+                                        // Activate auto-dislike countdown when preview loads
+                                        // This handles both moderation rules and container blacklists
+                                        if (autoDislikeQueue.isQueued(itemId)) {
+                                            autoDislikeQueue.activateItem(itemId);
+                                        }
                                     }
-                                }
-                            }">
+                                }">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item"
@@ -784,9 +830,15 @@ onUnmounted(() => {
                                                 <span
                                                     class="bg-prussian-blue-700 border-l border-twilight-indigo-500 flex items-center justify-center relative overflow-hidden min-w-12">
                                                     <!-- Progress fill (only shows when active) - use transform for width animation -->
+                                                    <!-- Access queueUpdateTrigger to ensure reactivity to queue changes -->
                                                     <div v-if="autoDislikeQueue.isActive(item.id)"
                                                         class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-transform duration-100"
-                                                        :style="{ transform: `scaleX(${autoDislikeQueue.getProgress(item.id)})`, transformOrigin: 'left' }">
+                                                        :style="{ 
+                                                            transform: `scaleX(${autoDislikeQueue.getProgress(item.id)})`, 
+                                                            transformOrigin: 'left',
+                                                            width: '100%'
+                                                        }"
+                                                        :key="`progress-${item.id}-${queueUpdateTrigger}`">
                                                     </div>
                                                     <!-- Timer text overlay or paused indicator -->
                                                     <span
@@ -850,9 +902,13 @@ onUnmounted(() => {
                                             @contextmenu.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e)"
                                             @auxclick.stop="(e: MouseEvent) => containerPillInteractions.handlePillAuxClick(container.id, e)"
                                             @mousedown.stop="(e: MouseEvent) => { if (e.button === 1) e.preventDefault(); }">
-                                            <Pill :label="container.type"
+                                            <Pill
+                                                :label="container.type"
                                                 :value="containerBadges.getItemCountForContainerId(container.id)"
-                                                :variant="containerBadges.getVariantForContainerType(container.type)" />
+                                                :variant="containerBadges.getVariantForContainerType(container.type)"
+                                                :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
+                                                @dismiss="() => handleContainerBan(container)"
+                                            />
                                         </div>
                                     </div>
 

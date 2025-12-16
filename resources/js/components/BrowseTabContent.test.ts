@@ -203,6 +203,47 @@ vi.mock('./FileViewer.vue', () => ({
     },
 }));
 
+// Mock ContainerBlacklistManager
+vi.mock('./container-blacklist/ContainerBlacklistManager.vue', () => ({
+    default: {
+        name: 'ContainerBlacklistManager',
+        template: '<div class="container-blacklist-manager-mock"></div>',
+        props: ['disabled'],
+        emits: ['blacklists-changed'],
+        methods: {
+            openBlacklistDialog: vi.fn(),
+        },
+        expose: ['openBlacklistDialog'],
+    },
+}));
+
+// Mock ContainerBlacklistDialog
+vi.mock('./container-blacklist/ContainerBlacklistDialog.vue', () => ({
+    default: {
+        name: 'ContainerBlacklistDialog',
+        template: '<div class="container-blacklist-dialog-mock"></div>',
+        props: ['open', 'containerId', 'containerType', 'containerSource', 'containerSourceId', 'containerReferrer'],
+        emits: ['update:open', 'blacklist-changed'],
+    },
+}));
+
+// Mock container blacklist composables
+vi.mock('@/composables/useContainerBlacklists', () => {
+    const { ref } = require('vue');
+    return {
+        useContainerBlacklists: vi.fn(() => ({
+            blacklists: ref([]),
+            isLoading: ref(false),
+            error: ref(null),
+            fetchBlacklists: vi.fn(),
+            createBlacklist: vi.fn(),
+            deleteBlacklist: vi.fn(),
+            isContainerBlacklisted: vi.fn(() => false),
+            getBlacklistedContainerActionType: vi.fn(() => null),
+        })),
+    };
+});
+
 // Mock BrowseStatusBar
 vi.mock('./BrowseStatusBar.vue', () => ({
     default: {
@@ -231,13 +272,14 @@ vi.mock('./ui/button', () => ({
     },
 }));
 
-vi.mock('./ui/Pill.vue', () => ({
-    default: {
-        name: 'Pill',
-        template: '<span class="pill-mock"><span class="pill-label">{{ label }}</span><span class="pill-value">{{ value }}</span></span>',
-        props: ['label', 'value', 'variant', 'size', 'reversed', 'dismissible'],
-    },
-}));
+    vi.mock('./ui/Pill.vue', () => ({
+        default: {
+            name: 'Pill',
+            template: '<span class="pill-mock"><span class="pill-label">{{ label }}</span><span class="pill-value">{{ value }}</span><button v-if="dismissible" @click.stop="$emit(\'dismiss\')" class="pill-dismiss-button">×</button></span>',
+            props: ['label', 'value', 'variant', 'size', 'reversed', 'dismissible'],
+            emits: ['dismiss'],
+        },
+    }));
 
 vi.mock('./ui/select', () => ({
     Select: {
@@ -381,6 +423,7 @@ vi.mock('lucide-vue-next', () => ({
     GripVertical: { name: 'GripVertical', template: '<div class="grip-icon"></div>', props: ['size', 'class'] },
     ChevronRight: { name: 'ChevronRight', template: '<div class="chevron-right-icon"></div>', props: ['size', 'class'] },
     Save: { name: 'Save', template: '<div class="save-icon"></div>', props: ['size', 'class'] },
+    Ban: { name: 'Ban', template: '<div class="ban-icon"></div>', props: ['size', 'class'] },
 }));
 
 // Mock composables

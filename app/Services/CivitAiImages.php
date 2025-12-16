@@ -213,4 +213,11 @@ class CivitAiImages extends BaseService
 
         return in_array($normalized, ['image', 'video'], true) ? $normalized : null;
     }
+
+    public function getBlacklistableContainerTypes(): array
+    {
+        return [
+            'User',
+        ];
+    }
 }

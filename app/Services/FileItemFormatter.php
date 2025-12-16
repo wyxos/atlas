@@ -12,7 +12,7 @@ class FileItemFormatter
      * Format files into items structure for frontend.
      *
      * @param  Collection<int, File>|array<int, File>  $files
-     * @param  array<int>  $willAutoDislikeIds  IDs of files to flag with will_auto_dislike = true
+     * @param  array<int>  $willAutoDislikeIds  IDs of files to flag with will_auto_dislike = true (includes both moderation and container blacklist)
      * @param  bool  $minimal  If true, return only essential layout data (id, width, height, src, key, index) for virtualization
      * @return array<int, array<string, mixed>>
      */
@@ -62,13 +62,17 @@ class FileItemFormatter
                     $file->load('containers');
                 }
 
-                $containers = $file->containers->map(fn (Container $container) => [
-                    'id' => $container->id,
-                    'type' => $container->type,
-                    'source' => $container->source,
-                    'source_id' => $container->source_id,
-                    'referrer' => $container->referrer,
-                ])->values()->all();
+                $containers = $file->containers->map(function (Container $container) {
+                    return [
+                        'id' => $container->id,
+                        'type' => $container->type,
+                        'source' => $container->source,
+                        'source_id' => $container->source_id,
+                        'referrer' => $container->referrer,
+                        'action_type' => $container->action_type,
+                        'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
+                    ];
+                })->values()->all();
 
                 $item = [
                     'id' => $file->id,
@@ -98,13 +102,17 @@ class FileItemFormatter
                     $file->load('containers');
                 }
 
-                $containers = $file->containers->map(fn (Container $container) => [
-                    'id' => $container->id,
-                    'type' => $container->type,
-                    'source' => $container->source,
-                    'source_id' => $container->source_id,
-                    'referrer' => $container->referrer,
-                ])->values()->all();
+                $containers = $file->containers->map(function (Container $container) {
+                    return [
+                        'id' => $container->id,
+                        'type' => $container->type,
+                        'source' => $container->source,
+                        'source_id' => $container->source_id,
+                        'referrer' => $container->referrer,
+                        'action_type' => $container->action_type,
+                        'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
+                    ];
+                })->values()->all();
 
                 $item = [
                     'id' => $file->id,

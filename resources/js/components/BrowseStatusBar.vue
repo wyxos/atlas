@@ -29,7 +29,7 @@ withDefaults(defineProps<Props>(), {
         <!-- Queued Reactions Pill -->
         <Pill v-if="queuedReactionsCount > 0" label="Queued" :value="queuedReactionsCount" variant="warning" reversed
             data-test="queued-reactions-pill" />
-        <!-- Auto-Dislike Queue Pill -->
+        <!-- Auto-Dislike Queue Pill (includes both moderation rules and container blacklists) -->
         <Pill v-if="queuedAutoDislikeCount > 0" label="Dislike" :value="queuedAutoDislikeCount" variant="danger" reversed
             data-test="auto-dislike-queue-pill" />
         <!-- Count Pill -->

@@ -130,13 +130,28 @@ class Browser
         $flaggedIds = $moderationResult['flaggedIds'];
         $processedIds = $moderationResult['processedIds']; // Files immediately auto-disliked or blacklisted
 
+        // Container blacklist: apply container blacklist rules after moderation
+        // - ui_countdown: flag files for UI countdown (reuses existing auto-dislike queue)
+        // - auto_dislike: immediately auto-dislike files in blacklisted containers
+        // - blacklist: immediately blacklist files in blacklisted containers
+        $containerBlacklistResult = app(\App\Services\ContainerBlacklistService::class)
+            ->filterBannedContainers(collect($persisted));
+        $containerFlaggedFileIds = $containerBlacklistResult['flaggedFileIds'];
+        $containerProcessedIds = $containerBlacklistResult['processedIds'];
+
+        // Merge flagged file IDs from both moderation and container blacklist (both use same auto-dislike queue)
+        $flaggedIds = array_merge($flaggedIds, $containerFlaggedFileIds);
+
+        // Merge processed IDs from both moderation and container blacklist
+        $processedIds = array_merge($processedIds, $containerProcessedIds);
+
         // Filter out processed files (auto-disliked or blacklisted) from response
         $persisted = collect($persisted)->reject(function ($file) use ($processedIds) {
             return in_array($file->id, $processedIds, true);
         })->values()->all();
 
         // Transform persisted files to items format for frontend
-        // Pass flagged IDs so they get will_auto_dislike = true
+        // Pass flagged IDs so they get will_auto_dislike = true (includes both moderation and container blacklist)
         // Use minimal format for virtualization (load full data on-demand)
         $page = (int) (request()->input('page', 1));
         $minimal = request()->boolean('minimal', true); // Default to minimal for performance
