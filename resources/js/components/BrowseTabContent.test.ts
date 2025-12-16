@@ -272,14 +272,14 @@ vi.mock('./ui/button', () => ({
     },
 }));
 
-    vi.mock('./ui/Pill.vue', () => ({
-        default: {
-            name: 'Pill',
+vi.mock('./ui/Pill.vue', () => ({
+    default: {
+        name: 'Pill',
             template: '<span class="pill-mock"><span class="pill-label">{{ label }}</span><span class="pill-value">{{ value }}</span><button v-if="dismissible" @click.stop="$emit(\'dismiss\')" class="pill-dismiss-button">×</button></span>',
-            props: ['label', 'value', 'variant', 'size', 'reversed', 'dismissible'],
+        props: ['label', 'value', 'variant', 'size', 'reversed', 'dismissible'],
             emits: ['dismiss'],
-        },
-    }));
+    },
+}));
 
 vi.mock('./ui/select', () => ({
     Select: {

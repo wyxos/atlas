@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Heart, ThumbsUp, ThumbsDown, Smile, X, Plus } from 'lucide-vue-next';
-import type { QueuedReaction } from '../../composables/useReactionQueue';
+import { Heart, ThumbsUp, ThumbsDown, Smile, X, Plus, Undo } from 'lucide-vue-next';
+import type { QueuedReaction } from '@/composables/useReactionQueue';
 
 interface Props {
     batchId: string;
@@ -62,54 +62,43 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div
-        @mouseenter="handleMouseEnter"
-        @mouseleave="handleMouseLeave"
+    <div @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave"
         class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm">
         <div class="flex items-center gap-3 mb-2">
             <!-- Multiple Preview Images (up to 5, then plus icon) - stacked with overlapping effect -->
-            <div class="relative shrink-0" style="width: 40px; height: 40px;">
-                <!-- Fifth preview (10% visible, behind everything) - offset by 90% (36px) -->
-                <div v-if="reactions.length > 4 && reactions[4].previewUrl"
-                    class="absolute top-0 left-0 z-[1]"
-                    style="transform: translateX(36px);">
-                    <img :src="reactions[4].previewUrl"
-                        :alt="`File #${reactions[4].fileId}`"
-                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+            <div class="flex shrink-0 items-center relative">
+                <!-- First preview (on top) - no translation -->
+                <div v-if="reactions.length > 0 && reactions[0].previewUrl" class="relative z-5">
+                    <img :src="reactions[0].previewUrl" :alt="`File #${reactions[0].fileId}`"
+                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
                 </div>
-                <!-- Fourth preview (30% visible, behind third) - offset by 70% (28px) -->
-                <div v-if="reactions.length > 3 && reactions[3].previewUrl"
-                    class="absolute top-0 left-0 z-[2]"
-                    style="transform: translateX(28px);">
-                    <img :src="reactions[3].previewUrl"
-                        :alt="`File #${reactions[3].fileId}`"
-                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                <!-- Second preview (behind first) - translateX(-10%) -->
+                <div v-if="reactions.length > 1 && reactions[1].previewUrl" class="relative z-4"
+                    style="transform: translateX(-10%);">
+                    <img :src="reactions[1].previewUrl" :alt="`File #${reactions[1].fileId}`"
+                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
                 </div>
-                <!-- Third preview (50% visible, behind second) - offset by 50% (20px) -->
-                <div v-if="reactions.length > 2 && reactions[2].previewUrl"
-                    class="absolute top-0 left-0 z-[3]"
-                    style="transform: translateX(20px);">
-                    <img :src="reactions[2].previewUrl"
-                        :alt="`File #${reactions[2].fileId}`"
-                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                <!-- Third preview (behind second) - translateX(-30%) -->
+                <div v-if="reactions.length > 2 && reactions[2].previewUrl" class="relative z-3"
+                    style="transform: translateX(-30%);">
+                    <img :src="reactions[2].previewUrl" :alt="`File #${reactions[2].fileId}`"
+                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
                 </div>
-                <!-- Second preview (70% visible, behind first) - offset by 30% (12px) -->
-                <div v-if="reactions.length > 1 && reactions[1].previewUrl"
-                    class="absolute top-0 left-0 z-[4]"
-                    style="transform: translateX(12px);">
-                    <img :src="reactions[1].previewUrl"
-                        :alt="`File #${reactions[1].fileId}`"
-                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                <!-- Fourth preview (behind third) - translateX(-50%) -->
+                <div v-if="reactions.length > 3 && reactions[3].previewUrl" class="relative z-2"
+                    style="transform: translateX(-50%);">
+                    <img :src="reactions[3].previewUrl" :alt="`File #${reactions[3].fileId}`"
+                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
                 </div>
-                <!-- First preview (100% visible, on top) - no offset -->
-                <div v-if="reactions.length > 0 && reactions[0].previewUrl" class="relative z-[5]">
-                    <img :src="reactions[0].previewUrl"
-                        :alt="`File #${reactions[0].fileId}`"
-                        class="w-10 h-10 object-cover rounded border border-smart-blue-500/30" />
+                <!-- Fifth preview (behind everything) - translateX(-70%) -->
+                <div v-if="reactions.length > 4 && reactions[4].previewUrl" class="relative z-1"
+                    style="transform: translateX(-70%);">
+                    <img :src="reactions[4].previewUrl" :alt="`File #${reactions[4].fileId}`"
+                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
                 </div>
                 <!-- Plus icon for additional items (if more than 5) -->
                 <div v-if="reactions.length > 5"
-                    class="absolute top-0 left-0 z-0 w-10 h-10 rounded border border-smart-blue-500/30 bg-smart-blue-500/20 flex items-center justify-center">
+                    class="relative z-0 -ml-4 w-10 h-10 rounded border border-smart-blue-500/30 bg-smart-blue-500/20 flex items-center justify-center">
                     <Plus :size="16" class="text-smart-blue-400" />
                 </div>
             </div>
@@ -135,7 +124,7 @@ const emit = defineEmits<{
             <button @click="handleCancel"
                 class="p-1 rounded hover:bg-black/20 text-white/70 hover:text-white transition-colors"
                 aria-label="Cancel batch reaction">
-                <X :size="16" />
+                <Undo X :size="16" />
             </button>
         </div>
     </div>

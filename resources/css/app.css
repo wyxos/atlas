@@ -376,14 +376,18 @@
 
 /* Vue Toastification Custom Styling for Reaction Queue */
 .reaction-toast-container {
-    max-width: 24rem !important; /* max-w-sm */
+    max-width: 400px !important;
+    /* max-w-sm */
     z-index: 50 !important;
-    gap: 0.5rem !important; /* gap-2 */
+    gap: 0.5rem !important;
+    /* gap-2 */
 }
 
 .reaction-toast-container.bottom-right {
-    bottom: 1rem !important; /* bottom-4 */
-    right: 1rem !important; /* right-4 */
+    bottom: 1rem !important;
+    /* bottom-4 */
+    right: 1rem !important;
+    /* right-4 */
 }
 
 /* Remove Vue Toastification default styling and match app theme */
