@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted, h, getCurrentInstance } from 'vue';
+import { ref, computed, onUnmounted, h, getCurrentInstance, type Component } from 'vue';
 import { useToast } from 'vue-toastification';
 import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
 import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
@@ -228,6 +228,7 @@ export function useReactionQueue() {
             if (existingBatchToastId) {
                 // Update existing batch toast
                 const firstReaction = batchReactions[0];
+                // Update toast with new content - use same format as toast creation
                 toast.update(existingBatchToastId, {
                     content: h(BatchReactionToast, {
                         batchId: preservedBatchId,
