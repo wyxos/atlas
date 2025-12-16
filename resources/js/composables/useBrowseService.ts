@@ -117,7 +117,8 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             }
         }
 
-        const response = await window.axios.get(browseIndex.url({ query: queryParams }));
+        // Add minimal=true to request minimal items for virtualization
+        const response = await window.axios.get(browseIndex.url({ query: { ...queryParams, minimal: true } }));
         const data = response.data;
 
         // Update currentPage to the page we just loaded
@@ -157,6 +158,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             const existingItem = options?.getActiveTab()?.itemsData?.find(
                 (existing: MasonryItem) => existing.id === newItem.id
             );
+            
             // If item exists in database, preserve its previewed_count and seen_count
             if (existingItem) {
                 return {
@@ -165,6 +167,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
                     seen_count: existingItem.seen_count ?? newItem.seen_count,
                 };
             }
+            
             return newItem;
         });
 

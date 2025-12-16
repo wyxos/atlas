@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
 
 type PillVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
@@ -24,8 +24,62 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     // Cache: Map<itemId, Set<containerId>> - O(1) lookup for item's containers
     const itemContainersCache = ref<Map<number, Set<number>>>(new Map());
 
-    // Rebuild all caches when items change
+    // Track previous items to detect removals for incremental updates
+    const previousItems = ref<Map<number, MasonryItem>>(new Map());
+
+    // Incrementally update caches when items are removed (much faster than full rebuild)
+    function updateCachesForRemovedItems(removedItemIds: number[]): void {
+        for (const itemId of removedItemIds) {
+            const itemContainers = itemContainersCache.value.get(itemId);
+            if (itemContainers) {
+                // Decrement count for each container
+                for (const containerId of itemContainers) {
+                    const currentCount = containerCountCache.value.get(containerId) || 0;
+                    if (currentCount > 1) {
+                        containerCountCache.value.set(containerId, currentCount - 1);
+                    } else {
+                        containerCountCache.value.delete(containerId);
+                        containerTypeCache.value.delete(containerId);
+                    }
+                }
+                // Remove item from cache
+                itemContainersCache.value.delete(itemId);
+            }
+            previousItems.value.delete(itemId);
+        }
+    }
+
+    // Rebuild all caches when items change (only when needed, e.g., initial load or large changes)
     function rebuildCaches(): void {
+        const itemCount = items.value.length;
+        const previousCount = previousItems.value.size;
+        const isRemoval = itemCount < previousCount;
+        
+        // If items were removed and we have previous state, use incremental update
+        if (isRemoval && previousCount > 0 && itemCount > 0) {
+            const currentItemIds = new Set(items.value.map(item => item.id));
+            const removedItemIds: number[] = [];
+            
+            for (const itemId of previousItems.value.keys()) {
+                if (!currentItemIds.has(itemId)) {
+                    removedItemIds.push(itemId);
+                }
+            }
+            
+            if (removedItemIds.length > 0 && removedItemIds.length < itemCount) {
+                // Incremental update is faster for small removals
+                updateCachesForRemovedItems(removedItemIds);
+                
+                // Update previousItems to match current
+                previousItems.value.clear();
+                for (const item of items.value) {
+                    previousItems.value.set(item.id, item);
+                }
+                return;
+            }
+        }
+        
+        // Full rebuild for additions or large changes
         const countMap = new Map<number, number>();
         const typeMap = new Map<number, string>();
         const itemContainersMap = new Map<number, Set<number>>();
@@ -57,24 +111,26 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
         containerCountCache.value = countMap;
         containerTypeCache.value = typeMap;
         itemContainersCache.value = itemContainersMap;
+        
+        // Update previousItems
+        previousItems.value.clear();
+        for (const item of items.value) {
+            previousItems.value.set(item.id, item);
+        }
     }
 
-    // Watch items array and rebuild caches when it changes
+    // Watch items array length and rebuild caches when it changes
+    // Defer cache updates to nextTick to avoid blocking animations
     watch(
         () => items.value.length,
         () => {
-            rebuildCaches();
+            // Defer cache rebuild to nextTick to avoid blocking removal animations
+            // This allows Vibe's FLIP animations to run smoothly
+            nextTick(() => {
+                rebuildCaches();
+            });
         },
         { immediate: true }
-    );
-
-    // Also watch for item changes (when items are added/removed/updated)
-    watch(
-        () => items.value.map((item) => item.id),
-        () => {
-            rebuildCaches();
-        },
-        { deep: false }
     );
 
     // Get containers for a specific item (returns full container data including referrer)

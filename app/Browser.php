@@ -137,8 +137,10 @@ class Browser
 
         // Transform persisted files to items format for frontend
         // Pass flagged IDs so they get will_auto_dislike = true
+        // Use minimal format for virtualization (load full data on-demand)
         $page = (int) (request()->input('page', 1));
-        $items = FileItemFormatter::format($persisted, $page, $flaggedIds);
+        $minimal = request()->boolean('minimal', true); // Default to minimal for performance
+        $items = FileItemFormatter::format($persisted, $page, $flaggedIds, $minimal);
 
         return [
             'items' => $items,

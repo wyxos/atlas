@@ -170,3 +170,4 @@ test('can delete a moderation rule', function () {
 
     expect(ModerationRule::find($rule->id))->toBeNull();
 });
+
