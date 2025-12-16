@@ -1,6 +1,5 @@
 - Browse
     - moderation
-      - ban by container
       - display a toast for auto backend dislike/blacklist with possibility to negate all or specific files
     - local files
       - render local files
