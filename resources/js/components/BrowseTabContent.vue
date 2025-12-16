@@ -2,7 +2,7 @@
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown, Image, Video } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -784,15 +784,15 @@ onUnmounted(() => {
                                     if (itemId) {
                                         // Track that this item has loaded (refs are auto-unwrapped in templates)
                                         loadedItemIds.add(itemId);
-                                        
+
                                         // Handle preview increment
                                         const result = await itemPreview.handleItemPreload(itemId);
-                                        
+
                                         // If will_auto_dislike was newly set, add to queue
                                         if (result?.will_auto_dislike) {
                                             autoDislikeQueue.addToQueue(itemId, true); // Start active since preview just loaded
                                         }
-                                        
+
                                         // Activate auto-dislike countdown when preview loads
                                         // This handles both moderation rules and container blacklists
                                         if (autoDislikeQueue.isQueued(itemId)) {
@@ -801,8 +801,8 @@ onUnmounted(() => {
                                     }
                                 }">
                             <template
-                                #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
-                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item"
+                                #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc, mediaType }">
+                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500"
                                     :data-key="item.key" :data-masonry-item-id="item.id"
                                     :class="containerBadges.getMasonryItemClasses.value(item)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
@@ -833,8 +833,8 @@ onUnmounted(() => {
                                                     <!-- Access queueUpdateTrigger to ensure reactivity to queue changes -->
                                                     <div v-if="autoDislikeQueue.isActive(item.id)"
                                                         class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-transform duration-100"
-                                                        :style="{ 
-                                                            transform: `scaleX(${autoDislikeQueue.getProgress(item.id)})`, 
+                                                        :style="{
+                                                            transform: `scaleX(${autoDislikeQueue.getProgress(item.id)})`,
                                                             transformOrigin: 'left',
                                                             width: '100%'
                                                         }"
@@ -858,29 +858,31 @@ onUnmounted(() => {
                                         </div>
                                     </Transition>
                                     <!-- Placeholder background - icon by default (before preloading starts) -->
+                                    <!-- Note: Vibe's MasonryItem provides this, but we override for dark theme -->
                                     <div v-if="!imageLoaded && !imageError" :class="[
-                                        'absolute inset-0 bg-slate-100 flex items-center justify-center transition-opacity duration-500',
+                                        'absolute inset-0 flex items-center justify-center transition-opacity duration-500',
                                         showMedia ? 'opacity-0 pointer-events-none' : 'opacity-100'
                                     ]">
                                         <!-- Media type indicator badge - shown BEFORE preloading starts -->
                                         <div
-                                            class="w-12 h-12 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-sm">
-                                            <i class="fas fa-image text-xl text-slate-400"></i>
+                                            class="w-12 h-12 rounded-full bg-prussian-blue-700/80 backdrop-blur-sm flex items-center justify-center shadow-sm border border-twilight-indigo-500/30">
+                                            <Image v-if="mediaType === 'image'" :size="20" class="text-twilight-indigo-300" />
+                                            <Video v-else-if="mediaType === 'video'" :size="20" class="text-twilight-indigo-300" />
                                         </div>
                                     </div>
 
-                                    <!-- Spinner (only shown when loading/preloading) -->
+                                    <!-- Spinner (only shown when loading/preloading) - centered vertically -->
                                     <div v-if="isLoading"
-                                        class="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-center justify-center z-10">
-                                        <div class="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm">
-                                            <Loader2 class="w-4 h-4 text-smart-blue-500 animate-spin" />
+                                        class="absolute inset-0 flex items-center justify-center z-10">
+                                        <div class="bg-prussian-blue-700/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border border-twilight-indigo-500/30">
+                                            <Loader2 class="w-4 h-4 text-smart-blue-400 animate-spin" />
                                         </div>
                                     </div>
 
                                     <!-- Error state -->
                                     <div v-if="imageError"
-                                        class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-400 text-sm p-4 text-center">
-                                        <i class="fas fa-image text-2xl mb-2 opacity-50"></i>
+                                        class="absolute inset-0 flex flex-col items-center justify-center bg-prussian-blue-800/50 text-twilight-indigo-300 text-sm p-4 text-center border border-twilight-indigo-500/30 rounded-lg">
+                                        <Image :size="32" class="mb-2 opacity-50" />
                                         <span>Failed to load image</span>
                                     </div>
 
