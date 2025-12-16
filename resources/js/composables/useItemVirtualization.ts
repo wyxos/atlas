@@ -57,7 +57,12 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
             );
             
             // Cache the loaded items
-            for (const [idStr, fullItem] of Object.entries(response.data.items)) {
+            const itemsData = response.data?.items;
+            if (!itemsData) {
+                return;
+            }
+            
+            for (const [idStr, fullItem] of Object.entries(itemsData)) {
                 const id = Number.parseInt(idStr, 10);
                 fullItemsCache.value.set(id, fullItem);
                 

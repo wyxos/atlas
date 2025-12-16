@@ -13,7 +13,7 @@ describe('useContainerBadges', () => {
     });
 
     describe('Caching optimizations', () => {
-        it('caches container counts for O(1) lookup', () => {
+        it('caches container counts for O(1) lookup', async () => {
             const items = ref<MasonryItem[]>([
                 {
                     id: 1,
@@ -31,7 +31,10 @@ describe('useContainerBadges', () => {
 
             const { getItemCountForContainerId } = useContainerBadges(items);
 
-            // First call should build cache
+            // Wait for cache to be built (watch defers to nextTick)
+            await nextTick();
+
+            // First call should use cache
             expect(getItemCountForContainerId(10)).toBe(3);
 
             // Subsequent calls should use cache (O(1) lookup)
@@ -49,6 +52,9 @@ describe('useContainerBadges', () => {
 
             const { getItemCountForContainerId } = useContainerBadges(items);
 
+            // Wait for initial cache build
+            await nextTick();
+
             expect(getItemCountForContainerId(10)).toBe(1);
 
             // Add more items
@@ -58,14 +64,15 @@ describe('useContainerBadges', () => {
             } as MasonryItem);
 
             // Wait for Vue reactivity and watchers to process
+            // The watch defers rebuildCaches to nextTick, so we need to wait for it
             await nextTick();
-            vi.advanceTimersByTime(100); // Give watchers time to run
+            await nextTick(); // Wait for the deferred rebuildCaches to complete
 
             // Cache should be rebuilt
             expect(getItemCountForContainerId(10)).toBe(2);
         });
 
-        it('uses Map-based lookup for isSiblingItem', () => {
+        it('uses Map-based lookup for isSiblingItem', async () => {
             const items = ref<MasonryItem[]>([
                 {
                     id: 1,
@@ -78,6 +85,9 @@ describe('useContainerBadges', () => {
             ]);
 
             const { isSiblingItem, setHoveredContainerId } = useContainerBadges(items);
+
+            // Wait for cache to be built
+            await nextTick();
 
             setHoveredContainerId(10);
             vi.advanceTimersByTime(100); // Wait for debounce
@@ -148,7 +158,7 @@ describe('useContainerBadges', () => {
     });
 
     describe('Performance with large arrays', () => {
-        it('handles 3000+ items efficiently', () => {
+        it('handles 3000+ items efficiently', async () => {
             // Create a large array of items
             const largeItems: MasonryItem[] = [];
             for (let i = 0; i < 3000; i++) {
@@ -160,6 +170,9 @@ describe('useContainerBadges', () => {
 
             const items = ref<MasonryItem[]>(largeItems);
             const { getItemCountForContainerId } = useContainerBadges(items);
+
+            // Wait for cache to be built
+            await nextTick();
 
             // This should be fast due to caching (O(1) instead of O(n))
             const start = performance.now();
