@@ -572,9 +572,9 @@ export function useReactionQueue() {
     // Cleanup on unmount (only if called within a component context)
     const instance = getCurrentInstance();
     if (instance) {
-        onUnmounted(() => {
-            cancelAll();
-        });
+    onUnmounted(() => {
+        cancelAll();
+    });
     }
 
     return {

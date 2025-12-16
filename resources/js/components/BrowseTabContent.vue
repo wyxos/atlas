@@ -779,11 +779,11 @@ onUnmounted(() => {
                             @mouseenter="() => { hoveredItemIndex = index; if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.freeze(); } }"
                             @mouseleave="() => { hoveredItemIndex = null; containerBadges.setHoveredContainerId(null); if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.unfreeze(); } }"
                                 @preload:success="async (payload: { item: any; type: 'image' | 'video'; src: string }) => {
-                                    // payload.item is the item passed to MasonryItem, which should have the id
-                                    const itemId = payload.item?.id ?? item?.id;
-                                    if (itemId) {
-                                        // Track that this item has loaded (refs are auto-unwrapped in templates)
-                                        loadedItemIds.add(itemId);
+                                // payload.item is the item passed to MasonryItem, which should have the id
+                                const itemId = payload.item?.id ?? item?.id;
+                                if (itemId) {
+                                    // Track that this item has loaded (refs are auto-unwrapped in templates)
+                                    loadedItemIds.add(itemId);
 
                                         // Handle preview increment
                                         const result = await itemPreview.handleItemPreload(itemId);
@@ -793,13 +793,13 @@ onUnmounted(() => {
                                             autoDislikeQueue.addToQueue(itemId, true); // Start active since preview just loaded
                                         }
 
-                                        // Activate auto-dislike countdown when preview loads
+                                    // Activate auto-dislike countdown when preview loads
                                         // This handles both moderation rules and container blacklists
-                                        if (autoDislikeQueue.isQueued(itemId)) {
-                                            autoDislikeQueue.activateItem(itemId);
-                                        }
+                                    if (autoDislikeQueue.isQueued(itemId)) {
+                                        autoDislikeQueue.activateItem(itemId);
                                     }
-                                }">
+                                }
+                            }">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc, mediaType }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500"

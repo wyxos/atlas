@@ -170,15 +170,15 @@ const dismissButtonClasses = computed(() => {
     }
     
     const hoverClasses = {
-        primary: 'hover:bg-smart-blue-600/40',
-        secondary: 'hover:bg-sapphire-600/40',
-        success: 'hover:bg-success-600/40',
-        warning: 'hover:bg-warning-600/40',
-        danger: 'hover:bg-danger-600/40',
-        info: 'hover:bg-info-600/40',
-        neutral: 'hover:bg-prussian-blue-600/60',
-    };
-    
+    primary: 'hover:bg-smart-blue-600/40',
+    secondary: 'hover:bg-sapphire-600/40',
+    success: 'hover:bg-success-600/40',
+    warning: 'hover:bg-warning-600/40',
+    danger: 'hover:bg-danger-600/40',
+    info: 'hover:bg-info-600/40',
+    neutral: 'hover:bg-prussian-blue-600/60',
+};
+
     return `${base} ${variant.value.borderSide} ${hoverClasses[props.variant]} hover:text-twilight-indigo-100 px-2`;
 });
 

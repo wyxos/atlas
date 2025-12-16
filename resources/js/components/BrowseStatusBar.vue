@@ -65,18 +65,18 @@ withDefaults(defineProps<Props>(), {
                 class="px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-3"
                 :class="backfill.active ? 'bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100' : 'bg-prussian-blue-700/30 text-twilight-indigo-400'">
                 <template v-if="backfill.active">
-                    <span v-if="!backfill.waiting">
-                        {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} calls)
-                    </span>
-                    <template v-else>
-                        <div class="h-2 w-20 overflow-hidden rounded bg-muted">
-                            <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
-                                width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
-                            }" />
-                        </div>
-                        <span class="text-xs text-warning-100">next in {{ (backfill.waitRemainingMs /
-                            1000).toFixed(1) }}s</span>
-                    </template>
+                <span v-if="!backfill.waiting">
+                    {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} calls)
+                </span>
+                <template v-else>
+                    <div class="h-2 w-20 overflow-hidden rounded bg-muted">
+                        <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
+                            width: Math.max(0, 100 - Math.round((backfill.waitRemainingMs / Math.max(1, backfill.waitTotalMs)) * 100)) + '%',
+                        }" />
+                    </div>
+                    <span class="text-xs text-warning-100">next in {{ (backfill.waitRemainingMs /
+                        1000).toFixed(1) }}s</span>
+                </template>
                 </template>
                 <span v-else class="text-xs">Inactive</span>
             </span>
@@ -95,19 +95,19 @@ withDefaults(defineProps<Props>(), {
                 class="px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-3"
                 :class="backfill.retryActive ? 'bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100' : 'bg-prussian-blue-700/30 text-twilight-indigo-400'">
                 <template v-if="backfill.retryActive">
-                    <div class="h-2 w-20 overflow-hidden rounded bg-muted">
-                        <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
-                            width:
-                                Math.max(
-                                    0,
-                                    100 - Math.round((backfill.retryWaitRemainingMs / Math.max(1, backfill.retryWaitTotalMs)) * 100),
-                                ) + '%',
-                        }" />
-                    </div>
-                    <span class="text-xs text-warning-100">
-                        retry {{ backfill.retryAttempt }} / {{ backfill.retryMax }} in {{
-                            (backfill.retryWaitRemainingMs / 1000).toFixed(1) }}s
-                    </span>
+                <div class="h-2 w-20 overflow-hidden rounded bg-muted">
+                    <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{
+                        width:
+                            Math.max(
+                                0,
+                                100 - Math.round((backfill.retryWaitRemainingMs / Math.max(1, backfill.retryWaitTotalMs)) * 100),
+                            ) + '%',
+                    }" />
+                </div>
+                <span class="text-xs text-warning-100">
+                    retry {{ backfill.retryAttempt }} / {{ backfill.retryMax }} in {{
+                        (backfill.retryWaitRemainingMs / 1000).toFixed(1) }}s
+                </span>
                 </template>
                 <span v-else class="text-xs">Inactive</span>
             </span>
