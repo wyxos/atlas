@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted, h } from 'vue';
+import { ref, computed, onUnmounted, h, getCurrentInstance } from 'vue';
 import { useToast } from 'vue-toastification';
 import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
 import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
@@ -568,10 +568,13 @@ export function useReactionQueue() {
         win.__reactionQueueResumeAll = resumeAll;
     }
 
-    // Cleanup on unmount
-    onUnmounted(() => {
-        cancelAll();
-    });
+    // Cleanup on unmount (only if called within a component context)
+    const instance = getCurrentInstance();
+    if (instance) {
+        onUnmounted(() => {
+            cancelAll();
+        });
+    }
 
     return {
         queuedReactions: computed(() => queuedReactions.value),

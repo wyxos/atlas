@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted } from 'vue';
+import { ref, computed, onUnmounted, getCurrentInstance } from 'vue';
 
 const COUNTDOWN_DURATION = 5000; // 5 seconds
 const TICK_INTERVAL = 100; // Update every 100ms for smooth countdown
@@ -203,10 +203,13 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
         return Array.from(queue.value.keys());
     }
 
-    // Cleanup on unmount
-    onUnmounted(() => {
-        clearQueue();
-    });
+    // Cleanup on unmount (only if called within a component context)
+    const instance = getCurrentInstance();
+    if (instance) {
+        onUnmounted(() => {
+            clearQueue();
+        });
+    }
 
     return {
         queue: computed(() => queue.value),
