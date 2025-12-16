@@ -66,42 +66,20 @@ const emit = defineEmits<{
         class="bg-prussian-blue-800 border border-smart-blue-500/50 rounded-lg p-3 shadow-lg backdrop-blur-sm">
         <div class="flex items-center gap-3 mb-2">
             <!-- Multiple Preview Images (up to 5, then plus icon) - stacked with overlapping effect -->
-            <div class="flex shrink-0 items-center relative">
-                <!-- First preview (on top) - no translation -->
-                <div v-if="reactions.length > 0 && reactions[0].previewUrl" class="relative z-5">
-                    <img :src="reactions[0].previewUrl" :alt="`File #${reactions[0].fileId}`"
-                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
-                </div>
-                <!-- Second preview (behind first) - translateX(-10%) -->
-                <div v-if="reactions.length > 1 && reactions[1].previewUrl" class="relative z-4"
-                    style="transform: translateX(-10%);">
-                    <img :src="reactions[1].previewUrl" :alt="`File #${reactions[1].fileId}`"
-                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
-                </div>
-                <!-- Third preview (behind second) - translateX(-30%) -->
-                <div v-if="reactions.length > 2 && reactions[2].previewUrl" class="relative z-3"
-                    style="transform: translateX(-30%);">
-                    <img :src="reactions[2].previewUrl" :alt="`File #${reactions[2].fileId}`"
-                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
-                </div>
-                <!-- Fourth preview (behind third) - translateX(-50%) -->
-                <div v-if="reactions.length > 3 && reactions[3].previewUrl" class="relative z-2"
-                    style="transform: translateX(-50%);">
-                    <img :src="reactions[3].previewUrl" :alt="`File #${reactions[3].fileId}`"
-                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
-                </div>
-                <!-- Fifth preview (behind everything) - translateX(-70%) -->
-                <div v-if="reactions.length > 4 && reactions[4].previewUrl" class="relative z-1"
-                    style="transform: translateX(-70%);">
-                    <img :src="reactions[4].previewUrl" :alt="`File #${reactions[4].fileId}`"
-                        class="w-16 h-16 object-cover rounded border border-smart-blue-500/30" />
-                </div>
-                <!-- Plus icon for additional items (if more than 5) -->
-                <div v-if="reactions.length > 5"
-                    class="relative z-0 -ml-4 w-10 h-10 rounded border border-smart-blue-500/30 bg-smart-blue-500/20 flex items-center justify-center">
-                    <Plus :size="16" class="text-smart-blue-400" />
-                </div>
-            </div>
+           <div class="flex gap-2 items-center">
+               <div class="stacked-images">
+                   <template v-for="(reaction, index) in reactions.slice(0, 5)" :key="reaction.fileId">
+                       <div v-if="reaction.previewUrl" class="stacked-image">
+                           <img :src="reaction.previewUrl" :alt="`File #${reaction.fileId}`" />
+                       </div>
+                   </template>
+               </div>
+
+               <!-- Plus icon for additional items (if more than 5) -->
+               <div v-if="reactions.length > 5" class="stacked-image-plus">
+                   <Plus :size="16" class="text-smart-blue-400" />
+               </div>
+           </div>
 
             <div class="flex-1 flex gap-4 min-w-0">
                 <!-- Reaction Icon -->
@@ -129,3 +107,105 @@ const emit = defineEmits<{
         </div>
     </div>
 </template>
+
+<style scoped>
+.stacked-images {
+    --s: 64px;
+    /* image size (w-16 = 4rem = 64px) */
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.stacked-image {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.stacked-image img {
+    width: var(--s);
+    height: var(--s);
+    object-fit: cover;
+    border-radius: 0.25rem;
+    display: block;
+}
+
+/* First image (100% visible) - on top */
+.stacked-image:first-child {
+    z-index: 5;
+}
+
+.stacked-image:first-child img {
+    border: 2px solid rgb(59 130 246 / 1);
+    /* border-smart-blue-500 */
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    /* shadow-lg */
+}
+
+/* Second image (70% visible) - translate back 30% */
+.stacked-image:nth-child(2) {
+    z-index: 4;
+    margin-left: calc(var(--s) * -0.3);
+}
+
+.stacked-image:nth-child(2) img {
+    border: 1px solid rgb(59 130 246 / 0.5);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    /* shadow-md */
+    opacity: 0.9;
+}
+
+/* Third image (50% visible) - translate back 50% */
+.stacked-image:nth-child(3) {
+    z-index: 3;
+    margin-left: calc(var(--s) * -0.5);
+}
+
+.stacked-image:nth-child(3) img {
+    border: 1px solid rgb(59 130 246 / 0.4);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    /* shadow */
+    opacity: 0.8;
+}
+
+/* Fourth image (30% visible) - translate back 70% */
+.stacked-image:nth-child(4) {
+    z-index: 2;
+    margin-left: calc(var(--s) * -0.7);
+}
+
+.stacked-image:nth-child(4) img {
+    border: 1px solid rgb(59 130 246 / 0.3);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    /* shadow-sm */
+    opacity: 0.7;
+}
+
+/* Fifth image (10% visible) - translate back 90% */
+.stacked-image:nth-child(5) {
+    z-index: 1;
+    margin-left: calc(var(--s) * -0.9);
+}
+
+.stacked-image:nth-child(5) img {
+    border: 1px solid rgb(59 130 246 / 0.2);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    /* shadow-sm */
+    opacity: 0.6;
+}
+
+/* Plus icon */
+.stacked-image-plus {
+    position: relative;
+    z-index: 0;
+    width: 80px;
+    height: 80px;
+    border-radius: 0.25rem;
+    border: 1px solid rgb(59 130 246 / 0.3);
+    background-color: rgb(59 130 246 / 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: calc(var(--s) * -0.9);
+}
+</style>

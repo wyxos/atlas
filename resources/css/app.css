@@ -376,7 +376,6 @@
 
 /* Vue Toastification Custom Styling for Reaction Queue */
 .reaction-toast-container {
-    max-width: 400px !important;
     /* max-w-sm */
     z-index: 50 !important;
     gap: 0.5rem !important;
