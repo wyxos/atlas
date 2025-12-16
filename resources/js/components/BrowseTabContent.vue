@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
 import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
@@ -33,8 +33,10 @@ import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
+import { useItemVirtualization } from '@/composables/useItemVirtualization';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
+import { analyzeItemSizes, logItemSizeDiagnostics, createMinimalItems, compareItemPerformance } from '@/utils/itemSizeDiagnostics';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -58,19 +60,30 @@ const emit = defineEmits<{
 }>();
 
 // Local state for this tab
-const items = ref<MasonryItem[]>([]);
+// Use shallowRef to reduce Vue reactivity overhead with large arrays (3k+ items)
+// This prevents deep reactivity tracking on each item, significantly improving performance
+const items = shallowRef<MasonryItem[]>([]);
 // Map-based lookup for O(1) item access instead of O(n) find() operations
 const itemsMap = ref<Map<number, MasonryItem>>(new Map());
 
 // Sync itemsMap whenever items array changes
 watch(
     () => items.value,
-    (newItems) => {
+    (newItems, oldItems) => {
         const newMap = new Map<number, MasonryItem>();
         for (const item of newItems) {
             newMap.set(item.id, item);
         }
         itemsMap.value = newMap;
+
+        // Diagnostic: Log item size analysis when items change (only in dev mode)
+        if (import.meta.env.DEV && newItems.length > 0) {
+            // Only log when we have a significant number of items to avoid spam
+            if (newItems.length >= 100 && newItems.length % 500 === 0) {
+                const diagnostics = analyzeItemSizes(newItems);
+                logItemSizeDiagnostics(diagnostics);
+            }
+        }
     },
     { immediate: true, deep: false }
 );
@@ -101,6 +114,9 @@ const isMounted = ref(false);
 
 // Auto-dislike queue composable with expiration handler
 const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
+
+// Item virtualization composable - loads minimal items initially, then full data on-demand
+const itemVirtualization = useItemVirtualization(items);
 
 // Handle auto-dislike queue expiration - perform auto-dislike in batch
 async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
@@ -313,7 +329,8 @@ const layout = {
 };
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
-    return await getNextPageFromComposable(page);
+    const result = await getNextPageFromComposable(page);
+    return result;
 }
 
 function onMasonryClick(e: MouseEvent): void {
@@ -415,6 +432,7 @@ const promptData = usePromptData(items);
 // Masonry reaction handler composable (needs restoreToMasonry)
 const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
+    itemsMap,
     masonry,
     computed(() => props.tab),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
@@ -583,6 +601,9 @@ onMounted(async () => {
     if (props.tab) {
         await initializeTab(props.tab);
     }
+    // Initialize virtualization after items are loaded
+    await nextTick();
+    itemVirtualization.initialize();
 });
 
 // Watch for tab ID changes to ensure re-initialization when switching to a different tab
@@ -736,7 +757,8 @@ onUnmounted(() => {
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item"
-                                    :data-key="item.key" :class="containerBadges.getMasonryItemClasses.value(item)"
+                                    :data-key="item.key" :data-masonry-item-id="item.id"
+                                    :class="containerBadges.getMasonryItemClasses.value(item)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
                                     @auxclick="(e: MouseEvent) => masonryInteractions.handleMasonryItemAuxClick(e, item)">
                                     <!-- Auto-disliked indicator overlay with smooth animation -->

@@ -8,6 +8,7 @@ import { createReactionCallback } from '@/utils/reactions';
  */
 export function useMasonryReactionHandler(
     items: Ref<MasonryItem[]>,
+    itemsMap: Ref<Map<number, MasonryItem>>,
     masonry: Ref<any>,
     tab: Ref<BrowseTabData | undefined>,
     onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void,
@@ -23,7 +24,8 @@ export function useMasonryReactionHandler(
         type: 'love' | 'like' | 'dislike' | 'funny',
         removeItem: (item: MasonryItem) => void
     ): Promise<void> {
-        const item = items.value.find((i) => i.id === fileId);
+        // Use Map lookup instead of O(n) find operations
+        const item = itemsMap.value.get(fileId);
         const itemIndex = item ? items.value.findIndex((i) => i.id === fileId) : -1;
         const tabId = tab.value?.id;
 
@@ -47,7 +49,7 @@ export function useMasonryReactionHandler(
 
         // Remove auto_disliked and will_auto_dislike flags if user is reacting (like, funny, favorite - not dislike)
         if (item && (type === 'love' || type === 'like' || type === 'funny')) {
-            const itemIndex = items.value.findIndex((i) => i.id === fileId);
+            // itemIndex already calculated above, reuse it
             if (itemIndex !== -1) {
                 Object.assign(items.value[itemIndex], {
                     auto_disliked: false,

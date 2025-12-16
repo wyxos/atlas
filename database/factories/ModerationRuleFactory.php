@@ -100,3 +100,4 @@ class ModerationRuleFactory extends Factory
         return $this->state(fn () => ['nsfw' => false]);
     }
 }
+
