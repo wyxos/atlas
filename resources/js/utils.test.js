@@ -1,40 +1,29 @@
 import { describe, it, expect } from 'vitest';
+import { cn } from '@/lib/utils';
 
 describe('Utility Functions', () => {
-    it('should add two numbers correctly', () => {
-        const add = (a, b) => a + b;
-        expect(add(2, 3)).toBe(5);
-        expect(add(-1, 1)).toBe(0);
-        expect(add(0, 0)).toBe(0);
-    });
+    describe('cn (className utility)', () => {
+        it('merges class names correctly', () => {
+            expect(cn('foo', 'bar')).toBe('foo bar');
+        });
 
-    it('should format a string correctly', () => {
-        const formatName = (firstName, lastName) => `${firstName} ${lastName}`;
-        expect(formatName('John', 'Doe')).toBe('John Doe');
-        expect(formatName('Jane', 'Smith')).toBe('Jane Smith');
-    });
+        it('handles conditional classes', () => {
+            expect(cn('foo', false && 'bar', 'baz')).toBe('foo baz');
+            expect(cn('foo', true && 'bar')).toBe('foo bar');
+        });
 
-    it('should validate email format', () => {
-        const isValidEmail = (email) => {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return emailRegex.test(email);
-        };
+        it('merges Tailwind classes correctly', () => {
+            // twMerge should deduplicate conflicting classes
+            expect(cn('px-2 py-1', 'px-4')).toContain('px-4');
+        });
 
-        expect(isValidEmail('test@example.com')).toBe(true);
-        expect(isValidEmail('user.name@domain.co.uk')).toBe(true);
-        expect(isValidEmail('invalid-email')).toBe(false);
-        expect(isValidEmail('@example.com')).toBe(false);
-        expect(isValidEmail('test@')).toBe(false);
-    });
+        it('handles empty inputs', () => {
+            expect(cn()).toBe('');
+            expect(cn('', null, undefined)).toBe('');
+        });
 
-    it('should calculate the sum of an array', () => {
-        const sumArray = (arr) => arr.reduce((sum, num) => sum + num, 0);
-
-        expect(sumArray([1, 2, 3, 4, 5])).toBe(15);
-        expect(sumArray([10, 20, 30])).toBe(60);
-        expect(sumArray([])).toBe(0);
-        expect(sumArray([-5, 5])).toBe(0);
+        it('handles arrays of classes', () => {
+            expect(cn(['foo', 'bar'], 'baz')).toBe('foo bar baz');
+        });
     });
 });
-
-
