@@ -97,6 +97,20 @@ function isTabDataLoading(tabId: number): boolean {
     return tabDataLoadingStates.value.get(tabId) ?? false;
 }
 
+// Handle masonry loading change from tab content (wrapper for prop binding)
+function handleMasonryLoadingChangeFromTab(isLoading: boolean): void {
+    if (activeTabId.value !== null) {
+        handleTabMasonryLoadingChange(activeTabId.value, isLoading);
+    }
+}
+
+// Handle tab data loading change from tab content (wrapper for prop binding)
+function handleTabDataLoadingChangeFromTab(isLoading: boolean): void {
+    if (activeTabId.value !== null) {
+        handleTabDataLoadingChange(activeTabId.value, isLoading);
+    }
+}
+
 
 // Tab management function
 // Flow: Load tabs (without files) > Determine focus tab > If has files, load them > Restore query params
@@ -166,8 +180,8 @@ onMounted(async () => {
                 <BrowseTabContent v-if="activeTab" :key="activeTab.id" :tab="activeTab"
                     :available-services="availableServices" :update-active-tab="updateActiveTab"
                     :load-tab-items="loadTabItems" :on-reaction="handleReaction"
-                    :on-loading-change="(isLoading) => activeTabId !== null && handleTabMasonryLoadingChange(activeTabId, isLoading)"
-                    :on-tab-data-loading-change="(isLoading) => activeTabId !== null && handleTabDataLoadingChange(activeTabId, isLoading)" />
+                    :on-loading-change="handleMasonryLoadingChangeFromTab"
+                    :on-tab-data-loading-change="handleTabDataLoadingChangeFromTab" />
                 <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
                     <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                 </div>
