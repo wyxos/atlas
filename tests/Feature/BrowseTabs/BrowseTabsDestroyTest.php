@@ -68,4 +68,3 @@ test('deleting non-existent tab returns 404', function () {
 
     $response->assertNotFound();
 });
-

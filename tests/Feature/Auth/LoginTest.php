@@ -189,4 +189,3 @@ test('login shows validation errors for invalid credentials', function () {
     $response->assertSessionHasErrors('email');
     expect(session()->get('errors')->first('email'))->toContain('credentials');
 });
-

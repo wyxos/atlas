@@ -137,4 +137,3 @@ test('guest cannot delete account', function () {
 
     $response->assertUnauthorized();
 });
-

@@ -226,4 +226,3 @@ class Wallhaven extends BaseService
         return $originalUrl;
     }
 }
-

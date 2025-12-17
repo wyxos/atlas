@@ -8,17 +8,17 @@ uses(RefreshDatabase::class);
 
 test('admin can serve existing file', function () {
     $admin = User::factory()->admin()->create();
-    
+
     $testContent = 'test file content';
     $filePath = 'private/images/ab/cd/test.jpg';
     $fullPath = storage_path("app/{$filePath}");
-    
+
     // Ensure directory exists
-    if (!is_dir(dirname($fullPath))) {
+    if (! is_dir(dirname($fullPath))) {
         mkdir(dirname($fullPath), 0755, true);
     }
     file_put_contents($fullPath, $testContent);
-    
+
     $file = File::factory()->create([
         'path' => $filePath,
         'mime_type' => 'image/jpeg',
@@ -30,7 +30,7 @@ test('admin can serve existing file', function () {
     // Verify file exists and content matches
     expect(file_exists($fullPath))->toBeTrue();
     expect(file_get_contents($fullPath))->toBe($testContent);
-    
+
     // Cleanup
     if (file_exists($fullPath)) {
         unlink($fullPath);
@@ -39,16 +39,16 @@ test('admin can serve existing file', function () {
 
 test('file serve returns correct Content-Type header', function () {
     $admin = User::factory()->admin()->create();
-    
+
     $filePath = 'private/images/ab/cd/test.jpg';
     $fullPath = storage_path("app/{$filePath}");
-    
+
     // Ensure directory exists
-    if (!is_dir(dirname($fullPath))) {
+    if (! is_dir(dirname($fullPath))) {
         mkdir(dirname($fullPath), 0755, true);
     }
     file_put_contents($fullPath, 'test content');
-    
+
     $file = File::factory()->create([
         'path' => $filePath,
         'mime_type' => 'image/jpeg',
@@ -58,7 +58,7 @@ test('file serve returns correct Content-Type header', function () {
 
     $response->assertSuccessful();
     $response->assertHeader('Content-Type', 'image/jpeg');
-    
+
     // Cleanup
     if (file_exists($fullPath)) {
         unlink($fullPath);
@@ -67,17 +67,17 @@ test('file serve returns correct Content-Type header', function () {
 
 test('file serve returns file content', function () {
     $admin = User::factory()->admin()->create();
-    
+
     $testContent = 'binary file content';
     $filePath = 'private/videos/ab/cd/test.mp4';
     $fullPath = storage_path("app/{$filePath}");
-    
+
     // Ensure directory exists
-    if (!is_dir(dirname($fullPath))) {
+    if (! is_dir(dirname($fullPath))) {
         mkdir(dirname($fullPath), 0755, true);
     }
     file_put_contents($fullPath, $testContent);
-    
+
     $file = File::factory()->create([
         'path' => $filePath,
         'mime_type' => 'video/mp4',
@@ -89,7 +89,7 @@ test('file serve returns file content', function () {
     // Verify file exists and content matches
     expect(file_exists($fullPath))->toBeTrue();
     expect(file_get_contents($fullPath))->toBe($testContent);
-    
+
     // Cleanup
     if (file_exists($fullPath)) {
         unlink($fullPath);
@@ -122,9 +122,9 @@ test('regular user cannot serve files', function () {
     $user = User::factory()->create();
     $filePath = 'private/images/ab/cd/test.jpg';
     $fullPath = storage_path("app/{$filePath}");
-    
+
     // Ensure directory exists
-    if (!is_dir(dirname($fullPath))) {
+    if (! is_dir(dirname($fullPath))) {
         mkdir(dirname($fullPath), 0755, true);
     }
     file_put_contents($fullPath, 'test content');
@@ -133,7 +133,7 @@ test('regular user cannot serve files', function () {
     $response = $this->actingAs($user)->get("/api/files/{$file->id}/serve");
 
     $response->assertForbidden();
-    
+
     // Cleanup
     if (file_exists($fullPath)) {
         unlink($fullPath);
@@ -147,4 +147,3 @@ test('guest cannot serve files', function () {
 
     $response->assertRedirect('/login');
 });
-

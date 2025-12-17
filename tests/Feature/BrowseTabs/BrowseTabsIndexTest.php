@@ -38,7 +38,7 @@ test('tabs do not include items_data in index response (lazy loading)', function
     $user = User::factory()->create();
     $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
     $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
-    
+
     $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
     $response = $this->actingAs($user)->getJson('/api/browse-tabs');
@@ -48,19 +48,20 @@ test('tabs do not include items_data in index response (lazy loading)', function
     $tabData = collect($data)->firstWhere('id', $tab->id);
     // items_data should NOT be included in index response (for performance with 1000+ tabs)
     expect($tabData)->not->toHaveKey('items_data');
-    // But file_ids should be included
-    expect($tabData['file_ids'])->toBeArray();
-    expect(count($tabData['file_ids']))->toBe(2);
+    // file_ids should NOT be included in index response (for performance)
+    expect($tabData)->not->toHaveKey('file_ids');
+    // has_files should NOT be included - frontend will check by calling items endpoint
+    expect($tabData)->not->toHaveKey('has_files');
 });
 
-test('tabs include file_ids when files exist', function () {
+test('tabs do not include file-related data in index response', function () {
     $user = User::factory()->create();
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
         'url' => 'https://example.com/original.jpg',
         'thumbnail_url' => 'https://example.com/thumb.jpg',
     ]);
-    
+
     $tab = BrowseTab::factory()->for($user)->withFiles([$file->id])->create();
 
     $response = $this->actingAs($user)->getJson('/api/browse-tabs');
@@ -68,19 +69,20 @@ test('tabs include file_ids when files exist', function () {
     $response->assertSuccessful();
     $data = $response->json();
     $tabData = collect($data)->firstWhere('id', $tab->id);
-    // file_ids should be included
-    expect($tabData['file_ids'])->toBeArray();
-    expect($tabData['file_ids'][0])->toBe($file->id);
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
+    // file_ids should NOT be included in index response
+    expect($tabData)->not->toHaveKey('file_ids');
+    // has_files should NOT be included - frontend will check by calling items endpoint
+    expect($tabData)->not->toHaveKey('has_files');
 });
 
-test('tabs maintain file_ids order based on pivot position', function () {
+test('tabs do not include file-related data regardless of file count', function () {
     $user = User::factory()->create();
     $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
     $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
     $file3 = File::factory()->create(['referrer_url' => 'https://example.com/file3.jpg']);
-    
+
     // Create tab with files in specific order: file3, file1, file2
     $tab = BrowseTab::factory()->for($user)->withFiles([$file3->id, $file1->id, $file2->id])->create();
 
@@ -89,18 +91,15 @@ test('tabs maintain file_ids order based on pivot position', function () {
     $response->assertSuccessful();
     $data = $response->json();
     $tabData = collect($data)->firstWhere('id', $tab->id);
-    // file_ids should maintain order
-    expect($tabData['file_ids'])->toBeArray();
-    expect(count($tabData['file_ids']))->toBe(3);
-    // Verify order by checking file_ids matches the order we specified
-    expect($tabData['file_ids'][0])->toBe($file3->id);
-    expect($tabData['file_ids'][1])->toBe($file1->id);
-    expect($tabData['file_ids'][2])->toBe($file2->id);
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
+    // file_ids should NOT be included in index response
+    expect($tabData)->not->toHaveKey('file_ids');
+    // has_files should NOT be included - frontend will check by calling items endpoint
+    expect($tabData)->not->toHaveKey('has_files');
 });
 
-test('tabs without files have empty file_ids', function () {
+test('tabs without files do not include file-related data', function () {
     $user = User::factory()->create();
     $tab = BrowseTab::factory()->for($user)->create();
 
@@ -109,16 +108,18 @@ test('tabs without files have empty file_ids', function () {
     $response->assertSuccessful();
     $data = $response->json();
     $tabData = collect($data)->firstWhere('id', $tab->id);
-    expect($tabData['file_ids'])->toBeArray();
-    expect($tabData['file_ids'])->toBeEmpty();
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
+    // file_ids should NOT be included in index response
+    expect($tabData)->not->toHaveKey('file_ids');
+    // has_files should NOT be included - frontend will check by calling items endpoint
+    expect($tabData)->not->toHaveKey('has_files');
 });
 
 test('user only sees their own tabs', function () {
     $user1 = User::factory()->create();
     $user2 = User::factory()->create();
-    
+
     BrowseTab::factory()->for($user1)->count(2)->create();
     BrowseTab::factory()->for($user2)->count(3)->create();
 
@@ -141,7 +142,7 @@ test('guest cannot view browse tabs', function () {
 test('tabs include query_params in index response', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
-    
+
     $tab = BrowseTab::factory()->for($user)
         ->withQueryParams(['page' => 3, 'next' => 'cursor-123'])
         ->withFiles([$file->id])
@@ -158,4 +159,3 @@ test('tabs include query_params in index response', function () {
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
 });
-

@@ -11,7 +11,7 @@ test('authenticated user can load items for their tab', function () {
     $user = User::factory()->create();
     $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
     $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
-    
+
     $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
     $response = $this->actingAs($user)->getJson("/api/browse-tabs/{$tab->id}/items");
@@ -33,7 +33,7 @@ test('items are formatted correctly', function () {
         'url' => 'https://example.com/original.jpg',
         'thumbnail_url' => 'https://example.com/thumb.jpg',
     ]);
-    
+
     $tab = BrowseTab::factory()->for($user)->withFiles([$file->id])->create();
 
     $response = $this->actingAs($user)->getJson("/api/browse-tabs/{$tab->id}/items");
@@ -42,7 +42,7 @@ test('items are formatted correctly', function () {
     $data = $response->json();
     expect($data['items_data'])->toBeArray();
     expect(count($data['items_data']))->toBe(1);
-    
+
     $item = $data['items_data'][0];
     expect($item)->toHaveKey('id');
     expect($item['id'])->toBe($file->id);
@@ -60,7 +60,7 @@ test('items are formatted correctly', function () {
 test('items use correct page number from query_params', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
-    
+
     $tab = BrowseTab::factory()->for($user)
         ->withQueryParams(['page' => 5])
         ->withFiles([$file->id])
@@ -76,7 +76,7 @@ test('items use correct page number from query_params', function () {
 test('items default to page 1 when query_params page is missing', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
-    
+
     $tab = BrowseTab::factory()->for($user)
         ->withQueryParams([])
         ->withFiles([$file->id])
@@ -107,7 +107,7 @@ test('user cannot load items for another users tab', function () {
     $user1 = User::factory()->create();
     $user2 = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
-    
+
     $tab = BrowseTab::factory()->for($user1)->withFiles([$file->id])->create();
 
     $response = $this->actingAs($user2)->getJson("/api/browse-tabs/{$tab->id}/items");
@@ -129,7 +129,7 @@ test('items maintain file order based on pivot position', function () {
     $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
     $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
     $file3 = File::factory()->create(['referrer_url' => 'https://example.com/file3.jpg']);
-    
+
     // Create tab with files in specific order: file3, file1, file2
     $tab = BrowseTab::factory()->for($user)->withFiles([$file3->id, $file1->id, $file2->id])->create();
 
@@ -143,4 +143,3 @@ test('items maintain file order based on pivot position', function () {
     expect($data['items_data'][1]['id'])->toBe($file1->id);
     expect($data['items_data'][2]['id'])->toBe($file2->id);
 });
-

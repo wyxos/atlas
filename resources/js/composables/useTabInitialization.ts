@@ -56,9 +56,6 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         // Reset previewed items tracking when switching tabs
         deps.clearPreviewedItems();
 
-        const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
-        deps.isTabRestored.value = tabHasRestorableItems;
-
         // Restore selected service for UI
         const serviceFromQuery = tab.queryParams?.service as string | null;
         deps.selectedService.value = serviceFromQuery || '';
@@ -66,29 +63,34 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         // Restore both page and next from queryParams
         const pageFromQuery = tab.queryParams?.page;
         const nextFromQuery = tab.queryParams?.next;
-        deps.pendingRestoreNextCursor.value = tabHasRestorableItems ? (nextFromQuery ?? null) : null;
 
-        // Always reload items from database when initializing
-        if (tab.fileIds && tab.fileIds.length > 0) {
-            try {
-                // Notify parent that we're loading tab data
-                if (deps.onTabDataLoadingChange) {
-                    deps.onTabDataLoadingChange(true);
-                }
-                const loadedItems = await deps.loadTabItems(tab.id);
-                tab.itemsData = loadedItems;
-            } catch (error) {
-                console.error('Failed to load tab items:', error);
-                tab.itemsData = [];
-            } finally {
-                // Notify parent that tab data loading is complete
-                if (deps.onTabDataLoadingChange) {
-                    deps.onTabDataLoadingChange(false);
-                }
+        // Always reload items from database when initializing a tab
+        // This ensures we always have fresh data when switching tabs
+        // If the tab has no files, the endpoint will return empty arrays
+        try {
+            // Notify parent that we're loading tab data
+            if (deps.onTabDataLoadingChange) {
+                deps.onTabDataLoadingChange(true);
             }
-        } else {
+            const loadedItems = await deps.loadTabItems(tab.id);
+            tab.itemsData = loadedItems;
+            // fileIds will be updated by loadTabItems
+        } catch (error) {
+            console.error('Failed to load tab items:', error);
             tab.itemsData = [];
+            tab.fileIds = [];
+        } finally {
+            // Notify parent that tab data loading is complete
+            if (deps.onTabDataLoadingChange) {
+                deps.onTabDataLoadingChange(false);
+            }
         }
+
+        // Determine if tab has restorable items after loading
+        const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
+        deps.isTabRestored.value = tabHasRestorableItems;
+        // Set pendingRestoreNextCursor if we have restorable items and a next cursor from query params
+        deps.pendingRestoreNextCursor.value = tabHasRestorableItems && nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;
 
         // Restore currentPage from saved queryParams
         if (pageFromQuery !== undefined && pageFromQuery !== null) {

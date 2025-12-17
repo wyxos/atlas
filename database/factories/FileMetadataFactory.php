@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\File;
-use App\Models\FileMetadata;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

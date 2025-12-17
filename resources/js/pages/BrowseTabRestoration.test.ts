@@ -151,7 +151,6 @@ describe('Browse - Tab Restoration', () => {
 
         const tabConfig = createMockTabConfig(tabId, {
             query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
-            file_ids: [1, 2],
             items_data: mockItems,
         });
 
@@ -400,13 +399,12 @@ describe('Browse - Tab Restoration', () => {
                     },
                 });
             }
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/browse-tabs') && !url.includes('/items')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
                         label: 'Scrolled Tab',
                         query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
-                        file_ids: mockItems.map(item => item.id),
                         position: 0,
                     }],
                 });

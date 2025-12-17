@@ -611,13 +611,12 @@ describe('Browse - Core', () => {
         const pageParam = 'cursor-string-123';
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/browse-tabs') && !url.includes('/items')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
                         query_params: { service: 'civit-ai-images', page: pageParam },
-                        file_ids: [123],
                         position: 0,
                     }],
                 });
@@ -660,13 +659,12 @@ describe('Browse - Core', () => {
         const pageValue = 123;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/browse-tabs') && !url.includes('/items')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
                         query_params: { service: 'civit-ai-images', page: pageValue },
-                        file_ids: [123],
                         position: 0,
                     }],
                 });

@@ -60,4 +60,3 @@ test('logout clears authentication', function () {
 
     $this->assertGuest();
 });
-

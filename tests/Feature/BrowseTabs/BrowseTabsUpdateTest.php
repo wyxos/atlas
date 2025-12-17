@@ -169,4 +169,3 @@ test('tab update maintains file order', function () {
     expect($files[1]->id)->toBe($file2->id);
     expect($files[2]->id)->toBe($file1->id);
 });
-

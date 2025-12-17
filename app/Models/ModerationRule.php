@@ -25,7 +25,9 @@ class ModerationRule extends Model
      * Action type constants.
      */
     public const ACTION_UI_COUNTDOWN = 'ui_countdown';
+
     public const ACTION_AUTO_DISLIKE = 'auto_dislike';
+
     public const ACTION_BLACKLIST = 'blacklist';
 
     /**

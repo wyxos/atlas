@@ -45,7 +45,6 @@ describe('useBrowseTabs', () => {
                 id: 1,
                 label: 'Tab 1',
                 query_params: { page: 1 },
-                file_ids: [],
                 position: 0,
                 is_active: false,
             },
@@ -53,7 +52,6 @@ describe('useBrowseTabs', () => {
                 id: 2,
                 label: 'Tab 2',
                 query_params: { page: 2 },
-                file_ids: [1, 2],
                 position: 1,
                 is_active: false,
             },
@@ -69,19 +67,20 @@ describe('useBrowseTabs', () => {
         expect(tabs.value).toHaveLength(2);
         expect(tabs.value[0].id).toBe(1);
         expect(tabs.value[0].label).toBe('Tab 1');
+        expect(tabs.value[0].fileIds).toEqual([]); // fileIds should be empty on initial load
         expect(tabs.value[0].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(tabs.value[1].id).toBe(2);
         expect(tabs.value[1].label).toBe('Tab 2');
-        expect(tabs.value[1].fileIds).toEqual([1, 2]);
+        expect(tabs.value[1].fileIds).toEqual([]); // fileIds should be empty on initial load
         expect(tabs.value[1].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(isLoadingTabs.value).toBe(false);
     });
 
     it('sorts tabs by position', async () => {
         const mockTabs = [
-            { id: 3, label: 'Tab 3', query_params: {}, file_ids: [], items_data: [], position: 2, is_active: false },
-            { id: 1, label: 'Tab 1', query_params: {}, file_ids: [], items_data: [], position: 0, is_active: false },
-            { id: 2, label: 'Tab 2', query_params: {}, file_ids: [], items_data: [], position: 1, is_active: false },
+            { id: 3, label: 'Tab 3', query_params: {}, position: 2, is_active: false },
+            { id: 1, label: 'Tab 1', query_params: {}, position: 0, is_active: false },
+            { id: 2, label: 'Tab 2', query_params: {}, position: 1, is_active: false },
         ];
 
         mockAxios.get.mockResolvedValueOnce({ data: mockTabs });
@@ -155,7 +154,6 @@ describe('useBrowseTabs', () => {
                 id: 2,
                 label: 'Tab 2',
                 query_params: {},
-                file_ids: [],
                 position: 1,
                 is_active: true,
             },

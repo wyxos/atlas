@@ -223,4 +223,3 @@ test('browse returns empty items array when service fails', function () {
     expect($data['items'])->toBeArray();
     expect($data['items'])->toBeEmpty();
 });
-
