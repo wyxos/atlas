@@ -2,6 +2,7 @@ import { ref, computed, onUnmounted, h, getCurrentInstance, type Component } fro
 import { useToast } from 'vue-toastification';
 import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
 import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
+import { useTimerManager } from './useTimerManager';
 
 export interface QueuedReaction {
     id: string;
@@ -32,6 +33,10 @@ const batchToastIds = ref<Map<string, string | number>>(new Map()); // Track bat
 
 export function useReactionQueue() {
     const toast = useToast();
+
+    // Register with centralized timer manager
+    const timerManager = useTimerManager();
+    const systemId = 'reaction-queue' as const;
 
     // Define cancel functions first so they're available in queueReaction callbacks
     async function cancelReaction(fileId: number, isTabActive?: (tabId: number) => boolean): Promise<void> {
@@ -406,7 +411,8 @@ export function useReactionQueue() {
         queuedReactions.value = [];
     }
 
-    function pauseAll(): void {
+    // Internal pause/resume functions that actually modify state
+    function internalPauseAll(): void {
         if (isPaused.value) {
             return; // Already paused
         }
@@ -438,7 +444,7 @@ export function useReactionQueue() {
         });
     }
 
-    function resumeAll(): void {
+    function internalResumeAll(): void {
         if (!isPaused.value) {
             return; // Not paused
         }
@@ -562,19 +568,25 @@ export function useReactionQueue() {
         });
     }
 
-    // Register pause/resume functions globally for toast container hover events
-    if (typeof window !== 'undefined') {
-        const win = window as any;
-        win.__reactionQueuePauseAll = pauseAll;
-        win.__reactionQueueResumeAll = resumeAll;
+    // Public pause/resume functions that delegate to timer manager
+    function pauseAll(): void {
+        timerManager.freeze(systemId);
     }
+
+    function resumeAll(): void {
+        timerManager.unfreeze(systemId);
+    }
+
+    // Register with timer manager
+    timerManager.registerSystem(systemId, internalPauseAll, internalResumeAll);
 
     // Cleanup on unmount (only if called within a component context)
     const instance = getCurrentInstance();
     if (instance) {
-    onUnmounted(() => {
-        cancelAll();
-    });
+        onUnmounted(() => {
+            timerManager.unregisterSystem(systemId);
+            cancelAll();
+        });
     }
 
     return {

@@ -837,8 +837,9 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
-                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" @apply="handleApplyFilters" />
+                <BrowseFiltersSheet v-model:open="isFilterSheetOpen" v-model="selectedService"
+                    :available-services="availableServices" :tab="tab" :masonry="masonry"
+                    :is-masonry-loading="masonry?.isLoading ?? false" @apply="handleApplyFilters" />
 
                 <!-- Moderation Rules -->
                 <ModerationRulesManager :disabled="masonry?.isLoading ?? false"

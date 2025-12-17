@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useAutoDislikeQueue } from './useAutoDislikeQueue';
+import { useTimerManager } from './useTimerManager';
 
 describe('useAutoDislikeQueue', () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        // Reset timer manager state for test isolation
+        const manager = useTimerManager();
+        manager.reset();
     });
 
     afterEach(() => {

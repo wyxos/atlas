@@ -13,17 +13,23 @@ const props = defineProps<Props>();
 
 const QUEUE_DELAY_SECONDS = 5;
 
-// Handle hover events to pause/resume countdown
+// Handle hover events to pause/resume countdown (uses centralized timer manager)
 function handleMouseEnter(): void {
     const win = window as any;
-    if (win.__reactionQueuePauseAll) {
+    // Use new timer manager functions (backward compatible with old names)
+    if (win.__timerManagerFreeze) {
+        win.__timerManagerFreeze();
+    } else if (win.__reactionQueuePauseAll) {
         win.__reactionQueuePauseAll();
     }
 }
 
 function handleMouseLeave(): void {
     const win = window as any;
-    if (win.__reactionQueueResumeAll) {
+    // Use new timer manager functions (backward compatible with old names)
+    if (win.__timerManagerUnfreeze) {
+        win.__timerManagerUnfreeze();
+    } else if (win.__reactionQueueResumeAll) {
         win.__reactionQueueResumeAll();
     }
 }
