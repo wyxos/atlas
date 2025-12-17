@@ -97,6 +97,7 @@ const isTabRestored = ref(false);
 const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
+const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
 
 // Container refs for FileViewer
@@ -408,7 +409,7 @@ const containerBadges = useContainerBadges(items);
 const containerBlacklistManager = ref<InstanceType<typeof ContainerBlacklistManager> | null>(null);
 
 // Check if a container type is blacklistable for the current service
-function isContainerBlacklistable(container: { type: string; source: string }): boolean {
+function isContainerBlacklistable(container: { type: string; source?: string }): boolean {
     // Hardcoded mapping for now - in the future, this could come from service metadata
     // CivitAI: only 'User' type is blacklistable (case-sensitive match)
     if (container.source === 'CivitAI' || currentTabService.value === 'civit-ai-images') {
@@ -420,9 +421,15 @@ function isContainerBlacklistable(container: { type: string; source: string }): 
 }
 
 // Handle container ban button click
-function handleContainerBan(container: { id: number; type: string; source: string; source_id: string; referrer?: string | null }): void {
-    if (containerBlacklistManager.value) {
-        containerBlacklistManager.value.openBlacklistDialog(container);
+function handleContainerBan(container: { id: number; type: string; source?: string; source_id?: string; referrer?: string | null }): void {
+    if (containerBlacklistManager.value && container.source && container.source_id) {
+        containerBlacklistManager.value.openBlacklistDialog({
+            id: container.id,
+            type: container.type,
+            source: container.source,
+            source_id: container.source_id,
+            referrer: container.referrer ?? null,
+        });
     }
 }
 
@@ -558,6 +565,120 @@ function removeItemFromMasonry(item: MasonryItem): void {
             masonry.value.remove(masonryItem);
         }
     }
+}
+
+// Event handlers for masonry items
+function handleMasonryItemMouseEnter(index: number, itemId: number): void {
+    hoveredItemIndex.value = index;
+    hoveredItemId.value = itemId;
+    if (autoDislikeQueue.isQueued(itemId)) {
+        autoDislikeQueue.freeze();
+    }
+}
+
+function handleMasonryItemMouseLeave(): void {
+    const itemId = hoveredItemId.value;
+    hoveredItemIndex.value = null;
+    hoveredItemId.value = null;
+    containerBadges.setHoveredContainerId(null);
+    if (itemId && autoDislikeQueue.isQueued(itemId)) {
+        autoDislikeQueue.unfreeze();
+    }
+}
+
+async function handleItemPreloadSuccess(payload: { item: any; type: 'image' | 'video'; src: string }, item: MasonryItem): Promise<void> {
+    // payload.item is the item passed to MasonryItem, which should have the id
+    const itemId = payload.item?.id ?? item?.id;
+    if (itemId) {
+        // Track that this item has loaded (refs are auto-unwrapped in templates)
+        loadedItemIds.value.add(itemId);
+
+        // Handle preview increment
+        const result = await itemPreview.handleItemPreload(itemId);
+
+        // If will_auto_dislike was newly set, add to queue
+        if (result?.will_auto_dislike) {
+            autoDislikeQueue.addToQueue(itemId, true); // Start active since preview just loaded
+        }
+
+        // Activate auto-dislike countdown when preview loads
+        // This handles both moderation rules and container blacklists
+        if (autoDislikeQueue.isQueued(itemId)) {
+            autoDislikeQueue.activateItem(itemId);
+        }
+    }
+}
+
+function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
+    masonryInteractions.handleMasonryItemAuxClick(e, item);
+}
+
+// Event handlers for container pills
+function handleContainerPillMouseEnter(containerId: number): void {
+    containerBadges.setHoveredContainerId(containerId);
+}
+
+function handleContainerPillMouseLeave(): void {
+    containerBadges.setHoveredContainerId(null);
+}
+
+function handleContainerPillClick(containerId: number, e: MouseEvent): void {
+    containerPillInteractions.handlePillClick(containerId, e);
+}
+
+function handleContainerPillDblClick(containerId: number, e: MouseEvent): void {
+    containerPillInteractions.handlePillClick(containerId, e, true);
+}
+
+function handleContainerPillContextMenu(containerId: number, e: MouseEvent): void {
+    containerPillInteractions.handlePillClick(containerId, e);
+}
+
+function handleContainerPillAuxClick(containerId: number, e: MouseEvent): void {
+    containerPillInteractions.handlePillAuxClick(containerId, e);
+}
+
+function handleContainerPillMouseDown(e: MouseEvent): void {
+    if (e.button === 1) {
+        e.preventDefault();
+    }
+}
+
+function handlePillDismiss(container: { id: number; type: string; source?: string; source_id?: string; referrer?: string | null }): void {
+    handleContainerBan(container);
+}
+
+function handlePromptDialogClick(item: MasonryItem): void {
+    promptData.openPromptDialog(item);
+}
+
+function handleRemoveItem(remove: (item: MasonryItem) => void, item: MasonryItem): void {
+    remove(item);
+}
+
+function handleFileReaction(itemId: number, type: 'love' | 'like' | 'dislike' | 'funny', remove: (item: MasonryItem) => void): void {
+    handleMasonryReaction(itemId, type, remove);
+}
+
+function handleCopyPromptClick(): void {
+    if (promptData.currentPromptData.value) {
+        promptData.copyPromptToClipboard(promptData.currentPromptData.value);
+    }
+}
+
+function handlePromptDialogUpdate(val: boolean): void {
+    if (!val) {
+        promptData.closePromptDialog();
+    }
+}
+
+// Computed property for progress bar style
+function getProgressBarStyle(itemId: number): { transform: string; transformOrigin: string; width: string } {
+    return {
+        transform: `scaleX(${autoDislikeQueue.getProgress(itemId)})`,
+        transformOrigin: 'left',
+        width: '100%',
+    };
 }
 
 // Refresh/reload the tab
@@ -724,11 +845,8 @@ onUnmounted(() => {
                     @rules-changed="handleModerationRulesChanged" />
 
                 <!-- Container Blacklists -->
-                <ContainerBlacklistManager
-                    ref="containerBlacklistManager"
-                    :disabled="masonry?.isLoading ?? false"
-                    @blacklists-changed="handleModerationRulesChanged"
-                />
+                <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading ?? false"
+                    @blacklists-changed="handleModerationRulesChanged" />
 
                 <!-- Cancel Loading Button -->
                 <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
@@ -776,37 +894,16 @@ onUnmounted(() => {
                     data-test="masonry-component">
                     <template #default="{ item, index, remove }">
                         <VibeMasonryItem :item="item" :remove="remove"
-                            @mouseenter="() => { hoveredItemIndex = index; if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.freeze(); } }"
-                            @mouseleave="() => { hoveredItemIndex = null; containerBadges.setHoveredContainerId(null); if (autoDislikeQueue.isQueued(item.id)) { autoDislikeQueue.unfreeze(); } }"
-                                @preload:success="async (payload: { item: any; type: 'image' | 'video'; src: string }) => {
-                                // payload.item is the item passed to MasonryItem, which should have the id
-                                const itemId = payload.item?.id ?? item?.id;
-                                if (itemId) {
-                                    // Track that this item has loaded (refs are auto-unwrapped in templates)
-                                    loadedItemIds.add(itemId);
-
-                                        // Handle preview increment
-                                        const result = await itemPreview.handleItemPreload(itemId);
-
-                                        // If will_auto_dislike was newly set, add to queue
-                                        if (result?.will_auto_dislike) {
-                                            autoDislikeQueue.addToQueue(itemId, true); // Start active since preview just loaded
-                                        }
-
-                                    // Activate auto-dislike countdown when preview loads
-                                        // This handles both moderation rules and container blacklists
-                                    if (autoDislikeQueue.isQueued(itemId)) {
-                                        autoDislikeQueue.activateItem(itemId);
-                                    }
-                                }
-                            }">
+                            @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
+                            @mouseleave="handleMasonryItemMouseLeave"
+                            @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc, mediaType }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500"
                                     :data-key="item.key" :data-masonry-item-id="item.id"
                                     :class="containerBadges.getMasonryItemClasses.value(item)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
-                                    @auxclick="(e: MouseEvent) => masonryInteractions.handleMasonryItemAuxClick(e, item)">
+                                    @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item)">
                                     <!-- Auto-disliked indicator overlay with smooth animation -->
                                     <Transition name="ring-fade">
                                         <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
@@ -833,11 +930,7 @@ onUnmounted(() => {
                                                     <!-- Access queueUpdateTrigger to ensure reactivity to queue changes -->
                                                     <div v-if="autoDislikeQueue.isActive(item.id)"
                                                         class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-transform duration-100"
-                                                        :style="{
-                                                            transform: `scaleX(${autoDislikeQueue.getProgress(item.id)})`,
-                                                            transformOrigin: 'left',
-                                                            width: '100%'
-                                                        }"
+                                                        :style="getProgressBarStyle(item.id)"
                                                         :key="`progress-${item.id}-${queueUpdateTrigger}`">
                                                     </div>
                                                     <!-- Timer text overlay or paused indicator -->
@@ -866,15 +959,18 @@ onUnmounted(() => {
                                         <!-- Media type indicator badge - shown BEFORE preloading starts -->
                                         <div
                                             class="w-12 h-12 rounded-full bg-prussian-blue-700/80 backdrop-blur-sm flex items-center justify-center shadow-sm border border-twilight-indigo-500/30">
-                                            <Image v-if="mediaType === 'image'" :size="20" class="text-twilight-indigo-300" />
-                                            <Video v-else-if="mediaType === 'video'" :size="20" class="text-twilight-indigo-300" />
+                                            <Image v-if="mediaType === 'image'" :size="20"
+                                                class="text-twilight-indigo-300" />
+                                            <Video v-else-if="mediaType === 'video'" :size="20"
+                                                class="text-twilight-indigo-300" />
                                         </div>
                                     </div>
 
                                     <!-- Spinner (only shown when loading/preloading) - centered vertically -->
                                     <div v-if="isLoading"
                                         class="absolute inset-0 flex items-center justify-center z-10">
-                                        <div class="bg-prussian-blue-700/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border border-twilight-indigo-500/30">
+                                        <div
+                                            class="bg-prussian-blue-700/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border border-twilight-indigo-500/30">
                                             <Loader2 class="w-4 h-4 text-smart-blue-400 animate-spin" />
                                         </div>
                                     </div>
@@ -897,20 +993,18 @@ onUnmounted(() => {
                                         class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
                                         <div v-for="container in containerBadges.getContainersForItem(item)"
                                             :key="container.id" class="cursor-pointer"
-                                            @mouseenter="() => { containerBadges.setHoveredContainerId(container.id); }"
-                                            @mouseleave="() => { containerBadges.setHoveredContainerId(null); }"
-                                            @click.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e)"
-                                            @dblclick.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e, true)"
-                                            @contextmenu.stop="(e: MouseEvent) => containerPillInteractions.handlePillClick(container.id, e)"
-                                            @auxclick.stop="(e: MouseEvent) => containerPillInteractions.handlePillAuxClick(container.id, e)"
-                                            @mousedown.stop="(e: MouseEvent) => { if (e.button === 1) e.preventDefault(); }">
-                                            <Pill
-                                                :label="container.type"
+                                            @mouseenter="handleContainerPillMouseEnter(container.id)"
+                                            @mouseleave="handleContainerPillMouseLeave"
+                                            @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
+                                            @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
+                                            @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
+                                            @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
+                                            @mousedown.stop="handleContainerPillMouseDown">
+                                            <Pill :label="container.type"
                                                 :value="containerBadges.getItemCountForContainerId(container.id)"
                                                 :variant="containerBadges.getVariantForContainerType(container.type)"
                                                 :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
-                                                @dismiss="() => handleContainerBan(container)"
-                                            />
+                                                @dismiss="() => handlePillDismiss(container)" />
                                         </div>
                                     </div>
 
@@ -919,8 +1013,7 @@ onUnmounted(() => {
                                         class="absolute top-2 right-2 z-50 pointer-events-auto">
                                         <Button variant="ghost" size="sm"
                                             class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
-                                            @click.stop="() => promptData.openPromptDialog(item)"
-                                            aria-label="Show prompt">
+                                            @click.stop="handlePromptDialogClick(item)" aria-label="Show prompt">
                                             <Info :size="14" />
                                         </Button>
                                     </div>
@@ -932,8 +1025,8 @@ onUnmounted(() => {
                                             :previewed-count="(item.previewed_count as number) ?? 0"
                                             :viewed-count="(item.seen_count as number) ?? 0" :current-index="index"
                                             :total-items="items.length" variant="small"
-                                            :remove-item="() => remove(item)"
-                                            @reaction="(type) => handleMasonryReaction(item.id, type, remove)" />
+                                            :remove-item="() => handleRemoveItem(remove, item)"
+                                            @reaction="(type) => handleFileReaction(item.id, type, remove)" />
                                     </div>
                                 </div>
                             </template>
@@ -989,8 +1082,7 @@ onUnmounted(() => {
         </Dialog>
 
         <!-- Prompt Dialog -->
-        <Dialog v-model="promptData.promptDialogOpen.value"
-            @update:model-value="(val) => { if (!val) promptData.closePromptDialog(); }">
+        <Dialog v-model="promptData.promptDialogOpen.value" @update:model-value="handlePromptDialogUpdate">
             <DialogContent class="sm:max-w-[600px] bg-prussian-blue-600">
                 <DialogHeader>
                     <DialogTitle class="text-twilight-indigo-100">Prompt</DialogTitle>
@@ -1012,9 +1104,7 @@ onUnmounted(() => {
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" size="sm"
-                        @click="() => { if (promptData.currentPromptData.value) promptData.copyPromptToClipboard(promptData.currentPromptData.value); }"
-                        aria-label="Copy prompt">
+                    <Button variant="outline" size="sm" @click="handleCopyPromptClick" aria-label="Copy prompt">
                         <Copy :size="16" class="mr-2" />
                         Copy
                     </Button>
