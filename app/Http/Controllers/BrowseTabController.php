@@ -13,18 +13,13 @@ class BrowseTabController extends Controller
      * Get all tabs for the authenticated user.
      * Note: items_data is NOT loaded here to support 1000+ tabs efficiently.
      * Use the items() method to load items for a specific tab when needed.
+     * No file-related information is included in the response.
      */
     public function index(): JsonResponse
     {
         $tabs = BrowseTab::forUser(auth()->id())
-            ->with('files:id') // Only load file IDs, not full file data
             ->ordered()
             ->get();
-
-        // Only add file_ids, not the full items_data (for performance with 1000+ tabs)
-        $tabs->each(function (BrowseTab $tab) {
-            $tab->file_ids = $tab->files->pluck('id')->toArray();
-        });
 
         return response()->json($tabs);
     }

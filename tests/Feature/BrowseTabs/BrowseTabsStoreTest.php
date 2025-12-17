@@ -62,7 +62,7 @@ test('tab creation accepts optional file_ids', function () {
     $response->assertStatus(201);
     $data = $response->json();
     expect($data['file_ids'])->toBe([$file1->id, $file2->id]);
-    
+
     // Verify files are attached via relationship
     $tab = BrowseTab::find($data['id']);
     expect($tab->files)->toHaveCount(2);
@@ -231,4 +231,3 @@ test('validation fails when file_ids contains non-integer', function () {
     $response->assertStatus(422);
     $response->assertJsonValidationErrors('file_ids.0');
 });
-

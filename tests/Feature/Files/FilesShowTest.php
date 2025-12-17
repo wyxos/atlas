@@ -56,4 +56,3 @@ test('viewing non-existent file returns 404', function () {
 
     $response->assertNotFound();
 });
-

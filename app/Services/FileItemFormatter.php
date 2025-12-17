@@ -104,11 +104,11 @@ class FileItemFormatter
 
                 $containers = $file->containers->map(function (Container $container) {
                     return [
-                    'id' => $container->id,
-                    'type' => $container->type,
-                    'source' => $container->source,
-                    'source_id' => $container->source_id,
-                    'referrer' => $container->referrer,
+                        'id' => $container->id,
+                        'type' => $container->type,
+                        'source' => $container->source,
+                        'source_id' => $container->source_id,
+                        'referrer' => $container->referrer,
                         'action_type' => $container->action_type,
                         'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
                     ];

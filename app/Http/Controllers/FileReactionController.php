@@ -181,6 +181,7 @@ class FileReactionController extends Controller
                     'file_id' => $file->id,
                     'reaction' => null,
                 ];
+
                 continue;
             }
 

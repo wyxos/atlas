@@ -74,4 +74,3 @@ test('deleted user is removed from database', function () {
 
     $this->assertDatabaseMissing('users', ['id' => $userId]);
 });
-

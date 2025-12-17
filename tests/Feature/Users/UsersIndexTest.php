@@ -142,4 +142,3 @@ test('users listing includes filter metadata', function () {
     $data = $response->json();
     expect($data['filters'])->toBeArray();
 });
-

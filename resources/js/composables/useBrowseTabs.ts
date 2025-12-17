@@ -24,7 +24,7 @@ export type BrowseTabData = {
     id: number;
     label: string;
     queryParams: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
-    fileIds: number[]; // Database file IDs
+    fileIds: number[]; // Database file IDs (loaded when tab is initialized)
     itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
     isActive: boolean;
@@ -47,7 +47,6 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
                 id: number;
                 label: string;
                 query_params?: Record<string, string | number | null>;
-                file_ids?: number[];
                 items_data?: MasonryItem[]; // Not included in initial load, but kept for backward compatibility
                 position?: number;
                 is_active?: boolean;
@@ -55,7 +54,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
                 id: tab.id,
                 label: tab.label,
                 queryParams: tab.query_params || {},
-                fileIds: tab.file_ids || [],
+                fileIds: [], // Always empty on initial load - loaded when tab is initialized
                 itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
                 position: tab.position || 0,
                 isActive: tab.is_active ?? false,

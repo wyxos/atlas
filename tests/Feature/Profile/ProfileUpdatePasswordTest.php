@@ -169,4 +169,3 @@ test('password update follows Password defaults rules', function () {
         $response->assertJsonValidationErrors('password');
     }
 });
-

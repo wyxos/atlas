@@ -251,7 +251,6 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
         id: tabId,
         label: `Test Tab ${tabId}`,
         query_params: { service: 'civit-ai-images', page: 1 },
-        file_ids: [],
         items_data: [],
         position: 0,
         is_active: false,
@@ -264,8 +263,14 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
  */
 export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], browseResponse?: any) {
     mocks.mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/api/browse-tabs')) {
-            return Promise.resolve({ data: Array.isArray(tabConfig) ? tabConfig : [tabConfig] });
+        if (url.includes('/api/browse-tabs') && !url.includes('/items')) {
+            // Return tab configs for initial load without file-related data
+            const configs = Array.isArray(tabConfig) ? tabConfig : [tabConfig];
+            const tabsForIndex = configs.map((tab: any) => {
+                const { file_ids, has_files, items_data, ...rest } = tab;
+                return rest;
+            });
+            return Promise.resolve({ data: tabsForIndex });
         }
         if (url.includes('/api/browse-tabs/') && url.includes('/items')) {
             const tabId = url.match(/\/api\/browse-tabs\/(\d+)\/items/)?.[1];

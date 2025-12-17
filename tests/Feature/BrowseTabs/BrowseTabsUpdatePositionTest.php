@@ -107,4 +107,3 @@ test('updating non-existent tab position returns 404', function () {
 
     $response->assertNotFound();
 });
-

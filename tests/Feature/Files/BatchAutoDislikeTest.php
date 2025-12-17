@@ -216,4 +216,3 @@ test('batch auto-dislike handles empty valid file list', function () {
             'file_ids' => [],
         ]);
 });
-

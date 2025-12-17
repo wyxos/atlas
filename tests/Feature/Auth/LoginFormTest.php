@@ -26,4 +26,3 @@ test('login form returns correct view', function () {
 
     $response->assertViewIs('auth.login');
 });
-

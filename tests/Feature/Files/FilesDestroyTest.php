@@ -65,4 +65,3 @@ test('deleted file is removed from database', function () {
 
     $this->assertDatabaseMissing('files', ['id' => $fileId]);
 });
-

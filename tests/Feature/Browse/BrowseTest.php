@@ -87,13 +87,11 @@ it('new tab does not load images until service is selected', function () {
         ->assertSeeIn('[data-test="no-service-message"]', 'Select a service to start browsing');
 
     // Verify remote service was only called for fetching services (limit=1) and nothing else
-    Http::assertSent(fn ($request) => 
-        str_contains($request->url(), 'civitai.com/api/v1/images') &&
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'civitai.com/api/v1/images') &&
         str_contains($request->url(), 'limit=1')
     );
 
-    Http::assertNotSent(fn ($request) => 
-        str_contains($request->url(), 'civitai.com/api/v1/images') &&
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'civitai.com/api/v1/images') &&
         ! str_contains($request->url(), 'limit=1')
     );
 });
@@ -164,8 +162,7 @@ it('applies selected service and loads images', function () {
     $page->assertPresent('[data-test="masonry-component"]');
 
     // Verify remote service was called to load images (should not use limit=1 here)
-    Http::assertSent(fn ($request) => 
-        str_contains($request->url(), 'civitai.com/api/v1/images') &&
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'civitai.com/api/v1/images') &&
         ! str_contains($request->url(), 'limit=1')
     );
 });

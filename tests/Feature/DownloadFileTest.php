@@ -189,7 +189,7 @@ test('generates thumbnail for image files', function () {
     $image = imagecreatetruecolor(1, 1);
     $white = imagecolorallocate($image, 255, 255, 255);
     imagefill($image, 0, 0, $white);
-    
+
     ob_start();
     imagejpeg($image, null, 100);
     $jpegContent = ob_get_clean();

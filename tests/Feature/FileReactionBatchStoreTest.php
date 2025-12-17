@@ -43,7 +43,7 @@ test('batch store reactions for multiple files', function () {
 
 test('batch store removes existing reactions before creating new ones', function () {
     $file = File::factory()->create();
-    
+
     // Create existing reaction
     Reaction::create([
         'file_id' => $file->id,
@@ -74,7 +74,7 @@ test('batch store removes existing reactions before creating new ones', function
 
 test('batch store toggles reaction off if same type is sent again', function () {
     $file = File::factory()->create();
-    
+
     // Create existing reaction
     Reaction::create([
         'file_id' => $file->id,
@@ -135,4 +135,3 @@ test('batch store requires authentication', function () {
 
     $response->assertUnauthorized();
 });
-
