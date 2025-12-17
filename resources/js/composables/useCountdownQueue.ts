@@ -1,4 +1,5 @@
 import { ref, computed, onUnmounted, getCurrentInstance } from 'vue';
+import { useTimerManager } from './useTimerManager';
 
 const COUNTDOWN_DURATION = 5000; // 5 seconds
 const TICK_INTERVAL = 100; // Update every 100ms for smooth countdown
@@ -22,6 +23,22 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
     const queue = ref<Map<T, QueuedItem<T>>>(new Map());
     const isFrozen = ref(false);
     let tickInterval: ReturnType<typeof setInterval> | null = null;
+
+    // Register with centralized timer manager
+    const timerManager = useTimerManager();
+    const systemId = 'auto-dislike' as const;
+
+    // Internal freeze/unfreeze functions that actually modify state
+    function internalFreeze(): void {
+        isFrozen.value = true;
+    }
+
+    function internalUnfreeze(): void {
+        isFrozen.value = false;
+    }
+
+    // Register with timer manager
+    timerManager.registerSystem(systemId, internalFreeze, internalUnfreeze);
 
     const queuedItems = computed(() => Array.from(queue.value.values()));
     const queueSize = computed(() => queue.value.size);
@@ -115,16 +132,18 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
 
     /**
      * Freeze all countdowns (called on hover).
+     * Delegates to centralized timer manager to coordinate with other timer systems.
      */
     function freeze(): void {
-        isFrozen.value = true;
+        timerManager.freeze(systemId);
     }
 
     /**
      * Unfreeze all countdowns (called when hover ends).
+     * Delegates to centralized timer manager to coordinate with other timer systems.
      */
     function unfreeze(): void {
-        isFrozen.value = false;
+        timerManager.unfreeze(systemId);
     }
 
     /**
@@ -207,6 +226,7 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
     const instance = getCurrentInstance();
     if (instance) {
         onUnmounted(() => {
+            timerManager.unregisterSystem(systemId);
             clearQueue();
         });
     }

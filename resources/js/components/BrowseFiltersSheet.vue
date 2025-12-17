@@ -15,6 +15,7 @@ interface Props {
     tab?: BrowseTabData;
     masonry?: { isLoading?: boolean; reset?: () => void; loadPage?: (page: number) => Promise<void>; cancelLoad?: () => void; destroy?: () => void } | null;
     isMasonryLoading?: boolean;
+    modelValue?: string; // v-model for selectedService
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -25,6 +26,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
+    'update:modelValue': [value: string];
     'apply': [filters: {
         service: string;
         nsfw: boolean;
@@ -35,9 +37,14 @@ const emit = defineEmits<{
     'reset': [];
 }>();
 
-// Reactive form to track all filter query params
+// Computed property for service that syncs with parent's selectedService via v-model
+const selectedService = computed({
+    get: () => props.modelValue || '',
+    set: (value: string) => emit('update:modelValue', value),
+});
+
+// Reactive form to track all filter query params (service is synced via v-model)
 const filterForm = reactive({
-    service: '',
     nsfw: false,
     type: 'all',
     limit: '20',
@@ -47,7 +54,7 @@ const filterForm = reactive({
 // Initialize filter form from tab's queryParams
 watch(() => props.tab?.queryParams, (queryParams) => {
     if (queryParams) {
-        filterForm.service = (queryParams.service as string) || '';
+        // Service is handled via v-model, so we don't set it here
         const nsfwValue = queryParams.nsfw;
         filterForm.nsfw = Boolean(nsfwValue && (nsfwValue === 1 || nsfwValue === '1' || nsfwValue === 'true'));
         filterForm.type = (queryParams.type as string) || 'all';
@@ -55,7 +62,6 @@ watch(() => props.tab?.queryParams, (queryParams) => {
         filterForm.sort = (queryParams.sort as string) || 'Newest';
     } else {
         // Reset to defaults if no queryParams
-        filterForm.service = '';
         filterForm.nsfw = false;
         filterForm.type = 'all';
         filterForm.limit = '20';
@@ -70,13 +76,13 @@ const isOpen = computed({
 
 // Apply filters
 async function applyFilters(): Promise<void> {
-    if (!filterForm.service) {
+    if (!selectedService.value) {
         // Service is required
         return;
     }
 
     emit('apply', {
-        service: filterForm.service,
+        service: selectedService.value,
         nsfw: filterForm.nsfw,
         type: filterForm.type,
         limit: filterForm.limit,
@@ -90,14 +96,15 @@ async function applyFilters(): Promise<void> {
 // Reset filters
 function resetFilters(): void {
     if (props.tab?.queryParams) {
-        filterForm.service = (props.tab.queryParams.service as string) || '';
+        // Service is handled via v-model, reset it through the computed property
+        selectedService.value = (props.tab.queryParams.service as string) || '';
         const nsfwValue = props.tab.queryParams.nsfw;
         filterForm.nsfw = Boolean(nsfwValue && (nsfwValue === 1 || nsfwValue === '1' || nsfwValue === 'true'));
         filterForm.type = (props.tab.queryParams.type as string) || 'all';
         filterForm.limit = String(props.tab.queryParams.limit || '20');
         filterForm.sort = (props.tab.queryParams.sort as string) || 'Newest';
     } else {
-        filterForm.service = '';
+        selectedService.value = '';
         filterForm.nsfw = false;
         filterForm.type = 'all';
         filterForm.limit = '20';
@@ -111,8 +118,7 @@ function resetFilters(): void {
 <template>
     <Sheet v-model:open="isOpen">
         <SheetTrigger as-child>
-            <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button"
-                :disabled="isMasonryLoading">
+            <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button" :disabled="isMasonryLoading">
                 <SlidersHorizontal :size="14" />
             </Button>
         </SheetTrigger>
@@ -124,7 +130,7 @@ function resetFilters(): void {
                 <!-- Service Filter -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Service</label>
-                    <Select v-model="filterForm.service">
+                    <Select v-model="selectedService">
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
@@ -152,11 +158,13 @@ function resetFilters(): void {
                         </div>
                         <div class="flex items-center gap-2">
                             <RadioGroupItem value="image" id="type-image" />
-                            <label for="type-image" class="text-sm text-twilight-indigo-200 cursor-pointer">Image</label>
+                            <label for="type-image"
+                                class="text-sm text-twilight-indigo-200 cursor-pointer">Image</label>
                         </div>
                         <div class="flex items-center gap-2">
                             <RadioGroupItem value="video" id="type-video" />
-                            <label for="type-video" class="text-sm text-twilight-indigo-200 cursor-pointer">Video</label>
+                            <label for="type-video"
+                                class="text-sm text-twilight-indigo-200 cursor-pointer">Video</label>
                         </div>
                     </RadioGroup>
                 </div>
@@ -201,11 +209,10 @@ function resetFilters(): void {
                 <Button variant="destructive" @click="resetFilters">
                     Reset
                 </Button>
-                <Button variant="default" @click="applyFilters" :disabled="!filterForm.service">
+                <Button variant="default" @click="applyFilters" :disabled="!selectedService">
                     Apply
                 </Button>
             </SheetFooter>
         </SheetContent>
     </Sheet>
 </template>
-
