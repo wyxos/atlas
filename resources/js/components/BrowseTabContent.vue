@@ -1039,9 +1039,6 @@ onUnmounted(() => {
                 data-test="no-service-message">
                 <p class="text-twilight-indigo-300 text-lg">Select a service to start browsing</p>
             </div>
-            <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
-                <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
-            </div>
         </div>
 
         <!-- File Viewer -->
