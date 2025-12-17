@@ -5,10 +5,10 @@ import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
 import BrowseTabContent from '../components/BrowseTabContent.vue';
 import { Button } from '@/components/ui/button';
-import { useBrowseTabs, type MasonryItem } from '../composables/useBrowseTabs';
-import { useBrowseService } from '../composables/useBrowseService';
-import { useReactionQueue } from '../composables/useReactionQueue';
-import { createReactionCallback } from '../utils/reactions';
+import { useBrowseTabs, type MasonryItem } from '@/composables/useBrowseTabs';
+import { useBrowseService } from '@/composables/useBrowseService';
+import { useReactionQueue } from '@/composables/useReactionQueue';
+import { createReactionCallback } from '@/utils/reactions';
 
 const isPanelMinimized = ref(false);
 
