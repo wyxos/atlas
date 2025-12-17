@@ -32,6 +32,14 @@ If a workaround seems necessary, propose:
 A) real fix (preferred)
 B) workaround (needs approval), with risks
 
+## Verification execution rule
+In VERIFY, the agent must:
+1) Provide the exact command(s) to run the relevant tests and checks
+2) Prefer running them via available MCP tools (shell/git) when possible
+3) If the agent cannot run them, it must say "NOT RUN" and explain why, then provide a short checklist of what I should run locally
+
+The agent must not claim success without stating whether verification was RUN or NOT RUN.
+
 ## Failure accounting (no hand-waving)
 If tests fail after PATCH:
 - list each failure: test name, error, likely cause, and whether related

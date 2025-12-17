@@ -1,0 +1,145 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ref, computed } from 'vue';
+import { useBrowseService } from './useBrowseService';
+import type { UseBrowseServiceOptions } from './useBrowseService';
+
+// Mock axios
+const mockAxios = {
+    get: vi.fn(),
+};
+
+Object.defineProperty(window, 'axios', {
+    value: mockAxios,
+    writable: true,
+});
+
+// Mock browseIndex action
+vi.mock('@/actions/App/Http/Controllers/BrowseController', () => ({
+    index: {
+        url: vi.fn((params: any) => {
+            const query = new URLSearchParams(params?.query || {}).toString();
+            return `/api/browse?${query}`;
+        }),
+    },
+}));
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+describe('useBrowseService', () => {
+    it('initializes with empty state', () => {
+        const { availableServices, isApplyingService } = useBrowseService();
+
+        expect(availableServices.value).toEqual([]);
+        expect(isApplyingService.value).toBe(false);
+    });
+
+    it('fetches available services from API', async () => {
+        const mockServices = [
+            { key: 'civit-ai-images', label: 'CivitAI Images' },
+            { key: 'wallhaven', label: 'Wallhaven' },
+        ];
+
+        mockAxios.get.mockResolvedValue({
+            data: {
+                items: [],
+                services: mockServices,
+            },
+        });
+
+        const { fetchServices, availableServices } = useBrowseService();
+
+        await fetchServices();
+
+        expect(mockAxios.get).toHaveBeenCalled();
+        expect(availableServices.value).toEqual(mockServices);
+    });
+
+    it('falls back to default services when API returns empty', async () => {
+        mockAxios.get.mockResolvedValue({
+            data: {
+                items: [],
+                services: [],
+            },
+        });
+
+        const { fetchServices, availableServices } = useBrowseService();
+
+        await fetchServices();
+
+        expect(availableServices.value).toEqual([
+            { key: 'civit-ai-images', label: 'CivitAI Images' },
+            { key: 'wallhaven', label: 'Wallhaven' },
+        ]);
+    });
+
+    it('falls back to default services on error', async () => {
+        mockAxios.get.mockRejectedValue(new Error('Network error'));
+
+        const { fetchServices, availableServices } = useBrowseService();
+
+        await fetchServices();
+
+        expect(availableServices.value).toEqual([
+            { key: 'civit-ai-images', label: 'CivitAI Images' },
+            { key: 'wallhaven', label: 'Wallhaven' },
+        ]);
+    });
+
+    it('returns empty result when no service is selected', async () => {
+        const options: UseBrowseServiceOptions = {
+            hasServiceSelected: computed(() => false),
+            isTabRestored: ref(false),
+            items: ref([]),
+            nextCursor: ref(null),
+            currentPage: ref(null),
+            pendingRestoreNextCursor: ref(null),
+            currentTabService: computed(() => null),
+            activeTabId: ref(null),
+            getActiveTab: () => undefined,
+            updateActiveTab: vi.fn(),
+        };
+
+        const { getNextPage } = useBrowseService(options);
+
+        const result = await getNextPage(1);
+
+        expect(result.items).toEqual([]);
+        expect(result.nextPage).toBeNull();
+        expect(mockAxios.get).not.toHaveBeenCalled();
+    });
+
+    it('returns empty result when tab is restored', async () => {
+        const options: UseBrowseServiceOptions = {
+            hasServiceSelected: computed(() => true),
+            isTabRestored: ref(true),
+            items: ref([]),
+            nextCursor: ref('cursor-123'),
+            currentPage: ref(null),
+            pendingRestoreNextCursor: ref(null),
+            currentTabService: computed(() => 'civit-ai-images'),
+            activeTabId: ref(1),
+            getActiveTab: () => undefined,
+            updateActiveTab: vi.fn(),
+        };
+
+        const { getNextPage } = useBrowseService(options);
+
+        const result = await getNextPage(1);
+
+        expect(result.items).toEqual([]);
+        expect(result.nextPage).toBe('cursor-123');
+        expect(mockAxios.get).not.toHaveBeenCalled();
+    });
+
+    it('gets current service from tab query params', () => {
+        const { getCurrentService } = useBrowseService();
+
+        expect(getCurrentService({ service: 'civit-ai-images' })).toBe('civit-ai-images');
+        expect(getCurrentService({})).toBeNull();
+        expect(getCurrentService()).toBeNull();
+    });
+});
+
