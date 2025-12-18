@@ -19,7 +19,7 @@ import {
     DialogClose,
 } from './ui/dialog';
 import { useBackfill } from '@/composables/useBackfill';
-import { useBrowseService } from '@/composables/useBrowseService';
+import { useBrowseService, type GetPageResult } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import { useContainerBadges } from '@/composables/useContainerBadges';
@@ -39,11 +39,6 @@ import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import { analyzeItemSizes, logItemSizeDiagnostics, createMinimalItems, compareItemPerformance } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
-
-type GetPageResult = {
-    items: MasonryItem[];
-    nextPage: string | number | null;
-};
 
 interface Props {
     tab?: BrowseTabData;
