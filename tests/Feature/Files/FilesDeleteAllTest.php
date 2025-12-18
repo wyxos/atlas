@@ -4,10 +4,16 @@ use App\Models\BrowseTab;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
-test('admin can delete all files from their browse tabs', function () {
+beforeEach(function () {
+    Storage::fake('atlas-app');
+    Storage::fake('local');
+});
+
+test('admin can delete all files in database', function () {
     $admin = User::factory()->admin()->create();
     $file1 = File::factory()->create();
     $file2 = File::factory()->create();
@@ -37,7 +43,7 @@ test('admin can delete all files from their browse tabs', function () {
     $this->assertDatabaseMissing('files', ['id' => $file3->id]);
 });
 
-test('deleteAll only deletes files from user\'s browse tabs', function () {
+test('deleteAll deletes all files in database regardless of user', function () {
     $admin = User::factory()->admin()->create();
     $otherUser = User::factory()->create();
 
@@ -57,18 +63,17 @@ test('deleteAll only deletes files from user\'s browse tabs', function () {
 
     $response->assertSuccessful();
 
-    // Verify admin's files are deleted
+    // Verify all files are deleted, including other user's files
     $this->assertDatabaseMissing('files', ['id' => $file1->id]);
     $this->assertDatabaseMissing('files', ['id' => $file2->id]);
-
-    // Verify other user's files are NOT deleted
-    $this->assertDatabaseHas('files', ['id' => $file3->id]);
+    $this->assertDatabaseMissing('files', ['id' => $file3->id]);
 });
 
 test('deleteAll returns correct deleted count', function () {
     $admin = User::factory()->admin()->create();
     $file1 = File::factory()->create();
     $file2 = File::factory()->create();
+    $file3 = File::factory()->create(); // File not attached to any tab
 
     $tab = BrowseTab::factory()->for($admin)->create();
     $tab->files()->attach([$file1->id => ['position' => 0], $file2->id => ['position' => 1]]);
@@ -77,7 +82,7 @@ test('deleteAll returns correct deleted count', function () {
 
     $response->assertSuccessful();
     $response->assertJson([
-        'deleted_count' => 2,
+        'deleted_count' => 3, // All files in database, including unattached ones
     ]);
 });
 
@@ -113,4 +118,32 @@ test('deleteAll handles user with no files gracefully', function () {
         'message' => 'All files deleted successfully.',
         'deleted_count' => 0,
     ]);
+});
+
+test('deleteAll empties atlas app storage', function () {
+    $admin = User::factory()->admin()->create();
+    $file = File::factory()->create();
+
+    // Create files in atlas app storage
+    $atlasDisk = Storage::disk('atlas-app');
+    $atlasDisk->put('test-file.txt', 'test content');
+    $atlasDisk->put('subdir/another-file.txt', 'more content');
+
+    // Create files in private storage
+    $localDisk = Storage::disk('local');
+    $localDisk->put('private/test-private.txt', 'private content');
+    $localDisk->put('private/images/test-image.jpg', 'image content');
+
+    $response = $this->actingAs($admin)->deleteJson('/api/files');
+
+    $response->assertSuccessful();
+
+    // Verify atlas app storage is emptied
+    $atlasDisk->assertMissing('test-file.txt');
+    $atlasDisk->assertMissing('subdir/another-file.txt');
+
+    // Verify private storage is emptied
+    $localDisk->assertMissing('private/test-private.txt');
+    $localDisk->assertMissing('private/images/test-image.jpg');
+    expect($localDisk->exists('private'))->toBeFalse();
 });

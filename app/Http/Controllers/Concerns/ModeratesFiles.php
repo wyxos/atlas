@@ -4,15 +4,17 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\ModerationRule;
+use App\Models\Reaction;
 use App\Services\Moderation\Moderator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 trait ModeratesFiles
 {
     /**
      * Apply moderation rules to files based on their action_type.
      * - ui_countdown: Returns IDs for UI to queue with countdown
-     * - auto_dislike: Immediately sets auto_disliked = true and dispatches delete job
+     * - auto_dislike: Immediately sets auto_disliked = true, creates dislike reaction, and dispatches delete job
      * - blacklist: Immediately sets blacklisted_at = now() and dispatches delete job
      *
      * @return array{flaggedIds:array<int>, moderationData:array<int, array>, processedIds:array<int>}
@@ -39,7 +41,9 @@ trait ModeratesFiles
         $moderator = new Moderator;
         $flaggedIds = []; // For ui_countdown action type
         $moderationData = [];
-        $processedIds = []; // Files that were immediately processed (auto_dislike or blacklist)
+        $autoDislikeFileIds = []; // Files to auto-dislike
+        $blacklistFileIds = []; // Files to blacklist
+        $filesToDelete = []; // Files with paths that need delete jobs
 
         foreach ($files as $file) {
             // Skip files already auto-disliked or blacklisted
@@ -81,28 +85,65 @@ trait ModeratesFiles
                     // Queue for UI countdown
                     $flaggedIds[] = $file->id;
                 } elseif ($actionType === ModerationRule::ACTION_AUTO_DISLIKE) {
-                    // Immediately auto-dislike
-                    $file->auto_disliked = true;
-                    $file->save();
-                    $processedIds[] = $file->id;
-
-                    // Dispatch delete job if file has a path
+                    // Collect for batch processing
+                    $autoDislikeFileIds[] = $file->id;
                     if (! empty($file->path)) {
-                        DeleteAutoDislikedFileJob::dispatch($file->path);
+                        $filesToDelete[] = $file->path;
                     }
                 } elseif ($actionType === ModerationRule::ACTION_BLACKLIST) {
-                    // Immediately blacklist
-                    $file->blacklisted_at = now();
-                    $file->save();
-                    $processedIds[] = $file->id;
-
-                    // Dispatch delete job if file has a path
+                    // Collect for batch processing
+                    $blacklistFileIds[] = $file->id;
                     if (! empty($file->path)) {
-                        DeleteAutoDislikedFileJob::dispatch($file->path);
+                        $filesToDelete[] = $file->path;
                     }
                 }
             }
         }
+
+        // Batch update auto-disliked files
+        if (! empty($autoDislikeFileIds)) {
+            \App\Models\File::whereIn('id', $autoDislikeFileIds)->update(['auto_disliked' => true]);
+
+            // Batch create dislike reactions for auto-disliked files
+            $user = Auth::user();
+            if ($user) {
+                $reactionsToInsert = array_map(function ($fileId) use ($user) {
+                    return [
+                        'file_id' => $fileId,
+                        'user_id' => $user->id,
+                        'type' => 'dislike',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }, $autoDislikeFileIds);
+
+                // Check for existing reactions to avoid duplicates
+                $existingReactions = Reaction::whereIn('file_id', $autoDislikeFileIds)
+                    ->where('user_id', $user->id)
+                    ->pluck('file_id')
+                    ->toArray();
+
+                $newReactionsToInsert = array_filter($reactionsToInsert, function ($reaction) use ($existingReactions) {
+                    return ! in_array($reaction['file_id'], $existingReactions);
+                });
+
+                if (! empty($newReactionsToInsert)) {
+                    Reaction::insert($newReactionsToInsert);
+                }
+            }
+        }
+
+        // Batch update blacklisted files
+        if (! empty($blacklistFileIds)) {
+            \App\Models\File::whereIn('id', $blacklistFileIds)->update(['blacklisted_at' => now()]);
+        }
+
+        // Dispatch delete jobs for files with paths
+        foreach ($filesToDelete as $path) {
+            DeleteAutoDislikedFileJob::dispatch($path);
+        }
+
+        $processedIds = array_merge($autoDislikeFileIds, $blacklistFileIds);
 
         return [
             'flaggedIds' => $flaggedIds,

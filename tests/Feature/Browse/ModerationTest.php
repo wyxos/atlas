@@ -4,8 +4,10 @@ use App\Http\Controllers\Concerns\ModeratesFiles;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationRule;
+use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
@@ -317,4 +319,137 @@ test('no active rules returns empty results', function () {
     $result = $this->controller->callModerateFiles(collect([$file]));
 
     expect($result['flaggedIds'])->toBeEmpty();
+});
+
+test('immediate auto_dislike creates dislike reaction and updates file', function () {
+    Bus::fake();
+
+    // Create an active moderation rule with auto_dislike action
+    $rule = ModerationRule::factory()->any(['spam'])->create([
+        'name' => 'Spam rule',
+        'active' => true,
+        'action_type' => ModerationRule::ACTION_AUTO_DISLIKE,
+    ]);
+
+    // Create file with matching prompt
+    $file = File::factory()->create([
+        'referrer_url' => 'https://example.com/file.jpg',
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/test.jpg',
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This is spam content'],
+    ]);
+    $file->load('metadata');
+
+    // Call moderateFiles directly
+    $result = $this->controller->callModerateFiles(collect([$file]));
+
+    // Assert file is processed (not flagged for UI)
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->toContain($file->id);
+
+    // Assert file is auto-disliked in database
+    expect($file->fresh()->auto_disliked)->toBeTrue();
+
+    // Verify dislike reaction was created
+    $reaction = Reaction::where('file_id', $file->id)
+        ->where('user_id', $this->user->id)
+        ->where('type', 'dislike')
+        ->first();
+    expect($reaction)->not->toBeNull();
+
+    // Verify delete job was dispatched
+    Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
+});
+
+test('immediate blacklist updates file but does not create reaction', function () {
+    Bus::fake();
+
+    // Create an active moderation rule with blacklist action
+    $rule = ModerationRule::factory()->any(['spam'])->create([
+        'name' => 'Spam rule',
+        'active' => true,
+        'action_type' => ModerationRule::ACTION_BLACKLIST,
+    ]);
+
+    // Create file with matching prompt
+    $file = File::factory()->create([
+        'referrer_url' => 'https://example.com/file.jpg',
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/test.jpg',
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This is spam content'],
+    ]);
+    $file->load('metadata');
+
+    // Call moderateFiles directly
+    $result = $this->controller->callModerateFiles(collect([$file]));
+
+    // Assert file is processed (not flagged for UI)
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->toContain($file->id);
+
+    // Assert file is blacklisted in database
+    expect($file->fresh()->blacklisted_at)->not->toBeNull();
+
+    // Verify NO dislike reaction was created (blacklist does not create reactions)
+    $reaction = Reaction::where('file_id', $file->id)
+        ->where('user_id', $this->user->id)
+        ->where('type', 'dislike')
+        ->first();
+    expect($reaction)->toBeNull();
+
+    // Verify delete job was dispatched
+    Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
+});
+
+test('batch processing uses single query for multiple files', function () {
+    Bus::fake();
+
+    // Create an active moderation rule with auto_dislike action
+    $rule = ModerationRule::factory()->any(['spam'])->create([
+        'name' => 'Spam rule',
+        'active' => true,
+        'action_type' => ModerationRule::ACTION_AUTO_DISLIKE,
+    ]);
+
+    // Create multiple files with matching prompts
+    $files = collect(range(1, 3))->map(function ($i) {
+        $file = File::factory()->create([
+            'referrer_url' => "https://example.com/file{$i}.jpg",
+            'auto_disliked' => false,
+            'blacklisted_at' => null,
+        ]);
+        FileMetadata::factory()->create([
+            'file_id' => $file->id,
+            'payload' => ['prompt' => 'This is spam content'],
+        ]);
+        $file->load('metadata');
+
+        return $file;
+    });
+
+    // Call moderateFiles directly
+    $result = $this->controller->callModerateFiles($files);
+
+    // Assert all files are processed
+    expect(count($result['processedIds']))->toBe(3);
+
+    // Assert all files are auto-disliked (batch update)
+    foreach ($files as $file) {
+        expect($file->fresh()->auto_disliked)->toBeTrue();
+    }
+
+    // Verify dislike reactions were created for all files (batch insert)
+    $reactions = Reaction::whereIn('file_id', $files->pluck('id'))
+        ->where('user_id', $this->user->id)
+        ->where('type', 'dislike')
+        ->get();
+    expect($reactions->count())->toBe(3);
 });

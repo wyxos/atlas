@@ -121,6 +121,14 @@ const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
 // Item virtualization composable - loads minimal items initially, then full data on-demand
 const itemVirtualization = useItemVirtualization(items);
 
+// Browse service composable - fetch services if not provided via prop
+const { availableServices: localServices, fetchServices } = useBrowseService();
+
+// Use prop services if available, otherwise use local services
+const availableServices = computed(() => {
+    return props.availableServices.length > 0 ? props.availableServices : localServices.value;
+});
+
 // Handle auto-dislike queue expiration - perform auto-dislike in batch
 async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
     // Guard: Don't proceed if component is unmounted
@@ -780,6 +788,12 @@ watch(
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
     isMounted.value = true;
+
+    // Fetch services if not provided via prop (fallback for when tab mounts before parent fetches)
+    if (props.availableServices.length === 0) {
+        await fetchServices();
+    }
+
     if (props.tab) {
         await initializeTab(props.tab);
     }
