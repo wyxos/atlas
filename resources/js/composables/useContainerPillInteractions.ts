@@ -118,12 +118,24 @@ export function useContainerPillInteractions(
             }
             : undefined;
 
-        // Queue reactions for all siblings with the same batchId and batch restore callback
-        for (const item of siblings) {
+        // Queue all reactions first, then the batch toast will be created/updated once
+        // This ensures we don't create multiple toasts when queuing synchronously
+        const reactionsToQueue = siblings.map((item) => {
             const itemIndex = items.value.findIndex((i) => i.id === item.id);
             const previewUrl = item.src;
+            return {
+                fileId: item.id,
+                itemIndex,
+                previewUrl,
+                item,
+            };
+        });
+
+        // Queue all reactions with the same batchId
+        // The useReactionQueue will handle creating/updating a single batch toast
+        for (const { fileId, itemIndex, previewUrl, item } of reactionsToQueue) {
             queueReaction(
-                item.id,
+                fileId,
                 reactionType,
                 createReactionCallback(),
                 previewUrl,
@@ -136,7 +148,7 @@ export function useContainerPillInteractions(
             );
 
             // Emit to parent
-            onReaction(item.id, reactionType);
+            onReaction(fileId, reactionType);
         }
     }
 

@@ -1188,7 +1188,6 @@ describe('BrowseTabContent - Container Badges', () => {
 
             expect(updateActiveTab).toHaveBeenCalledWith(
                 [],
-                [],
                 expect.objectContaining({
                     service: 'test-service',
                     nsfw: 1,

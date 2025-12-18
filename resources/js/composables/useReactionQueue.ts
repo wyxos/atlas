@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted, h, getCurrentInstance, type Component } from 'vue';
+import { ref, computed, onUnmounted, h, getCurrentInstance, nextTick, type Component } from 'vue';
 import { useToast } from 'vue-toastification';
 import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
 import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
@@ -227,47 +227,55 @@ export function useReactionQueue() {
 
         // Create toast for this reaction
         if (preservedBatchId) {
-            // Batch reaction - create or update batch toast
-            const existingBatchToastId = batchToastIds.value.get(preservedBatchId);
-            const batchReactions = queuedReactions.value.filter((q) => q.batchId === preservedBatchId);
+            // Batch reaction - defer toast creation/update to nextTick to ensure all reactions are queued first
+            // This prevents creating multiple toasts when reactions are queued synchronously
+            nextTick(() => {
+                const existingBatchToastId = batchToastIds.value.get(preservedBatchId);
+                const batchReactions = queuedReactions.value.filter((q) => q.batchId === preservedBatchId);
 
-            if (existingBatchToastId) {
-                // Update existing batch toast
-                const firstReaction = batchReactions[0];
-                // Update toast with new content - use same format as toast creation
-                toast.update(existingBatchToastId, {
-                    content: h(BatchReactionToast, {
-                        batchId: preservedBatchId,
-                        reactions: batchReactions,
-                        type: firstReaction?.type || 'like',
-                        countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
-                        onCancelBatch: (batchId: string) => {
-                            cancelBatch(batchId);
-                        },
-                    }),
-                });
-            } else {
-                // Create new batch toast
-                const firstReaction = batchReactions[0];
-                const toastId = toast({
-                    content: h(BatchReactionToast, {
-                        batchId: preservedBatchId,
-                        reactions: batchReactions,
-                        type: firstReaction?.type || 'like',
-                        countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
-                        onCancelBatch: (batchId: string) => {
-                            cancelBatch(batchId);
-                        },
-                    }),
-                    timeout: false, // We'll manage timeout manually
-                    closeOnClick: false,
-                });
-                batchToastIds.value.set(preservedBatchId, toastId);
-                // Store toastId in all batch reactions
-                batchReactions.forEach((r) => {
-                    r.toastId = toastId;
-                });
-            }
+                // Skip if no reactions found (shouldn't happen, but safety check)
+                if (batchReactions.length === 0) {
+                    return;
+                }
+
+                if (existingBatchToastId) {
+                    // Update existing batch toast
+                    const firstReaction = batchReactions[0];
+                    // Update toast with new content - use same format as toast creation
+                    toast.update(existingBatchToastId, {
+                        content: h(BatchReactionToast, {
+                            batchId: preservedBatchId,
+                            reactions: batchReactions,
+                            type: firstReaction?.type || 'like',
+                            countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                            onCancelBatch: (batchId: string) => {
+                                cancelBatch(batchId);
+                            },
+                        }),
+                    });
+                } else {
+                    // Create new batch toast
+                    const firstReaction = batchReactions[0];
+                    const toastId = toast({
+                        content: h(BatchReactionToast, {
+                            batchId: preservedBatchId,
+                            reactions: batchReactions,
+                            type: firstReaction?.type || 'like',
+                            countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                            onCancelBatch: (batchId: string) => {
+                                cancelBatch(batchId);
+                            },
+                        }),
+                        timeout: false, // We'll manage timeout manually
+                        closeOnClick: false,
+                    });
+                    batchToastIds.value.set(preservedBatchId, toastId);
+                    // Store toastId in all batch reactions
+                    batchReactions.forEach((r) => {
+                        r.toastId = toastId;
+                    });
+                }
+            });
         } else {
             // Single reaction - create individual toast
             const toastId = toast({

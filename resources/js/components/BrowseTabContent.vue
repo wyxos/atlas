@@ -785,6 +785,18 @@ watch(
     }
 );
 
+// Sync selectedService with currentTabService when tab changes
+// This ensures the service selector shows the correct service when switching tabs
+watch(
+    () => currentTabService.value,
+    (newService) => {
+        if (newService) {
+            selectedService.value = newService;
+        }
+    },
+    { immediate: true }
+);
+
 // Track loaded item IDs to handle timing between preload:success and watch
 const loadedItemIds = ref<Set<number>>(new Set());
 
