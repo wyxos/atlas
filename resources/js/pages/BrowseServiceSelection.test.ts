@@ -183,7 +183,8 @@ describe('Browse - Service Selection', () => {
         const tabContentVm = getBrowseTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.hasServiceSelected).toBe(false);
-            expect(tabContentVm.loadAtPage).toBe(null);
+            // loadAtPage is set to 1 (pageValue) when no items, but won't load until service is selected
+            expect(tabContentVm.loadAtPage).toBe(1);
             expect(tabContentVm.items.length).toBe(0);
         } else {
             const itemLoadingCalls = mocks.mockAxios.get.mock.calls
@@ -340,6 +341,7 @@ describe('Browse - Service Selection', () => {
         let tabContentVm = getBrowseTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.currentTabService).toBe('civit-ai-images');
+            // selectedService is now synced with currentTabService when tab changes
             expect(tabContentVm.selectedService).toBe('civit-ai-images');
         }
 

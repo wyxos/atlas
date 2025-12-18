@@ -13,13 +13,16 @@ Object.defineProperty(window, 'axios', {
     writable: true,
 });
 
-// Mock browseIndex action
+// Mock browseIndex and browseServices actions
 vi.mock('@/actions/App/Http/Controllers/BrowseController', () => ({
     index: {
         url: vi.fn((params: any) => {
             const query = new URLSearchParams(params?.query || {}).toString();
             return `/api/browse?${query}`;
         }),
+    },
+    services: {
+        url: vi.fn(() => '/api/browse/services'),
     },
 }));
 

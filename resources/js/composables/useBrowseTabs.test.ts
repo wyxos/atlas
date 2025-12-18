@@ -126,7 +126,6 @@ describe('useBrowseTabs', () => {
         expect(mockAxios.post).toHaveBeenCalledWith('/api/browse-tabs', {
             label: 'Browse 1',
             query_params: {},
-            file_ids: [],
             position: 0,
         });
         expect(mockAxios.patch).toHaveBeenCalledWith('/api/browse-tabs/1/active');
@@ -272,15 +271,13 @@ describe('useBrowseTabs', () => {
         const itemsData = [
             { id: 1, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false },
         ];
-        const fileIds = [1];
         const queryParams = { page: 1, next: 'cursor-123' };
 
-        updateActiveTab(itemsData, fileIds, queryParams);
+        updateActiveTab(itemsData, queryParams);
 
         const activeTab = tabs.value.find(t => t.id === 1);
         expect(activeTab).toBeDefined();
         expect(activeTab?.itemsData).toEqual(itemsData);
-        expect(activeTab?.fileIds).toEqual(fileIds);
         expect(activeTab?.queryParams).toEqual(queryParams);
 
         // Wait for debounce
@@ -289,7 +286,6 @@ describe('useBrowseTabs', () => {
         expect(mockAxios.put).toHaveBeenCalledWith('/api/browse-tabs/1', {
             label: 'Tab 1',
             query_params: queryParams,
-            file_ids: fileIds,
             position: 0,
         });
     });
