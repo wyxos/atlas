@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, watch } from 'vue';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
 import { useReactionBatch } from '@/composables/useReactionBatch';
+import type { ReactionType } from '@/types/reaction';
 
 interface Props {
     fileId?: number;
@@ -24,7 +25,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-    reaction: [type: 'love' | 'like' | 'dislike' | 'funny'];
+    reaction: [type: ReactionType];
 }>();
 
 // Reaction batch queue
@@ -57,7 +58,7 @@ async function fetchReaction(): Promise<void> {
 }
 
 // Handle reaction click
-async function handleReactionClick(type: 'love' | 'like' | 'dislike' | 'funny'): Promise<void> {
+async function handleReactionClick(type: ReactionType): Promise<void> {
     if (!props.fileId || isUpdating.value) {
         return;
     }

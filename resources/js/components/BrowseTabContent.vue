@@ -2,7 +2,7 @@
 import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown, Image, Video } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown, Image, Video, TestTube } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -38,6 +38,7 @@ import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import { analyzeItemSizes, logItemSizeDiagnostics, createMinimalItems, compareItemPerformance } from '@/utils/itemSizeDiagnostics';
+import type { ReactionType } from '@/types/reaction';
 
 type GetPageResult = {
     items: MasonryItem[];
@@ -47,7 +48,7 @@ type GetPageResult = {
 interface Props {
     tab?: BrowseTabData;
     availableServices: Array<{ key: string; label: string }>;
-    onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void;
+    onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
     updateActiveTab: (itemsData: MasonryItem[], fileIds: number[], queryParams: Record<string, string | number | null>) => void;
@@ -511,7 +512,7 @@ const { handleMasonryReaction } = useMasonryReactionHandler(
     itemsMap,
     masonry,
     computed(() => props.tab),
-    (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
+    (fileId: number, type: ReactionType) => {
         // Remove from auto-dislike queue if user reacts (any reaction cancels auto-dislike)
         // Use Map for O(1) lookup instead of O(n) findIndex
         if (autoDislikeQueue.isQueued(fileId)) {
@@ -705,13 +706,22 @@ function handleRemoveItem(remove: (item: MasonryItem) => void, item: MasonryItem
     remove(item);
 }
 
-function handleFileReaction(itemId: number, type: 'love' | 'like' | 'dislike' | 'funny', remove: (item: MasonryItem) => void): void {
+function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void): void {
     handleMasonryReaction(itemId, type, remove);
 }
 
 function handleCopyPromptClick(): void {
     if (promptData.currentPromptData.value) {
         promptData.copyPromptToClipboard(promptData.currentPromptData.value);
+    }
+}
+
+function handleTestPromptClick(): void {
+    if (promptData.currentPromptData.value) {
+        const params = new URLSearchParams();
+        params.set('text', promptData.currentPromptData.value);
+        const url = `/moderation/test?${params.toString()}`;
+        window.open(url, '_blank', 'noopener,noreferrer');
     }
 }
 
@@ -1160,6 +1170,15 @@ onUnmounted(() => {
                     <Button variant="outline" size="sm" @click="handleCopyPromptClick" aria-label="Copy prompt">
                         <Copy :size="16" class="mr-2" />
                         Copy
+                    </Button>
+                    <Button 
+                        v-if="promptData.currentPromptData.value" 
+                        variant="outline" 
+                        size="sm" 
+                        @click="handleTestPromptClick" 
+                        aria-label="Test prompt against moderation rules">
+                        <TestTube :size="16" class="mr-2" />
+                        Test
                     </Button>
                     <DialogClose as-child>
                         <Button variant="outline" size="sm" @click="promptData.closePromptDialog()">

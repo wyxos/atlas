@@ -59,6 +59,19 @@ class BrowseController extends Controller
             ->with('containers')
             ->get();
 
+        // Re-run moderation on files to catch files that should now be auto-disliked
+        $fileModerationService = app(\App\Services\FileModerationService::class);
+        $moderationResult = $fileModerationService->moderate($files);
+        $processedIds = $moderationResult['processedIds'];
+
+        // Filter out files that were just auto-disliked or blacklisted by moderation
+        // Also filter out files that are already marked as auto-disliked or blacklisted
+        $files = $files->reject(function ($file) use ($processedIds) {
+            return in_array($file->id, $processedIds, true)
+                || $file->auto_disliked
+                || $file->blacklisted_at !== null;
+        });
+
         // Get will_auto_dislike IDs from moderation (if needed)
         $flaggedIds = [];
         // TODO: Add moderation check if needed

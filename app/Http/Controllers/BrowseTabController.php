@@ -147,6 +147,20 @@ class BrowseTabController extends Controller
             ->orderByPivot('position')
             ->get();
 
+        // Re-run moderation on files to catch files that should now be auto-disliked
+        // (e.g., if moderation rules were added/activated after files were added to tab)
+        $fileModerationService = app(\App\Services\FileModerationService::class);
+        $moderationResult = $fileModerationService->moderate($files);
+        $processedIds = $moderationResult['processedIds'];
+
+        // Filter out files that were just auto-disliked or blacklisted by moderation
+        // Also filter out files that are already marked as auto-disliked or blacklisted
+        $files = $files->reject(function ($file) use ($processedIds) {
+            return in_array($file->id, $processedIds, true)
+                || $file->auto_disliked
+                || $file->blacklisted_at !== null;
+        });
+
         $itemsData = [];
 
         if ($files->isNotEmpty()) {

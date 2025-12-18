@@ -60,6 +60,12 @@ const routes: RouteRecordRaw[] = [
         meta: { layout: 'DashboardLayout' },
     },
     {
+        path: '/moderation/test',
+        name: 'moderation-test',
+        component: () => import('./pages/ModerationTest.vue'),
+        meta: { layout: 'DashboardLayout' },
+    },
+    {
         path: '/profile',
         name: 'profile',
         component: () => import('./pages/Profile.vue'),

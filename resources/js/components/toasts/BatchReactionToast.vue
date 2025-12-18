@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Heart, ThumbsUp, ThumbsDown, Smile, X, Plus, Undo } from 'lucide-vue-next';
 import type { QueuedReaction } from '@/composables/useReactionQueue';
+import type { ReactionType } from '@/types/reaction';
 
 interface Props {
     batchId: string;
     reactions: QueuedReaction[];
-    type: 'love' | 'like' | 'dislike' | 'funny';
+    type: ReactionType;
     countdown: number;
     onCancelBatch?: (batchId: string) => void;
 }

@@ -1,4 +1,5 @@
 import type { MasonryItem } from './useBrowseTabs';
+import type { ReactionType } from '@/types/reaction';
 
 /**
  * Composable for handling masonry item interactions (mouse events, alt-click reactions).
@@ -6,7 +7,7 @@ import type { MasonryItem } from './useBrowseTabs';
 export function useMasonryInteractions(
     items: import('vue').Ref<MasonryItem[]>,
     masonry: import('vue').Ref<any>,
-    handleMasonryReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny', removeItem: (item: MasonryItem) => void) => Promise<void>
+    handleMasonryReaction: (fileId: number, type: ReactionType, removeItem: (item: MasonryItem) => void) => Promise<void>
 ) {
     // Handle ALT + mouse button combinations for quick reactions
     function handleAltClickReaction(e: MouseEvent, fileId: number): void {
@@ -14,7 +15,7 @@ export function useMasonryInteractions(
         e.preventDefault();
         e.stopPropagation();
 
-        let reactionType: 'love' | 'like' | 'dislike' | 'funny' | null = null;
+        let reactionType: ReactionType | null = null;
 
         // ALT + Left Click = Like
         if (e.button === 0 || (e.type === 'click' && e.button === 0)) {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useBrowseTabs, type MasonryItem } from '@/composables/useBrowseTabs';
 import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
+import type { ReactionType } from '@/types/reaction';
 
 const isPanelMinimized = ref(false);
 
@@ -60,7 +61,7 @@ const activeTab = computed(() => getActiveTab());
 // Handle reaction
 async function handleReaction(
     fileId: number,
-    type: 'love' | 'like' | 'dislike' | 'funny'
+    type: ReactionType
 ): Promise<void> {
     // Try to find the item from the active tab to get preview URL
     const activeTabData = activeTab.value;

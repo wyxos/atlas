@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/moderation-rules/{moderationRule}', [\App\Http\Controllers\ModerationRuleController::class, 'show'])->name('api.moderation-rules.show');
     Route::put('/api/moderation-rules/{moderationRule}', [\App\Http\Controllers\ModerationRuleController::class, 'update'])->name('api.moderation-rules.update');
     Route::delete('/api/moderation-rules/{moderationRule}', [\App\Http\Controllers\ModerationRuleController::class, 'destroy'])->name('api.moderation-rules.destroy');
+    Route::post('/api/moderation-rules/test', [\App\Http\Controllers\ModerationRuleController::class, 'testRule'])->name('api.moderation-rules.test');
 
     // Container Blacklists
     Route::get('/api/container-blacklists', [\App\Http\Controllers\ContainerBlacklistController::class, 'index'])->name('api.container-blacklists.index');
