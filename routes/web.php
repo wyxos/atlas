@@ -41,6 +41,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/api/browse-tabs/{browseTab}', [\App\Http\Controllers\BrowseTabController::class, 'destroy'])->name('api.browse-tabs.destroy');
     Route::patch('/api/browse-tabs/{browseTab}/position', [\App\Http\Controllers\BrowseTabController::class, 'updatePosition'])->name('api.browse-tabs.position');
     Route::patch('/api/browse-tabs/{browseTab}/active', [\App\Http\Controllers\BrowseTabController::class, 'setActive'])->name('api.browse-tabs.active');
+    Route::delete('/api/browse-tabs', [\App\Http\Controllers\BrowseTabController::class, 'deleteAll'])->name('api.browse-tabs.delete-all');
+    Route::delete('/api/files', [\App\Http\Controllers\FilesController::class, 'deleteAll'])->name('api.files.delete-all');
 
     // Moderation Rules
     Route::get('/api/moderation-rules', [\App\Http\Controllers\ModerationRuleController::class, 'index'])->name('api.moderation-rules.index');

@@ -273,4 +273,27 @@ class FilesController extends Controller
             'seen_count' => $file->seen_count,
         ]);
     }
+
+    /**
+     * Delete all files for the authenticated user.
+     */
+    public function deleteAll(): JsonResponse
+    {
+        $user = Auth::user();
+
+        // Get all files owned by the user
+        $files = File::where('user_id', $user->id)->get();
+
+        $deletedCount = 0;
+        foreach ($files as $file) {
+            Gate::authorize('delete', $file);
+            $file->delete();
+            $deletedCount++;
+        }
+
+        return response()->json([
+            'message' => 'All files deleted successfully.',
+            'deleted_count' => $deletedCount,
+        ]);
+    }
 }
