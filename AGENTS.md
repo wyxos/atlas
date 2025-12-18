@@ -15,6 +15,12 @@ If a fallback is needed, it must:
 - surface degraded mode to the user and/or telemetry
 - provide a retry path
 
+## Product intent protection (no reintroducing removed behavior)
+If the user explicitly removed a behavior (e.g., fallbacks/defaults, silencing errors, broad mocks),
+the agent must not reintroduce it to make tests pass.
+Instead, update tests to match the new intended behavior or ask for clarification if intent is unclear.
+
+
 ## Tool-first (MCP) rule
 If an MCP tool exists for an operation (e.g., git, shell, filesystem queries), use it instead of writing manual commands.
 
