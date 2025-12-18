@@ -142,6 +142,12 @@ class Browser
             return in_array($file->id, $processedIds, true);
         })->values()->all();
 
+        // Attach filtered files to tab if tab_id is provided
+        $tabId = request()->input('tab_id');
+        if ($tabId) {
+            $this->attachFilesToTab($tabId, $persisted);
+        }
+
         // Transform persisted files to items format for frontend
         // Pass flagged IDs so they get will_auto_dislike = true (includes both moderation and container blacklist)
         // Use minimal format for virtualization (load full data on-demand)
@@ -179,5 +185,43 @@ class Browser
             CivitAiImages::key() => CivitAiImages::class,
             Wallhaven::key() => Wallhaven::class,
         ];
+    }
+
+    /**
+     * Attach files to a browse tab with positions.
+     *
+     * @param  array<int, \App\Models\File>  $files
+     */
+    protected function attachFilesToTab(int $tabId, array $files): void
+    {
+        if (empty($files)) {
+            return; // Nothing to attach
+        }
+
+        $browseTab = \App\Models\BrowseTab::find($tabId);
+
+        if (! $browseTab || $browseTab->user_id !== auth()->id()) {
+            return; // Tab doesn't exist or user doesn't own it
+        }
+
+        // Get current highest position in tab
+        $maxPosition = $browseTab->files()->max('browse_tab_file.position') ?? -1;
+
+        // Prepare sync data with positions
+        $syncData = [];
+        foreach ($files as $index => $file) {
+            if (! $file instanceof \App\Models\File) {
+                continue; // Skip invalid entries
+            }
+            $position = $maxPosition + 1 + $index;
+            $syncData[$file->id] = ['position' => $position];
+        }
+
+        if (empty($syncData)) {
+            return; // No valid files to attach
+        }
+
+        // Sync files to tab (without detaching existing files)
+        $browseTab->files()->syncWithoutDetaching($syncData);
     }
 }

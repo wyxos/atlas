@@ -12,4 +12,3 @@ final class ActionType
 
     public const BLACKLIST = 'blacklist';
 }
-

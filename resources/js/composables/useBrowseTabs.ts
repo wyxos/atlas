@@ -92,7 +92,6 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
             const response = await window.axios.post(browseTabsStore.url(), {
                 label: newTab.label,
                 query_params: newTab.queryParams,
-                file_ids: newTab.fileIds,
                 position: newTab.position,
             });
 
@@ -157,7 +156,6 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
 
     function updateActiveTab(
         itemsData: MasonryItem[],
-        fileIds: number[],
         queryParams: Record<string, string | number | null>
     ): void {
         const activeTab = getActiveTab();
@@ -166,7 +164,6 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
 
         activeTab.itemsData = itemsData;
-        activeTab.fileIds = fileIds;
         activeTab.queryParams = queryParams;
         saveTabDebounced(activeTab);
     }
@@ -186,7 +183,6 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
             await window.axios.put(browseTabsUpdate.url(tab.id), {
                 label: tab.label,
                 query_params: tab.queryParams,
-                file_ids: tab.fileIds,
                 position: tab.position,
             });
         } catch (error) {
