@@ -293,6 +293,45 @@ const hasServiceSelected = computed(() => {
     return typeof service === 'string' && service.length > 0;
 });
 
+// Computed property to determine if Masonry should skip initial load
+// Skip initial load if:
+// 1. We already have items loaded, OR
+// 2. The tab has itemsData or fileIds to restore (prevents Masonry from loading on refresh), OR
+// 3. loadAtPage is null AND we have a service AND we have page/next in queryParams (restoring state)
+// The key insight: if loadAtPage is null and we have saved state (page/next), initializeTab will restore items
+// via masonry.init(), so we should skip Masonry's automatic initial load to avoid double-loading
+const shouldSkipInitialLoad = computed(() => {
+    // If we already have items, skip initial load
+    if (items.value.length > 0) {
+        return true;
+    }
+
+    // If the tab has itemsData or fileIds, we're restoring from database, so skip initial load
+    // This prevents Masonry from triggering a load on refresh when we have items to restore
+    const tab = props.tab;
+    if (tab) {
+        const hasItemsData = tab.itemsData && tab.itemsData.length > 0;
+        const hasFileIds = tab.fileIds && tab.fileIds.length > 0;
+        if (hasItemsData || hasFileIds) {
+            return true;
+        }
+
+        // If loadAtPage is null AND we have a service AND we have page/next in queryParams,
+        // we're restoring state, so skip initial load to prevent Masonry from loading and resetting page/next
+        // This is the key fix for the refresh issue: when restoring, initializeTab will restore items
+        // via masonry.init(), so we must skip Masonry's automatic initial load
+        if (loadAtPage.value === null && hasServiceSelected.value) {
+            const hasPage = tab.queryParams?.page !== undefined && tab.queryParams?.page !== null;
+            const hasNext = tab.queryParams?.next !== undefined && tab.queryParams?.next !== null;
+            if (hasPage || hasNext) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+});
+
 // Computed property for apply button disabled state
 // Button should only be disabled when:
 // - No service is selected
@@ -888,7 +927,7 @@ onUnmounted(() => {
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
-                    :skip-initial-load="items.length > 0" :backfill-enabled="true" :backfill-delay-ms="2000"
+                    :skip-initial-load="shouldSkipInitialLoad" :backfill-enabled="true" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
                     @backfill:stop="onBackfillStop" @backfill:retry-start="onBackfillRetryStart"
                     @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
