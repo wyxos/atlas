@@ -1,5 +1,6 @@
 import { ref, shallowRef, type Ref, nextTick } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
+import { items as browseItems } from '@/actions/App/Http/Controllers/BrowseController';
 
 /**
  * Composable for virtualizing masonry items - loading minimal data initially,
@@ -52,7 +53,7 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
         
         try {
             const response = await window.axios.post<{ items: Record<number, MasonryItem> }>(
-                '/api/browse/items',
+                browseItems.url(),
                 { ids: idsToLoad }
             );
             
