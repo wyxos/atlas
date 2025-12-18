@@ -12,7 +12,7 @@ export function useRefreshDialog(
     nextCursor: Ref<string | number | null>,
     loadAtPage: Ref<string | number | null>,
     tab: Ref<BrowseTabData | undefined>,
-    updateActiveTab: (itemsData: MasonryItem[], fileIds: number[], queryParams: Record<string, string | number | null>) => void,
+    updateActiveTab: (itemsData: MasonryItem[], queryParams: Record<string, string | number | null>) => void,
     initializeTab: (tab: BrowseTabData | undefined) => Promise<void>
 ) {
     const refreshDialogOpen = ref(false);

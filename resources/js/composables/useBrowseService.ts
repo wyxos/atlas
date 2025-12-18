@@ -104,6 +104,11 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             }
         }
 
+        // Include tab_id if available
+        if (options.activeTabId.value) {
+            queryParams.tab_id = options.activeTabId.value;
+        }
+
         // Add minimal=true to request minimal items for virtualization
         const response = await window.axios.get(browseIndex.url({ query: { ...queryParams, minimal: true } }));
         const data = response.data;
@@ -125,15 +130,13 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             if (activeTab) {
                 // Append new items to existing items (masonry will update items.value separately)
                 const updatedItemsData = [...activeTab.itemsData, ...data.items];
-                // Extract database file IDs from all items in the tab
-                const updatedFileIds = updatedItemsData.map(item => item.id);
                 // Store both page and next in queryParams (service handles format conversion)
                 const updatedQueryParams = {
                     ...activeTab.queryParams,
                     page: pageToRequest,
                     next: data.nextPage,
                 };
-                options.updateActiveTab(updatedItemsData, updatedFileIds, updatedQueryParams);
+                options.updateActiveTab(updatedItemsData, updatedQueryParams);
             }
         }
 
@@ -176,7 +179,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         loadAtPage: Ref<string | number | null>,
         masonry: Ref<{ isLoading: boolean; cancelLoad: () => void; destroy: () => void } | null>,
         getActiveTab: () => BrowseTabData | undefined,
-        updateActiveTab: (itemsData: MasonryItem[], fileIds: number[], queryParams: Record<string, string | number | null>) => void,
+        updateActiveTab: (itemsData: MasonryItem[], queryParams: Record<string, string | number | null>) => void,
         nextTick: () => Promise<void>
     ): Promise<void> {
         if (!activeTabId.value || !selectedService.value || isApplyingService.value) {
@@ -215,7 +218,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
                 const activeTab = getActiveTab();
                 if (activeTab) {
                     // Update tab with new queryParams, same pattern as getNextPage
-                    updateActiveTab([], [], updatedQueryParams);
+                    updateActiveTab([], updatedQueryParams);
                 }
             }
 

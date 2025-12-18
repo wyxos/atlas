@@ -31,7 +31,7 @@ const router = useRouter();
 // Create reactive listing instance (Listing.create returns a reactive Proxy)
 // Proxy provides dynamic filter properties (e.g., listing.search, listing.date_from)
 // TypeScript can't infer dynamic Proxy properties, so we cast to any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const listing = Listing.create<File>({
     filters: {
         search: '',

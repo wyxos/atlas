@@ -11,7 +11,7 @@ export function useResetDialog(
     nextCursor: Ref<string | number | null>,
     loadAtPage: Ref<string | number | null>,
     tab: Ref<BrowseTabData | undefined>,
-    updateActiveTab: (itemsData: MasonryItem[], fileIds: number[], queryParams: Record<string, string | number | null>) => void
+    updateActiveTab: (itemsData: MasonryItem[], queryParams: Record<string, string | number | null>) => void
 ) {
     const resetDialogOpen = ref(false);
 
@@ -43,7 +43,7 @@ export function useResetDialog(
         loadAtPage.value = 1;
 
         // Update tab data
-        updateActiveTab([], [], {
+        updateActiveTab([], {
             ...currentTab.queryParams,
             page: 1,
             next: null,

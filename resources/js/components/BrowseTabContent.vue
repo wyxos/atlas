@@ -51,7 +51,7 @@ interface Props {
     onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
-    updateActiveTab: (itemsData: MasonryItem[], fileIds: number[], queryParams: Record<string, string | number | null>) => void;
+    updateActiveTab: (itemsData: MasonryItem[], queryParams: Record<string, string | number | null>) => void;
     loadTabItems: (tabId: number) => Promise<MasonryItem[]>;
 }
 
@@ -178,12 +178,11 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
             return;
         }
 
-        // Update tab (remove from fileIds and itemsData)
+        // Update tab (remove from itemsData)
         // Note: Backend already de-associated from tabs, we just update local state
         if (props.tab && autoDislikedIds.length > 0) {
-            const updatedFileIds = props.tab.fileIds.filter((id) => !autoDislikedIds.includes(id));
             const updatedItemsData = props.tab.itemsData.filter((item) => !autoDislikedIds.includes(item.id));
-            props.updateActiveTab(updatedItemsData, updatedFileIds, props.tab.queryParams);
+            props.updateActiveTab(updatedItemsData, props.tab.queryParams);
         }
     } catch (error) {
         console.error('Failed to batch perform auto-dislike:', error);
@@ -260,7 +259,7 @@ async function handleApplyFilters(filters: {
     selectedService.value = filters.service;
 
     // Update tab with all filter params
-    props.updateActiveTab([], [], updatedQueryParams);
+    props.updateActiveTab([], updatedQueryParams);
 
     // Use the same approach as reset button: reset() and loadPage(1)
     if (masonry.value) {
@@ -764,7 +763,7 @@ async function refreshTab(): Promise<void> {
         next: null,
     };
 
-    props.updateActiveTab([], [], updatedQueryParams);
+    props.updateActiveTab([], updatedQueryParams);
 
     // Reset masonry and reload
     if (masonry.value) {
