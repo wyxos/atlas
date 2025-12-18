@@ -158,6 +158,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 0,
+                            is_active: true,
                         },
                         {
                             id: tab2Id,
@@ -166,6 +167,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 1,
+                            is_active: false,
                         },
                     ],
                 });
@@ -219,6 +221,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 0,
+                            is_active: true,
                         },
                         {
                             id: tab2Id,
@@ -227,6 +230,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 1,
+                            is_active: false,
                         },
                     ],
                 });
@@ -282,6 +286,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 0,
+                            is_active: true,
                         },
                         {
                             id: tab2Id,
@@ -290,6 +295,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 1,
+                            is_active: false,
                         },
                     ],
                 });
@@ -360,6 +366,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 0,
+                            is_active: true,
                         },
                     ],
                 });
@@ -412,6 +419,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 0,
+                            is_active: true,
                         },
                         {
                             id: tab2Id,
@@ -420,6 +428,7 @@ describe('Browse - Tab Management', () => {
                             file_ids: [],
                             items_data: [],
                             position: 1,
+                            is_active: false,
                         },
                     ],
                 });

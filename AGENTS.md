@@ -6,7 +6,9 @@
 A task is only "done" if:
 1) The intended behavior change is implemented
 2) Relevant tests are added/updated OR a concrete reason is given why no test applies
-3) Verification steps are provided, and failures (if any) are fully accounted for
+3) Verification is RUN when MCP/shell tools are available, with raw output included
+    - If verification is NOT RUN, the task is not "done"; it is "ready for local verification" only
+4) Failures (if any) are fully accounted for
 
 ## Observability rule (no silent degradation)
 Do not add fallback/default behavior that masks operational failures unless explicitly requested.
@@ -20,9 +22,16 @@ If the user explicitly removed a behavior (e.g., fallbacks/defaults, silencing e
 the agent must not reintroduce it to make tests pass.
 Instead, update tests to match the new intended behavior or ask for clarification if intent is unclear.
 
+## Test-fix scope rule
+If the user asks to "fix tests" (or similar), do not change production/runtime behavior to satisfy tests.
+Only change tests and test utilities unless the user explicitly approves a production change.
 
 ## Tool-first (MCP) rule
-If an MCP tool exists for an operation (e.g., git, shell, filesystem queries), use it instead of writing manual commands.
+If an MCP tool exists for an operation (git/shell/filesystem), the agent must use it.
+
+The agent may only fall back to manual instructions if:
+- the tool invocation fails or is unavailable, AND
+- the agent includes the tool error/output as evidence.
 
 ## Required response format
 Respond in exactly three sections:
@@ -45,13 +54,24 @@ If a workaround seems necessary, propose:
 A) real fix (preferred)
 B) workaround (needs approval), with risks
 
-## Verification execution rule
+## Verification rule (execution + evidence)
 In VERIFY, the agent must:
-1) Provide the exact command(s) to run the relevant tests and checks
-2) Prefer running them via available MCP tools (shell/git) when possible
-3) If the agent cannot run them, it must say "NOT RUN" and explain why, then provide a short checklist of what I should run locally
+- RUN the relevant verification via MCP/shell when available
+- Paste raw command output as evidence
+
+If verification is NOT RUN, the agent must:
+- state NOT RUN + why
+- not claim tests are resolved/passing
+- provide a minimal local run checklist
 
 The agent must not claim success without stating whether verification was RUN or NOT RUN.
+
+## Evidence rule (no unverifiable claims)
+The agent may not claim tests are fixed/passing unless it includes evidence:
+- a command transcript/output, or
+- the MCP tool output showing success.
+
+If verification was NOT RUN, the agent must not state that failures are resolved; it may only state what it changed and what it expects to happen.
 
 ## Failure accounting (no hand-waving)
 If tests fail after PATCH:

@@ -349,6 +349,7 @@ describe('Browse - Tab Restoration', () => {
                         query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
                         file_ids: mockItems.map(item => item.id),
                         position: 0,
+                        is_active: true,
                     }],
                 });
             }
@@ -406,6 +407,7 @@ describe('Browse - Tab Restoration', () => {
                         label: 'Scrolled Tab',
                         query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
                         position: 0,
+                        is_active: true,
                     }],
                 });
             }
