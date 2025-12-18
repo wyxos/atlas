@@ -8,6 +8,13 @@ A task is only "done" if:
 2) Relevant tests are added/updated OR a concrete reason is given why no test applies
 3) Verification steps are provided, and failures (if any) are fully accounted for
 
+## Observability rule (no silent degradation)
+Do not add fallback/default behavior that masks operational failures unless explicitly requested.
+If a fallback is needed, it must:
+- preserve an explicit error signal (status + error details)
+- surface degraded mode to the user and/or telemetry
+- provide a retry path
+
 ## Tool-first (MCP) rule
 If an MCP tool exists for an operation (e.g., git, shell, filesystem queries), use it instead of writing manual commands.
 
