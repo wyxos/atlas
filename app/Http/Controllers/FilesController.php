@@ -244,11 +244,22 @@ class FilesController extends Controller
             Reaction::insert($newReactionsToInsert);
         }
 
-        // De-associate from all tabs belonging to this user
-        $userTabs = BrowseTab::forUser($user->id)->get();
-        if ($userTabs->isNotEmpty()) {
-            foreach ($userTabs as $tab) {
+        // Detach files from tab(s)
+        // If tab_id is provided, detach from that specific tab only
+        // Otherwise, detach from all tabs belonging to this user
+        if ($tabId) {
+            $tab = BrowseTab::where('id', $tabId)
+                ->where('user_id', $user->id)
+                ->first();
+            if ($tab) {
                 $tab->files()->detach($validFileIds);
+            }
+        } else {
+            $userTabs = BrowseTab::forUser($user->id)->get();
+            if ($userTabs->isNotEmpty()) {
+                foreach ($userTabs as $tab) {
+                    $tab->files()->detach($validFileIds);
+                }
             }
         }
 

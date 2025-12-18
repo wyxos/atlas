@@ -323,7 +323,7 @@ async function handleReaction(type: ReactionType): Promise<void> {
     // We need to queue the reaction manually with restore callback
     const { queueReaction } = useReactionQueue();
     const previewUrl = currentItem.src;
-    queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, props.tabId, itemIndex, currentItem);
+    queueReaction(fileId, type, createReactionCallback(props.tabId), previewUrl, restoreItem, props.tabId, itemIndex, currentItem);
 
     // Emit to parent
     if (props.onReaction) {

@@ -137,7 +137,7 @@ export function useContainerPillInteractions(
             queueReaction(
                 fileId,
                 reactionType,
-                createReactionCallback(),
+                createReactionCallback(tabId),
                 previewUrl,
                 undefined, // No individual restore callback for batch reactions
                 tabId,

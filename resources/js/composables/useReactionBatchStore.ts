@@ -18,17 +18,22 @@ let batchTimeout: ReturnType<typeof setTimeout> | null = null;
  * Composable to batch reaction store requests.
  * Collects requests for a short period and sends them together.
  */
-export function useReactionBatchStore() {
+export function useReactionBatchStore(tabId?: number) {
     async function batchStoreReactions(
         reactions: Array<{ file_id: number; type: ReactionType }>
     ): Promise<Array<{ file_id: number; reaction: { type: string } | null }>> {
         try {
+            const payload: {
+                reactions: Array<{ file_id: number; type: ReactionType }>;
+                tab_id?: number;
+            } = { reactions };
+            if (tabId !== undefined) {
+                payload.tab_id = tabId;
+            }
             const response = await window.axios.post<{
                 message: string;
                 reactions: Array<{ file_id: number; reaction: { type: string } | null }>;
-            }>('/api/files/reactions/batch/store', {
-                reactions,
-            });
+            }>('/api/files/reactions/batch/store', payload);
 
             return response.data.reactions;
         } catch (error) {

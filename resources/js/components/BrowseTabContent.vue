@@ -143,6 +143,7 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
             file_ids: number[];
         }>('/api/files/auto-dislike/batch', {
             file_ids: expiredIds,
+            tab_id: props.tab?.id,
         });
 
         // Guard: Check again after async operation
