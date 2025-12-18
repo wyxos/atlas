@@ -38,6 +38,33 @@ class BrowseController extends Controller
     }
 
     /**
+     * Get available browse services metadata.
+     */
+    public function services(): JsonResponse
+    {
+        // Use reflection to access protected method from Browser class
+        $browser = new \App\Browser;
+        $reflection = new \ReflectionClass($browser);
+        $method = $reflection->getMethod('getAvailableServices');
+        $method->setAccessible(true);
+        $services = $method->invoke($browser);
+
+        $servicesMeta = [];
+        foreach ($services as $key => $serviceClass) {
+            $serviceInstance = app($serviceClass);
+            $servicesMeta[] = [
+                'key' => $serviceInstance::key(),
+                'label' => $serviceInstance::label(),
+                'defaults' => $serviceInstance->defaultParams(),
+            ];
+        }
+
+        return response()->json([
+            'services' => $servicesMeta,
+        ]);
+    }
+
+    /**
      * Load full item data for a batch of IDs (for virtualization).
      * Used to load full data on-demand when items come into viewport.
      */

@@ -1,6 +1,6 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
-import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
+import { index as browseIndex, services as browseServices } from '@/actions/App/Http/Controllers/BrowseController';
 
 export type GetPageResult = {
     items: MasonryItem[];
@@ -31,12 +31,11 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
     const isApplyingService = ref(false);
 
     /**
-     * Fetch available services from the browse API
+     * Fetch available services from the services endpoint
      */
     async function fetchServices(): Promise<void> {
         try {
-            // Fetch services from browse endpoint (will return services metadata)
-            const response = await window.axios.get(browseIndex.url({ query: { page: 1, limit: 1 } }));
+            const response = await window.axios.get(browseServices.url());
             availableServices.value = response.data.services || [];
         } catch (error) {
             console.error('Failed to fetch services:', error);
@@ -146,7 +145,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             const existingItem = options?.getActiveTab()?.itemsData?.find(
                 (existing: MasonryItem) => existing.id === newItem.id
             );
-            
+
             // If item exists in database, preserve its previewed_count and seen_count
             if (existingItem) {
                 return {
@@ -155,7 +154,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
                     seen_count: existingItem.seen_count ?? newItem.seen_count,
                 };
             }
-            
+
             return newItem;
         });
 
