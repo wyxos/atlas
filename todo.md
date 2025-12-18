@@ -1,6 +1,8 @@
 - Browse
     - moderation
       - display a toast for auto backend dislike/blacklist with possibility to negate all or specific files
+      - filter out immediately moderated files from results
+      - detach to perform detach for all tabs for that user
     - local files
       - render local files
       - handle refresh page instead of backfill
