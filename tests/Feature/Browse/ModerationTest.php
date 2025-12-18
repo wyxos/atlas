@@ -1,31 +1,21 @@
 <?php
 
-use App\Http\Controllers\Concerns\ModeratesFiles;
+use App\Enums\ActionType;
 use App\Models\File;
 use App\Models\FileMetadata;
 use App\Models\ModerationRule;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\FileModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
-// Create a test class that uses the ModeratesFiles trait
-class TestModerationController
-{
-    use ModeratesFiles;
-
-    public function callModerateFiles($files)
-    {
-        return $this->moderateFiles($files);
-    }
-}
-
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
-    $this->controller = new TestModerationController;
+    $this->service = app(FileModerationService::class);
 });
 
 test('files with matching prompts are flagged for auto-dislike', function () {
@@ -57,8 +47,8 @@ test('files with matching prompts are flagged for auto-dislike', function () {
     ]);
     $file2->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file1, $file2]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file1, $file2]));
 
     // Assert file1 is flagged (but NOT auto-disliked in DB - that happens later via UI)
     expect($result['flaggedIds'])->toContain($file1->id)
@@ -85,8 +75,8 @@ test('files without matching prompts are not flagged', function () {
     ]);
     $file->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file]));
 
     // Assert file is not flagged
     expect($result['flaggedIds'])->toBeEmpty();
@@ -112,8 +102,8 @@ test('inactive rules are ignored', function () {
     ]);
     $file->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file]));
 
     // Assert file is not flagged
     expect($result['flaggedIds'])->toBeEmpty();
@@ -154,8 +144,8 @@ test('multiple active rules are checked', function () {
     ]);
     $file2->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file1, $file2]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file1, $file2]));
 
     // Assert both files are flagged
     expect($result['flaggedIds'])->toContain($file1->id)
@@ -180,8 +170,8 @@ test('files already auto-disliked are skipped', function () {
     ]);
     $file->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file]));
 
     // Assert file is not flagged (already processed)
     expect($result['flaggedIds'])->toBeEmpty();
@@ -210,8 +200,8 @@ test('files without prompts are skipped', function () {
         'auto_disliked' => false,
     ]);
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file1, $file2]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file1, $file2]));
 
     // Assert files are not flagged
     expect($result['flaggedIds'])->toBeEmpty();
@@ -238,8 +228,8 @@ test('moderation result includes correct structure', function () {
     ]);
     $file->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file]));
 
     // Assert result structure
     expect($result)->toHaveKeys(['flaggedIds', 'processedIds'])
@@ -268,8 +258,8 @@ test('batch flagging works correctly for multiple files', function () {
         return $file;
     });
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles($files);
+    // Call moderate directly
+    $result = $this->service->moderate($files);
 
     // Assert all files are flagged
     expect(count($result['flaggedIds']))->toBe(5);
@@ -288,7 +278,7 @@ test('empty file collection returns empty results', function () {
         'active' => true,
     ]);
 
-    $result = $this->controller->callModerateFiles(collect([]));
+    $result = $this->service->moderate(collect([]));
 
     expect($result['flaggedIds'])->toBeEmpty()
         ->and($result['processedIds'])->toBeEmpty();
@@ -305,7 +295,7 @@ test('no active rules returns empty results', function () {
     ]);
     $file->load('metadata');
 
-    $result = $this->controller->callModerateFiles(collect([$file]));
+    $result = $this->service->moderate(collect([$file]));
 
     expect($result['flaggedIds'])->toBeEmpty();
 });
@@ -317,7 +307,7 @@ test('immediate auto_dislike creates dislike reaction and updates file', functio
     $rule = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
-        'action_type' => ModerationRule::ACTION_AUTO_DISLIKE,
+        'action_type' => ActionType::AUTO_DISLIKE,
     ]);
 
     // Create file with matching prompt
@@ -333,8 +323,8 @@ test('immediate auto_dislike creates dislike reaction and updates file', functio
     ]);
     $file->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file]));
 
     // Assert file is processed (not flagged for UI)
     expect($result['flaggedIds'])->toBeEmpty()
@@ -361,7 +351,7 @@ test('immediate blacklist updates file but does not create reaction', function (
     $rule = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
-        'action_type' => ModerationRule::ACTION_BLACKLIST,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create file with matching prompt
@@ -377,8 +367,8 @@ test('immediate blacklist updates file but does not create reaction', function (
     ]);
     $file->load('metadata');
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles(collect([$file]));
+    // Call moderate directly
+    $result = $this->service->moderate(collect([$file]));
 
     // Assert file is processed (not flagged for UI)
     expect($result['flaggedIds'])->toBeEmpty()
@@ -405,7 +395,7 @@ test('batch processing uses single query for multiple files', function () {
     $rule = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
-        'action_type' => ModerationRule::ACTION_AUTO_DISLIKE,
+        'action_type' => ActionType::AUTO_DISLIKE,
     ]);
 
     // Create multiple files with matching prompts
@@ -424,8 +414,8 @@ test('batch processing uses single query for multiple files', function () {
         return $file;
     });
 
-    // Call moderateFiles directly
-    $result = $this->controller->callModerateFiles($files);
+    // Call moderate directly
+    $result = $this->service->moderate($files);
 
     // Assert all files are processed
     expect(count($result['processedIds']))->toBe(3);

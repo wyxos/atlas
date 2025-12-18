@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ActionType;
 use App\Models\ModerationRule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class ModerationRuleController extends Controller
             'name' => $validated['name'] ?? null,
             'active' => $validated['active'] ?? true,
             'nsfw' => $validated['nsfw'] ?? false,
-            'action_type' => $validated['action_type'] ?? ModerationRule::ACTION_UI_COUNTDOWN,
+            'action_type' => $validated['action_type'] ?? ActionType::UI_COUNTDOWN,
             'op' => $validated['op'],
             'terms' => $validated['terms'] ?? null,
             'min' => $validated['min'] ?? null,
