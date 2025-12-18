@@ -206,4 +206,17 @@ class BrowseTabController extends Controller
 
         return response()->json($browseTab);
     }
+
+    /**
+     * Delete all tabs for the authenticated user.
+     */
+    public function deleteAll(): JsonResponse
+    {
+        $deletedCount = BrowseTab::forUser(auth()->id())->delete();
+
+        return response()->json([
+            'message' => 'All tabs deleted successfully.',
+            'deleted_count' => $deletedCount,
+        ]);
+    }
 }

@@ -34,8 +34,11 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
 
     activeTabId.value = tabId;
 
-    // Set the tab as active in the backend
-    await setActiveTab(tabId);
+    // Only set the tab as active in the backend if it's not already marked as active
+    // This avoids redundant API calls when restoring state from backend
+    if (!tab.isActive) {
+        await setActiveTab(tabId);
+    }
 }
 
 // Tab management using composable - pass switchTab callback for UI handling
@@ -119,16 +122,19 @@ async function loadTabs(): Promise<void> {
         // Step 1: Load all tabs without files (items_data is not included)
         await loadTabsFromComposable();
 
-        // Step 2: Determine which tab to focus (active tab if exists, otherwise first tab)
+        // Step 2: Only focus a tab if one is already marked as active
+        // Don't auto-activate tabs - let user choose if none is active
         if (tabs.value.length > 0 && activeTabId.value === null) {
-            // Find the active tab, or fall back to the first tab
             const activeTab = tabs.value.find(t => t.isActive);
-            const tabToFocus = activeTab || tabs.value[0];
-
-            // Step 3: If tab has files, load items lazily
-            // Step 4: Restore query params (handled in switchTab)
-            // Pass skipActiveCheck=true since activeTabId is null, so switchTab will set it
-            await switchTab(tabToFocus.id, true);
+            
+            // Only switch to tab if one is already marked as active
+            if (activeTab) {
+                // Step 3: If tab has files, load items lazily
+                // Step 4: Restore query params (handled in switchTab)
+                // Pass skipActiveCheck=true since activeTabId is null, so switchTab will set it
+                await switchTab(activeTab.id, true);
+            }
+            // If no tab is active, activeTabId remains null and user must select one
         }
         // If no tabs exist, render nothing until a tab is created
     } catch (error) {
