@@ -281,8 +281,18 @@ class FilesController extends Controller
     {
         $user = Auth::user();
 
-        // Get all files owned by the user
-        $files = File::where('user_id', $user->id)->get();
+        // Get all browse tabs for the user
+        $browseTabs = BrowseTab::forUser($user->id)->get();
+
+        // Collect all unique file IDs from all user's browse tabs
+        $fileIds = collect();
+        foreach ($browseTabs as $tab) {
+            $fileIds = $fileIds->merge($tab->files->pluck('id'));
+        }
+        $fileIds = $fileIds->unique()->values();
+
+        // Get all files and authorize deletion
+        $files = File::whereIn('id', $fileIds)->get();
 
         $deletedCount = 0;
         foreach ($files as $file) {
