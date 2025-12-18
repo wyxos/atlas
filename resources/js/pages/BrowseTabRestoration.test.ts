@@ -461,7 +461,9 @@ describe('Browse - Tab Restoration', () => {
             return;
         }
 
-        expect(tabContentVm.pendingRestoreNextCursor).toBe(cursorY);
+        // With the new approach, Masonry handles pagination state via initialPage/initialNextPage props
+        // Verify that nextCursor is set correctly (which will be passed to Masonry as initialNextPage)
+        expect(tabContentVm.nextCursor).toBe(cursorY);
 
         await tabContentVm.getNextPage(1);
 
