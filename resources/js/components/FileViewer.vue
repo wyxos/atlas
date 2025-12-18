@@ -1142,9 +1142,13 @@ defineExpose({
         <div :class="[
             'relative overflow-hidden transition-all duration-500 ease-in-out',
             overlayIsFilled ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-1 min-h-0'
-        ]">
+        ]" :style="{
+            height: overlayIsFilled ? undefined : '100%',
+        }">
             <!-- Image container -->
-            <div class="relative flex-1 min-h-0 overflow-hidden">
+            <div class="relative flex-1 min-h-0 overflow-hidden" :style="{
+                height: overlayIsFilled ? undefined : '100%',
+            }">
                 <!-- Preview image (shown immediately, behind spinner) -->
                 <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
                     :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
@@ -1156,11 +1160,18 @@ defineExpose({
                             height: overlayImageSize.height + 'px',
                             top: imageCenterPosition.top + 'px',
                             left: imageCenterPosition.left + 'px',
+                            transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
                         } : overlayImageSize ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
-                        } : {}),
-                        transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            top: '50%',
+                            left: '50%',
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        } : {
+                            top: '50%',
+                            left: '50%',
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        }),
                         transformOrigin: 'center center',
                     }" draggable="false" />
 
@@ -1182,11 +1193,18 @@ defineExpose({
                             height: overlayImageSize.height + 'px',
                             top: imageCenterPosition.top + 'px',
                             left: imageCenterPosition.left + 'px',
+                            transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
                         } : overlayImageSize ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
-                        } : {}),
-                        transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            top: '50%',
+                            left: '50%',
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        } : {
+                            top: '50%',
+                            left: '50%',
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        }),
                         transformOrigin: 'center center',
                     }" draggable="false" @click="handleOverlayImageClick"
                     @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"

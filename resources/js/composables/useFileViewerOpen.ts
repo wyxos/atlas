@@ -105,6 +105,20 @@ export function useFileViewerOpen(
         overlay.overlayBorderRadius.value = radius || null;
         overlay.overlayIsAnimating.value = false;
 
+        // Calculate initial image center position immediately (before preload)
+        // This ensures images are positioned correctly from the start
+        const borderWidth = 4; // border-4 = 4px
+        const initialContentWidth = width - (borderWidth * 2);
+        const initialContentHeight = height - (borderWidth * 2);
+        // Initially image size equals container size (overlayImageSize is set to { width, height })
+        const initialImageLeft = Math.round((initialContentWidth - imageSize.overlayImageSize.value.width) / 2);
+        const initialImageTop = Math.round((initialContentHeight - imageSize.overlayImageSize.value.height) / 2);
+
+        imageSize.imageCenterPosition.value = {
+            top: initialImageTop,
+            left: initialImageLeft,
+        };
+
         // Wait for DOM update
         await nextTick();
 
@@ -142,7 +156,7 @@ export function useFileViewerOpen(
             await nextTick();
         }
 
-        // Precalculate flexbox center position for initial (small) container
+        // Update image center position after preload (image size may have changed)
         // Image container is inside border, so position relative to container (not border)
         const borderWidth = 4; // border-4 = 4px
         const initialContentWidth = width - (borderWidth * 2);
