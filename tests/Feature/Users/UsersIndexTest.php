@@ -25,7 +25,11 @@ test('admin can view users listing', function () {
 });
 
 test('admin can filter users by search name', function () {
-    $admin = User::factory()->admin()->create();
+    // Set explicit name/email for admin to avoid random matches with search term
+    $admin = User::factory()->admin()->create([
+        'name' => 'Admin User',
+        'email' => 'admin@example.com',
+    ]);
     User::factory()->create(['name' => 'John Doe']);
     User::factory()->create(['name' => 'Jane Smith']);
 
