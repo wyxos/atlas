@@ -618,6 +618,7 @@ describe('Browse - Core', () => {
                         label: 'Test Tab',
                         query_params: { service: 'civit-ai-images', page: pageParam },
                         position: 0,
+                        is_active: true,
                     }],
                 });
             }
@@ -666,6 +667,7 @@ describe('Browse - Core', () => {
                         label: 'Test Tab',
                         query_params: { service: 'civit-ai-images', page: pageValue },
                         position: 0,
+                        is_active: true,
                     }],
                 });
             }

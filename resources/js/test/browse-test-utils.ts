@@ -253,7 +253,7 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
         query_params: { service: 'civit-ai-images', page: 1 },
         items_data: [],
         position: 0,
-        is_active: false,
+        is_active: true, // Default to active so tests can access tab content
         ...overrides,
     };
 }
