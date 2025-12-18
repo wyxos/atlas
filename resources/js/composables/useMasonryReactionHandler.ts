@@ -72,7 +72,7 @@ export function useMasonryReactionHandler(
 
         // Queue the AJAX request with restore callback, tab ID, index, and item
         const previewUrl = item?.src;
-        queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, tabId, itemIndex, item);
+        queueReaction(fileId, type, createReactionCallback(tabId), previewUrl, restoreItem, tabId, itemIndex, item);
 
         // Emit to parent
         onReaction(fileId, type);
