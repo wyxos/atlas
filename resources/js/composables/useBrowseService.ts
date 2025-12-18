@@ -38,21 +38,9 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             // Fetch services from browse endpoint (will return services metadata)
             const response = await window.axios.get(browseIndex.url({ query: { page: 1, limit: 1 } }));
             availableServices.value = response.data.services || [];
-
-            // Fallback to default services if none returned
-            if (availableServices.value.length === 0) {
-                availableServices.value = [
-                    { key: 'civit-ai-images', label: 'CivitAI Images' },
-                    { key: 'wallhaven', label: 'Wallhaven' },
-                ];
-            }
         } catch (error) {
             console.error('Failed to fetch services:', error);
-            // Fallback to default services
-            availableServices.value = [
-                { key: 'civit-ai-images', label: 'CivitAI Images' },
-                { key: 'wallhaven', label: 'Wallhaven' },
-            ];
+            availableServices.value = [];
         }
     }
 
