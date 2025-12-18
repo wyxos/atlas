@@ -90,13 +90,16 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         deps.currentPage.value = pageValue;
         deps.nextCursor.value = nextValue;
 
-        // Simplified: Just set items and loadAtPage
-        // Masonry will handle pagination state via initialPage/initialNextPage props
+        // Set items and loadAtPage
+        // loadAtPage should always reflect the page value from query params for consistency
+        // skipInitialLoad prop will prevent Masonry from actually loading when items exist
         if (tab.itemsData && tab.itemsData.length > 0) {
             // When we have items to restore, set items and let Masonry auto-initialize
             // Masonry will use initialPage and initialNextPage props to restore pagination state
             deps.items.value = tab.itemsData;
-            deps.loadAtPage.value = null; // Skip initial load since items are provided
+            // Set loadAtPage to pageValue even when items exist - skipInitialLoad will prevent the load
+            // This ensures loadAtPage always reflects the actual page state from query params
+            deps.loadAtPage.value = pageValue;
         } else {
             // No items to restore, set loadAtPage for initial load
             deps.loadAtPage.value = pageValue;
