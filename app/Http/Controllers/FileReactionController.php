@@ -9,6 +9,7 @@ use App\Models\Reaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class FileReactionController extends Controller
@@ -23,7 +24,6 @@ class FileReactionController extends Controller
 
         $validated = $request->validate([
             'type' => ['required', 'string', 'in:love,like,dislike,funny'],
-            'tab_id' => ['nullable', 'integer', 'exists:browse_tabs,id'],
         ]);
 
         $user = Auth::user();
@@ -75,21 +75,14 @@ class FileReactionController extends Controller
             DownloadFile::dispatch($file->id);
         }
 
-        // Detach file from tab(s)
-        // If tab_id is provided, detach from that specific tab only
-        // Otherwise, detach from all tabs belonging to this user
-        if (isset($validated['tab_id'])) {
-            $tab = BrowseTab::where('id', $validated['tab_id'])
-                ->where('user_id', $user->id)
-                ->first();
-            if ($tab) {
-                $tab->files()->detach($file->id);
-            }
-        } else {
-            $userTabs = BrowseTab::forUser($user->id)->get();
-            foreach ($userTabs as $tab) {
-                $tab->files()->detach($file->id);
-            }
+        // Detach file from all tabs belonging to this user
+        // Once a file is reacted to, it should be removed from all tabs for that user
+        $userTabIds = BrowseTab::forUser($user->id)->pluck('id');
+        if ($userTabIds->isNotEmpty()) {
+            DB::table('browse_tab_file')
+                ->whereIn('browse_tab_id', $userTabIds)
+                ->where('file_id', $file->id)
+                ->delete();
         }
 
         return response()->json([
@@ -171,7 +164,6 @@ class FileReactionController extends Controller
             'reactions' => 'required|array',
             'reactions.*.file_id' => 'required|integer|exists:files,id',
             'reactions.*.type' => 'required|string|in:love,like,dislike,funny',
-            'tab_id' => ['nullable', 'integer', 'exists:browse_tabs,id'],
         ]);
 
         $user = Auth::user();
@@ -228,21 +220,14 @@ class FileReactionController extends Controller
                 DownloadFile::dispatch($file->id);
             }
 
-            // Detach file from tab(s)
-            // If tab_id is provided, detach from that specific tab only
-            // Otherwise, detach from all tabs belonging to this user
-            if (isset($validated['tab_id'])) {
-                $tab = BrowseTab::where('id', $validated['tab_id'])
-                    ->where('user_id', $user->id)
-                    ->first();
-                if ($tab) {
-                    $tab->files()->detach($file->id);
-                }
-            } else {
-                $userTabs = BrowseTab::forUser($user->id)->get();
-                foreach ($userTabs as $tab) {
-                    $tab->files()->detach($file->id);
-                }
+            // Detach file from all tabs belonging to this user
+            // Once a file is reacted to, it should be removed from all tabs for that user
+            $userTabIds = BrowseTab::forUser($user->id)->pluck('id');
+            if ($userTabIds->isNotEmpty()) {
+                DB::table('browse_tab_file')
+                    ->whereIn('browse_tab_id', $userTabIds)
+                    ->where('file_id', $file->id)
+                    ->delete();
             }
 
             $results[] = [
