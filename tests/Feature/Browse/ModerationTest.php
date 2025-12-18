@@ -66,12 +66,6 @@ test('files with matching prompts are flagged for auto-dislike', function () {
 
     // Assert file is NOT auto-disliked in database (new behavior)
     expect($file1->fresh()->auto_disliked)->toBeFalse();
-
-    // Assert moderation data is returned for flagged file
-    expect($result['moderationData'][$file1->id])->toHaveKeys(['reason', 'rule_id', 'rule_name', 'hits'])
-        ->and($result['moderationData'][$file1->id]['reason'])->toBe('moderation:rule')
-        ->and($result['moderationData'][$file1->id]['rule_id'])->toBe($rule->id)
-        ->and($result['moderationData'][$file1->id]['rule_name'])->toBe('Block spam');
 });
 
 test('files without matching prompts are not flagged', function () {
@@ -166,10 +160,6 @@ test('multiple active rules are checked', function () {
     // Assert both files are flagged
     expect($result['flaggedIds'])->toContain($file1->id)
         ->and($result['flaggedIds'])->toContain($file2->id);
-
-    // Assert correct rule is matched for each
-    expect($result['moderationData'][$file1->id]['rule_id'])->toBe($rule1->id);
-    expect($result['moderationData'][$file2->id]['rule_id'])->toBe($rule2->id);
 });
 
 test('files already auto-disliked are skipped', function () {
@@ -252,9 +242,8 @@ test('moderation result includes correct structure', function () {
     $result = $this->controller->callModerateFiles(collect([$file]));
 
     // Assert result structure
-    expect($result)->toHaveKeys(['flaggedIds', 'moderationData'])
-        ->and($result['flaggedIds'])->toContain($file->id)
-        ->and($result['moderationData'][$file->id])->toBeArray();
+    expect($result)->toHaveKeys(['flaggedIds', 'processedIds'])
+        ->and($result['flaggedIds'])->toContain($file->id);
 });
 
 test('batch flagging works correctly for multiple files', function () {
@@ -302,7 +291,7 @@ test('empty file collection returns empty results', function () {
     $result = $this->controller->callModerateFiles(collect([]));
 
     expect($result['flaggedIds'])->toBeEmpty()
-        ->and($result['moderationData'])->toBeEmpty();
+        ->and($result['processedIds'])->toBeEmpty();
 });
 
 test('no active rules returns empty results', function () {

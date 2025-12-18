@@ -17,14 +17,13 @@ trait ModeratesFiles
      * - auto_dislike: Immediately sets auto_disliked = true, creates dislike reaction, and dispatches delete job
      * - blacklist: Immediately sets blacklisted_at = now() and dispatches delete job
      *
-     * @return array{flaggedIds:array<int>, moderationData:array<int, array>, processedIds:array<int>}
+     * @return array{flaggedIds:array<int>, processedIds:array<int>}
      */
     protected function moderateFiles(Collection $files): array
     {
         if ($files->isEmpty()) {
             return [
                 'flaggedIds' => [],
-                'moderationData' => [],
                 'processedIds' => [],
             ];
         }
@@ -33,14 +32,12 @@ trait ModeratesFiles
         if ($activeRules->isEmpty()) {
             return [
                 'flaggedIds' => [],
-                'moderationData' => [],
                 'processedIds' => [],
             ];
         }
 
         $moderator = new Moderator;
         $flaggedIds = []; // For ui_countdown action type
-        $moderationData = [];
         $autoDislikeFileIds = []; // Files to auto-dislike
         $blacklistFileIds = []; // Files to blacklist
         $filesToDelete = []; // Files with paths that need delete jobs
@@ -71,14 +68,6 @@ trait ModeratesFiles
 
             if ($matchedRule) {
                 $actionType = $matchedRule->action_type ?? ModerationRule::ACTION_UI_COUNTDOWN;
-
-                $moderationData[$file->id] = [
-                    'reason' => 'moderation:rule',
-                    'rule_id' => $matchedRule->id,
-                    'rule_name' => $matchedRule->name,
-                    'options' => $matchedRule->options ?? null,
-                    'hits' => array_values($hits),
-                ];
 
                 // Handle different action types
                 if ($actionType === ModerationRule::ACTION_UI_COUNTDOWN) {
@@ -147,7 +136,6 @@ trait ModeratesFiles
 
         return [
             'flaggedIds' => $flaggedIds,
-            'moderationData' => $moderationData,
             'processedIds' => $processedIds,
         ];
     }
