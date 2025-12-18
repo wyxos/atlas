@@ -39,6 +39,7 @@ import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import { analyzeItemSizes, logItemSizeDiagnostics, createMinimalItems, compareItemPerformance } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
+import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 
 interface Props {
     tab?: BrowseTabData;
@@ -141,7 +142,7 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
             message: string;
             auto_disliked_count: number;
             file_ids: number[];
-        }>('/api/files/auto-dislike/batch', {
+        }>(batchPerformAutoDislike.url(), {
             file_ids: expiredIds,
             tab_id: props.tab?.id,
         });

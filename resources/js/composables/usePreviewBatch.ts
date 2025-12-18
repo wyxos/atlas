@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { batchIncrementPreview } from '@/actions/App/Http/Controllers/FilesController';
 
 interface PendingPreview {
     fileId: number;
@@ -22,7 +23,7 @@ export function usePreviewBatch() {
             const response = await window.axios.post<{
                 message: string;
                 results: Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>;
-            }>('/api/files/preview/batch', {
+            }>(batchIncrementPreview.url(), {
                 file_ids: fileIds,
             });
 

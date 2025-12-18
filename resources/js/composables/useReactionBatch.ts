@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { batchShow as batchShowReactions } from '@/actions/App/Http/Controllers/FileReactionController';
 
 interface PendingReaction {
     fileId: number;
@@ -23,7 +24,7 @@ export function useReactionBatch() {
         try {
             const response = await window.axios.post<{
                 reactions: Array<{ file_id: number; reaction: { type: string } | null }>;
-            }>('/api/files/reactions/batch', {
+            }>(batchShowReactions.url(), {
                 file_ids: fileIds,
             });
 

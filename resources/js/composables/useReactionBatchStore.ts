@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import type { ReactionType } from '@/types/reaction';
+import { batchStore as batchStoreReaction } from '@/actions/App/Http/Controllers/FileReactionController';
 
 interface PendingReaction {
     fileId: number;
@@ -33,7 +34,7 @@ export function useReactionBatchStore(tabId?: number) {
             const response = await window.axios.post<{
                 message: string;
                 reactions: Array<{ file_id: number; reaction: { type: string } | null }>;
-            }>('/api/files/reactions/batch/store', payload);
+            }>(batchStoreReaction.url(), payload);
 
             return response.data.reactions;
         } catch (error) {
