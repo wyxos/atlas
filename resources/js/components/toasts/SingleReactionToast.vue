@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Heart, ThumbsUp, ThumbsDown, Smile, X } from 'lucide-vue-next';
+import type { ReactionType } from '@/types/reaction';
 
 interface Props {
     fileId: number;
-    type: 'love' | 'like' | 'dislike' | 'funny';
+    type: ReactionType;
     previewUrl?: string;
     countdown: number;
     onCancel?: (fileId: number) => void;

@@ -1,10 +1,11 @@
 import type { MasonryItem } from './useBrowseTabs';
 import { useReactionQueue } from './useReactionQueue';
 import { createReactionCallback } from '../utils/reactions';
+import type { ReactionType } from '@/types/reaction';
 
 export interface ReactionHandlerOptions {
     items: import('vue').Ref<MasonryItem[]>;
-    onReaction?: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void;
+    onReaction?: (fileId: number, type: ReactionType) => void;
     removeFromMasonry?: (item: MasonryItem) => void;
 }
 
@@ -13,7 +14,7 @@ export function useReactionHandler(options: ReactionHandlerOptions) {
 
     async function handleReaction(
         fileId: number,
-        type: 'love' | 'like' | 'dislike' | 'funny'
+        type: ReactionType
     ): Promise<void> {
         const item = options.items.value.find((i) => i.id === fileId);
 

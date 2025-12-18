@@ -2,6 +2,7 @@ import { nextTick, type Ref } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
 import { useReactionQueue } from './useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
+import type { ReactionType } from '@/types/reaction';
 
 /**
  * Composable for handling masonry item reactions with restore functionality.
@@ -11,7 +12,7 @@ export function useMasonryReactionHandler(
     itemsMap: Ref<Map<number, MasonryItem>>,
     masonry: Ref<any>,
     tab: Ref<BrowseTabData | undefined>,
-    onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void,
+    onReaction: (fileId: number, type: ReactionType) => void,
     restoreToMasonry: (item: MasonryItem, index: number, masonryInstance?: any) => Promise<void>
 ) {
     const { queueReaction } = useReactionQueue();
@@ -21,7 +22,7 @@ export function useMasonryReactionHandler(
      */
     async function handleMasonryReaction(
         fileId: number,
-        type: 'love' | 'like' | 'dislike' | 'funny',
+        type: ReactionType,
         removeItem: (item: MasonryItem) => void
     ): Promise<void> {
         // Use Map lookup instead of O(n) find operations

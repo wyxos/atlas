@@ -1,8 +1,9 @@
 import { ref } from 'vue';
+import type { ReactionType } from '@/types/reaction';
 
 interface PendingReaction {
     fileId: number;
-    type: 'love' | 'like' | 'dislike' | 'funny';
+    type: ReactionType;
     resolve: (value: { file_id: number; reaction: { type: string } | null }) => void;
     reject: (error: any) => void;
 }
@@ -19,7 +20,7 @@ let batchTimeout: ReturnType<typeof setTimeout> | null = null;
  */
 export function useReactionBatchStore() {
     async function batchStoreReactions(
-        reactions: Array<{ file_id: number; type: 'love' | 'like' | 'dislike' | 'funny' }>
+        reactions: Array<{ file_id: number; type: ReactionType }>
     ): Promise<Array<{ file_id: number; reaction: { type: string } | null }>> {
         try {
             const response = await window.axios.post<{
@@ -51,7 +52,7 @@ export function useReactionBatchStore() {
         }
 
         // Group by type to batch similar reactions together
-        const reactionsByType = new Map<'love' | 'like' | 'dislike' | 'funny', Array<{ file_id: number; type: 'love' | 'like' | 'dislike' | 'funny' }>>();
+        const reactionsByType = new Map<ReactionType, Array<{ file_id: number; type: ReactionType }>>();
 
         reactions.forEach((pending) => {
             if (!reactionsByType.has(pending.type)) {
@@ -65,7 +66,7 @@ export function useReactionBatchStore() {
 
         // Process each type group in chunks
         reactionsByType.forEach(async (typeReactions, type) => {
-            const chunks: Array<Array<{ file_id: number; type: 'love' | 'like' | 'dislike' | 'funny' }>> = [];
+            const chunks: Array<Array<{ file_id: number; type: ReactionType }>> = [];
             for (let i = 0; i < typeReactions.length; i += MAX_BATCH_SIZE) {
                 chunks.push(typeReactions.slice(i, i + MAX_BATCH_SIZE));
             }
@@ -119,7 +120,7 @@ export function useReactionBatchStore() {
      */
     function queueReactionStore(
         fileId: number,
-        type: 'love' | 'like' | 'dislike' | 'funny'
+        type: ReactionType
     ): Promise<{ file_id: number; reaction: { type: string } | null }> {
         return new Promise((resolve, reject) => {
             const key = `${fileId}-${type}`;

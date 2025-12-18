@@ -3,11 +3,12 @@ import { useToast } from 'vue-toastification';
 import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
 import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
 import { useTimerManager } from './useTimerManager';
+import type { ReactionType } from '@/types/reaction';
 
 export interface QueuedReaction {
     id: string;
     fileId: number;
-    type: 'love' | 'like' | 'dislike' | 'funny';
+    type: ReactionType;
     previewUrl?: string;
     countdown: number;
     timeoutId: ReturnType<typeof setTimeout> | null;
@@ -15,7 +16,7 @@ export interface QueuedReaction {
     startTime: number; // Track when countdown started
     pausedAt: number | null; // Track when paused (null if not paused)
     pausedRemaining: number | null; // Remaining time when paused
-    executeCallback: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => Promise<void>; // Store callback for resume
+    executeCallback: (fileId: number, type: ReactionType) => Promise<void>; // Store callback for resume
     restoreItem?: (tabId: number, isTabActive: (tabId: number) => boolean) => void | Promise<void>; // Callback to restore item to masonry with tab check
     restoreBatch?: (tabId: number, isTabActive: (tabId: number) => boolean) => void | Promise<void>; // Callback to restore entire batch to masonry with tab check
     tabId?: number; // Tab ID where the item was removed
@@ -126,8 +127,8 @@ export function useReactionQueue() {
 
     function queueReaction(
         fileId: number,
-        type: 'love' | 'like' | 'dislike' | 'funny',
-        executeCallback: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => Promise<void>,
+        type: ReactionType,
+        executeCallback: (fileId: number, type: ReactionType) => Promise<void>,
         previewUrl?: string,
         restoreItem?: (tabId: number, isTabActive: (tabId: number) => boolean) => void,
         tabId?: number,

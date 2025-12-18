@@ -96,4 +96,31 @@ class ModerationRuleController extends Controller
 
         return response()->json(['message' => 'Moderation rule deleted successfully']);
     }
+
+    /**
+     * Test text against a rule and return match results.
+     * Accepts rule_id to test an existing rule.
+     */
+    public function testRule(Request $request): JsonResponse
+    {
+        $request->validate([
+            'text' => ['required', 'string'],
+            'rule_id' => ['required', 'integer', 'exists:moderation_rules,id'],
+        ]);
+
+        $text = $request->string('text')->toString();
+        $rule = ModerationRule::findOrFail($request->integer('rule_id'));
+
+        $moderator = new \App\Services\Moderation\Moderator;
+        $moderator->loadRule($rule);
+
+        $matches = $moderator->check($text);
+        $hits = $moderator->collectMatches($text);
+
+        return response()->json([
+            'matches' => $matches,
+            'hits' => $hits,
+            'rule' => $rule,
+        ]);
+    }
 }

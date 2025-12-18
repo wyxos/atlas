@@ -2,6 +2,7 @@ import { ref, type Ref } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
 import { useReactionQueue } from './useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
+import type { ReactionType } from '@/types/reaction';
 
 type Container = {
     id: number;
@@ -18,7 +19,7 @@ export function useContainerPillInteractions(
     items: Ref<MasonryItem[]>,
     masonry: Ref<{ removeMany?: (items: MasonryItem[]) => Promise<void> } | null>,
     tabId: number | undefined,
-    onReaction: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void,
+    onReaction: (fileId: number, type: ReactionType) => void,
     restoreManyToMasonry?: (
         itemsToRestore: Array<{ item: MasonryItem; index: number }>,
         masonryInstance?: any
@@ -65,7 +66,7 @@ export function useContainerPillInteractions(
      */
     async function batchReactToSiblings(
         containerId: number,
-        reactionType: 'love' | 'like' | 'dislike' | 'funny'
+        reactionType: ReactionType
     ): Promise<void> {
         const siblings = getSiblingItems(containerId);
 
@@ -195,7 +196,7 @@ export function useContainerPillInteractions(
         }
 
         // Determine reaction type based on button and modifiers
-        let reactionType: 'love' | 'like' | 'dislike' | 'funny' | null = null;
+        let reactionType: ReactionType | null = null;
 
         // For double-click, use the button from the last click
         const buttonToCheck = isDoubleClick && lastClick ? lastClick.button : e.button;

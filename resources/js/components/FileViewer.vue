@@ -8,6 +8,7 @@ import { useReactionHandler } from '@/composables/useReactionHandler';
 import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
+import type { ReactionType } from '@/types/reaction';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -16,7 +17,7 @@ interface Props {
     hasMore?: boolean;
     isLoading?: boolean;
     onLoadMore?: () => Promise<void>;
-    onReaction?: (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => void;
+    onReaction?: (fileId: number, type: ReactionType) => void;
     removeFromMasonry?: (item: MasonryItem) => void;
     restoreToMasonry?: (item: MasonryItem, index: number, masonryInstance?: any) => void | Promise<void>;
     tabId?: number;
@@ -258,7 +259,7 @@ const { handleReaction: handleReactionBase } = useReactionHandler({
 });
 
 // Handle reaction in FileViewer - removes from carousel and auto-navigates
-async function handleReaction(type: 'love' | 'like' | 'dislike' | 'funny'): Promise<void> {
+async function handleReaction(type: ReactionType): Promise<void> {
     if (currentItemIndex.value === null) return;
 
     const currentItem = items.value[currentItemIndex.value];
@@ -426,7 +427,7 @@ function handleOverlayImageClick(e: MouseEvent): void {
         const currentItem = items.value[currentItemIndex.value];
         if (!currentItem) return;
 
-        let reactionType: 'love' | 'like' | 'dislike' | 'funny' | null = null;
+        let reactionType: ReactionType | null = null;
 
         // ALT + Left Click = Like
         if (e.button === 0 || (e.type === 'click' && e.button === 0)) {
