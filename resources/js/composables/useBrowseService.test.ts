@@ -57,36 +57,8 @@ describe('useBrowseService', () => {
         expect(availableServices.value).toEqual(mockServices);
     });
 
-    it('falls back to default services when API returns empty', async () => {
-        mockAxios.get.mockResolvedValue({
-            data: {
-                items: [],
-                services: [],
-            },
-        });
-
-        const { fetchServices, availableServices } = useBrowseService();
-
-        await fetchServices();
-
-        expect(availableServices.value).toEqual([
-            { key: 'civit-ai-images', label: 'CivitAI Images' },
-            { key: 'wallhaven', label: 'Wallhaven' },
-        ]);
-    });
-
-    it('falls back to default services on error', async () => {
-        mockAxios.get.mockRejectedValue(new Error('Network error'));
-
-        const { fetchServices, availableServices } = useBrowseService();
-
-        await fetchServices();
-
-        expect(availableServices.value).toEqual([
-            { key: 'civit-ai-images', label: 'CivitAI Images' },
-            { key: 'wallhaven', label: 'Wallhaven' },
-        ]);
-    });
+    // Note: Fallback behavior was removed in commit dfc0cb92 for better error transparency
+    // Tests removed as they test obsolete behavior
 
     it('returns empty result when no service is selected', async () => {
         const options: UseBrowseServiceOptions = {

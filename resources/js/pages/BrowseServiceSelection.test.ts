@@ -212,6 +212,7 @@ describe('Browse - Service Selection', () => {
                         query_params: {},
                         file_ids: [],
                         position: 0,
+                        is_active: true,
                     }],
                 });
             }
@@ -298,6 +299,7 @@ describe('Browse - Service Selection', () => {
                             query_params: { service: 'civit-ai-images', page: 1 },
                             file_ids: [],
                             position: 0,
+                            is_active: true,
                         },
                         {
                             id: tab2Id,
@@ -305,6 +307,7 @@ describe('Browse - Service Selection', () => {
                             query_params: { service: 'wallhaven', page: 1 },
                             file_ids: [],
                             position: 1,
+                            is_active: false,
                         },
                     ],
                 });
