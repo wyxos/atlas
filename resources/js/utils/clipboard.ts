@@ -22,7 +22,6 @@ export async function copyToClipboard(
                 description: 'Please try again or copy manually',
             });
         }
-        console.error('Error copying to clipboard:', err);
         throw err;
     }
 }
