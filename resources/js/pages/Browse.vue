@@ -58,12 +58,6 @@ const {
 // Computed property for active tab to ensure proper reactivity
 const activeTab = computed(() => getActiveTab());
 
-// Browse service composable - just for fetching available services
-const {
-    availableServices,
-    fetchServices: fetchServicesFromComposable,
-} = useBrowseService();
-
 // Handle reaction
 async function handleReaction(
     fileId: number,
@@ -150,14 +144,8 @@ async function loadTabs(): Promise<void> {
 
 // Initialize on mount
 onMounted(async () => {
-    // Fetch available services first (in parallel with tabs for faster loading)
-    const servicesPromise = fetchServicesFromComposable();
-
     // Load tabs - loadTabs will set the first tab as active if tabs exist
-    const tabsPromise = loadTabs();
-
-    // Wait for both to complete
-    await Promise.all([servicesPromise, tabsPromise]);
+    await loadTabs();
 });
 </script>
 
@@ -184,7 +172,7 @@ onMounted(async () => {
             </TabPanel>
             <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
                 <BrowseTabContent v-if="activeTab" :key="activeTab.id" :tab="activeTab"
-                    :available-services="availableServices" :update-active-tab="updateActiveTab"
+                    :available-services="[]" :update-active-tab="updateActiveTab"
                     :load-tab-items="loadTabItems" :on-reaction="handleReaction"
                     :on-loading-change="handleMasonryLoadingChangeFromTab"
                     :on-tab-data-loading-change="handleTabDataLoadingChangeFromTab" />

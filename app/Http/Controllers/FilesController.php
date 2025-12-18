@@ -9,6 +9,7 @@ use App\Models\Reaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 
 class FilesController extends Controller
 {
@@ -275,30 +276,30 @@ class FilesController extends Controller
     }
 
     /**
-     * Delete all files for the authenticated user.
+     * Delete all files in the database and empty atlas app storage.
      */
     public function deleteAll(): JsonResponse
     {
         $user = Auth::user();
 
-        // Get all browse tabs for the user
-        $browseTabs = BrowseTab::forUser($user->id)->get();
+        // Authorize that user can view any files (admin only)
+        Gate::authorize('viewAny', File::class);
 
-        // Collect all unique file IDs from all user's browse tabs
-        $fileIds = collect();
-        foreach ($browseTabs as $tab) {
-            $fileIds = $fileIds->merge($tab->files->pluck('id'));
-        }
-        $fileIds = $fileIds->unique()->values();
+        // Delete all files in the database
+        $deletedCount = File::count();
+        File::query()->delete();
 
-        // Get all files and authorize deletion
-        $files = File::whereIn('id', $fileIds)->get();
-
-        $deletedCount = 0;
+        // Empty atlas app storage
+        $atlasDisk = Storage::disk('atlas-app');
+        $files = $atlasDisk->allFiles();
         foreach ($files as $file) {
-            Gate::authorize('delete', $file);
-            $file->delete();
-            $deletedCount++;
+            $atlasDisk->delete($file);
+        }
+
+        // Also clear private directory (where File model stores files)
+        $localDisk = Storage::disk('local');
+        if ($localDisk->exists('private')) {
+            $localDisk->deleteDirectory('private');
         }
 
         return response()->json([

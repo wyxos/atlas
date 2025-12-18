@@ -3,6 +3,8 @@
 use App\Jobs\DeleteAutoDislikedFileJob;
 use App\Models\Container;
 use App\Models\File;
+use App\Models\Reaction;
+use App\Models\User;
 use App\Services\ContainerBlacklistService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -54,6 +56,8 @@ test('flags files for ui_countdown action type', function () {
 
 test('auto-dislikes files for auto_dislike action type', function () {
     Bus::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
 
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
@@ -71,6 +75,14 @@ test('auto-dislikes files for auto_dislike action type', function () {
     expect($result['flaggedFileIds'])->toBeEmpty();
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->auto_disliked)->toBeTrue();
+
+    // Verify dislike reaction was created
+    $reaction = Reaction::where('file_id', $file->id)
+        ->where('user_id', $user->id)
+        ->where('type', 'dislike')
+        ->first();
+    expect($reaction)->not->toBeNull();
+
     Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function ($job) use ($file) {
         return $job->filePath === $file->path;
     });
@@ -78,6 +90,8 @@ test('auto-dislikes files for auto_dislike action type', function () {
 
 test('blacklists files for blacklist action type', function () {
     Bus::fake();
+    $user = User::factory()->create();
+    $this->actingAs($user);
 
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
@@ -95,6 +109,14 @@ test('blacklists files for blacklist action type', function () {
     expect($result['flaggedFileIds'])->toBeEmpty();
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
+
+    // Verify NO dislike reaction was created (blacklist does not create reactions)
+    $reaction = Reaction::where('file_id', $file->id)
+        ->where('user_id', $user->id)
+        ->where('type', 'dislike')
+        ->first();
+    expect($reaction)->toBeNull();
+
     Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function ($job) use ($file) {
         return $job->filePath === $file->path;
     });
