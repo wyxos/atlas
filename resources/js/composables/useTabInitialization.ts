@@ -8,7 +8,6 @@ interface TabInitializationDependencies {
         isLoading: boolean;
         cancelLoad: () => void;
         destroy: () => void;
-        init: (items: MasonryItem[], page: string | number | null, next: string | number | null) => void;
         refreshLayout: (items: MasonryItem[]) => void;
     } | null>;
 
@@ -18,7 +17,6 @@ interface TabInitializationDependencies {
     nextCursor: Ref<string | number | null>;
     loadAtPage: Ref<string | number | null>;
     isTabRestored: Ref<boolean>;
-    pendingRestoreNextCursor: Ref<string | number | null>;
     selectedService: Ref<string>;
 
     // Composable methods
@@ -56,14 +54,6 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         // Reset previewed items tracking when switching tabs
         deps.clearPreviewedItems();
 
-        // Restore selected service for UI
-        const serviceFromQuery = tab.queryParams?.service as string | null;
-        deps.selectedService.value = serviceFromQuery || '';
-
-        // Restore both page and next from queryParams
-        const pageFromQuery = tab.queryParams?.page;
-        const nextFromQuery = tab.queryParams?.next;
-
         // Always reload items from database when initializing a tab
         // This ensures we always have fresh data when switching tabs
         // If the tab has no files, the endpoint will return empty arrays
@@ -90,84 +80,27 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         // Use fileIds as the source of truth (stored in DB) - itemsData is just a derived representation
         const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0;
         deps.isTabRestored.value = tabHasRestorableItems;
-        // Set pendingRestoreNextCursor if we have restorable items and a next cursor from query params
-        deps.pendingRestoreNextCursor.value = tabHasRestorableItems && nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;
 
-        // Restore currentPage from saved queryParams
-        if (pageFromQuery !== undefined && pageFromQuery !== null) {
-            deps.currentPage.value = pageFromQuery;
-        } else {
-            deps.currentPage.value = 1;
-        }
+        // Always restore page and next from tab.queryParams
+        const pageValue = (tab.queryParams?.page as string | number | undefined) ?? 1;
+        const nextValue = (tab.queryParams?.next as string | number | null | undefined) ?? null;
 
-        // Restore nextCursor from saved queryParams
-        if (nextFromQuery !== undefined && nextFromQuery !== null) {
-            deps.nextCursor.value = nextFromQuery;
-        } else {
-            deps.nextCursor.value = null;
-        }
+        // Set currentPage and nextCursor from tab data
+        // These will be passed to Masonry via initialPage and initialNextPage props
+        deps.currentPage.value = pageValue;
+        deps.nextCursor.value = nextValue;
 
-        // Set loadAtPage and prepare for masonry initialization
-        const serviceValue = tab.queryParams?.service;
-        const hasService = typeof serviceValue === 'string' && serviceValue.length > 0;
-
+        // Simplified: Just set items and loadAtPage
+        // Masonry will handle pagination state via initialPage/initialNextPage props
         if (tab.itemsData && tab.itemsData.length > 0) {
-            deps.loadAtPage.value = null;
-            deps.items.value = [];
-        } else if (hasService) {
-            if (pageFromQuery !== undefined && pageFromQuery !== null) {
-                deps.loadAtPage.value = pageFromQuery;
-            } else {
-                deps.loadAtPage.value = 1;
-            }
-            deps.items.value = [];
+            // When we have items to restore, set items and let Masonry auto-initialize
+            // Masonry will use initialPage and initialNextPage props to restore pagination state
+            deps.items.value = tab.itemsData;
+            deps.loadAtPage.value = null; // Skip initial load since items are provided
         } else {
-            deps.loadAtPage.value = null;
+            // No items to restore, set loadAtPage for initial load
+            deps.loadAtPage.value = pageValue;
             deps.items.value = [];
-        }
-
-        await nextTick();
-
-        // Wait for masonry component to be ready - it might not be available immediately
-        // Only wait if we have items to initialize with
-        if (tab.itemsData && tab.itemsData.length > 0) {
-            let retries = 0;
-            while (!deps.masonry.value && retries < 20) {
-                await nextTick();
-                await new Promise(resolve => setTimeout(resolve, 50));
-                retries++;
-            }
-
-            // If we have pre-loaded items, use masonry.init() to properly initialize
-            if (deps.masonry.value) {
-                const pageValue = pageFromQuery !== undefined && pageFromQuery !== null ? pageFromQuery : 1;
-                const nextValue = nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;
-
-                if (pageValue !== undefined && pageValue !== null) {
-                    deps.currentPage.value = pageValue;
-                }
-                if (nextValue !== undefined && nextValue !== null) {
-                    deps.nextCursor.value = nextValue;
-                }
-
-                deps.masonry.value.init(tab.itemsData, pageValue, nextValue);
-
-                await nextTick();
-
-                // Ensure items.value is updated with the initialized items (masonry should sync via v-model)
-                // If masonry doesn't sync immediately, manually set items to preserve previewed_count
-                if (deps.items.value.length === 0 && tab.itemsData.length > 0) {
-                    deps.items.value = [...tab.itemsData];
-                }
-
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        if (deps.masonry.value && deps.items.value.length > 0) {
-                            deps.masonry.value.refreshLayout(deps.items.value);
-                        }
-                    });
-                });
-            }
         }
 
         // Reset isTabRestored after initialization is complete

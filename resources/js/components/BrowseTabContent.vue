@@ -95,7 +95,6 @@ const currentPage = ref<string | number | null>(1);
 const nextCursor = ref<string | number | null>(null);
 const loadAtPage = ref<string | number | null>(null);
 const isTabRestored = ref(false);
-const pendingRestoreNextCursor = ref<string | number | null>(null);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
@@ -301,45 +300,10 @@ const hasServiceSelected = computed(() => {
     return typeof service === 'string' && service.length > 0;
 });
 
-// Computed property to determine if Masonry should skip initial load
-// Skip initial load if:
-// 1. We already have items loaded, OR
-// 2. The tab has fileIds to restore (fileIds is the source of truth stored in DB), OR
-// 3. loadAtPage is null AND we have a service AND we have page/next in queryParams (restoring state)
-// The key insight: if loadAtPage is null and we have saved state (page/next), initializeTab will restore items
-// via masonry.init(), so we should skip Masonry's automatic initial load to avoid double-loading
-// Note: We use fileIds as the source of truth (not itemsData) since fileIds is what's stored in the database
-// and itemsData is just a derived/loaded representation that may not be present during initialization
+// Simplified: Skip initial load if we have items
+// Masonry will auto-initialize pagination state via initialPage/initialNextPage props
 const shouldSkipInitialLoad = computed(() => {
-    // If we already have items, skip initial load
-    if (items.value.length > 0) {
-        return true;
-    }
-
-    // If the tab has fileIds, we're restoring from database, so skip initial load
-    // fileIds is the source of truth stored in the database - itemsData is just a derived representation
-    // This prevents Masonry from triggering a load on refresh when we have items to restore
-    const tab = props.tab;
-    if (tab) {
-        const hasFileIds = tab.fileIds && tab.fileIds.length > 0;
-        if (hasFileIds) {
-            return true;
-        }
-
-        // If loadAtPage is null AND we have a service AND we have page/next in queryParams,
-        // we're restoring state, so skip initial load to prevent Masonry from loading and resetting page/next
-        // This is the key fix for the refresh issue: when restoring, initializeTab will restore items
-        // via masonry.init(), so we must skip Masonry's automatic initial load
-        if (loadAtPage.value === null && hasServiceSelected.value) {
-            const hasPage = tab.queryParams?.page !== undefined && tab.queryParams?.page !== null;
-            const hasNext = tab.queryParams?.next !== undefined && tab.queryParams?.next !== null;
-            if (hasPage || hasNext) {
-                return true;
-            }
-        }
-    }
-
-    return false;
+    return items.value.length > 0;
 });
 
 // Computed property for apply button disabled state
@@ -363,7 +327,6 @@ const {
     items,
     nextCursor,
     currentPage,
-    pendingRestoreNextCursor,
     currentTabService,
     activeTabId: computed(() => props.tab?.id ?? null),
     getActiveTab: () => props.tab,
@@ -542,7 +505,6 @@ const { initializeTab } = useTabInitialization({
     nextCursor,
     loadAtPage,
     isTabRestored,
-    pendingRestoreNextCursor,
     selectedService,
     clearPreviewedItems: itemPreview.clearPreviewedItems,
     onTabDataLoadingChange: props.onTabDataLoadingChange,
@@ -951,7 +913,8 @@ onUnmounted(() => {
             <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
-                    :load-at-page="loadAtPage" :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
+                    :load-at-page="loadAtPage" :initial-page="currentPage" :initial-next-page="nextCursor"
+                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
                     :skip-initial-load="shouldSkipInitialLoad" :backfill-enabled="true" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
                     @backfill:stop="onBackfillStop" @backfill:retry-start="onBackfillRetryStart"

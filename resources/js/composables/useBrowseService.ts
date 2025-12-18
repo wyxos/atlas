@@ -19,7 +19,6 @@ export type UseBrowseServiceOptions = {
     items: Ref<MasonryItem[]>;
     nextCursor: Ref<string | number | null>;
     currentPage: Ref<string | number | null>;
-    pendingRestoreNextCursor: Ref<string | number | null>;
     currentTabService: ComputedRef<string | null>;
     activeTabId: Ref<number | null>;
     getActiveTab: () => BrowseTabData | undefined;
@@ -69,12 +68,9 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             };
         }
 
-        // Determine actual cursor/page to request. When restoring, Masonry may request page 1.
-        let pageToRequest: string | number = page;
-        if (options.pendingRestoreNextCursor.value !== null) {
-            pageToRequest = options.pendingRestoreNextCursor.value;
-            options.pendingRestoreNextCursor.value = null;
-        }
+        // Use the page parameter directly - Masonry will handle pagination state correctly
+        // via initialPage/initialNextPage props, so no need for pendingRestoreNextCursor
+        const pageToRequest: string | number = page;
 
         // Always pass as 'page' parameter - service will handle conversion
         const queryParams: Record<string, string | number> = {
