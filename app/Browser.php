@@ -2,19 +2,18 @@
 
 namespace App;
 
-use App\Http\Controllers\Concerns\ModeratesFiles;
 use App\Services\BaseService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
+use App\Services\ContainerModerationService;
 use App\Services\FileItemFormatter;
+use App\Services\FileModerationService;
 use App\Services\Wallhaven;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Storage;
 
 class Browser
 {
-    use ModeratesFiles;
-
     /**
      * Resolve a source key and return the service transform result.
      *
@@ -122,25 +121,18 @@ class Browser
 
         $persisted = app(BrowsePersister::class)->persist($filesPayload);
 
-        // Moderation: apply rules based on action_type
-        // - ui_countdown: flagged for UI countdown
-        // - auto_dislike: immediately auto-disliked
-        // - blacklist: immediately blacklisted
-        $moderationResult = $this->moderateFiles(collect($persisted));
-        $flaggedIds = $moderationResult['flaggedIds'];
-        $processedIds = $moderationResult['processedIds']; // Files immediately auto-disliked or blacklisted
+        // File moderation: apply rules based on action_type
+        $fileModerationResult = app(FileModerationService::class)->moderate(collect($persisted));
+        $flaggedIds = $fileModerationResult['flaggedIds'];
+        $processedIds = $fileModerationResult['processedIds'];
 
-        // Container blacklist: apply container blacklist rules after moderation
-        // - ui_countdown: flag files for UI countdown (reuses existing auto-dislike queue)
-        // - auto_dislike: immediately auto-dislike files in blacklisted containers
-        // - blacklist: immediately blacklist files in blacklisted containers
-        $containerBlacklistResult = app(\App\Services\ContainerBlacklistService::class)
-            ->filterBannedContainers(collect($persisted));
-        $containerFlaggedFileIds = $containerBlacklistResult['flaggedFileIds'];
-        $containerProcessedIds = $containerBlacklistResult['processedIds'];
+        // Container moderation: apply container moderation rules after file moderation
+        $containerModerationResult = app(ContainerModerationService::class)->moderate(collect($persisted));
+        $containerFlaggedIds = $containerModerationResult['flaggedIds'];
+        $containerProcessedIds = $containerModerationResult['processedIds'];
 
         // Merge flagged file IDs from both moderation and container blacklist (both use same auto-dislike queue)
-        $flaggedIds = array_merge($flaggedIds, $containerFlaggedFileIds);
+        $flaggedIds = array_merge($flaggedIds, $containerFlaggedIds);
 
         // Merge processed IDs from both moderation and container blacklist
         $processedIds = array_merge($processedIds, $containerProcessedIds);
