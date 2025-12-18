@@ -87,7 +87,8 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         }
 
         // Determine if tab has restorable items after loading
-        const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0 || (tab.itemsData?.length ?? 0) > 0;
+        // Use fileIds as the source of truth (stored in DB) - itemsData is just a derived representation
+        const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0;
         deps.isTabRestored.value = tabHasRestorableItems;
         // Set pendingRestoreNextCursor if we have restorable items and a next cursor from query params
         deps.pendingRestoreNextCursor.value = tabHasRestorableItems && nextFromQuery !== undefined && nextFromQuery !== null ? nextFromQuery : null;

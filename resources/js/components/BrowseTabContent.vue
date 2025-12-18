@@ -296,23 +296,25 @@ const hasServiceSelected = computed(() => {
 // Computed property to determine if Masonry should skip initial load
 // Skip initial load if:
 // 1. We already have items loaded, OR
-// 2. The tab has itemsData or fileIds to restore (prevents Masonry from loading on refresh), OR
+// 2. The tab has fileIds to restore (fileIds is the source of truth stored in DB), OR
 // 3. loadAtPage is null AND we have a service AND we have page/next in queryParams (restoring state)
 // The key insight: if loadAtPage is null and we have saved state (page/next), initializeTab will restore items
 // via masonry.init(), so we should skip Masonry's automatic initial load to avoid double-loading
+// Note: We use fileIds as the source of truth (not itemsData) since fileIds is what's stored in the database
+// and itemsData is just a derived/loaded representation that may not be present during initialization
 const shouldSkipInitialLoad = computed(() => {
     // If we already have items, skip initial load
     if (items.value.length > 0) {
         return true;
     }
 
-    // If the tab has itemsData or fileIds, we're restoring from database, so skip initial load
+    // If the tab has fileIds, we're restoring from database, so skip initial load
+    // fileIds is the source of truth stored in the database - itemsData is just a derived representation
     // This prevents Masonry from triggering a load on refresh when we have items to restore
     const tab = props.tab;
     if (tab) {
-        const hasItemsData = tab.itemsData && tab.itemsData.length > 0;
         const hasFileIds = tab.fileIds && tab.fileIds.length > 0;
-        if (hasItemsData || hasFileIds) {
+        if (hasFileIds) {
             return true;
         }
 
