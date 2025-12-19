@@ -67,7 +67,8 @@ class BrowsePersister
         return $allFiles->filter(function (File $file) {
             return ($file->downloaded === false || $file->downloaded === null)
                 && ! $file->previewed_at
-                && ! $file->blacklisted_at;
+                && ! $file->blacklisted_at
+                && ! $file->auto_disliked;
         })->values()->all();
     }
 

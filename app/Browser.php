@@ -125,11 +125,13 @@ class Browser
         $fileModerationResult = app(FileModerationService::class)->moderate(collect($persisted));
         $flaggedIds = $fileModerationResult['flaggedIds'];
         $processedIds = $fileModerationResult['processedIds'];
+        $immediateActions = $fileModerationResult['immediateActions'] ?? [];
 
         // Container moderation: apply container moderation rules after file moderation
         $containerModerationResult = app(ContainerModerationService::class)->moderate(collect($persisted));
         $containerFlaggedIds = $containerModerationResult['flaggedIds'];
         $containerProcessedIds = $containerModerationResult['processedIds'];
+        $containerImmediateActions = $containerModerationResult['immediateActions'] ?? [];
 
         // Merge flagged file IDs from both moderation and container blacklist (both use same auto-dislike queue)
         $flaggedIds = array_merge($flaggedIds, $containerFlaggedIds);
@@ -137,9 +139,25 @@ class Browser
         // Merge processed IDs from both moderation and container blacklist
         $processedIds = array_merge($processedIds, $containerProcessedIds);
 
+        // Merge immediate actions from both moderation and container blacklist
+        $immediateActions = array_merge($immediateActions, $containerImmediateActions);
+
+        // Store files before filtering (needed for immediate actions formatting)
+        $allFilesBeforeFilter = collect($persisted)->keyBy('id');
+
         // Filter out processed files (auto-disliked or blacklisted) from response
+        // This includes files that were processed in this request (via processedIds)
+        // and files that were already auto-disliked/blacklisted (defensive check)
         $persisted = collect($persisted)->reject(function ($file) use ($processedIds) {
-            return in_array($file->id, $processedIds, true);
+            // Filter if file was processed in this request
+            if (in_array($file->id, $processedIds, true)) {
+                return true;
+            }
+            
+            // Defensive check: filter if file is already auto-disliked or blacklisted
+            // (refresh from DB to get latest state, as model instances may be stale)
+            $fresh = $file->fresh();
+            return $fresh && ($fresh->auto_disliked || $fresh->blacklisted_at !== null);
         })->values()->all();
 
         // Attach filtered files to tab if tab_id is provided
@@ -164,6 +182,23 @@ class Browser
         $minimal = request()->boolean('minimal', true); // Default to minimal for performance
         $items = FileItemFormatter::format($persisted, $page, $flaggedIds, $minimal);
 
+        // Format immediate actions with file information for frontend toast
+        $immediateActionItems = [];
+        if (! empty($immediateActions)) {
+            // Get files that were immediately processed (before they were filtered out)
+            // Use allFilesBeforeFilter which contains files before filtering
+            foreach ($immediateActions as $action) {
+                $file = $allFilesBeforeFilter->get($action['file_id']);
+                if ($file) {
+                    $immediateActionItems[] = [
+                        'id' => $file->id,
+                        'action_type' => $action['action_type'],
+                        'thumbnail' => $file->thumbnail_url ?? $file->url,
+                    ];
+                }
+            }
+        }
+
         return [
             'items' => $items,
             'filter' => [
@@ -177,6 +212,7 @@ class Browser
                 'flagged_ids' => $flaggedIds,
                 'processed_count' => count($processedIds),
                 'processed_ids' => $processedIds,
+                'immediate_actions' => $immediateActionItems,
             ],
             'error' => $serviceError,
             'services' => $servicesMeta,
