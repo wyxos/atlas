@@ -5,6 +5,7 @@ import { index as browseIndex, services as browseServices } from '@/actions/App/
 export type GetPageResult = {
     items: MasonryItem[];
     nextPage: string | number | null; // Can be cursor string or number
+    immediateActions?: Array<{ id: number; action_type: string; thumbnail?: string }>;
 };
 
 export type ServiceOption = {
@@ -108,6 +109,16 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         const response = await window.axios.get(browseIndex.url({ query: { ...queryParams, minimal: true } }));
         const data = response.data;
 
+        // Collect immediate actions (auto_dislike/blacklist) from moderation response
+        const immediateActions = data.moderation?.immediate_actions ?? [];
+
+        // Return immediate actions so they can be collected by the caller
+        const result: GetPageResult & { immediateActions?: Array<{ id: number; action_type: string; thumbnail?: string }> } = {
+            items: [],
+            nextPage: null,
+            immediateActions,
+        };
+
         // Update currentPage to the page we just loaded
         // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
         if (!options.isTabRestored.value || options.items.value.length === 0) {
@@ -154,6 +165,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         return {
             items: mergedItems,
             nextPage: data.nextPage, // Pass cursor to Masonry for next request
+            immediateActions: result.immediateActions ?? [],
         };
     }
 

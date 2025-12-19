@@ -33,6 +33,7 @@ import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandl
 import { useTabInitialization } from '@/composables/useTabInitialization';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useItemVirtualization } from '@/composables/useItemVirtualization';
+import { useImmediateActionsToast } from '@/composables/useImmediateActionsToast';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -116,6 +117,9 @@ const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
 
 // Item virtualization composable - loads minimal items initially, then full data on-demand
 const itemVirtualization = useItemVirtualization(items);
+
+// Immediate actions toast composable - collects and displays immediately processed items
+const immediateActionsToast = useImmediateActionsToast();
 
 // Browse service composable - fetch services if not provided via prop
 const { availableServices: localServices, fetchServices } = useBrowseService();
@@ -205,11 +209,19 @@ const {
     backfill,
     onBackfillStart,
     onBackfillTick,
-    onBackfillStop,
+    onBackfillStop: onBackfillStopOriginal,
     onBackfillRetryStart,
     onBackfillRetryTick,
     onBackfillRetryStop,
 } = useBackfill();
+
+// Wrap onBackfillStop to show toast when backfill completes
+function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
+    onBackfillStopOriginal(payload);
+
+    // Show toast with collected immediate actions when backfill completes
+    immediateActionsToast.showToast();
+}
 
 // Computed property to display page value
 const displayPage = computed(() => currentPage.value ?? 1);
@@ -330,6 +342,12 @@ const layout = {
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
     const result = await getNextPageFromComposable(page);
+
+    // Collect immediate actions from the result
+    if (result.immediateActions && result.immediateActions.length > 0) {
+        immediateActionsToast.addActions(result.immediateActions);
+    }
+
     return result;
 }
 
@@ -689,6 +707,19 @@ function getProgressBarStyle(itemId: number): { transform: string; transformOrig
 }
 
 
+// Track previous loading state to detect when loading completes
+const wasLoading = ref(false);
+// Track if backfill is active to avoid showing toast twice
+const backfillWasActive = ref(false);
+
+// Watch backfill state
+watch(
+    () => backfill.active,
+    (isActive) => {
+        backfillWasActive.value = isActive;
+    }
+);
+
 // Watch masonry loading state and emit to parent
 watch(
     () => masonry.value?.isLoading ?? false,
@@ -697,6 +728,21 @@ watch(
         if (props.onLoadingChange) {
             props.onLoadingChange(isLoading);
         }
+
+        // Show toast when loading completes (if we were loading before and now we're not)
+        // Only show if backfill is not active (to avoid duplicate toasts)
+        // This handles cases where backfill doesn't run or completes before backfill:stop
+        if (wasLoading.value && !isLoading && !backfill.active) {
+            // Small delay to ensure backfill:stop has a chance to fire first if it was active
+            setTimeout(() => {
+                // Double-check backfill is still not active before showing
+                if (!backfill.active) {
+                    immediateActionsToast.showToast();
+                }
+            }, 200);
+        }
+
+        wasLoading.value = isLoading;
     }
 );
 

@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 
-type TimerSystemId = 'auto-dislike' | 'reaction-queue';
+type TimerSystemId = 'auto-dislike' | 'reaction-queue' | 'immediate-actions-toast';
 
 interface TimerSystem {
     id: TimerSystemId;

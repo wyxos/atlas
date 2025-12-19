@@ -14,13 +14,51 @@ use Illuminate\Support\Facades\Auth;
 abstract class BaseModerationService
 {
     /**
+     * File IDs flagged for UI countdown.
+     *
+     * @var array<int>
+     */
+    protected array $flaggedIds = [];
+
+    /**
+     * File IDs to auto-dislike.
+     *
+     * @var array<int>
+     */
+    protected array $autoDislikeFileIds = [];
+
+    /**
+     * File IDs to blacklist.
+     *
+     * @var array<int>
+     */
+    protected array $blacklistFileIds = [];
+
+    /**
+     * File paths that need delete jobs.
+     *
+     * @var array<string>
+     */
+    protected array $filesToDelete = [];
+
+    /**
+     * Immediate actions (auto_dislike/blacklist) tracked for toast notification.
+     *
+     * @var array<int, array{file_id:int, action_type:string}>
+     */
+    protected array $immediateActions = [];
+
+    /**
      * Process files and apply moderation rules.
      *
      * @param  Collection<int, File>  $files
-     * @return array{flaggedIds:array<int>, processedIds:array<int>}
+     * @return array{flaggedIds:array<int>, processedIds:array<int>, immediateActions:array<int, array{file_id:int, action_type:string}>}
      */
     public function process(Collection $files): array
     {
+        // Reset state for this processing run
+        $this->resetState();
+
         if ($files->isEmpty()) {
             return $this->emptyResult();
         }
@@ -29,11 +67,6 @@ abstract class BaseModerationService
         if (! $this->hasRules()) {
             return $this->emptyResult();
         }
-
-        $flaggedIds = [];
-        $autoDislikeFileIds = [];
-        $blacklistFileIds = [];
-        $filesToDelete = [];
 
         foreach ($files as $file) {
             // Skip files already auto-disliked or blacklisted
@@ -53,40 +86,56 @@ abstract class BaseModerationService
             }
 
             $actionType = $this->getActionType($match);
-            $this->handleActionType($actionType, $file, $flaggedIds, $autoDislikeFileIds, $blacklistFileIds, $filesToDelete);
+            
+            // Track immediate actions (auto_dislike or blacklist)
+            if ($actionType === ActionType::AUTO_DISLIKE || $actionType === ActionType::BLACKLIST) {
+                $this->immediateActions[$file->id] = [
+                    'file_id' => $file->id,
+                    'action_type' => $actionType,
+                ];
+            }
+            
+            $this->handleActionType($actionType, $file);
         }
 
         // Process files
-        $processedIds = $this->processFiles($autoDislikeFileIds, $blacklistFileIds, $filesToDelete);
+        $processedIds = $this->processFiles();
 
         return [
-            'flaggedIds' => $flaggedIds,
+            'flaggedIds' => $this->flaggedIds,
             'processedIds' => $processedIds,
+            'immediateActions' => array_values($this->immediateActions),
         ];
+    }
+
+    /**
+     * Reset all state arrays for a new processing run.
+     */
+    protected function resetState(): void
+    {
+        $this->flaggedIds = [];
+        $this->autoDislikeFileIds = [];
+        $this->blacklistFileIds = [];
+        $this->filesToDelete = [];
+        $this->immediateActions = [];
     }
 
     /**
      * Handle action type for a file and collect it into appropriate arrays.
      */
-    protected function handleActionType(
-        string $actionType,
-        File $file,
-        array &$flaggedIds,
-        array &$autoDislikeFileIds,
-        array &$blacklistFileIds,
-        array &$filesToDelete
-    ): void {
+    protected function handleActionType(string $actionType, File $file): void
+    {
         if ($actionType === ActionType::UI_COUNTDOWN) {
-            $flaggedIds[] = $file->id;
+            $this->flaggedIds[] = $file->id;
         } elseif ($actionType === ActionType::AUTO_DISLIKE) {
-            $autoDislikeFileIds[] = $file->id;
+            $this->autoDislikeFileIds[] = $file->id;
             if (! empty($file->path)) {
-                $filesToDelete[] = $file->path;
+                $this->filesToDelete[] = $file->path;
             }
         } elseif ($actionType === ActionType::BLACKLIST) {
-            $blacklistFileIds[] = $file->id;
+            $this->blacklistFileIds[] = $file->id;
             if (! empty($file->path)) {
-                $filesToDelete[] = $file->path;
+                $this->filesToDelete[] = $file->path;
             }
         }
     }
@@ -94,19 +143,13 @@ abstract class BaseModerationService
     /**
      * Process files with auto-dislike and blacklist actions.
      *
-     * @param  array<int>  $autoDislikeFileIds  File IDs to auto-dislike
-     * @param  array<int>  $blacklistFileIds  File IDs to blacklist
-     * @param  array<string>  $filesToDelete  File paths that need delete jobs
      * @return array<int> Combined processed file IDs
      */
-    protected function processFiles(
-        array $autoDislikeFileIds,
-        array $blacklistFileIds,
-        array $filesToDelete = []
-    ): array {
+    protected function processFiles(): array
+    {
         // Batch update auto-disliked files
-        if (! empty($autoDislikeFileIds)) {
-            File::whereIn('id', $autoDislikeFileIds)->update(['auto_disliked' => true]);
+        if (! empty($this->autoDislikeFileIds)) {
+            File::whereIn('id', $this->autoDislikeFileIds)->update(['auto_disliked' => true]);
 
             // Batch create dislike reactions for auto-disliked files
             $user = Auth::user();
@@ -119,10 +162,10 @@ abstract class BaseModerationService
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
-                }, $autoDislikeFileIds);
+                }, $this->autoDislikeFileIds);
 
                 // Check for existing reactions to avoid duplicates
-                $existingReactions = Reaction::whereIn('file_id', $autoDislikeFileIds)
+                $existingReactions = Reaction::whereIn('file_id', $this->autoDislikeFileIds)
                     ->where('user_id', $user->id)
                     ->pluck('file_id')
                     ->toArray();
@@ -138,28 +181,29 @@ abstract class BaseModerationService
         }
 
         // Batch update blacklisted files
-        if (! empty($blacklistFileIds)) {
-            File::whereIn('id', $blacklistFileIds)->update(['blacklisted_at' => now()]);
+        if (! empty($this->blacklistFileIds)) {
+            File::whereIn('id', $this->blacklistFileIds)->update(['blacklisted_at' => now()]);
         }
 
         // Dispatch delete jobs for files with paths
-        foreach ($filesToDelete as $path) {
+        foreach ($this->filesToDelete as $path) {
             DeleteAutoDislikedFileJob::dispatch($path);
         }
 
-        return array_merge($autoDislikeFileIds, $blacklistFileIds);
+        return array_merge($this->autoDislikeFileIds, $this->blacklistFileIds);
     }
 
     /**
      * Create an empty result structure.
      *
-     * @return array{flaggedIds:array<int>, processedIds:array<int>}
+     * @return array{flaggedIds:array<int>, processedIds:array<int>, immediateActions:array<int, array{file_id:int, action_type:string}>}
      */
     protected function emptyResult(): array
     {
         return [
             'flaggedIds' => [],
             'processedIds' => [],
+            'immediateActions' => [],
         ];
     }
 
