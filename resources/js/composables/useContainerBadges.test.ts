@@ -184,5 +184,76 @@ describe('useContainerBadges', () => {
             expect(duration).toBeLessThan(10);
         });
     });
+
+    describe('Container ordering', () => {
+        it('sorts containers by type priority (User before Post)', () => {
+            const items = ref<MasonryItem[]>([
+                {
+                    id: 1,
+                    containers: [
+                        { id: 2, type: 'Post' },
+                        { id: 1, type: 'User' },
+                    ],
+                } as MasonryItem,
+            ]);
+
+            const { getContainersForItem } = useContainerBadges(items);
+
+            const containers = getContainersForItem(items.value[0]);
+
+            // User should come before Post regardless of ID order
+            expect(containers[0].type).toBe('User');
+            expect(containers[0].id).toBe(1);
+            expect(containers[1].type).toBe('Post');
+            expect(containers[1].id).toBe(2);
+        });
+
+        it('sorts containers by ID when types have same priority', () => {
+            const items = ref<MasonryItem[]>([
+                {
+                    id: 1,
+                    containers: [
+                        { id: 3, type: 'gallery' },
+                        { id: 1, type: 'album' },
+                        { id: 2, type: 'gallery' },
+                    ],
+                } as MasonryItem,
+            ]);
+
+            const { getContainersForItem } = useContainerBadges(items);
+
+            const containers = getContainersForItem(items.value[0]);
+
+            // Same priority types should sort by ID
+            expect(containers[0].type).toBe('album');
+            expect(containers[0].id).toBe(1);
+            expect(containers[1].type).toBe('gallery');
+            expect(containers[1].id).toBe(2);
+            expect(containers[2].type).toBe('gallery');
+            expect(containers[2].id).toBe(3);
+        });
+
+        it('sorts User before Post even when Post has lower ID', () => {
+            const items = ref<MasonryItem[]>([
+                {
+                    id: 1,
+                    containers: [
+                        { id: 1, type: 'Post' },
+                        { id: 2, type: 'User' },
+                    ],
+                } as MasonryItem,
+            ]);
+
+            const { getContainersForItem } = useContainerBadges(items);
+
+            const containers = getContainersForItem(items.value[0]);
+
+            // User should come first even though it has a higher ID
+            expect(containers[0].type).toBe('User');
+            expect(containers[0].id).toBe(2);
+            expect(containers[1].type).toBe('Post');
+            expect(containers[1].id).toBe(1);
+        });
+    });
 });
 
