@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { ThumbsDown, Ban, X, Plus } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { ThumbsDown, Ban, Plus, Eye } from 'lucide-vue-next';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '../ui/dialog';
 
 interface ImmediateActionItem {
     id: number;
@@ -16,6 +24,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const TOAST_DURATION_SECONDS = 5;
+const isReviewModalOpen = ref(false);
 
 // Handle hover events to pause/resume countdown (uses centralized timer manager)
 function handleMouseEnter(): void {
@@ -72,12 +81,33 @@ function getActionColor(): string {
     return hasBlacklist ? 'text-danger-400' : 'text-gray-400';
 }
 
+function getItemActionIcon(item: ImmediateActionItem) {
+    return item.action_type === 'blacklist' ? Ban : ThumbsDown;
+}
+
+function getItemActionColor(item: ImmediateActionItem): string {
+    return item.action_type === 'blacklist' ? 'text-danger-400' : 'text-gray-400';
+}
+
+function getItemActionLabel(item: ImmediateActionItem): string {
+    if (item.action_type === 'auto_dislike') {
+        return 'Auto-disliked';
+    } else if (item.action_type === 'blacklist') {
+        return 'Blacklisted';
+    }
+    return item.action_type;
+}
+
 function handleDismiss(): void {
     if (props.onDismiss) {
         props.onDismiss();
     }
     // Emit close-toast event for Vue Toastification
     emit('close-toast');
+}
+
+function handleReview(): void {
+    isReviewModalOpen.value = true;
 }
 
 const emit = defineEmits<{
@@ -122,14 +152,44 @@ const emit = defineEmits<{
                 </div>
             </div>
 
-            <!-- Dismiss Button -->
-            <button @click="handleDismiss"
+            <!-- Review Button -->
+            <button @click="handleReview"
                 class="p-1 rounded hover:bg-black/20 text-white/70 hover:text-white transition-colors"
-                aria-label="Dismiss toast">
-                <X :size="16" />
+                aria-label="Review actions">
+                <Eye :size="16" />
             </button>
         </div>
     </div>
+
+    <!-- Review Modal -->
+    <Dialog v-model:open="isReviewModalOpen">
+        <DialogContent class="sm:max-w-[600px] bg-prussian-blue-600">
+            <DialogHeader>
+                <DialogTitle class="text-twilight-indigo-100">
+                    Review Actions
+                </DialogTitle>
+                <DialogDescription class="text-base mt-2 text-twilight-indigo-200">
+                    {{ items.length }} file{{ items.length !== 1 ? 's' : '' }} {{ getActionLabel() }}
+                </DialogDescription>
+            </DialogHeader>
+            <div class="max-h-[60vh] overflow-y-auto space-y-3 mt-4">
+                <div v-for="item in items" :key="item.id" class="flex items-center gap-3 p-3 bg-prussian-blue-700/50 rounded-lg border border-smart-blue-500/30">
+                    <div v-if="item.thumbnail" class="shrink-0">
+                        <img :src="item.thumbnail" :alt="`File #${item.id}`" class="w-16 h-16 object-cover rounded border border-smart-blue-500/50" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-white">
+                            File #{{ item.id }}
+                        </div>
+                        <div class="text-xs text-twilight-indigo-300 mt-1">
+                            Action: {{ getItemActionLabel(item) }}
+                        </div>
+                    </div>
+                    <component :is="getItemActionIcon(item)" :size="20" :class="getItemActionColor(item)" />
+                </div>
+            </div>
+        </DialogContent>
+    </Dialog>
 </template>
 
 <style scoped>
