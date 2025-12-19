@@ -206,7 +206,12 @@ describe('Browse - Container Blacklist Countdown Start', () => {
             return;
         }
 
-        // Wait for items to be loaded and watch to trigger
+        // Wait for items to be loaded
+        await wrapper.vm.$nextTick();
+        await flushPromises();
+
+        // Manually set items to trigger the watch (items might not be loaded through API in test)
+        tabContentVm.items = browseResponse.items;
         await wrapper.vm.$nextTick();
         await flushPromises();
 

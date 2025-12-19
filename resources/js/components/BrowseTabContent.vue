@@ -215,6 +215,11 @@ const {
     onBackfillRetryStop,
 } = useBackfill();
 
+// Wrap onBackfillStop to call original handler (backfill still needs its handler)
+function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
+    onBackfillStopOriginal(payload);
+}
+
 // Handle loading:stop to show toast when loading completes (regardless of backfill)
 function onLoadingStop(payload: { fetched?: number }): void {
     // Show toast with collected immediate actions when loading completes
