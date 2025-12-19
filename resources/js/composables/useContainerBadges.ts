@@ -54,22 +54,22 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
         const itemCount = items.value.length;
         const previousCount = previousItems.value.size;
         const isRemoval = itemCount < previousCount;
-        
+
         // If items were removed and we have previous state, use incremental update
         if (isRemoval && previousCount > 0 && itemCount > 0) {
             const currentItemIds = new Set(items.value.map(item => item.id));
             const removedItemIds: number[] = [];
-            
+
             for (const itemId of previousItems.value.keys()) {
                 if (!currentItemIds.has(itemId)) {
                     removedItemIds.push(itemId);
                 }
             }
-            
+
             if (removedItemIds.length > 0 && removedItemIds.length < itemCount) {
                 // Incremental update is faster for small removals
                 updateCachesForRemovedItems(removedItemIds);
-                
+
                 // Update previousItems to match current
                 previousItems.value.clear();
                 for (const item of items.value) {
@@ -78,7 +78,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
                 return;
             }
         }
-        
+
         // Full rebuild for additions or large changes
         const countMap = new Map<number, number>();
         const typeMap = new Map<number, string>();
@@ -111,7 +111,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
         containerCountCache.value = countMap;
         containerTypeCache.value = typeMap;
         itemContainersCache.value = itemContainersMap;
-        
+
         // Update previousItems
         previousItems.value.clear();
         for (const item of items.value) {
@@ -134,9 +134,12 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     );
 
     // Get containers for a specific item (returns full container data including referrer)
+    // Containers are sorted by ID for consistent ordering across items
     function getContainersForItem(item: MasonryItem): Array<{ id: number; type: string; source?: string; source_id?: string; referrer?: string }> {
         const containers = (item as any).containers || [];
-        return containers.filter((container: { id?: number; type?: string }) => container?.id && container?.type);
+        const filtered = containers.filter((container: { id?: number; type?: string }) => container?.id && container?.type);
+        // Sort by container ID for consistent ordering across items
+        return filtered.sort((a: { id: number }, b: { id: number }) => a.id - b.id);
     }
 
     // Count items that have a container with the same container ID - O(1) lookup from cache

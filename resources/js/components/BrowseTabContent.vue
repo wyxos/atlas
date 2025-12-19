@@ -558,7 +558,7 @@ function handleMasonryItemMouseEnter(index: number, itemId: number): void {
     hoveredItemIndex.value = index;
     hoveredItemId.value = itemId;
     if (autoDislikeQueue.isQueued(itemId)) {
-        autoDislikeQueue.freeze();
+        autoDislikeQueue.freezeItem(itemId);
     }
 }
 
@@ -568,7 +568,7 @@ function handleMasonryItemMouseLeave(): void {
     hoveredItemId.value = null;
     containerBadges.setHoveredContainerId(null);
     if (itemId && autoDislikeQueue.isQueued(itemId)) {
-        autoDislikeQueue.unfreeze();
+        autoDislikeQueue.unfreezeItem(itemId);
     }
 }
 
@@ -749,9 +749,14 @@ watch(
         newItems.forEach((item) => {
             // Add to queue if will_auto_dislike is true and wasn't before
             if (item.will_auto_dislike && !oldMap.get(item.id)) {
-                // Start active if preview already loaded, otherwise inactive (frozen until loads)
-                const isAlreadyLoaded = loadedItemIds.value.has(item.id);
-                autoDislikeQueue.addToQueue(item.id, isAlreadyLoaded);
+                // Start countdown immediately for items flagged from backend
+                // These items matched rules/containers with ui_countdown, so countdown should start right away
+                autoDislikeQueue.addToQueue(item.id, true);
+
+                // If this item is currently being hovered, freeze it
+                if (hoveredItemId.value === item.id) {
+                    autoDislikeQueue.freezeItem(item.id);
+                }
             }
             // Remove from queue if will_auto_dislike is false and was true before
             else if (!item.will_auto_dislike && oldMap.get(item.id)) {
@@ -807,15 +812,16 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
+                <!-- Filters Button (Primary) -->
                 <BrowseFiltersSheet v-model:open="isFilterSheetOpen" v-model="selectedService"
                     :available-services="availableServices" :tab="tab" :masonry="masonry"
                     :is-masonry-loading="masonry?.isLoading ?? false" @apply="handleApplyFilters" />
 
-                <!-- Moderation Rules -->
+                <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
                     @rules-changed="handleModerationRulesChanged" />
 
-                <!-- Container Blacklists -->
+                <!-- Container Blacklists Button (Warning) -->
                 <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading ?? false"
                     @blacklists-changed="handleModerationRulesChanged" />
 
@@ -839,13 +845,16 @@ onUnmounted(() => {
                     <RefreshCcw :size="14" />
                 </Button>
 
+                <!-- Reset to First Page Button -->
                 <Button :disabled="(!hasServiceSelected && !resetDialog.isOnFirstPage)"
                     @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
-                    data-test="reset-to-first-page-button">
+                    data-test="reset-to-first-page-button" title="Reset to first page">
                     <ChevronsLeft :size="14"></ChevronsLeft>
                 </Button>
+
+                <!-- Apply Service Button -->
                 <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="h-10 w-10"
-                    data-test="apply-service-button">
+                    data-test="apply-service-button" title="Apply selected service">
                     <Loader2 v-if="masonry?.isLoading" :size="14" class="mr-2 animate-spin" />
                     <Play :size="14" v-else />
                 </Button>
@@ -878,6 +887,13 @@ onUnmounted(() => {
                                     <!-- Auto-disliked indicator overlay with smooth animation -->
                                     <Transition name="ring-fade">
                                         <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
+                                            class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active"
+                                            style="will-change: transform, opacity;">
+                                        </div>
+                                    </Transition>
+                                    <!-- Will auto-dislike indicator overlay (red ring for flagged items) -->
+                                    <Transition name="ring-fade">
+                                        <div v-if="items.find(i => i.id === item.id)?.will_auto_dislike && !items.find(i => i.id === item.id)?.auto_disliked"
                                             class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active"
                                             style="will-change: transform, opacity;">
                                         </div>

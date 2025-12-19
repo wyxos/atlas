@@ -25,6 +25,8 @@ class StoreBrowseTabRequest extends FormRequest
             'label' => ['required', 'string', 'max:255'],
             'query_params' => ['nullable', 'array'],
             'position' => ['nullable', 'integer', 'min:0'],
+            'file_ids' => ['nullable', 'array'],
+            'file_ids.*' => ['required', 'integer', 'exists:files,id'],
         ];
     }
 }

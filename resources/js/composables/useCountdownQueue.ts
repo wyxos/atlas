@@ -9,6 +9,7 @@ interface QueuedItem<T = number> {
     addedAt: number;
     remaining: number;
     isActive: boolean; // Only active items have countdown ticking (preview loaded)
+    isFrozen: boolean; // Per-item freeze state (for hover)
 }
 
 type OnExpireCallback<T = number> = (expiredIds: T[]) => void;
@@ -20,8 +21,9 @@ type OnExpireCallback<T = number> = (expiredIds: T[]) => void;
  * Items are queued immediately but countdown only starts when activated (preview loaded).
  */
 export function useCountdownQueue<T extends number = number>(onExpire?: OnExpireCallback<T>) {
-    const queue = ref<Map<T, QueuedItem<T>>>(new Map());
-    const isFrozen = ref(false);
+    const queue = ref(new Map<T, QueuedItem<T>>());
+    const isFrozen = ref(false); // Global freeze state (for timer manager coordination)
+    const frozenItems = new Set<T>(); // Per-item freeze state (for hover) - not reactive, just for tracking
     let tickInterval: ReturnType<typeof setInterval> | null = null;
 
     // Register with centralized timer manager
@@ -77,12 +79,13 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
             return; // Already queued
         }
 
-        queue.value.set(id, {
-            id,
+        queue.value.set(id as any, {
+            id: id as T,
             addedAt: Date.now(),
             remaining: COUNTDOWN_DURATION,
             isActive: startActive,
-        });
+            isFrozen: false,
+        } as any);
 
         // Start tick interval if not already running
         if (!tickInterval) {
@@ -131,18 +134,58 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
     }
 
     /**
-     * Freeze all countdowns (called on hover).
-     * Delegates to centralized timer manager to coordinate with other timer systems.
+     * Freeze a specific item's countdown (called on hover).
+     * Also freezes globally for timer manager coordination.
      */
-    function freeze(): void {
+    function freezeItem(id: T): void {
+        const item = queue.value.get(id);
+        if (item) {
+            item.isFrozen = true;
+            frozenItems.add(id);
+        }
+        // Also freeze globally for timer manager coordination
         timerManager.freeze(systemId);
     }
 
     /**
-     * Unfreeze all countdowns (called when hover ends).
-     * Delegates to centralized timer manager to coordinate with other timer systems.
+     * Unfreeze a specific item's countdown (called when hover ends).
+     * Also unfreezes globally if no items are frozen.
+     */
+    function unfreezeItem(id: T): void {
+        const item = queue.value.get(id);
+        if (item) {
+            item.isFrozen = false;
+            frozenItems.delete(id);
+        }
+        // Unfreeze globally if no items are frozen
+        if (frozenItems.size === 0) {
+            timerManager.unfreeze(systemId);
+        }
+    }
+
+    /**
+     * Freeze all countdowns (called on hover) - legacy method for backward compatibility.
+     * Now delegates to per-item freezing.
+     */
+    function freeze(): void {
+        // Freeze all items in the queue
+        queue.value.forEach((item, id) => {
+            item.isFrozen = true;
+            frozenItems.add(id);
+        });
+        timerManager.freeze(systemId);
+    }
+
+    /**
+     * Unfreeze all countdowns (called when hover ends) - legacy method for backward compatibility.
+     * Now delegates to per-item unfreezing.
      */
     function unfreeze(): void {
+        // Unfreeze all items in the queue
+        queue.value.forEach((item) => {
+            item.isFrozen = false;
+        });
+        frozenItems.clear();
         timerManager.unfreeze(systemId);
     }
 
@@ -167,14 +210,14 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
      */
     function tick(): void {
         if (isFrozen.value) {
-            return; // Don't tick when frozen
+            return; // Don't tick when globally frozen (for timer manager coordination)
         }
 
         const expired: T[] = [];
 
         queue.value.forEach((item, id) => {
-            // Only tick active items (preview loaded)
-            if (!item.isActive) {
+            // Only tick active items (preview loaded) that are not frozen
+            if (!item.isActive || item.isFrozen) {
                 return;
             }
 
@@ -245,6 +288,8 @@ export function useCountdownQueue<T extends number = number>(onExpire?: OnExpire
         removeFromQueue,
         isQueued,
         isActive,
+        freezeItem,
+        unfreezeItem,
         freeze,
         unfreeze,
         getRemaining,

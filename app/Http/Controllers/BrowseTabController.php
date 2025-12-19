@@ -40,6 +40,16 @@ class BrowseTabController extends Controller
             'position' => $request->position ?? ($maxPosition + 1),
         ]);
 
+        // Sync files if file_ids are provided
+        if ($request->has('file_ids') && is_array($request->file_ids)) {
+            $fileIds = $request->file_ids;
+            $syncData = [];
+            foreach ($fileIds as $index => $fileId) {
+                $syncData[$fileId] = ['position' => $index];
+            }
+            $tab->files()->sync($syncData);
+        }
+
         $tab->load('files.metadata');
 
         // Add file_ids to response for frontend compatibility
@@ -60,7 +70,20 @@ class BrowseTabController extends Controller
 
         $validated = $request->validated();
 
+        // Extract file_ids before updating (they're not a fillable attribute)
+        $fileIds = $validated['file_ids'] ?? null;
+        unset($validated['file_ids']);
+
         $browseTab->update($validated);
+
+        // Sync files if file_ids are provided
+        if ($fileIds !== null && is_array($fileIds)) {
+            $syncData = [];
+            foreach ($fileIds as $index => $fileId) {
+                $syncData[$fileId] = ['position' => $index];
+            }
+            $browseTab->files()->sync($syncData);
+        }
 
         $browseTab->load('files.metadata');
 
