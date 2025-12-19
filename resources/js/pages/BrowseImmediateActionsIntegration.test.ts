@@ -58,10 +58,59 @@ const mocks: BrowseMocks = {
 };
 
 // Mock @wyxos/vibe
-vi.mock('@wyxos/vibe', () => {
-    const { createVibeMockFactory } = require('@/test/browse-test-utils');
-    return createVibeMockFactory(mocks);
-});
+vi.mock('@wyxos/vibe', () => ({
+    Masonry: {
+        name: 'Masonry',
+        template: `
+            <div class="masonry-mock">
+                <slot
+                    v-for="(item, index) in items"
+                    :key="item.id || index"
+                    :item="item"
+                    :remove="() => {}"
+                    :index="index"
+                ></slot>
+            </div>
+        `,
+        props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
+        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'loading:stop', 'update:items'],
+        setup() {
+            const exposed = {
+                init: mockInit,
+                refreshLayout: vi.fn(),
+                cancelLoad: mockCancelLoad,
+                destroy: mockDestroy,
+                remove: mockRemove,
+                removeMany: mockRemoveMany,
+                restore: mockRestore,
+                restoreMany: mockRestoreMany,
+            };
+            Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
+            return exposed;
+        },
+    },
+    MasonryItem: {
+        name: 'MasonryItem',
+        template: `
+            <div @mouseenter="$emit('mouseenter', $event)" @mouseleave="$emit('mouseleave', $event)">
+                <slot
+                    :item="item"
+                    :remove="remove"
+                    :imageLoaded="true"
+                    :imageError="false"
+                    :videoLoaded="false"
+                    :videoError="false"
+                    :isLoading="false"
+                    :showMedia="true"
+                    :imageSrc="item?.src || item?.thumbnail || ''"
+                    :videoSrc="null"
+                ></slot>
+            </div>
+        `,
+        props: ['item', 'remove'],
+        emits: ['mouseenter', 'mouseleave', 'preload:success', 'in-view'],
+    },
+}));
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -120,9 +169,9 @@ describe('Browse - Immediate Actions Toast Integration', () => {
         await flushPromises();
         await nextTick();
 
-        // Trigger backfill:stop to show toast
-        if (tabContent && typeof tabContent.onBackfillStop === 'function') {
-            await tabContent.onBackfillStop({ fetched: 10, calls: 5 });
+        // Trigger loading:stop to show toast (this is what shows the toast now)
+        if (tabContent && typeof tabContent.onLoadingStop === 'function') {
+            await tabContent.onLoadingStop({ fetched: 10 });
         }
 
         await flushPromises();
