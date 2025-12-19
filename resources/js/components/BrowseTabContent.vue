@@ -215,11 +215,9 @@ const {
     onBackfillRetryStop,
 } = useBackfill();
 
-// Wrap onBackfillStop to show toast when backfill completes
-function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
-    onBackfillStopOriginal(payload);
-
-    // Show toast with collected immediate actions when backfill completes
+// Handle loading:stop to show toast when loading completes (regardless of backfill)
+function onLoadingStop(payload: { fetched?: number }): void {
+    // Show toast with collected immediate actions when loading completes
     immediateActionsToast.showToast();
 }
 
@@ -707,19 +705,6 @@ function getProgressBarStyle(itemId: number): { transform: string; transformOrig
 }
 
 
-// Track previous loading state to detect when loading completes
-const wasLoading = ref(false);
-// Track if backfill is active to avoid showing toast twice
-const backfillWasActive = ref(false);
-
-// Watch backfill state
-watch(
-    () => backfill.active,
-    (isActive) => {
-        backfillWasActive.value = isActive;
-    }
-);
-
 // Watch masonry loading state and emit to parent
 watch(
     () => masonry.value?.isLoading ?? false,
@@ -728,21 +713,6 @@ watch(
         if (props.onLoadingChange) {
             props.onLoadingChange(isLoading);
         }
-
-        // Show toast when loading completes (if we were loading before and now we're not)
-        // Only show if backfill is not active (to avoid duplicate toasts)
-        // This handles cases where backfill doesn't run or completes before backfill:stop
-        if (wasLoading.value && !isLoading && !backfill.active) {
-            // Small delay to ensure backfill:stop has a chance to fire first if it was active
-            setTimeout(() => {
-                // Double-check backfill is still not active before showing
-                if (!backfill.active) {
-                    immediateActionsToast.showToast();
-                }
-            }, 200);
-        }
-
-        wasLoading.value = isLoading;
     }
 );
 
@@ -929,7 +899,8 @@ onUnmounted(() => {
                     :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
                     @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
-                    @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
+                    @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
+                    data-test="masonry-component">
                     <template #default="{ item, index, remove }">
                         <VibeMasonryItem :item="item" :remove="remove" :preload-threshold="0.5"
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
