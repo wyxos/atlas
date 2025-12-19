@@ -3,13 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\DownloadFile;
-use App\Models\BrowseTab;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\BrowseTabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class FileReactionController extends Controller
@@ -77,13 +76,7 @@ class FileReactionController extends Controller
 
         // Detach file from all tabs belonging to this user
         // Once a file is reacted to, it should be removed from all tabs for that user
-        $userTabIds = BrowseTab::forUser($user->id)->pluck('id');
-        if ($userTabIds->isNotEmpty()) {
-            DB::table('browse_tab_file')
-                ->whereIn('browse_tab_id', $userTabIds)
-                ->where('file_id', $file->id)
-                ->delete();
-        }
+        app(BrowseTabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
 
         return response()->json([
             'message' => 'Reaction updated.',
@@ -222,13 +215,7 @@ class FileReactionController extends Controller
 
             // Detach file from all tabs belonging to this user
             // Once a file is reacted to, it should be removed from all tabs for that user
-            $userTabIds = BrowseTab::forUser($user->id)->pluck('id');
-            if ($userTabIds->isNotEmpty()) {
-                DB::table('browse_tab_file')
-                    ->whereIn('browse_tab_id', $userTabIds)
-                    ->where('file_id', $file->id)
-                    ->delete();
-            }
+            app(BrowseTabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
 
             $results[] = [
                 'file_id' => $file->id,

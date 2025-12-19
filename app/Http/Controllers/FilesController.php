@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Listings\FileListing;
-use App\Models\BrowseTab;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\BrowseTabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -244,24 +244,8 @@ class FilesController extends Controller
             Reaction::insert($newReactionsToInsert);
         }
 
-        // Detach files from tab(s)
-        // If tab_id is provided, detach from that specific tab only
-        // Otherwise, detach from all tabs belonging to this user
-        if ($tabId) {
-            $tab = BrowseTab::where('id', $tabId)
-                ->where('user_id', $user->id)
-                ->first();
-            if ($tab) {
-                $tab->files()->detach($validFileIds);
-            }
-        } else {
-            $userTabs = BrowseTab::forUser($user->id)->get();
-            if ($userTabs->isNotEmpty()) {
-                foreach ($userTabs as $tab) {
-                    $tab->files()->detach($validFileIds);
-                }
-            }
-        }
+        // Detach files from all tabs belonging to this user
+        app(BrowseTabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
 
         return response()->json([
             'message' => 'Files auto-disliked successfully.',
