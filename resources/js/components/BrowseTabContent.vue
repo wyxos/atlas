@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, AlertTriangle, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, RotateCw, Play, ThumbsDown, Image, Video, TestTube } from 'lucide-vue-next';
+import { Loader2, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, Play, ThumbsDown, Image, Video, TestTube } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -21,7 +21,6 @@ import {
 import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService, type GetPageResult } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
-import { createReactionCallback } from '@/utils/reactions';
 import { useContainerBadges } from '@/composables/useContainerBadges';
 import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
 import { usePromptData } from '@/composables/usePromptData';
@@ -37,7 +36,8 @@ import { useItemVirtualization } from '@/composables/useItemVirtualization';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
-import { analyzeItemSizes, logItemSizeDiagnostics, createMinimalItems, compareItemPerformance } from '@/utils/itemSizeDiagnostics';
+// Diagnostic utilities (dev-only, tree-shaken in production)
+import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 
@@ -276,8 +276,7 @@ async function handleApplyFilters(filters: {
 
 // Handle moderation rules changes (e.g., reload to apply new rules)
 function handleModerationRulesChanged(): void {
-    // For now, just log the change. Future: could reload items with new moderation filters
-    console.log('Moderation rules changed');
+    // Rules are applied server-side on next API call, no action needed here
 }
 
 // Check if current tab has a service selected
@@ -531,14 +530,6 @@ async function applyService(): Promise<void> {
 }
 
 
-async function handleCarouselLoadMore(): Promise<void> {
-    if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
-        if (typeof masonry.value.loadNext === 'function') {
-            await masonry.value.loadNext();
-        }
-    }
-}
-
 // Cancel masonry loading
 function cancelMasonryLoad(): void {
     if (masonry.value?.isLoading && typeof masonry.value.cancelLoad === 'function') {
@@ -546,7 +537,7 @@ function cancelMasonryLoad(): void {
     }
 }
 
-// Load next page manually
+// Load next page manually (used by both button click and carousel load more)
 async function loadNextPage(): Promise<void> {
     if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
         if (typeof masonry.value.loadNext === 'function') {
@@ -688,43 +679,6 @@ function getProgressBarStyle(itemId: number): { transform: string; transformOrig
     };
 }
 
-// Refresh/reload the tab
-async function refreshTab(): Promise<void> {
-    if (!props.tab) {
-        return;
-    }
-
-    // Cancel any ongoing load
-    if (masonry.value?.isLoading) {
-        cancelMasonryLoad();
-    }
-
-    // Reset to page 1 and reload
-    currentPage.value = 1;
-    nextCursor.value = null;
-    loadAtPage.value = 1;
-    items.value = [];
-
-    // Update tab - backend will update query_params when browse request is made
-    props.updateActiveTab([]);
-
-    // Reset masonry and reload
-    if (masonry.value) {
-        if (typeof masonry.value.reset === 'function') {
-            masonry.value.reset();
-            await nextTick();
-            if (typeof masonry.value.loadPage === 'function') {
-                await masonry.value.loadPage(1);
-            }
-        } else {
-            masonry.value.destroy();
-            await nextTick();
-            await initializeTab(props.tab);
-        }
-    } else {
-        await initializeTab(props.tab);
-    }
-}
 
 // Watch masonry loading state and emit to parent
 watch(
@@ -1064,9 +1018,9 @@ onUnmounted(() => {
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :has-more="nextCursor !== null" :is-loading="masonry?.isLoading ?? false"
-            :on-load-more="handleCarouselLoadMore" :on-reaction="props.onReaction"
-            :remove-from-masonry="removeItemFromMasonry" :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id"
-            :masonry-instance="masonry" @close="() => { }" />
+            :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
+            :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
+            @close="() => { }" />
 
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
@@ -1126,12 +1080,8 @@ onUnmounted(() => {
                         <Copy :size="16" class="mr-2" />
                         Copy
                     </Button>
-                    <Button 
-                        v-if="promptData.currentPromptData.value" 
-                        variant="outline" 
-                        size="sm" 
-                        @click="handleTestPromptClick" 
-                        aria-label="Test prompt against moderation rules">
+                    <Button v-if="promptData.currentPromptData.value" variant="outline" size="sm"
+                        @click="handleTestPromptClick" aria-label="Test prompt against moderation rules">
                         <TestTube :size="16" class="mr-2" />
                         Test
                     </Button>
