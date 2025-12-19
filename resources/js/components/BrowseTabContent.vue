@@ -264,6 +264,19 @@ async function handleApplyFilters(filters: {
     loadAtPage.value = 1;
     selectedService.value = filters.service;
 
+    // Update local queryParams immediately so getNextPage can read them
+    // Backend will update query_params in database when browse request is made
+    props.tab.queryParams = {
+        ...props.tab.queryParams,
+        service: filters.service,
+        nsfw: filters.nsfw ? 1 : 0,
+        type: filters.type,
+        limit: Number(filters.limit),
+        sort: filters.sort,
+        page: 1,
+        next: null,
+    };
+
     // Update tab - backend will update query_params when browse request is made
     props.updateActiveTab([]);
 
