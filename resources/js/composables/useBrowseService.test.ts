@@ -33,10 +33,9 @@ beforeEach(() => {
 
 describe('useBrowseService', () => {
     it('initializes with empty state', () => {
-        const { availableServices, isApplyingService } = useBrowseService();
+        const { availableServices } = useBrowseService();
 
         expect(availableServices.value).toEqual([]);
-        expect(isApplyingService.value).toBe(false);
     });
 
     it('fetches available services from API', async () => {
