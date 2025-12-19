@@ -122,7 +122,7 @@ vi.mock('@wyxos/vibe', () => ({
             </div>
         `,
         props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave', 'preload:success'],
+        emits: ['mouseenter', 'mouseleave', 'preload:success', 'in-view'],
     },
 }));
 
@@ -138,7 +138,7 @@ beforeEach(() => {
 });
 
 describe('Browse - Preview and Seen Count Tracking', () => {
-    it('increments preview count when item is preloaded', async () => {
+    it('increments preview count when item is fully in view', async () => {
         const browseResponse = {
             items: [
                 { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 0 },
@@ -175,10 +175,9 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
-            await masonryItem.vm.$emit('preload:success', {
+            await masonryItem.vm.$emit('in-view', {
                 item: { id: 1 },
                 type: 'image',
-                src: 'test1.jpg',
             });
 
             await flushPromises();
@@ -302,10 +301,9 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
-            await masonryItem.vm.$emit('preload:success', {
+            await masonryItem.vm.$emit('in-view', {
                 item: { id: 1 },
                 type: 'image',
-                src: 'test1.jpg',
             });
 
             await flushPromises();

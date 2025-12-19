@@ -122,7 +122,7 @@ vi.mock('@wyxos/vibe', () => ({
             </div>
         `,
         props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave', 'preload:success'],
+        emits: ['mouseenter', 'mouseleave', 'preload:success', 'in-view'],
     },
 }));
 
@@ -181,10 +181,9 @@ describe('Browse - Auto-Dislike Countdown Integration', () => {
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
-            await masonryItem.vm.$emit('preload:success', {
+            await masonryItem.vm.$emit('in-view', {
                 item: { id: 1 },
                 type: 'image',
-                src: 'test1.jpg',
             });
 
             await flushPromises();
@@ -243,10 +242,9 @@ describe('Browse - Auto-Dislike Countdown Integration', () => {
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
-            await masonryItem.vm.$emit('preload:success', {
+            await masonryItem.vm.$emit('in-view', {
                 item: { id: 1 },
                 type: 'image',
-                src: 'test1.jpg',
             });
 
             await flushPromises();
@@ -289,11 +287,10 @@ describe('Browse - Auto-Dislike Countdown Integration', () => {
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
-            // Emit preload:success to activate countdown
-            await masonryItem.vm.$emit('preload:success', {
+            // Emit in-view to activate countdown
+            await masonryItem.vm.$emit('in-view', {
                 item: { id: 1 },
                 type: 'image',
-                src: 'test1.jpg',
             });
 
             await flushPromises();

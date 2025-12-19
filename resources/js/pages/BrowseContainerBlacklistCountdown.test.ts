@@ -122,7 +122,7 @@ vi.mock('@wyxos/vibe', () => ({
             </div>
         `,
         props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave', 'preload:success'],
+        emits: ['mouseenter', 'mouseleave', 'preload:success', 'in-view'],
     },
 }));
 
