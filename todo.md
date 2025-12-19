@@ -1,34 +1,43 @@
-- Browse
-    - moderation
-      - display a toast for auto backend dislike/blacklist with possibility to negate all or specific files
-    - local files
-      - render local files
-      - handle refresh page instead of backfill
-      - auto blacklist if preview count >= 5 while disliked
-    - handle video
-    - preload next items in fileviewer
-    - restore scout
-    - restore horizon
-    - download manager
-    - filter dynamic/defined by service class
-- implement file listing
-    - view
-        - containers
-- implement file scanning
-    - image
-      - generate thumbnail
-    - audio
-      - extract metadata
-      - convert to mp3 where relevant but preserve original
-      - generate waveform
-      - generate/retrieve cover art
-      - retrieve lyrics
-      - 
-    - spotify playlist scanning
-    - video
-      - convert to mp4
-      - extract metadata
-      - generate thumbnail
-      - generate preview seekbar
-      - extract subtitles
-      - generate segments to enable streaming
+- [ ] Browse feature improvements
+    - [ ] Moderation system
+        - [ ] Display toast notification for auto backend dislike/blacklist actions with option to undo for all or specific files
+        - [ ] Auto-blacklist files if preview count >= 5 while disliked
+    - [ ] Local files support
+        - [ ] Render local files in browse interface
+        - [ ] Handle page refresh instead of backfill for local files
+    - [ ] Video handling
+      - [ ] Display video from CivitAI in masonry and fileviewer 
+      - [ ] Implement video playback and controls in browse interface
+    - [ ] FileViewer enhancements
+        - [ ] Preload next items in FileViewer for smoother navigation
+    - [ ] Search functionality
+        - [ ] Restore Laravel Scout integration for full-text search
+    - [ ] Queue monitoring
+        - [ ] Restore Laravel Horizon dashboard for queue monitoring
+    - [ ] Download management
+        - [ ] Implement download manager for batch file downloads
+    - [ ] Dynamic filtering
+        - [ ] Implement service-defined dynamic filters in browse interface (form building at service level)
+- [ ] File listing feature
+    - [ ] List view
+        - [ ] Display content from containers of the file
+        - [ ] re-use fileviewer layout
+- [ ] File scanning and processing
+    - [ ] Image processing
+        - [ ] Generate thumbnails for image files
+        - [ ] Extract metadata from image files (dimensions, format, EXIF data, etc.)
+    - [ ] Audio processing
+        - [ ] Extract metadata from audio files (artist, album, duration, etc.)
+        - [ ] Convert audio to MP3 format where relevant while preserving original file
+        - [ ] Generate audio waveform visualization
+        - [ ] Generate or retrieve cover art for audio files
+        - [ ] Retrieve and store lyrics for audio files
+    - [ ] Spotify integration
+        - [ ] Implement Spotify playlist scanning and import functionality
+    - [ ] Video processing
+        - [ ] Convert video files to MP4 format for compatibility
+        - [ ] Extract metadata from video files (duration, resolution, codec, etc.)
+        - [ ] Generate thumbnail images for video files
+        - [ ] Generate preview seekbar with keyframe thumbnails
+        - [ ] Extract and store subtitles from video files
+        - [ ] Generate video segments (HLS/DASH) to enable adaptive streaming
