@@ -133,13 +133,38 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
         { immediate: true }
     );
 
+    // Container type priority order (lower index = higher priority, appears first)
+    // This ensures consistent ordering: User always before Post, etc.
+    const CONTAINER_TYPE_PRIORITY: Record<string, number> = {
+        'User': 0,
+        'Post': 1,
+        // Add other types as needed - they will sort alphabetically after priority types
+    };
+
+    // Get priority for a container type (lower = higher priority)
+    function getContainerTypePriority(type: string): number {
+        if (type in CONTAINER_TYPE_PRIORITY) {
+            return CONTAINER_TYPE_PRIORITY[type];
+        }
+        // Types not in priority list get a high priority value and sort alphabetically
+        return 100 + type.charCodeAt(0);
+    }
+
     // Get containers for a specific item (returns full container data including referrer)
-    // Containers are sorted by ID for consistent ordering across items
+    // Containers are sorted by type priority first, then by ID for consistent ordering
     function getContainersForItem(item: MasonryItem): Array<{ id: number; type: string; source?: string; source_id?: string; referrer?: string }> {
         const containers = (item as any).containers || [];
         const filtered = containers.filter((container: { id?: number; type?: string }) => container?.id && container?.type);
-        // Sort by container ID for consistent ordering across items
-        return filtered.sort((a: { id: number }, b: { id: number }) => a.id - b.id);
+        // Sort by type priority first, then by ID as tiebreaker
+        return filtered.sort((a: { id: number; type: string }, b: { id: number; type: string }) => {
+            const priorityA = getContainerTypePriority(a.type);
+            const priorityB = getContainerTypePriority(b.type);
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB;
+            }
+            // If same priority, sort by ID
+            return a.id - b.id;
+        });
     }
 
     // Count items that have a container with the same container ID - O(1) lookup from cache
