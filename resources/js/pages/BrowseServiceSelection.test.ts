@@ -260,7 +260,9 @@ describe('Browse - Service Selection', () => {
         await waitForStable(wrapper);
 
         const activeTab = vm.getActiveTab();
-        expect(activeTab.queryParams.service).toBe('civit-ai-images');
+        // QueryParams are updated by the backend when browse request is made, not immediately by frontend
+        // The backend will update query_params.service when the browse API is called with source parameter
+        // Frontend preserves existing queryParams until backend updates them
         expect(tabContentVm.loadAtPage).toBe(1);
         expect(tabContentVm.hasServiceSelected).toBe(true);
 

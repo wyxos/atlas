@@ -229,6 +229,10 @@ describe('Browse - Core', () => {
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(
             expect.stringContaining('/api/browse?page=2')
         );
+        // Verify tab_id was included in the request (backend will update query_params)
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(
+            expect.stringContaining(`tab_id=${tabId}`)
+        );
         expect(result).toHaveProperty('items');
         expect(result).toHaveProperty('nextPage');
         expect(result.items).toBeInstanceOf(Array);
@@ -238,8 +242,9 @@ describe('Browse - Core', () => {
         const updatedTab = vm.tabs.find((t: any) => t.id === tabId);
         expect(updatedTab).toBeDefined();
         expect(updatedTab.itemsData.length).toBe(40);
-        expect(updatedTab.queryParams.page).toBe(2);
-        expect(updatedTab.queryParams.next).toBe(3);
+        // QueryParams are updated by the backend, not the frontend
+        // The backend updates query_params in the database when tab_id is provided
+        // Frontend preserves existing queryParams (they will be updated on next tab load)
     });
 
     it('handles API errors gracefully', async () => {

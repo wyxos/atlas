@@ -271,22 +271,25 @@ describe('useBrowseTabs', () => {
         const itemsData = [
             { id: 1, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false },
         ];
-        const queryParams = { page: 1, next: 'cursor-123' };
+        // QueryParams are preserved from existing tab state (not updated by frontend)
+        const existingQueryParams = tabs.value.find(t => t.id === 1)?.queryParams || {};
 
-        updateActiveTab(itemsData, queryParams);
+        updateActiveTab(itemsData);
 
         const activeTab = tabs.value.find(t => t.id === 1);
         expect(activeTab).toBeDefined();
         expect(activeTab?.itemsData).toEqual(itemsData);
-        expect(activeTab?.queryParams).toEqual(queryParams);
+        // QueryParams should be preserved (not updated by frontend)
+        expect(activeTab?.queryParams).toEqual(existingQueryParams);
 
         // Wait for debounce
         await new Promise(resolve => setTimeout(resolve, 600));
 
+        // QueryParams are managed by the backend (Browser.php), not sent from frontend
         expect(mockAxios.put).toHaveBeenCalledWith('/api/browse-tabs/1', {
             label: 'Tab 1',
-            query_params: queryParams,
             position: 0,
+            // query_params are not sent - backend manages them
         });
     });
 
