@@ -18,7 +18,7 @@ let batchTimeout: ReturnType<typeof setTimeout> | null = null;
  * Collects requests for a short period and sends them together.
  */
 export function usePreviewBatch() {
-    async function batchIncrementPreview(fileIds: number[]): Promise<Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>> {
+    async function executeBatchIncrementPreview(fileIds: number[]): Promise<Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>> {
         try {
             const response = await window.axios.post<{
                 message: string;
@@ -57,7 +57,7 @@ export function usePreviewBatch() {
         // Process each chunk
         chunks.forEach(async (chunk) => {
             try {
-                const results = await batchIncrementPreview(chunk);
+                const results = await executeBatchIncrementPreview(chunk);
                 const resultsMap = new Map(results.map((r) => [r.id, r]));
 
                 // Resolve all promises for this chunk
