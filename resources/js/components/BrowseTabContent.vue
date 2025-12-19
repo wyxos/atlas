@@ -950,11 +950,11 @@ onUnmounted(() => {
                                                     class="bg-prussian-blue-700 border-l border-twilight-indigo-500 flex items-center justify-center relative overflow-hidden min-w-12">
                                                     <!-- Progress fill (only shows when active) - use transform for width animation -->
                                                     <!-- Access queueUpdateTrigger to ensure reactivity to queue changes -->
-                                                    <div v-if="autoDislikeQueue.isActive(item.id)"
+                                                    <span v-if="autoDislikeQueue.isActive(item.id)"
                                                         class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-transform duration-100"
                                                         :style="getProgressBarStyle(item.id)"
                                                         :key="`progress-${item.id}-${queueUpdateTrigger}`">
-                                                    </div>
+                                                    </span>
                                                     <!-- Timer text overlay or paused indicator -->
                                                     <span
                                                         class="relative z-10 px-2 py-1 text-xs font-semibold text-white tabular-nums drop-shadow-sm">
