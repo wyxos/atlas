@@ -86,7 +86,7 @@ abstract class BaseModerationService
             }
 
             $actionType = $this->getActionType($match);
-            
+
             // Track immediate actions (auto_dislike or blacklist)
             if ($actionType === ActionType::AUTO_DISLIKE || $actionType === ActionType::BLACKLIST) {
                 $this->immediateActions[$file->id] = [
@@ -94,7 +94,7 @@ abstract class BaseModerationService
                     'action_type' => $actionType,
                 ];
             }
-            
+
             $this->handleActionType($actionType, $file);
         }
 

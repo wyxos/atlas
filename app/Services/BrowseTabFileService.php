@@ -13,10 +13,6 @@ class BrowseTabFileService
 {
     /**
      * Detach a single file from all tabs belonging to a user.
-     *
-     * @param  int  $userId
-     * @param  int  $fileId
-     * @return void
      */
     public function detachFileFromUserTabs(int $userId, int $fileId): void
     {
@@ -32,9 +28,7 @@ class BrowseTabFileService
     /**
      * Detach multiple files from all tabs belonging to a user.
      *
-     * @param  int  $userId
      * @param  array<int>  $fileIds
-     * @return void
      */
     public function detachFilesFromUserTabs(int $userId, array $fileIds): void
     {
@@ -51,4 +45,3 @@ class BrowseTabFileService
         }
     }
 }
-
