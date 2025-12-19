@@ -42,11 +42,6 @@ class FileReactionController extends Controller
             ]);
         }
 
-        // Delete any existing reaction first (only one reaction allowed at a time)
-        if ($existingReaction) {
-            $existingReaction->delete();
-        }
-
         // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
         // If user manually dislikes, keep auto_disliked flag
         // Also remove blacklist flags if file was blacklisted and user is reacting positively
@@ -62,12 +57,17 @@ class FileReactionController extends Controller
             $file->update($updates);
         }
 
-        // Create the new reaction
-        $reaction = Reaction::create([
-            'file_id' => $file->id,
-            'user_id' => $user->id,
-            'type' => $validated['type'],
-        ]);
+        // Use updateOrCreate to atomically update or create the reaction
+        // This prevents race conditions where concurrent requests could create duplicates
+        $reaction = Reaction::updateOrCreate(
+            [
+                'file_id' => $file->id,
+                'user_id' => $user->id,
+            ],
+            [
+                'type' => $validated['type'],
+            ]
+        );
 
         // Dispatch download job if reaction is not dislike
         if ($validated['type'] !== 'dislike') {
@@ -182,11 +182,6 @@ class FileReactionController extends Controller
                 continue;
             }
 
-            // Delete any existing reaction first (only one reaction allowed at a time)
-            if ($existingReaction) {
-                $existingReaction->delete();
-            }
-
             // Remove auto_disliked flag if user is reacting (like, funny, love - not dislike)
             // Also remove blacklist flags if file was blacklisted and user is reacting positively
             if (in_array($reactionData['type'], ['love', 'like', 'funny'])) {
@@ -201,12 +196,17 @@ class FileReactionController extends Controller
                 $file->update($updates);
             }
 
-            // Create the new reaction
-            $reaction = Reaction::create([
-                'file_id' => $file->id,
-                'user_id' => $user->id,
-                'type' => $reactionData['type'],
-            ]);
+            // Use updateOrCreate to atomically update or create the reaction
+            // This prevents race conditions where concurrent requests could create duplicates
+            $reaction = Reaction::updateOrCreate(
+                [
+                    'file_id' => $file->id,
+                    'user_id' => $user->id,
+                ],
+                [
+                    'type' => $reactionData['type'],
+                ]
+            );
 
             // Dispatch download job if reaction is not dislike
             if ($reactionData['type'] !== 'dislike') {
