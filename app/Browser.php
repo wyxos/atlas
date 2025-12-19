@@ -147,7 +147,9 @@ class Browser
         if ($tabId) {
             $this->attachFilesToTab($tabId, $persisted);
             // Update tab's query_params with current filter state (backend is responsible for this)
+            // Store 'service' key (not 'source') to match frontend expectation
             $this->updateTabQueryParams($tabId, [
+                'service' => $source, // Store the service key as 'service' for frontend compatibility
                 ...$service->defaultParams(),
                 ...$filter,
                 'page' => request()->input('page', 1),
