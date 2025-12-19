@@ -219,6 +219,12 @@ const currentTabService = computed(() => {
     return props.tab?.queryParams?.service as string | null;
 });
 
+// Get pageSize from limit filter, defaulting to 20
+const pageSize = computed(() => {
+    const limit = props.tab?.queryParams?.limit;
+    return limit ? Number(limit) : 20;
+});
+
 // Handle filter apply from BrowseFiltersSheet
 async function handleApplyFilters(filters: {
     service: string;
@@ -572,26 +578,32 @@ function handleMasonryItemMouseLeave(): void {
     }
 }
 
+async function handleItemInView(payload: { item: any; type: 'image' | 'video' }, item: MasonryItem): Promise<void> {
+    // payload.item is the item passed to MasonryItem, which should have the id
+    const itemId = payload.item?.id ?? item?.id;
+    if (itemId) {
+        // Handle preview increment when item is fully in view
+        const result = await itemPreview.handleItemPreload(itemId);
+
+        // If will_auto_dislike was newly set, add to queue
+        if (result?.will_auto_dislike) {
+            autoDislikeQueue.addToQueue(itemId, true); // Start active since item is in view
+        }
+
+        // Activate auto-dislike countdown when item is in view
+        // This handles both moderation rules and container blacklists
+        if (autoDislikeQueue.isQueued(itemId)) {
+            autoDislikeQueue.activateItem(itemId);
+        }
+    }
+}
+
 async function handleItemPreloadSuccess(payload: { item: any; type: 'image' | 'video'; src: string }, item: MasonryItem): Promise<void> {
     // payload.item is the item passed to MasonryItem, which should have the id
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
         // Track that this item has loaded (refs are auto-unwrapped in templates)
         loadedItemIds.value.add(itemId);
-
-        // Handle preview increment
-        const result = await itemPreview.handleItemPreload(itemId);
-
-        // If will_auto_dislike was newly set, add to queue
-        if (result?.will_auto_dislike) {
-            autoDislikeQueue.addToQueue(itemId, true); // Start active since preview just loaded
-        }
-
-        // Activate auto-dislike countdown when preview loads
-        // This handles both moderation rules and container blacklists
-        if (autoDislikeQueue.isQueued(itemId)) {
-            autoDislikeQueue.activateItem(itemId);
-        }
     }
 }
 
@@ -868,14 +880,15 @@ onUnmounted(() => {
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :initial-page="currentPage" :initial-next-page="nextCursor" :layout="layout" layout-mode="auto"
                     :mobile-breakpoint="768" :skip-initial-load="true" :backfill-enabled="true"
-                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @backfill:start="onBackfillStart"
-                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
+                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
                     <template #default="{ item, index, remove }">
-                        <VibeMasonryItem :item="item" :remove="remove"
+                        <VibeMasonryItem :item="item" :remove="remove" :preload-threshold="0.5"
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
                             @mouseleave="handleMasonryItemMouseLeave"
+                            @in-view="(payload: { item: any; type: 'image' | 'video' }) => handleItemInView(payload, item)"
                             @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
                             <template
                                 #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc, mediaType }">
