@@ -286,11 +286,9 @@ const hasServiceSelected = computed(() => {
     return typeof service === 'string' && service.length > 0;
 });
 
-// Simplified: Skip initial load if we have items
-// Masonry will auto-initialize pagination state via initialPage/initialNextPage props
-const shouldSkipInitialLoad = computed(() => {
-    return items.value.length > 0;
-});
+// Always skip initial load - we control loading explicitly via loadAtPage
+// Masonry will load when loadAtPage is set, and auto-initialize pagination state via initialPage/initialNextPage props
+const shouldSkipInitialLoad = true;
 
 // Computed property for apply button disabled state
 // Button should only be disabled when:
@@ -861,12 +859,11 @@ onUnmounted(() => {
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :load-at-page="loadAtPage" :initial-page="currentPage" :initial-next-page="nextCursor"
-                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768"
-                    :skip-initial-load="shouldSkipInitialLoad" :backfill-enabled="true" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick"
-                    @backfill:stop="onBackfillStop" @backfill:retry-start="onBackfillRetryStart"
-                    @backfill:retry-tick="onBackfillRetryTick" @backfill:retry-stop="onBackfillRetryStop"
-                    data-test="masonry-component">
+                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" :skip-initial-load="true"
+                    :backfill-enabled="true" :backfill-delay-ms="2000" :backfill-max-calls="Infinity"
+                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
+                    @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
                     <template #default="{ item, index, remove }">
                         <VibeMasonryItem :item="item" :remove="remove"
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"

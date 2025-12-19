@@ -190,7 +190,7 @@ describe('Browse - Core', () => {
         expect(masonry.props('loadAtPage')).toBe(1);
         expect(masonry.props('layoutMode')).toBe('auto');
         expect(masonry.props('mobileBreakpoint')).toBe(768);
-        expect(masonry.props('skipInitialLoad')).toBe(false);
+        expect(masonry.props('skipInitialLoad')).toBe(true);
         expect(masonry.props('layout')).toEqual({
             gutterX: 12,
             gutterY: 12,
