@@ -107,7 +107,26 @@ function handleDismiss(): void {
 }
 
 function handleReview(): void {
+    // Freeze timer when opening modal
+    const win = window as any;
+    if (win.__timerManagerFreeze) {
+        win.__timerManagerFreeze();
+    } else if (win.__reactionQueuePauseAll) {
+        win.__reactionQueuePauseAll();
+    }
     isReviewModalOpen.value = true;
+}
+
+function handleModalClose(isOpen: boolean): void {
+    if (!isOpen) {
+        // Unfreeze timer when modal closes
+        const win = window as any;
+        if (win.__timerManagerUnfreeze) {
+            win.__timerManagerUnfreeze();
+        } else if (win.__reactionQueueResumeAll) {
+            win.__reactionQueueResumeAll();
+        }
+    }
 }
 
 const emit = defineEmits<{
@@ -162,7 +181,7 @@ const emit = defineEmits<{
     </div>
 
     <!-- Review Modal -->
-    <Dialog v-model:open="isReviewModalOpen">
+    <Dialog v-model:open="isReviewModalOpen" @update:open="handleModalClose">
         <DialogContent class="sm:max-w-[600px] bg-prussian-blue-600">
             <DialogHeader>
                 <DialogTitle class="text-twilight-indigo-100">
