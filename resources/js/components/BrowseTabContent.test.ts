@@ -138,7 +138,7 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getNextPage', 'loadAtPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
+        props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop'],
         setup(props: { items: any[] }, { expose }: any) {
             expose({
@@ -441,7 +441,6 @@ vi.mock('@/composables/useBackfill', () => ({
 
 vi.mock('@/composables/useBrowseService', () => ({
     useBrowseService: () => ({
-        isApplyingService: ref(false),
         getNextPage: vi.fn().mockResolvedValue({ items: [], nextPage: null }),
         applyService: vi.fn().mockResolvedValue(undefined),
     }),

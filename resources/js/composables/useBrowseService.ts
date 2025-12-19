@@ -27,7 +27,6 @@ export type UseBrowseServiceOptions = {
 
 export function useBrowseService(options?: UseBrowseServiceOptions) {
     const availableServices = ref<ServiceOption[]>([]);
-    const isApplyingService = ref(false);
 
     /**
      * Fetch available services from the services endpoint
@@ -168,16 +167,21 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         currentPage: Ref<string | number | null>,
         nextCursor: Ref<string | number | null>,
         loadAtPage: Ref<string | number | null>,
-        masonry: Ref<{ isLoading: boolean; cancelLoad: () => void; destroy: () => void } | null>,
+        masonry: Ref<{
+            isLoading: boolean;
+            cancelLoad: () => void;
+            destroy: () => void;
+            reset?: () => void;
+            loadPage?: (page: number | string) => Promise<void>;
+        } | null>,
         getActiveTab: () => BrowseTabData | undefined,
         updateActiveTab: (itemsData: MasonryItem[]) => void,
         nextTick: () => Promise<void>
     ): Promise<void> {
-        if (!activeTabId.value || !selectedService.value || isApplyingService.value) {
+        if (!activeTabId.value || !selectedService.value || masonry.value?.isLoading) {
             return;
         }
 
-        isApplyingService.value = true;
         try {
             const tab = getActiveTab();
             if (!tab) {
@@ -208,24 +212,13 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
                 }
             }
 
-            // Reset masonry and trigger load
-            if (masonry.value) {
-                if (masonry.value.isLoading) {
-                    masonry.value.cancelLoad();
-                }
-                masonry.value.destroy();
-            }
-
-            await nextTick();
-
-            // Trigger initial load
-            if (masonry.value && loadAtPage.value !== null) {
-                // Masonry will auto-load when loadAtPage is set
+            // Reset masonry and trigger load (same approach as filter sheet)
+            if (masonry.value?.loadPage) {
+                await masonry.value.loadPage(1);
             }
         } catch (error) {
             console.error('Failed to apply service:', error);
         } finally {
-            isApplyingService.value = false;
             selectedService.value = ''; // Clear selection after applying
         }
     }
@@ -242,7 +235,6 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
 
     return {
         availableServices,
-        isApplyingService,
         fetchServices,
         getNextPage,
         applyService,

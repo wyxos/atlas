@@ -293,16 +293,15 @@ const shouldSkipInitialLoad = true;
 // Computed property for apply button disabled state
 // Button should only be disabled when:
 // - No service is selected
-// - Service is currently being applied
+// - Service is currently being applied (masonry is loading)
 // - Selected service is already the current service
 // It should NOT be disabled when masonry is loading
 const isApplyButtonDisabled = computed(() => {
-    return !selectedService.value || isApplyingService.value || selectedService.value === currentTabService.value;
+    return !selectedService.value || (masonry?.value?.isLoading ?? false) || selectedService.value === currentTabService.value;
 });
 
 // Browse service composable
 const {
-    isApplyingService,
     getNextPage: getNextPageFromComposable,
     applyService: applyServiceFromComposable,
 } = useBrowseService({
@@ -795,7 +794,7 @@ onUnmounted(() => {
             data-test="service-selection-header">
             <div class="flex items-center gap-3">
                 <div class="flex-1">
-                    <Select v-model="selectedService" :disabled="isApplyingService">
+                    <Select v-model="selectedService" :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
                             <SelectValue
                                 :placeholder="hasServiceSelected ? (availableServices.find(s => s.key === currentTabService)?.label || currentTabService || undefined) : 'Select a service...'" />
@@ -847,7 +846,7 @@ onUnmounted(() => {
                 </Button>
                 <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="h-10 w-10"
                     data-test="apply-service-button">
-                    <Loader2 v-if="isApplyingService" :size="14" class="mr-2 animate-spin" />
+                    <Loader2 v-if="masonry?.isLoading" :size="14" class="mr-2 animate-spin" />
                     <Play :size="14" v-else />
                 </Button>
             </div>
@@ -858,10 +857,10 @@ onUnmounted(() => {
             <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
-                    :load-at-page="loadAtPage" :initial-page="currentPage" :initial-next-page="nextCursor"
-                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" :skip-initial-load="true"
-                    :backfill-enabled="true" :backfill-delay-ms="2000" :backfill-max-calls="Infinity"
-                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :initial-page="currentPage" :initial-next-page="nextCursor" :layout="layout" layout-mode="auto"
+                    :mobile-breakpoint="768" :skip-initial-load="true" :backfill-enabled="true"
+                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" data-test="masonry-component">
                     <template #default="{ item, index, remove }">
