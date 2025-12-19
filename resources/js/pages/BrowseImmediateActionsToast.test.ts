@@ -1,32 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useImmediateActionsToast } from '../composables/useImmediateActionsToast';
 
-// Mock vue-toastification
-vi.mock('vue-toastification', () => {
-    const toastIds = new Map();
-    let toastIdCounter = 0;
-
+// Mock vue-toastification using vi.hoisted for proper hoisting
+const { mockToastFn, mockUseToast } = vi.hoisted(() => {
     const toastFn = vi.fn((options: any) => {
-        const id = `toast-${++toastIdCounter}`;
-        toastIds.set(id, options);
-        return id;
+        return `toast-${Date.now()}`;
     });
 
     const toast = Object.assign(toastFn, {
-        update: vi.fn((id: string, options: any) => {
-            if (toastIds.has(id)) {
-                toastIds.set(id, { ...toastIds.get(id), ...options });
-            }
-        }),
-        dismiss: vi.fn((id: string) => {
-            toastIds.delete(id);
-        }),
+        update: vi.fn(),
+        dismiss: vi.fn(),
     });
 
-    return {
-        useToast: vi.fn(() => toast),
-    };
+    const useToast = vi.fn(() => toast);
+
+    return { mockToastFn: toastFn, mockUseToast: useToast };
 });
+
+vi.mock('vue-toastification', () => ({
+    useToast: mockUseToast,
+}));
 
 describe('Browse - Immediate Actions Toast', () => {
     beforeEach(() => {
@@ -45,9 +38,12 @@ describe('Browse - Immediate Actions Toast', () => {
         showToast();
 
         // Verify toast was created (mocked)
-        const { useToast } = require('vue-toastification');
-        const toast = useToast();
-        expect(toast).toHaveBeenCalled();
+        expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({
+            content: expect.anything(),
+            timeout: false,
+            closeOnClick: false,
+            closeButton: false,
+        }));
     });
 
     it('does not show toast when no actions are collected', () => {
@@ -75,9 +71,12 @@ describe('Browse - Immediate Actions Toast', () => {
         showToast();
 
         // Verify toast was created with both actions
-        const { useToast } = require('vue-toastification');
-        const toast = useToast();
-        expect(toast).toHaveBeenCalled();
+        expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({
+            content: expect.anything(),
+            timeout: false,
+            closeOnClick: false,
+            closeButton: false,
+        }));
     });
 });
 

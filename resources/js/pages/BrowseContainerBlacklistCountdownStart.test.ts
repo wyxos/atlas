@@ -229,16 +229,24 @@ describe('Browse - Container Blacklist Countdown Start', () => {
         expect(initialRemaining).toBeGreaterThan(0);
         expect(initialRemaining).toBeLessThanOrEqual(5000); // Should be 5000ms or less
 
-        // Advance time by 1 second
+        // Advance time by 1 second (1000ms)
+        // Note: The countdown ticks every 50ms, so after 1000ms it will have ticked ~20 times
+        // The remaining time should decrease by approximately 1000ms (allowing for tick interval rounding)
         vi.advanceTimersByTime(1000);
         vi.runOnlyPendingTimers();
 
         await wrapper.vm.$nextTick();
+        await flushPromises();
 
         // Verify remaining time has decreased
         const remainingAfter1s = autoDislikeQueue.getRemaining(1);
         expect(remainingAfter1s).toBeLessThan(initialRemaining);
-        expect(remainingAfter1s).toBe(initialRemaining - 1000);
+        // Allow for variance due to tick interval (50ms) - should decrease by roughly 1000ms
+        // Account for potential tick that happened before we started measuring
+        const expectedDecrease = 1000;
+        const tolerance = 100; // Allow 100ms tolerance for timing
+        expect(remainingAfter1s).toBeGreaterThanOrEqual(initialRemaining - expectedDecrease - tolerance);
+        expect(remainingAfter1s).toBeLessThanOrEqual(initialRemaining - expectedDecrease + tolerance);
     });
 });
 

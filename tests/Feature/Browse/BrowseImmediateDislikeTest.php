@@ -399,4 +399,3 @@ test('immediately blacklisted files from blacklisted containers are excluded fro
         ->and($data['moderation']['immediate_actions'][0]['action_type'])->toBe('blacklist')
         ->and($data['moderation']['immediate_actions'][0]['thumbnail'])->not->toBeEmpty();
 });
-

@@ -153,10 +153,11 @@ class Browser
             if (in_array($file->id, $processedIds, true)) {
                 return true;
             }
-            
+
             // Defensive check: filter if file is already auto-disliked or blacklisted
             // (refresh from DB to get latest state, as model instances may be stale)
             $fresh = $file->fresh();
+
             return $fresh && ($fresh->auto_disliked || $fresh->blacklisted_at !== null);
         })->values()->all();
 

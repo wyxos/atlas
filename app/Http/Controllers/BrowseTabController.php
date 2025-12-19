@@ -17,7 +17,11 @@ class BrowseTabController extends Controller
      */
     public function index(): JsonResponse
     {
-        $tabs = BrowseTab::forUser(auth()->id())
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
+        $tabs = BrowseTab::forUser($userId)
             ->ordered()
             ->get();
 
@@ -29,12 +33,16 @@ class BrowseTabController extends Controller
      */
     public function store(StoreBrowseTabRequest $request): JsonResponse
     {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
         // Get the highest position for this user's tabs
-        $maxPosition = BrowseTab::forUser(auth()->id())
+        $maxPosition = BrowseTab::forUser($userId)
             ->max('position') ?? -1;
 
         $tab = BrowseTab::create([
-            'user_id' => auth()->id(),
+            'user_id' => $userId,
             'label' => $request->label,
             'query_params' => $request->query_params,
             'position' => $request->position ?? ($maxPosition + 1),
@@ -63,8 +71,12 @@ class BrowseTabController extends Controller
      */
     public function update(UpdateBrowseTabRequest $request, BrowseTab $browseTab): JsonResponse
     {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== auth()->id()) {
+        if ($browseTab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
@@ -98,8 +110,12 @@ class BrowseTabController extends Controller
      */
     public function destroy(BrowseTab $browseTab): JsonResponse
     {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== auth()->id()) {
+        if ($browseTab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
@@ -114,8 +130,12 @@ class BrowseTabController extends Controller
      */
     public function items(BrowseTab $browseTab): JsonResponse
     {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== auth()->id()) {
+        if ($browseTab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
@@ -178,8 +198,12 @@ class BrowseTabController extends Controller
      */
     public function updatePosition(BrowseTab $browseTab): JsonResponse
     {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== auth()->id()) {
+        if ($browseTab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
@@ -201,13 +225,17 @@ class BrowseTabController extends Controller
      */
     public function setActive(BrowseTab $browseTab): JsonResponse
     {
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== auth()->id()) {
+        if ($browseTab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
         // Deactivate all other tabs for this user
-        BrowseTab::forUser(auth()->id())
+        BrowseTab::forUser($userId)
             ->where('id', '!=', $browseTab->id)
             ->update(['is_active' => false]);
 
@@ -222,7 +250,11 @@ class BrowseTabController extends Controller
      */
     public function deleteAll(): JsonResponse
     {
-        $deletedCount = BrowseTab::forUser(auth()->id())->delete();
+        /** @var Guard $auth */
+        $auth = auth();
+        /** @var int|null $userId */
+        $userId = $auth->id();
+        $deletedCount = BrowseTab::forUser($userId)->delete();
 
         return response()->json([
             'message' => 'All tabs deleted successfully.',
