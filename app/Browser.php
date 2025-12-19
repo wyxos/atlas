@@ -146,6 +146,13 @@ class Browser
         $tabId = request()->input('tab_id');
         if ($tabId) {
             $this->attachFilesToTab($tabId, $persisted);
+            // Update tab's query_params with current filter state (backend is responsible for this)
+            $this->updateTabQueryParams($tabId, [
+                ...$service->defaultParams(),
+                ...$filter,
+                'page' => request()->input('page', 1),
+                'next' => $filter['next'] ?? null,
+            ]);
         }
 
         // Transform persisted files to items format for frontend
@@ -223,5 +230,24 @@ class Browser
 
         // Sync files to tab (without detaching existing files)
         $browseTab->files()->syncWithoutDetaching($syncData);
+    }
+
+    /**
+     * Update a browse tab's query_params.
+     *
+     * @param  array<string, mixed>  $queryParams
+     */
+    protected function updateTabQueryParams(int $tabId, array $queryParams): void
+    {
+        $browseTab = \App\Models\BrowseTab::find($tabId);
+
+        if (! $browseTab || $browseTab->user_id !== auth()->id()) {
+            return; // Tab doesn't exist or user doesn't own it
+        }
+
+        // Update query_params with the provided params
+        $browseTab->update([
+            'query_params' => $queryParams,
+        ]);
     }
 }

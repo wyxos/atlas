@@ -47,7 +47,7 @@ interface Props {
     onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
-    updateActiveTab: (itemsData: MasonryItem[], queryParams: Record<string, string | number | null>) => void;
+    updateActiveTab: (itemsData: MasonryItem[]) => void;
     loadTabItems: (tabId: number) => Promise<MasonryItem[]>;
 }
 
@@ -178,7 +178,7 @@ async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
         // Note: Backend already de-associated from tabs, we just update local state
         if (props.tab && autoDislikedIds.length > 0) {
             const updatedItemsData = props.tab.itemsData.filter((item) => !autoDislikedIds.includes(item.id));
-            props.updateActiveTab(updatedItemsData, props.tab.queryParams);
+            props.updateActiveTab(updatedItemsData);
         }
     } catch (error) {
         console.error('Failed to batch perform auto-dislike:', error);
@@ -236,17 +236,6 @@ async function handleApplyFilters(filters: {
         return;
     }
 
-    const updatedQueryParams: Record<string, string | number | null> = {
-        ...props.tab.queryParams,
-        service: filters.service || null,
-        nsfw: filters.nsfw ? 1 : null,
-        type: filters.type !== 'all' ? filters.type : null,
-        limit: filters.limit ? Number(filters.limit) : null,
-        sort: filters.sort !== 'Newest' ? filters.sort : null,
-        page: 1, // Reset to page 1 when applying filters
-        next: null,
-    };
-
     // Clear existing items and reset pagination
     items.value = [];
     currentPage.value = 1;
@@ -254,8 +243,8 @@ async function handleApplyFilters(filters: {
     loadAtPage.value = 1;
     selectedService.value = filters.service;
 
-    // Update tab with all filter params
-    props.updateActiveTab([], updatedQueryParams);
+    // Update tab - backend will update query_params when browse request is made
+    props.updateActiveTab([]);
 
     // Use the same approach as reset button: reset() and loadPage(1)
     if (masonry.value) {
@@ -293,7 +282,8 @@ function handleModerationRulesChanged(): void {
 
 // Check if current tab has a service selected
 const hasServiceSelected = computed(() => {
-    const service = currentTabService.value;
+    // Check both tab's queryParams (from backend) and local selectedService (during selection)
+    const service = currentTabService.value || selectedService.value;
     return typeof service === 'string' && service.length > 0;
 });
 
@@ -715,14 +705,8 @@ async function refreshTab(): Promise<void> {
     loadAtPage.value = 1;
     items.value = [];
 
-    // Update tab query params
-    const updatedQueryParams: Record<string, string | number | null> = {
-        ...props.tab.queryParams,
-        page: 1,
-        next: null,
-    };
-
-    props.updateActiveTab([], updatedQueryParams);
+    // Update tab - backend will update query_params when browse request is made
+    props.updateActiveTab([]);
 
     // Reset masonry and reload
     if (masonry.value) {

@@ -22,7 +22,7 @@ export type UseBrowseServiceOptions = {
     currentTabService: ComputedRef<string | null>;
     activeTabId: Ref<number | null>;
     getActiveTab: () => BrowseTabData | undefined;
-    updateActiveTab: (itemsData: MasonryItem[], fileIds: number[], queryParams: Record<string, string | number | null>) => void;
+    updateActiveTab: (itemsData: MasonryItem[]) => void;
 };
 
 export function useBrowseService(options?: UseBrowseServiceOptions) {
@@ -119,20 +119,15 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         // Update next cursor from API response (for local state, used for loading more)
         options.nextCursor.value = data.nextPage; // This is the cursor/page string from CivitAI
 
-        // Update active tab with new items - this is the single source of truth for tab updates
+        // Update active tab with new items - backend is responsible for updating query_params
         // Only update if we're not restoring a tab (to prevent overwriting restored state)
         if (options.activeTabId.value && !options.isTabRestored.value) {
             const activeTab = options.getActiveTab();
             if (activeTab) {
                 // Append new items to existing items (masonry will update items.value separately)
                 const updatedItemsData = [...activeTab.itemsData, ...data.items];
-                // Store both page and next in queryParams (service handles format conversion)
-                const updatedQueryParams = {
-                    ...activeTab.queryParams,
-                    page: pageToRequest,
-                    next: data.nextPage,
-                };
-                options.updateActiveTab(updatedItemsData, updatedQueryParams);
+                // Backend updates query_params automatically, so we only update itemsData
+                options.updateActiveTab(updatedItemsData);
             }
         }
 
@@ -175,7 +170,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         loadAtPage: Ref<string | number | null>,
         masonry: Ref<{ isLoading: boolean; cancelLoad: () => void; destroy: () => void } | null>,
         getActiveTab: () => BrowseTabData | undefined,
-        updateActiveTab: (itemsData: MasonryItem[], queryParams: Record<string, string | number | null>) => void,
+        updateActiveTab: (itemsData: MasonryItem[]) => void,
         nextTick: () => Promise<void>
     ): Promise<void> {
         if (!activeTabId.value || !selectedService.value || isApplyingService.value) {
@@ -189,32 +184,27 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
                 return;
             }
 
-            // Update tab's queryParams with service, preserving all other params
-            const updatedQueryParams = {
-                ...tab.queryParams,
-                service: selectedService.value,
-                page: 1, // Reset to page 1 when changing service
-                next: null,
-                // Preserve filter params if they exist
-                ...(tab.queryParams.nsfw !== undefined && { nsfw: tab.queryParams.nsfw }),
-                ...(tab.queryParams.type && { type: tab.queryParams.type }),
-                ...(tab.queryParams.limit && { limit: tab.queryParams.limit }),
-                ...(tab.queryParams.sort && { sort: tab.queryParams.sort }),
-            };
-
             // Clear existing items and reset pagination
             items.value = [];
             currentPage.value = 1;
             nextCursor.value = null;
             loadAtPage.value = 1;
 
-            // Update tab - this persists the changes (same as getNextPage does)
+            // Update tab - backend will update query_params when browse request is made
             // Use the same pattern as getNextPage: check activeTabId and get active tab before updating
             if (activeTabId.value) {
                 const activeTab = getActiveTab();
                 if (activeTab) {
-                    // Update tab with new queryParams, same pattern as getNextPage
-                    updateActiveTab([], updatedQueryParams);
+                    // Temporarily update local queryParams so hasServiceSelected becomes true
+                    // Backend will update query_params in database when browse request is made
+                    activeTab.queryParams = {
+                        ...activeTab.queryParams,
+                        service: selectedService.value,
+                        page: 1,
+                        next: null,
+                    };
+                    // Backend updates query_params automatically, so we only update itemsData
+                    updateActiveTab([]);
                 }
             }
 

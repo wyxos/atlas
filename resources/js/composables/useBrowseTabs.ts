@@ -155,8 +155,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
     }
 
     function updateActiveTab(
-        itemsData: MasonryItem[],
-        queryParams: Record<string, string | number | null>
+        itemsData: MasonryItem[]
     ): void {
         const activeTab = getActiveTab();
         if (!activeTab) {
@@ -164,7 +163,8 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
 
         activeTab.itemsData = itemsData;
-        activeTab.queryParams = queryParams;
+        // Note: queryParams are updated by the backend (Browser.php) when browse requests are made
+        // Frontend only updates itemsData, not queryParams
         saveTabDebounced(activeTab);
     }
 
@@ -180,10 +180,13 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
 
     async function saveTab(tab: BrowseTabData): Promise<void> {
         try {
+            // Only save UI-managed fields (label, position)
+            // query_params are managed by the backend (Browser.php) and should not be updated from frontend
+            // The backend updates query_params when browse requests are made with tab_id
             await window.axios.put(browseTabsUpdate.url(tab.id), {
                 label: tab.label,
-                query_params: tab.queryParams,
                 position: tab.position,
+                // Do not send query_params - backend manages them
             });
         } catch (error) {
             console.error('Failed to save tab:', error);

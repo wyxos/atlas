@@ -1186,18 +1186,8 @@ describe('BrowseTabContent - Container Badges', () => {
             await flushPromises();
             await nextTick();
 
-            expect(updateActiveTab).toHaveBeenCalledWith(
-                [],
-                expect.objectContaining({
-                    service: 'test-service',
-                    nsfw: 1,
-                    type: 'image',
-                    limit: 40,
-                    sort: 'Most Reactions',
-                    page: 1,
-                    next: null,
-                })
-            );
+            // Backend updates query_params, frontend only updates itemsData
+            expect(updateActiveTab).toHaveBeenCalledWith([]);
             // The sheet should be closed after applying
             expect(vm.isFilterSheetOpen).toBe(false);
         });
