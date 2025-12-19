@@ -19,6 +19,7 @@ import type {
     ModerationRuleNode,
     ModerationRuleOp,
     ModerationRuleActionType,
+    ModerationRuleTerm,
     CreateModerationRulePayload,
 } from '@/types/moderation';
 
@@ -90,7 +91,10 @@ function ruleToForm(rule: ModerationRule): ModerationRuleForm {
         op: rule.op,
         terms: rule.terms ?? [],
         min: rule.min,
-        options: rule.options ?? { case_sensitive: false, whole_word: true },
+        options: {
+            case_sensitive: rule.options?.case_sensitive ?? false,
+            whole_word: rule.options?.whole_word ?? true,
+        },
         children: rule.children ?? [],
     };
 }
@@ -118,11 +122,14 @@ function startNewRule(): void {
 // Handle rule node updates from RuleEditor
 function onRuleNodeUpdate(node: ModerationRuleNode): void {
     if (!ruleForm.value) return;
-    
+
     ruleForm.value.op = node.op;
     ruleForm.value.terms = node.terms ?? [];
     ruleForm.value.min = node.min ?? null;
-    ruleForm.value.options = node.options ?? { case_sensitive: false, whole_word: true };
+    ruleForm.value.options = {
+        case_sensitive: node.options?.case_sensitive ?? false,
+        whole_word: node.options?.whole_word ?? true,
+    };
     ruleForm.value.children = node.children ?? [];
 }
 
@@ -141,9 +148,9 @@ const ruleNodeFromForm = computed<ModerationRuleNode | null>(() => {
 // Save rule
 async function saveRule(): Promise<void> {
     if (!ruleForm.value) return;
-    
+
     isSaving.value = true;
-    
+
     try {
         const payload: CreateModerationRulePayload = {
             name: ruleForm.value.name || null,
@@ -160,7 +167,7 @@ async function saveRule(): Promise<void> {
                 ? ruleForm.value.children
                 : null,
         };
-        
+
         if (ruleForm.value.id) {
             // Update existing
             const updated = await updateRule(ruleForm.value.id, payload);
@@ -176,7 +183,7 @@ async function saveRule(): Promise<void> {
                 ruleForm.value = ruleToForm(created);
             }
         }
-        
+
         emit('rules-changed');
     } finally {
         isSaving.value = false;
@@ -187,9 +194,9 @@ async function saveRule(): Promise<void> {
 async function confirmDeleteRule(): Promise<void> {
     if (!selectedRule.value?.id) return;
     if (!confirm('Are you sure you want to delete this rule?')) return;
-    
+
     isDeleting.value = true;
-    
+
     try {
         const success = await deleteRule(selectedRule.value.id);
         if (success) {
@@ -208,9 +215,17 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
     const terms = rule.terms ?? [];
     const min = rule.min;
     const children = rule.children ?? [];
-    
-    const joinTerms = (list: string[]) => list.slice(0, 3).join(', ') + (list.length > 3 ? '...' : '');
-    
+
+    // Extract term strings from term objects or strings
+    const extractTermString = (term: string | { term: string; allow_digit_prefix?: boolean }): string => {
+        return typeof term === 'string' ? term : term.term;
+    };
+
+    const joinTerms = (termList: (string | { term: string; allow_digit_prefix?: boolean })[]) => {
+        const termStrings = termList.map(extractTermString);
+        return termStrings.slice(0, 3).join(', ') + (termStrings.length > 3 ? '...' : '');
+    };
+
     switch (op) {
         case 'any':
             return `any of: ${joinTerms(terms)}`;
@@ -233,15 +248,8 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
 <template>
     <div>
         <!-- Trigger Button -->
-        <Button
-            size="sm"
-            variant="ghost"
-            class="h-10 w-10"
-            data-test="moderation-rules-button"
-            title="Moderation Rules"
-            :disabled="disabled"
-            @click="openDialog"
-        >
+        <Button size="sm" variant="ghost" class="h-10 w-10" data-test="moderation-rules-button" title="Moderation Rules"
+            :disabled="disabled" @click="openDialog">
             <Shield :size="14" />
         </Button>
 
@@ -268,11 +276,8 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
                                 <!-- Name -->
                                 <div class="space-y-2">
                                     <label class="text-sm font-medium text-regal-navy-100">Rule Name</label>
-                                    <Input
-                                        v-model="ruleForm.name"
-                                        placeholder="Untitled rule"
-                                        class="bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100 placeholder:text-twilight-indigo-400"
-                                    />
+                                    <Input v-model="ruleForm.name" placeholder="Untitled rule"
+                                        class="bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100 placeholder:text-twilight-indigo-400" />
                                 </div>
 
                                 <!-- Flags -->
@@ -291,7 +296,8 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
                                 <div class="space-y-2">
                                     <label class="text-sm font-medium text-regal-navy-100">Action Type</label>
                                     <Select v-model="ruleForm.action_type">
-                                        <SelectTrigger class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
+                                        <SelectTrigger
+                                            class="w-full bg-prussian-blue-500 border-twilight-indigo-500 text-regal-navy-100">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -308,41 +314,33 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
                                     </Select>
                                     <p class="text-xs text-twilight-indigo-400">
                                         <span v-if="ruleForm.action_type === 'ui_countdown'">
-                                            Files matching this rule will show a 5-second countdown before being auto-disliked.
+                                            Files matching this rule will show a 5-second countdown before being
+                                            auto-disliked.
                                         </span>
                                         <span v-else-if="ruleForm.action_type === 'auto_dislike'">
-                                            Files matching this rule will be immediately auto-disliked and removed from results.
+                                            Files matching this rule will be immediately auto-disliked and removed from
+                                            results.
                                         </span>
                                         <span v-else>
-                                            Files matching this rule will be immediately blacklisted and removed from results.
+                                            Files matching this rule will be immediately blacklisted and removed from
+                                            results.
                                         </span>
                                     </p>
                                 </div>
 
                                 <!-- Rule Editor -->
                                 <div class="pt-4 border-t border-twilight-indigo-500/30">
-                                    <RuleEditor
-                                        v-if="ruleNodeFromForm"
-                                        :model-value="ruleNodeFromForm"
-                                        @update:model-value="onRuleNodeUpdate"
-                                    />
+                                    <RuleEditor v-if="ruleNodeFromForm" :model-value="ruleNodeFromForm"
+                                        @update:model-value="onRuleNodeUpdate" />
                                 </div>
 
                                 <!-- Actions -->
                                 <div class="flex items-center gap-3 pt-4 border-t border-twilight-indigo-500/30">
-                                    <Button
-                                        @click="saveRule"
-                                        :disabled="isSaving"
-                                        class="h-10"
-                                    >
+                                    <Button @click="saveRule" :disabled="isSaving" class="h-10">
                                         <Loader2 v-if="isSaving" :size="14" class="mr-2 animate-spin" />
                                         {{ ruleForm.id ? 'Save Changes' : 'Create Rule' }}
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        @click="isDialogOpen = false"
-                                        class="h-10"
-                                    >
+                                    <Button variant="outline" @click="isDialogOpen = false" class="h-10">
                                         Close
                                     </Button>
                                 </div>
@@ -366,22 +364,12 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
                                 Rules ({{ rules.length }})
                             </span>
                             <div class="flex items-center gap-2">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    @click="startNewRule"
-                                    class="h-8"
-                                >
+                                <Button size="sm" variant="outline" @click="startNewRule" class="h-8">
                                     <Plus :size="14" class="mr-1" />
                                     Add New
                                 </Button>
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    :disabled="!selectedRule?.id || isDeleting"
-                                    @click="confirmDeleteRule"
-                                    class="h-8"
-                                >
+                                <Button size="sm" variant="destructive" :disabled="!selectedRule?.id || isDeleting"
+                                    @click="confirmDeleteRule" class="h-8">
                                     <Trash2 :size="14" />
                                 </Button>
                             </div>
@@ -395,7 +383,8 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
                             </div>
 
                             <!-- Error -->
-                            <div v-else-if="error" class="flex flex-col items-center justify-center py-8 px-4 text-center">
+                            <div v-else-if="error"
+                                class="flex flex-col items-center justify-center py-8 px-4 text-center">
                                 <AlertTriangle :size="24" class="text-danger-400 mb-2" />
                                 <p class="text-xs text-danger-300">{{ error }}</p>
                                 <Button variant="outline" size="sm" class="mt-2 h-8" @click="fetchRules">
@@ -410,28 +399,20 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
 
                             <!-- Rules List -->
                             <ul v-else>
-                                <li
-                                    v-for="rule in rules"
-                                    :key="rule.id"
-                                    @click="selectRule(rule)"
+                                <li v-for="rule in rules" :key="rule.id" @click="selectRule(rule)"
                                     class="cursor-pointer border-b border-twilight-indigo-500/20 p-3 hover:bg-prussian-blue-500/50 transition-colors"
-                                    :class="selectedRule?.id === rule.id ? 'bg-prussian-blue-500/70' : ''"
-                                >
+                                    :class="selectedRule?.id === rule.id ? 'bg-prussian-blue-500/70' : ''">
                                     <div class="flex items-center justify-between mb-1">
                                         <span class="text-sm font-medium text-regal-navy-100 truncate">
                                             {{ rule.name || 'Untitled' }}
                                         </span>
                                         <div class="flex items-center gap-1.5 shrink-0 ml-2">
-                                            <span
-                                                v-if="rule.active"
-                                                class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/20 text-emerald-400"
-                                            >
+                                            <span v-if="rule.active"
+                                                class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/20 text-emerald-400">
                                                 active
                                             </span>
-                                            <span
-                                                v-if="rule.nsfw"
-                                                class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/20 text-amber-400"
-                                            >
+                                            <span v-if="rule.nsfw"
+                                                class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/20 text-amber-400">
                                                 nsfw
                                             </span>
                                         </div>
@@ -448,4 +429,3 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): st
         </Dialog>
     </div>
 </template>
-

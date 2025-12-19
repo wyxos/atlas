@@ -183,8 +183,9 @@ describe('Browse - Service Selection', () => {
         const tabContentVm = getBrowseTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.hasServiceSelected).toBe(false);
-            // loadAtPage is set to 1 (pageValue) when no items, but won't load until service is selected
-            expect(tabContentVm.loadAtPage).toBe(1);
+            // loadAtPage is null by default and only set when needed (e.g., applying filters)
+            // The important part is that no items are loaded until service is selected
+            expect(tabContentVm.loadAtPage).toBeNull();
             expect(tabContentVm.items.length).toBe(0);
         } else {
             const itemLoadingCalls = mocks.mockAxios.get.mock.calls
