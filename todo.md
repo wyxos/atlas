@@ -11,12 +11,24 @@
     - restore horizon
     - download manager
     - filter dynamic/defined by service class
-    - 
-
 - implement file listing
     - view
         - containers
 - implement file scanning
     - image
+      - generate thumbnail
     - audio
+      - extract metadata
+      - convert to mp3 where relevant but preserve original
+      - generate waveform
+      - generate/retrieve cover art
+      - retrieve lyrics
+      - 
+    - spotify playlist scanning
     - video
+      - convert to mp4
+      - extract metadata
+      - generate thumbnail
+      - generate preview seekbar
+      - extract subtitles
+      - generate segments to enable streaming

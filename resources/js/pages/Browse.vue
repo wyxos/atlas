@@ -5,9 +5,7 @@ import TabPanel from '../components/ui/TabPanel.vue';
 import BrowseTab from '../components/BrowseTab.vue';
 import BrowseTabContent from '../components/BrowseTabContent.vue';
 import { Button } from '@/components/ui/button';
-import { useBrowseTabs, type MasonryItem } from '@/composables/useBrowseTabs';
-import { useReactionQueue } from '@/composables/useReactionQueue';
-import { createReactionCallback } from '@/utils/reactions';
+import { useBrowseTabs } from '@/composables/useBrowseTabs';
 import type { ReactionType } from '@/types/reaction';
 
 const isPanelMinimized = ref(false);
@@ -17,9 +15,6 @@ const tabMasonryLoadingStates = ref<Map<number, boolean>>(new Map());
 
 // Track tab data loading state per tab (for spinner in tab panel)
 const tabDataLoadingStates = ref<Map<number, boolean>>(new Map());
-
-// Reaction queue
-const { queueReaction } = useReactionQueue();
 
 // Simplified tab switching - just set active tab ID
 async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promise<void> {
@@ -58,17 +53,15 @@ const {
 // Computed property for active tab to ensure proper reactivity
 const activeTab = computed(() => getActiveTab());
 
-// Handle reaction
-async function handleReaction(
+// Handle reaction callback
+// Note: The reaction is already queued before this callback is invoked.
+// This callback is only used for side effects (e.g., removing from auto-dislike queue).
+function handleReaction(
     fileId: number,
     type: ReactionType
-): Promise<void> {
-    // Try to find the item from the active tab to get preview URL
-    const activeTabData = activeTab.value;
-    const item = activeTabData?.itemsData?.find((i: MasonryItem) => i.id === fileId);
-    const previewUrl = item?.src;
-
-    queueReaction(fileId, type, createReactionCallback(), previewUrl);
+): void {
+    // No-op: reaction is already queued before onReaction is called
+    // This callback exists for compatibility with components that call onReaction
 }
 
 // Handle masonry loading state changes from tab content (for pill)
