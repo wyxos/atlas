@@ -76,38 +76,24 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
             }
         }
 
-        // Determine if tab has restorable items after loading
-        // Use fileIds as the source of truth (stored in DB) - itemsData is just a derived representation
-        const tabHasRestorableItems = (tab.fileIds?.length ?? 0) > 0;
-        deps.isTabRestored.value = tabHasRestorableItems;
-
-        // Always restore page and next from tab.queryParams
+        // Restore pagination state from tab.queryParams
+        // These will be passed to Masonry via initialPage and initialNextPage props
         const pageValue = (tab.queryParams?.page as string | number | undefined) ?? 1;
         const nextValue = (tab.queryParams?.next as string | number | null | undefined) ?? null;
-
-        // Set currentPage and nextCursor from tab data
-        // These will be passed to Masonry via initialPage and initialNextPage props
         deps.currentPage.value = pageValue;
         deps.nextCursor.value = nextValue;
 
-        // Set items and loadAtPage
-        // loadAtPage should always reflect the page value from query params for consistency
-        // skipInitialLoad prop will prevent Masonry from actually loading when items exist
-        if (tab.itemsData && tab.itemsData.length > 0) {
-            // When we have items to restore, set items and let Masonry auto-initialize
-            // Masonry will use initialPage and initialNextPage props to restore pagination state
-            deps.items.value = tab.itemsData;
-            // Set loadAtPage to pageValue even when items exist - skipInitialLoad will prevent the load
-            // This ensures loadAtPage always reflects the actual page state from query params
-            deps.loadAtPage.value = pageValue;
-        } else {
-            // No items to restore, set loadAtPage for initial load
-            deps.loadAtPage.value = pageValue;
-            deps.items.value = [];
-        }
+        // Set items - Masonry will automatically call restoreItems() when skipInitialLoad is true
+        // and items are provided via v-model, using initialPage and initialNextPage props
+        deps.items.value = tab.itemsData ?? [];
 
+        // Set isTabRestored flag based on whether we have items to restore
+        // This prevents getNextPage from loading during restoration
+        deps.isTabRestored.value = (tab.itemsData?.length ?? 0) > 0;
+        
         // Reset isTabRestored after initialization is complete
         // This allows getNextPage to work normally after tab restoration
+        await nextTick();
         deps.isTabRestored.value = false;
     }
 
