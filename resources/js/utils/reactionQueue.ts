@@ -3,6 +3,7 @@ import { useQueue } from '@/composables/useQueue';
 import { createReactionCallback } from './reactions';
 import type { ReactionType } from '@/types/reaction';
 import ReactionQueueToast from '@/components/toasts/ReactionQueueToast.vue';
+import BatchReactionQueueToast from '@/components/toasts/BatchReactionQueueToast.vue';
 
 const toast = useToast();
 
@@ -83,6 +84,75 @@ export function queueReaction(
 }
 
 /**
+ * Queue a batch of reactions with countdown toast.
+ * Shows toast immediately with countdown, executes all reactions on expiration.
+ */
+export function queueBatchReaction(
+    fileIds: number[],
+    reactionType: ReactionType,
+    previews: Array<{ fileId: number; thumbnail?: string }>,
+    restoreCallback?: () => Promise<void> | void
+): void {
+    if (fileIds.length === 0) {
+        return;
+    }
+
+    const queueId = `batch-${reactionType}-${fileIds.join('-')}-${Date.now()}`;
+
+    // Create reaction callback
+    const reactionCallback = createReactionCallback();
+
+    // Add to queue
+    queue.add({
+        id: queueId,
+        duration: REACTION_COUNTDOWN_DURATION,
+        onComplete: async () => {
+            try {
+                // Execute all reactions in the batch
+                await Promise.all(fileIds.map((fileId) => reactionCallback(fileId, reactionType)));
+                // Dismiss toast on success
+                toast.dismiss(queueId);
+            } catch (error) {
+                console.error('Failed to execute queued batch reaction:', error);
+                // Show error toast
+                toast.error('Failed to save batch reaction', {
+                    id: `${queueId}-error`,
+                });
+                // Dismiss the countdown toast
+                toast.dismiss(queueId);
+            }
+        },
+        metadata: {
+            fileIds,
+            reactionType,
+            previews,
+            restoreCallback,
+        },
+    });
+
+    // Show toast immediately with countdown
+    toast(
+        {
+            component: BatchReactionQueueToast,
+            props: {
+                queueId,
+                reactionType,
+                previews,
+                totalCount: fileIds.length,
+            },
+        },
+        {
+            id: queueId,
+            timeout: false, // Don't auto-dismiss - we handle it in onComplete
+            closeButton: false,
+            closeOnClick: false,
+            toastClassName: 'reaction-queue-toast-wrapper',
+            bodyClassName: 'reaction-queue-toast-body',
+        }
+    );
+}
+
+/**
  * Cancel a queued reaction and restore to masonry if restore callback exists.
  */
 export async function cancelQueuedReaction(fileId: number, reactionType: ReactionType): Promise<void> {
@@ -102,6 +172,29 @@ export async function cancelQueuedReaction(fileId: number, reactionType: Reactio
             await restoreCallback();
         } catch (error) {
             console.error('Failed to restore item to masonry:', error);
+        }
+    }
+}
+
+/**
+ * Cancel a queued batch reaction and restore to masonry if restore callback exists.
+ */
+export async function cancelBatchQueuedReaction(queueId: string): Promise<void> {
+    const item = queue.getAll().find((item) => item.id === queueId);
+    
+    // Get restore callback from metadata before removing
+    const restoreCallback = item?.metadata?.restoreCallback as (() => Promise<void> | void) | undefined;
+    
+    // Remove from queue
+    queue.remove(queueId);
+    toast.dismiss(queueId);
+    
+    // Restore to masonry if callback exists
+    if (restoreCallback) {
+        try {
+            await restoreCallback();
+        } catch (error) {
+            console.error('Failed to restore batch items to masonry:', error);
         }
     }
 }

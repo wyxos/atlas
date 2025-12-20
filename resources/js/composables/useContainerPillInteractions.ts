@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
-import { createReactionCallback } from '@/utils/reactions';
+import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 
 type Container = {
@@ -99,39 +99,23 @@ export function useContainerPillInteractions(
             console.warn('[useContainerPillInteractions] removeMany not available on masonry instance');
         }
 
-        // Create a batch ID for grouping these reactions
-        const batchId = `batch-${containerId}-${reactionType}-${Date.now()}`;
-
         // Create batch restore callback if restoreManyToMasonry is available
         const batchRestoreCallback = restoreManyToMasonry && tabId !== undefined
-            ? async (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
-                // Only restore if the tab is active
-                const tabActive = isTabActive(restoreTabId);
-                if (!tabActive) {
-                    return;
-                }
-
+            ? async () => {
                 // Restore all items in the batch using restoreManyToMasonry
                 await restoreManyToMasonry(itemsToRestore, masonry.value);
             }
             : undefined;
 
-        // Process all reactions
-        const reactionsToProcess = siblings.map((item) => {
-            const itemIndex = items.value.findIndex((i) => i.id === item.id);
-            const previewUrl = item.src;
-            return {
-                fileId: item.id,
-                itemIndex,
-                previewUrl,
-                item,
-            };
-        });
+        // Prepare previews and file IDs for the batch reaction queue
+        const fileIds = siblings.map((item) => item.id);
+        const previews = siblings.map((item) => ({
+            fileId: item.id,
+            thumbnail: item.thumbnail || item.src,
+        }));
 
-        // Execute reactions directly
-        for (const { fileId } of reactionsToProcess) {
-            await createReactionCallback()(fileId, reactionType);
-        }
+        // Queue batch reaction with countdown toast
+        queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback);
 
         // Call onReaction once for the batch (not per item)
         // This is just a callback to notify parent
