@@ -374,19 +374,6 @@
     }
 }
 
-/* Remove gap from toast container - snap to screen edges */
-.Vue-Toastification__container {
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-.Vue-Toastification__container.bottom-right {
-    bottom: 0 !important;
-    right: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
 /* Remove default blue background from vue-toastification globally */
 .Vue-Toastification__toast {
     background: transparent !important;
@@ -401,38 +388,4 @@
 .Vue-Toastification__toast--info {
     background: transparent !important;
     border: none !important;
-}
-
-.Vue-Toastification__toast--default::before,
-.Vue-Toastification__toast--success::before,
-.Vue-Toastification__toast--error::before,
-.Vue-Toastification__toast--warning::before,
-.Vue-Toastification__toast--info::before {
-    display: none !important;
-}
-
-/* Remove blue background for custom toast class */
-.custom-toast {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-/* Remove blue background for reaction queue toasts */
-.reaction-queue-toast-wrapper {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-.reaction-queue-toast-wrapper .Vue-Toastification__toast-body {
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-.reaction-queue-toast-body {
-    padding: 0 !important;
-    margin: 0 !important;
 }
