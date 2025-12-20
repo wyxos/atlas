@@ -12,6 +12,7 @@ interface Props {
     totalItems?: number;
     variant?: 'default' | 'small';
     removeItem?: () => void;
+    hideDislike?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -22,6 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
     totalItems: undefined,
     variant: 'default',
     removeItem: undefined,
+    hideDislike: false,
 });
 
 const emit = defineEmits<{
@@ -147,7 +149,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             </button>
 
             <!-- Dislike -->
-            <button @click="handleDislikeClick" :disabled="isUpdating" :class="[
+            <button v-if="!hideDislike" @click="handleDislikeClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
                 isSmall ? 'p-1' : 'p-2',
                 dislike ? 'bg-gray-500 text-white' : 'text-white hover:text-gray-400'

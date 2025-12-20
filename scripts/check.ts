@@ -28,7 +28,7 @@ function log(message: string, color: ColorKey = 'reset'): void {
 function runCommand(command: string, description: string, cwd: string = projectRoot): boolean {
     log(`\n${colors.bright}${description}${colors.reset}`, 'cyan');
     log(`Running: ${command}`, 'blue');
-    
+
     try {
         execSync(command, {
             cwd,
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
     // 2. JavaScript/TypeScript Linting (ESLint)
     try {
         execSync('npx eslint --version', { stdio: 'ignore', cwd: projectRoot });
-        
+
         const configFiles = [
             'eslint.config.js',
             'eslint.config.mjs',
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
             '.eslintrc.yml',
             '.eslintrc.yaml',
         ];
-        
+
         const hasConfig = configFiles.some(file => {
             try {
                 return existsSync(join(projectRoot, file));
@@ -90,7 +90,7 @@ async function main(): Promise<void> {
                 return false;
             }
         });
-        
+
         if (hasConfig) {
             // First, try to auto-fix issues
             log('\nAttempting to auto-fix ESLint issues...', 'blue');
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
             } catch {
                 // Continue to check even if fix had issues
             }
-            
+
             // Then check for remaining issues
             results.jsLint = runCommand(
                 'npx eslint . --ext .js,.mjs,.cjs,.jsx,.ts,.tsx,.vue',
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
     // Use php to run pint on Windows
     const isWindows = process.platform === 'win32';
     const pintPath = isWindows ? 'vendor\\bin\\pint' : 'vendor/bin/pint';
-    
+
     // First, auto-fix issues (Pint fixes by default when run without --test)
     log('\nAttempting to auto-fix PHP issues with Pint...', 'blue');
     try {
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
     } catch {
         // Continue to check even if fix had issues
     }
-    
+
     // Then check for remaining issues
     results.phpLint = runCommand(
         `php ${pintPath} --test`,
@@ -159,17 +159,17 @@ async function main(): Promise<void> {
     log('\n' + '='.repeat(60), 'bright');
     log('Summary', 'bright');
     log('='.repeat(60), 'bright');
-    
+
     const allPassed = Object.values(results).every(result => result === true);
-    
+
     log(`TypeScript Check:   ${results.jsTypeCheck ? '✓' : '✗'}`, results.jsTypeCheck ? 'green' : 'red');
     log(`JavaScript Linting: ${results.jsLint ? '✓' : '✗'}`, results.jsLint ? 'green' : 'red');
     log(`JavaScript Tests:   ${results.jsTest ? '✓' : '✗'}`, results.jsTest ? 'green' : 'red');
     log(`PHP Linting:        ${results.phpLint ? '✓' : '✗'}`, results.phpLint ? 'green' : 'red');
     log(`PHP Tests:          ${results.phpTest ? '✓' : '✗'}`, results.phpTest ? 'green' : 'red');
-    
+
     log('\n' + '='.repeat(60), 'bright');
-    
+
     if (allPassed) {
         log('All checks passed! ✓', 'green');
         process.exit(0);

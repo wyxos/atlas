@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { ThumbsDown, Ban, Plus, Eye } from 'lucide-vue-next';
 import {
     Dialog,
@@ -8,6 +8,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '../ui/dialog';
+import FileReactions from '../FileReactions.vue';
+import type { ReactionType } from '@/types/reaction';
 
 interface ImmediateActionItem {
     id: number;
@@ -19,12 +21,23 @@ interface Props {
     items: ImmediateActionItem[];
     countdown: number;
     onDismiss?: () => void;
+    onReaction?: (fileId: number, type: ReactionType) => void;
 }
 
 const props = defineProps<Props>();
 
 const TOAST_DURATION_SECONDS = 5;
 const isReviewModalOpen = ref(false);
+const modalItems = ref<ImmediateActionItem[]>([]);
+const reactedFileIds = ref<Set<number>>(new Set());
+
+// Initialize modal items when modal opens, excluding already reacted files
+watch(isReviewModalOpen, (isOpen) => {
+    if (isOpen) {
+        // Filter out files that have already been reacted to
+        modalItems.value = props.items.filter(item => !reactedFileIds.value.has(item.id));
+    }
+});
 
 // Handle hover events to pause/resume countdown (uses centralized timer manager)
 function handleMouseEnter(): void {
@@ -129,6 +142,19 @@ function handleModalClose(isOpen: boolean): void {
     }
 }
 
+function handleItemReaction(fileId: number, type: ReactionType): void {
+    // Track that this file has been reacted to
+    reactedFileIds.value.add(fileId);
+    
+    // Remove item from modal when reacted to
+    modalItems.value = modalItems.value.filter(item => item.id !== fileId);
+    
+    // Call parent reaction handler if provided
+    if (props.onReaction) {
+        props.onReaction(fileId, type);
+    }
+}
+
 const emit = defineEmits<{
     'close-toast': [];
 }>();
@@ -188,23 +214,33 @@ const emit = defineEmits<{
                     Review Actions
                 </DialogTitle>
                 <DialogDescription class="text-base mt-2 text-twilight-indigo-200">
-                    {{ items.length }} file{{ items.length !== 1 ? 's' : '' }} {{ getActionLabel() }}
+                    {{ modalItems.length }} file{{ modalItems.length !== 1 ? 's' : '' }} {{ getActionLabel() }}
                 </DialogDescription>
             </DialogHeader>
-            <div class="max-h-[60vh] overflow-y-auto space-y-3 mt-4">
-                <div v-for="item in items" :key="item.id" class="flex items-center gap-3 p-3 bg-prussian-blue-700/50 rounded-lg border border-smart-blue-500/30">
-                    <div v-if="item.thumbnail" class="shrink-0">
-                        <img :src="item.thumbnail" :alt="`File #${item.id}`" class="w-16 h-16 object-cover rounded border border-smart-blue-500/50" />
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-white">
-                            File #{{ item.id }}
+            <div class="max-h-[60vh] overflow-y-auto mt-4">
+                <div v-if="modalItems.length === 0" class="text-center text-twilight-indigo-300 py-8">
+                    All files have been reviewed.
+                </div>
+                <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div v-for="item in modalItems" :key="item.id" class="flex flex-col bg-prussian-blue-700/50 rounded-lg border border-smart-blue-500/30 overflow-hidden">
+                        <div v-if="item.thumbnail" class="relative w-full aspect-square">
+                            <img :src="item.thumbnail" :alt="`File #${item.id}`" class="w-full h-full object-cover" />
+                            <div class="absolute top-2 right-2">
+                                <component :is="getItemActionIcon(item)" :size="16" :class="getItemActionColor(item)" />
+                            </div>
                         </div>
-                        <div class="text-xs text-twilight-indigo-300 mt-1">
-                            Action: {{ getItemActionLabel(item) }}
+                        <div class="p-3 space-y-2">
+                            <div class="text-xs text-twilight-indigo-300">
+                                {{ getItemActionLabel(item) }}
+                            </div>
+                            <FileReactions 
+                                :file-id="item.id" 
+                                :hide-dislike="true"
+                                variant="small"
+                                @reaction="(type) => handleItemReaction(item.id, type)"
+                            />
                         </div>
                     </div>
-                    <component :is="getItemActionIcon(item)" :size="20" :class="getItemActionColor(item)" />
                 </div>
             </div>
         </DialogContent>

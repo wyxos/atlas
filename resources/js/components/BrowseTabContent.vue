@@ -21,6 +21,7 @@ import {
 import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService, type GetPageResult } from '@/composables/useBrowseService';
 import { useReactionQueue } from '@/composables/useReactionQueue';
+import { createReactionCallback } from '@/utils/reactions';
 import { useContainerBadges } from '@/composables/useContainerBadges';
 import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
 import { usePromptData } from '@/composables/usePromptData';
@@ -119,7 +120,24 @@ const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
 const itemVirtualization = useItemVirtualization(items);
 
 // Immediate actions toast composable - collects and displays immediately processed items
-const immediateActionsToast = useImmediateActionsToast();
+const immediateActionsToast = useImmediateActionsToast((fileId: number, type: ReactionType) => {
+    // Handle reaction from modal - remove from auto-dislike queue if user reacts
+    if (autoDislikeQueue.isQueued(fileId)) {
+        autoDislikeQueue.removeFromQueue(fileId);
+        const item = itemsMap.value.get(fileId);
+        if (item) {
+            item.will_auto_dislike = false;
+        }
+    }
+    
+    // Queue the reaction (same as masonry reactions) - this triggers AJAX and toast
+    const item = itemsMap.value.get(fileId);
+    const previewUrl = item?.src;
+    queueReaction(fileId, type, createReactionCallback(), previewUrl);
+    
+    // Also call parent handler for side effects
+    props.onReaction(fileId, type);
+});
 
 // Browse service composable - fetch services if not provided via prop
 const { availableServices: localServices, fetchServices } = useBrowseService();
