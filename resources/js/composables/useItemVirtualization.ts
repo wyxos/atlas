@@ -1,4 +1,4 @@
-import { ref, shallowRef, type Ref, nextTick } from 'vue';
+import { ref, type Ref, nextTick } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
 import { items as browseItems } from '@/actions/App/Http/Controllers/BrowseController';
 
@@ -117,11 +117,6 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
         if (itemsNeedingData.length === 0) {
             return;
         }
-        
-        // Get viewport bounds
-        const viewportTop = window.scrollY;
-        const viewportBottom = viewportTop + window.innerHeight;
-        const buffer = 500; // Load items 500px before/after viewport
         
         // Find items that are in or near viewport
         const visibleItemIds: number[] = [];

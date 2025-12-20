@@ -3,7 +3,7 @@ import { Download, FileText, Copy, ExternalLink } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '../utils/date';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatFileSize, getMimeTypeCategory, getMimeTypeBadgeClasses } from '../utils/file';
+import { formatFileSize, getMimeTypeBadgeClasses } from '../utils/file';
 import { openUrl } from '../utils/url';
 import type { File } from '../types/file';
 
@@ -11,7 +11,7 @@ interface Props {
     file: File;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 </script>
 

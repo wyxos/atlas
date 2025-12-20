@@ -52,8 +52,7 @@ describe('Browse - Immediate Actions Toast', () => {
         showToast();
 
         // Verify toast was not created (no actions to show)
-        const { useToast } = require('vue-toastification');
-        const toast = useToast();
+        // showToast returns early if no actions, so toast() should not be called
         // showToast returns early if no actions, so toast() should not be called
         // But we can't easily verify this without accessing internal state
         // So we just verify the function doesn't throw

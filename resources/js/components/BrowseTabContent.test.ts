@@ -20,8 +20,8 @@ Object.defineProperty(window, 'axios', {
 });
 
 // Mock composables
-vi.mock('@/composables/useContainerBadges', () => {
-    const { ref, computed } = require('vue');
+vi.mock('@/composables/useContainerBadges', async () => {
+    const { ref, computed } = await import('vue');
     return {
         useContainerBadges: vi.fn((itemsRef: any) => {
             const hoveredContainerId = ref(null);
@@ -64,7 +64,7 @@ const mockBatchReactToSiblings = vi.fn();
 vi.mock('@/composables/useContainerPillInteractions', () => ({
     useContainerPillInteractions: vi.fn(() => ({
         getContainersForItem: vi.fn((item: any) => (item as any).containers || []),
-        getSiblingItems: vi.fn((containerId: number) => []),
+        getSiblingItems: vi.fn((_containerId: number) => []),
         getContainerUrl: vi.fn((containerId: number) => `https://example.com/container/${containerId}`),
         batchReactToSiblings: mockBatchReactToSiblings,
         handlePillClick: vi.fn(),
@@ -72,8 +72,8 @@ vi.mock('@/composables/useContainerPillInteractions', () => ({
     })),
 }));
 
-vi.mock('@/composables/usePromptData', () => {
-    const { ref, computed } = require('vue');
+vi.mock('@/composables/usePromptData', async () => {
+    const { ref, computed } = await import('vue');
     return {
         usePromptData: vi.fn(() => ({
             promptDataLoading: ref(new Map()),
@@ -101,8 +101,8 @@ vi.mock('@/composables/useMasonryInteractions', () => ({
     })),
 }));
 
-vi.mock('@/composables/useItemPreview', () => {
-    const { ref } = require('vue');
+vi.mock('@/composables/useItemPreview', async () => {
+    const { ref } = await import('vue');
     return {
         useItemPreview: vi.fn(() => ({
             previewedItems: ref(new Set()),
@@ -228,8 +228,8 @@ vi.mock('./container-blacklist/ContainerBlacklistDialog.vue', () => ({
 }));
 
 // Mock container blacklist composables
-vi.mock('@/composables/useContainerBlacklists', () => {
-    const { ref } = require('vue');
+vi.mock('@/composables/useContainerBlacklists', async () => {
+    const { ref } = await import('vue');
     return {
         useContainerBlacklists: vi.fn(() => ({
             blacklists: ref([]),

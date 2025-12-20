@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue';
-import { Ban, Plus, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
+import { ref, nextTick } from 'vue';
+import { Ban, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -17,7 +17,7 @@ interface Props {
     disabled?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
     disabled: false,
 });
 

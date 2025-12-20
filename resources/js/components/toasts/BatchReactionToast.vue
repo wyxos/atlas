@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Heart, ThumbsUp, ThumbsDown, Smile, X, Plus, Undo } from 'lucide-vue-next';
+import { Heart, ThumbsUp, ThumbsDown, Smile, Plus, Undo } from 'lucide-vue-next';
 import type { QueuedReaction } from '@/composables/useReactionQueue';
 import type { ReactionType } from '@/types/reaction';
 
@@ -17,7 +17,10 @@ const QUEUE_DELAY_SECONDS = 5;
 
 // Handle hover events to pause/resume countdown (uses centralized timer manager)
 function handleMouseEnter(): void {
-    const win = window as any;
+    const win = window as Window & {
+        __timerManagerFreeze?: () => void;
+        __reactionQueuePauseAll?: () => void;
+    };
     // Use new timer manager functions (backward compatible with old names)
     if (win.__timerManagerFreeze) {
         win.__timerManagerFreeze();
@@ -27,7 +30,10 @@ function handleMouseEnter(): void {
 }
 
 function handleMouseLeave(): void {
-    const win = window as any;
+    const win = window as Window & {
+        __timerManagerUnfreeze?: () => void;
+        __reactionQueueResumeAll?: () => void;
+    };
     // Use new timer manager functions (backward compatible with old names)
     if (win.__timerManagerUnfreeze) {
         win.__timerManagerUnfreeze();
@@ -75,7 +81,7 @@ const emit = defineEmits<{
             <!-- Multiple Preview Images (up to 5, then plus icon) - stacked with overlapping effect -->
             <div class="flex gap-2 items-center">
                 <div class="stacked-images">
-                    <template v-for="(reaction, index) in reactions.slice(0, 5)" :key="reaction.fileId">
+                    <template v-for="reaction in reactions.slice(0, 5)" :key="reaction.fileId">
                         <div v-if="reaction.previewUrl" class="stacked-image">
                             <img :src="reaction.previewUrl" :alt="`File #${reaction.fileId}`" />
                         </div>

@@ -1,8 +1,6 @@
 import { nextTick, type Ref } from 'vue';
 import { preloadImage, findMasonryItemByImageSrc, calculateBestFitSize, getAvailableWidth } from './useFileViewerUtils';
 
-const BORDER_WIDTH = 4;
-
 export function useFileViewerOpen(
     overlay: {
         overlayRect: Ref<{ top: number; left: number; width: number; height: number } | null>;

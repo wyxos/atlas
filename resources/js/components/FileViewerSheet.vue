@@ -4,11 +4,11 @@ import { X, Loader2 } from 'lucide-vue-next';
 interface Props {
     isOpen: boolean;
     fileId: number | null;
-    fileData: any;
+    fileData: import('@/types/file').File | null;
     isLoading: boolean;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 const emit = defineEmits<{
     close: [];
@@ -110,6 +110,7 @@ const emit = defineEmits<{
         <div class="flex-1 overflow-y-auto p-4 min-w-0 opacity-0 pointer-events-none"></div>
     </div>
 </template>
+
 
 
 

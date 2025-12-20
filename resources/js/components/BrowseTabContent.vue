@@ -69,7 +69,7 @@ const itemsMap = ref<Map<number, MasonryItem>>(new Map());
 // Sync itemsMap whenever items array changes
 watch(
     () => items.value,
-    (newItems, oldItems) => {
+    (newItems) => {
         const newMap = new Map<number, MasonryItem>();
         for (const item of newItems) {
             newMap.set(item.id, item);
@@ -104,7 +104,7 @@ const tabContentContainer = ref<HTMLElement | null>(null);
 const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Reaction queue
-const { queuedReactions, queueReaction, cancelReaction } = useReactionQueue();
+const { queuedReactions, queueReaction } = useReactionQueue();
 
 // Item preview composable (needs to be initialized early)
 const itemPreview = useItemPreview(items, computed(() => props.tab));
@@ -239,7 +239,7 @@ function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
 }
 
 // Handle loading:stop to show toast when loading completes (regardless of backfill)
-function onLoadingStop(payload: { fetched?: number }): void {
+function onLoadingStop(): void {
     // Show toast with collected immediate actions when loading completes
     immediateActionsToast.showToast();
 }
@@ -247,14 +247,26 @@ function onLoadingStop(payload: { fetched?: number }): void {
 // Computed property to display page value
 const displayPage = computed(() => currentPage.value ?? 1);
 
+// Local reactive copy of queryParams to avoid prop mutation
+const localQueryParams = ref<Record<string, string | number | null>>({});
+
+// Sync localQueryParams with prop when tab changes
+watch(() => props.tab?.queryParams, (queryParams) => {
+    if (queryParams) {
+        localQueryParams.value = { ...queryParams };
+    } else {
+        localQueryParams.value = {};
+    }
+}, { immediate: true, deep: true });
+
 // Get current tab's service
 const currentTabService = computed(() => {
-    return props.tab?.queryParams?.service as string | null;
+    return localQueryParams.value?.service as string | null;
 });
 
 // Get pageSize from limit filter, defaulting to 20
 const pageSize = computed(() => {
-    const limit = props.tab?.queryParams?.limit;
+    const limit = localQueryParams.value?.limit;
     return limit ? Number(limit) : 20;
 });
 
@@ -284,8 +296,8 @@ async function handleApplyFilters(filters: {
 
     // Update local queryParams immediately so getNextPage can read them
     // Backend will update query_params in database when browse request is made
-    props.tab.queryParams = {
-        ...props.tab.queryParams,
+    localQueryParams.value = {
+        ...localQueryParams.value,
         service: filters.service,
         nsfw: filters.nsfw ? 1 : 0,
         type: filters.type,
@@ -340,7 +352,6 @@ const hasServiceSelected = computed(() => {
 
 // Always skip initial load - we control loading explicitly via loadAtPage
 // Masonry will load when loadAtPage is set, and auto-initialize pagination state via initialPage/initialNextPage props
-const shouldSkipInitialLoad = true;
 
 // Computed property for apply button disabled state
 // Button should only be disabled when:
@@ -364,7 +375,7 @@ const {
     currentPage,
     currentTabService,
     activeTabId: computed(() => props.tab?.id ?? null),
-    getActiveTab: () => props.tab,
+    getActiveTab: () => props.tab ? { ...props.tab, queryParams: localQueryParams.value } : undefined,
     updateActiveTab: props.updateActiveTab,
 });
 
@@ -630,7 +641,7 @@ function handleMasonryItemMouseLeave(): void {
     }
 }
 
-async function handleItemInView(payload: { item: any; type: 'image' | 'video' }, item: MasonryItem): Promise<void> {
+async function handleItemInView(payload: { item: { id?: number }; type: 'image' | 'video' }, item: MasonryItem): Promise<void> {
     // payload.item is the item passed to MasonryItem, which should have the id
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
@@ -650,7 +661,7 @@ async function handleItemInView(payload: { item: any; type: 'image' | 'video' },
     }
 }
 
-async function handleItemPreloadSuccess(payload: { item: any; type: 'image' | 'video'; src: string }, item: MasonryItem): Promise<void> {
+async function handleItemPreloadSuccess(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }, item: MasonryItem): Promise<void> {
     // payload.item is the item passed to MasonryItem, which should have the id
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
@@ -941,10 +952,10 @@ onUnmounted(() => {
                         <VibeMasonryItem :item="item" :remove="remove" :preload-threshold="0.5"
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
                             @mouseleave="handleMasonryItemMouseLeave"
-                            @in-view="(payload: { item: any; type: 'image' | 'video' }) => handleItemInView(payload, item)"
-                            @preload:success="(payload: { item: any; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
+                            @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
+                            @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
                             <template
-                                #default="{ imageLoaded, imageError, videoLoaded, videoError, isLoading, showMedia, imageSrc, videoSrc, mediaType }">
+                                #default="{ imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500"
                                     :data-key="item.key" :data-masonry-item-id="item.id"
                                     :class="containerBadges.getMasonryItemClasses.value(item)"

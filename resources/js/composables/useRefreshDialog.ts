@@ -1,5 +1,4 @@
 import { ref, type Ref } from 'vue';
-import { nextTick } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
 
 /**

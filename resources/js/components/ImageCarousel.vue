@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick, TransitionGroup } from 'vue';
+import { ref, watch } from 'vue';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next';
 import type { MasonryItem } from '../composables/useBrowseTabs';
 

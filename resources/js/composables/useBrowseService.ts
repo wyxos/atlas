@@ -187,8 +187,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             loadPage?: (page: number | string) => Promise<void>;
         } | null>,
         getActiveTab: () => BrowseTabData | undefined,
-        updateActiveTab: (itemsData: MasonryItem[]) => void,
-        nextTick: () => Promise<void>
+        updateActiveTab: (itemsData: MasonryItem[]) => void
     ): Promise<void> {
         if (!activeTabId.value || !selectedService.value || masonry.value?.isLoading) {
             return;

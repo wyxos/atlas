@@ -40,7 +40,6 @@ async function switchTab(tabId: number, skipActiveCheck: boolean = false): Promi
 const {
     tabs,
     activeTabId,
-    isLoadingTabs,
     loadTabs: loadTabsFromComposable,
     createTab,
     closeTab,
@@ -56,10 +55,8 @@ const activeTab = computed(() => getActiveTab());
 // Handle reaction callback
 // Note: The reaction is already queued before this callback is invoked.
 // This callback is only used for side effects (e.g., removing from auto-dislike queue).
-function handleReaction(
-    fileId: number,
-    type: ReactionType
-): void {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function handleReaction(_fileId: number, _type: ReactionType): void {
     // No-op: reaction is already queued before onReaction is called
     // This callback exists for compatibility with components that call onReaction
 }
@@ -124,7 +121,7 @@ async function loadTabs(): Promise<void> {
             // If no tab is active, activeTabId remains null and user must select one
         }
         // If no tabs exist, render nothing until a tab is created
-    } catch (error) {
+    } catch {
         // Error already logged in composable
         // Don't create a tab on error - let user create manually
     }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { Shield, Plus, Loader2, AlertTriangle, Trash2 } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,7 @@ interface Props {
     disabled?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
     disabled: false,
 });
 
@@ -210,7 +210,7 @@ async function confirmDeleteRule(): Promise<void> {
 }
 
 // Summarize rule for display
-function summarizeRule(rule: ModerationRule | ModerationRuleNode, depth = 0): string {
+function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
     const op = rule.op;
     const terms = rule.terms ?? [];
     const min = rule.min;
