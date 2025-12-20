@@ -123,17 +123,18 @@ class Browser
 
         // File moderation: apply rules based on action_type
         $fileModerationResult = app(FileModerationService::class)->moderate(collect($persisted));
-        $flaggedIds = $fileModerationResult['flaggedIds'];
+        $flaggedIds = $fileModerationResult['flaggedIds']; // Files matching rules with 'ui_countdown' action type
         $processedIds = $fileModerationResult['processedIds'];
         $immediateActions = $fileModerationResult['immediateActions'] ?? [];
 
         // Container moderation: apply container moderation rules after file moderation
         $containerModerationResult = app(ContainerModerationService::class)->moderate(collect($persisted));
-        $containerFlaggedIds = $containerModerationResult['flaggedIds'];
+        $containerFlaggedIds = $containerModerationResult['flaggedIds']; // Files matching container blacklist with 'ui_countdown' action type
         $containerProcessedIds = $containerModerationResult['processedIds'];
         $containerImmediateActions = $containerModerationResult['immediateActions'] ?? [];
 
-        // Merge flagged file IDs from both moderation and container blacklist (both use same auto-dislike queue)
+        // Merge flagged file IDs from both moderation rules and container blacklist rules
+        // Both include files that match rules with 'ui_countdown' action type (will show will_auto_dislike = true in UI)
         $flaggedIds = array_merge($flaggedIds, $containerFlaggedIds);
 
         // Merge processed IDs from both moderation and container blacklist
@@ -183,21 +184,24 @@ class Browser
         $minimal = request()->boolean('minimal', true); // Default to minimal for performance
         $items = FileItemFormatter::format($persisted, $page, $flaggedIds, $minimal);
 
-        // Format immediate actions with file information for frontend toast
-        $immediateActionItems = [];
+        // Format immediately processed files (auto-disliked/blacklisted) for frontend toast notifications
+        // These are files that were immediately processed (before they were filtered out)
+        $immediatelyProcessedFiles = [];
         if (! empty($immediateActions)) {
-            // Get files that were immediately processed (before they were filtered out)
-            // Use allFilesBeforeFilter which contains files before filtering
-            foreach ($immediateActions as $action) {
-                $file = $allFilesBeforeFilter->get($action['file_id']);
-                if ($file) {
-                    $immediateActionItems[] = [
-                        'id' => $file->id,
-                        'action_type' => $action['action_type'],
-                        'thumbnail' => $file->thumbnail_url ?? $file->url,
-                    ];
-                }
-            }
+            // Extract file IDs and create action_type map
+            $immediateFileIds = array_column($immediateActions, 'file_id');
+            $actionTypeMap = array_column($immediateActions, 'action_type', 'file_id');
+            
+            // Filter files directly from collection and map to desired structure
+            $immediatelyProcessedFiles = $allFilesBeforeFilter
+                ->only($immediateFileIds)
+                ->map(fn ($file) => [
+                    'id' => $file->id,
+                    'action_type' => $actionTypeMap[$file->id] ?? 'auto_dislike',
+                    'thumbnail' => $file->thumbnail_url ?? $file->url,
+                ])
+                ->values()
+                ->all();
         }
 
         return [
@@ -209,11 +213,13 @@ class Browser
                 'next' => $filter['next'] ?? null,
             ],
             'moderation' => [
-                'flagged_count' => count($flaggedIds),
-                'flagged_ids' => $flaggedIds,
-                'processed_count' => count($processedIds),
-                'processed_ids' => $processedIds,
-                'immediate_actions' => $immediateActionItems,
+                // Files that match moderation/container rules with 'ui_countdown' action type
+                // These will show will_auto_dislike = true in the UI (red ring indicator)
+                // Includes both file moderation rules and container blacklist rules
+                'toDislike' => $flaggedIds,
+                // Files that were immediately auto-disliked or blacklisted in this request
+                // These were moderated out (removed) and should show toast notifications
+                'moderatedOut' => $immediatelyProcessedFiles,
             ],
             'error' => $serviceError,
             'services' => $servicesMeta,

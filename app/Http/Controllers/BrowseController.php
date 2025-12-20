@@ -34,12 +34,9 @@ class BrowseController extends Controller
             'items' => $items,
             'nextPage' => $payload['filter']['next'] ?? null, // Return cursor as nextPage for frontend
             'services' => $payload['services'] ?? [], // Return available services
-            'moderation' => $payload['moderation'] ?? [ // Include moderation data (immediate actions, etc.)
-                'flagged_count' => 0,
-                'flagged_ids' => [],
-                'processed_count' => 0,
-                'processed_ids' => [],
-                'immediate_actions' => [],
+            'moderation' => $payload['moderation'] ?? [ // Include moderation data
+                'toDislike' => [],
+                'moderatedOut' => [],
             ],
         ]);
     }
