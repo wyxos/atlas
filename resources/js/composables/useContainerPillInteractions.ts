@@ -1,6 +1,5 @@
 import { ref, type Ref } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
-import { useReactionQueue } from './useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import type { ReactionType } from '@/types/reaction';
 
@@ -25,7 +24,6 @@ export function useContainerPillInteractions(
         masonryInstance?: any
     ) => Promise<void>
 ) {
-    const { queueReaction } = useReactionQueue();
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
     const DOUBLE_CLICK_DELAY_MS = 300; // Maximum time between clicks to count as double-click
 
@@ -118,9 +116,8 @@ export function useContainerPillInteractions(
             }
             : undefined;
 
-        // Queue all reactions first, then the batch toast will be created/updated once
-        // This ensures we don't create multiple toasts when queuing synchronously
-        const reactionsToQueue = siblings.map((item) => {
+        // Process all reactions
+        const reactionsToProcess = siblings.map((item) => {
             const itemIndex = items.value.findIndex((i) => i.id === item.id);
             const previewUrl = item.src;
             return {
@@ -131,32 +128,16 @@ export function useContainerPillInteractions(
             };
         });
 
-        // Queue all reactions with the same batchId
-        // The useReactionQueue will handle creating/updating a single batch toast
-        // IMPORTANT: Don't call onReaction for each item - it might create individual toasts
-        // The batch toast will be created by useReactionQueue, and onReaction is just a callback
-        // that should be called once for the batch, not per item
-        for (const { fileId, itemIndex, previewUrl, item } of reactionsToQueue) {
-            queueReaction(
-                fileId,
-                reactionType,
-                createReactionCallback(),
-                previewUrl,
-                undefined, // No individual restore callback for batch reactions
-                tabId,
-                itemIndex,
-                item,
-                batchId, // Pass batchId to group these reactions
-                batchRestoreCallback // Pass batch restore callback
-            );
+        // Execute reactions directly
+        for (const { fileId } of reactionsToProcess) {
+            await createReactionCallback()(fileId, reactionType);
         }
 
-        // Call onReaction once for the batch (not per item) to avoid duplicate toasts
-        // This is just a callback to notify parent, not to create toasts
-        // The actual toast is created by useReactionQueue when batchId is provided
+        // Call onReaction once for the batch (not per item)
+        // This is just a callback to notify parent
         if (siblings.length > 0) {
             // Call onReaction for the first item as a representative of the batch
-            // This maintains compatibility but doesn't create individual toasts
+            // This maintains compatibility
             onReaction(siblings[0].id, reactionType);
         }
     }

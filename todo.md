@@ -41,3 +41,20 @@
         - [ ] Generate preview seekbar with keyframe thumbnails
         - [ ] Extract and store subtitles from video files
         - [ ] Generate video segments (HLS/DASH) to enable adaptive streaming
+
+
+- Queue reaction and everything else
+  - need a queue manager
+    - will handle queueing auto dislike
+    - reactions
+    - immediate action toast
+  - concept of time freeze
+  - a toast template
+    - single reaction template
+    - batch reaction template
+  - on previewed count increment > if eligible > queue + countdown on item
+  - reaction > queue + toast
+  - on masonry each successful request > if eligible > queue + ui countdown on item
+  - on masonry loading stop > if stacked immediate actions > queue + toast
+  - hover on any of those items in queue, freeze everything
+- 

@@ -4,18 +4,11 @@ import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { MasonryItem } from './useBrowseTabs';
 
 // Mock dependencies
-vi.mock('./useReactionQueue', () => ({
-    useReactionQueue: () => ({
-        queueReaction: vi.fn(),
-    }),
-}));
-
 vi.mock('@/utils/reactions', () => ({
     createReactionCallback: vi.fn(() => vi.fn()),
 }));
 
 describe('useContainerPillInteractions', () => {
-    const mockQueueReaction = vi.fn();
     const mockOnReaction = vi.fn();
     const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
 

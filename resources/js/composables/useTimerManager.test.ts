@@ -39,60 +39,47 @@ describe('useTimerManager', () => {
             const manager = useTimerManager();
             const autoDislikeFreeze = vi.fn();
             const autoDislikeUnfreeze = vi.fn();
-            const reactionQueueFreeze = vi.fn();
-            const reactionQueueUnfreeze = vi.fn();
 
             manager.registerSystem('auto-dislike', autoDislikeFreeze, autoDislikeUnfreeze);
-            manager.registerSystem('reaction-queue', reactionQueueFreeze, reactionQueueUnfreeze);
 
             // Freeze from auto-dislike system
             manager.freeze('auto-dislike');
 
-            // Both systems should be frozen
+            // System should be frozen
             expect(autoDislikeFreeze).toHaveBeenCalledTimes(1);
-            expect(reactionQueueFreeze).toHaveBeenCalledTimes(1);
             expect(manager.isFrozen.value).toBe(true);
             expect(manager.getFreezeCount('auto-dislike')).toBe(1);
-            expect(manager.getFreezeCount('reaction-queue')).toBe(0);
         });
 
         it('unfreezes all systems only when all systems have no active freezes', () => {
             const manager = useTimerManager();
             const autoDislikeFreeze = vi.fn();
             const autoDislikeUnfreeze = vi.fn();
-            const reactionQueueFreeze = vi.fn();
-            const reactionQueueUnfreeze = vi.fn();
 
             manager.registerSystem('auto-dislike', autoDislikeFreeze, autoDislikeUnfreeze);
-            manager.registerSystem('reaction-queue', reactionQueueFreeze, reactionQueueUnfreeze);
 
-            // Freeze from both systems
+            // Freeze from auto-dislike (multiple times)
             manager.freeze('auto-dislike');
-            manager.freeze('reaction-queue');
+            manager.freeze('auto-dislike');
 
             expect(manager.isFrozen.value).toBe(true);
-            expect(manager.getFreezeCount('auto-dislike')).toBe(1);
-            expect(manager.getFreezeCount('reaction-queue')).toBe(1);
+            expect(manager.getFreezeCount('auto-dislike')).toBe(2);
 
-            // Unfreeze from auto-dislike (but reaction-queue is still frozen)
+            // Unfreeze once
             manager.unfreeze('auto-dislike');
 
-            // Should not unfreeze because reaction-queue is still frozen
+            // Should not unfreeze because count is still > 0
             expect(autoDislikeUnfreeze).not.toHaveBeenCalled();
-            expect(reactionQueueUnfreeze).not.toHaveBeenCalled();
             expect(manager.isFrozen.value).toBe(true);
-            expect(manager.getFreezeCount('auto-dislike')).toBe(0);
-            expect(manager.getFreezeCount('reaction-queue')).toBe(1);
+            expect(manager.getFreezeCount('auto-dislike')).toBe(1);
 
-            // Unfreeze from reaction-queue (now all systems are unfrozen)
-            manager.unfreeze('reaction-queue');
+            // Unfreeze again (now count is 0)
+            manager.unfreeze('auto-dislike');
 
-            // Now both systems should be unfrozen
+            // Now should be unfrozen
             expect(autoDislikeUnfreeze).toHaveBeenCalledTimes(1);
-            expect(reactionQueueUnfreeze).toHaveBeenCalledTimes(1);
             expect(manager.isFrozen.value).toBe(false);
             expect(manager.getFreezeCount('auto-dislike')).toBe(0);
-            expect(manager.getFreezeCount('reaction-queue')).toBe(0);
         });
 
         it('handles multiple freeze requests from the same system', () => {
@@ -150,27 +137,6 @@ describe('useTimerManager', () => {
         });
     });
 
-    describe('global functions', () => {
-        it('exposes global functions for toast components', () => {
-            const manager = useTimerManager();
-            const reactionQueueFreeze = vi.fn();
-            const reactionQueueUnfreeze = vi.fn();
-
-            manager.registerSystem('reaction-queue', reactionQueueFreeze, reactionQueueUnfreeze);
-
-            const win = window as any;
-            expect(win.__timerManagerFreeze).toBeDefined();
-            expect(win.__timerManagerUnfreeze).toBeDefined();
-            expect(win.__reactionQueuePauseAll).toBeDefined();
-            expect(win.__reactionQueueResumeAll).toBeDefined();
-
-            // Call global freeze function
-            win.__timerManagerFreeze();
-
-            expect(reactionQueueFreeze).toHaveBeenCalledTimes(1);
-            expect(manager.getFreezeCount('reaction-queue')).toBe(1);
-        });
-    });
 });
 
 

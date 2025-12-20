@@ -11,26 +11,16 @@ interface Props {
     isLoading?: boolean;
     backfill: BackfillState;
     visible?: boolean;
-    queuedReactionsCount?: number;
-    queuedAutoDislikeCount?: number;
 }
 
 withDefaults(defineProps<Props>(), {
     isLoading: false,
     visible: true,
-    queuedReactionsCount: 0,
-    queuedAutoDislikeCount: 0,
 });
 </script>
 
 <template>
     <div v-if="visible" class="my-2 flex flex-wrap items-center justify-center gap-3" data-test="pagination-info">
-        <!-- User Reactions Queue Pill (user-initiated: love, like, dislike, funny) -->
-        <Pill label="Reactions" :value="queuedReactionsCount || 'None'"
-            :variant="queuedReactionsCount > 0 ? 'warning' : 'neutral'" reversed data-test="queued-reactions-pill" />
-        <!-- Auto-Dislike Queue Pill (automatic from moderation rules and container blacklists) -->
-        <Pill label="Auto-Dislike" :value="queuedAutoDislikeCount || 'None'"
-            :variant="queuedAutoDislikeCount > 0 ? 'danger' : 'neutral'" reversed data-test="auto-dislike-queue-pill" />
         <!-- Count Pill -->
         <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
         <!-- Current Page Pill -->

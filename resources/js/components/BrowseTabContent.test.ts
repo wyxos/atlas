@@ -249,7 +249,7 @@ vi.mock('./BrowseStatusBar.vue', () => ({
     default: {
         name: 'BrowseStatusBar',
         template: '<div class="browse-status-bar-mock"></div>',
-        props: ['items', 'displayPage', 'nextCursor', 'isLoading', 'backfill', 'queuedReactionsCount', 'visible'],
+        props: ['items', 'displayPage', 'nextCursor', 'isLoading', 'backfill', 'visible'],
     },
 }));
 
@@ -446,18 +446,6 @@ vi.mock('@/composables/useBrowseService', () => ({
     }),
 }));
 
-vi.mock('@/composables/useReactionQueue', () => ({
-    useReactionQueue: () => ({
-        queuedReactions: ref([]),
-        queueReaction: vi.fn(),
-        cancelReaction: vi.fn(),
-        cancelBatch: vi.fn(),
-        cancelAll: vi.fn(),
-        pauseAll: vi.fn(),
-        resumeAll: vi.fn(),
-        isPaused: ref(false),
-    }),
-}));
 
 vi.mock('@/utils/reactions', () => ({
     createReactionCallback: vi.fn(() => vi.fn()),

@@ -3,7 +3,6 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
 import FileViewer from '../components/FileViewer.vue';
-import { useReactionQueue } from '../composables/useReactionQueue';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -135,10 +134,11 @@ describe('Browse - ALT + Click Reactions', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            const { queuedReactions } = useReactionQueue();
-            expect(queuedReactions.value.length).toBe(1);
-            expect(queuedReactions.value[0].fileId).toBe(1);
-            expect(queuedReactions.value[0].type).toBe('like');
+            // Verify API was called for reaction
+            expect(mockAxios.post).toHaveBeenCalledWith(
+                expect.stringContaining('/api/files/1/reaction'),
+                expect.objectContaining({ type: 'like' })
+            );
 
             const fileViewer = wrapper.findComponent(FileViewer);
             const fileViewerVm = fileViewer.vm as any;
@@ -186,10 +186,11 @@ describe('Browse - ALT + Click Reactions', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            const { queuedReactions } = useReactionQueue();
-            expect(queuedReactions.value.length).toBe(1);
-            expect(queuedReactions.value[0].fileId).toBe(2);
-            expect(queuedReactions.value[0].type).toBe('dislike');
+            // Verify API was called for reaction
+            expect(mockAxios.post).toHaveBeenCalledWith(
+                expect.stringContaining('/api/files/2/reaction'),
+                expect.objectContaining({ type: 'dislike' })
+            );
         }
     });
 
@@ -233,10 +234,11 @@ describe('Browse - ALT + Click Reactions', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            const { queuedReactions } = useReactionQueue();
-            expect(queuedReactions.value.length).toBe(1);
-            expect(queuedReactions.value[0].fileId).toBe(3);
-            expect(queuedReactions.value[0].type).toBe('love');
+            // Verify API call was made directly (no queueing)
+            expect(mockAxios.post).toHaveBeenCalledWith(
+                expect.stringContaining('/api/files/3/reaction'),
+                expect.objectContaining({ type: 'love' })
+            );
         }
     });
 
@@ -283,10 +285,11 @@ describe('Browse - ALT + Click Reactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        const { queuedReactions } = useReactionQueue();
-        expect(queuedReactions.value.length).toBe(1);
-        expect(queuedReactions.value[0].fileId).toBe(1);
-        expect(queuedReactions.value[0].type).toBe('like');
+        // Verify API was called for reaction
+        expect(mockAxios.post).toHaveBeenCalledWith(
+            expect.stringContaining('/api/files/1/reaction'),
+            expect.objectContaining({ type: 'like' })
+        );
     });
 
     it('triggers dislike reaction when ALT + Right Click on overlay image', async () => {
@@ -332,10 +335,11 @@ describe('Browse - ALT + Click Reactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        const { queuedReactions } = useReactionQueue();
-        expect(queuedReactions.value.length).toBe(1);
-        expect(queuedReactions.value[0].fileId).toBe(1);
-        expect(queuedReactions.value[0].type).toBe('dislike');
+        // Verify API call was made directly (no queueing)
+        expect(mockAxios.post).toHaveBeenCalledWith(
+            expect.stringContaining('/api/files/1/reaction'),
+            expect.objectContaining({ type: 'dislike' })
+        );
     });
 
     it('triggers love reaction when ALT + Middle Click on overlay image', async () => {
@@ -381,10 +385,11 @@ describe('Browse - ALT + Click Reactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        const { queuedReactions } = useReactionQueue();
-        expect(queuedReactions.value.length).toBe(1);
-        expect(queuedReactions.value[0].fileId).toBe(1);
-        expect(queuedReactions.value[0].type).toBe('love');
+        // Verify API call was made directly (no queueing)
+        expect(mockAxios.post).toHaveBeenCalledWith(
+            expect.stringContaining('/api/files/1/reaction'),
+            expect.objectContaining({ type: 'love' })
+        );
     });
 
     it('does not trigger reaction when clicking without ALT key', async () => {
@@ -428,9 +433,8 @@ describe('Browse - ALT + Click Reactions', () => {
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            // No reaction should be queued when ALT key is not pressed
-            const { queuedReactions } = useReactionQueue();
-            expect(queuedReactions.value.length).toBe(0);
+            // No reaction API call should be made when ALT key is not pressed
+            expect(mockAxios.post).not.toHaveBeenCalled();
         }
     });
 });

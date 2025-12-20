@@ -3,7 +3,6 @@ import { show, destroy } from '@/actions/App/Http/Controllers/FilesController';
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ArrowLeft, Download, FileText, Copy, ExternalLink, Trash2, Eye, Info } from 'lucide-vue-next';
-import { toast } from 'vue-sonner';
 import { Button } from '@/components/ui/button';
 import FileDetailsCard from '../components/FileDetailsCard.vue';
 import FileDetailsPanel from '../components/ui/FileDetailsPanel.vue';
@@ -84,7 +83,6 @@ async function deleteFile(): Promise<void> {
 
     try {
         await window.axios.delete(`/api/files/${file.value.id}`);
-        toast.success('File deleted successfully');
         router.push('/files');
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number; data?: { message?: string } } };

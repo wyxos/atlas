@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
-import { useReactionBatch } from '@/composables/useReactionBatch';
+import { batchShow as batchShowReactions } from '@/actions/App/Http/Controllers/FileReactionController';
 import type { ReactionType } from '@/types/reaction';
 
 interface Props {
@@ -30,9 +30,6 @@ const emit = defineEmits<{
     reaction: [type: ReactionType];
 }>();
 
-// Reaction batch queue
-const { queueReactionFetch } = useReactionBatch();
-
 // Reaction state
 const currentReaction = ref<string | null>(null);
 const isUpdating = ref(false);
@@ -43,7 +40,7 @@ const like = computed(() => currentReaction.value === 'like');
 const dislike = computed(() => currentReaction.value === 'dislike');
 const funny = computed(() => currentReaction.value === 'funny');
 
-// Fetch current reaction when fileId changes (batched)
+// Fetch current reaction when fileId changes
 async function fetchReaction(): Promise<void> {
     if (!props.fileId) {
         currentReaction.value = null;
@@ -51,8 +48,14 @@ async function fetchReaction(): Promise<void> {
     }
 
     try {
-        const response = await queueReactionFetch(props.fileId);
-        currentReaction.value = response.reaction?.type || null;
+        const response = await window.axios.post<{
+            reactions: Array<{ file_id: number; reaction: { type: string } | null }>;
+        }>(batchShowReactions.url(), {
+            file_ids: [props.fileId],
+        });
+        
+        const result = response.data.reactions.find(r => r.file_id === props.fileId);
+        currentReaction.value = result?.reaction?.type || null;
     } catch (error) {
         console.error('Failed to fetch reaction:', error);
         currentReaction.value = null;
