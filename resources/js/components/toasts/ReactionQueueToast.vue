@@ -61,30 +61,44 @@ const textColor = computed(() => {
 
 /**
  * Secondary text color classes - danger theme for dislike.
+ * Use white for better visibility on red background.
  */
 const secondaryTextColor = computed(() => {
     if (isDislike.value) {
-        return 'text-danger-200';
+        return 'text-white';
     }
     return 'text-twilight-indigo-300';
 });
 
 /**
+ * Icon color classes - danger theme for dislike.
+ * Use white for better visibility on red background.
+ */
+const iconColor = computed(() => {
+    if (isDislike.value) {
+        return 'text-white';
+    }
+    return reactionConfig.value.color;
+});
+
+/**
  * Progress bar background classes - danger theme for dislike.
+ * Use white with opacity for better visibility on red background.
  */
 const progressBarBg = computed(() => {
     if (isDislike.value) {
-        return 'bg-danger-500/20';
+        return 'bg-white/20';
     }
     return 'bg-twilight-indigo-500/20';
 });
 
 /**
  * Progress bar fill classes - danger theme for dislike.
+ * Use white for better visibility on red background.
  */
 const progressBarFill = computed(() => {
     if (isDislike.value) {
-        return 'bg-danger-400';
+        return 'bg-white';
     }
     return 'bg-smart-blue-400';
 });
@@ -101,10 +115,11 @@ const dismissButtonClasses = computed(() => {
 
 /**
  * Undo button classes - danger theme for dislike.
+ * Use white text for better visibility on red background.
  */
 const undoButtonClasses = computed(() => {
     if (isDislike.value) {
-        return 'flex items-center gap-1 rounded bg-danger-500/20 px-2 py-1 text-xs font-medium text-danger-200 transition-colors hover:bg-danger-500/30 hover:text-danger-100';
+        return 'flex items-center gap-1 rounded bg-white/20 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-white/30 hover:text-white';
     }
     return 'flex items-center gap-1 rounded bg-twilight-indigo-500/20 px-2 py-1 text-xs font-medium text-twilight-indigo-200 transition-colors hover:bg-twilight-indigo-500/30 hover:text-twilight-indigo-100';
 });
@@ -132,7 +147,7 @@ function handleDismiss(): void {
 <template>
     <div :class="toastClasses" @mouseenter="queue.freezeAll()" @mouseleave="queue.unfreezeAll()">
         <!-- File Preview Thumbnail -->
-        <div v-if="thumbnail" class="flex-shrink-0">
+        <div v-if="thumbnail" class="shrink-0">
             <img :src="thumbnail" :alt="`File ${fileId}`" class="size-16 rounded object-cover" />
         </div>
 
@@ -140,7 +155,7 @@ function handleDismiss(): void {
         <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0">
-                    <div :class="['flex-shrink-0', reactionConfig.color]">
+                    <div :class="['shrink-0', iconColor]">
                         <component :is="Icon" class="size-4" />
                     </div>
                     <p :class="['text-sm font-semibold truncate', textColor]">
@@ -178,6 +193,6 @@ function handleDismiss(): void {
 <style scoped>
 .reaction-queue-toast {
     min-width: 300px;
-    max-width: 400px;
+    max-width: 600px;
 }
 </style>
