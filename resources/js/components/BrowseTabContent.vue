@@ -783,23 +783,15 @@ onUnmounted(() => {
                             @mouseleave="handleMasonryItemMouseLeave"
                             @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
                             @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
-                            <template
-                                #default="{ imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
+                            <template #default="{ imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500"
                                     :data-key="item.key" :data-masonry-item-id="item.id"
                                     :class="containerBadges.getMasonryItemClasses.value(item)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
                                     @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item)">
-                                    <!-- Auto-disliked indicator overlay with smooth animation -->
-                                    <Transition name="ring-fade">
-                                        <div v-if="items.find(i => i.id === item.id)?.auto_disliked"
-                                            class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active"
-                                            style="will-change: transform, opacity;">
-                                        </div>
-                                    </Transition>
                                     <!-- Will auto-dislike indicator overlay (red ring for flagged items) -->
                                     <Transition name="ring-fade">
-                                        <div v-if="items.find(i => i.id === item.id)?.will_auto_dislike && !items.find(i => i.id === item.id)?.auto_disliked"
+                                        <div v-if="item.will_auto_dislike"
                                             class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active"
                                             style="will-change: transform, opacity;">
                                         </div>
@@ -1043,5 +1035,4 @@ onUnmounted(() => {
 .fade-leave-to {
     opacity: 0;
 }
-
 </style>
