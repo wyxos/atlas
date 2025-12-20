@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import 'vue-sonner/style.css';
 import DashboardLayout from './layouts/DashboardLayout.vue';
 import PublicLayout from './layouts/PublicLayout.vue';
-import { Toaster } from './components/ui/sonner';
 
 const route = useRoute();
 const layout = shallowRef(DashboardLayout);
@@ -45,7 +43,6 @@ function handleLogout() {
         <component :is="layout" :user-name="userName" :app-name="appName" @logout="handleLogout">
             <router-view />
         </component>
-        <Toaster />
     </div>
 </template>
 

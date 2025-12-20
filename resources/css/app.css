@@ -374,65 +374,65 @@
     }
 }
 
-/* Vue Toastification Custom Styling for Reaction Queue */
-.reaction-toast-container {
-    /* max-w-sm */
-    z-index: 50 !important;
-    gap: 0.5rem !important;
-    /* gap-2 */
-}
-
-.reaction-toast-container.bottom-right {
-    bottom: 1rem !important;
-    /* bottom-4 */
-    right: 1rem !important;
-    /* right-4 */
-}
-
-/* Remove Vue Toastification default styling and match app theme */
-.reaction-toast {
-    background: transparent !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    min-height: auto !important;
-}
-
-.reaction-toast .Vue-Toastification__toast-body {
+/* Remove gap from toast container - snap to screen edges */
+.Vue-Toastification__container {
     padding: 0 !important;
     margin: 0 !important;
 }
 
-/* Hide Vue Toastification default progress bar (we use our own) */
-.reaction-toast .Vue-Toastification__progress-bar {
-    display: none !important;
+.Vue-Toastification__container.bottom-right {
+    bottom: 0 !important;
+    right: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
-/* Hide Vue Toastification default icon */
-.reaction-toast .Vue-Toastification__icon {
-    display: none !important;
-}
-
-/* Hide Vue Toastification default close button (we use our own) */
-.reaction-toast .Vue-Toastification__close-button {
-    display: none !important;
-}
-
-/* Remove any default borders or outlines */
-.reaction-toast-container .Vue-Toastification__toast {
+/* Remove default blue background from vue-toastification globally */
+.Vue-Toastification__toast {
+    background: transparent !important;
     border: none !important;
-    outline: none !important;
     box-shadow: none !important;
-    background: transparent !important;
 }
 
-/* Ensure no blue edges or default styling */
-.reaction-toast-container .Vue-Toastification__toast--default {
+.Vue-Toastification__toast--default,
+.Vue-Toastification__toast--success,
+.Vue-Toastification__toast--error,
+.Vue-Toastification__toast--warning,
+.Vue-Toastification__toast--info {
     background: transparent !important;
     border: none !important;
 }
 
-.reaction-toast-container .Vue-Toastification__toast--default::before {
+.Vue-Toastification__toast--default::before,
+.Vue-Toastification__toast--success::before,
+.Vue-Toastification__toast--error::before,
+.Vue-Toastification__toast--warning::before,
+.Vue-Toastification__toast--info::before {
     display: none !important;
+}
+
+/* Remove blue background for custom toast class */
+.custom-toast {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Remove blue background for reaction queue toasts */
+.reaction-queue-toast-wrapper {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.reaction-queue-toast-wrapper .Vue-Toastification__toast-body {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.reaction-queue-toast-body {
+    padding: 0 !important;
+    margin: 0 !important;
 }
