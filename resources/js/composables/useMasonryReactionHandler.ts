@@ -1,6 +1,5 @@
 import { nextTick, type Ref } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
-import { useReactionQueue } from './useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import type { ReactionType } from '@/types/reaction';
 
@@ -15,10 +14,9 @@ export function useMasonryReactionHandler(
     onReaction: (fileId: number, type: ReactionType) => void,
     restoreToMasonry: (item: MasonryItem, index: number, masonryInstance?: any) => Promise<void>
 ) {
-    const { queueReaction } = useReactionQueue();
 
     /**
-     * Handle reaction with queue (wrapper for masonry removeItem callback).
+     * Handle reaction (wrapper for masonry removeItem callback).
      */
     async function handleMasonryReaction(
         fileId: number,
@@ -70,9 +68,8 @@ export function useMasonryReactionHandler(
             await nextTick();
         }
 
-        // Queue the AJAX request with restore callback, tab ID, index, and item
-        const previewUrl = item?.src;
-        queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, tabId, itemIndex, item);
+        // Execute reaction callback directly
+        await createReactionCallback()(fileId, type);
 
         // Emit to parent
         onReaction(fileId, type);

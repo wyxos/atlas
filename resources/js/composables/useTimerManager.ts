@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 
-type TimerSystemId = 'auto-dislike' | 'reaction-queue' | 'immediate-actions-toast';
+type TimerSystemId = 'auto-dislike';
 
 interface TimerSystem {
     id: TimerSystemId;
@@ -145,41 +145,9 @@ export function useTimerManager() {
     globalFreezeFn = freeze;
     globalUnfreezeFn = unfreeze;
 
-    // Register global functions for toast components (backward compatibility)
+    // Register global functions for backward compatibility
     // Only register once (singleton pattern)
     if (typeof window !== 'undefined' && !globalFunctionsRegistered) {
-        const win = window as Window & {
-            __timerManagerFreeze?: () => void;
-            __timerManagerUnfreeze?: () => void;
-            __reactionQueuePauseAll?: () => void;
-            __reactionQueueResumeAll?: () => void;
-        };
-        // Freeze all systems - works for both reaction-queue and immediate-actions-toast
-        // Since freezing any system freezes all systems, we can use reaction-queue as the default
-        // The timer manager will freeze ALL registered systems when any system freezes
-        win.__timerManagerFreeze = () => {
-            if (globalFreezeFn) {
-                // Freeze using reaction-queue - this will freeze ALL registered systems
-                globalFreezeFn('reaction-queue');
-            }
-        };
-        win.__timerManagerUnfreeze = () => {
-            if (globalUnfreezeFn) {
-                // Unfreeze using reaction-queue - this will unfreeze all systems when all freeze requests are cleared
-                globalUnfreezeFn('reaction-queue');
-            }
-        };
-        // Keep old names for backward compatibility during transition
-        win.__reactionQueuePauseAll = () => {
-            if (globalFreezeFn) {
-                globalFreezeFn('reaction-queue');
-            }
-        };
-        win.__reactionQueueResumeAll = () => {
-            if (globalUnfreezeFn) {
-                globalUnfreezeFn('reaction-queue');
-            }
-        };
         globalFunctionsRegistered = true;
     }
 

@@ -20,7 +20,6 @@ import {
 } from './ui/dialog';
 import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService, type GetPageResult } from '@/composables/useBrowseService';
-import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import { useContainerBadges } from '@/composables/useContainerBadges';
 import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
@@ -32,9 +31,7 @@ import { useResetDialog } from '@/composables/useResetDialog';
 import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
-import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useItemVirtualization } from '@/composables/useItemVirtualization';
-import { useImmediateActionsToast } from '@/composables/useImmediateActionsToast';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -103,41 +100,14 @@ const masonryContainer = ref<HTMLElement | null>(null);
 const tabContentContainer = ref<HTMLElement | null>(null);
 const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
-// Reaction queue
-const { queuedReactions, queueReaction } = useReactionQueue();
-
 // Item preview composable (needs to be initialized early)
 const itemPreview = useItemPreview(items, computed(() => props.tab));
 
 // Track if component is mounted to prevent accessing state after unmount
 const isMounted = ref(false);
 
-// Auto-dislike queue composable with expiration handler
-// This handles both moderation rules and container blacklists (both flag files for countdown)
-const autoDislikeQueue = useAutoDislikeQueue(handleAutoDislikeExpire);
-
 // Item virtualization composable - loads minimal items initially, then full data on-demand
 const itemVirtualization = useItemVirtualization(items);
-
-// Immediate actions toast composable - collects and displays immediately processed items
-const immediateActionsToast = useImmediateActionsToast((fileId: number, type: ReactionType) => {
-    // Handle reaction from modal - remove from auto-dislike queue if user reacts
-    if (autoDislikeQueue.isQueued(fileId)) {
-        autoDislikeQueue.removeFromQueue(fileId);
-        const item = itemsMap.value.get(fileId);
-        if (item) {
-            item.will_auto_dislike = false;
-        }
-    }
-    
-    // Queue the reaction (same as masonry reactions) - this triggers AJAX and toast
-    const item = itemsMap.value.get(fileId);
-    const previewUrl = item?.src;
-    queueReaction(fileId, type, createReactionCallback(), previewUrl);
-    
-    // Also call parent handler for side effects
-    props.onReaction(fileId, type);
-});
 
 // Browse service composable - fetch services if not provided via prop
 const { availableServices: localServices, fetchServices } = useBrowseService();
@@ -147,65 +117,6 @@ const availableServices = computed(() => {
     return props.availableServices.length > 0 ? props.availableServices : localServices.value;
 });
 
-// Handle auto-dislike queue expiration - perform auto-dislike in batch
-async function handleAutoDislikeExpire(expiredIds: number[]): Promise<void> {
-    // Guard: Don't proceed if component is unmounted
-    if (!isMounted.value) {
-        return;
-    }
-
-    if (expiredIds.length === 0) {
-        return;
-    }
-
-    // Batch perform auto-dislike (backend handles de-association from tabs)
-    try {
-        const response = await window.axios.post<{
-            message: string;
-            auto_disliked_count: number;
-            file_ids: number[];
-        }>(batchPerformAutoDislike.url(), {
-            file_ids: expiredIds,
-            tab_id: props.tab?.id,
-        });
-
-        // Guard: Check again after async operation
-        if (!isMounted.value) {
-            return;
-        }
-
-        const autoDislikedIds = response.data.file_ids;
-
-        // Remove from masonry - get items directly from items array (not itemsMap) to ensure correct references
-        // This matches the pattern used in container pill interactions for correct FLIP animations
-        const itemsToRemove: MasonryItem[] = items.value.filter((item) => autoDislikedIds.includes(item.id));
-
-        // Remove from masonry using removeMany for batch removal
-        // Masonry component manages items array through v-model, so no manual array manipulation needed
-        if (masonry.value?.removeMany && itemsToRemove.length > 0) {
-            await masonry.value.removeMany(itemsToRemove);
-        } else if (masonry.value?.remove) {
-            // Fallback to individual removal if removeMany is not available
-            for (const item of itemsToRemove) {
-                masonry.value.remove(item);
-            }
-        }
-
-        // Guard: Check again after masonry operations
-        if (!isMounted.value) {
-            return;
-        }
-
-        // Update tab (remove from itemsData)
-        // Note: Backend already de-associated from tabs, we just update local state
-        if (props.tab && autoDislikedIds.length > 0) {
-            const updatedItemsData = props.tab.itemsData.filter((item) => !autoDislikedIds.includes(item.id));
-            props.updateActiveTab(updatedItemsData);
-        }
-    } catch (error) {
-        console.error('Failed to batch perform auto-dislike:', error);
-    }
-}
 
 
 // Masonry restore composable
@@ -238,10 +149,9 @@ function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
     onBackfillStopOriginal(payload);
 }
 
-// Handle loading:stop to show toast when loading completes (regardless of backfill)
+// Handle loading:stop
 function onLoadingStop(): void {
-    // Show toast with collected immediate actions when loading completes
-    immediateActionsToast.showToast();
+    // Loading stopped
 }
 
 // Computed property to display page value
@@ -388,10 +298,6 @@ const layout = {
 async function getNextPage(page: number | string): Promise<GetPageResult> {
     const result = await getNextPageFromComposable(page);
 
-    // Collect immediate actions from the result
-    if (result.immediateActions && result.immediateActions.length > 0) {
-        immediateActionsToast.addActions(result.immediateActions);
-    }
 
     return result;
 }
@@ -503,15 +409,6 @@ const containerPillInteractions = useContainerPillInteractions(
     masonry,
     props.tab?.id,
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
-        // Remove from auto-dislike queue if user reacts (any reaction cancels auto-dislike)
-        // Use Map for O(1) lookup instead of O(n) findIndex
-        if (autoDislikeQueue.isQueued(fileId)) {
-            autoDislikeQueue.removeFromQueue(fileId);
-            const item = itemsMap.value.get(fileId);
-            if (item) {
-                item.will_auto_dislike = false;
-            }
-        }
         props.onReaction(fileId, type);
     },
     restoreManyToMasonry
@@ -527,15 +424,6 @@ const { handleMasonryReaction } = useMasonryReactionHandler(
     masonry,
     computed(() => props.tab),
     (fileId: number, type: ReactionType) => {
-        // Remove from auto-dislike queue if user reacts (any reaction cancels auto-dislike)
-        // Use Map for O(1) lookup instead of O(n) findIndex
-        if (autoDislikeQueue.isQueued(fileId)) {
-            autoDislikeQueue.removeFromQueue(fileId);
-            const item = itemsMap.value.get(fileId);
-            if (item) {
-                item.will_auto_dislike = false;
-            }
-        }
         props.onReaction(fileId, type);
     },
     restoreToMasonry
@@ -626,9 +514,6 @@ function removeItemFromMasonry(item: MasonryItem): void {
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
     hoveredItemIndex.value = index;
     hoveredItemId.value = itemId;
-    if (autoDislikeQueue.isQueued(itemId)) {
-        autoDislikeQueue.freezeItem(itemId);
-    }
 }
 
 function handleMasonryItemMouseLeave(): void {
@@ -636,9 +521,6 @@ function handleMasonryItemMouseLeave(): void {
     hoveredItemIndex.value = null;
     hoveredItemId.value = null;
     containerBadges.setHoveredContainerId(null);
-    if (itemId && autoDislikeQueue.isQueued(itemId)) {
-        autoDislikeQueue.unfreezeItem(itemId);
-    }
 }
 
 async function handleItemInView(payload: { item: { id?: number }; type: 'image' | 'video' }, item: MasonryItem): Promise<void> {
@@ -648,16 +530,6 @@ async function handleItemInView(payload: { item: { id?: number }; type: 'image' 
         // Handle preview increment when item is fully in view
         const result = await itemPreview.handleItemPreload(itemId);
 
-        // If will_auto_dislike was newly set, add to queue
-        if (result?.will_auto_dislike) {
-            autoDislikeQueue.addToQueue(itemId, true); // Start active since item is in view
-        }
-
-        // Activate auto-dislike countdown when item is in view
-        // This handles both moderation rules and container blacklists
-        if (autoDislikeQueue.isQueued(itemId)) {
-            autoDislikeQueue.activateItem(itemId);
-        }
     }
 }
 
@@ -743,13 +615,6 @@ function handlePromptDialogUpdate(val: boolean): void {
 }
 
 // Computed property for progress bar style
-function getProgressBarStyle(itemId: number): { transform: string; transformOrigin: string; width: string } {
-    return {
-        transform: `scaleX(${autoDislikeQueue.getProgress(itemId)})`,
-        transformOrigin: 'left',
-        width: '100%',
-    };
-}
 
 
 // Watch masonry loading state and emit to parent
@@ -807,40 +672,6 @@ watch(
 // Track loaded item IDs to handle timing between preload:success and watch
 const loadedItemIds = ref<Set<number>>(new Set());
 
-// Computed to track queue changes for reactivity (forces re-render when queue updates)
-// Accessing queuedItems ensures Vue tracks Map mutations
-const queueUpdateTrigger = computed(() => {
-    // Access queuedItems to ensure Vue tracks queue changes
-    const items = autoDislikeQueue.queuedItems.value;
-    // Return a value that changes when queue updates
-    return items.length > 0 ? items.map(i => `${i.id}-${i.remaining}`).join(',') : '';
-});
-
-// Watch for will_auto_dislike flag and add to queue
-watch(
-    () => items.value.map((item) => ({ id: item.id, will_auto_dislike: item.will_auto_dislike })),
-    (newItems, oldItems) => {
-        const oldMap = new Map(oldItems?.map((i) => [i.id, i.will_auto_dislike]) ?? []);
-        newItems.forEach((item) => {
-            // Add to queue if will_auto_dislike is true and wasn't before
-            if (item.will_auto_dislike && !oldMap.get(item.id)) {
-                // Start countdown immediately for items flagged from backend
-                // These items matched rules/containers with ui_countdown, so countdown should start right away
-                autoDislikeQueue.addToQueue(item.id, true);
-
-                // If this item is currently being hovered, freeze it
-                if (hoveredItemId.value === item.id) {
-                    autoDislikeQueue.freezeItem(item.id);
-                }
-            }
-            // Remove from queue if will_auto_dislike is false and was true before
-            else if (!item.will_auto_dislike && oldMap.get(item.id)) {
-                autoDislikeQueue.removeFromQueue(item.id);
-            }
-        });
-    },
-    { deep: true, immediate: true }
-);
 
 
 // Cleanup on unmount
@@ -848,8 +679,6 @@ onUnmounted(() => {
     // Mark component as unmounted to prevent callbacks from accessing state
     isMounted.value = false;
 
-    // Clear auto-dislike queue to stop any pending countdowns
-    autoDislikeQueue.clearQueue();
 
     // Clear loading state when component is destroyed
     emit('update:loading', false);
@@ -975,45 +804,6 @@ onUnmounted(() => {
                                             style="will-change: transform, opacity;">
                                         </div>
                                     </Transition>
-                                    <!-- Per-item auto-dislike countdown pill (bottom center): icon | progress with timer overlay -->
-                                    <Transition name="countdown-fade">
-                                        <div v-if="autoDislikeQueue.isQueued(item.id)"
-                                            class="absolute inset-x-0 bottom-2 flex justify-center z-20 pointer-events-none"
-                                            style="will-change: opacity;">
-                                            <span
-                                                class="inline-flex items-stretch rounded overflow-hidden border border-danger-500 shadow-lg">
-                                                <!-- Dislike icon -->
-                                                <span
-                                                    class="px-2 py-1 text-xs font-medium bg-danger-600 text-white flex items-center justify-center">
-                                                    <ThumbsDown :size="12" />
-                                                </span>
-                                                <!-- Progress bar with timer overlay (shows paused state if not active) -->
-                                                <span
-                                                    class="bg-prussian-blue-700 border-l border-twilight-indigo-500 flex items-center justify-center relative overflow-hidden min-w-12">
-                                                    <!-- Progress fill (only shows when active) - use transform for width animation -->
-                                                    <!-- Access queueUpdateTrigger to ensure reactivity to queue changes -->
-                                                    <span v-if="autoDislikeQueue.isActive(item.id)"
-                                                        class="absolute left-0 top-0 bottom-0 bg-danger-500 transition-transform duration-100"
-                                                        :style="getProgressBarStyle(item.id)"
-                                                        :key="`progress-${item.id}-${queueUpdateTrigger}`">
-                                                    </span>
-                                                    <!-- Timer text overlay or paused indicator -->
-                                                    <span
-                                                        class="relative z-10 px-2 py-1 text-xs font-semibold text-white tabular-nums drop-shadow-sm">
-                                                        <template v-if="autoDislikeQueue.isActive(item.id)">
-                                                            {{ Math.floor(autoDislikeQueue.getRemaining(item.id) / 1000)
-                                                            }}:{{
-                                                                String(Math.floor((autoDislikeQueue.getRemaining(item.id) %
-                                                                    1000) / 10)).padStart(2, '0') }}
-                                                        </template>
-                                                        <template v-else>
-                                                            <i class="fas fa-pause text-[10px]"></i>
-                                                        </template>
-                                                    </span>
-                                                </span>
-                                            </span>
-                                        </div>
-                                    </Transition>
                                     <!-- Placeholder background - icon by default (before preloading starts) -->
                                     <!-- Note: Vibe's MasonryItem provides this, but we override for dark theme -->
                                     <div v-if="!imageLoaded && !imageError" :class="[
@@ -1114,8 +904,6 @@ onUnmounted(() => {
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-            :queued-reactions-count="queuedReactions.length"
-            :queued-auto-dislike-count="autoDislikeQueue.queueSize.value"
             :visible="tab !== null && tab !== undefined && hasServiceSelected" />
 
         <!-- Reset to First Page Warning Dialog -->
@@ -1256,14 +1044,4 @@ onUnmounted(() => {
     opacity: 0;
 }
 
-.countdown-fade-enter-active,
-.countdown-fade-leave-active {
-    transition: opacity 0.3s ease;
-    will-change: opacity;
-}
-
-.countdown-fade-enter-from,
-.countdown-fade-leave-to {
-    opacity: 0;
-}
 </style>

@@ -5,7 +5,6 @@ import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
 import type { MasonryItem } from '@/composables/useBrowseTabs';
 import { useReactionHandler } from '@/composables/useReactionHandler';
-import { useReactionQueue } from '@/composables/useReactionQueue';
 import { createReactionCallback } from '@/utils/reactions';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { ReactionType } from '@/types/reaction';
@@ -318,12 +317,8 @@ async function handleReaction(type: ReactionType): Promise<void> {
         }
     } : undefined;
 
-    // Queue the reaction (this will also emit to parent)
-    // Note: handleReactionBase doesn't have access to restore callback since it removes from masonry directly
-    // We need to queue the reaction manually with restore callback
-    const { queueReaction } = useReactionQueue();
-    const previewUrl = currentItem.src;
-    queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, props.tabId, itemIndex, currentItem);
+    // Call reaction callback directly
+    await createReactionCallback()(fileId, type);
 
     // Emit to parent
     if (props.onReaction) {

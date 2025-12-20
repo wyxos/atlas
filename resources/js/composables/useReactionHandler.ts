@@ -1,5 +1,4 @@
 import type { MasonryItem } from './useBrowseTabs';
-import { useReactionQueue } from './useReactionQueue';
 import { createReactionCallback } from '../utils/reactions';
 import type { ReactionType } from '@/types/reaction';
 
@@ -10,7 +9,6 @@ export interface ReactionHandlerOptions {
 }
 
 export function useReactionHandler(options: ReactionHandlerOptions) {
-    const { queueReaction } = useReactionQueue();
 
     async function handleReaction(
         fileId: number,
@@ -44,9 +42,8 @@ export function useReactionHandler(options: ReactionHandlerOptions) {
             options.removeFromMasonry(item);
         }
 
-        // Queue the AJAX request with restore callback (no tabId/context for this handler)
-        const previewUrl = item?.src;
-        queueReaction(fileId, type, createReactionCallback(), previewUrl, restoreItem, undefined, itemIndex, item);
+        // Execute reaction callback directly
+        await createReactionCallback()(fileId, type);
 
         // Emit to parent if callback provided
         if (options.onReaction) {

@@ -123,13 +123,13 @@ Object.defineProperty(window, 'axios', {
     writable: true,
 });
 
-describe('Browse - Immediate Actions Toast Integration', () => {
+describe('Browse - Immediate Actions Integration', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         setupBrowseTestMocks(mocks);
     });
 
-    it('collects and displays immediate actions toast when files are auto-disliked', async () => {
+    it('collects immediate actions when files are auto-disliked', async () => {
         const tabConfig = createMockTabConfig(1, {
             query_params: { service: 'civit-ai-images', page: 1 },
         });
@@ -169,7 +169,7 @@ describe('Browse - Immediate Actions Toast Integration', () => {
         await flushPromises();
         await nextTick();
 
-        // Trigger loading:stop to show toast (this is what shows the toast now)
+        // Trigger loading:stop
         if (tabContent && typeof tabContent.onLoadingStop === 'function') {
             await tabContent.onLoadingStop({ fetched: 10 });
         }
@@ -178,8 +178,6 @@ describe('Browse - Immediate Actions Toast Integration', () => {
         await nextTick();
 
         // Verify that immediate actions were collected
-        // (We can't easily verify the toast UI without more complex setup,
-        // but we can verify the composable was called)
         expect(mockAxios.get).toHaveBeenCalled();
     });
 });
