@@ -11,6 +11,12 @@ import {
 import FileReactions from '../FileReactions.vue';
 import type { ReactionType } from '@/types/reaction';
 
+// Disable automatic attribute inheritance since we have multiple root nodes
+// and don't need the toast-id attribute that Vue Toastification passes
+defineOptions({
+    inheritAttrs: false,
+});
+
 interface ImmediateActionItem {
     id: number;
     action_type: string;
@@ -41,7 +47,10 @@ watch(isReviewModalOpen, (isOpen) => {
 
 // Handle hover events to pause/resume countdown (uses centralized timer manager)
 function handleMouseEnter(): void {
-    const win = window as any;
+    const win = window as Window & {
+        __timerManagerFreeze?: () => void;
+        __reactionQueuePauseAll?: () => void;
+    };
     // Use new timer manager functions (backward compatible with old names)
     if (win.__timerManagerFreeze) {
         win.__timerManagerFreeze();
@@ -51,7 +60,10 @@ function handleMouseEnter(): void {
 }
 
 function handleMouseLeave(): void {
-    const win = window as any;
+    const win = window as Window & {
+        __timerManagerUnfreeze?: () => void;
+        __reactionQueueResumeAll?: () => void;
+    };
     // Use new timer manager functions (backward compatible with old names)
     if (win.__timerManagerUnfreeze) {
         win.__timerManagerUnfreeze();
@@ -120,8 +132,11 @@ function handleDismiss(): void {
 }
 
 function handleReview(): void {
-    // Freeze timer when opening modal
-    const win = window as any;
+    // Freeze timer when opening modal - this freezes ALL timer systems (reaction-queue, immediate-actions-toast, etc.)
+    const win = window as Window & {
+        __timerManagerFreeze?: () => void;
+        __reactionQueuePauseAll?: () => void;
+    };
     if (win.__timerManagerFreeze) {
         win.__timerManagerFreeze();
     } else if (win.__reactionQueuePauseAll) {
@@ -132,8 +147,11 @@ function handleReview(): void {
 
 function handleModalClose(isOpen: boolean): void {
     if (!isOpen) {
-        // Unfreeze timer when modal closes
-        const win = window as any;
+        // Unfreeze timer when modal closes - this unfreezes ALL timer systems
+        const win = window as Window & {
+            __timerManagerUnfreeze?: () => void;
+            __reactionQueueResumeAll?: () => void;
+        };
         if (win.__timerManagerUnfreeze) {
             win.__timerManagerUnfreeze();
         } else if (win.__reactionQueueResumeAll) {

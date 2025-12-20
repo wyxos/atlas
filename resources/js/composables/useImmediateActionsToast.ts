@@ -1,4 +1,4 @@
-import { ref, h, onUnmounted } from 'vue';
+import { ref, h, onUnmounted, getCurrentInstance } from 'vue';
 import { useToast } from 'vue-toastification';
 import { useTimerManager } from './useTimerManager';
 import ImmediateActionToast from '../components/toasts/ImmediateActionToast.vue';
@@ -55,21 +55,7 @@ export function useImmediateActionsToast(onReaction?: (fileId: number, type: Rea
             return;
         }
 
-        // Prevent duplicate toasts - if already showing, just update the existing one
-        if (isShowingToast.value && currentToastId.value !== null) {
-            // Update existing toast with latest actions
-            toast.update(currentToastId.value, {
-                content: h(ImmediateActionToast, {
-                    items: [...pendingActions.value],
-                    countdown: countdown.value / 1000,
-                    onDismiss: handleDismiss,
-                    onReaction,
-                }),
-            });
-            return;
-        }
-
-        // Dismiss existing toast if any
+        // Dismiss existing toast if any (always recreate to avoid update issues)
         if (currentToastId.value !== null) {
             toast.dismiss(currentToastId.value);
             currentToastId.value = null;
@@ -112,9 +98,10 @@ export function useImmediateActionsToast(onReaction?: (fileId: number, type: Rea
             if (!isFrozen.value) {
                 countdown.value = Math.max(0, countdown.value - TOAST_UPDATE_INTERVAL_MS);
 
-                // Update toast with new countdown
+                // Update toast with new countdown (same pattern as useReactionQueue)
                 if (currentToastId.value !== null && pendingActions.value.length > 0) {
-                    toast.update(currentToastId.value, {
+                    const queued = currentToastId.value;
+                    toast.update(queued, {
                         content: h(ImmediateActionToast, {
                             items: [...pendingActions.value],
                             countdown: countdown.value / 1000, // Convert to seconds
@@ -161,11 +148,14 @@ export function useImmediateActionsToast(onReaction?: (fileId: number, type: Rea
         handleDismiss();
     }
 
-    // Cleanup on unmount
-    onUnmounted(() => {
-        handleDismiss();
-        timerManager.unregisterSystem(systemId);
-    });
+    // Cleanup on unmount (only if called within a component context)
+    const instance = getCurrentInstance();
+    if (instance) {
+        onUnmounted(() => {
+            handleDismiss();
+            timerManager.unregisterSystem(systemId);
+        });
+    }
 
     /**
      * Check if there are pending actions
