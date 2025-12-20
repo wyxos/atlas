@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue';
+import { ref, watch } from 'vue';
 import { calculateBestFitSize, getAvailableWidth } from './useFileViewerUtils';
 
 const BORDER_WIDTH = 4;
@@ -67,6 +67,7 @@ export function useFileViewerImageSize(
         recalculateImageSize,
     };
 }
+
 
 
 

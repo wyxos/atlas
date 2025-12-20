@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { X, Loader2, AlertTriangle } from 'lucide-vue-next';
+import { Loader2, AlertTriangle } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -12,7 +12,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useContainerBlacklists } from '@/composables/useContainerBlacklists';
-import type { ContainerBlacklist, ContainerBlacklistActionType } from '@/types/container-blacklist';
+import type { ContainerBlacklistActionType } from '@/types/container-blacklist';
 
 interface Props {
     container: {

@@ -1,4 +1,4 @@
-import { reactive, type Ref } from 'vue';
+import { reactive } from 'vue';
 import type { Listing } from '@wyxos/listing';
 
 type DeleteErrorHandler = (error: unknown, statusCode?: number) => {

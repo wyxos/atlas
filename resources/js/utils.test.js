@@ -8,8 +8,10 @@ describe('Utility Functions', () => {
         });
 
         it('handles conditional classes', () => {
-            expect(cn('foo', false && 'bar', 'baz')).toBe('foo baz');
-            expect(cn('foo', true && 'bar')).toBe('foo bar');
+            const condition1 = false;
+            const condition2 = true;
+            expect(cn('foo', condition1 && 'bar', 'baz')).toBe('foo baz');
+            expect(cn('foo', condition2 && 'bar')).toBe('foo bar');
         });
 
         it('merges Tailwind classes correctly', () => {

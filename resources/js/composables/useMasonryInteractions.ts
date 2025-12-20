@@ -64,7 +64,7 @@ export function useMasonryInteractions(
     }
 
     // Handle middle click mousedown on masonry item (prevent default to avoid browser scroll)
-    function handleMasonryItemMouseDown(e: MouseEvent, item: MasonryItem): void {
+    function handleMasonryItemMouseDown(e: MouseEvent): void {
         // Middle click without ALT - prevent default to avoid browser scroll
         // Actual opening will be handled in auxclick
         if (!e.altKey && e.button === 1) {

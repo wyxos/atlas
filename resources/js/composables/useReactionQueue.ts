@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted, h, getCurrentInstance, nextTick, type Component } from 'vue';
+import { ref, computed, onUnmounted, h, getCurrentInstance, nextTick } from 'vue';
 import { useToast } from 'vue-toastification';
 import SingleReactionToast from '../components/toasts/SingleReactionToast.vue';
 import BatchReactionToast from '../components/toasts/BatchReactionToast.vue';
@@ -466,9 +466,6 @@ export function useReactionQueue() {
             if (queued.pausedAt === null || queued.pausedRemaining === null) {
                 return;
             }
-
-            // Calculate how long we were paused
-            const pauseDuration = now - queued.pausedAt;
 
             // Adjust startTime to account for the pause
             queued.startTime = now - (QUEUE_DELAY_MS - queued.pausedRemaining);

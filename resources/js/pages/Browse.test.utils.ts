@@ -273,7 +273,7 @@ export function createMockBrowseResponse(
     nextPageValue: number | string | null = null
 ) {
     const pageNum = typeof page === 'number' ? page : 1;
-    const items = Array.from({ length: 40 }, (_, i) => {
+                const items = Array.from({ length: 40 }, () => {
         const itemId = typeof page === 'number' ? i + 1 : parseInt(`item-${page}-${i}`) || i + 1;
         return {
             id: itemId,

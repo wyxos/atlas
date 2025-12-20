@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, watch, computed } from 'vue';
+import { ref, nextTick, onUnmounted, watch } from 'vue';
 import { X, Loader2, Menu } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
@@ -19,9 +19,9 @@ interface Props {
     onLoadMore?: () => Promise<void>;
     onReaction?: (fileId: number, type: ReactionType) => void;
     removeFromMasonry?: (item: MasonryItem) => void;
-    restoreToMasonry?: (item: MasonryItem, index: number, masonryInstance?: any) => void | Promise<void>;
+    restoreToMasonry?: (item: MasonryItem, index: number, masonryInstance?: InstanceType<typeof import('@wyxos/vibe').Masonry>) => void | Promise<void>;
     tabId?: number;
-    masonryInstance?: any; // Masonry component instance for restore method
+    masonryInstance?: InstanceType<typeof import('@wyxos/vibe').Masonry>; // Masonry component instance for restore method
 }
 
 const props = defineProps<Props>();
@@ -60,7 +60,7 @@ const imageTranslateX = ref(0); // Translate X for slide animation
 const navigationDirection = ref<'left' | 'right' | null>(null); // Track navigation direction
 const currentNavigationTarget = ref<number | null>(null); // Track current navigation target to cancel stale preloads
 const isSheetOpen = ref(false); // Track if the sheet is open
-const fileData = ref<any>(null); // Store file data from API
+const fileData = ref<import('@/types/file').File | null>(null); // Store file data from API
 const isLoadingFileData = ref(false); // Track if file data is loading
 
 // Watch props.items and sync to reactive items (only when props change externally)
@@ -252,7 +252,7 @@ function closeOverlay(): void {
 }
 
 // Reaction handler - we'll handle masonry removal separately to ensure correct item reference
-const { handleReaction: handleReactionBase } = useReactionHandler({
+useReactionHandler({
     items,
     onReaction: props.onReaction,
     // Don't pass removeFromMasonry here - we'll call it directly with the correct item reference
@@ -1003,7 +1003,7 @@ function handleMouseButton(e: MouseEvent): void {
 }
 
 // Handle popstate event to prevent browser navigation when we're handling mouse navigation
-function handlePopState(e: PopStateEvent): void {
+function handlePopState(): void {
     // If we're handling mouse navigation or overlay is open, prevent browser navigation
     if (isHandlingMouseNavigation || (overlayRect.value && overlayFillComplete.value && !overlayIsClosing.value)) {
         // Push current state back to prevent navigation

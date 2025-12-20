@@ -34,7 +34,6 @@ export function useTimerManager() {
      */
     function registerSystem(systemId: TimerSystemId, freeze: () => void, unfreeze: () => void): void {
         const wasAlreadyRegistered = registeredSystems.value.has(systemId);
-        const previousFreezeCount = freezeRequestCounts.value.get(systemId) || 0;
 
         registeredSystems.value.set(systemId, {
             id: systemId,

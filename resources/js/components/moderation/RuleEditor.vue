@@ -69,7 +69,7 @@ function updateOp(newOp: ModerationRuleOp): void {
 
 // Terms management
 // Terms can be strings or objects with {term: string, allow_digit_prefix: boolean}
-function normalizeTerm(term: any): { term: string; allow_digit_prefix: boolean } {
+function normalizeTerm(term: string | { term?: string; allow_digit_prefix?: boolean } | null): { term: string; allow_digit_prefix: boolean } {
     if (typeof term === 'string') {
         return { term, allow_digit_prefix: false };
     }
@@ -82,11 +82,11 @@ function normalizeTerm(term: any): { term: string; allow_digit_prefix: boolean }
     return { term: '', allow_digit_prefix: false };
 }
 
-function getTermValue(term: any): string {
+function getTermValue(term: string | { term?: string; allow_digit_prefix?: boolean } | null): string {
     return normalizeTerm(term).term;
 }
 
-function getTermAllowDigitPrefix(term: any): boolean {
+function getTermAllowDigitPrefix(term: string | { term?: string; allow_digit_prefix?: boolean } | null): boolean {
     return normalizeTerm(term).allow_digit_prefix;
 }
 

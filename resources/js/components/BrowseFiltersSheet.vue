@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue';
-import { nextTick } from 'vue';
+import { reactive, watch, computed } from 'vue';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { SlidersHorizontal, Check } from 'lucide-vue-next';
+import { SlidersHorizontal } from 'lucide-vue-next';
 import type { BrowseTabData } from '@/composables/useBrowseTabs';
 
 interface Props {

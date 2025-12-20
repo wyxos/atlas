@@ -25,7 +25,7 @@ beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => { });
 
     // Reset default mock implementation
-    mockAxios.get.mockImplementation((url: string) => {
+    mockAxios.get.mockImplementation(() => {
         return Promise.resolve({ data: [] });
     });
 });

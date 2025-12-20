@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
 import { useReactionBatch } from '@/composables/useReactionBatch';
 import type { ReactionType } from '@/types/reaction';
@@ -92,20 +92,11 @@ function handleFunnyClick(): void {
 
 // Computed properties for variant checks
 const isSmall = computed(() => props.variant === 'small');
-const isDefault = computed(() => props.variant === 'default');
 
 // Computed properties for styling classes
 const containerClasses = computed(() => [
     'flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-lg',
     isSmall.value ? 'gap-2 px-2 py-1' : 'gap-4 px-4 py-2'
-]);
-
-const buttonClasses = computed(() => (baseClasses: string, activeClasses: string, hoverClasses: string) => [
-    'rounded transition-colors',
-    isSmall.value ? 'p-1' : 'p-2',
-    baseClasses,
-    activeClasses,
-    hoverClasses
 ]);
 
 const separatorHeight = computed(() => isSmall.value ? 'h-4' : 'h-6');
