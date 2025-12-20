@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { queueReaction, cancelQueuedReaction } from './reactionQueue';
+import { queueReaction, cancelQueuedReaction, queueBatchReaction, cancelBatchQueuedReaction } from './reactionQueue';
 import { useQueue } from '@/composables/useQueue';
 import type { ReactionType } from '@/types/reaction';
 
@@ -195,6 +195,198 @@ describe('reactionQueue', () => {
 
         it('handles canceling non-existent reaction gracefully', async () => {
             await expect(cancelQueuedReaction(999, 'like')).resolves.not.toThrow();
+        });
+    });
+
+    describe('queueBatchReaction', () => {
+        it('does nothing if fileIds array is empty', () => {
+            queueBatchReaction([], 'like', []);
+
+            expect(mockToast).not.toHaveBeenCalled();
+            expect(queue.getAll().length).toBe(0);
+        });
+
+        it('adds batch reaction to queue with correct id pattern', () => {
+            const fileIds = [123, 456, 789];
+            queueBatchReaction(fileIds, 'like', []);
+
+            const items = queue.getAll();
+            expect(items.length).toBe(1);
+            expect(items[0].id).toMatch(/^batch-like-123-456-789-\d+$/);
+        });
+
+        it('shows toast immediately with BatchReactionQueueToast component', () => {
+            const fileIds = [123, 456];
+            const previews = [
+                { fileId: 123, thumbnail: 'thumb1.jpg' },
+                { fileId: 456, thumbnail: 'thumb2.jpg' },
+            ];
+            queueBatchReaction(fileIds, 'like', previews);
+
+            expect(mockToast).toHaveBeenCalledTimes(1);
+            const toastCall = mockToast.mock.calls[0];
+            expect(toastCall[0].component.name || toastCall[0].component.__name).toBe('BatchReactionQueueToast');
+            expect(toastCall[0].props).toMatchObject({
+                reactionType: 'like',
+                previews,
+                totalCount: 2,
+            });
+        });
+
+        it('passes correct props to batch toast component', () => {
+            const fileIds = [1, 2, 3, 4, 5, 6];
+            const previews = fileIds.map((id) => ({ fileId: id, thumbnail: `thumb${id}.jpg` }));
+            queueBatchReaction(fileIds, 'dislike', previews);
+
+            const toastCall = mockToast.mock.calls[0];
+            expect(toastCall[0].props.totalCount).toBe(6);
+            // Component receives all previews, but only shows first 5
+            expect(toastCall[0].props.previews).toHaveLength(6);
+            expect(toastCall[0].props.reactionType).toBe('dislike');
+        });
+
+        it('executes all reaction callbacks when countdown expires', async () => {
+            const fileIds = [123, 456, 789];
+            queueBatchReaction(fileIds, 'like', []);
+
+            // Advance time past duration (5 seconds)
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(mockReactionCallback).toHaveBeenCalledTimes(3);
+            expect(mockReactionCallback).toHaveBeenCalledWith(123, 'like');
+            expect(mockReactionCallback).toHaveBeenCalledWith(456, 'like');
+            expect(mockReactionCallback).toHaveBeenCalledWith(789, 'like');
+        });
+
+        it('dismisses toast after successful batch execution', async () => {
+            const fileIds = [123, 456];
+            queueBatchReaction(fileIds, 'like', []);
+
+            // Get queueId before advancing time
+            const items = queue.getAll();
+            const queueId = items[0]?.id;
+            expect(queueId).toBeDefined();
+
+            // Advance time past duration
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(mockToast.dismiss).toHaveBeenCalledWith(queueId);
+        });
+
+        it('shows error toast on batch execution failure', async () => {
+            const error = new Error('API Error');
+            mockReactionCallback.mockRejectedValueOnce(error);
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            const fileIds = [123, 456];
+            queueBatchReaction(fileIds, 'like', []);
+
+            // Get queueId before advancing time
+            const items = queue.getAll();
+            const queueId = items[0]?.id;
+            expect(queueId).toBeDefined();
+
+            // Advance time past duration
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(mockToast.error).toHaveBeenCalledWith(
+                'Failed to save batch reaction',
+                expect.objectContaining({
+                    id: `${queueId}-error`,
+                })
+            );
+            expect(mockToast.dismiss).toHaveBeenCalledWith(queueId);
+        });
+
+        it('stores metadata correctly', () => {
+            const fileIds = [123, 456, 789];
+            const previews = [
+                { fileId: 123, thumbnail: 'thumb1.jpg' },
+                { fileId: 456, thumbnail: 'thumb2.jpg' },
+                { fileId: 789 },
+            ];
+            const restoreCallback = vi.fn();
+            queueBatchReaction(fileIds, 'dislike', previews, restoreCallback);
+
+            const items = queue.getAll();
+            expect(items[0]?.metadata).toEqual({
+                fileIds,
+                reactionType: 'dislike',
+                previews,
+                restoreCallback,
+            });
+        });
+
+        it('handles different reaction types', () => {
+            const types: ReactionType[] = ['like', 'dislike', 'love', 'funny'];
+            const fileIds = [123, 456];
+
+            types.forEach((type) => {
+                queueBatchReaction(fileIds, type, []);
+                const items = queue.getAll();
+                expect(items.some((item) => item.id.includes(`batch-${type}`))).toBe(true);
+            });
+        });
+    });
+
+    describe('cancelBatchQueuedReaction', () => {
+        it('removes batch reaction from queue', async () => {
+            const fileIds = [123, 456, 789];
+            queueBatchReaction(fileIds, 'like', []);
+
+            const items = queue.getAll();
+            const queueId = items[0]?.id;
+            expect(queue.has(queueId)).toBe(true);
+
+            await cancelBatchQueuedReaction(queueId);
+
+            expect(queue.has(queueId)).toBe(false);
+        });
+
+        it('dismisses toast when canceling', async () => {
+            const fileIds = [123, 456];
+            queueBatchReaction(fileIds, 'like', []);
+
+            const items = queue.getAll();
+            const queueId = items[0]?.id;
+
+            await cancelBatchQueuedReaction(queueId);
+
+            expect(mockToast.dismiss).toHaveBeenCalledWith(queueId);
+        });
+
+        it('calls restore callback when canceling', async () => {
+            const restoreCallback = vi.fn().mockResolvedValue(undefined);
+            const fileIds = [123, 456];
+            queueBatchReaction(fileIds, 'like', [], restoreCallback);
+
+            const items = queue.getAll();
+            const queueId = items[0]?.id;
+
+            await cancelBatchQueuedReaction(queueId);
+
+            expect(restoreCallback).toHaveBeenCalledTimes(1);
+        });
+
+        it('handles restore callback errors gracefully', async () => {
+            const restoreCallback = vi.fn().mockRejectedValue(new Error('Restore failed'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            const fileIds = [123, 456];
+            queueBatchReaction(fileIds, 'like', [], restoreCallback);
+
+            const items = queue.getAll();
+            const queueId = items[0]?.id;
+
+            await expect(cancelBatchQueuedReaction(queueId)).resolves.not.toThrow();
+            expect(mockToast.dismiss).toHaveBeenCalledWith(queueId);
+        });
+
+        it('handles canceling non-existent batch reaction gracefully', async () => {
+            await expect(cancelBatchQueuedReaction('non-existent-id')).resolves.not.toThrow();
         });
     });
 });
