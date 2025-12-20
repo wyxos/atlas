@@ -8,6 +8,7 @@ export interface QueueItem {
     onStart?: () => void | Promise<void>;
     metadata?: any;
     isPaused: boolean;
+    isStarted: boolean;
     startTime: number;
     pausedAt?: number;
     elapsedWhenPaused: number;
@@ -44,6 +45,11 @@ export function useQueue() {
         const currentTime = performance.now();
 
         queue.value.forEach((item, id) => {
+            // Skip items that haven't started yet
+            if (!item.isStarted) {
+                return;
+            }
+
             // Skip paused items
             if (item.isPaused) {
                 return;
@@ -170,11 +176,14 @@ export function useQueue() {
         onComplete: () => void | Promise<void>;
         onStart?: () => void | Promise<void>;
         metadata?: any;
+        startImmediately?: boolean;
     }): string {
         // If item already exists, remove it first
         if (queue.value.has(item.id)) {
             remove(item.id);
         }
+
+        const startImmediately = item.startImmediately !== false; // Default to true
 
         const queueItem: QueueItem = {
             id: item.id,
@@ -184,14 +193,15 @@ export function useQueue() {
             onStart: item.onStart,
             metadata: item.metadata,
             isPaused: false,
+            isStarted: startImmediately,
             startTime: performance.now(),
             elapsedWhenPaused: 0,
         };
 
         queue.value.set(item.id, queueItem);
 
-        // Execute onStart callback if provided
-        if (queueItem.onStart) {
+        // Execute onStart callback if provided and starting immediately
+        if (startImmediately && queueItem.onStart) {
             try {
                 const result = queueItem.onStart();
                 if (result instanceof Promise) {
@@ -204,7 +214,7 @@ export function useQueue() {
             }
         }
 
-        // Start timer loop if not running
+        // Start timer loop if not running (needed even for non-started items for when they do start)
         startTimerLoop();
 
         return item.id;
@@ -232,10 +242,11 @@ export function useQueue() {
 
     /**
      * Stop (pause) a queue item's countdown.
+     * Only works on items that have started.
      */
     function stop(id: string): boolean {
         const item = queue.value.get(id);
-        if (!item || item.isPaused) {
+        if (!item || !item.isStarted || item.isPaused) {
             return false;
         }
 
@@ -249,10 +260,11 @@ export function useQueue() {
 
     /**
      * Resume (unpause) a queue item's countdown.
+     * Only works on items that have started.
      */
     function resume(id: string): boolean {
         const item = queue.value.get(id);
-        if (!item || !item.isPaused) {
+        if (!item || !item.isStarted || !item.isPaused) {
             return false;
         }
 
@@ -260,6 +272,39 @@ export function useQueue() {
         // Remaining time is already correct (wasn't being decremented while paused)
         item.pausedAt = undefined;
         // Note: elapsedWhenPaused is kept for reference but not used in calculation
+
+        // Ensure timer loop is running
+        startTimerLoop();
+
+        return true;
+    }
+
+    /**
+     * Start the countdown for an item that was added with startImmediately: false.
+     * Items that haven't started are not affected by freeze/unfreeze.
+     */
+    function start(id: string): boolean {
+        const item = queue.value.get(id);
+        if (!item || item.isStarted) {
+            return false;
+        }
+
+        item.isStarted = true;
+        item.startTime = performance.now();
+
+        // Execute onStart callback if provided
+        if (item.onStart) {
+            try {
+                const result = item.onStart();
+                if (result instanceof Promise) {
+                    result.catch((error) => {
+                        console.error(`Error executing onStart for queue item ${id}:`, error);
+                    });
+                }
+            } catch (error) {
+                console.error(`Error executing onStart for queue item ${id}:`, error);
+            }
+        }
 
         // Ensure timer loop is running
         startTimerLoop();
@@ -418,6 +463,7 @@ export function useQueue() {
         // Countdown control
         stop,
         resume,
+        start,
 
         // Freeze control
         freezeAll,

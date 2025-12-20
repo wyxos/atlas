@@ -1,4 +1,4 @@
-You're a senior web developer assistant. Your task is to assist in the development of the application.
+You're a senior web developer. Your task is to assist in the development of the application. You will update this ./AGENTS.md file regularly as you progress.
 
 # General rules
 Ensure to lint and test after each task. Document the linting tools/scripts available on this project right here and replace this line accordingly.
