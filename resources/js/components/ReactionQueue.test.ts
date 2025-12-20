@@ -46,24 +46,38 @@ vi.mock('vue-toastification', () => {
 });
 
 import { useReactionQueue } from '../composables/useReactionQueue';
+import { useTimerManager } from '../composables/useTimerManager';
 import SingleReactionToast from './toasts/SingleReactionToast.vue';
 import BatchReactionToast from './toasts/BatchReactionToast.vue';
 
 describe('ReactionQueue Toast Integration', () => {
+    let reactionQueue: ReturnType<typeof useReactionQueue>;
+    let timerManager: ReturnType<typeof useTimerManager>;
+
     beforeEach(() => {
         vi.useFakeTimers();
+        // Reset timer manager state between tests
+        timerManager = useTimerManager();
+        timerManager.reset();
+        // Create a single reaction queue instance for all tests
+        // This will register with the timer manager automatically
+        reactionQueue = useReactionQueue();
+        // Clear any existing reactions
+        reactionQueue.cancelAll();
     });
 
     afterEach(() => {
         vi.useRealTimers();
         vi.clearAllMocks();
+        // Clean up any queued reactions
+        reactionQueue.cancelAll();
+        timerManager.reset();
     });
 
     it('creates a toast when a single reaction is queued', () => {
-        const { queueReaction } = useReactionQueue();
         const executeCallback = vi.fn();
 
-        queueReaction(1, 'love', executeCallback, 'preview.jpg');
+        reactionQueue.queueReaction(1, 'love', executeCallback, 'preview.jpg');
 
         // The toast should be created (we can't easily test the actual toast creation
         // without a full Vue app setup, but we can verify the composable works)
@@ -71,15 +85,94 @@ describe('ReactionQueue Toast Integration', () => {
     });
 
     it('creates a batch toast when multiple reactions share a batchId', () => {
-        const { queueReaction } = useReactionQueue();
         const executeCallback = vi.fn();
         const batchId = 'test-batch';
 
-        queueReaction(1, 'like', executeCallback, 'preview1.jpg', undefined, undefined, undefined, undefined, batchId);
-        queueReaction(2, 'like', executeCallback, 'preview2.jpg', undefined, undefined, undefined, undefined, batchId);
+        reactionQueue.queueReaction(1, 'like', executeCallback, 'preview1.jpg', undefined, undefined, undefined, undefined, batchId);
+        reactionQueue.queueReaction(2, 'like', executeCallback, 'preview2.jpg', undefined, undefined, undefined, undefined, batchId);
 
         // Both reactions should be queued with the same batchId
         expect(executeCallback).not.toHaveBeenCalled();
+    });
+
+    it('starts reaction in paused state when timer manager is frozen', () => {
+        const executeCallback = vi.fn();
+
+        // Freeze the timer manager (simulating modal open)
+        timerManager.freeze('reaction-queue');
+
+        // Queue a reaction while frozen
+        reactionQueue.queueReaction(1, 'like', executeCallback, 'preview1.jpg');
+
+        // Reaction should be queued but paused
+        expect(reactionQueue.queuedReactions.value).toHaveLength(1);
+        const queued = reactionQueue.queuedReactions.value[0];
+        expect(queued.pausedAt).not.toBeNull();
+        expect(queued.pausedRemaining).toBe(5000); // Full 5 seconds remaining
+        expect(queued.timeoutId).toBeNull(); // No timeout started
+        expect(queued.intervalId).toBeNull(); // No interval started
+
+        // Execute callback should not have been called
+        expect(executeCallback).not.toHaveBeenCalled();
+    });
+
+    it('resumes reactions created while frozen when timer manager unfreezes', async () => {
+        const executeCallback = vi.fn();
+
+        // Freeze the timer manager (simulating modal open)
+        timerManager.freeze('reaction-queue');
+
+        // Queue a reaction while frozen
+        reactionQueue.queueReaction(1, 'like', executeCallback, 'preview1.jpg');
+
+        // Verify it's paused
+        expect(reactionQueue.queuedReactions.value).toHaveLength(1);
+        const beforeResume = reactionQueue.queuedReactions.value[0];
+        expect(beforeResume.pausedAt).not.toBeNull();
+        expect(beforeResume.timeoutId).toBeNull();
+
+        // Unfreeze the timer manager (simulating modal close)
+        timerManager.unfreeze('reaction-queue');
+
+        // Reaction should now have timers started (check immediately, don't advance time)
+        expect(reactionQueue.queuedReactions.value).toHaveLength(1);
+        const queued = reactionQueue.queuedReactions.value[0];
+        expect(queued.pausedAt).toBeNull(); // Paused state cleared
+        expect(queued.pausedRemaining).toBeNull(); // Paused remaining cleared
+        expect(queued.timeoutId).not.toBeNull(); // Timeout started
+        expect(queued.intervalId).not.toBeNull(); // Interval started
+    });
+
+    it('resumes multiple reactions created while frozen', async () => {
+        const executeCallback = vi.fn();
+
+        // Freeze the timer manager
+        timerManager.freeze('reaction-queue');
+
+        // Queue multiple reactions while frozen
+        reactionQueue.queueReaction(1, 'like', executeCallback, 'preview1.jpg');
+        reactionQueue.queueReaction(2, 'love', executeCallback, 'preview2.jpg');
+        reactionQueue.queueReaction(3, 'funny', executeCallback, 'preview3.jpg');
+
+        // All should be paused
+        expect(reactionQueue.queuedReactions.value).toHaveLength(3);
+        reactionQueue.queuedReactions.value.forEach((queued) => {
+            expect(queued.pausedAt).not.toBeNull();
+            expect(queued.timeoutId).toBeNull();
+        });
+
+        // Unfreeze
+        timerManager.unfreeze('reaction-queue');
+
+        // Wait a tick for the resume logic to complete
+        await vi.runOnlyPendingTimersAsync();
+
+        // All should now have timers started
+        reactionQueue.queuedReactions.value.forEach((queued) => {
+            expect(queued.pausedAt).toBeNull();
+            expect(queued.timeoutId).not.toBeNull();
+            expect(queued.intervalId).not.toBeNull();
+        });
     });
 });
 

@@ -202,6 +202,10 @@ export function useReactionQueue() {
         // Create new queued reaction
         const queueId = `${fileId}-${Date.now()}`;
         const startTime = Date.now();
+        
+        // Check if timer manager is currently frozen (e.g., modal is open)
+        // If frozen, start the reaction in a paused state
+        const isCurrentlyFrozen = timerManager.isFrozen.value;
         const queuedReaction: QueuedReaction = {
             id: queueId,
             fileId,
@@ -211,8 +215,8 @@ export function useReactionQueue() {
             timeoutId: null,
             intervalId: null,
             startTime,
-            pausedAt: null,
-            pausedRemaining: null,
+            pausedAt: isCurrentlyFrozen ? startTime : null, // Pause immediately if frozen
+            pausedRemaining: isCurrentlyFrozen ? QUEUE_DELAY_MS : null, // Full delay remaining if frozen
             executeCallback,
             restoreItem: preservedRestoreItem,
             restoreBatch: preservedRestoreBatch,
@@ -224,6 +228,78 @@ export function useReactionQueue() {
 
         // Add to queue
         queuedReactions.value.push(queuedReaction);
+        
+        // If currently frozen, don't start timers - they'll start when unfrozen
+        if (isCurrentlyFrozen) {
+            // Update isPaused state to match
+            if (!isPaused.value) {
+                isPaused.value = true;
+            }
+            // Create toast but don't start countdown yet
+            if (preservedBatchId) {
+                // Batch reaction - defer toast creation/update to nextTick
+                nextTick(() => {
+                    const existingBatchToastId = batchToastIds.value.get(preservedBatchId);
+                    const batchReactions = queuedReactions.value.filter((q) => q.batchId === preservedBatchId);
+
+                    if (batchReactions.length === 0) {
+                        return;
+                    }
+
+                    if (existingBatchToastId) {
+                        const firstReaction = batchReactions[0];
+                        toast.update(existingBatchToastId, {
+                            content: h(BatchReactionToast, {
+                                batchId: preservedBatchId,
+                                reactions: batchReactions,
+                                type: firstReaction?.type || 'like',
+                                countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                                onCancelBatch: (batchId: string) => {
+                                    cancelBatch(batchId);
+                                },
+                            }),
+                        });
+                    } else {
+                        const firstReaction = batchReactions[0];
+                        const toastId = toast({
+                            content: h(BatchReactionToast, {
+                                batchId: preservedBatchId,
+                                reactions: batchReactions,
+                                type: firstReaction?.type || 'like',
+                                countdown: firstReaction?.countdown || QUEUE_DELAY_MS / 1000,
+                                onCancelBatch: (batchId: string) => {
+                                    cancelBatch(batchId);
+                                },
+                            }),
+                            timeout: false,
+                            closeOnClick: false,
+                        });
+                        batchToastIds.value.set(preservedBatchId, toastId);
+                        batchReactions.forEach((r) => {
+                            r.toastId = toastId;
+                        });
+                    }
+                });
+            } else {
+                // Single reaction - create individual toast
+                const toastId = toast({
+                    content: h(SingleReactionToast, {
+                        fileId,
+                        type,
+                        previewUrl,
+                        countdown: QUEUE_DELAY_MS / 1000,
+                        onCancel: (fileId: number) => {
+                            cancelReaction(fileId);
+                        },
+                    }),
+                    timeout: false,
+                    closeOnClick: false,
+                });
+                queuedReaction.toastId = toastId;
+            }
+            // Don't start timers - they'll start when unfrozen via internalResumeAll
+            return;
+        }
 
         // Create toast for this reaction
         if (preservedBatchId) {
