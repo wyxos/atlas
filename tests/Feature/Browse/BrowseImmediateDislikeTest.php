@@ -107,12 +107,11 @@ test('immediately auto-disliked files are excluded from browse response items', 
 
     // Assert moderation data shows the file was processed
     expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['processed_ids'])->toContain($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'])->not->toBeEmpty()
-        ->and(count($data['moderation']['immediate_actions']))->toBe(1)
-        ->and($data['moderation']['immediate_actions'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'][0]['action_type'])->toBe('auto_dislike')
-        ->and($data['moderation']['immediate_actions'][0]['thumbnail'])->not->toBeEmpty();
+        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
+        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
+        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
+        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('auto_dislike')
+        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
 });
 
 test('immediately blacklisted files are excluded from browse response items', function () {
@@ -190,12 +189,11 @@ test('immediately blacklisted files are excluded from browse response items', fu
 
     // Assert moderation data shows the file was processed
     expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['processed_ids'])->toContain($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'])->not->toBeEmpty()
-        ->and(count($data['moderation']['immediate_actions']))->toBe(1)
-        ->and($data['moderation']['immediate_actions'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'][0]['action_type'])->toBe('blacklist')
-        ->and($data['moderation']['immediate_actions'][0]['thumbnail'])->not->toBeEmpty();
+        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
+        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
+        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
+        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
+        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
 });
 
 test('immediately auto-disliked files from blacklisted containers are excluded from browse response items', function () {
@@ -300,12 +298,11 @@ test('immediately auto-disliked files from blacklisted containers are excluded f
 
     // Assert moderation data shows the file was processed
     expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['processed_ids'])->toContain($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'])->not->toBeEmpty()
-        ->and(count($data['moderation']['immediate_actions']))->toBe(1)
-        ->and($data['moderation']['immediate_actions'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'][0]['action_type'])->toBe('auto_dislike')
-        ->and($data['moderation']['immediate_actions'][0]['thumbnail'])->not->toBeEmpty();
+        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
+        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
+        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
+        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('auto_dislike')
+        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
 });
 
 test('immediately blacklisted files from blacklisted containers are excluded from browse response items', function () {
@@ -392,10 +389,9 @@ test('immediately blacklisted files from blacklisted containers are excluded fro
 
     // Assert moderation data shows the file was processed
     expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['processed_ids'])->toContain($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'])->not->toBeEmpty()
-        ->and(count($data['moderation']['immediate_actions']))->toBe(1)
-        ->and($data['moderation']['immediate_actions'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['immediate_actions'][0]['action_type'])->toBe('blacklist')
-        ->and($data['moderation']['immediate_actions'][0]['thumbnail'])->not->toBeEmpty();
+        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
+        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
+        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
+        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
+        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
 });
