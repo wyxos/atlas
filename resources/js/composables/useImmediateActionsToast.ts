@@ -2,6 +2,7 @@ import { ref, h, onUnmounted } from 'vue';
 import { useToast } from 'vue-toastification';
 import { useTimerManager } from './useTimerManager';
 import ImmediateActionToast from '../components/toasts/ImmediateActionToast.vue';
+import type { ReactionType } from '@/types/reaction';
 
 export interface ImmediateActionItem {
     id: number;
@@ -12,7 +13,7 @@ export interface ImmediateActionItem {
 const TOAST_DURATION_MS = 5000; // 5 seconds
 const TOAST_UPDATE_INTERVAL_MS = 50; // Update every 50ms for smooth countdown
 
-export function useImmediateActionsToast() {
+export function useImmediateActionsToast(onReaction?: (fileId: number, type: ReactionType) => void) {
     const toast = useToast();
     const timerManager = useTimerManager();
     const systemId = 'immediate-actions-toast' as const;
@@ -62,6 +63,7 @@ export function useImmediateActionsToast() {
                     items: [...pendingActions.value],
                     countdown: countdown.value / 1000,
                     onDismiss: handleDismiss,
+                    onReaction,
                 }),
             });
             return;
@@ -84,6 +86,7 @@ export function useImmediateActionsToast() {
                 items: [...pendingActions.value],
                 countdown: countdown.value / 1000, // Convert to seconds
                 onDismiss: handleDismiss,
+                onReaction,
             }),
             timeout: false, // Manual timeout control
             closeOnClick: false,
@@ -116,6 +119,7 @@ export function useImmediateActionsToast() {
                             items: [...pendingActions.value],
                             countdown: countdown.value / 1000, // Convert to seconds
                             onDismiss: handleDismiss,
+                            onReaction,
                         }),
                     });
                 }

@@ -28,6 +28,16 @@ vi.mock('../ui/dialog', () => ({
     },
 }));
 
+// Mock FileReactions component
+vi.mock('../FileReactions.vue', () => ({
+    default: {
+        name: 'FileReactions',
+        template: '<div class="file-reactions-mock" data-file-id="[fileId]"><button @click="$emit(\'reaction\', \'like\')" class="reaction-button">Like</button></div>',
+        props: ['fileId', 'hideDislike', 'variant'],
+        emits: ['reaction'],
+    },
+}));
+
 describe('ImmediateActionToast', () => {
     const mockItems = [
         { id: 1, action_type: 'auto_dislike', thumbnail: 'https://example.com/thumb1.jpg' },
@@ -141,10 +151,14 @@ describe('ImmediateActionToast', () => {
 
         await wrapper.vm.$nextTick();
 
+        // Check that FileReactions components are rendered (one per item)
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(3);
+        
+        // Check that grid layout is present
         const modalContent = wrapper.find('.dialog-content-mock');
-        expect(modalContent.text()).toContain('File #1');
-        expect(modalContent.text()).toContain('File #2');
-        expect(modalContent.text()).toContain('File #3');
+        const grid = modalContent.find('.grid');
+        expect(grid.exists()).toBe(true);
     });
 
     it('displays correct action labels in modal', async () => {
@@ -288,6 +302,252 @@ describe('ImmediateActionToast', () => {
         await toastContainer.trigger('mouseleave');
 
         expect(mockTimerManagerUnfreeze).toHaveBeenCalledTimes(1);
+    });
+
+    it('displays items in grid layout when modal is open', async () => {
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        const modalContent = wrapper.find('.dialog-content-mock');
+        const grid = modalContent.find('.grid');
+        expect(grid.exists()).toBe(true);
+        expect(grid.classes()).toContain('grid-cols-2');
+        expect(grid.classes()).toContain('sm:grid-cols-3');
+    });
+
+    it('displays FileReactions component for each item', async () => {
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(3);
+    });
+
+    it('passes hideDislike prop to FileReactions', async () => {
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        fileReactions.forEach((reactions) => {
+            expect(reactions.props('hideDislike')).toBe(true);
+        });
+    });
+
+    it('removes item from modal when reacted to', async () => {
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        // Initially should have 3 items
+        let fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(3);
+
+        // React to first item
+        const firstReactions = fileReactions[0];
+        await firstReactions.vm.$emit('reaction', 'like');
+
+        await wrapper.vm.$nextTick();
+
+        // Should now have 2 items
+        fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(2);
+    });
+
+    it('calls onReaction handler when item is reacted to', async () => {
+        const mockOnReaction = vi.fn();
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+                onReaction: mockOnReaction,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        await fileReactions[0].vm.$emit('reaction', 'like');
+
+        await wrapper.vm.$nextTick();
+
+        expect(mockOnReaction).toHaveBeenCalledWith(1, 'like');
+    });
+
+    it('displays empty state when all items are reviewed', async () => {
+        const singleItem = [{ id: 1, action_type: 'auto_dislike', thumbnail: 'thumb1.jpg' }];
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: singleItem,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        // React to the only item
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        await fileReactions[0].vm.$emit('reaction', 'like');
+
+        await wrapper.vm.$nextTick();
+
+        // Should show empty state
+        const modalContent = wrapper.find('.dialog-content-mock');
+        expect(modalContent.text()).toContain('All files have been reviewed.');
+    });
+
+    it('initializes modalItems when modal opens', async () => {
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        // Modal should have all items
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(3);
+    });
+
+    it('updates modal item count in description when items are removed', async () => {
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        // Initially shows 3 files
+        let description = wrapper.find('.dialog-description-mock');
+        expect(description.text()).toContain('3 files');
+
+        // React to one item
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        await fileReactions[0].vm.$emit('reaction', 'like');
+
+        await wrapper.vm.$nextTick();
+
+        // Should now show 2 files
+        description = wrapper.find('.dialog-description-mock');
+        expect(description.text()).toContain('2 files');
+    });
+
+    it('excludes reacted files when modal is reopened', async () => {
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        // Initially should have 3 items
+        let fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(3);
+
+        // React to first item
+        await fileReactions[0].vm.$emit('reaction', 'like');
+        await wrapper.vm.$nextTick();
+
+        // Should now have 2 items
+        fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(2);
+
+        // Close modal
+        const dialog = wrapper.findComponent({ name: 'Dialog' });
+        await dialog.vm.$emit('update:open', false);
+        await wrapper.vm.$nextTick();
+
+        // Reopen modal
+        await reviewButton.trigger('click');
+        await wrapper.vm.$nextTick();
+
+        // Should still have only 2 items (reacted file should not reappear)
+        fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        expect(fileReactions.length).toBe(2);
+    });
+
+    it('reuses onReaction handler when items are reacted to', async () => {
+        const mockOnReaction = vi.fn();
+        const wrapper = mount(ImmediateActionToast, {
+            props: {
+                items: mockItems,
+                countdown: 5,
+                onReaction: mockOnReaction,
+            },
+        });
+
+        const reviewButton = wrapper.find('button[aria-label="Review actions"]');
+        await reviewButton.trigger('click');
+
+        await wrapper.vm.$nextTick();
+
+        // React to multiple items
+        const fileReactions = wrapper.findAllComponents({ name: 'FileReactions' });
+        await fileReactions[0].vm.$emit('reaction', 'like');
+        await wrapper.vm.$nextTick();
+
+        await fileReactions[1].vm.$emit('reaction', 'love');
+        await wrapper.vm.$nextTick();
+
+        // Verify onReaction was called for both
+        expect(mockOnReaction).toHaveBeenCalledTimes(2);
+        expect(mockOnReaction).toHaveBeenCalledWith(1, 'like');
+        expect(mockOnReaction).toHaveBeenCalledWith(2, 'love');
     });
 });
 
