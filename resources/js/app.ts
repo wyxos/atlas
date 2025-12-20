@@ -1,6 +1,8 @@
 import { createApp } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import Oruga from '@oruga-ui/oruga-next';
+import Toast, { POSITION } from 'vue-toastification';
+import 'vue-toastification/dist/index.css';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { fas } from '@fortawesome/free-solid-svg-icons';
@@ -37,6 +39,20 @@ if (appElement && appElement.children.length === 0 && !appElement.nextElementSib
         },
     });
 
+    // Register Vue Toastification
+    app.use(Toast, {
+        position: POSITION.BOTTOM_RIGHT, // Position toasts at bottom right
+        maxToasts: Infinity, // No limit on toasts
+        newestOnTop: true,
+        timeout: false, // Default to no auto-dismiss (we handle it in queue)
+        closeOnClick: false, // Don't close on click (we handle it manually)
+        pauseOnFocusLoss: false, // Don't pause on focus loss
+        pauseOnHover: false, // Don't pause on hover (we handle freeze in queue)
+        hideProgressBar: true, // Hide default progress bar (we use our own)
+        icon: false, // Disable default icons (we use our own)
+        closeButton: false, // Hide default close button (we use our own)
+        toastClassName: 'custom-toast', // Default class for all toasts
+    });
 
     app.mount('#app');
 }

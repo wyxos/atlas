@@ -1,6 +1,6 @@
 import { nextTick, type Ref } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
-import { createReactionCallback } from '@/utils/reactions';
+import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 
 /**
@@ -28,20 +28,7 @@ export function useMasonryReactionHandler(
         const itemIndex = item ? items.value.findIndex((i) => i.id === fileId) : -1;
         const tabId = tab.value?.id;
 
-        // Create restore callback to add item back to masonry at original index
-        const restoreItem = item && tabId !== undefined && itemIndex !== -1
-            ? async (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
-                // Only restore if the tab is active
-                const tabActive = isTabActive(restoreTabId);
-                if (!tabActive) {
-                    return;
-                }
-
-                // Restore item using the provided restore function
-                await restoreToMasonry(item, itemIndex, masonry.value);
-            }
-            : undefined;
-
+        // Remove from masonry BEFORE queueing
         if (item && removeItem) {
             removeItem(item);
         }
@@ -68,10 +55,19 @@ export function useMasonryReactionHandler(
             await nextTick();
         }
 
-        // Execute reaction callback directly
-        await createReactionCallback()(fileId, type);
+        // Create restore callback for undo functionality
+        const restoreCallback = item && tabId !== undefined && itemIndex !== -1
+            ? async () => {
+                // Restore item using the provided restore function
+                await restoreToMasonry(item, itemIndex, masonry.value);
+            }
+            : undefined;
 
-        // Emit to parent
+        // Queue reaction with countdown toast (pass thumbnail and restore callback)
+        const thumbnail = item?.thumbnail || item?.src || '';
+        queueReaction(fileId, type, thumbnail, restoreCallback);
+
+        // Emit to parent (reaction is queued, not executed yet)
         onReaction(fileId, type);
     }
 
