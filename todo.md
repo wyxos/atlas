@@ -41,9 +41,3 @@
         - [ ] Generate preview seekbar with keyframe thumbnails
         - [ ] Extract and store subtitles from video files
         - [ ] Generate video segments (HLS/DASH) to enable adaptive streaming
-
-
-- when incrementing count
-  - if greater than 3, inform UI to auto blacklist
-- when browsing
-  - if files match moderate rule or blacklisted container with ui_countdown flag, inform UI to auto blacklist once files are in view 
