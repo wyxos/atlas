@@ -110,7 +110,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         const data = response.data;
 
         // Collect files that were moderated out (blacklist) from moderation response
-        const immediateActions = data.moderation?.moderatedOut ?? [];
+        const immediateActions = Array.isArray(data.moderation) ? data.moderation : [];
 
         // Return immediate actions so they can be collected by the caller
         const result: GetPageResult & { immediateActions?: Array<{ id: number; action_type: string; thumbnail?: string }> } = {
