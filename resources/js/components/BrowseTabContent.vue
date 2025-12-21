@@ -528,24 +528,23 @@ function handleMasonryItemMouseEnter(index: number, itemId: number): void {
     hoveredItemIndex.value = index;
     hoveredItemId.value = itemId;
 
-    // Freeze auto-dislike queue if hovering over an item that will be auto-disliked
-    const item = itemsMap.value.get(itemId);
-    if (item?.will_auto_dislike) {
+    // Freeze auto-dislike queue only if hovering over an item with an active countdown
+    if (autoDislikeQueue.hasActiveCountdown(itemId)) {
         autoDislikeQueue.freezeAll();
     }
 }
 
 function handleMasonryItemMouseLeave(): void {
     const itemId = hoveredItemId.value;
-    const wasHoveringFlaggedItem = itemId !== null && itemsMap.value.get(itemId)?.will_auto_dislike;
+    const wasHoveringItemWithCountdown = itemId !== null && autoDislikeQueue.hasActiveCountdown(itemId);
 
     hoveredItemIndex.value = null;
     hoveredItemId.value = null;
     containerBadges.setHoveredContainerId(null);
 
-    // Unfreeze auto-dislike queue when mouse leaves a flagged item
-    // (The queue will be frozen again if mouse enters another flagged item)
-    if (wasHoveringFlaggedItem) {
+    // Unfreeze auto-dislike queue when mouse leaves an item with active countdown
+    // (The queue will be frozen again if mouse enters another item with countdown)
+    if (wasHoveringItemWithCountdown) {
         autoDislikeQueue.unfreezeAll();
     }
 }
