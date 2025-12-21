@@ -1,7 +1,6 @@
 import { ref, nextTick, triggerRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
 import { usePreviewBatch } from './usePreviewBatch';
-import { normalizeMasonryItem } from '@/utils/itemNormalizer';
 
 /**
  * Composable for handling item preview count increments.
@@ -50,15 +49,15 @@ export function useItemPreview(
             const combinedWillAutoDislike = existingFlag || response.will_auto_dislike;
 
             // Update local item state - update in both items.value and tab.itemsData
-            // Note: items uses shallowRef, but since all properties exist initially (normalized),
-            // we can replace the object and trigger reactivity manually.
+            // Note: items uses shallowRef, so we need to replace the object and trigger reactivity manually.
+            // Backend already ensures all properties exist, so no normalization needed.
             if (itemIndex !== -1) {
-                // Create updated item object with all properties normalized
-                const updatedItem = normalizeMasonryItem({
+                // Create updated item object (backend already includes all properties)
+                const updatedItem = {
                     ...items.value[itemIndex],
                     previewed_count: response.previewed_count,
                     will_auto_dislike: combinedWillAutoDislike,
-                });
+                };
 
                 // Replace the element - with normalized items, direct assignment + triggerRef works
                 // This is O(1) efficient and ensures reactivity

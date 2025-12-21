@@ -1,7 +1,6 @@
 import { ref, type Ref, nextTick, triggerRef } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
 import { items as browseItems } from '@/actions/App/Http/Controllers/BrowseController';
-import { normalizeMasonryItem } from '@/utils/itemNormalizer';
 
 /**
  * Composable for virtualizing masonry items - loading minimal data initially,
@@ -84,13 +83,13 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
                 const itemIndex = items.value.findIndex((item) => item.id === id);
                 if (itemIndex !== -1) {
                     // Merge full data into existing item (preserve layout properties like key, index)
+                    // Backend formatter already includes all properties, so no normalization needed
                     const existingItem = items.value[itemIndex];
-                    // Normalize to ensure all properties exist for reactivity
-                    const updatedItem = normalizeMasonryItem({ 
+                    const updatedItem = { 
                         ...fullItem, 
                         key: existingItem.key, 
                         index: existingItem.index 
-                    });
+                    };
                     
                     // With normalized items (all properties exist), direct assignment works with shallowRef
                     // because we're replacing the object reference, not adding new properties
