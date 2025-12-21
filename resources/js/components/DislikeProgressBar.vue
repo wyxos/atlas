@@ -17,7 +17,7 @@ const props = withDefaults(defineProps<Props>(), {
         <div class="w-full relative">
             <!-- Progress Bar Container -->
             <div
-                class="relative h-12 bg-black/80 rounded-lg overflow-hidden border border-danger-500/50 shadow-xl">
+                class="relative h-10 bg-black/80 rounded-lg overflow-hidden border border-danger-500/50 shadow-xl">
                 <!-- Progress Fill (Red) -->
                 <div class="absolute inset-0 bg-danger-600 transition-all duration-100 ease-linear"
                     :style="{ width: `${progress}%` }" />
