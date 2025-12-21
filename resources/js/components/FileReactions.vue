@@ -11,6 +11,7 @@ interface Props {
     currentIndex?: number;
     totalItems?: number;
     variant?: 'default' | 'small';
+    mode?: 'default' | 'reaction-only';
     removeItem?: () => void;
     hideDislike?: boolean;
 }
@@ -22,6 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
     currentIndex: undefined,
     totalItems: undefined,
     variant: 'default',
+    mode: 'default',
     removeItem: undefined,
     hideDislike: false,
 });
@@ -95,6 +97,7 @@ function handleFunnyClick(): void {
 
 // Computed properties for variant checks
 const isSmall = computed(() => props.variant === 'small');
+const isReactionOnly = computed(() => props.mode === 'reaction-only');
 
 // Computed properties for styling classes
 const containerClasses = computed(() => [
@@ -143,7 +146,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             </button>
 
             <!-- Dislike -->
-            <button v-if="!hideDislike" @click="handleDislikeClick" :disabled="isUpdating" :class="[
+            <button v-if="!hideDislike && !isReactionOnly" @click="handleDislikeClick" :disabled="isUpdating" :class="[
                 'rounded transition-colors',
                 isSmall ? 'p-1' : 'p-2',
                 dislike ? 'bg-gray-500 text-white' : 'text-white hover:text-gray-400'
@@ -162,10 +165,10 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
         </div>
 
         <!-- Separator -->
-        <div :class="['w-px bg-white/20', separatorHeight]" />
+        <div v-if="!isReactionOnly" :class="['w-px bg-white/20', separatorHeight]" />
 
         <!-- Count Icons -->
-        <div class="flex items-center gap-2">
+        <div v-if="!isReactionOnly" class="flex items-center gap-2">
             <!-- Previewed Count -->
             <div class="flex items-center text-white gap-1.5">
                 <span :class="[textSize, 'font-medium']">{{ previewedCount }}</span>
@@ -180,7 +183,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
         </div>
 
         <!-- Index/Total -->
-        <div v-if="indexDisplay" class="flex items-center text-white gap-1.5">
+        <div v-if="!isReactionOnly && indexDisplay" class="flex items-center text-white gap-1.5">
             <Hash :size="18" />
             <span :class="['font-medium text-white', textSize]">{{ indexDisplay }}</span>
         </div>
