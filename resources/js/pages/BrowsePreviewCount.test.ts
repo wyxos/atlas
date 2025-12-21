@@ -122,7 +122,7 @@ vi.mock('@wyxos/vibe', () => ({
             </div>
         `,
         props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave', 'preload:success', 'in-view'],
+        emits: ['mouseenter', 'mouseleave', 'preload:success', 'in-view', 'in-view-and-loaded'],
     },
 }));
 
@@ -167,15 +167,18 @@ describe('Browse - Preview and Seen Count Tracking', () => {
 
         mockQueuePreviewIncrement.mockResolvedValueOnce({
             previewed_count: 1,
+            will_auto_dislike: false,
         });
 
         const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
-            await masonryItem.vm.$emit('in-view', {
+            // Emit in-view-and-loaded event (the new event that triggers preview count increment)
+            await masonryItem.vm.$emit('in-view-and-loaded', {
                 item: { id: 1 },
                 type: 'image',
+                src: 'test1.jpg',
             });
 
             await flushPromises();

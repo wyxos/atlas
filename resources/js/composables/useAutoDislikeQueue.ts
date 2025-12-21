@@ -24,7 +24,7 @@ export function useAutoDislikeQueue(
     items: Ref<MasonryItem[]>,
     removeItem: (item: MasonryItem) => void
 ) {
-    const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue } = useQueue();
+    const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll } = useQueue();
 
     /**
      * Execute batch dislike operation (debounced).
@@ -146,13 +146,12 @@ export function useAutoDislikeQueue(
     }
 
     /**
-     * Format remaining time as MM:SS string.
+     * Format remaining time as SS:MM string (seconds:milliseconds).
      */
     function formatCountdown(remainingMs: number): string {
-        const totalSeconds = Math.ceil(remainingMs / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        const totalSeconds = Math.floor(remainingMs / 1000);
+        const milliseconds = Math.floor((remainingMs % 1000) / 10); // Convert to centiseconds (0-99)
+        return `${totalSeconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(2, '0')}`;
     }
 
     return {
@@ -162,6 +161,8 @@ export function useAutoDislikeQueue(
         getCountdownProgress,
         hasActiveCountdown,
         formatCountdown,
+        freezeAll,
+        unfreezeAll,
     };
 }
 
