@@ -766,7 +766,7 @@ onUnmounted(() => {
                             @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
                             @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
                             <template #default="{ imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
-                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500"
+                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
                                     :data-key="item.key" :data-masonry-item-id="item.id"
                                     :class="containerBadges.getMasonryItemClasses.value(item)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
@@ -810,45 +810,51 @@ onUnmounted(() => {
                                     ]" />
 
                                     <!-- Container badges (shows on hover with type and count) -->
-                                    <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(item).length > 0"
-                                        class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
-                                        <div v-for="container in containerBadges.getContainersForItem(item)"
-                                            :key="container.id" class="cursor-pointer"
-                                            @mouseenter="handleContainerPillMouseEnter(container.id)"
-                                            @mouseleave="handleContainerPillMouseLeave"
-                                            @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
-                                            @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
-                                            @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
-                                            @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
-                                            @mousedown.stop="handleContainerPillMouseDown">
-                                            <Pill :label="container.type"
-                                                :value="containerBadges.getItemCountForContainerId(container.id)"
-                                                :variant="containerBadges.getVariantForContainerType(container.type)"
-                                                :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
-                                                @dismiss="() => handlePillDismiss(container)" />
+                                    <Transition name="fade">
+                                        <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(item).length > 0"
+                                            class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
+                                            <div v-for="container in containerBadges.getContainersForItem(item)"
+                                                :key="container.id" class="cursor-pointer"
+                                                @mouseenter="handleContainerPillMouseEnter(container.id)"
+                                                @mouseleave="handleContainerPillMouseLeave"
+                                                @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
+                                                @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
+                                                @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
+                                                @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
+                                                @mousedown.stop="handleContainerPillMouseDown">
+                                                <Pill :label="container.type"
+                                                    :value="containerBadges.getItemCountForContainerId(container.id)"
+                                                    :variant="containerBadges.getVariantForContainerType(container.type)"
+                                                    :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
+                                                    @dismiss="() => handlePillDismiss(container)" />
+                                            </div>
                                         </div>
-                                    </div>
+                                    </Transition>
 
                                     <!-- Info badge (shows on hover, opens dialog on click) -->
-                                    <div v-if="hoveredItemIndex === index && imageLoaded"
-                                        class="absolute top-2 right-2 z-50 pointer-events-auto">
-                                        <Button variant="ghost" size="sm"
-                                            class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
-                                            @click.stop="handlePromptDialogClick(item)" aria-label="Show prompt">
-                                            <Info :size="14" />
-                                        </Button>
-                                    </div>
+                                    <Transition name="fade">
+                                        <div v-if="hoveredItemIndex === index && imageLoaded"
+                                            class="absolute top-2 right-2 z-50 pointer-events-auto">
+                                            <Button variant="ghost" size="sm"
+                                                class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
+                                                @click.stop="handlePromptDialogClick(item)" aria-label="Show prompt">
+                                                <Info :size="14" />
+                                            </Button>
+                                        </div>
+                                    </Transition>
 
                                     <!-- Hover reactions overlay -->
-                                    <div v-show="hoveredItemIndex === index && imageLoaded"
-                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                        <FileReactions :file-id="item.id"
-                                            :previewed-count="(item.previewed_count as number) ?? 0"
-                                            :viewed-count="(item.seen_count as number) ?? 0" :current-index="index"
-                                            :total-items="items.length" variant="small"
-                                            :remove-item="() => handleRemoveItem(remove, item)"
-                                            @reaction="(type) => handleFileReaction(item.id, type, remove)" />
-                                    </div>
+                                    <Transition name="fade">
+                                        <div v-if="hoveredItemIndex === index && imageLoaded"
+                                            class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
+                                            <FileReactions :file-id="item.id"
+                                                :previewed-count="(item.previewed_count as number) ?? 0"
+                                                :viewed-count="(item.seen_count as number) ?? 0" :current-index="index"
+                                                :total-items="items.length" variant="small"
+                                                :remove-item="() => handleRemoveItem(remove, item)"
+                                                @reaction="(type) => handleFileReaction(item.id, type, remove)" />
+                                        </div>
+                                    </Transition>
 
                                     <!-- Progress Bar Overlay -->
                                     <DislikeProgressBar :progress="60" countdown="05:00" />
@@ -1005,7 +1011,7 @@ onUnmounted(() => {
 
 .fade-enter-active,
 .fade-leave-active {
-    transition: opacity 0.2s ease;
+    transition: opacity 0.3s ease-in-out;
     will-change: opacity;
 }
 
