@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, Play, ThumbsDown, Image, Video, TestTube } from 'lucide-vue-next';
+import { Loader2, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, Play, Image, Video, TestTube } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
@@ -38,7 +38,6 @@ import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistM
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
-import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 
 interface Props {
     tab?: BrowseTabData;
@@ -528,18 +527,12 @@ async function handleItemInView(payload: { item: { id?: number }; type: 'image' 
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
         // Handle preview increment when item is fully in view
-        const result = await itemPreview.handleItemPreload(itemId);
-
+        await itemPreview.handleItemPreload(itemId);
     }
 }
 
 async function handleItemPreloadSuccess(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }, item: MasonryItem): Promise<void> {
-    // payload.item is the item passed to MasonryItem, which should have the id
-    const itemId = payload.item?.id ?? item?.id;
-    if (itemId) {
-        // Track that this item has loaded (refs are auto-unwrapped in templates)
-        loadedItemIds.value.add(itemId);
-    }
+    // Item preload successful - handler kept for potential future use
 }
 
 function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
@@ -668,11 +661,6 @@ watch(
     },
     { immediate: true }
 );
-
-// Track loaded item IDs to handle timing between preload:success and watch
-const loadedItemIds = ref<Set<number>>(new Set());
-
-
 
 // Cleanup on unmount
 onUnmounted(() => {
