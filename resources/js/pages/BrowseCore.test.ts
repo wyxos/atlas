@@ -488,7 +488,7 @@ describe('Browse - Core', () => {
         const tabConfig = createMockTabConfig(tabId, {
             query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
             file_ids: [1, 2],
-            items_data: mockItems,
+            items: mockItems,
         });
 
         const router = await createTestRouter('/browse');
@@ -539,7 +539,7 @@ describe('Browse - Core', () => {
                         label: 'Test Tab',
                         query_params: { service: 'civit-ai-images', page: 1 },
                         file_ids: [],
-                        items_data: [],
+                        items: [],
                         position: 0,
                     }],
                 });
@@ -629,8 +629,7 @@ describe('Browse - Core', () => {
             if (url.includes('/api/browse-tabs/1/items')) {
                 return Promise.resolve({
                     data: {
-                        items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
-                        file_ids: [123],
+                        items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                     },
                 });
             }
@@ -678,8 +677,7 @@ describe('Browse - Core', () => {
             if (url.includes('/api/browse-tabs/1/items')) {
                 return Promise.resolve({
                     data: {
-                        items_data: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
-                        file_ids: [123],
+                        items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                     },
                 });
             }

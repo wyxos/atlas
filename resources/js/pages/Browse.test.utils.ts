@@ -300,7 +300,7 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
         label: `Test Tab ${tabId}`,
         query_params: { service: 'civit-ai-images', page: 1 },
         file_ids: [],
-        items_data: [],
+        items: [],
         position: 0,
         is_active: false,
         ...overrides,
@@ -315,15 +315,14 @@ export function setupAxiosMocks(tabConfig: any | any[], browseResponse?: any) {
         if (url.includes('/api/browse-tabs/') && url.includes('/items')) {
             const tabId = url.match(/\/api\/browse-tabs\/(\d+)\/items/)?.[1];
             const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig;
-            if (tab && tab.items_data) {
+            if (tab && tab.items) {
                 return Promise.resolve({
                     data: {
-                        items_data: tab.items_data,
-                        file_ids: tab.file_ids || [],
+                        items: tab.items,
                     },
                 });
             }
-            return Promise.resolve({ data: { items_data: [], file_ids: [] } });
+            return Promise.resolve({ data: { items: [] } });
         }
         if (url.includes('/api/browse')) {
             return Promise.resolve({

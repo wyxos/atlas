@@ -45,7 +45,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
                 id: number;
                 label: string;
                 query_params?: Record<string, string | number | null>;
-                items_data?: MasonryItem[]; // Not included in initial load, but kept for backward compatibility
+                items?: MasonryItem[]; // Not included in initial load, loaded lazily when restoring a tab
                 position?: number;
                 is_active?: boolean;
             }) => ({
@@ -204,11 +204,11 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
             // Update the tab with loaded items
             const tab = tabs.value.find(t => t.id === tabId);
             if (tab) {
-                tab.itemsData = data.items_data || [];
-                tab.fileIds = data.file_ids || [];
+                tab.itemsData = data.items || [];
+                // fileIds can be derived from items if needed: data.items?.map(item => item.id) || []
             }
 
-            return data.items_data || [];
+            return data.items || [];
         } catch (error) {
             console.error('Failed to load tab items:', error);
             throw error;

@@ -113,7 +113,8 @@ const tabContentContainer = ref<HTMLElement | null>(null);
 const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Item preview composable (needs to be initialized early)
-const itemPreview = useItemPreview(items, computed(() => props.tab));
+// Pass itemsMap for O(1) item existence checks (important for 10k+ items)
+const itemPreview = useItemPreview(items, computed(() => props.tab), itemsMap);
 
 // Track if component is mounted to prevent accessing state after unmount
 const isMounted = ref(false);

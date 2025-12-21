@@ -1,6 +1,7 @@
-import { ref, type Ref, nextTick } from 'vue';
+import { ref, type Ref, nextTick, triggerRef } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
 import { items as browseItems } from '@/actions/App/Http/Controllers/BrowseController';
+import { normalizeMasonryItem } from '@/utils/itemNormalizer';
 
 /**
  * Composable for virtualizing masonry items - loading minimal data initially,
@@ -22,9 +23,19 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
     
     /**
      * Check if an item has full data loaded.
+     * An item is considered to have full data if:
+     * 1. It's in the cache, OR
+     * 2. It has originalUrl (indicates it was loaded from database with full data)
      */
     function hasFullData(itemId: number): boolean {
-        return fullItemsCache.value.has(itemId);
+        if (fullItemsCache.value.has(itemId)) {
+            return true;
+        }
+        // Check if item already has full data (e.g., loaded from database)
+        const item = items.value.find((i) => i.id === itemId);
+        // If item has originalUrl, it means it was loaded with full data from database
+        // No need to load it again via /api/browse/items
+        return item?.originalUrl !== undefined && item.originalUrl !== null;
     }
     
     /**
@@ -68,11 +79,25 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
                 fullItemsCache.value.set(id, fullItem);
                 
                 // Update the item in the items array
+                // Note: items uses shallowRef, but since all properties exist initially (normalized),
+                // we can now use direct assignment which is more efficient than splice
                 const itemIndex = items.value.findIndex((item) => item.id === id);
                 if (itemIndex !== -1) {
                     // Merge full data into existing item (preserve layout properties like key, index)
                     const existingItem = items.value[itemIndex];
-                    items.value[itemIndex] = { ...fullItem, key: existingItem.key, index: existingItem.index };
+                    // Normalize to ensure all properties exist for reactivity
+                    const updatedItem = normalizeMasonryItem({ 
+                        ...fullItem, 
+                        key: existingItem.key, 
+                        index: existingItem.index 
+                    });
+                    
+                    // With normalized items (all properties exist), direct assignment works with shallowRef
+                    // because we're replacing the object reference, not adding new properties
+                    items.value[itemIndex] = updatedItem;
+                    
+                    // Manually trigger reactivity for shallowRef (still needed for array element changes)
+                    triggerRef(items);
                 }
             }
         } catch (error) {
@@ -138,12 +163,17 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
     
     /**
      * Initialize: load full data for initially visible items.
+     * Only loads items that don't already have full data (e.g., from database).
      */
     function initialize(): void {
         // Wait for DOM to be ready
         nextTick(() => {
             // Load first batch of items immediately (first 50 items)
-            const initialBatch = items.value.slice(0, 50).map((item) => item.id);
+            // But only if they don't already have full data
+            const initialBatch = items.value
+                .slice(0, 50)
+                .filter((item) => !hasFullData(item.id))
+                .map((item) => item.id);
             if (initialBatch.length > 0) {
                 loadFullItems(initialBatch);
             }

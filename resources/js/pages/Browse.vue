@@ -103,7 +103,7 @@ function handleTabDataLoadingChangeFromTab(isLoading: boolean): void {
 // Flow: Load tabs (without files) > Determine focus tab > If has files, load them > Restore query params
 async function loadTabs(): Promise<void> {
     try {
-        // Step 1: Load all tabs without files (items_data is not included)
+        // Step 1: Load all tabs without files (items are not included)
         await loadTabsFromComposable();
 
         // Step 2: Only focus a tab if one is already marked as active

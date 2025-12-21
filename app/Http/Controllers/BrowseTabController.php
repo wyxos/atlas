@@ -11,7 +11,7 @@ class BrowseTabController extends Controller
 {
     /**
      * Get all tabs for the authenticated user.
-     * Note: items_data is NOT loaded here to support 1000+ tabs efficiently.
+     * Note: items are NOT loaded here to support 1000+ tabs efficiently.
      * Use the items() method to load items for a specific tab when needed.
      * No file-related information is included in the response.
      */
@@ -188,8 +188,7 @@ class BrowseTabController extends Controller
         }
 
         return response()->json([
-            'items_data' => $itemsData,
-            'file_ids' => $files->pluck('id')->toArray(),
+            'items' => $itemsData,
         ]);
     }
 

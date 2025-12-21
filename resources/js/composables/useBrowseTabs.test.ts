@@ -39,7 +39,7 @@ describe('useBrowseTabs', () => {
         expect(isLoadingTabs.value).toBe(false);
     });
 
-    it('loads tabs from API without items_data (lazy loading)', async () => {
+    it('loads tabs from API without items (lazy loading)', async () => {
         const mockTabs = [
             {
                 id: 1,
@@ -312,8 +312,7 @@ describe('useBrowseTabs', () => {
             if (url === '/api/browse-tabs/1/items' || url.includes('/api/browse-tabs/1/items')) {
                 return Promise.resolve({
                     data: {
-                        items_data: mockItemsData,
-                        file_ids: [1, 2],
+                        items: mockItemsData,
                     },
                 });
             }

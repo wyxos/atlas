@@ -151,7 +151,7 @@ describe('Browse - Tab Restoration', () => {
 
         const tabConfig = createMockTabConfig(tabId, {
             query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
-            items_data: mockItems,
+            items: mockItems,
         });
 
         const router = await createTestRouter('/browse');
@@ -180,7 +180,7 @@ describe('Browse - Tab Restoration', () => {
         const tabConfig = createMockTabConfig(tabId, {
             query_params: { service: 'civit-ai-images', page: 1 },
             file_ids: [1, 2],
-            items_data: mockItems,
+            items: mockItems,
         });
 
         const router = await createTestRouter('/browse');
@@ -202,7 +202,7 @@ describe('Browse - Tab Restoration', () => {
         const tabConfig = createMockTabConfig(tabId, {
             query_params: { service: 'civit-ai-images', page: 1 },
             file_ids: [1, 2],
-            items_data: mockItems,
+            items: mockItems,
         });
 
         const router = await createTestRouter('/browse');
@@ -267,7 +267,7 @@ describe('Browse - Tab Restoration', () => {
             createMockTabConfig(tab2Id, {
                 query_params: { service: 'civit-ai-images', page: 1 },
                 file_ids: [3, 4],
-                items_data: mockItems,
+                items: mockItems,
                 position: 1,
             }),
         ];
@@ -356,8 +356,7 @@ describe('Browse - Tab Restoration', () => {
             if (url.includes('/api/browse-tabs/1/items')) {
                 return Promise.resolve({
                     data: {
-                        items_data: mockItems,
-                        file_ids: mockItems.map(item => item.id),
+                        items: mockItems,
                     },
                 });
             }
@@ -395,8 +394,7 @@ describe('Browse - Tab Restoration', () => {
             if (url.includes('/api/browse-tabs/1/items')) {
                 return Promise.resolve({
                     data: {
-                        items_data: mockItems,
-                        file_ids: mockItems.map(item => item.id),
+                        items: mockItems,
                     },
                 });
             }
