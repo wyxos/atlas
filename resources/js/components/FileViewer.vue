@@ -27,6 +27,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
     close: [];
+    open: [];
 }>();
 
 // Make items reactive for carousel removal
@@ -561,6 +562,9 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     overlayImage.value = { src, srcset, sizes, alt };
     overlayBorderRadius.value = radius || null;
     overlayIsAnimating.value = false;
+
+    // Emit open event when FileViewer opens
+    emit('open');
 
     // Wait for DOM update
     await nextTick();

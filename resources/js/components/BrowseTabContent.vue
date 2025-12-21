@@ -549,6 +549,17 @@ function handleMasonryItemMouseLeave(): void {
     }
 }
 
+function handleFileViewerOpen(): void {
+    // Freeze only auto-dislike countdowns when FileViewer opens
+    // Other countdowns (e.g., reaction queue) continue normally
+    autoDislikeQueue.freezeAutoDislikeOnly();
+}
+
+function handleFileViewerClose(): void {
+    // Resume only auto-dislike countdowns when FileViewer closes (after 2 second delay)
+    autoDislikeQueue.unfreezeAutoDislikeOnly();
+}
+
 async function handleItemInView(payload: { item: { id?: number }; type: 'image' | 'video' }, item: MasonryItem): Promise<void> {
     // This event is kept for backward compatibility, but we now use in-view-and-loaded
     // for triggering preview count increment
@@ -935,7 +946,7 @@ onUnmounted(() => {
             :items="items" :has-more="nextCursor !== null" :is-loading="masonry?.isLoading ?? false"
             :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
             :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
-            @close="() => { }" />
+            @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"

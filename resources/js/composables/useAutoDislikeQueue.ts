@@ -15,6 +15,8 @@ interface PendingDislike {
 // Global state for pending dislikes (debounced batch)
 const pendingDislikes = ref<Map<number, PendingDislike>>(new Map());
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+// Track unfreeze timeout for FileViewer (separate from hover unfreeze in useQueue)
+let fileViewerUnfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Composable for managing auto-dislike countdown timers with debounced batch execution.
@@ -24,7 +26,12 @@ export function useAutoDislikeQueue(
     items: Ref<MasonryItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
-    const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen } = useQueue();
+    const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen, stop, resume, getAll } = useQueue();
+    
+    // Track auto-dislike items that are frozen (for FileViewer)
+    const frozenAutoDislikeItems = ref<Set<number>>(new Set());
+    // Track if FileViewer is currently open (so we can freeze new items immediately)
+    const isFileViewerOpen = ref(false);
 
     /**
      * Execute batch dislike operation (debounced).
@@ -106,6 +113,12 @@ export function useAutoDislikeQueue(
                 scheduleBatchDislike();
             },
         });
+
+        // If FileViewer is open, freeze this item immediately
+        if (isFileViewerOpen.value) {
+            stop(`auto-dislike-${fileId}`);
+            frozenAutoDislikeItems.value.add(fileId);
+        }
     }
 
     /**
@@ -119,6 +132,9 @@ export function useAutoDislikeQueue(
 
         // Also remove from pending dislikes if it's there
         pendingDislikes.value.delete(fileId);
+        
+        // Remove from frozen items if it was frozen
+        frozenAutoDislikeItems.value.delete(fileId);
     }
 
     /**
@@ -151,6 +167,51 @@ export function useAutoDislikeQueue(
         return `${totalSeconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(2, '0')}`;
     }
 
+    /**
+     * Freeze only auto-dislike countdowns (used when FileViewer opens).
+     * Other countdowns (e.g., reaction queue) continue normally.
+     */
+    function freezeAutoDislikeOnly(): void {
+        isFileViewerOpen.value = true;
+        
+        // Find all auto-dislike items in the queue and stop them individually
+        const allItems = getAll();
+        allItems.forEach((item) => {
+            if (item.id.startsWith('auto-dislike-')) {
+                const fileId = parseInt(item.id.replace('auto-dislike-', ''), 10);
+                if (!isNaN(fileId)) {
+                    stop(item.id);
+                    frozenAutoDislikeItems.value.add(fileId);
+                }
+            }
+        });
+    }
+
+    /**
+     * Unfreeze only auto-dislike countdowns (used when FileViewer closes).
+     * Resumes after 2 second delay.
+     */
+    function unfreezeAutoDislikeOnly(): void {
+        isFileViewerOpen.value = false;
+        
+        // Clear any pending unfreeze timeout
+        if (fileViewerUnfreezeTimeout) {
+            clearTimeout(fileViewerUnfreezeTimeout);
+            fileViewerUnfreezeTimeout = null;
+        }
+
+        // Resume after 2 second delay
+        fileViewerUnfreezeTimeout = setTimeout(() => {
+            // Resume all frozen auto-dislike items
+            frozenAutoDislikeItems.value.forEach((fileId) => {
+                const queueId = `auto-dislike-${fileId}`;
+                resume(queueId);
+            });
+            frozenAutoDislikeItems.value.clear();
+            fileViewerUnfreezeTimeout = null;
+        }, 2000);
+    }
+
     return {
         startAutoDislikeCountdown,
         cancelAutoDislikeCountdown,
@@ -158,8 +219,10 @@ export function useAutoDislikeQueue(
         getCountdownProgress,
         hasActiveCountdown,
         formatCountdown,
-        freezeAll,
-        unfreezeAll,
+        freezeAll, // For hover freeze (freezes all countdowns)
+        unfreezeAll, // For hover unfreeze (unfreezes all countdowns)
+        freezeAutoDislikeOnly, // For FileViewer (freezes only auto-dislike countdowns)
+        unfreezeAutoDislikeOnly, // For FileViewer (unfreezes only auto-dislike countdowns)
         isFrozen, // Expose frozen state for UI indicators
     };
 }
