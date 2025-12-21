@@ -145,7 +145,6 @@ describe('Browse - Immediate Actions Integration', () => {
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
             moderation: {
-                toDislike: [],
                 moderatedOut: immediateActions,
             },
         });

@@ -213,10 +213,6 @@ class Browser
                 'next' => $filter['next'] ?? null,
             ],
             'moderation' => [
-                // Files that match moderation/container rules with 'ui_countdown' action type
-                // These will show will_auto_dislike = true in the UI (red ring indicator)
-                // Includes both file moderation rules and container blacklist rules
-                'toDislike' => $flaggedIds,
                 // Files that were immediately auto-disliked or blacklisted in this request
                 // These were moderated out (removed) and should show toast notifications
                 'moderatedOut' => $immediatelyProcessedFiles,
