@@ -2,6 +2,7 @@ import { nextTick, type Ref } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
+import type { Masonry } from '@wyxos/vibe';
 
 /**
  * Composable for handling masonry item reactions with restore functionality.
@@ -9,19 +10,18 @@ import type { ReactionType } from '@/types/reaction';
 export function useMasonryReactionHandler(
     items: Ref<MasonryItem[]>,
     itemsMap: Ref<Map<number, MasonryItem>>,
-    masonry: Ref<any>,
+    masonry: Ref<InstanceType<typeof Masonry> | null>,
     tab: Ref<BrowseTabData | undefined>,
     onReaction: (fileId: number, type: ReactionType) => void,
-    restoreToMasonry: (item: MasonryItem, index: number, masonryInstance?: any) => Promise<void>
+    restoreToMasonry: (item: MasonryItem, index: number, masonryInstance?: InstanceType<typeof Masonry>) => Promise<void>
 ) {
 
     /**
-     * Handle reaction (wrapper for masonry removeItem callback).
+     * Handle reaction - removes item from masonry and queues reaction.
      */
     async function handleMasonryReaction(
         fileId: number,
-        type: ReactionType,
-        removeItem: (item: MasonryItem) => void
+        type: ReactionType
     ): Promise<void> {
         // Use Map lookup instead of O(n) find operations
         const item = itemsMap.value.get(fileId);
@@ -29,8 +29,8 @@ export function useMasonryReactionHandler(
         const tabId = tab.value?.id;
 
         // Remove from masonry BEFORE queueing
-        if (item && removeItem) {
-            removeItem(item);
+        if (item && masonry.value?.remove) {
+            masonry.value.remove(item);
         }
 
         // Create restore callback for undo functionality

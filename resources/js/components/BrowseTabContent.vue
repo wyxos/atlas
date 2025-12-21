@@ -520,8 +520,8 @@ function removeItemFromMasonry(item: MasonryItem): void {
     }
 }
 
-// Auto-dislike queue composable (initialized after removeItemFromMasonry is defined)
-const autoDislikeQueue = useAutoDislikeQueue(items, removeItemFromMasonry);
+// Auto-dislike queue composable
+const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
 
 // Event handlers for masonry items
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
@@ -639,7 +639,8 @@ function handleRemoveItem(remove: (item: MasonryItem) => void, item: MasonryItem
 function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void): void {
     // Cancel auto-dislike countdown if user reacts manually
     autoDislikeQueue.cancelAutoDislikeCountdown(itemId);
-    handleMasonryReaction(itemId, type, remove);
+    // Note: remove parameter is kept for FileReactions component compatibility but not used here
+    handleMasonryReaction(itemId, type);
 }
 
 function handleCopyPromptClick(): void {
