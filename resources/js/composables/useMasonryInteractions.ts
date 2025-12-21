@@ -1,13 +1,14 @@
 import type { MasonryItem } from './useBrowseTabs';
 import type { ReactionType } from '@/types/reaction';
+import type { Masonry } from '@wyxos/vibe';
 
 /**
  * Composable for handling masonry item interactions (mouse events, alt-click reactions).
  */
 export function useMasonryInteractions(
     items: import('vue').Ref<MasonryItem[]>,
-    masonry: import('vue').Ref<any>,
-    handleMasonryReaction: (fileId: number, type: ReactionType, removeItem: (item: MasonryItem) => void) => Promise<void>
+    masonry: import('vue').Ref<InstanceType<typeof Masonry> | null>,
+    handleMasonryReaction: (fileId: number, type: ReactionType) => Promise<void>
 ) {
     // Handle ALT + mouse button combinations for quick reactions
     function handleAltClickReaction(e: MouseEvent, fileId: number): void {
@@ -33,14 +34,7 @@ export function useMasonryInteractions(
         if (reactionType) {
             const item = items.value.find((i) => i.id === fileId);
             if (item && masonry.value?.remove) {
-                // Use masonry's remove method directly
-                const removeFn = (itemToRemove: MasonryItem) => {
-                    const masonryItem = items.value.find((i) => i.id === itemToRemove.id);
-                    if (masonryItem) {
-                        masonry.value.remove(masonryItem);
-                    }
-                };
-                handleMasonryReaction(fileId, reactionType, removeFn);
+                handleMasonryReaction(fileId, reactionType);
             }
         }
     }

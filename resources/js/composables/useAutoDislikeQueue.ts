@@ -2,13 +2,13 @@ import { ref, type Ref } from 'vue';
 import { useQueue } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 import type { MasonryItem } from './useBrowseTabs';
+import type { Masonry } from '@wyxos/vibe';
 
 const COUNTDOWN_DURATION_MS = 5 * 1000; // 5 seconds
 const DEBOUNCE_DELAY_MS = 500; // 500ms debounce for batch operations
 
 interface PendingDislike {
     fileId: number;
-    removeItem: (item: MasonryItem) => void;
     item: MasonryItem;
 }
 
@@ -22,7 +22,7 @@ let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
  */
 export function useAutoDislikeQueue(
     items: Ref<MasonryItem[]>,
-    removeItem: (item: MasonryItem) => void
+    masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
     const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen } = useQueue();
 
@@ -44,14 +44,12 @@ export function useAutoDislikeQueue(
         }
 
         const fileIds = Array.from(dislikes.keys());
-        const itemsToRemove: MasonryItem[] = [];
+        const itemsToRemove = Array.from(dislikes.values()).map((pending) => pending.item);
 
-        // Remove items from masonry first
-        dislikes.forEach((pending) => {
-            itemsToRemove.push(pending.item);
-            // Call removeItem callback to remove from masonry
-            pending.removeItem(pending.item);
-        });
+        // Remove items from masonry first (batch removal)
+        if (masonry.value && itemsToRemove.length > 0) {
+            await masonry.value.removeMany(itemsToRemove);
+        }
 
         // Batch dislike API call
         try {
@@ -98,7 +96,6 @@ export function useAutoDislikeQueue(
                 // When countdown expires, add to pending dislikes (will be batched)
                 pendingDislikes.value.set(fileId, {
                     fileId,
-                    removeItem,
                     item,
                 });
 
