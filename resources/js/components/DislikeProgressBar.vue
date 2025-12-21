@@ -1,29 +1,23 @@
 <script setup lang="ts">
 import { ThumbsDown, Pause, Play } from 'lucide-vue-next';
-import { watch } from 'vue';
 
 interface Props {
     progress?: number;
     countdown?: string;
     isFrozen?: boolean;
+    isHovered?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     progress: 60,
     countdown: '05:00',
     isFrozen: false,
+    isHovered: false,
 });
-
-// Watch isFrozen to debug reactivity (can be removed later)
-watch(() => props.isFrozen, (newVal) => {
-    if (import.meta.env.DEV) {
-        console.log('[DislikeProgressBar] isFrozen changed:', newVal);
-    }
-}, { immediate: true });
 </script>
 
 <template>
-    <div class="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+    <div class="absolute inset-0 flex items-center justify-center z-40 pointer-events-none" :class="{ 'opacity-20': props.isHovered }">
         <div class="w-full relative flex items-center gap-2 bg-black/80 rounded">
             <!-- Progress Bar Container -->
             <div
