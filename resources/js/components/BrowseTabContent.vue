@@ -916,7 +916,8 @@ onUnmounted(() => {
                                         v-if="slotItem.will_auto_dislike && autoDislikeQueue.hasActiveCountdown(slotItem.id)"
                                         :progress="autoDislikeQueue.getCountdownProgress(slotItem.id)"
                                         :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(slotItem.id))"
-                                        :is-frozen="autoDislikeQueue.isFrozen.value" />
+                                        :is-frozen="autoDislikeQueue.isFrozen.value"
+                                        :is-hovered="hoveredItemId === slotItem.id && autoDislikeQueue.hasActiveCountdown(slotItem.id)" />
                                 </div>
                             </template>
                         </VibeMasonryItem>

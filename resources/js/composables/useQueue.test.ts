@@ -344,7 +344,7 @@ describe('useQueue', () => {
             expect(queue.getRemainingTime('test-1')).toBeCloseTo(initialRemaining, 0);
         });
 
-        it('unfreezes all countdowns', () => {
+        it('unfreezes all countdowns', async () => {
             const queue = useQueue();
             const onComplete = vi.fn();
 
@@ -358,6 +358,14 @@ describe('useQueue', () => {
             expect(queue.isFrozen.value).toBe(true);
 
             queue.unfreezeAll();
+            // isFrozen should still be true immediately (2 second delay)
+            expect(queue.isFrozen.value).toBe(true);
+
+            // Advance time past the 2 second delay
+            vi.advanceTimersByTime(2000);
+            await vi.runAllTimersAsync();
+
+            // Now it should be unfrozen
             expect(queue.isFrozen.value).toBe(false);
         });
     });
@@ -559,8 +567,11 @@ describe('useQueue', () => {
             vi.advanceTimersByTime(1000);
             expect(queue.getRemainingTime('test-1')).toBeCloseTo(remainingAfterStart, 0);
 
-            // Unfreeze - now it should progress
+            // Unfreeze - now it should progress (after 2 second delay)
             queue.unfreezeAll();
+            // Advance past the 2 second delay
+            vi.advanceTimersByTime(2000);
+            // Then advance 1 second for countdown progress
             vi.advanceTimersByTime(1000);
             expect(queue.getRemainingTime('test-1')).toBeLessThan(remainingAfterStart);
         });
@@ -586,8 +597,11 @@ describe('useQueue', () => {
             vi.advanceTimersByTime(1000);
             expect(queue.getRemainingTime('test-1')).toBeCloseTo(remainingWhenFrozen, 0);
 
-            // Unfreeze - countdown should resume
+            // Unfreeze - countdown should resume (after 2 second delay)
             queue.unfreezeAll();
+            // Advance past the 2 second delay
+            vi.advanceTimersByTime(2000);
+            // Then advance 500ms for countdown progress
             vi.advanceTimersByTime(500);
             expect(queue.getRemainingTime('test-1')).toBeLessThan(remainingWhenFrozen);
         });
