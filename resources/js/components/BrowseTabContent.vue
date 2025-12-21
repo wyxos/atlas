@@ -548,13 +548,21 @@ async function handleItemInViewAndLoaded(payload: { item: { id?: number }; type:
     // payload.item is the item passed to MasonryItem, which should have the id
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
+        // Find the item in the items array to get the full item object
+        const fullItem = items.value.find((i) => i.id === itemId) || item;
+
+        // Check if item is already flagged for auto-dislike (from moderation rules)
+        const isModerationFlagged = fullItem.will_auto_dislike === true;
+
         // Increment preview count when item is fully in view AND media is loaded
         const result = await itemPreview.incrementPreviewCount(itemId);
 
-        // If backend indicates this item should be auto-disliked, start countdown
-        if (result?.will_auto_dislike) {
-            // Find the item in the items array to get the full item object
-            const fullItem = items.value.find((i) => i.id === itemId) || item;
+        // Start countdown if:
+        // 1. Item was already flagged for auto-dislike (from moderation rules) OR
+        // 2. Preview count increment indicates it should be auto-disliked (from preview count threshold)
+        const shouldAutoDislike = isModerationFlagged || result?.will_auto_dislike === true;
+
+        if (shouldAutoDislike) {
             autoDislikeQueue.startAutoDislikeCountdown(itemId, fullItem);
         }
     }
