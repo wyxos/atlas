@@ -44,6 +44,7 @@ import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
 import { useItemVirtualization } from '@/composables/useItemVirtualization';
+import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -518,6 +519,9 @@ function removeItemFromMasonry(item: MasonryItem): void {
     }
 }
 
+// Auto-dislike queue composable (initialized after removeItemFromMasonry is defined)
+const autoDislikeQueue = useAutoDislikeQueue(items, removeItemFromMasonry);
+
 // Event handlers for masonry items
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
     hoveredItemIndex.value = index;
@@ -532,11 +536,27 @@ function handleMasonryItemMouseLeave(): void {
 }
 
 async function handleItemInView(payload: { item: { id?: number }; type: 'image' | 'video' }, item: MasonryItem): Promise<void> {
+    // This event is kept for backward compatibility, but we now use in-view-and-loaded
+    // for triggering preview count increment
+}
+
+/**
+ * Handle when item is both fully in view AND media is loaded.
+ * This is when we should increment preview count and check for auto-dislike.
+ */
+async function handleItemInViewAndLoaded(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }, item: MasonryItem): Promise<void> {
     // payload.item is the item passed to MasonryItem, which should have the id
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
-        // Increment preview count when item is fully in view
-        await itemPreview.incrementPreviewCount(itemId);
+        // Increment preview count when item is fully in view AND media is loaded
+        const result = await itemPreview.incrementPreviewCount(itemId);
+
+        // If backend indicates this item should be auto-disliked, start countdown
+        if (result?.will_auto_dislike) {
+            // Find the item in the items array to get the full item object
+            const fullItem = items.value.find((i) => i.id === itemId) || item;
+            autoDislikeQueue.startAutoDislikeCountdown(itemId, fullItem);
+        }
     }
 }
 
@@ -592,6 +612,8 @@ function handleRemoveItem(remove: (item: MasonryItem) => void, item: MasonryItem
 }
 
 function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void): void {
+    // Cancel auto-dislike countdown if user reacts manually
+    autoDislikeQueue.cancelAutoDislikeCountdown(itemId);
     handleMasonryReaction(itemId, type, remove);
 }
 
@@ -764,6 +786,7 @@ onUnmounted(() => {
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
                             @mouseleave="handleMasonryItemMouseLeave"
                             @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
+                            @in-view-and-loaded="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)"
                             @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
                             <template #default="{ imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
@@ -856,8 +879,11 @@ onUnmounted(() => {
                                         </div>
                                     </Transition>
 
-                                    <!-- Progress Bar Overlay -->
-                                    <DislikeProgressBar :progress="60" countdown="05:00" />
+                                    <!-- Progress Bar Overlay (only show if will_auto_dislike is true and countdown is active) -->
+                                    <DislikeProgressBar
+                                        v-if="item.will_auto_dislike && autoDislikeQueue.hasActiveCountdown(item.id)"
+                                        :progress="autoDislikeQueue.getCountdownProgress(item.id)"
+                                        :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(item.id))" />
                                 </div>
                             </template>
                         </VibeMasonryItem>
