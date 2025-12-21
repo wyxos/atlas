@@ -91,11 +91,11 @@ export function useItemVirtualization(items: Ref<MasonryItem[]>) {
                         index: existingItem.index 
                     };
                     
-                    // With normalized items (all properties exist), direct assignment works with shallowRef
-                    // because we're replacing the object reference, not adding new properties
-                    items.value[itemIndex] = updatedItem;
+                    // Use splice to replace the element - Vue tracks splice() mutations better than direct assignment
+                    // This ensures Masonry's v-for sees the change and updates the slot prop
+                    items.value.splice(itemIndex, 1, updatedItem);
                     
-                    // Manually trigger reactivity for shallowRef (still needed for array element changes)
+                    // Manually trigger reactivity for shallowRef (still needed)
                     triggerRef(items);
                 }
             }
