@@ -43,18 +43,7 @@
         - [ ] Generate video segments (HLS/DASH) to enable adaptive streaming
 
 
-- Queue reaction and everything else
-  - need a queue manager
-    - will handle queueing auto dislike
-    - reactions
-    - immediate action toast
-  - concept of time freeze
-  - a toast template
-    - single reaction template
-    - batch reaction template
-  - on previewed count increment > if eligible > queue + countdown on item
-  - reaction > queue + toast
-  - on masonry each successful request > if eligible > queue + ui countdown on item
-  - on masonry loading stop > if stacked immediate actions > queue + toast
-  - hover on any of those items in queue, freeze everything
-- 
+- when incrementing count
+  - if greater than 3, inform UI to auto blacklist
+- when browsing
+  - if files match moderate rule or blacklisted container with ui_countdown flag, inform UI to auto blacklist once files are in view 
