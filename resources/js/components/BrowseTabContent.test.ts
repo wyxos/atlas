@@ -106,7 +106,7 @@ vi.mock('@/composables/useItemPreview', async () => {
     return {
         useItemPreview: vi.fn(() => ({
             previewedItems: ref(new Set()),
-            handleItemPreload: vi.fn(),
+            incrementPreviewCount: vi.fn(),
             clearPreviewedItems: vi.fn(),
         })),
     };
