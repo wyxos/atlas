@@ -1,6 +1,7 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
 import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
 import { index as browseIndex, services as browseServices } from '@/actions/App/Http/Controllers/BrowseController';
+import { normalizeMasonryItems } from '@/utils/itemNormalizer';
 
 export type GetPageResult = {
     items: MasonryItem[];
@@ -144,23 +145,27 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         // Merge new items from browse API with existing database items to preserve previewed_count and seen_count
         // If items come from browse API, they won't have previewed_count or seen_count, but we should preserve
         // these values from existing items if they exist in the database
-        const mergedItems = data.items.map((newItem: MasonryItem) => {
-            // Check if this item already exists in the database (from tab.itemsData)
-            const existingItem = options?.getActiveTab()?.itemsData?.find(
-                (existing: MasonryItem) => existing.id === newItem.id
-            );
+        // CRITICAL: Normalize items to ensure all properties exist initially for reactivity with shallowRef
+        const mergedItems = normalizeMasonryItems(
+            data.items.map((newItem: MasonryItem) => {
+                // Check if this item already exists in the database (from tab.itemsData)
+                const existingItem = options?.getActiveTab()?.itemsData?.find(
+                    (existing: MasonryItem) => existing.id === newItem.id
+                );
 
-            // If item exists in database, preserve its previewed_count and seen_count
-            if (existingItem) {
-                return {
-                    ...newItem,
-                    previewed_count: existingItem.previewed_count ?? newItem.previewed_count,
-                    seen_count: existingItem.seen_count ?? newItem.seen_count,
-                };
-            }
+                // If item exists in database, preserve its previewed_count and seen_count
+                if (existingItem) {
+                    return {
+                        ...newItem,
+                        previewed_count: existingItem.previewed_count ?? newItem.previewed_count,
+                        seen_count: existingItem.seen_count ?? newItem.seen_count,
+                        will_auto_dislike: existingItem.will_auto_dislike ?? newItem.will_auto_dislike,
+                    };
+                }
 
-            return newItem;
-        });
+                return newItem;
+            })
+        );
 
         return {
             items: mergedItems,
