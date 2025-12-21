@@ -15,6 +15,9 @@ class ContainerBlacklistController extends Controller
     public function index(): JsonResponse
     {
         $containers = Container::whereNotNull('blacklisted_at')
+            ->withCount(['files as blacklisted_files_count' => function ($query) {
+                $query->whereNotNull('blacklisted_at');
+            }])
             ->orderBy('blacklisted_at', 'desc')
             ->get();
 
