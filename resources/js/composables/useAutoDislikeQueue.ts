@@ -24,7 +24,7 @@ export function useAutoDislikeQueue(
     items: Ref<MasonryItem[]>,
     removeItem: (item: MasonryItem) => void
 ) {
-    const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll } = useQueue();
+    const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen } = useQueue();
 
     /**
      * Execute batch dislike operation (debounced).
@@ -163,6 +163,7 @@ export function useAutoDislikeQueue(
         formatCountdown,
         freezeAll,
         unfreezeAll,
+        isFrozen, // Expose frozen state for UI indicators
     };
 }
 

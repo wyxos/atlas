@@ -405,23 +405,43 @@ export function useQueue() {
         });
     }
 
+    // Track unfreeze timeout to allow cancellation if freeze is called again
+    let unfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
+
     /**
      * Freeze all countdowns (pause timer loop).
      */
     function freezeAll(): void {
+        // Cancel any pending unfreeze timeout
+        if (unfreezeTimeout) {
+            clearTimeout(unfreezeTimeout);
+            unfreezeTimeout = null;
+        }
         isFrozen.value = true;
         // Timer loop will continue but won't update items when frozen
     }
 
     /**
      * Unfreeze all countdowns (resume timer loop).
+     * Resumes after a 2 second delay to give user time to move mouse away.
      */
     function unfreezeAll(): void {
-        isFrozen.value = false;
-        // Timer loop will resume updating items
-        if (queue.value.size > 0) {
-            startTimerLoop();
+        // Clear any pending unfreeze timeout
+        if (unfreezeTimeout) {
+            clearTimeout(unfreezeTimeout);
+            unfreezeTimeout = null;
         }
+
+        // Keep isFrozen = true during the delay, then set to false and resume
+        // This ensures the UI shows frozen state during the delay
+        unfreezeTimeout = setTimeout(() => {
+            isFrozen.value = false;
+            unfreezeTimeout = null;
+            // Timer loop will resume updating items
+            if (queue.value.size > 0) {
+                startTimerLoop();
+            }
+        }, 2000);
     }
 
     /**
@@ -468,6 +488,8 @@ export function useQueue() {
         // Freeze control
         freezeAll,
         unfreezeAll,
+        // Expose isFrozen as computed to ensure reactivity when passed as prop
+        // The computed will re-evaluate whenever isFrozen.value changes
         isFrozen: computed(() => isFrozen.value),
 
         // Modal state

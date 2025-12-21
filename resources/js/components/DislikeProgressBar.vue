@@ -1,23 +1,33 @@
 <script setup lang="ts">
-import { ThumbsDown } from 'lucide-vue-next';
+import { ThumbsDown, Pause, Play } from 'lucide-vue-next';
+import { watch } from 'vue';
 
 interface Props {
     progress?: number;
     countdown?: string;
+    isFrozen?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     progress: 60,
     countdown: '05:00',
+    isFrozen: false,
 });
+
+// Watch isFrozen to debug reactivity (can be removed later)
+watch(() => props.isFrozen, (newVal) => {
+    if (import.meta.env.DEV) {
+        console.log('[DislikeProgressBar] isFrozen changed:', newVal);
+    }
+}, { immediate: true });
 </script>
 
 <template>
     <div class="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
-        <div class="w-full relative">
+        <div class="w-full relative flex items-center gap-2 bg-black/80 rounded">
             <!-- Progress Bar Container -->
             <div
-                class="relative h-10 bg-black/80 rounded overflow-hidden border border-danger-500/50 shadow-xl">
+                class="relative h-10  overflow-hidden border border-danger-500/50 shadow-xl flex-1">
                 <!-- Progress Fill (Red) -->
                 <div class="absolute inset-0 bg-danger-600 transition-all duration-100 ease-linear"
                     :style="{ width: `${progress}%` }" />
@@ -32,6 +42,12 @@ const props = withDefaults(defineProps<Props>(), {
                         {{ countdown }}
                     </span>
                 </div>
+            </div>
+
+            <!-- Queue Status Icon (outside progress bar, on the right) -->
+            <div class="shrink-0" :class="props.isFrozen ? 'text-yellow-400' : 'text-green-400'">
+                <Pause v-if="props.isFrozen" :size="20" class="animate-pulse" />
+                <Play v-else :size="20" />
             </div>
         </div>
     </div>

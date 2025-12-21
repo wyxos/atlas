@@ -819,7 +819,6 @@ onUnmounted(() => {
                             <template
                                 #default="{ item: slotItem, imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
                                 <!-- Use item from slot props (reactive) instead of outer scope item (may be stale) -->
-                                <p class="text-white">{{ slotItem.will_auto_dislike }}</p>
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
                                     :data-key="slotItem.key" :data-masonry-item-id="slotItem.id"
                                     :class="containerBadges.getMasonryItemClasses.value(slotItem)"
@@ -916,7 +915,8 @@ onUnmounted(() => {
                                     <DislikeProgressBar
                                         v-if="slotItem.will_auto_dislike && autoDislikeQueue.hasActiveCountdown(slotItem.id)"
                                         :progress="autoDislikeQueue.getCountdownProgress(slotItem.id)"
-                                        :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(slotItem.id))" />
+                                        :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(slotItem.id))"
+                                        :is-frozen="autoDislikeQueue.isFrozen.value" />
                                 </div>
                             </template>
                         </VibeMasonryItem>
