@@ -23,8 +23,6 @@ export interface File {
     previewed_count: number;
     seen_at: string | null;
     seen_count: number;
-    auto_disliked: boolean;
-    will_auto_dislike?: boolean;
     blacklisted_at: string | null;
     blacklist_reason: string | null;
     downloaded: boolean;

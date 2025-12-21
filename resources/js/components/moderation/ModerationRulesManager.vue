@@ -304,9 +304,6 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                             <SelectItem value="ui_countdown">
                                                 UI Countdown (5s delay)
                                             </SelectItem>
-                                            <SelectItem value="auto_dislike">
-                                                Immediate Auto-Dislike
-                                            </SelectItem>
                                             <SelectItem value="blacklist">
                                                 Immediate Blacklist
                                             </SelectItem>
@@ -316,10 +313,6 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                         <span v-if="ruleForm.action_type === 'ui_countdown'">
                                             Files matching this rule will show a 5-second countdown before being
                                             auto-disliked.
-                                        </span>
-                                        <span v-else-if="ruleForm.action_type === 'auto_dislike'">
-                                            Files matching this rule will be immediately auto-disliked and removed from
-                                            results.
                                         </span>
                                         <span v-else>
                                             Files matching this rule will be immediately blacklisted and removed from

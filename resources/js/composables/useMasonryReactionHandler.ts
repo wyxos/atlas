@@ -33,28 +33,6 @@ export function useMasonryReactionHandler(
             removeItem(item);
         }
 
-        // Remove auto_disliked and will_auto_dislike flags if user is reacting (like, funny, favorite - not dislike)
-        if (item && (type === 'love' || type === 'like' || type === 'funny')) {
-            // itemIndex already calculated above, reuse it
-            if (itemIndex !== -1) {
-                Object.assign(items.value[itemIndex], {
-                    auto_disliked: false,
-                    will_auto_dislike: false,
-                });
-            }
-            // Also update in tab.itemsData if it exists
-            if (tab.value?.itemsData) {
-                const tabItemIndex = tab.value.itemsData.findIndex((i) => i.id === fileId);
-                if (tabItemIndex !== -1) {
-                    Object.assign(tab.value.itemsData[tabItemIndex], {
-                        auto_disliked: false,
-                        will_auto_dislike: false,
-                    });
-                }
-            }
-            await nextTick();
-        }
-
         // Create restore callback for undo functionality
         const restoreCallback = item && tabId !== undefined && itemIndex !== -1
             ? async () => {

@@ -13,7 +13,7 @@ export function useItemPreview(
     const { queuePreviewIncrement } = usePreviewBatch();
 
     // Increment preview count when item is preloaded (batched)
-    async function handleItemPreload(fileId: number): Promise<{ will_auto_dislike: boolean } | void> {
+    async function handleItemPreload(fileId: number): Promise<void> {
         // Skip if we've already incremented preview count for this item
         if (previewedItems.value.has(fileId)) {
             return;
@@ -28,15 +28,9 @@ export function useItemPreview(
 
             // Update local item state - update in both items.value and tab.itemsData
             const itemIndex = items.value.findIndex((i) => i.id === fileId);
-            let wasWillAutoDislike = false;
             if (itemIndex !== -1) {
                 // Update the item in place to maintain reactivity
                 const currentItem = items.value[itemIndex];
-                wasWillAutoDislike = currentItem.will_auto_dislike ?? false;
-                
-                if (response.will_auto_dislike) {
-                    currentItem.will_auto_dislike = true;
-                }
                 currentItem.previewed_count = response.previewed_count;
             }
 
@@ -46,16 +40,12 @@ export function useItemPreview(
                 if (tabItemIndex !== -1) {
                     Object.assign(tab.value.itemsData[tabItemIndex], {
                         previewed_count: response.previewed_count,
-                        will_auto_dislike: response.will_auto_dislike ? true : tab.value.itemsData[tabItemIndex].will_auto_dislike ?? false,
                     });
                 }
             }
 
             // Force reactivity update
             await nextTick();
-            
-            // Return will_auto_dislike status if it was newly set
-            return { will_auto_dislike: response.will_auto_dislike && !wasWillAutoDislike };
         } catch (error) {
             console.error('Failed to increment preview count:', error);
             // Don't throw - preview count is not critical

@@ -45,7 +45,7 @@ describe('useContainerBlacklists', () => {
                 type: 'User',
                 source: 'CivitAI',
                 source_id: '456',
-                action_type: 'auto_dislike',
+                action_type: 'blacklist',
                 blacklisted_at: '2024-01-14T10:00:00Z',
             },
         ];
@@ -111,7 +111,7 @@ describe('useContainerBlacklists', () => {
         };
         const updated = {
             ...existing,
-            action_type: 'auto_dislike',
+            action_type: 'blacklist',
         };
 
         const { blacklists, createBlacklist } = useContainerBlacklists();
@@ -119,7 +119,7 @@ describe('useContainerBlacklists', () => {
 
         mockAxios.post.mockResolvedValue({ data: updated });
 
-        await createBlacklist(1, 'auto_dislike');
+        await createBlacklist(1, 'blacklist');
 
         expect(blacklists.value[0]).toEqual(updated);
     });

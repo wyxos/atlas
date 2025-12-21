@@ -166,9 +166,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         await wrapper.vm.$nextTick();
 
         mockQueuePreviewIncrement.mockResolvedValueOnce({
-            file_id: 1,
             previewed_count: 1,
-            auto_disliked: false,
         });
 
         const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
@@ -264,101 +262,4 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         }
     });
 
-    it('sets auto_disliked flag when preview count reaches 3', async () => {
-        const browseResponse = {
-            items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 2 },
-            ],
-            nextPage: null,
-            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-        };
-        const tabConfig = createMockTabConfig(1);
-        setupAxiosMocks(mocks, tabConfig, browseResponse);
-        const router = await createTestRouter();
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await waitForStable(wrapper);
-
-        const tabContentVm = await waitForTabContent(wrapper);
-        if (!tabContentVm) {
-            return;
-        }
-
-        tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 2, auto_disliked: false }];
-        await wrapper.vm.$nextTick();
-
-        mockQueuePreviewIncrement.mockResolvedValueOnce({
-            file_id: 1,
-            previewed_count: 3,
-            auto_disliked: true,
-        });
-
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
-        const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
-
-        if (masonryItem.exists()) {
-            await masonryItem.vm.$emit('in-view', {
-                item: { id: 1 },
-                type: 'image',
-            });
-
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-
-            expect(mockQueuePreviewIncrement).toHaveBeenCalledWith(1);
-        }
-    });
-
-    it('removes auto_disliked flag when user reacts with like', async () => {
-        const browseResponse = {
-            items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, auto_disliked: true },
-            ],
-            nextPage: null,
-            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-        };
-        const tabConfig = createMockTabConfig(1);
-        setupAxiosMocks(mocks, tabConfig, browseResponse);
-        const router = await createTestRouter();
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await waitForStable(wrapper);
-
-        const tabContentVm = await waitForTabContent(wrapper);
-        if (!tabContentVm) {
-            return;
-        }
-
-        tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, auto_disliked: true }];
-        await wrapper.vm.$nextTick();
-
-        mocks.mockAxios.post.mockResolvedValueOnce({
-            data: { message: 'Reaction updated.', reaction: { type: 'like' } },
-        });
-
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
-        const fileReactions = browseTabContentComponent.findComponent({ name: 'FileReactions' });
-
-        if (fileReactions.exists()) {
-            await fileReactions.vm.$emit('reaction', 'like');
-
-            await flushPromises();
-            await wrapper.vm.$nextTick();
-
-            const updatedItem = tabContentVm.items.find((i: any) => i.id === 1);
-            if (updatedItem) {
-                expect(updatedItem.auto_disliked).toBe(false);
-            } else {
-                expect(tabContentVm.items.length).toBe(0);
-            }
-        }
-    });
 });

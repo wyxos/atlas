@@ -109,7 +109,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         const response = await window.axios.get(browseIndex.url({ query: { ...queryParams, minimal: true } }));
         const data = response.data;
 
-        // Collect files that were moderated out (auto_dislike/blacklist) from moderation response
+        // Collect files that were moderated out (blacklist) from moderation response
         const immediateActions = data.moderation?.moderatedOut ?? [];
 
         // Return immediate actions so they can be collected by the caller
