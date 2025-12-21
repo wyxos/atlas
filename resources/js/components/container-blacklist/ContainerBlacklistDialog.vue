@@ -192,9 +192,6 @@ function handleCancel(): void {
                             <SelectItem value="ui_countdown">
                                 UI Countdown (5s delay)
                             </SelectItem>
-                            <SelectItem value="auto_dislike">
-                                Immediate Auto-Dislike
-                            </SelectItem>
                             <SelectItem value="blacklist">
                                 Immediate Blacklist
                             </SelectItem>
@@ -203,9 +200,6 @@ function handleCancel(): void {
                     <p class="text-xs text-twilight-indigo-400">
                         <span v-if="actionType === 'ui_countdown'">
                             Files in this container will show a 5-second countdown before being auto-disliked.
-                        </span>
-                        <span v-else-if="actionType === 'auto_dislike'">
-                            Files in this container will be immediately auto-disliked and removed from results.
                         </span>
                         <span v-else>
                             Files in this container will be immediately blacklisted and removed from results.

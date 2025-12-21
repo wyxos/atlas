@@ -3,7 +3,7 @@ import { batchIncrementPreview } from '@/actions/App/Http/Controllers/FilesContr
 
 interface PendingPreview {
     fileId: number;
-    resolve: (value: { previewed_count: number; will_auto_dislike: boolean }) => void;
+    resolve: (value: { previewed_count: number }) => void;
     reject: (error: any) => void;
 }
 
@@ -18,16 +18,17 @@ let batchTimeout: ReturnType<typeof setTimeout> | null = null;
  * Collects requests for a short period and sends them together.
  */
 export function usePreviewBatch() {
-    async function executeBatchIncrementPreview(fileIds: number[]): Promise<Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>> {
+    async function executeBatchIncrementPreview(fileIds: number[]): Promise<Array<{ id: number; previewed_count: number }>> {
         try {
             const response = await window.axios.post<{
                 message: string;
-                results: Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>;
+                results: Array<{ id: number; previewed_count: number; }>;
             }>(batchIncrementPreview.url(), {
                 file_ids: fileIds,
             });
 
-            return response.data.results;
+            // Extract only previewed_count, ignoring will_auto_dislike
+            return response.data.results.map((r) => ({ id: r.id, previewed_count: r.previewed_count }));
         } catch (error) {
             console.error('Failed to batch increment preview counts:', error);
             throw error;
@@ -68,7 +69,6 @@ export function usePreviewBatch() {
                         if (result) {
                             pending.resolve({
                                 previewed_count: result.previewed_count,
-                                will_auto_dislike: result.will_auto_dislike,
                             });
                         } else {
                             // If result not found, reject
@@ -102,7 +102,7 @@ export function usePreviewBatch() {
      * Queue a preview increment request.
      * Returns a promise that resolves when the batch request completes.
      */
-    function queuePreviewIncrement(fileId: number): Promise<{ previewed_count: number; will_auto_dislike: boolean }> {
+    function queuePreviewIncrement(fileId: number): Promise<{ previewed_count: number }> {
         return new Promise((resolve, reject) => {
             // If already pending, reject the new request (shouldn't happen, but safety check)
             if (pendingPreviews.value.has(fileId)) {

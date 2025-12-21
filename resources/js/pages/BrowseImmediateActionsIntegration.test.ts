@@ -135,7 +135,7 @@ describe('Browse - Immediate Actions Integration', () => {
         });
 
         const immediateActions = [
-            { id: 1, action_type: 'auto_dislike', thumbnail: 'https://example.com/thumb1.jpg' },
+            { id: 1, action_type: 'blacklist', thumbnail: 'https://example.com/thumb1.jpg' },
             { id: 2, action_type: 'blacklist', thumbnail: 'https://example.com/thumb2.jpg' },
         ];
 

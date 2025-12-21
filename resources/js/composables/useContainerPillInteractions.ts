@@ -79,19 +79,6 @@ export function useContainerPillInteractions(
             return { item, index: itemIndex !== -1 ? itemIndex : items.value.length };
         });
 
-        // Remove auto_disliked and will_auto_dislike flags if user is reacting (like, funny, favorite - not dislike)
-        if (reactionType === 'love' || reactionType === 'like' || reactionType === 'funny') {
-            for (const item of siblings) {
-                const itemIndex = items.value.findIndex((i) => i.id === item.id);
-                if (itemIndex !== -1) {
-                    Object.assign(items.value[itemIndex], {
-                        auto_disliked: false,
-                        will_auto_dislike: false,
-                    });
-                }
-            }
-        }
-
         // Use removeMany for efficient batch removal
         if (masonry.value?.removeMany) {
             await masonry.value.removeMany(siblings);

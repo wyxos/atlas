@@ -129,11 +129,11 @@ vi.mock('@wyxos/vibe', () => ({
         name: 'Masonry',
         template: `
             <div class="masonry-mock" data-test="masonry-component">
-                <slot 
-                    v-for="(item, index) in items" 
+                <slot
+                    v-for="(item, index) in items"
                     :key="item.id || index"
-                    :item="item" 
-                    :remove="remove" 
+                    :item="item"
+                    :remove="remove"
                     :index="index"
                 ></slot>
             </div>
@@ -161,15 +161,15 @@ vi.mock('@wyxos/vibe', () => ({
     MasonryItem: {
         name: 'MasonryItem',
         template: `
-            <div 
-                class="masonry-item" 
+            <div
+                class="masonry-item"
                 :data-key="item.key"
-                @mouseenter="$emit('mouseenter', $event)" 
+                @mouseenter="$emit('mouseenter', $event)"
                 @mouseleave="$emit('mouseleave', $event)"
                 @mousedown="$emit('mousedown', $event)"
                 @auxclick="$emit('auxclick', $event)"
             >
-                <slot 
+                <slot
                     :item="item"
                     :remove="remove"
                     :imageLoaded="true"
@@ -472,7 +472,7 @@ beforeEach(() => {
 
     // Default mock for axios
     mockAxios.get.mockResolvedValue({ data: { items: [], nextPage: null } });
-    mockAxios.post.mockResolvedValue({ data: { previewed_count: 0, auto_disliked: false } });
+    mockAxios.post.mockResolvedValue({ data: { previewed_count: 0 } });
     mockAxios.put.mockResolvedValue({ data: {} });
     mockAxios.delete.mockResolvedValue({ data: {} });
     mockAxios.patch.mockResolvedValue({ data: {} });
@@ -504,7 +504,6 @@ describe('BrowseTabContent - Container Badges', () => {
         notFound: false,
         previewed_count: 0,
         seen_count: 0,
-        auto_disliked: false,
         containers,
     } as MasonryItem);
 
