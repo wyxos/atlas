@@ -12,8 +12,8 @@ export function useItemPreview(
     const previewedItems = ref<Set<number>>(new Set());
     const { queuePreviewIncrement } = usePreviewBatch();
 
-    // Increment preview count when item is preloaded (batched)
-    async function handleItemPreload(fileId: number): Promise<void> {
+    // Increment preview count when item comes into view (batched)
+    async function incrementPreviewCount(fileId: number): Promise<void> {
         // Skip if we've already incremented preview count for this item
         if (previewedItems.value.has(fileId)) {
             return;
@@ -59,7 +59,7 @@ export function useItemPreview(
 
     return {
         previewedItems,
-        handleItemPreload,
+        incrementPreviewCount,
         clearPreviewedItems,
     };
 }

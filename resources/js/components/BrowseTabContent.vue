@@ -535,8 +535,8 @@ async function handleItemInView(payload: { item: { id?: number }; type: 'image' 
     // payload.item is the item passed to MasonryItem, which should have the id
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
-        // Handle preview increment when item is fully in view
-        await itemPreview.handleItemPreload(itemId);
+        // Increment preview count when item is fully in view
+        await itemPreview.incrementPreviewCount(itemId);
     }
 }
 
