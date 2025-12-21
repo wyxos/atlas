@@ -644,18 +644,6 @@ onMounted(async () => {
     itemVirtualization.initialize();
 });
 
-// Watch for tab ID changes to ensure re-initialization when switching to a different tab
-// This is a safety measure in case the component doesn't get destroyed/recreated
-watch(
-    () => props.tab?.id,
-    async (newId, oldId) => {
-        // Only re-initialize if tab ID actually changed and tab exists
-        if (newId && newId !== oldId && props.tab) {
-            await initializeTab(props.tab);
-        }
-    }
-);
-
 // Sync selectedService with currentTabService when tab changes
 // This ensures the service selector shows the correct service when switching tabs
 watch(
