@@ -526,13 +526,27 @@ const autoDislikeQueue = useAutoDislikeQueue(items, removeItemFromMasonry);
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
     hoveredItemIndex.value = index;
     hoveredItemId.value = itemId;
+
+    // Freeze auto-dislike queue if hovering over an item that will be auto-disliked
+    const item = itemsMap.value.get(itemId);
+    if (item?.will_auto_dislike) {
+        autoDislikeQueue.freezeAll();
+    }
 }
 
 function handleMasonryItemMouseLeave(): void {
     const itemId = hoveredItemId.value;
+    const wasHoveringFlaggedItem = itemId !== null && itemsMap.value.get(itemId)?.will_auto_dislike;
+
     hoveredItemIndex.value = null;
     hoveredItemId.value = null;
     containerBadges.setHoveredContainerId(null);
+
+    // Unfreeze auto-dislike queue when mouse leaves a flagged item
+    // (The queue will be frozen again if mouse enters another flagged item)
+    if (wasHoveringFlaggedItem) {
+        autoDislikeQueue.unfreezeAll();
+    }
 }
 
 async function handleItemInView(payload: { item: { id?: number }; type: 'image' | 'video' }, item: MasonryItem): Promise<void> {
