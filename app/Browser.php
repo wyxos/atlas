@@ -191,7 +191,7 @@ class Browser
             // Extract file IDs and create action_type map
             $immediateFileIds = array_column($immediateActions, 'file_id');
             $actionTypeMap = array_column($immediateActions, 'action_type', 'file_id');
-            
+
             // Filter files directly from collection and map to desired structure
             $immediatelyProcessedFiles = $allFilesBeforeFilter
                 ->only($immediateFileIds)
@@ -212,11 +212,7 @@ class Browser
                 'page' => request()->input('page', 1),
                 'next' => $filter['next'] ?? null,
             ],
-            'moderation' => [
-                // Files that were immediately auto-disliked or blacklisted in this request
-                // These were moderated out (removed) and should show toast notifications
-                'moderatedOut' => $immediatelyProcessedFiles,
-            ],
+            'moderation' => $immediatelyProcessedFiles,
             'error' => $serviceError,
             'services' => $servicesMeta,
         ];

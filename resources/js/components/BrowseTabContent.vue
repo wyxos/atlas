@@ -48,6 +48,8 @@ import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
+import BatchModerationToast from './toasts/BatchModerationToast.vue';
+import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
@@ -162,9 +164,56 @@ function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
     onBackfillStopOriginal(payload);
 }
 
+// Accumulate moderation data from each page load
+const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
+
+const toast = useToast();
+
+/**
+ * Show moderation toast with accumulated moderated files.
+ */
+function showModerationToast(moderatedFiles: Array<{ id: number; action_type: string; thumbnail?: string }>): void {
+    if (moderatedFiles.length === 0) {
+        return;
+    }
+
+    const toastId = `moderation-${Date.now()}`;
+    
+    // Prepare previews for the toast (up to 5)
+    const previews = moderatedFiles.slice(0, 5).map(file => ({
+        id: file.id,
+        action_type: file.action_type,
+        thumbnail: file.thumbnail,
+    }));
+
+    toast(
+        {
+            component: BatchModerationToast,
+            props: {
+                toastId,
+                previews,
+                totalCount: moderatedFiles.length,
+            },
+        },
+        {
+            id: toastId,
+            timeout: false, // Don't auto-dismiss
+            closeButton: false,
+            closeOnClick: false,
+            toastClassName: 'moderation-toast-wrapper',
+            bodyClassName: 'moderation-toast-body',
+        }
+    );
+}
+
 // Handle loading:stop
 function onLoadingStop(): void {
-    // Loading stopped
+    // Show moderation toast if there are accumulated moderated files
+    if (accumulatedModeration.value.length > 0) {
+        showModerationToast(accumulatedModeration.value);
+        // Clear accumulated moderation after showing toast
+        accumulatedModeration.value = [];
+    }
 }
 
 // Computed property to display page value
@@ -309,7 +358,14 @@ const layout = {
 };
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
-    return await getNextPageFromComposable(page);
+    const result = await getNextPageFromComposable(page);
+    
+    // Accumulate moderation data from this page
+    if (result.immediateActions && result.immediateActions.length > 0) {
+        accumulatedModeration.value.push(...result.immediateActions);
+    }
+    
+    return result;
 }
 
 function onMasonryClick(e: MouseEvent): void {
