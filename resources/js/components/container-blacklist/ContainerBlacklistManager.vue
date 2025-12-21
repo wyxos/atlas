@@ -208,9 +208,17 @@ defineExpose({
                                             </span>
                                         </div>
                                     </div>
-                                    <p class="text-[11px] text-twilight-indigo-400 truncate">
-                                        {{ blacklist.source }} - {{ blacklist.source_id }}
-                                    </p>
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-[11px] text-twilight-indigo-400 truncate">
+                                            {{ blacklist.source }} - {{ blacklist.source_id }}
+                                        </p>
+                                        <span
+                                            v-if="blacklist.blacklisted_files_count !== undefined"
+                                            class="text-[11px] font-medium text-twilight-indigo-300 shrink-0 ml-2"
+                                        >
+                                            {{ blacklist.blacklisted_files_count }} file{{ blacklist.blacklisted_files_count !== 1 ? 's' : '' }}
+                                        </span>
+                                    </div>
                                 </li>
                             </ul>
                         </div>

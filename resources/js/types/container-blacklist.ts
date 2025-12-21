@@ -8,6 +8,7 @@ export interface ContainerBlacklist {
     referrer?: string | null;
     action_type: ContainerBlacklistActionType | null;
     blacklisted_at: string | null;
+    blacklisted_files_count?: number;
     created_at?: string;
     updated_at?: string;
 }
