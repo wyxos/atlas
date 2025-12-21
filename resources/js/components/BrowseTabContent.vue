@@ -1,26 +1,38 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, shallowRef } from 'vue';
-import type { MasonryItem, BrowseTabData } from '@/composables/useBrowseTabs';
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import type { BrowseTabData, MasonryItem } from '@/composables/useBrowseTabs';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
-import { Loader2, Info, Copy, RefreshCcw, ChevronsLeft, X, ChevronDown, Play, Image, Video, TestTube } from 'lucide-vue-next';
+import {
+    ChevronDown,
+    ChevronsLeft,
+    Copy,
+    Image,
+    Info,
+    Loader2,
+    Play,
+    RefreshCcw,
+    TestTube,
+    Video,
+    X
+} from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
+import DislikeProgressBar from './DislikeProgressBar.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import Pill from './ui/Pill.vue';
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogClose,
 } from './ui/dialog';
 import { useBackfill } from '@/composables/useBackfill';
-import { useBrowseService, type GetPageResult } from '@/composables/useBrowseService';
-import { createReactionCallback } from '@/utils/reactions';
+import { type GetPageResult, useBrowseService } from '@/composables/useBrowseService';
 import { useContainerBadges } from '@/composables/useContainerBadges';
 import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
 import { usePromptData } from '@/composables/usePromptData';
@@ -295,10 +307,7 @@ const layout = {
 };
 
 async function getNextPage(page: number | string): Promise<GetPageResult> {
-    const result = await getNextPageFromComposable(page);
-
-
-    return result;
+    return await getNextPageFromComposable(page);
 }
 
 function onMasonryClick(e: MouseEvent): void {
@@ -607,9 +616,6 @@ function handlePromptDialogUpdate(val: boolean): void {
     }
 }
 
-// Computed property for progress bar style
-
-
 // Watch masonry loading state and emit to parent
 watch(
     () => masonry.value?.isLoading ?? false,
@@ -855,6 +861,9 @@ onUnmounted(() => {
                                             :remove-item="() => handleRemoveItem(remove, item)"
                                             @reaction="(type) => handleFileReaction(item.id, type, remove)" />
                                     </div>
+
+                                    <!-- Progress Bar Overlay -->
+                                    <DislikeProgressBar :progress="60" countdown="05:00" />
                                 </div>
                             </template>
                         </VibeMasonryItem>
