@@ -49,8 +49,8 @@ export function useItemPreview(
             const combinedWillAutoDislike = existingFlag || response.will_auto_dislike;
 
             // Update local item state - update in both items.value and tab.itemsData
-            // Note: items uses shallowRef, so we need to replace the object and trigger reactivity manually.
-            // Backend already ensures all properties exist, so no normalization needed.
+            // Note: items uses shallowRef, so we need to use splice() to ensure v-for in Masonry sees the change.
+            // Direct assignment + triggerRef doesn't always trigger v-for re-evaluation with shallowRef.
             if (itemIndex !== -1) {
                 // Create updated item object (backend already includes all properties)
                 const updatedItem = {
@@ -59,12 +59,21 @@ export function useItemPreview(
                     will_auto_dislike: combinedWillAutoDislike,
                 };
 
-                // Replace the element - with normalized items, direct assignment + triggerRef works
-                // This is O(1) efficient and ensures reactivity
-                items.value[itemIndex] = updatedItem;
+                // Use splice to replace the element - Vue tracks splice() mutations better than direct assignment
+                // This ensures Masonry's v-for sees the change and updates the slot prop
+                items.value.splice(itemIndex, 1, updatedItem);
 
-                // Manually trigger reactivity for shallowRef (required for array element changes)
+                // CRITICAL: Also update itemsMap to ensure O(1) lookups use the updated item
+                if (itemsMap?.value) {
+                    itemsMap.value.set(fileId, updatedItem);
+                }
+
+                // Manually trigger reactivity for shallowRef (still needed)
                 triggerRef(items);
+
+                // Force Vue to process the change before continuing
+                // This ensures Masonry's v-for re-evaluates and updates slot props
+                await nextTick();
             }
 
             // Also update in tab.itemsData if it exists

@@ -563,14 +563,16 @@ async function handleItemInViewAndLoaded(payload: { item: { id?: number }; type:
     // payload.item is the item passed to MasonryItem, which should have the id
     const itemId = payload.item?.id ?? item?.id;
     if (itemId) {
-        // Find the item in the items array to get the full item object
-        const fullItem = items.value.find((i) => i.id === itemId) || item;
-
-        // Check if item is already flagged for auto-dislike (from moderation rules)
-        const isModerationFlagged = fullItem.will_auto_dislike === true;
-
         // Increment preview count when item is fully in view AND media is loaded
         const result = await itemPreview.incrementPreviewCount(itemId);
+
+        // Get fresh item reference from items array after update (item might have been updated)
+        // This ensures we have the latest will_auto_dislike and previewed_count values
+        await nextTick(); // Wait for item update to complete
+        const updatedItem = items.value.find((i) => i.id === itemId) || item;
+
+        // Check if item is already flagged for auto-dislike (from moderation rules)
+        const isModerationFlagged = updatedItem.will_auto_dislike === true;
 
         // Start countdown if:
         // 1. Item was already flagged for auto-dislike (from moderation rules) OR
@@ -578,7 +580,7 @@ async function handleItemInViewAndLoaded(payload: { item: { id?: number }; type:
         const shouldAutoDislike = isModerationFlagged || result?.will_auto_dislike === true;
 
         if (shouldAutoDislike) {
-            autoDislikeQueue.startAutoDislikeCountdown(itemId, fullItem);
+            autoDislikeQueue.startAutoDislikeCountdown(itemId, updatedItem);
         }
     }
 }
@@ -805,18 +807,24 @@ onUnmounted(() => {
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
                     data-test="masonry-component">
                     <template #default="{ item, index, remove }">
-                        <VibeMasonryItem :item="item" :remove="remove" :preload-threshold="0.5"
+                        <!-- Get fresh item reference from itemsMap to ensure reactivity with shallowRef -->
+                        <!-- The item from Masonry slot may be stale, so we look it up fresh from itemsMap -->
+                        <!-- In templates, refs are auto-unwrapped, so use itemsMap not itemsMap.value -->
+                        <VibeMasonryItem :item="itemsMap.get(item.id) || item" :remove="remove" :preload-threshold="0.5"
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
                             @mouseleave="handleMasonryItemMouseLeave"
                             @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
                             @in-view-and-loaded="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)"
                             @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
-                            <template #default="{ imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
+                            <template
+                                #default="{ item: slotItem, imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
+                                <!-- Use item from slot props (reactive) instead of outer scope item (may be stale) -->
+                                <p class="text-white">{{ slotItem.will_auto_dislike }}</p>
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
-                                    :data-key="item.key" :data-masonry-item-id="item.id"
-                                    :class="containerBadges.getMasonryItemClasses.value(item)"
-                                    @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
-                                    @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item)">
+                                    :data-key="slotItem.key" :data-masonry-item-id="slotItem.id"
+                                    :class="containerBadges.getMasonryItemClasses.value(slotItem)"
+                                    @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, slotItem)"
+                                    @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, slotItem)">
                                     <!-- Placeholder background - icon by default (before preloading starts) -->
                                     <!-- Note: Vibe's MasonryItem provides this, but we override for dark theme -->
                                     <div v-if="!imageLoaded && !imageError" :class="[
@@ -850,16 +858,17 @@ onUnmounted(() => {
                                     </div>
 
                                     <!-- Image (only render when imageSrc is available from Vibe's preloading) -->
-                                    <img v-if="imageSrc && !imageError" :src="imageSrc" :alt="`Item ${item.id}`" :class="[
-                                        'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
-                                        imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
-                                    ]" />
+                                    <img v-if="imageSrc && !imageError" :src="imageSrc" :alt="`Item ${slotItem.id}`"
+                                        :class="[
+                                            'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
+                                            imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
+                                        ]" />
 
                                     <!-- Container badges (shows on hover with type and count) -->
                                     <Transition name="fade">
-                                        <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(item).length > 0"
+                                        <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(slotItem).length > 0"
                                             class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
-                                            <div v-for="container in containerBadges.getContainersForItem(item)"
+                                            <div v-for="container in containerBadges.getContainersForItem(slotItem)"
                                                 :key="container.id" class="cursor-pointer"
                                                 @mouseenter="handleContainerPillMouseEnter(container.id)"
                                                 @mouseleave="handleContainerPillMouseLeave"
@@ -883,7 +892,8 @@ onUnmounted(() => {
                                             class="absolute top-2 right-2 z-50 pointer-events-auto">
                                             <Button variant="ghost" size="sm"
                                                 class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
-                                                @click.stop="handlePromptDialogClick(item)" aria-label="Show prompt">
+                                                @click.stop="handlePromptDialogClick(slotItem)"
+                                                aria-label="Show prompt">
                                                 <Info :size="14" />
                                             </Button>
                                         </div>
@@ -893,20 +903,20 @@ onUnmounted(() => {
                                     <Transition name="fade">
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
                                             class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                            <FileReactions :file-id="item.id"
-                                                :previewed-count="(item.previewed_count as number) ?? 0"
-                                                :viewed-count="(item.seen_count as number) ?? 0" :current-index="index"
-                                                :total-items="items.length" variant="small"
-                                                :remove-item="() => handleRemoveItem(remove, item)"
-                                                @reaction="(type) => handleFileReaction(item.id, type, remove)" />
+                                            <FileReactions :file-id="slotItem.id"
+                                                :previewed-count="(slotItem.previewed_count as number) ?? 0"
+                                                :viewed-count="(slotItem.seen_count as number) ?? 0"
+                                                :current-index="index" :total-items="items.length" variant="small"
+                                                :remove-item="() => handleRemoveItem(remove, slotItem)"
+                                                @reaction="(type) => handleFileReaction(slotItem.id, type, remove)" />
                                         </div>
                                     </Transition>
 
                                     <!-- Progress Bar Overlay (only show if will_auto_dislike is true and countdown is active) -->
                                     <DislikeProgressBar
-                                        v-if="item.will_auto_dislike && autoDislikeQueue.hasActiveCountdown(item.id)"
-                                        :progress="autoDislikeQueue.getCountdownProgress(item.id)"
-                                        :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(item.id))" />
+                                        v-if="slotItem.will_auto_dislike && autoDislikeQueue.hasActiveCountdown(slotItem.id)"
+                                        :progress="autoDislikeQueue.getCountdownProgress(slotItem.id)"
+                                        :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(slotItem.id))" />
                                 </div>
                             </template>
                         </VibeMasonryItem>
