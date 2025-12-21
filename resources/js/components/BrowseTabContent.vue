@@ -777,13 +777,6 @@ onUnmounted(() => {
                                     :class="containerBadges.getMasonryItemClasses.value(item)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, item)"
                                     @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item)">
-                                    <!-- Will auto-dislike indicator overlay (red ring for flagged items) -->
-                                    <Transition name="ring-fade">
-                                        <div v-if="item.will_auto_dislike"
-                                            class="absolute inset-0 border-2 border-red-500 pointer-events-none z-10 rounded-lg ring-fade-enter-active"
-                                            style="will-change: transform, opacity;">
-                                        </div>
-                                    </Transition>
                                     <!-- Placeholder background - icon by default (before preloading starts) -->
                                     <!-- Note: Vibe's MasonryItem provides this, but we override for dark theme -->
                                     <div v-if="!imageLoaded && !imageError" :class="[
