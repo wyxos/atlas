@@ -13,10 +13,10 @@ export function useItemPreview(
     const { queuePreviewIncrement } = usePreviewBatch();
 
     // Increment preview count when item comes into view (batched)
-    async function incrementPreviewCount(fileId: number): Promise<void> {
+    async function incrementPreviewCount(fileId: number): Promise<{ will_auto_dislike: boolean } | null> {
         // Skip if we've already incremented preview count for this item
         if (previewedItems.value.has(fileId)) {
-            return;
+            return null;
         }
 
         try {
@@ -32,6 +32,8 @@ export function useItemPreview(
                 // Update the item in place to maintain reactivity
                 const currentItem = items.value[itemIndex];
                 currentItem.previewed_count = response.previewed_count;
+                // Update will_auto_dislike flag
+                currentItem.will_auto_dislike = response.will_auto_dislike;
             }
 
             // Also update in tab.itemsData if it exists
@@ -40,15 +42,19 @@ export function useItemPreview(
                 if (tabItemIndex !== -1) {
                     Object.assign(tab.value.itemsData[tabItemIndex], {
                         previewed_count: response.previewed_count,
+                        will_auto_dislike: response.will_auto_dislike,
                     });
                 }
             }
 
             // Force reactivity update
             await nextTick();
+
+            return { will_auto_dislike: response.will_auto_dislike };
         } catch (error) {
             console.error('Failed to increment preview count:', error);
             // Don't throw - preview count is not critical
+            return null;
         }
     }
 
