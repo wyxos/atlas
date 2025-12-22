@@ -49,6 +49,7 @@ class Tab extends Model
         'query_params',
         'position',
         'is_active',
+        'source_type',
     ];
 
     /**
@@ -110,4 +111,3 @@ class Tab extends Model
         return FileItemFormatter::format($files, $page);
     }
 }
-

@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Tab;
 use App\Models\File;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -230,4 +230,62 @@ test('validation fails when file_ids contains non-integer', function () {
 
     $response->assertStatus(422);
     $response->assertJsonValidationErrors('file_ids.0');
+});
+
+test('tab creation defaults to online source type', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/tabs', [
+        'label' => 'My Tab',
+    ]);
+
+    $response->assertStatus(201);
+    $data = $response->json();
+    expect($data['source_type'])->toBe('online');
+    $this->assertDatabaseHas('tabs', [
+        'id' => $data['id'],
+        'source_type' => 'online',
+    ]);
+});
+
+test('tab creation accepts offline source type', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/tabs', [
+        'label' => 'My Tab',
+        'source_type' => 'offline',
+    ]);
+
+    $response->assertStatus(201);
+    $data = $response->json();
+    expect($data['source_type'])->toBe('offline');
+    $this->assertDatabaseHas('tabs', [
+        'id' => $data['id'],
+        'source_type' => 'offline',
+    ]);
+});
+
+test('tab creation accepts online source type', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/tabs', [
+        'label' => 'My Tab',
+        'source_type' => 'online',
+    ]);
+
+    $response->assertStatus(201);
+    $data = $response->json();
+    expect($data['source_type'])->toBe('online');
+});
+
+test('validation fails when source_type is invalid', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->postJson('/api/tabs', [
+        'label' => 'My Tab',
+        'source_type' => 'invalid',
+    ]);
+
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors('source_type');
 });

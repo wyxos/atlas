@@ -15,17 +15,22 @@ interface Props {
     masonry?: { isLoading?: boolean; reset?: () => void; loadPage?: (page: number) => Promise<void>; cancelLoad?: () => void; destroy?: () => void } | null;
     isMasonryLoading?: boolean;
     modelValue?: string; // v-model for selectedService
+    isOfflineMode?: boolean;
+    selectedSource?: string; // v-model for selectedSource in offline mode
 }
 
 const props = withDefaults(defineProps<Props>(), {
     open: false,
     masonry: null,
     isMasonryLoading: false,
+    isOfflineMode: false,
+    selectedSource: 'all',
 });
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
     'update:modelValue': [value: string];
+    'update:selectedSource': [value: string];
     'apply': [filters: {
         service: string;
         nsfw: boolean;
@@ -40,6 +45,12 @@ const emit = defineEmits<{
 const selectedService = computed({
     get: () => props.modelValue || '',
     set: (value: string) => emit('update:modelValue', value),
+});
+
+// Computed property for source in offline mode
+const selectedSourceModel = computed({
+    get: () => props.selectedSource || 'all',
+    set: (value: string) => emit('update:selectedSource', value),
 });
 
 // Reactive form to track all filter query params (service is synced via v-model)
@@ -75,13 +86,15 @@ const isOpen = computed({
 
 // Apply filters
 async function applyFilters(): Promise<void> {
-    if (!selectedService.value) {
-        // Service is required
+    // In offline mode, service is not required (we use LocalService)
+    // In online mode, service is required
+    if (!props.isOfflineMode && !selectedService.value) {
+        // Service is required for online mode
         return;
     }
 
     emit('apply', {
-        service: selectedService.value,
+        service: props.isOfflineMode ? 'local' : selectedService.value,
         nsfw: filterForm.nsfw,
         type: filterForm.type,
         limit: filterForm.limit,
@@ -126,8 +139,8 @@ function resetFilters(): void {
                 <SheetTitle>Advanced Filters</SheetTitle>
             </SheetHeader>
             <div class="flex-1 p-6 overflow-y-auto space-y-6">
-                <!-- Service Filter -->
-                <div class="space-y-2">
+                <!-- Service Filter (only shown in online mode) -->
+                <div v-if="!isOfflineMode" class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Service</label>
                     <Select v-model="selectedService">
                         <SelectTrigger class="w-full">
@@ -137,6 +150,21 @@ function resetFilters(): void {
                             <SelectItem v-for="service in availableServices" :key="service.key" :value="service.key">
                                 {{ service.label }}
                             </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <!-- Source Filter (only shown in offline mode) -->
+                <div v-if="isOfflineMode" class="space-y-2">
+                    <label class="text-sm font-medium text-regal-navy-100">Source</label>
+                    <Select v-model="selectedSourceModel">
+                        <SelectTrigger class="w-full">
+                            <SelectValue placeholder="All Sources" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Sources</SelectItem>
+                            <SelectItem value="CivitAI">CivitAI</SelectItem>
+                            <SelectItem value="Wallhaven">Wallhaven</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -208,7 +236,8 @@ function resetFilters(): void {
                 <Button variant="destructive" @click="resetFilters">
                     Reset
                 </Button>
-                <Button variant="default" @click="applyFilters" :disabled="!selectedService">
+                <Button variant="default" @click="applyFilters" 
+                    :disabled="!isOfflineMode && !selectedService">
                     Apply
                 </Button>
             </SheetFooter>

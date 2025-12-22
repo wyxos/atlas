@@ -50,8 +50,20 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             throw new Error('useBrowseService options are required for getNextPage');
         }
 
-        // IMPORTANT: Don't load if no service is selected
-        if (!options.hasServiceSelected.value) {
+        // IMPORTANT: Don't load if no service is selected (for online mode)
+        // Or if no source is selected (for offline mode)
+        const activeTab = options.getActiveTab();
+        const isOfflineMode = activeTab?.sourceType === 'offline';
+        
+        if (!isOfflineMode && !options.hasServiceSelected.value) {
+            return {
+                items: [],
+                nextPage: null,
+            };
+        }
+        
+        // For offline mode, check if source is selected
+        if (isOfflineMode && !activeTab?.queryParams?.source) {
             return {
                 items: [],
                 nextPage: null,
@@ -77,28 +89,36 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             page: String(pageToRequest),
         };
 
-        // Include service parameter if available
-        const currentService = options.currentTabService.value;
-        if (currentService) {
-            queryParams.source = currentService;
-        }
-
         // Include filter parameters from tab's queryParams
-        const activeTab = options.getActiveTab();
+        // (activeTab already retrieved above)
         if (activeTab?.queryParams) {
+            // In offline mode, source is set directly in queryParams
+            // In online mode, service is converted to source parameter
+            if (activeTab.queryParams.source) {
+                queryParams.source = activeTab.queryParams.source;
+            } else {
+                // Include service parameter if available (online mode)
+                const currentService = options.currentTabService.value;
+                if (currentService) {
+                    queryParams.source = currentService;
+                }
+            }
+
             if (activeTab.queryParams.nsfw !== undefined && activeTab.queryParams.nsfw !== null) {
                 queryParams.nsfw = activeTab.queryParams.nsfw;
             }
             if (activeTab.queryParams.type && activeTab.queryParams.type !== 'all') {
                 queryParams.type = activeTab.queryParams.type;
             }
-            if (activeTab.queryParams.limit) {
-                queryParams.limit = Number(activeTab.queryParams.limit);
-            }
             if (activeTab.queryParams.sort && activeTab.queryParams.sort !== 'Newest') {
                 queryParams.sort = activeTab.queryParams.sort;
             }
         }
+
+        // Always include limit (default to 20 if not set in queryParams)
+        queryParams.limit = activeTab?.queryParams?.limit 
+            ? Number(activeTab.queryParams.limit) 
+            : 20;
 
         // Include tab_id if available
         if (options.activeTabId.value) {

@@ -2,12 +2,14 @@
 
 namespace App;
 
+use App\Models\File;
 use App\Services\BaseService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
 use App\Services\ContainerModerationService;
 use App\Services\FileItemFormatter;
 use App\Services\FileModerationService;
+use App\Services\LocalService;
 use App\Services\Wallhaven;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Storage;
@@ -47,9 +49,22 @@ class Browser
             ];
         }
 
+        // Check if this is a local/offline tab
+        $tabId = request()->input('tab_id');
+        $isLocalMode = false;
+        if ($tabId) {
+            $tab = \App\Models\Tab::find($tabId);
+            $isLocalMode = $tab && $tab->source_type === 'offline';
+        }
+
         // Resolve service instance
-        $serviceClass = $services[$source] ?? $services[CivitAiImages::key()] ?? CivitAiImages::class;
-        $service = app($serviceClass);
+        // If local mode, use LocalService; otherwise use the selected service
+        if ($isLocalMode) {
+            $service = app(LocalService::class);
+        } else {
+            $serviceClass = $services[$source] ?? $services[CivitAiImages::key()] ?? CivitAiImages::class;
+            $service = app($serviceClass);
+        }
 
         if (method_exists($service, 'setParams')) {
             $service->setParams($params);
@@ -119,7 +134,19 @@ class Browser
             }
         }
 
-        $persisted = app(BrowsePersister::class)->persist($filesPayload);
+        // Only persist files if not in local mode (local files already exist in DB)
+        // For local mode, convert transformed format back to File models for moderation
+        if ($isLocalMode) {
+            // Extract file referrer URLs from transformed format
+            $referrers = collect($filesPayload)->map(function ($item) {
+                return $item['file']['referrer_url'] ?? null;
+            })->filter()->values()->all();
+
+            // Load File models with metadata
+            $persisted = File::with('metadata')->whereIn('referrer_url', $referrers)->get()->all();
+        } else {
+            $persisted = app(BrowsePersister::class)->persist($filesPayload);
+        }
 
         // File moderation: apply rules based on action_type
         $fileModerationResult = app(FileModerationService::class)->moderate(collect($persisted));
@@ -162,9 +189,9 @@ class Browser
             return $fresh && ($fresh->auto_disliked || $fresh->blacklisted_at !== null);
         })->values()->all();
 
-        // Attach filtered files to tab if tab_id is provided
-        $tabId = request()->input('tab_id');
-        if ($tabId) {
+        // Attach filtered files to tab if tab_id is provided and not in local mode
+        // Local mode doesn't attach files to tabs as they get updated every time
+        if ($tabId && ! $isLocalMode) {
             $this->attachFilesToTab($tabId, $persisted);
             // Update tab's query_params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation
@@ -228,6 +255,7 @@ class Browser
         return [
             CivitAiImages::key() => CivitAiImages::class,
             Wallhaven::key() => Wallhaven::class,
+            LocalService::key() => LocalService::class,
         ];
     }
 
