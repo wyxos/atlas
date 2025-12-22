@@ -49,23 +49,6 @@ test('can create blacklist with blacklist action type', function () {
     expect($data['action_type'])->toBe('blacklist');
 });
 
-test('can create blacklist with blacklist action type', function () {
-    $user = User::factory()->create();
-    $container = Container::factory()->create([
-        'type' => 'User',
-        'source' => 'CivitAI',
-    ]);
-
-    $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
-        'container_id' => $container->id,
-        'action_type' => 'blacklist',
-    ]);
-
-    $response->assertStatus(201);
-    $data = $response->json();
-    expect($data['action_type'])->toBe('blacklist');
-});
-
 test('validates container_id is required', function () {
     $user = User::factory()->create();
 
