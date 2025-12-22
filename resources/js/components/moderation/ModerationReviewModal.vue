@@ -74,7 +74,7 @@ function formatActionType(actionType: string): string {
                     <h3 class="text-sm font-semibold text-twilight-indigo-200 mb-3">
                         {{ formatActionType(actionType) }} ({{ fileGroup.length }})
                     </h3>
-                    <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         <div v-for="file in fileGroup" :key="file.id"
                             class="relative aspect-square rounded-lg overflow-hidden border-2 border-danger-500/50 bg-prussian-blue-500">
                             <img v-if="file.thumbnail" :src="file.thumbnail" :alt="`File ${file.id}`"
