@@ -1,6 +1,4 @@
 - [ ] Browse feature improvements
-    - [ ] Moderation system
-        - [ ] Auto-blacklist files if preview count >= 5 while disliked
     - [ ] Local files support
         - [ ] Render local files in browse interface
         - [ ] Handle page refresh instead of backfill for local files

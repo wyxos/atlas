@@ -19,10 +19,11 @@ beforeEach(function () {
 });
 
 test('files with matching prompts are flagged for auto-dislike', function () {
-    // Create an active moderation rule
+    // Create an active moderation rule with DISLIKE action type
     $rule = ModerationRule::factory()->any(['spam', 'advertisement'])->create([
         'name' => 'Block spam',
         'active' => true,
+        'action_type' => ActionType::DISLIKE,
     ]);
 
     // Create files with prompts
@@ -35,7 +36,7 @@ test('files with matching prompts are flagged for auto-dislike', function () {
         'file_id' => $file1->id,
         'payload' => ['prompt' => 'This is a spam advertisement'],
     ]);
-    $file1->load('metadata');
+    $file1 = $file1->fresh()->load('metadata');
 
     $file2 = File::factory()->create([
         'referrer_url' => 'https://example.com/file2.jpg',
@@ -45,7 +46,7 @@ test('files with matching prompts are flagged for auto-dislike', function () {
         'file_id' => $file2->id,
         'payload' => ['prompt' => 'Beautiful landscape photo'],
     ]);
-    $file2->load('metadata');
+    $file2 = $file2->fresh()->load('metadata');
 
     // Call moderate directly
     $result = $this->service->moderate(collect([$file1, $file2]));
@@ -110,14 +111,16 @@ test('inactive rules are ignored', function () {
 });
 
 test('multiple active rules are checked', function () {
-    // Create multiple active rules
+    // Create multiple active rules with DISLIKE action type
     $rule1 = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
+        'action_type' => ActionType::DISLIKE,
     ]);
     $rule2 = ModerationRule::factory()->any(['advertisement'])->create([
         'name' => 'Ad rule',
         'active' => true,
+        'action_type' => ActionType::DISLIKE,
     ]);
 
     // Create file matching first rule
@@ -130,7 +133,7 @@ test('multiple active rules are checked', function () {
         'file_id' => $file1->id,
         'payload' => ['prompt' => 'This is spam content'],
     ]);
-    $file1->load('metadata');
+    $file1 = $file1->fresh()->load('metadata');
 
     // Create file matching second rule
     $file2 = File::factory()->create([
@@ -142,7 +145,7 @@ test('multiple active rules are checked', function () {
         'file_id' => $file2->id,
         'payload' => ['prompt' => 'This is an advertisement'],
     ]);
-    $file2->load('metadata');
+    $file2 = $file2->fresh()->load('metadata');
 
     // Call moderate directly
     $result = $this->service->moderate(collect([$file1, $file2]));
@@ -208,10 +211,11 @@ test('files without prompts are skipped', function () {
 });
 
 test('moderation result includes correct structure', function () {
-    // Create an active moderation rule
+    // Create an active moderation rule with DISLIKE action type
     $rule = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
+        'action_type' => ActionType::DISLIKE,
     ]);
 
     // Create file with matching prompt
@@ -226,7 +230,7 @@ test('moderation result includes correct structure', function () {
         'file_id' => $file->id,
         'payload' => ['prompt' => 'This is spam content'],
     ]);
-    $file->load('metadata');
+    $file = $file->fresh()->load('metadata');
 
     // Call moderate directly
     $result = $this->service->moderate(collect([$file]));
@@ -237,9 +241,10 @@ test('moderation result includes correct structure', function () {
 });
 
 test('batch flagging works correctly for multiple files', function () {
-    // Create an active moderation rule
+    // Create an active moderation rule with DISLIKE action type
     ModerationRule::factory()->any(['spam'])->create([
         'active' => true,
+        'action_type' => ActionType::DISLIKE,
     ]);
 
     // Create multiple files with matching prompts
@@ -253,9 +258,7 @@ test('batch flagging works correctly for multiple files', function () {
             'file_id' => $file->id,
             'payload' => ['prompt' => 'This is spam content'],
         ]);
-        $file->load('metadata');
-
-        return $file;
+        return $file->fresh()->load('metadata');
     });
 
     // Call moderate directly
