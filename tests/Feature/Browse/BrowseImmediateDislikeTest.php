@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
-test('immediately auto-disliked files are excluded from browse response items', function () {
+test('immediately blacklisted files from moderation rules are excluded from browse response items', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -90,8 +90,8 @@ test('immediately auto-disliked files are excluded from browse response items', 
     expect($matchedFile)->not->toBeNull()
         ->and($nonMatchedFile)->not->toBeNull();
 
-    // Assert matched file is auto-disliked in database
-    expect($matchedFile->fresh()->auto_disliked)->toBeTrue();
+    // Assert matched file is blacklisted in database
+    expect($matchedFile->fresh()->blacklisted_at)->not->toBeNull();
 
     // Assert matched file is NOT in the returned items
     expect($returnedFileIds)->not->toContain($matchedFile->id);
@@ -293,99 +293,8 @@ test('immediately blacklisted files from blacklisted containers are excluded fro
     expect($returnedFileIds)->toContain($nonMatchedFile->id);
 
     // Note: Files from the first request were attached to the tab before the container was blacklisted
-    // After the second request, the matched file is auto-disliked and filtered out from the response
+    // After the second request, the matched file is blacklisted and filtered out from the response
     // The important assertion is that the file is excluded from the response and processed correctly
-
-    // Assert moderation data shows the file was processed
-    expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
-        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
-        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
-        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
-});
-
-test('immediately blacklisted files from blacklisted containers are excluded from browse response items', function () {
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    // Mock CivitAI API response
-    Http::fake(function ($request) {
-        $url = $request->url();
-        if (str_contains($url, 'civitai.com/api/v1/images')) {
-            return Http::response([
-                'items' => [
-                    [
-                        'id' => 123,
-                        'url' => 'https://image.civitai.com/xmpq/file1.jpg',
-                        'meta' => [
-                            'prompt' => 'beautiful landscape',
-                            'width' => 640,
-                            'height' => 640,
-                        ],
-                        'width' => 640,
-                        'height' => 640,
-                        'type' => 'image',
-                        'hash' => 'abc123',
-                    ],
-                ],
-                'metadata' => [
-                    'nextCursor' => null,
-                ],
-            ], 200);
-        }
-
-        return Http::response([], 200);
-    });
-
-    // Create a tab
-    $tab = BrowseTab::factory()->for($user)->create([
-        'label' => 'Test Tab',
-        'query_params' => [
-            'service' => 'civit-ai-images',
-            'page' => 1,
-        ],
-    ]);
-
-    // Make browse request to get files persisted
-    $response = $this->getJson('/api/browse?source=civit-ai-images&page=1&tab_id='.$tab->id);
-    $response->assertSuccessful();
-
-    // Find the file that will be matched
-    $matchedFile = File::where('referrer_url', 'https://civitai.com/images/123')->first();
-
-    // File should exist
-    expect($matchedFile)->not->toBeNull();
-
-    // Create a blacklisted container with blacklist action type
-    $container = Container::factory()->create([
-        'type' => 'User',
-        'source' => 'CivitAI',
-        'source_id' => 'user123',
-        'blacklisted_at' => now(),
-        'action_type' => ActionType::BLACKLIST,
-    ]);
-
-    // Attach container to the file
-    $matchedFile->containers()->attach($container->id);
-
-    // Make another browse request - the file should now be blacklisted
-    $response = $this->getJson('/api/browse?source=civit-ai-images&page=1&tab_id='.$tab->id);
-    $response->assertSuccessful();
-    $data = $response->json();
-
-    // Get file IDs from the response items
-    $returnedFileIds = collect($data['items'])->pluck('id')->toArray();
-
-    // Assert matched file is blacklisted in database
-    expect($matchedFile->fresh()->blacklisted_at)->not->toBeNull();
-
-    // Assert matched file is NOT in the returned items
-    expect($returnedFileIds)->not->toContain($matchedFile->id);
-
-    // Note: The file was attached to the tab in the first request before the container was blacklisted
-    // After blacklisting, the file is filtered out from the response but may still be in the tab
-    // The important thing is that it's excluded from the response and blacklisted
 
     // Assert moderation data shows the file was processed
     expect($data['moderation'])->not->toBeNull()
