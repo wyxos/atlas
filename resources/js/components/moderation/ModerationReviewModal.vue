@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from 'vue';
-import { useQueue } from '@/composables/useQueue';
+import { computed } from 'vue';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Shield } from 'lucide-vue-next';
@@ -22,32 +21,12 @@ const emit = defineEmits<{
     'update:open': [value: boolean];
 }>();
 
-const queue = useQueue();
-
 // Internal state for v-model
 const isModalOpen = computed({
     get: () => props.open,
     set: (value: boolean) => {
         emit('update:open', value);
-        // Freeze when opening, unfreeze when closing
-        if (value) {
-            queue.freezeAll();
-        } else {
-            queue.unfreezeImmediately();
-        }
     },
-});
-
-// Freeze queues when component mounts (if modal is already open)
-if (props.open) {
-    queue.freezeAll();
-}
-
-// Unfreeze queues when component unmounts
-onBeforeUnmount(() => {
-    if (props.open) {
-        queue.unfreezeImmediately();
-    }
 });
 
 function handleClose(): void {
@@ -96,24 +75,15 @@ function formatActionType(actionType: string): string {
                         {{ formatActionType(actionType) }} ({{ fileGroup.length }})
                     </h3>
                     <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                        <div
-                            v-for="file in fileGroup"
-                            :key="file.id"
-                            class="relative aspect-square rounded-lg overflow-hidden border-2 border-danger-500/50 bg-prussian-blue-500"
-                        >
-                            <img
-                                v-if="file.thumbnail"
-                                :src="file.thumbnail"
-                                :alt="`File ${file.id}`"
-                                class="w-full h-full object-cover"
-                            />
-                            <div
-                                v-else
-                                class="w-full h-full flex items-center justify-center bg-prussian-blue-500/50"
-                            >
+                        <div v-for="file in fileGroup" :key="file.id"
+                            class="relative aspect-square rounded-lg overflow-hidden border-2 border-danger-500/50 bg-prussian-blue-500">
+                            <img v-if="file.thumbnail" :src="file.thumbnail" :alt="`File ${file.id}`"
+                                class="w-full h-full object-cover" />
+                            <div v-else class="w-full h-full flex items-center justify-center bg-prussian-blue-500/50">
                                 <span class="text-xs text-twilight-indigo-300">#{{ file.id }}</span>
                             </div>
-                            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 text-center truncate">
+                            <div
+                                class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 text-center truncate">
                                 #{{ file.id }}
                             </div>
                         </div>
@@ -129,4 +99,3 @@ function formatActionType(actionType: string): string {
         </DialogContent>
     </Dialog>
 </template>
-

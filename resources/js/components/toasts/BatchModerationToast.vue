@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useToast } from 'vue-toastification';
+import { useQueue } from '@/composables/useQueue';
 import { Shield, Plus, Eye } from 'lucide-vue-next';
 import ModerationReviewModal from '@/components/moderation/ModerationReviewModal.vue';
 
 const toast = useToast();
+const queue = useQueue();
 
 interface PreviewItem {
     id: number;
@@ -118,12 +120,18 @@ const previewsContainerWidth = computed(() => {
 });
 
 function handleReview(): void {
+    // Freeze all queues before opening the modal
+    queue.freezeAll();
     // Open the moderation review modal
     isModalOpen.value = true;
 }
 
 function handleModalClose(open: boolean): void {
     isModalOpen.value = open;
+    // Unfreeze queues when modal closes (with 2-second delay)
+    if (!open) {
+        queue.unfreezeAll();
+    }
 }
 
 function handleDismiss(): void {
