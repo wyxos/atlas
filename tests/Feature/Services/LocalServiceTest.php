@@ -20,46 +20,33 @@ test('returns correct key, source, and label', function () {
 test('fetch returns paginated local files', function () {
     $user = User::factory()->create();
 
-    // Create files that should be included
+    // Create files
     $file1 = File::factory()->create([
-        'downloaded' => true,
         'downloaded_at' => now()->subDay(),
-        'blacklisted_at' => null,
-        'auto_disliked' => false,
     ]);
     $file2 = File::factory()->create([
-        'downloaded' => true,
         'downloaded_at' => now()->subHours(12),
-        'blacklisted_at' => null,
-        'auto_disliked' => false,
     ]);
-
-    // Create files that should be excluded
-    File::factory()->create(['downloaded' => false]);
-    File::factory()->create(['blacklisted_at' => now()]);
-    File::factory()->create(['auto_disliked' => true]);
+    $file3 = File::factory()->create([
+        'downloaded_at' => now()->subHours(6),
+    ]);
 
     $result = $this->service->fetch(['page' => 1, 'limit' => 20]);
 
     expect($result)->toHaveKey('items');
     expect($result)->toHaveKey('metadata');
     expect($result['metadata'])->toHaveKey('nextCursor');
-    expect($result['items'])->toHaveCount(2);
-    expect($result['items'][0]['id'])->toBe($file2->id); // More recent first
-    expect($result['items'][1]['id'])->toBe($file1->id);
+    expect($result['items'])->toHaveCount(3);
+    expect($result['items'][0]['id'])->toBe($file3->id); // More recent first
+    expect($result['items'][1]['id'])->toBe($file2->id);
+    expect($result['items'][2]['id'])->toBe($file1->id);
 });
 
 test('fetch filters by source when provided', function () {
     $file1 = File::factory()->create([
-        'downloaded' => true,
-        'blacklisted_at' => null,
-        'auto_disliked' => false,
         'source' => 'CivitAI',
     ]);
     $file2 = File::factory()->create([
-        'downloaded' => true,
-        'blacklisted_at' => null,
-        'auto_disliked' => false,
         'source' => 'Wallhaven',
     ]);
 
