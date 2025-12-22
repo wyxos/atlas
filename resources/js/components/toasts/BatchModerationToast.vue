@@ -81,7 +81,7 @@ const reviewButtonClasses = computed(() => {
  * Image 3: 25.6px offset (40% of 64px, 60% visible, 40% behind image 2)
  * Image 4: 38.4px offset (60% of 64px, 40% visible, 60% behind image 3)
  * Image 5: 51.2px offset (80% of 64px, 20% visible, 80% behind image 4)
- * 
+ *
  * The offset is calculated as a percentage of the image width (64px).
  * Each subsequent image is offset by 20% more than the previous one.
  */
@@ -102,7 +102,7 @@ function getPreviewOffset(index: number): number {
  */
 const previewsContainerWidth = computed(() => {
     if (visiblePreviews.value.length === 0) return '64px';
-    
+
     // Calculate width based on overlapping images
     // First image takes full 64px, each subsequent adds (64px - overlap)
     let totalWidth = 64; // First image
@@ -110,12 +110,12 @@ const previewsContainerWidth = computed(() => {
         const overlap = (i * 20) / 100 * 64; // Overlap in pixels
         totalWidth += (64 - overlap);
     }
-    
+
     // Add space for plus icon if needed
     if (hasMore.value) {
         totalWidth += 64;
     }
-    
+
     return `${totalWidth}px`;
 });
 
@@ -140,7 +140,7 @@ function handleDismiss(): void {
 </script>
 
 <template>
-    <div :class="toastClasses">
+    <div :class="toastClasses" class="flex! gap-4!">
         <!-- Overlapping Preview Thumbnails -->
         <div class="relative shrink-0 flex items-center" :style="{ width: previewsContainerWidth, height: '64px' }">
             <div
