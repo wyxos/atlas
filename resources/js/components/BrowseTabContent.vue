@@ -193,6 +193,7 @@ function showModerationToast(moderatedFiles: Array<{ id: number; action_type: st
                 toastId,
                 previews,
                 totalCount: moderatedFiles.length,
+                allFiles: moderatedFiles, // Pass all files for the modal
             },
         },
         {
