@@ -43,7 +43,7 @@ class ModerationRuleController extends Controller
             'name' => $validated['name'] ?? null,
             'active' => $validated['active'] ?? true,
             'nsfw' => $validated['nsfw'] ?? false,
-            'action_type' => $validated['action_type'] ?? ActionType::UI_COUNTDOWN,
+            'action_type' => $validated['action_type'] ?? 'ui_countdown',
             'op' => $validated['op'],
             'terms' => $validated['terms'] ?? null,
             'min' => $validated['min'] ?? null,

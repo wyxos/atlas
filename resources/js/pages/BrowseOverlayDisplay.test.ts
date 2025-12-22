@@ -124,7 +124,7 @@ describe('Browse - Overlay Display', () => {
         tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
             const mockItem = document.createElement('div');

@@ -1,5 +1,5 @@
 import { nextTick, type Ref } from 'vue';
-import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
+import type { MasonryItem, TabData } from './useTabs';
 
 interface TabInitializationDependencies {
     // Component refs
@@ -35,7 +35,7 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
     /**
      * Initialize a tab with its saved state and data.
      */
-    async function initializeTab(tab: BrowseTabData | undefined): Promise<void> {
+    async function initializeTab(tab: TabData | undefined): Promise<void> {
         if (!tab) return;
 
         // Close fileviewer

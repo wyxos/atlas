@@ -1,5 +1,5 @@
 import { ref, computed, nextTick, type Ref } from 'vue';
-import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
+import type { MasonryItem, TabData } from './useTabs';
 
 /**
  * Composable for managing the reset to first page dialog and reset logic.
@@ -10,7 +10,7 @@ export function useResetDialog(
     currentPage: Ref<string | number | null>,
     nextCursor: Ref<string | number | null>,
     loadAtPage: Ref<string | number | null>,
-    tab: Ref<BrowseTabData | undefined>,
+    tab: Ref<TabData | undefined>,
     updateActiveTab: (itemsData: MasonryItem[]) => void
 ) {
     const resetDialogOpen = ref(false);

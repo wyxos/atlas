@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import ImageCarousel from './ImageCarousel.vue';
-import type { MasonryItem } from '../composables/useBrowseTabs';
+import type { MasonryItem } from '../composables/useTabs';
 
 // Mock lucide-vue-next icons
 vi.mock('lucide-vue-next', () => ({

@@ -5,7 +5,7 @@ import Browse from './Browse.vue';
 import {
     setupBrowseTestMocks,
     createTestRouter,
-    getBrowseTabContent,
+    getTabContent,
     waitForStable,
     type BrowseMocks,
 } from '../test/browse-test-utils';
@@ -138,7 +138,7 @@ beforeEach(() => {
 describe('Browse - Service Selection', () => {
     it('new tab does not auto-load until service is selected', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({ data: [] });
             }
             if (url.includes('/api/browse')) {
@@ -180,7 +180,7 @@ describe('Browse - Service Selection', () => {
         expect(vm.activeTabId).toBe(1);
         await waitForStable(wrapper);
 
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.hasServiceSelected).toBe(false);
             // loadAtPage is null by default and only set when needed (e.g., applying filters)
@@ -206,7 +206,7 @@ describe('Browse - Service Selection', () => {
 
     it('applies selected service and triggers loading', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [{
                         id: 1,
@@ -247,7 +247,7 @@ describe('Browse - Service Selection', () => {
 
         await waitForStable(wrapper);
 
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -281,7 +281,7 @@ describe('Browse - Service Selection', () => {
             .filter((callUrl: string) => {
                 return typeof callUrl === 'string'
                     && callUrl.includes('/api/browse?')
-                    && !callUrl.includes('/api/browse-tabs')
+                    && !callUrl.includes('/api/tabs')
                     && !callUrl.includes('limit=1');
             });
         expect(browseCalls.length).toBeGreaterThan(0);
@@ -294,7 +294,7 @@ describe('Browse - Service Selection', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [
                         {
@@ -341,7 +341,7 @@ describe('Browse - Service Selection', () => {
 
         await waitForStable(wrapper);
 
-        let tabContentVm = getBrowseTabContent(wrapper);
+        let tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.currentTabService).toBe('civit-ai-images');
             // selectedService is now synced with currentTabService when tab changes
@@ -352,7 +352,7 @@ describe('Browse - Service Selection', () => {
         await waitForStable(wrapper);
 
         expect(vm.activeTabId).toBe(tab2Id);
-        tabContentVm = getBrowseTabContent(wrapper);
+        tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.currentTabService).toBe('wallhaven');
             expect(tabContentVm.selectedService).toBe('wallhaven');
@@ -363,7 +363,7 @@ describe('Browse - Service Selection', () => {
         const tabId = 1;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -396,7 +396,7 @@ describe('Browse - Service Selection', () => {
 
         await waitForStable(wrapper);
 
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -418,7 +418,7 @@ describe('Browse - Service Selection', () => {
 
     it('registers backfill event handlers on masonry component', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [{
                         id: 1,
@@ -447,7 +447,7 @@ describe('Browse - Service Selection', () => {
         await waitForStable(wrapper);
         await waitForStable(wrapper);
 
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }

@@ -1,5 +1,5 @@
 import { ref, computed, watch, nextTick } from 'vue';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 import type { PillVariant } from '@/components/ui/Pill.vue';
 
 /**

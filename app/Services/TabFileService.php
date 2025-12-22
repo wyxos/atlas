@@ -2,24 +2,24 @@
 
 namespace App\Services;
 
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Service for managing browse_tab_file pivot table operations.
+ * Service for managing tab_file pivot table operations.
  * Provides efficient bulk operations for detaching files from tabs.
  */
-class BrowseTabFileService
+class TabFileService
 {
     /**
      * Detach a single file from all tabs belonging to a user.
      */
     public function detachFileFromUserTabs(int $userId, int $fileId): void
     {
-        $userTabIds = BrowseTab::forUser($userId)->pluck('id');
+        $userTabIds = Tab::forUser($userId)->pluck('id');
         if ($userTabIds->isNotEmpty()) {
-            DB::table('browse_tab_file')
-                ->whereIn('browse_tab_id', $userTabIds)
+            DB::table('tab_file')
+                ->whereIn('tab_id', $userTabIds)
                 ->where('file_id', $fileId)
                 ->delete();
         }
@@ -36,12 +36,13 @@ class BrowseTabFileService
             return;
         }
 
-        $userTabIds = BrowseTab::forUser($userId)->pluck('id');
+        $userTabIds = Tab::forUser($userId)->pluck('id');
         if ($userTabIds->isNotEmpty()) {
-            DB::table('browse_tab_file')
-                ->whereIn('browse_tab_id', $userTabIds)
+            DB::table('tab_file')
+                ->whereIn('tab_id', $userTabIds)
                 ->whereIn('file_id', $fileIds)
                 ->delete();
         }
     }
 }
+

@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Listings\FileListing;
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\BrowseTabFileService;
+use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -245,7 +245,7 @@ class FilesController extends Controller
         }
 
         // Detach files from all tabs belonging to this user
-        app(BrowseTabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
+        app(TabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
 
         return response()->json([
             'message' => 'Files auto-disliked successfully.',

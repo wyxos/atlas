@@ -2,7 +2,7 @@
 import { Loader2 } from 'lucide-vue-next';
 import Pill from './ui/Pill.vue';
 import type { BackfillState } from '../composables/useBackfill';
-import type { MasonryItem } from '../composables/useBrowseTabs';
+import type { MasonryItem } from '../composables/useTabs';
 
 interface Props {
     items: MasonryItem[];

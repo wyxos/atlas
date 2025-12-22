@@ -1,4 +1,4 @@
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 import { incrementSeen } from '@/actions/App/Http/Controllers/FilesController';
 
 /**

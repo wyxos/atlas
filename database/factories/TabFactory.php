@@ -6,9 +6,9 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\BrowseTab>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Tab>
  */
-class BrowseTabFactory extends Factory
+class TabFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -40,7 +40,7 @@ class BrowseTabFactory extends Factory
     }
 
     /**
-     * Attach files to the browse tab.
+     * Attach files to the tab.
      */
     public function withFiles(array $fileIds): static
     {
@@ -53,3 +53,4 @@ class BrowseTabFactory extends Factory
         });
     }
 }
+

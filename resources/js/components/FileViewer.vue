@@ -3,7 +3,7 @@ import { ref, nextTick, onUnmounted, watch } from 'vue';
 import { X, Loader2, Menu } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
-import type { MasonryItem } from '@/composables/useBrowseTabs';
+import type { MasonryItem } from '@/composables/useTabs';
 import { useReactionHandler } from '@/composables/useReactionHandler';
 import { createReactionCallback } from '@/utils/reactions';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
@@ -327,7 +327,7 @@ async function handleReaction(type: ReactionType): Promise<void> {
     }
 
     // Remove from carousel (items array) AFTER masonry removal
-    // Note: removeFromMasonry removes from BrowseTabContent's items, which should sync to FileViewer's props.items
+    // Note: removeFromMasonry removes from TabContent's items, which should sync to FileViewer's props.items
     // via the watch. However, we need to remove from FileViewer's items directly for immediate carousel update.
     // The watch is blocked by isRemovingItem flag to prevent double removal.
     isRemovingItem.value = true;

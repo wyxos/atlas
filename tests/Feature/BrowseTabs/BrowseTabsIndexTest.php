@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,9 +9,9 @@ uses(RefreshDatabase::class);
 
 test('authenticated user can view their browse tabs', function () {
     $user = User::factory()->create();
-    BrowseTab::factory()->for($user)->count(3)->create();
+    Tab::factory()->for($user)->count(3)->create();
 
-    $response = $this->actingAs($user)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -21,11 +21,11 @@ test('authenticated user can view their browse tabs', function () {
 
 test('tabs are returned ordered by position', function () {
     $user = User::factory()->create();
-    $tab1 = BrowseTab::factory()->for($user)->create(['position' => 2]);
-    $tab2 = BrowseTab::factory()->for($user)->create(['position' => 0]);
-    $tab3 = BrowseTab::factory()->for($user)->create(['position' => 1]);
+    $tab1 = Tab::factory()->for($user)->create(['position' => 2]);
+    $tab2 = Tab::factory()->for($user)->create(['position' => 0]);
+    $tab3 = Tab::factory()->for($user)->create(['position' => 1]);
 
-    $response = $this->actingAs($user)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -39,9 +39,9 @@ test('tabs do not include items_data in index response (lazy loading)', function
     $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
     $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
 
-    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
+    $tab = Tab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -62,9 +62,9 @@ test('tabs do not include file-related data in index response', function () {
         'thumbnail_url' => 'https://example.com/thumb.jpg',
     ]);
 
-    $tab = BrowseTab::factory()->for($user)->withFiles([$file->id])->create();
+    $tab = Tab::factory()->for($user)->withFiles([$file->id])->create();
 
-    $response = $this->actingAs($user)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -84,9 +84,9 @@ test('tabs do not include file-related data regardless of file count', function 
     $file3 = File::factory()->create(['referrer_url' => 'https://example.com/file3.jpg']);
 
     // Create tab with files in specific order: file3, file1, file2
-    $tab = BrowseTab::factory()->for($user)->withFiles([$file3->id, $file1->id, $file2->id])->create();
+    $tab = Tab::factory()->for($user)->withFiles([$file3->id, $file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -101,9 +101,9 @@ test('tabs do not include file-related data regardless of file count', function 
 
 test('tabs without files do not include file-related data', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create();
+    $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -120,10 +120,10 @@ test('user only sees their own tabs', function () {
     $user1 = User::factory()->create();
     $user2 = User::factory()->create();
 
-    BrowseTab::factory()->for($user1)->count(2)->create();
-    BrowseTab::factory()->for($user2)->count(3)->create();
+    Tab::factory()->for($user1)->count(2)->create();
+    Tab::factory()->for($user2)->count(3)->create();
 
-    $response = $this->actingAs($user1)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user1)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -134,7 +134,7 @@ test('user only sees their own tabs', function () {
 });
 
 test('guest cannot view browse tabs', function () {
-    $response = $this->getJson('/api/browse-tabs');
+    $response = $this->getJson('/api/tabs');
 
     $response->assertUnauthorized();
 });
@@ -143,12 +143,12 @@ test('tabs include query_params in index response', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
 
-    $tab = BrowseTab::factory()->for($user)
+    $tab = Tab::factory()->for($user)
         ->withQueryParams(['page' => 3, 'next' => 'cursor-123'])
         ->withFiles([$file->id])
         ->create();
 
-    $response = $this->actingAs($user)->getJson('/api/browse-tabs');
+    $response = $this->actingAs($user)->getJson('/api/tabs');
 
     $response->assertSuccessful();
     $data = $response->json();

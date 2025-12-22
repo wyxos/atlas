@@ -1,5 +1,5 @@
 import type { Ref } from 'vue';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 
 /**
  * Composable for restoring items to masonry layout.

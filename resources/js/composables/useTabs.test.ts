@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useBrowseTabs } from './useBrowseTabs';
+import { useTabs } from './useTabs';
 
 // Mock axios
 const mockAxios = {
@@ -30,9 +30,9 @@ beforeEach(() => {
     });
 });
 
-describe('useBrowseTabs', () => {
+describe('useTabs', () => {
     it('initializes with empty state', () => {
-        const { tabs, activeTabId, isLoadingTabs } = useBrowseTabs();
+        const { tabs, activeTabId, isLoadingTabs } = useTabs();
 
         expect(tabs.value).toEqual([]);
         expect(activeTabId.value).toBeNull();
@@ -59,11 +59,11 @@ describe('useBrowseTabs', () => {
 
         mockAxios.get.mockResolvedValueOnce({ data: mockTabs });
 
-        const { tabs, loadTabs, isLoadingTabs } = useBrowseTabs();
+        const { tabs, loadTabs, isLoadingTabs } = useTabs();
 
         await loadTabs();
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs');
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs');
         expect(tabs.value).toHaveLength(2);
         expect(tabs.value[0].id).toBe(1);
         expect(tabs.value[0].label).toBe('Tab 1');
@@ -85,7 +85,7 @@ describe('useBrowseTabs', () => {
 
         mockAxios.get.mockResolvedValueOnce({ data: mockTabs });
 
-        const { tabs, loadTabs } = useBrowseTabs();
+        const { tabs, loadTabs } = useTabs();
 
         await loadTabs();
 
@@ -118,17 +118,17 @@ describe('useBrowseTabs', () => {
         });
 
         const onTabSwitch = vi.fn();
-        const { tabs, createTab, activeTabId } = useBrowseTabs(onTabSwitch);
+        const { tabs, createTab, activeTabId } = useTabs(onTabSwitch);
 
         await tabs.value; // Wait for initial state
         const newTab = await createTab();
 
-        expect(mockAxios.post).toHaveBeenCalledWith('/api/browse-tabs', {
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/tabs', {
             label: 'Browse 1',
             query_params: {},
             position: 0,
         });
-        expect(mockAxios.patch).toHaveBeenCalledWith('/api/browse-tabs/1/active');
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/tabs/1/active');
         expect(newTab.id).toBe(1);
         expect(newTab.label).toBe('Browse 1');
         expect(tabs.value).toHaveLength(1);
@@ -138,7 +138,7 @@ describe('useBrowseTabs', () => {
 
     it('closes a tab and switches to remaining tab', async () => {
         const onTabSwitch = vi.fn();
-        const { tabs, closeTab, activeTabId } = useBrowseTabs(onTabSwitch);
+        const { tabs, closeTab, activeTabId } = useTabs(onTabSwitch);
 
         // Set up tabs manually for this test
         tabs.value = [
@@ -160,8 +160,8 @@ describe('useBrowseTabs', () => {
 
         await closeTab(1);
 
-        expect(mockAxios.delete).toHaveBeenCalledWith('/api/browse-tabs/1');
-        expect(mockAxios.patch).toHaveBeenCalledWith('/api/browse-tabs/2/active');
+        expect(mockAxios.delete).toHaveBeenCalledWith('/api/tabs/1');
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/tabs/2/active');
         expect(tabs.value).toHaveLength(1);
         expect(tabs.value[0].id).toBe(2);
         expect(activeTabId.value).toBe(2); // Should switch to remaining tab
@@ -192,7 +192,7 @@ describe('useBrowseTabs', () => {
             },
         });
 
-        const { tabs, closeTab, activeTabId } = useBrowseTabs(onTabSwitch);
+        const { tabs, closeTab, activeTabId } = useTabs(onTabSwitch);
 
         // Set up single tab
         tabs.value = [
@@ -204,8 +204,8 @@ describe('useBrowseTabs', () => {
 
         await closeTab(1);
 
-        expect(mockAxios.delete).toHaveBeenCalledWith('/api/browse-tabs/1');
-        expect(mockAxios.patch).toHaveBeenCalledWith('/api/browse-tabs/1/active');
+        expect(mockAxios.delete).toHaveBeenCalledWith('/api/tabs/1');
+        expect(mockAxios.patch).toHaveBeenCalledWith('/api/tabs/1/active');
         expect(tabs.value).toHaveLength(1); // New tab created
         expect(activeTabId.value).toBe(1); // New tab ID
         expect(onTabSwitch).toHaveBeenCalledWith(1); // Should switch to new tab
@@ -213,7 +213,7 @@ describe('useBrowseTabs', () => {
 
     it('closes a non-active tab without switching', async () => {
         const onTabSwitch = vi.fn();
-        const { tabs, closeTab, activeTabId } = useBrowseTabs(onTabSwitch);
+        const { tabs, closeTab, activeTabId } = useTabs(onTabSwitch);
 
         // Set up tabs manually for this test
         tabs.value = [
@@ -226,7 +226,7 @@ describe('useBrowseTabs', () => {
 
         await closeTab(1);
 
-        expect(mockAxios.delete).toHaveBeenCalledWith('/api/browse-tabs/1');
+        expect(mockAxios.delete).toHaveBeenCalledWith('/api/tabs/1');
         expect(tabs.value).toHaveLength(1);
         expect(tabs.value[0].id).toBe(2);
         expect(activeTabId.value).toBe(2); // Should remain the same
@@ -234,7 +234,7 @@ describe('useBrowseTabs', () => {
     });
 
     it('gets active tab', () => {
-        const { tabs, activeTabId, getActiveTab } = useBrowseTabs();
+        const { tabs, activeTabId, getActiveTab } = useTabs();
 
         tabs.value = [
             { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
@@ -250,7 +250,7 @@ describe('useBrowseTabs', () => {
     });
 
     it('returns undefined when no active tab', () => {
-        const { getActiveTab } = useBrowseTabs();
+        const { getActiveTab } = useTabs();
 
         const activeTab = getActiveTab();
 
@@ -258,7 +258,7 @@ describe('useBrowseTabs', () => {
     });
 
     it('updates active tab', async () => {
-        const { tabs, activeTabId, updateActiveTab } = useBrowseTabs();
+        const { tabs, activeTabId, updateActiveTab } = useTabs();
 
         // Set up tabs manually for this test (simulating loaded state)
         tabs.value = [
@@ -286,7 +286,7 @@ describe('useBrowseTabs', () => {
         await new Promise(resolve => setTimeout(resolve, 600));
 
         // QueryParams are managed by the backend (Browser.php), not sent from frontend
-        expect(mockAxios.put).toHaveBeenCalledWith('/api/browse-tabs/1', {
+        expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/1', {
             label: 'Tab 1',
             position: 0,
             // query_params are not sent - backend manages them
@@ -294,7 +294,7 @@ describe('useBrowseTabs', () => {
     });
 
     it('loads items for a specific tab', async () => {
-        const { tabs, loadTabItems } = useBrowseTabs();
+        const { tabs, loadTabItems } = useTabs();
 
         // Set up tabs manually
         tabs.value = [
@@ -309,7 +309,7 @@ describe('useBrowseTabs', () => {
         // Clear previous mocks and set up specific mock for items endpoint
         mockAxios.get.mockReset();
         mockAxios.get.mockImplementation((url: string) => {
-            if (url === '/api/browse-tabs/1/items' || url.includes('/api/browse-tabs/1/items')) {
+            if (url === '/api/tabs/1/items' || url.includes('/api/tabs/1/items')) {
                 return Promise.resolve({
                     data: {
                         items: mockItemsData,
@@ -321,7 +321,7 @@ describe('useBrowseTabs', () => {
 
         const result = await loadTabItems(1);
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs/1/items');
         expect(result).toEqual(mockItemsData);
 
         const tab = tabs.value.find(t => t.id === 1);
@@ -330,7 +330,7 @@ describe('useBrowseTabs', () => {
     });
 
     it('handles load tab items error gracefully', async () => {
-        const { tabs, loadTabItems } = useBrowseTabs();
+        const { tabs, loadTabItems } = useTabs();
 
         tabs.value = [
             { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1], itemsData: [], position: 0, isActive: false },
@@ -340,7 +340,7 @@ describe('useBrowseTabs', () => {
         // Clear previous mocks and set up specific mock for items endpoint to reject
         mockAxios.get.mockReset();
         mockAxios.get.mockImplementation((url: string) => {
-            if (url === '/api/browse-tabs/1/items' || url.includes('/api/browse-tabs/1/items')) {
+            if (url === '/api/tabs/1/items' || url.includes('/api/tabs/1/items')) {
                 return Promise.reject(error);
             }
             return Promise.resolve({ data: [] });
@@ -359,7 +359,7 @@ describe('useBrowseTabs', () => {
         mockAxios.get.mockReset();
         mockAxios.get.mockRejectedValue(error);
 
-        const { loadTabs, isLoadingTabs, tabs } = useBrowseTabs();
+        const { loadTabs, isLoadingTabs, tabs } = useTabs();
 
         await expect(loadTabs()).rejects.toThrow('Network error');
         expect(isLoadingTabs.value).toBe(false);
@@ -371,13 +371,13 @@ describe('useBrowseTabs', () => {
         const error = new Error('Network error');
         mockAxios.post.mockRejectedValueOnce(error);
 
-        const { createTab } = useBrowseTabs();
+        const { createTab } = useTabs();
 
         await expect(createTab()).rejects.toThrow('Network error');
     });
 
     it('handles close tab error gracefully', async () => {
-        const { tabs, closeTab } = useBrowseTabs();
+        const { tabs, closeTab } = useTabs();
 
         // Set up tabs manually for this test
         tabs.value = [

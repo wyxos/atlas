@@ -1,4 +1,4 @@
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 import { createReactionCallback } from '../utils/reactions';
 import type { ReactionType } from '@/types/reaction';
 

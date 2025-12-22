@@ -180,7 +180,7 @@ export function setupBrowseTestMocks(mocks: BrowseMocks): void {
     mocks.mockRestoreMany.mockClear();
 
     mocks.mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/api/browse-tabs')) {
+        if (url.includes('/api/tabs')) {
             return Promise.resolve({ data: [] });
         }
         return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -206,10 +206,10 @@ export async function createTestRouter(initialPath = '/browse') {
 }
 
 /**
- * Get BrowseTabContent component from wrapper
+ * Get TabContent component from wrapper
  */
-export function getBrowseTabContent(wrapper: any) {
-    const browseTabContent = wrapper.findComponent({ name: 'BrowseTabContent' });
+export function getTabContent(wrapper: any) {
+    const tabContent = wrapper.findComponent({ name: 'TabContent' });
     if (browseTabContent.exists()) {
         return browseTabContent.vm;
     }
@@ -234,7 +234,7 @@ export async function waitForTabContent(wrapper: any, maxWait = 50): Promise<any
     while (Date.now() - start < maxWait) {
         await flushPromises();
         await wrapper.vm.$nextTick();
-        const tabContent = getBrowseTabContent(wrapper);
+        const tabContent = getTabContent(wrapper);
         if (tabContent) {
             return tabContent;
         }
@@ -263,7 +263,7 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
  */
 export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], browseResponse?: any) {
     mocks.mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/api/browse-tabs') && !url.includes('/items')) {
+        if (url.includes('/api/tabs') && !url.includes('/items')) {
             // Return tab configs for initial load without file-related data
             const configs = Array.isArray(tabConfig) ? tabConfig : [tabConfig];
             const tabsForIndex = configs.map((tab: any) => {
@@ -272,7 +272,7 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             });
             return Promise.resolve({ data: tabsForIndex });
         }
-        if (url.includes('/api/browse-tabs/') && url.includes('/items')) {
+        if (url.includes('/api/tabs/') && url.includes('/items')) {
             const tabId = url.match(/\/api\/browse-tabs\/(\d+)\/items/)?.[1];
             const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig;
             if (tab && tab.items) {
@@ -351,12 +351,12 @@ export async function mountBrowseWithTab(
 }
 
 /**
- * Get FileViewer component from wrapper (through BrowseTabContent)
+ * Get FileViewer component from wrapper (through TabContent)
  */
 export function getFileViewer(wrapper: any, FileViewerComponent: any) {
-    const browseTabContent = wrapper.findComponent({ name: 'BrowseTabContent' });
-    if (browseTabContent.exists()) {
-        const fileViewer = browseTabContent.findComponent(FileViewerComponent);
+    const tabContent = wrapper.findComponent({ name: 'TabContent' });
+    if (tabContent.exists()) {
+        const fileViewer = tabContent.findComponent(FileViewerComponent);
         if (fileViewer.exists()) {
             return fileViewer;
         }

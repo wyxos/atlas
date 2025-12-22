@@ -216,7 +216,7 @@ export function setupBrowseTestMocks() {
 
         // Mock tabs API to return empty array by default
         mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({ data: [] });
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -249,18 +249,18 @@ export async function createTestRouter(initialPath = '/browse') {
     return router;
 }
 
-export function getBrowseTabContent(wrapper: any) {
-    const browseTabContent = wrapper.findComponent({ name: 'BrowseTabContent' });
-    if (browseTabContent.exists()) {
-        return browseTabContent.vm;
+export function getTabContent(wrapper: any) {
+    const tabContent = wrapper.findComponent({ name: 'TabContent' });
+    if (tabContent.exists()) {
+        return tabContent.vm;
     }
     return null;
 }
 
 export function getFileViewer(wrapper: any) {
-    const browseTabContent = wrapper.findComponent({ name: 'BrowseTabContent' });
-    if (browseTabContent.exists()) {
-        const fileViewer = browseTabContent.findComponent(FileViewer);
+    const tabContent = wrapper.findComponent({ name: 'TabContent' });
+    if (tabContent.exists()) {
+        const fileViewer = tabContent.findComponent(FileViewer);
         if (fileViewer.exists()) {
             return fileViewer;
         }
@@ -309,10 +309,10 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
 
 export function setupAxiosMocks(tabConfig: any | any[], browseResponse?: any) {
     mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/api/browse-tabs')) {
+        if (url.includes('/api/tabs')) {
             return Promise.resolve({ data: Array.isArray(tabConfig) ? tabConfig : [tabConfig] });
         }
-        if (url.includes('/api/browse-tabs/') && url.includes('/items')) {
+        if (url.includes('/api/tabs/') && url.includes('/items')) {
             const tabId = url.match(/\/api\/browse-tabs\/(\d+)\/items/)?.[1];
             const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig;
             if (tab && tab.items) {
@@ -342,7 +342,7 @@ export async function waitForTabContent(wrapper: any, maxWait = 50): Promise<any
     while (Date.now() - start < maxWait) {
         await flushPromises();
         await wrapper.vm.$nextTick();
-        const tabContent = getBrowseTabContent(wrapper);
+        const tabContent = getTabContent(wrapper);
         if (tabContent) {
             return tabContent;
         }

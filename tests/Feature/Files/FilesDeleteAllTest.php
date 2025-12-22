@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,10 +20,10 @@ test('admin can delete all files in database', function () {
     $file3 = File::factory()->create();
 
     // Create browse tabs for the admin with files attached
-    $tab1 = BrowseTab::factory()->for($admin)->create();
+    $tab1 = Tab::factory()->for($admin)->create();
     $tab1->files()->attach([$file1->id => ['position' => 0], $file2->id => ['position' => 1]]);
 
-    $tab2 = BrowseTab::factory()->for($admin)->create();
+    $tab2 = Tab::factory()->for($admin)->create();
     $tab2->files()->attach([$file3->id => ['position' => 0]]);
 
     $response = $this->actingAs($admin)->deleteJson('/api/files');
@@ -52,11 +52,11 @@ test('deleteAll deletes all files in database regardless of user', function () {
     $file3 = File::factory()->create();
 
     // Create browse tabs for admin
-    $adminTab = BrowseTab::factory()->for($admin)->create();
+    $adminTab = Tab::factory()->for($admin)->create();
     $adminTab->files()->attach([$file1->id => ['position' => 0], $file2->id => ['position' => 1]]);
 
     // Create browse tabs for other user
-    $otherTab = BrowseTab::factory()->for($otherUser)->create();
+    $otherTab = Tab::factory()->for($otherUser)->create();
     $otherTab->files()->attach([$file3->id => ['position' => 0]]);
 
     $response = $this->actingAs($admin)->deleteJson('/api/files');
@@ -75,7 +75,7 @@ test('deleteAll returns correct deleted count', function () {
     $file2 = File::factory()->create();
     $file3 = File::factory()->create(); // File not attached to any tab
 
-    $tab = BrowseTab::factory()->for($admin)->create();
+    $tab = Tab::factory()->for($admin)->create();
     $tab->files()->attach([$file1->id => ['position' => 0], $file2->id => ['position' => 1]]);
 
     $response = $this->actingAs($admin)->deleteJson('/api/files');
@@ -90,7 +90,7 @@ test('regular user cannot delete all files', function () {
     $user = User::factory()->create();
     $file = File::factory()->create();
 
-    $tab = BrowseTab::factory()->for($user)->create();
+    $tab = Tab::factory()->for($user)->create();
     $tab->files()->attach([$file->id => ['position' => 0]]);
 
     $response = $this->actingAs($user)->deleteJson('/api/files');

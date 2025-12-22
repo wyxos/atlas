@@ -35,14 +35,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/browse', [\App\Http\Controllers\BrowseController::class, 'index'])->name('api.browse.index');
     Route::get('/api/browse/services', [\App\Http\Controllers\BrowseController::class, 'services'])->name('api.browse.services');
     Route::post('/api/browse/items', [\App\Http\Controllers\BrowseController::class, 'items'])->name('api.browse.items');
-    Route::get('/api/browse-tabs', [\App\Http\Controllers\BrowseTabController::class, 'index'])->name('api.browse-tabs.index');
-    Route::get('/api/browse-tabs/{browseTab}/items', [\App\Http\Controllers\BrowseTabController::class, 'items'])->name('api.browse-tabs.items');
-    Route::post('/api/browse-tabs', [\App\Http\Controllers\BrowseTabController::class, 'store'])->name('api.browse-tabs.store');
-    Route::put('/api/browse-tabs/{browseTab}', [\App\Http\Controllers\BrowseTabController::class, 'update'])->name('api.browse-tabs.update');
-    Route::delete('/api/browse-tabs/{browseTab}', [\App\Http\Controllers\BrowseTabController::class, 'destroy'])->name('api.browse-tabs.destroy');
-    Route::patch('/api/browse-tabs/{browseTab}/position', [\App\Http\Controllers\BrowseTabController::class, 'updatePosition'])->name('api.browse-tabs.position');
-    Route::patch('/api/browse-tabs/{browseTab}/active', [\App\Http\Controllers\BrowseTabController::class, 'setActive'])->name('api.browse-tabs.active');
-    Route::delete('/api/browse-tabs', [\App\Http\Controllers\BrowseTabController::class, 'deleteAll'])->name('api.browse-tabs.delete-all');
+    Route::get('/api/tabs', [\App\Http\Controllers\TabController::class, 'index'])->name('api.tabs.index');
+    Route::get('/api/tabs/{tab}/items', [\App\Http\Controllers\TabController::class, 'items'])->name('api.tabs.items');
+    Route::post('/api/tabs', [\App\Http\Controllers\TabController::class, 'store'])->name('api.tabs.store');
+    Route::put('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'update'])->name('api.tabs.update');
+    Route::delete('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'destroy'])->name('api.tabs.destroy');
+    Route::patch('/api/tabs/{tab}/position', [\App\Http\Controllers\TabController::class, 'updatePosition'])->name('api.tabs.position');
+    Route::patch('/api/tabs/{tab}/active', [\App\Http\Controllers\TabController::class, 'setActive'])->name('api.tabs.active');
+    Route::delete('/api/tabs', [\App\Http\Controllers\TabController::class, 'deleteAll'])->name('api.tabs.delete-all');
     Route::delete('/api/files', [\App\Http\Controllers\FilesController::class, 'deleteAll'])->name('api.files.delete-all');
 
     // Moderation Rules

@@ -4,16 +4,16 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateBrowseTabRequest extends FormRequest
+class UpdateTabRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
     {
-        $browseTab = $this->route('browseTab');
+        $tab = $this->route('tab');
 
-        return $browseTab && $browseTab->user_id === $this->user()->id;
+        return $tab && $tab->user_id === $this->user()->id;
     }
 
     /**
@@ -32,3 +32,4 @@ class UpdateBrowseTabRequest extends FormRequest
         ];
     }
 }
+

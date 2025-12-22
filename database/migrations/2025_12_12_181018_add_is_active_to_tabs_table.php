@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('browse_tabs', function (Blueprint $table) {
+        Schema::table('tabs', function (Blueprint $table) {
             $table->boolean('is_active')->default(false)->after('position');
 
             // Ensure only one active tab per user
@@ -25,8 +25,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('browse_tabs', function (Blueprint $table) {
+        Schema::table('tabs', function (Blueprint $table) {
             $table->dropColumn('is_active');
         });
     }
 };
+

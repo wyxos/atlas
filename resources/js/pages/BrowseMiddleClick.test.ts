@@ -171,7 +171,7 @@ describe('Browse - Middle Click Shortcuts', () => {
         tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryItem = browseTabContentComponent.find('.masonry-item');
 
         if (masonryItem.exists()) {
@@ -229,7 +229,7 @@ describe('Browse - Middle Click Shortcuts', () => {
         tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const fileViewer = browseTabContentComponent.findComponent(FileViewer);
         if (fileViewer.exists()) {
             const fileViewerVm = fileViewer.vm as any;

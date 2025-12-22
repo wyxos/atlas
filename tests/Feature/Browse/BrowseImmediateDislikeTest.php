@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\ActionType;
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\ModerationRule;
@@ -65,7 +65,7 @@ test('immediately blacklisted files from moderation rules are excluded from brow
     });
 
     // Create a tab
-    $tab = BrowseTab::factory()->for($user)->create([
+    $tab = Tab::factory()->for($user)->create([
         'label' => 'Test Tab',
         'query_params' => [
             'service' => 'civit-ai-images',
@@ -155,7 +155,7 @@ test('immediately blacklisted files are excluded from browse response items', fu
     });
 
     // Create a tab
-    $tab = BrowseTab::factory()->for($user)->create([
+    $tab = Tab::factory()->for($user)->create([
         'label' => 'Test Tab',
         'query_params' => [
             'service' => 'civit-ai-images',
@@ -243,7 +243,7 @@ test('immediately blacklisted files from blacklisted containers are excluded fro
     });
 
     // Create a tab
-    $tab = BrowseTab::factory()->for($user)->create([
+    $tab = Tab::factory()->for($user)->create([
         'label' => 'Test Tab',
         'query_params' => [
             'service' => 'civit-ai-images',

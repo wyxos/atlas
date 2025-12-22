@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 

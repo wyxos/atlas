@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { useContainerBadges } from './useContainerBadges';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 
 describe('useContainerBadges', () => {
     beforeEach(() => {
