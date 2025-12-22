@@ -46,6 +46,7 @@ class TabController extends Controller
             'label' => $request->label,
             'query_params' => $request->query_params,
             'position' => $request->position ?? ($maxPosition + 1),
+            'source_type' => $request->source_type ?? 'online',
         ]);
 
         // Sync files if file_ids are provided
@@ -261,4 +262,3 @@ class TabController extends Controller
         ]);
     }
 }
-

@@ -439,12 +439,17 @@ vi.mock('@/composables/useBackfill', () => ({
     }),
 }));
 
-vi.mock('@/composables/useBrowseService', () => ({
-    useBrowseService: () => ({
-        getNextPage: vi.fn().mockResolvedValue({ items: [], nextPage: null }),
-        applyService: vi.fn().mockResolvedValue(undefined),
-    }),
-}));
+vi.mock('@/composables/useBrowseService', async () => {
+    const { ref } = await import('vue');
+    return {
+        useBrowseService: () => ({
+            availableServices: ref([]),
+            fetchServices: vi.fn(),
+            getNextPage: vi.fn().mockResolvedValue({ items: [], nextPage: null }),
+            applyService: vi.fn().mockResolvedValue(undefined),
+        }),
+    };
+});
 
 
 vi.mock('@/utils/reactions', () => ({
@@ -1370,6 +1375,161 @@ describe('TabContent - Container Badges', () => {
             await nextTick();
 
             expect(vm.isFilterSheetOpen).toBe(false);
+        });
+    });
+
+    describe('offline mode', () => {
+        it('displays source type selector', async () => {
+            const tab = createMockTab({
+                sourceType: 'offline',
+            });
+
+            const wrapper = mount(TabContent, {
+                props: {
+                    tab,
+                    availableServices: [],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    loadTabItems: vi.fn().mockResolvedValue([]),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const vm = wrapper.vm as any;
+            expect(vm.isOfflineMode).toBe(true);
+        });
+
+        it('hides service dropdown in offline mode', async () => {
+            const tab = createMockTab({
+                sourceType: 'offline',
+            });
+
+            const wrapper = mount(TabContent, {
+                props: {
+                    tab,
+                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    loadTabItems: vi.fn().mockResolvedValue([]),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const serviceSelect = wrapper.find('[data-test="service-select"]');
+            expect(serviceSelect.exists()).toBe(false);
+        });
+
+        it('shows source dropdown in offline mode', async () => {
+            const tab = createMockTab({
+                sourceType: 'offline',
+            });
+
+            const wrapper = mount(TabContent, {
+                props: {
+                    tab,
+                    availableServices: [],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    loadTabItems: vi.fn().mockResolvedValue([]),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const vm = wrapper.vm as any;
+            expect(vm.selectedSource).toBe('all');
+        });
+
+        it('updates source type when changed', async () => {
+            const tab = createMockTab({
+                sourceType: 'online',
+            });
+            const updateActiveTab = vi.fn();
+
+            mockAxios.put.mockResolvedValueOnce({
+                data: { ...tab, source_type: 'offline' },
+            });
+
+            const wrapper = mount(TabContent, {
+                props: {
+                    tab,
+                    availableServices: [],
+                    onReaction: vi.fn(),
+                    updateActiveTab,
+                    loadTabItems: vi.fn().mockResolvedValue([]),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const vm = wrapper.vm as any;
+            await vm.handleSourceTypeChange('offline');
+            await flushPromises();
+
+            expect(mockAxios.put).toHaveBeenCalledWith(
+                `/api/tabs/${tab.id}`,
+                { source_type: 'offline' }
+            );
+        });
+
+        it('enables apply button in offline mode when source is selected', async () => {
+            const tab = createMockTab({
+                sourceType: 'offline',
+            });
+
+            const wrapper = mount(TabContent, {
+                props: {
+                    tab,
+                    availableServices: [],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    loadTabItems: vi.fn().mockResolvedValue([]),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const vm = wrapper.vm as any;
+            vm.selectedSource = 'CivitAI';
+            await nextTick();
+
+            expect(vm.isApplyButtonDisabled).toBe(false);
+        });
+
+        it('includes source parameter when applying in offline mode', async () => {
+            const tab = createMockTab({
+                sourceType: 'offline',
+            });
+
+            mockLoadPage.mockResolvedValue({ items: [], nextPage: null });
+            mockReset.mockResolvedValue(undefined);
+
+            const wrapper = mount(TabContent, {
+                props: {
+                    tab,
+                    availableServices: [],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    loadTabItems: vi.fn().mockResolvedValue([]),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const vm = wrapper.vm as any;
+            vm.selectedSource = 'CivitAI';
+            await vm.applyService();
+            await flushPromises();
+
+            expect(vm.localQueryParams.source).toBe('CivitAI');
         });
     });
 });

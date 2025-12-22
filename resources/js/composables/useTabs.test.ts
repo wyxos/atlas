@@ -76,6 +76,56 @@ describe('useTabs', () => {
         expect(isLoadingTabs.value).toBe(false);
     });
 
+    it('loads tabs with source_type field', async () => {
+        const mockTabs = [
+            {
+                id: 1,
+                label: 'Online Tab',
+                query_params: { page: 1 },
+                position: 0,
+                is_active: false,
+                source_type: 'online',
+            },
+            {
+                id: 2,
+                label: 'Offline Tab',
+                query_params: { page: 1 },
+                position: 1,
+                is_active: false,
+                source_type: 'offline',
+            },
+        ];
+
+        mockAxios.get.mockResolvedValueOnce({ data: mockTabs });
+
+        const { tabs, loadTabs } = useTabs();
+
+        await loadTabs();
+
+        expect(tabs.value[0].sourceType).toBe('online');
+        expect(tabs.value[1].sourceType).toBe('offline');
+    });
+
+    it('defaults sourceType to online when not provided', async () => {
+        const mockTabs = [
+            {
+                id: 1,
+                label: 'Tab 1',
+                query_params: { page: 1 },
+                position: 0,
+                is_active: false,
+            },
+        ];
+
+        mockAxios.get.mockResolvedValueOnce({ data: mockTabs });
+
+        const { tabs, loadTabs } = useTabs();
+
+        await loadTabs();
+
+        expect(tabs.value[0].sourceType).toBe('online');
+    });
+
     it('sorts tabs by position', async () => {
         const mockTabs = [
             { id: 3, label: 'Tab 3', query_params: {}, position: 2, is_active: false },

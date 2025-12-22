@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Tab;
 use App\Models\File;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -168,4 +168,50 @@ test('tab update maintains file order', function () {
     expect($files[0]->id)->toBe($file3->id);
     expect($files[1]->id)->toBe($file2->id);
     expect($files[2]->id)->toBe($file1->id);
+});
+
+test('tab update can change source type to offline', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create(['source_type' => 'online']);
+
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+        'source_type' => 'offline',
+    ]);
+
+    $response->assertSuccessful();
+    $data = $response->json();
+    expect($data['source_type'])->toBe('offline');
+    $this->assertDatabaseHas('tabs', [
+        'id' => $tab->id,
+        'source_type' => 'offline',
+    ]);
+});
+
+test('tab update can change source type to online', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create(['source_type' => 'offline']);
+
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+        'source_type' => 'online',
+    ]);
+
+    $response->assertSuccessful();
+    $data = $response->json();
+    expect($data['source_type'])->toBe('online');
+    $this->assertDatabaseHas('tabs', [
+        'id' => $tab->id,
+        'source_type' => 'online',
+    ]);
+});
+
+test('validation fails when source_type is invalid', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create();
+
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+        'source_type' => 'invalid',
+    ]);
+
+    $response->assertStatus(422);
+    $response->assertJsonValidationErrors('source_type');
 });

@@ -26,6 +26,7 @@ export type TabData = {
     itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
     isActive: boolean;
+    sourceType?: 'online' | 'offline'; // Defaults to 'online' if not set
 };
 
 export type OnTabSwitchCallback = (tabId: number) => Promise<void> | void;
@@ -48,6 +49,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 items?: MasonryItem[]; // Not included in initial load, loaded lazily when restoring a tab
                 position?: number;
                 is_active?: boolean;
+                source_type?: string;
             }) => ({
                 id: tab.id,
                 label: tab.label,
@@ -56,6 +58,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
                 position: tab.position || 0,
                 isActive: tab.is_active ?? false,
+                sourceType: (tab.source_type as 'online' | 'offline') || 'online',
             }));
 
             // Sort by position
@@ -96,6 +99,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             const data = response.data;
             newTab.id = data.id;
             newTab.isActive = data.is_active ?? false;
+            newTab.sourceType = data.source_type ?? 'online';
             tabs.value.push(newTab);
             activeTabId.value = newTab.id;
 

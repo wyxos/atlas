@@ -113,5 +113,116 @@ describe('useBrowseService', () => {
         expect(getCurrentService({})).toBeNull();
         expect(getCurrentService()).toBeNull();
     });
+
+    it('includes source parameter in offline mode', async () => {
+        const mockResponse = {
+            data: {
+                items: [],
+                nextPage: null,
+            },
+        };
+
+        mockAxios.get.mockResolvedValueOnce(mockResponse);
+
+        const options: UseBrowseServiceOptions = {
+            hasServiceSelected: computed(() => true),
+            isTabRestored: ref(false),
+            items: ref([]),
+            nextCursor: ref(null),
+            currentPage: ref(null),
+            currentTabService: computed(() => null),
+            activeTabId: ref(1),
+            getActiveTab: () => ({
+                id: 1,
+                sourceType: 'offline',
+                queryParams: { source: 'CivitAI', limit: 20 },
+                itemsData: [],
+            } as any),
+            updateActiveTab: vi.fn(),
+        };
+
+        const { getNextPage } = useBrowseService(options);
+
+        await getNextPage(1);
+
+        expect(mockAxios.get).toHaveBeenCalled();
+        const callUrl = mockAxios.get.mock.calls[0][0];
+        expect(callUrl).toContain('source=CivitAI');
+        expect(callUrl).toContain('limit=20');
+    });
+
+    it('includes limit parameter with default value when not set', async () => {
+        const mockResponse = {
+            data: {
+                items: [],
+                nextPage: null,
+            },
+        };
+
+        mockAxios.get.mockResolvedValueOnce(mockResponse);
+
+        const options: UseBrowseServiceOptions = {
+            hasServiceSelected: computed(() => true),
+            isTabRestored: ref(false),
+            items: ref([]),
+            nextCursor: ref(null),
+            currentPage: ref(null),
+            currentTabService: computed(() => 'civit-ai-images'),
+            activeTabId: ref(1),
+            getActiveTab: () => ({
+                id: 1,
+                sourceType: 'online',
+                queryParams: {},
+                itemsData: [],
+            } as any),
+            updateActiveTab: vi.fn(),
+        };
+
+        const { getNextPage } = useBrowseService(options);
+
+        await getNextPage(1);
+
+        expect(mockAxios.get).toHaveBeenCalled();
+        const callUrl = mockAxios.get.mock.calls[0][0];
+        expect(callUrl).toContain('limit=20');
+    });
+
+    it('allows getNextPage in offline mode without service selected', async () => {
+        const mockResponse = {
+            data: {
+                items: [],
+                nextPage: null,
+            },
+        };
+
+        mockAxios.get.mockResolvedValueOnce(mockResponse);
+
+        // In offline mode, hasServiceSelected can be false but we still allow the call
+        // if source is selected in queryParams
+        const options: UseBrowseServiceOptions = {
+            hasServiceSelected: computed(() => false), // Service not selected, but source is
+            isTabRestored: ref(false),
+            items: ref([]),
+            nextCursor: ref(null),
+            currentPage: ref(null),
+            currentTabService: computed(() => null),
+            activeTabId: ref(1),
+            getActiveTab: () => ({
+                id: 1,
+                sourceType: 'offline',
+                queryParams: { source: 'all', limit: 20 },
+                itemsData: [],
+            } as any),
+            updateActiveTab: vi.fn(),
+        };
+
+        const { getNextPage } = useBrowseService(options);
+
+        const result = await getNextPage(1);
+
+        // The call should be made because we're in offline mode and source is set
+        expect(mockAxios.get).toHaveBeenCalled();
+        expect(result.items).toEqual([]);
+    });
 });
 
