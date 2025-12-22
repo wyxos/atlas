@@ -3,6 +3,9 @@ import { computed } from 'vue';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Shield } from 'lucide-vue-next';
+import FileReactions from '@/components/FileReactions.vue';
+import { queueReaction } from '@/utils/reactionQueue';
+import type { ReactionType } from '@/types/reaction';
 
 interface ModeratedFile {
     id: number;
@@ -31,6 +34,14 @@ const isModalOpen = computed({
 
 function handleClose(): void {
     isModalOpen.value = false;
+}
+
+function handleFileReaction(fileId: number, type: ReactionType): void {
+    // Queue reaction (same as masonry interaction)
+    // These files are already moderated out, so we don't need to remove from masonry
+    const file = props.files.find(f => f.id === fileId);
+    const thumbnail = file?.thumbnail;
+    queueReaction(fileId, type, thumbnail);
 }
 
 // Group files by action type
@@ -85,6 +96,11 @@ function formatActionType(actionType: string): string {
                             <div
                                 class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1 py-0.5 text-center truncate">
                                 #{{ file.id }}
+                            </div>
+                            <!-- File Reactions Component -->
+                            <div class="absolute bottom-8 left-0 right-0 flex justify-center px-1">
+                                <FileReactions :file-id="file.id" mode="reaction-only" variant="small"
+                                    @reaction="(type) => handleFileReaction(file.id, type)" />
                             </div>
                         </div>
                     </div>
