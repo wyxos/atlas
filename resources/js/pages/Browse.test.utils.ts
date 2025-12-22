@@ -313,7 +313,7 @@ export function setupAxiosMocks(tabConfig: any | any[], browseResponse?: any) {
             return Promise.resolve({ data: Array.isArray(tabConfig) ? tabConfig : [tabConfig] });
         }
         if (url.includes('/api/tabs/') && url.includes('/items')) {
-            const tabId = url.match(/\/api\/browse-tabs\/(\d+)\/items/)?.[1];
+            const tabId = url.match(/\/api\/tabs\/(\d+)\/items/)?.[1];
             const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig;
             if (tab && tab.items) {
                 return Promise.resolve({
