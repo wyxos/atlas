@@ -26,10 +26,7 @@ class LocalService extends BaseService
         $source = $params['source'] ?? null; // Filter by source if provided
 
         // Build query
-        $query = File::query()
-            ->where('downloaded', true) // Only show downloaded files
-            ->whereNull('blacklisted_at') // Exclude blacklisted
-            ->where('auto_disliked', false); // Exclude auto-disliked
+        $query = File::query();
 
         // Filter by source if provided and not 'all'
         if ($source && $source !== 'all') {
