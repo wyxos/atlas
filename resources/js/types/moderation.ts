@@ -36,7 +36,7 @@ export interface ModerationRuleNode {
 /**
  * Action type for moderation rules.
  */
-export type ModerationRuleActionType = 'ui_countdown' | 'auto_dislike' | 'blacklist';
+export type ModerationRuleActionType = 'dislike' | 'blacklist';
 
 /**
  * The main ModerationRule interface representing a database record.

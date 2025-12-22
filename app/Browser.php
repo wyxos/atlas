@@ -123,18 +123,18 @@ class Browser
 
         // File moderation: apply rules based on action_type
         $fileModerationResult = app(FileModerationService::class)->moderate(collect($persisted));
-        $flaggedIds = $fileModerationResult['flaggedIds']; // Files matching rules with 'ui_countdown' action type
+        $flaggedIds = $fileModerationResult['flaggedIds']; // Files matching rules with 'dislike' action type
         $processedIds = $fileModerationResult['processedIds'];
         $immediateActions = $fileModerationResult['immediateActions'] ?? [];
 
         // Container moderation: apply container moderation rules after file moderation
         $containerModerationResult = app(ContainerModerationService::class)->moderate(collect($persisted));
-        $containerFlaggedIds = $containerModerationResult['flaggedIds']; // Files matching container blacklist with 'ui_countdown' action type
+        $containerFlaggedIds = $containerModerationResult['flaggedIds']; // Files matching container blacklist with 'dislike' action type
         $containerProcessedIds = $containerModerationResult['processedIds'];
         $containerImmediateActions = $containerModerationResult['immediateActions'] ?? [];
 
         // Merge flagged file IDs from both moderation rules and container blacklist rules
-        // Both include files that match rules with 'ui_countdown' action type (will show will_auto_dislike = true in UI)
+        // Both include files that match rules with 'dislike' action type (will show will_auto_dislike = true in UI)
         $flaggedIds = array_merge($flaggedIds, $containerFlaggedIds);
 
         // Merge processed IDs from both moderation and container blacklist
@@ -197,7 +197,7 @@ class Browser
                 ->only($immediateFileIds)
                 ->map(fn ($file) => [
                     'id' => $file->id,
-                    'action_type' => $actionTypeMap[$file->id] ?? 'auto_dislike',
+                    'action_type' => $actionTypeMap[$file->id] ?? 'dislike',
                     'thumbnail' => $file->thumbnail_url ?? $file->url,
                 ])
                 ->values()

@@ -15,11 +15,11 @@ test('immediately auto-disliked files are excluded from browse response items', 
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    // Create an active moderation rule with immediate auto_dislike action
+    // Create an active moderation rule with blacklist action (immediate action)
     ModerationRule::factory()->any(['girl'])->create([
         'name' => 'Block girl term',
         'active' => true,
-        'action_type' => ActionType::AUTO_DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Mock CivitAI API response with files that will match the rule
@@ -110,7 +110,7 @@ test('immediately auto-disliked files are excluded from browse response items', 
         ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
         ->and(count($data['moderation']['moderatedOut']))->toBe(1)
         ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('auto_dislike')
+        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
         ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
 });
 
@@ -196,7 +196,7 @@ test('immediately blacklisted files are excluded from browse response items', fu
         ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
 });
 
-test('immediately auto-disliked files from blacklisted containers are excluded from browse response items', function () {
+test('immediately blacklisted files from blacklisted containers are excluded from browse response items', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -263,19 +263,19 @@ test('immediately auto-disliked files from blacklisted containers are excluded f
     expect($matchedFile)->not->toBeNull()
         ->and($nonMatchedFile)->not->toBeNull();
 
-    // Create a blacklisted container with auto_dislike action type
+    // Create a blacklisted container with blacklist action type
     $container = Container::factory()->create([
         'type' => 'User',
         'source' => 'CivitAI',
         'source_id' => 'user123',
         'blacklisted_at' => now(),
-        'action_type' => ActionType::AUTO_DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Attach container to the matched file only
     $matchedFile->containers()->attach($container->id);
 
-    // Make another browse request - the matched file should now be auto-disliked
+    // Make another browse request - the matched file should now be blacklisted
     $response = $this->getJson('/api/browse?source=civit-ai-images&page=1&tab_id='.$tab->id);
     $response->assertSuccessful();
     $data = $response->json();
@@ -283,8 +283,8 @@ test('immediately auto-disliked files from blacklisted containers are excluded f
     // Get file IDs from the response items
     $returnedFileIds = collect($data['items'])->pluck('id')->toArray();
 
-    // Assert matched file is auto-disliked in database
-    expect($matchedFile->fresh()->auto_disliked)->toBeTrue();
+    // Assert matched file is blacklisted in database
+    expect($matchedFile->fresh()->blacklisted_at)->not->toBeNull();
 
     // Assert matched file is NOT in the returned items
     expect($returnedFileIds)->not->toContain($matchedFile->id);
@@ -301,7 +301,7 @@ test('immediately auto-disliked files from blacklisted containers are excluded f
         ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
         ->and(count($data['moderation']['moderatedOut']))->toBe(1)
         ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('auto_dislike')
+        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
         ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
 });
 

@@ -72,7 +72,7 @@ function defaultRuleForm(): ModerationRuleForm {
         name: '',
         active: true,
         nsfw: false,
-        action_type: 'ui_countdown',
+        action_type: 'dislike',
         op: 'any',
         terms: [],
         min: null,
@@ -87,7 +87,7 @@ function ruleToForm(rule: ModerationRule): ModerationRuleForm {
         name: rule.name ?? '',
         active: rule.active,
         nsfw: rule.nsfw,
-        action_type: rule.action_type ?? 'ui_countdown',
+        action_type: rule.action_type ?? 'dislike',
         op: rule.op,
         terms: rule.terms ?? [],
         min: rule.min,
@@ -301,8 +301,8 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="ui_countdown">
-                                                UI Countdown (5s delay)
+                                            <SelectItem value="dislike">
+                                                Dislike (5s countdown)
                                             </SelectItem>
                                             <SelectItem value="blacklist">
                                                 Immediate Blacklist
@@ -310,9 +310,9 @@ function summarizeRule(rule: ModerationRule | ModerationRuleNode): string {
                                         </SelectContent>
                                     </Select>
                                     <p class="text-xs text-twilight-indigo-400">
-                                        <span v-if="ruleForm.action_type === 'ui_countdown'">
+                                        <span v-if="ruleForm.action_type === 'dislike'">
                                             Files matching this rule will show a 5-second countdown before being
-                                            auto-disliked.
+                                            disliked.
                                         </span>
                                         <span v-else>
                                             Files matching this rule will be immediately blacklisted and removed from

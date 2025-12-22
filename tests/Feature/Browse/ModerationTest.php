@@ -300,14 +300,14 @@ test('no active rules returns empty results', function () {
     expect($result['flaggedIds'])->toBeEmpty();
 });
 
-test('immediate auto_dislike creates dislike reaction and updates file', function () {
+test('immediate blacklist updates file', function () {
     Bus::fake();
 
-    // Create an active moderation rule with auto_dislike action
+    // Create an active moderation rule with blacklist action
     $rule = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
-        'action_type' => ActionType::AUTO_DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create file with matching prompt
@@ -330,15 +330,8 @@ test('immediate auto_dislike creates dislike reaction and updates file', functio
     expect($result['flaggedIds'])->toBeEmpty()
         ->and($result['processedIds'])->toContain($file->id);
 
-    // Assert file is auto-disliked in database
-    expect($file->fresh()->auto_disliked)->toBeTrue();
-
-    // Verify dislike reaction was created
-    $reaction = Reaction::where('file_id', $file->id)
-        ->where('user_id', $this->user->id)
-        ->where('type', 'dislike')
-        ->first();
-    expect($reaction)->not->toBeNull();
+    // Assert file is blacklisted in database
+    expect($file->fresh()->blacklisted_at)->not->toBeNull();
 
     // Verify delete job was dispatched
     Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
@@ -391,11 +384,11 @@ test('immediate blacklist updates file but does not create reaction', function (
 test('batch processing uses single query for multiple files', function () {
     Bus::fake();
 
-    // Create an active moderation rule with auto_dislike action
+    // Create an active moderation rule with blacklist action
     $rule = ModerationRule::factory()->any(['spam'])->create([
         'name' => 'Spam rule',
         'active' => true,
-        'action_type' => ActionType::AUTO_DISLIKE,
+        'action_type' => ActionType::BLACKLIST,
     ]);
 
     // Create multiple files with matching prompts
@@ -420,15 +413,8 @@ test('batch processing uses single query for multiple files', function () {
     // Assert all files are processed
     expect(count($result['processedIds']))->toBe(3);
 
-    // Assert all files are auto-disliked (batch update)
+    // Assert all files are blacklisted (batch update)
     foreach ($files as $file) {
-        expect($file->fresh()->auto_disliked)->toBeTrue();
+        expect($file->fresh()->blacklisted_at)->not->toBeNull();
     }
-
-    // Verify dislike reactions were created for all files (batch insert)
-    $reactions = Reaction::whereIn('file_id', $files->pluck('id'))
-        ->where('user_id', $this->user->id)
-        ->where('type', 'dislike')
-        ->get();
-    expect($reactions->count())->toBe(3);
 });

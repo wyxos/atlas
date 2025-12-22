@@ -35,7 +35,7 @@ const emit = defineEmits<{
 
 const { blacklists, fetchBlacklists, deleteBlacklist, isContainerBlacklisted } = useContainerBlacklists();
 
-const actionType = ref<ContainerBlacklistActionType>('ui_countdown');
+const actionType = ref<ContainerBlacklistActionType>('dislike');
 const isSaving = ref(false);
 const isDeleting = ref(false);
 
@@ -48,7 +48,7 @@ const isOpen = computed({
 function resetState(): void {
     isSaving.value = false;
     isDeleting.value = false;
-    actionType.value = 'ui_countdown';
+    actionType.value = 'dislike';
 }
 
 // Expose method to initialize state (called by parent when opening)
@@ -117,7 +117,7 @@ async function handleWhitelist(): Promise<void> {
 
 function handleCancel(): void {
     isOpen.value = false;
-    actionType.value = 'ui_countdown';
+    actionType.value = 'dislike';
     isSaving.value = false;
 }
 </script>
@@ -189,8 +189,8 @@ function handleCancel(): void {
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="ui_countdown">
-                                UI Countdown (5s delay)
+                            <SelectItem value="dislike">
+                                Dislike (5s countdown)
                             </SelectItem>
                             <SelectItem value="blacklist">
                                 Immediate Blacklist
@@ -198,8 +198,8 @@ function handleCancel(): void {
                         </SelectContent>
                     </Select>
                     <p class="text-xs text-twilight-indigo-400">
-                        <span v-if="actionType === 'ui_countdown'">
-                            Files in this container will show a 5-second countdown before being auto-disliked.
+                        <span v-if="actionType === 'dislike'">
+                            Files in this container will show a 5-second countdown before being disliked.
                         </span>
                         <span v-else>
                             Files in this container will be immediately blacklisted and removed from results.

@@ -73,6 +73,6 @@ final class FileModerationService extends BaseModerationService
 
     protected function getActionType(object $match): string
     {
-        return $match->action_type ?? ActionType::UI_COUNTDOWN;
+        return $match->action_type ?? ActionType::DISLIKE;
     }
 }

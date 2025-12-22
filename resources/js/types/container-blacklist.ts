@@ -1,4 +1,4 @@
-export type ContainerBlacklistActionType = 'ui_countdown' | 'auto_dislike' | 'blacklist';
+export type ContainerBlacklistActionType = 'dislike' | 'blacklist';
 
 export interface ContainerBlacklist {
     id: number;
