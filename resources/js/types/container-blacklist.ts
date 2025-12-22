@@ -1,4 +1,7 @@
-export type ContainerBlacklistActionType = 'dislike' | 'blacklist';
+import type { ModerationRuleActionType } from './moderation';
+
+// Re-export for backward compatibility
+export type ContainerBlacklistActionType = ModerationRuleActionType;
 
 export interface ContainerBlacklist {
     id: number;

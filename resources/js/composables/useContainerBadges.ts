@@ -1,7 +1,6 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import type { MasonryItem } from './useBrowseTabs';
-
-type PillVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+import type { PillVariant } from '@/components/ui/Pill.vue';
 
 /**
  * Composable for managing container badges and their hover states.

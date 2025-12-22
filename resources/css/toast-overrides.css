@@ -28,6 +28,10 @@
     width: 100%;
 }
 
+.Vue-Toastification__toast.Vue-Toastification__toast--default {
+    @apply !p-0;
+}
+
 
 
 

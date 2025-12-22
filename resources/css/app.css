@@ -4,6 +4,7 @@
 @import '@wyxos/vibe/vibe.css';
 @import './masonry.css';
 @import './listing.css';
+@import './toast-overrides.css';
 
 /* Oruga Component Overrides */
 @import './oruga/table.css';
