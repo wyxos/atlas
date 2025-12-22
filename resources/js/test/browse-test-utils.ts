@@ -210,8 +210,8 @@ export async function createTestRouter(initialPath = '/browse') {
  */
 export function getTabContent(wrapper: any) {
     const tabContent = wrapper.findComponent({ name: 'TabContent' });
-    if (browseTabContent.exists()) {
-        return browseTabContent.vm;
+    if (tabContent.exists()) {
+        return tabContent.vm;
     }
     return null;
 }
