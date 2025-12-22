@@ -145,7 +145,7 @@ function handleDismiss(): void {
 </script>
 
 <template>
-    <div :class="toastClasses" @mouseenter="queue.freezeAll()" @mouseleave="queue.unfreezeAll()">
+    <div :class="toastClasses" @mouseenter="queue.freezeAll()" @mouseleave="queue.unfreezeAll()" class="flex! gap-4!">
         <!-- File Preview Thumbnail -->
         <div v-if="thumbnail" class="shrink-0">
             <img :src="thumbnail" :alt="`File ${fileId}`" class="size-16 rounded object-cover" />
