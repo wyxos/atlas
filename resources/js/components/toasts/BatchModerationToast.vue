@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useToast } from 'vue-toastification';
 import { Shield, Plus, Eye } from 'lucide-vue-next';
+import ModerationReviewModal from '@/components/moderation/ModerationReviewModal.vue';
 
 const toast = useToast();
 
@@ -15,9 +16,12 @@ interface Props {
     toastId: string;
     previews: PreviewItem[];
     totalCount: number;
+    allFiles: PreviewItem[]; // All moderated files for the modal
 }
 
 const props = defineProps<Props>();
+
+const isModalOpen = ref(false);
 
 // Show up to 5 previews, with + icon if more
 const visiblePreviews = computed(() => props.previews.slice(0, 5));
@@ -114,9 +118,12 @@ const previewsContainerWidth = computed(() => {
 });
 
 function handleReview(): void {
-    // TODO: Navigate to moderation review page or open review dialog
-    // For now, just dismiss the toast
-    toast.dismiss(props.toastId);
+    // Open the moderation review modal
+    isModalOpen.value = true;
+}
+
+function handleModalClose(open: boolean): void {
+    isModalOpen.value = open;
 }
 
 function handleDismiss(): void {
@@ -195,6 +202,9 @@ function handleDismiss(): void {
             </div>
         </div>
     </div>
+
+    <!-- Moderation Review Modal -->
+    <ModerationReviewModal :open="isModalOpen" :files="allFiles" @update:open="handleModalClose" />
 </template>
 
 <style scoped>

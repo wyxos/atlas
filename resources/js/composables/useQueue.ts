@@ -445,6 +445,25 @@ export function useQueue() {
     }
 
     /**
+     * Immediately unfreeze all countdowns (no delay).
+     * Use this for modals or other cases where immediate unfreezing is needed.
+     */
+    function unfreezeImmediately(): void {
+        // Clear any pending unfreeze timeout
+        if (unfreezeTimeout) {
+            clearTimeout(unfreezeTimeout);
+            unfreezeTimeout = null;
+        }
+
+        // Immediately unfreeze
+        isFrozen.value = false;
+        // Timer loop will resume updating items
+        if (queue.value.size > 0) {
+            startTimerLoop();
+        }
+    }
+
+    /**
      * Set modal open state (affects new items).
      */
     function setModalOpen(open: boolean): void {
@@ -488,6 +507,7 @@ export function useQueue() {
         // Freeze control
         freezeAll,
         unfreezeAll,
+        unfreezeImmediately,
         // Expose isFrozen as computed to ensure reactivity when passed as prop
         // The computed will re-evaluate whenever isFrozen.value changes
         isFrozen: computed(() => isFrozen.value),
