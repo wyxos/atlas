@@ -106,12 +106,12 @@ test('immediately blacklisted files from moderation rules are excluded from brow
     expect($tab->files()->where('file_id', $nonMatchedFile->id)->exists())->toBeTrue();
 
     // Assert moderation data shows the file was processed
-    expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
-        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
-        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
-        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
+    // Browser returns moderation as an array of immediately processed files (not an object with moderatedOut)
+    expect($data['moderation'])->toBeArray()
+        ->and(count($data['moderation']))->toBe(1)
+        ->and($data['moderation'][0]['id'])->toBe($matchedFile->id)
+        ->and($data['moderation'][0]['action_type'])->toBe('blacklist')
+        ->and($data['moderation'][0]['thumbnail'])->not->toBeEmpty();
 });
 
 test('immediately blacklisted files are excluded from browse response items', function () {
@@ -188,12 +188,12 @@ test('immediately blacklisted files are excluded from browse response items', fu
     expect($tab->files()->where('file_id', $matchedFile->id)->exists())->toBeFalse();
 
     // Assert moderation data shows the file was processed
-    expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
-        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
-        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
-        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
+    // Browser returns moderation as an array of immediately processed files (not an object with moderatedOut)
+    expect($data['moderation'])->toBeArray()
+        ->and(count($data['moderation']))->toBe(1)
+        ->and($data['moderation'][0]['id'])->toBe($matchedFile->id)
+        ->and($data['moderation'][0]['action_type'])->toBe('blacklist')
+        ->and($data['moderation'][0]['thumbnail'])->not->toBeEmpty();
 });
 
 test('immediately blacklisted files from blacklisted containers are excluded from browse response items', function () {
@@ -297,10 +297,10 @@ test('immediately blacklisted files from blacklisted containers are excluded fro
     // The important assertion is that the file is excluded from the response and processed correctly
 
     // Assert moderation data shows the file was processed
-    expect($data['moderation'])->not->toBeNull()
-        ->and($data['moderation']['moderatedOut'])->not->toBeEmpty()
-        ->and(count($data['moderation']['moderatedOut']))->toBe(1)
-        ->and($data['moderation']['moderatedOut'][0]['id'])->toBe($matchedFile->id)
-        ->and($data['moderation']['moderatedOut'][0]['action_type'])->toBe('blacklist')
-        ->and($data['moderation']['moderatedOut'][0]['thumbnail'])->not->toBeEmpty();
+    // Browser returns moderation as an array of immediately processed files (not an object with moderatedOut)
+    expect($data['moderation'])->toBeArray()
+        ->and(count($data['moderation']))->toBe(1)
+        ->and($data['moderation'][0]['id'])->toBe($matchedFile->id)
+        ->and($data['moderation'][0]['action_type'])->toBe('blacklist')
+        ->and($data['moderation'][0]['thumbnail'])->not->toBeEmpty();
 });
