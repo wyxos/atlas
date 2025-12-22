@@ -10,7 +10,7 @@ test('authenticated user can remove container from blacklist', function () {
     $user = User::factory()->create();
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
     ]);
 
     $response = $this->actingAs($user)->deleteJson("/api/container-blacklists/{$container->id}");
@@ -29,7 +29,7 @@ test('removing blacklist clears both blacklisted_at and action_type', function (
     $user = User::factory()->create();
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'auto_dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $this->actingAs($user)->deleteJson("/api/container-blacklists/{$container->id}");
@@ -57,7 +57,7 @@ test('returns 404 when container is not blacklisted', function () {
 test('guest cannot remove container from blacklist', function () {
     $container = Container::factory()->create([
         'blacklisted_at' => now(),
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
     ]);
 
     $response = $this->deleteJson("/api/container-blacklists/{$container->id}");

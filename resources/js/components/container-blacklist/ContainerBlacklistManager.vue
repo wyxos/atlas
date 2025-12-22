@@ -200,7 +200,7 @@ defineExpose({
                                             <span
                                                 class="px-1.5 py-0.5 text-[10px] font-medium rounded"
                                                 :class="{
-                                                    'bg-emerald-500/20 text-emerald-400': blacklist.action_type === 'ui_countdown',
+                                                    'bg-emerald-500/20 text-emerald-400': blacklist.action_type === 'dislike',
                                                     'bg-danger-500/20 text-danger-400': blacklist.action_type === 'blacklist',
                                                 }"
                                             >

@@ -1,6 +1,5 @@
 - [ ] Browse feature improvements
     - [ ] Moderation system
-        - [ ] Display toast notification for auto backend dislike/blacklist actions with option to undo for all or specific files
         - [ ] Auto-blacklist files if preview count >= 5 while disliked
     - [ ] Local files support
         - [ ] Render local files in browse interface

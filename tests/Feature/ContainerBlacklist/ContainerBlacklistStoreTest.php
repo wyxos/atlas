@@ -16,23 +16,23 @@ test('authenticated user can create container blacklist', function () {
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
     expect($data['id'])->toBe($container->id);
-    expect($data['action_type'])->toBe('ui_countdown');
+    expect($data['action_type'])->toBe('dislike');
     expect($data['blacklisted_at'])->not->toBeNull();
 
     $this->assertDatabaseHas('containers', [
         'id' => $container->id,
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
         'blacklisted_at' => now(),
     ]);
 });
 
-test('can create blacklist with auto_dislike action type', function () {
+test('can create blacklist with blacklist action type', function () {
     $user = User::factory()->create();
     $container = Container::factory()->create([
         'type' => 'User',
@@ -41,12 +41,12 @@ test('can create blacklist with auto_dislike action type', function () {
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'auto_dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['action_type'])->toBe('auto_dislike');
+    expect($data['action_type'])->toBe('blacklist');
 });
 
 test('can create blacklist with blacklist action type', function () {
@@ -70,7 +70,7 @@ test('validates container_id is required', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
     ]);
 
     $response->assertStatus(422);
@@ -82,7 +82,7 @@ test('validates container_id exists', function () {
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => 99999,
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
     ]);
 
     $response->assertStatus(422);
@@ -124,7 +124,7 @@ test('rejects non-blacklistable container types', function () {
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
     ]);
 
     $response->assertStatus(422);
@@ -138,18 +138,18 @@ test('updates existing container blacklist', function () {
     $container = Container::factory()->create([
         'type' => 'User',
         'source' => 'CivitAI',
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
         'blacklisted_at' => now()->subDays(1),
     ]);
 
     $response = $this->actingAs($user)->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'auto_dislike',
+        'action_type' => 'blacklist',
     ]);
 
     $response->assertStatus(201);
     $container->refresh();
-    expect($container->action_type)->toBe('auto_dislike');
+    expect($container->action_type)->toBe('blacklist');
     expect($container->blacklisted_at)->not->toBeNull();
 });
 
@@ -158,7 +158,7 @@ test('guest cannot create container blacklist', function () {
 
     $response = $this->postJson('/api/container-blacklists', [
         'container_id' => $container->id,
-        'action_type' => 'ui_countdown',
+        'action_type' => 'dislike',
     ]);
 
     $response->assertUnauthorized();

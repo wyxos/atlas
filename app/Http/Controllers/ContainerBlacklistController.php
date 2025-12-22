@@ -31,7 +31,7 @@ class ContainerBlacklistController extends Controller
     {
         $validated = $request->validate([
             'container_id' => ['required', 'integer', 'exists:containers,id'],
-            'action_type' => ['required', 'string', 'in:ui_countdown,auto_dislike,blacklist'],
+            'action_type' => ['required', 'string', 'in:dislike,blacklist'],
         ]);
 
         $container = Container::findOrFail($validated['container_id']);

@@ -87,8 +87,8 @@ abstract class BaseModerationService
 
             $actionType = $this->getActionType($match);
 
-            // Track immediate actions (auto_dislike or blacklist)
-            if ($actionType === ActionType::AUTO_DISLIKE || $actionType === ActionType::BLACKLIST) {
+            // Track immediate actions (blacklist only - dislike shows countdown)
+            if ($actionType === ActionType::BLACKLIST) {
                 $this->immediateActions[$file->id] = [
                     'file_id' => $file->id,
                     'action_type' => $actionType,
@@ -125,13 +125,8 @@ abstract class BaseModerationService
      */
     protected function handleActionType(string $actionType, File $file): void
     {
-        if ($actionType === ActionType::UI_COUNTDOWN) {
+        if ($actionType === ActionType::DISLIKE) {
             $this->flaggedIds[] = $file->id;
-        } elseif ($actionType === ActionType::AUTO_DISLIKE) {
-            $this->autoDislikeFileIds[] = $file->id;
-            if (! empty($file->path)) {
-                $this->filesToDelete[] = $file->path;
-            }
         } elseif ($actionType === ActionType::BLACKLIST) {
             $this->blacklistFileIds[] = $file->id;
             if (! empty($file->path)) {
