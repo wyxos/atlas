@@ -6,7 +6,7 @@ import FileViewer from '../components/FileViewer.vue';
 import {
     setupBrowseTestMocks,
     createTestRouter,
-    getBrowseTabContent,
+    getTabContent,
     waitForStable,
     type BrowseMocks,
 } from '../test/browse-test-utils';
@@ -148,7 +148,7 @@ describe('Browse - Tab Management', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [
                         {
@@ -190,7 +190,7 @@ describe('Browse - Tab Management', () => {
         await waitForStable(wrapper);
 
         const vm = wrapper.vm as any;
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -211,7 +211,7 @@ describe('Browse - Tab Management', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [
                         {
@@ -253,7 +253,7 @@ describe('Browse - Tab Management', () => {
         await waitForStable(wrapper);
 
         const vm = wrapper.vm as any;
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }
@@ -276,7 +276,7 @@ describe('Browse - Tab Management', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [
                         {
@@ -324,7 +324,7 @@ describe('Browse - Tab Management', () => {
         expect(vm.tabs.length).toBe(2);
         expect(vm.activeTabId).toBe(tab1Id);
 
-        const browseTabs = wrapper.findAllComponents({ name: 'BrowseTab' });
+        const browseTabs = wrapper.findAllComponents({ name: 'Tab' });
         const tab2Component = browseTabs.find((tab: any) => tab.props().id === tab2Id);
         expect(tab2Component).toBeDefined();
 
@@ -356,7 +356,7 @@ describe('Browse - Tab Management', () => {
         const tab1Id = 1;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [
                         {
@@ -409,7 +409,7 @@ describe('Browse - Tab Management', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [
                         {
@@ -478,7 +478,7 @@ describe('Browse - Tab Management', () => {
 
     it('creates a new tab and does not auto-load until service is selected', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({ data: [] });
             }
             if (url.includes('/api/browse')) {

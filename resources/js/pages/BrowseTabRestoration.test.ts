@@ -5,7 +5,7 @@ import Browse from './Browse.vue';
 import {
     setupBrowseTestMocks,
     createTestRouter,
-    getBrowseTabContent,
+    getTabContent,
     waitForStable,
     waitForTabContent,
     createMockTabConfig,
@@ -189,7 +189,7 @@ describe('Browse - Tab Restoration', () => {
 
         await waitForStable(wrapper);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/1/items');
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/tabs/1/items');
     });
 
     it('initializes masonry with restored items', async () => {
@@ -284,7 +284,7 @@ describe('Browse - Tab Restoration', () => {
         await vm.switchTab(tab2Id);
         await waitForStable(wrapper);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/browse-tabs/2/items');
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/tabs/2/items');
         expect(mocks.mockDestroy).toHaveBeenCalled();
     });
 
@@ -341,7 +341,7 @@ describe('Browse - Tab Restoration', () => {
         }));
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -353,7 +353,7 @@ describe('Browse - Tab Restoration', () => {
                     }],
                 });
             }
-            if (url.includes('/api/browse-tabs/1/items')) {
+            if (url.includes('/api/tabs/1/items')) {
                 return Promise.resolve({
                     data: {
                         items: mockItems,
@@ -373,7 +373,7 @@ describe('Browse - Tab Restoration', () => {
 
         await waitForStable(wrapper);
 
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
             expect(tabContentVm.currentPage).toBe(cursorX);
             expect(tabContentVm.nextCursor).toBe(cursorY);
@@ -391,14 +391,14 @@ describe('Browse - Tab Restoration', () => {
         ];
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs/1/items')) {
+            if (url.includes('/api/tabs/1/items')) {
                 return Promise.resolve({
                     data: {
                         items: mockItems,
                     },
                 });
             }
-            if (url.includes('/api/browse-tabs') && !url.includes('/items')) {
+            if (url.includes('/api/tabs') && !url.includes('/items')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -454,7 +454,7 @@ describe('Browse - Tab Restoration', () => {
         expect(vm.activeTabId).toBe(tabId);
         await waitForStable(wrapper);
 
-        const tabContentVm = getBrowseTabContent(wrapper);
+        const tabContentVm = getTabContent(wrapper);
         if (!tabContentVm) {
             return;
         }

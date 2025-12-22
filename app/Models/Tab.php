@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  *
  * Getters
  */
-class BrowseTab extends Model
+class Tab extends Model
 {
     use HasFactory;
 
@@ -35,7 +35,7 @@ class BrowseTab extends Model
      */
     protected static function newFactory()
     {
-        return \Database\Factories\BrowseTabFactory::new();
+        return \Database\Factories\TabFactory::new();
     }
 
     /**
@@ -66,7 +66,7 @@ class BrowseTab extends Model
     }
 
     /**
-     * Get the user that owns the browse tab.
+     * Get the user that owns the tab.
      */
     public function user(): BelongsTo
     {
@@ -74,11 +74,11 @@ class BrowseTab extends Model
     }
 
     /**
-     * Get the files associated with this browse tab.
+     * Get the files associated with this tab.
      */
     public function files(): BelongsToMany
     {
-        return $this->belongsToMany(File::class, 'browse_tab_file')
+        return $this->belongsToMany(File::class, 'tab_file')
             ->withPivot('position')
             ->orderByPivot('position');
     }
@@ -110,3 +110,4 @@ class BrowseTab extends Model
         return FileItemFormatter::format($files, $page);
     }
 }
+

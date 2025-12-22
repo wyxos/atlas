@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -81,7 +81,7 @@ test('batch auto-dislike de-associates files from user tabs', function () {
         'previewed_count' => 5,
     ]);
 
-    $tab = BrowseTab::factory()->for($this->user)->create();
+    $tab = Tab::factory()->for($this->user)->create();
     $tab->files()->attach($file->id, ['position' => 0]);
 
     expect($tab->files()->where('file_id', $file->id)->exists())->toBeTrue();

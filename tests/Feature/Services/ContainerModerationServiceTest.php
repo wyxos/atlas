@@ -76,33 +76,6 @@ test('blacklists files for blacklist action type', function () {
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
 
-    Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function ($job) use ($file) {
-        return $job->filePath === $file->path;
-    });
-});
-
-test('blacklists files for blacklist action type', function () {
-    Bus::fake();
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    $container = Container::factory()->create([
-        'blacklisted_at' => now(),
-        'action_type' => 'blacklist',
-    ]);
-    $file = File::factory()->create([
-        'auto_disliked' => false,
-        'blacklisted_at' => null,
-        'path' => 'downloads/ab/cd/test.jpg',
-    ]);
-    $file->containers()->attach($container->id);
-
-    $result = $this->service->moderate(collect([$file]));
-
-    expect($result['flaggedIds'])->toBeEmpty();
-    expect($result['processedIds'])->toContain($file->id);
-    expect($file->fresh()->blacklisted_at)->not->toBeNull();
-
     // Verify NO dislike reaction was created (blacklist does not create reactions)
     $reaction = Reaction::where('file_id', $file->id)
         ->where('user_id', $user->id)
@@ -216,7 +189,7 @@ test('handles multiple files with different action types', function () {
     expect($result['flaggedIds'])->toContain($file1->id);
     expect($result['processedIds'])->toContain($file2->id);
     expect($result['processedIds'])->toContain($file3->id);
-    expect($file2->fresh()->auto_disliked)->toBeTrue();
+    expect($file2->fresh()->blacklisted_at)->not->toBeNull();
     expect($file3->fresh()->blacklisted_at)->not->toBeNull();
 });
 

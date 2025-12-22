@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 
 // Mock dependencies
 vi.mock('@/utils/reactions', () => ({

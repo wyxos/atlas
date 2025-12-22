@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\BrowseTabFileService;
+use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -76,7 +76,7 @@ class FileReactionController extends Controller
 
         // Detach file from all tabs belonging to this user
         // Once a file is reacted to, it should be removed from all tabs for that user
-        app(BrowseTabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+        app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
 
         return response()->json([
             'message' => 'Reaction updated.',
@@ -215,7 +215,7 @@ class FileReactionController extends Controller
 
             // Detach file from all tabs belonging to this user
             // Once a file is reacted to, it should be removed from all tabs for that user
-            app(BrowseTabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+            app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
 
             $results[] = [
                 'file_id' => $file->id,

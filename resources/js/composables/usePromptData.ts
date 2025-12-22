@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 
 /**
  * Composable for managing prompt data loading, caching, and dialog state.

@@ -1,5 +1,5 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
-import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
+import type { MasonryItem, TabData } from './useTabs';
 import { index as browseIndex, services as browseServices } from '@/actions/App/Http/Controllers/BrowseController';
 
 export type GetPageResult = {
@@ -22,7 +22,7 @@ export type UseBrowseServiceOptions = {
     currentPage: Ref<string | number | null>;
     currentTabService: ComputedRef<string | null>;
     activeTabId: Ref<number | null>;
-    getActiveTab: () => BrowseTabData | undefined;
+    getActiveTab: () => TabData | undefined;
     updateActiveTab: (itemsData: MasonryItem[]) => void;
 };
 
@@ -186,7 +186,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             reset?: () => void;
             loadPage?: (page: number | string) => Promise<void>;
         } | null>,
-        getActiveTab: () => BrowseTabData | undefined,
+        getActiveTab: () => TabData | undefined,
         updateActiveTab: (itemsData: MasonryItem[]) => void
     ): Promise<void> {
         if (!activeTabId.value || !selectedService.value || masonry.value?.isLoading) {

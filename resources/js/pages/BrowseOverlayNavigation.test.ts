@@ -87,7 +87,7 @@ beforeEach(() => {
 });
 
 function getFileViewer(wrapper: any) {
-    const browseTabContent = wrapper.findComponent({ name: 'BrowseTabContent' });
+    const browseTabContent = wrapper.findComponent({ name: 'TabContent' });
     if (browseTabContent.exists()) {
         const fileViewer = browseTabContent.findComponent(FileViewer);
         if (fileViewer.exists()) return fileViewer;

@@ -1,7 +1,7 @@
 import { ref, type Ref } from 'vue';
 import { useQueue } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 import type { Masonry } from '@wyxos/vibe';
 
 const COUNTDOWN_DURATION_MS = 5 * 1000; // 5 seconds

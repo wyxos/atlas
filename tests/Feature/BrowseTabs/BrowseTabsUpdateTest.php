@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,16 +9,16 @@ uses(RefreshDatabase::class);
 
 test('user can update their own browse tab', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create(['label' => 'Old Label']);
+    $tab = Tab::factory()->for($user)->create(['label' => 'Old Label']);
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'label' => 'New Label',
     ]);
 
     $response->assertSuccessful();
     $data = $response->json();
     expect($data['label'])->toBe('New Label');
-    $this->assertDatabaseHas('browse_tabs', [
+    $this->assertDatabaseHas('tabs', [
         'id' => $tab->id,
         'label' => 'New Label',
     ]);
@@ -27,14 +27,14 @@ test('user can update their own browse tab', function () {
 test('user cannot update another user tab', function () {
     $user1 = User::factory()->create();
     $user2 = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user2)->create(['label' => 'Original Label']);
+    $tab = Tab::factory()->for($user2)->create(['label' => 'Original Label']);
 
-    $response = $this->actingAs($user1)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user1)->putJson("/api/tabs/{$tab->id}", [
         'label' => 'Hacked Label',
     ]);
 
     $response->assertForbidden();
-    $this->assertDatabaseHas('browse_tabs', [
+    $this->assertDatabaseHas('tabs', [
         'id' => $tab->id,
         'label' => 'Original Label',
     ]);
@@ -42,12 +42,12 @@ test('user cannot update another user tab', function () {
 
 test('tab update accepts partial data sometimes rules', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create([
+    $tab = Tab::factory()->for($user)->create([
         'label' => 'Original Label',
         'query_params' => ['page' => 1],
     ]);
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'label' => 'Updated Label',
     ]);
 
@@ -60,9 +60,9 @@ test('tab update accepts partial data sometimes rules', function () {
 
 test('tab update validates label when provided', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create();
+    $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'label' => str_repeat('a', 256),
     ]);
 
@@ -72,9 +72,9 @@ test('tab update validates label when provided', function () {
 
 test('tab update validates position when provided', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create();
+    $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'position' => -1,
     ]);
 
@@ -84,9 +84,9 @@ test('tab update validates position when provided', function () {
 
 test('tab update returns updated tab', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create();
+    $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'label' => 'Updated Label',
         'query_params' => ['page' => 2],
     ]);
@@ -100,9 +100,9 @@ test('tab update returns updated tab', function () {
 
 test('guest cannot update browse tabs', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create();
+    $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->putJson("/api/tabs/{$tab->id}", [
         'label' => 'Updated Label',
     ]);
 
@@ -112,7 +112,7 @@ test('guest cannot update browse tabs', function () {
 test('updating non-existent tab returns 404', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->putJson('/api/browse-tabs/99999', [
+    $response = $this->actingAs($user)->putJson('/api/tabs/99999', [
         'label' => 'Updated Label',
     ]);
 
@@ -124,9 +124,9 @@ test('tab update can sync files', function () {
     $file1 = File::factory()->create();
     $file2 = File::factory()->create();
     $file3 = File::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
+    $tab = Tab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'file_ids' => [$file3->id, $file1->id],
     ]);
 
@@ -140,9 +140,9 @@ test('tab update can remove all files', function () {
     $user = User::factory()->create();
     $file1 = File::factory()->create();
     $file2 = File::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
+    $tab = Tab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'file_ids' => [],
     ]);
 
@@ -156,9 +156,9 @@ test('tab update maintains file order', function () {
     $file1 = File::factory()->create();
     $file2 = File::factory()->create();
     $file3 = File::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
+    $tab = Tab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->putJson("/api/browse-tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
         'file_ids' => [$file3->id, $file2->id, $file1->id],
     ]);
 

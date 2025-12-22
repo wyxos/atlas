@@ -196,7 +196,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             will_auto_dislike: false,
         });
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
@@ -270,7 +270,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             will_auto_dislike: true, // This should trigger countdown
         });
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
@@ -400,7 +400,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             will_auto_dislike: false,
         });
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
         if (masonryItem.exists()) {
@@ -490,7 +490,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             data: { seen_count: 1 },
         });
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
 
         if (masonryContainer.exists()) {

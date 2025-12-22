@@ -3,7 +3,7 @@
  * This helps prove if object size is causing performance issues
  */
 
-import type { MasonryItem } from '@/composables/useBrowseTabs';
+import type { MasonryItem } from '@/composables/useTabs';
 import { createMinimalItems, compareItemPerformance } from './itemSizeDiagnostics';
 
 /**
@@ -43,7 +43,7 @@ export function setupPerformanceTest(items: MasonryItem[]): void {
 
     console.log('\n💡 To test with minimal items:');
     console.log('1. Open Vue DevTools');
-    console.log('2. Find the BrowseTabContent component');
+    console.log('2. Find the TabContent component');
     console.log('3. Set items.value to the minimal items array');
     console.log('\nOr use: window.testWithMinimalItems()');
 }

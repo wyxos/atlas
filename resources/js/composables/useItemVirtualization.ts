@@ -1,5 +1,5 @@
 import { ref, type Ref, nextTick, triggerRef } from 'vue';
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 import { items as browseItems } from '@/actions/App/Http/Controllers/BrowseController';
 
 /**

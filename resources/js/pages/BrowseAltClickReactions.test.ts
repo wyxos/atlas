@@ -85,7 +85,7 @@ beforeEach(() => {
 });
 
 function getFileViewer(wrapper: any) {
-    const browseTabContent = wrapper.findComponent({ name: 'BrowseTabContent' });
+    const browseTabContent = wrapper.findComponent({ name: 'TabContent' });
     if (browseTabContent.exists()) {
         const fileViewer = browseTabContent.findComponent(FileViewer);
         if (fileViewer.exists()) return fileViewer;
@@ -116,7 +116,7 @@ describe('Browse - ALT + Click Reactions', () => {
         tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
             const mockItem = document.createElement('div');
@@ -168,7 +168,7 @@ describe('Browse - ALT + Click Reactions', () => {
         tabContentVm.items = [{ id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
             const mockItem = document.createElement('div');
@@ -216,7 +216,7 @@ describe('Browse - ALT + Click Reactions', () => {
         tabContentVm.items = [{ id: 3, width: 300, height: 400, src: 'test3.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
             const mockItem = document.createElement('div');
@@ -414,7 +414,7 @@ describe('Browse - ALT + Click Reactions', () => {
         tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'BrowseTabContent' });
+        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
             const mockItem = document.createElement('div');

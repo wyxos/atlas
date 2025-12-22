@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -8,9 +8,9 @@ uses(RefreshDatabase::class);
 
 test('user can set their own tab as active', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create(['is_active' => false]);
+    $tab = Tab::factory()->for($user)->create(['is_active' => false]);
 
-    $response = $this->actingAs($user)->patchJson("/api/browse-tabs/{$tab->id}/active");
+    $response = $this->actingAs($user)->patchJson("/api/tabs/{$tab->id}/active");
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -22,11 +22,11 @@ test('user can set their own tab as active', function () {
 
 test('setting tab as active deactivates other tabs', function () {
     $user = User::factory()->create();
-    $tab1 = BrowseTab::factory()->for($user)->create(['is_active' => true]);
-    $tab2 = BrowseTab::factory()->for($user)->create(['is_active' => false]);
-    $tab3 = BrowseTab::factory()->for($user)->create(['is_active' => true]);
+    $tab1 = Tab::factory()->for($user)->create(['is_active' => true]);
+    $tab2 = Tab::factory()->for($user)->create(['is_active' => false]);
+    $tab3 = Tab::factory()->for($user)->create(['is_active' => true]);
 
-    $response = $this->actingAs($user)->patchJson("/api/browse-tabs/{$tab2->id}/active");
+    $response = $this->actingAs($user)->patchJson("/api/tabs/{$tab2->id}/active");
 
     $response->assertSuccessful();
 
@@ -42,9 +42,9 @@ test('setting tab as active deactivates other tabs', function () {
 test('user cannot set another user tab as active', function () {
     $user1 = User::factory()->create();
     $user2 = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user2)->create(['is_active' => false]);
+    $tab = Tab::factory()->for($user2)->create(['is_active' => false]);
 
-    $response = $this->actingAs($user1)->patchJson("/api/browse-tabs/{$tab->id}/active");
+    $response = $this->actingAs($user1)->patchJson("/api/tabs/{$tab->id}/active");
 
     $response->assertForbidden();
     expect($tab->fresh()->is_active)->toBeFalse();
@@ -52,9 +52,9 @@ test('user cannot set another user tab as active', function () {
 
 test('guest cannot set tab as active', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create();
+    $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->patchJson("/api/browse-tabs/{$tab->id}/active");
+    $response = $this->patchJson("/api/tabs/{$tab->id}/active");
 
     $response->assertUnauthorized();
 });
@@ -62,16 +62,16 @@ test('guest cannot set tab as active', function () {
 test('setting non-existent tab returns 404', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->patchJson('/api/browse-tabs/99999/active');
+    $response = $this->actingAs($user)->patchJson('/api/tabs/99999/active');
 
     $response->assertNotFound();
 });
 
 test('returns updated tab in response', function () {
     $user = User::factory()->create();
-    $tab = BrowseTab::factory()->for($user)->create(['is_active' => false]);
+    $tab = Tab::factory()->for($user)->create(['is_active' => false]);
 
-    $response = $this->actingAs($user)->patchJson("/api/browse-tabs/{$tab->id}/active");
+    $response = $this->actingAs($user)->patchJson("/api/tabs/{$tab->id}/active");
 
     $response->assertSuccessful();
     $data = $response->json();

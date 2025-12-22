@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next';
-import type { MasonryItem } from '../composables/useBrowseTabs';
+import type { MasonryItem } from '../composables/useTabs';
 
 interface Props {
     items: MasonryItem[];

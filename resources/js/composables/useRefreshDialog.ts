@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue';
-import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
+import type { MasonryItem, TabData } from './useTabs';
 
 /**
  * Composable for managing the refresh tab dialog and refresh logic.
@@ -10,9 +10,9 @@ export function useRefreshDialog(
     currentPage: Ref<string | number | null>,
     nextCursor: Ref<string | number | null>,
     loadAtPage: Ref<string | number | null>,
-    tab: Ref<BrowseTabData | undefined>,
+    tab: Ref<TabData | undefined>,
     updateActiveTab: (itemsData: MasonryItem[]) => void,
-    initializeTab: (tab: BrowseTabData | undefined) => Promise<void>
+    initializeTab: (tab: TabData | undefined) => Promise<void>
 ) {
     const refreshDialogOpen = ref(false);
 

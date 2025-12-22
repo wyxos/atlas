@@ -11,17 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('browse_tab_file', function (Blueprint $table) {
+        Schema::create('tab_file', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('browse_tab_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tab_id')->constrained()->cascadeOnDelete();
             $table->foreignId('file_id')->constrained()->cascadeOnDelete();
             $table->integer('position')->default(0);
             $table->timestamps();
 
-            // Ensure unique combination of browse_tab_id and file_id
-            $table->unique(['browse_tab_id', 'file_id']);
+            // Ensure unique combination of tab_id and file_id
+            $table->unique(['tab_id', 'file_id']);
             // Index for ordering
-            $table->index(['browse_tab_id', 'position']);
+            $table->index(['tab_id', 'position']);
         });
     }
 
@@ -30,6 +30,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('browse_tab_file');
+        Schema::dropIfExists('tab_file');
     }
 };
+

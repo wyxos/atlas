@@ -97,7 +97,7 @@ describe('Browse - Overlay Reactions', () => {
         const tabConfig = createMockTabConfig(1);
         setupAxiosMocks(mocks, tabConfig, browseResponse);
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/browse-tabs')) {
+            if (url.includes('/api/tabs')) {
                 return Promise.resolve({ data: [tabConfig] });
             }
             if (url.includes('/api/browse')) {

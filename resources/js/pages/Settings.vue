@@ -12,7 +12,7 @@ import {
     DialogTitle,
     DialogClose,
 } from '@/components/ui/dialog';
-import { deleteAll as deleteAllTabs } from '@/actions/App/Http/Controllers/BrowseTabController';
+import { deleteAll as deleteAllTabs } from '@/actions/App/Http/Controllers/TabController';
 import { deleteAll as deleteAllFiles } from '@/actions/App/Http/Controllers/FilesController';
 import { AlertTriangle } from 'lucide-vue-next';
 

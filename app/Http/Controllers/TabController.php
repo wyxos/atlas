@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreBrowseTabRequest;
-use App\Http\Requests\UpdateBrowseTabRequest;
-use App\Models\BrowseTab;
+use App\Http\Requests\StoreTabRequest;
+use App\Http\Requests\UpdateTabRequest;
+use App\Models\Tab;
 use Illuminate\Http\JsonResponse;
 
-class BrowseTabController extends Controller
+class TabController extends Controller
 {
     /**
      * Get all tabs for the authenticated user.
@@ -21,7 +21,7 @@ class BrowseTabController extends Controller
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
-        $tabs = BrowseTab::forUser($userId)
+        $tabs = Tab::forUser($userId)
             ->ordered()
             ->get();
 
@@ -29,19 +29,19 @@ class BrowseTabController extends Controller
     }
 
     /**
-     * Create a new browse tab.
+     * Create a new tab.
      */
-    public function store(StoreBrowseTabRequest $request): JsonResponse
+    public function store(StoreTabRequest $request): JsonResponse
     {
         /** @var Guard $auth */
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
         // Get the highest position for this user's tabs
-        $maxPosition = BrowseTab::forUser($userId)
+        $maxPosition = Tab::forUser($userId)
             ->max('position') ?? -1;
 
-        $tab = BrowseTab::create([
+        $tab = Tab::create([
             'user_id' => $userId,
             'label' => $request->label,
             'query_params' => $request->query_params,
@@ -67,16 +67,16 @@ class BrowseTabController extends Controller
     }
 
     /**
-     * Update a browse tab.
+     * Update a tab.
      */
-    public function update(UpdateBrowseTabRequest $request, BrowseTab $browseTab): JsonResponse
+    public function update(UpdateTabRequest $request, Tab $tab): JsonResponse
     {
         /** @var Guard $auth */
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== $userId) {
+        if ($tab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
@@ -86,7 +86,7 @@ class BrowseTabController extends Controller
         $fileIds = $validated['file_ids'] ?? null;
         unset($validated['file_ids']);
 
-        $browseTab->update($validated);
+        $tab->update($validated);
 
         // Sync files if file_ids are provided
         if ($fileIds !== null && is_array($fileIds)) {
@@ -94,32 +94,32 @@ class BrowseTabController extends Controller
             foreach ($fileIds as $index => $fileId) {
                 $syncData[$fileId] = ['position' => $index];
             }
-            $browseTab->files()->sync($syncData);
+            $tab->files()->sync($syncData);
         }
 
-        $browseTab->load('files.metadata');
+        $tab->load('files.metadata');
 
         // Add file_ids to response for frontend compatibility
-        $browseTab->file_ids = $browseTab->files->pluck('id')->toArray();
+        $tab->file_ids = $tab->files->pluck('id')->toArray();
 
-        return response()->json($browseTab);
+        return response()->json($tab);
     }
 
     /**
-     * Delete a browse tab.
+     * Delete a tab.
      */
-    public function destroy(BrowseTab $browseTab): JsonResponse
+    public function destroy(Tab $tab): JsonResponse
     {
         /** @var Guard $auth */
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== $userId) {
+        if ($tab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
-        $browseTab->delete();
+        $tab->delete();
 
         return response()->json(['message' => 'Tab deleted successfully']);
     }
@@ -128,21 +128,21 @@ class BrowseTabController extends Controller
      * Get items for a specific tab.
      * This endpoint is used to lazy-load items when restoring a tab.
      */
-    public function items(BrowseTab $browseTab): JsonResponse
+    public function items(Tab $tab): JsonResponse
     {
         /** @var Guard $auth */
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== $userId) {
+        if ($tab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
         // Optimize query: only select columns we need and eager load metadata efficiently
         // This prevents loading unnecessary data and reduces memory usage
         // For tabs with many files, this significantly improves performance
-        $files = $browseTab->files()
+        $files = $tab->files()
             ->select([
                 'files.id',
                 'files.url',
@@ -181,10 +181,10 @@ class BrowseTabController extends Controller
 
         if ($files->isNotEmpty()) {
             // Get page from query_params, default to 1
-            $page = isset($browseTab->query_params['page']) && is_numeric($browseTab->query_params['page'])
-                ? (int) $browseTab->query_params['page']
+            $page = isset($tab->query_params['page']) && is_numeric($tab->query_params['page'])
+                ? (int) $tab->query_params['page']
                 : 1;
-            $itemsData = BrowseTab::formatFilesToItems($files, $page);
+            $itemsData = Tab::formatFilesToItems($files, $page);
         }
 
         return response()->json([
@@ -195,14 +195,14 @@ class BrowseTabController extends Controller
     /**
      * Update tab position.
      */
-    public function updatePosition(BrowseTab $browseTab): JsonResponse
+    public function updatePosition(Tab $tab): JsonResponse
     {
         /** @var Guard $auth */
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== $userId) {
+        if ($tab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
@@ -211,37 +211,37 @@ class BrowseTabController extends Controller
             'position' => ['required', 'integer', 'min:0'],
         ]);
 
-        $browseTab->update([
+        $tab->update([
             'position' => $request->position,
         ]);
 
-        return response()->json($browseTab);
+        return response()->json($tab);
     }
 
     /**
      * Set a tab as active.
      * This will deactivate all other tabs for the user and activate the specified tab.
      */
-    public function setActive(BrowseTab $browseTab): JsonResponse
+    public function setActive(Tab $tab): JsonResponse
     {
         /** @var Guard $auth */
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
         // Ensure user owns this tab
-        if ($browseTab->user_id !== $userId) {
+        if ($tab->user_id !== $userId) {
             abort(403, 'Unauthorized');
         }
 
         // Deactivate all other tabs for this user
-        BrowseTab::forUser($userId)
-            ->where('id', '!=', $browseTab->id)
+        Tab::forUser($userId)
+            ->where('id', '!=', $tab->id)
             ->update(['is_active' => false]);
 
         // Activate this tab
-        $browseTab->update(['is_active' => true]);
+        $tab->update(['is_active' => true]);
 
-        return response()->json($browseTab);
+        return response()->json($tab);
     }
 
     /**
@@ -253,7 +253,7 @@ class BrowseTabController extends Controller
         $auth = auth();
         /** @var int|null $userId */
         $userId = $auth->id();
-        $deletedCount = BrowseTab::forUser($userId)->delete();
+        $deletedCount = Tab::forUser($userId)->delete();
 
         return response()->json([
             'message' => 'All tabs deleted successfully.',
@@ -261,3 +261,4 @@ class BrowseTabController extends Controller
         ]);
     }
 }
+

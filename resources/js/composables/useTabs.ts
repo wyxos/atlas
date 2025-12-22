@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { index as browseTabsIndex, store as browseTabsStore, update as browseTabsUpdate, destroy as browseTabsDestroy, items as browseTabsItems, setActive as browseTabsSetActive } from '@/actions/App/Http/Controllers/BrowseTabController';
+import { index as tabsIndex, store as tabsStore, update as tabsUpdate, destroy as tabsDestroy, items as tabsItems, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
 
 export type MasonryItem = {
     id: number; // Database file ID
@@ -18,7 +18,7 @@ export type MasonryItem = {
     [key: string]: unknown;
 };
 
-export type BrowseTabData = {
+export type TabData = {
     id: number;
     label: string;
     queryParams: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
@@ -30,8 +30,8 @@ export type BrowseTabData = {
 
 export type OnTabSwitchCallback = (tabId: number) => Promise<void> | void;
 
-export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
-    const tabs = ref<BrowseTabData[]>([]);
+export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
+    const tabs = ref<TabData[]>([]);
     const activeTabId = ref<number | null>(null);
     const isLoadingTabs = ref(false);
     const saveTabDebounceTimer = ref<number | null>(null);
@@ -39,7 +39,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
     async function loadTabs(): Promise<void> {
         isLoadingTabs.value = true;
         try {
-            const response = await window.axios.get(browseTabsIndex.url());
+            const response = await window.axios.get(tabsIndex.url());
             const data = response.data;
             tabs.value = data.map((tab: {
                 id: number;
@@ -69,12 +69,12 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
-    async function createTab(): Promise<BrowseTabData> {
+    async function createTab(): Promise<TabData> {
         const maxPosition = tabs.value.length > 0
             ? Math.max(...tabs.value.map(t => t.position))
             : -1;
 
-        const newTab: BrowseTabData = {
+        const newTab: TabData = {
             id: 0, // Temporary ID, will be set from response
             label: `Browse ${tabs.value.length + 1}`,
             queryParams: {
@@ -87,7 +87,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         };
 
         try {
-            const response = await window.axios.post(browseTabsStore.url(), {
+            const response = await window.axios.post(tabsStore.url(), {
                 label: newTab.label,
                 query_params: newTab.queryParams,
                 position: newTab.position,
@@ -116,7 +116,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
 
     async function closeTab(tabId: number): Promise<void> {
         try {
-            await window.axios.delete(browseTabsDestroy.url(tabId));
+            await window.axios.delete(tabsDestroy.url(tabId));
 
             const index = tabs.value.findIndex(t => t.id === tabId);
             if (index !== -1) {
@@ -145,7 +145,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
-    function getActiveTab(): BrowseTabData | undefined {
+    function getActiveTab(): TabData | undefined {
         if (!activeTabId.value) {
             return undefined;
         }
@@ -166,7 +166,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         saveTabDebounced(activeTab);
     }
 
-    function saveTabDebounced(tab: BrowseTabData): void {
+    function saveTabDebounced(tab: TabData): void {
         if (saveTabDebounceTimer.value) {
             clearTimeout(saveTabDebounceTimer.value);
         }
@@ -176,12 +176,12 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
         }, 500); // Debounce for 500ms
     }
 
-    async function saveTab(tab: BrowseTabData): Promise<void> {
+    async function saveTab(tab: TabData): Promise<void> {
         try {
             // Only save UI-managed fields (label, position)
             // query_params are managed by the backend (Browser.php) and should not be updated from frontend
             // The backend updates query_params when browse requests are made with tab_id
-            await window.axios.put(browseTabsUpdate.url(tab.id), {
+            await window.axios.put(tabsUpdate.url(tab.id), {
                 label: tab.label,
                 position: tab.position,
                 // Do not send query_params - backend manages them
@@ -198,7 +198,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
      */
     async function loadTabItems(tabId: number): Promise<MasonryItem[]> {
         try {
-            const response = await window.axios.get(browseTabsItems.url(tabId));
+            const response = await window.axios.get(tabsItems.url(tabId));
             const data = response.data;
 
             // Update the tab with loaded items
@@ -221,7 +221,7 @@ export function useBrowseTabs(onTabSwitch?: OnTabSwitchCallback) {
      */
     async function setActiveTab(tabId: number): Promise<void> {
         try {
-            await window.axios.patch(browseTabsSetActive.url(tabId));
+            await window.axios.patch(tabsSetActive.url(tabId));
 
             // Update local state: deactivate all tabs, then activate the specified one
             tabs.value.forEach(tab => {

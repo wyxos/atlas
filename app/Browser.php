@@ -242,14 +242,14 @@ class Browser
             return; // Nothing to attach
         }
 
-        $browseTab = \App\Models\BrowseTab::find($tabId);
+        $tab = \App\Models\Tab::find($tabId);
 
-        if (! $browseTab || $browseTab->user_id !== auth()->id()) {
+        if (! $tab || $tab->user_id !== auth()->id()) {
             return; // Tab doesn't exist or user doesn't own it
         }
 
         // Get current highest position in tab
-        $maxPosition = $browseTab->files()->max('browse_tab_file.position') ?? -1;
+        $maxPosition = $tab->files()->max('tab_file.position') ?? -1;
 
         // Prepare sync data with positions
         $syncData = [];
@@ -266,7 +266,7 @@ class Browser
         }
 
         // Sync files to tab (without detaching existing files)
-        $browseTab->files()->syncWithoutDetaching($syncData);
+        $tab->files()->syncWithoutDetaching($syncData);
     }
 
     /**
@@ -276,14 +276,14 @@ class Browser
      */
     protected function updateTabQueryParams(int $tabId, array $queryParams): void
     {
-        $browseTab = \App\Models\BrowseTab::find($tabId);
+        $tab = \App\Models\Tab::find($tabId);
 
-        if (! $browseTab || $browseTab->user_id !== auth()->id()) {
+        if (! $tab || $tab->user_id !== auth()->id()) {
             return; // Tab doesn't exist or user doesn't own it
         }
 
         // Update query_params with the provided params
-        $browseTab->update([
+        $tab->update([
             'query_params' => $queryParams,
         ]);
     }

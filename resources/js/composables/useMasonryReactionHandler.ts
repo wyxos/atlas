@@ -1,5 +1,5 @@
 import { nextTick, type Ref } from 'vue';
-import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
+import type { MasonryItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import type { Masonry } from '@wyxos/vibe';
@@ -11,7 +11,7 @@ export function useMasonryReactionHandler(
     items: Ref<MasonryItem[]>,
     itemsMap: Ref<Map<number, MasonryItem>>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
-    tab: Ref<BrowseTabData | undefined>,
+    tab: Ref<TabData | undefined>,
     onReaction: (fileId: number, type: ReactionType) => void,
     restoreToMasonry: (item: MasonryItem, index: number, masonryInstance?: InstanceType<typeof Masonry>) => Promise<void>
 ) {

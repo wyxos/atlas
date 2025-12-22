@@ -1,4 +1,4 @@
-import type { MasonryItem } from './useBrowseTabs';
+import type { MasonryItem } from './useTabs';
 import type { ReactionType } from '@/types/reaction';
 import type { Masonry } from '@wyxos/vibe';
 

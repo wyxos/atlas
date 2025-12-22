@@ -2,10 +2,10 @@
 import { ref, computed, onMounted } from 'vue';
 import { Plus } from 'lucide-vue-next';
 import TabPanel from '../components/ui/TabPanel.vue';
-import BrowseTab from '../components/BrowseTab.vue';
-import BrowseTabContent from '../components/BrowseTabContent.vue';
+import Tab from '../components/Tab.vue';
+import TabContent from '../components/TabContent.vue';
 import { Button } from '@/components/ui/button';
-import { useBrowseTabs } from '@/composables/useBrowseTabs';
+import { useTabs } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
 
 const isPanelMinimized = ref(false);
@@ -47,7 +47,7 @@ const {
     updateActiveTab,
     loadTabItems,
     setActiveTab,
-} = useBrowseTabs(switchTab);
+} = useTabs(switchTab);
 
 // Computed property for active tab to ensure proper reactivity
 const activeTab = computed(() => getActiveTab());
@@ -144,7 +144,7 @@ onMounted(async () => {
         <div class="flex-1 min-h-0 relative flex">
             <TabPanel :model-value="true" v-model:is-minimized="isPanelMinimized">
                 <template #tabs="{ isMinimized }">
-                    <BrowseTab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label"
+                    <Tab v-for="tab in tabs" :key="tab.id" :id="tab.id" :label="tab.label"
                         :is-active="tab.id === activeTabId" :is-minimized="isMinimized"
                         :is-loading="isTabDataLoading(tab.id)"
                         :is-masonry-loading="tabMasonryLoadingStates.get(tab.id) ?? false" @click="switchTab(tab.id)"
@@ -161,7 +161,7 @@ onMounted(async () => {
                 </template>
             </TabPanel>
             <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
-                <BrowseTabContent v-if="activeTab" :key="activeTab.id" :tab="activeTab"
+                <TabContent v-if="activeTab" :key="activeTab.id" :tab="activeTab"
                     :available-services="[]" :update-active-tab="updateActiveTab"
                     :load-tab-items="loadTabItems" :on-reaction="handleReaction"
                     :on-loading-change="handleMasonryLoadingChangeFromTab"

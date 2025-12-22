@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\BrowseTab;
+use App\Models\Tab;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,7 +13,7 @@ it('restores cursor values for a browsed tab after reload', function () {
     $user = User::factory()->create();
 
     // Persist a tab that already scrolled deep into CivitAI (cursor pagination)
-    $tab = BrowseTab::factory()
+    $tab = Tab::factory()
         ->for($user)
         ->withQueryParams([
             'service' => 'civit-ai-images',

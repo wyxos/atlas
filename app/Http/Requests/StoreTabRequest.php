@@ -4,7 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreBrowseTabRequest extends FormRequest
+class StoreTabRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -30,3 +30,4 @@ class StoreBrowseTabRequest extends FormRequest
         ];
     }
 }
+

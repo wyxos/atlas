@@ -1,5 +1,5 @@
 import { ref, nextTick, triggerRef } from 'vue';
-import type { MasonryItem, BrowseTabData } from './useBrowseTabs';
+import type { MasonryItem, TabData } from './useTabs';
 import { usePreviewBatch } from './usePreviewBatch';
 
 /**
@@ -7,7 +7,7 @@ import { usePreviewBatch } from './usePreviewBatch';
  */
 export function useItemPreview(
     items: import('vue').Ref<MasonryItem[]>,
-    tab: import('vue').Ref<BrowseTabData | undefined>,
+    tab: import('vue').Ref<TabData | undefined>,
     itemsMap?: import('vue').Ref<Map<number, MasonryItem>>
 ) {
     const previewedItems = ref<Set<number>>(new Set());

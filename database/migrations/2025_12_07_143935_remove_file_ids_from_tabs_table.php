@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('browse_tabs', function (Blueprint $table) {
+        Schema::table('tabs', function (Blueprint $table) {
             $table->dropColumn('file_ids');
         });
     }
@@ -21,8 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('browse_tabs', function (Blueprint $table) {
+        Schema::table('tabs', function (Blueprint $table) {
             $table->json('file_ids')->nullable()->after('query_params');
         });
     }
 };
+

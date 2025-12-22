@@ -6,12 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SlidersHorizontal } from 'lucide-vue-next';
-import type { BrowseTabData } from '@/composables/useBrowseTabs';
+import type { TabData } from '@/composables/useTabs';
 
 interface Props {
     open: boolean;
     availableServices: Array<{ key: string; label: string }>;
-    tab?: BrowseTabData;
+    tab?: TabData;
     masonry?: { isLoading?: boolean; reset?: () => void; loadPage?: (page: number) => Promise<void>; cancelLoad?: () => void; destroy?: () => void } | null;
     isMasonryLoading?: boolean;
     modelValue?: string; // v-model for selectedService
