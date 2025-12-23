@@ -257,6 +257,11 @@ const isOfflineMode = computed(() => {
     return currentTabSourceType.value === 'offline';
 });
 
+// Masonry mode: 'backfill' for online, 'refresh' for offline
+const masonryMode = computed(() => {
+    return isOfflineMode.value ? 'refresh' : 'backfill';
+});
+
 // Selected source for offline mode (default: 'all')
 const selectedSource = ref<string>('all');
 
@@ -1018,9 +1023,9 @@ onUnmounted(() => {
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :initial-page="currentPage" :initial-next-page="nextCursor" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" :skip-initial-load="true" :backfill-enabled="true"
-                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
-                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :mobile-breakpoint="768" :skip-initial-load="true" :mode="masonryMode" :backfill-delay-ms="2000"
+                    :backfill-max-calls="Infinity" :page-size="pageSize" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
                     data-test="masonry-component">
