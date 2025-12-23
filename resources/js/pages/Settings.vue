@@ -25,13 +25,13 @@ async function handleResetApp(): Promise<void> {
     try {
         // Delete all files first
         await window.axios.delete(deleteAllFiles.url());
-        
+
         // Then delete all tabs
         await window.axios.delete(deleteAllTabs.url());
-        
+
         // Close dialog
         resetDialogOpen.value = false;
-        
+
         // Redirect to home page
         router.push('/');
     } catch (error) {
@@ -47,7 +47,7 @@ async function handleResetApp(): Promise<void> {
     <PageLayout>
         <div>
             <h4 class="text-2xl font-semibold text-regal-navy-100 mb-4">Settings</h4>
-            
+
             <div class="space-y-6">
                 <div class="border border-danger-500/30 rounded-lg p-6 bg-prussian-blue-700/50">
                     <h5 class="text-lg font-semibold text-danger-400 mb-2">Danger Zone</h5>
@@ -79,9 +79,8 @@ async function handleResetApp(): Promise<void> {
                             Cancel
                         </Button>
                     </DialogClose>
-                    <Button @click="handleResetApp" variant="destructive" :disabled="isResetting" data-test="confirm-reset-button">
-                        <span v-if="isResetting">Resetting...</span>
-                        <span v-else>Reset App</span>
+                    <Button @click="handleResetApp" variant="destructive" :loading="isResetting" data-test="confirm-reset-button">
+                        Reset
                     </Button>
                 </DialogFooter>
             </DialogContent>
