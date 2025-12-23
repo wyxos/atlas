@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
+import { items as tabItems } from '@/actions/App/Http/Controllers/TabController';
+import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -12,7 +14,7 @@ import {
     setupAxiosMocks,
     createMockBrowseResponse,
     type BrowseMocks,
-} from '../test/browse-test-utils';
+} from '@/test/browse-test-utils';
 
 // Define mocks using vi.hoisted so they're available for vi.mock factories
 const {
@@ -189,7 +191,7 @@ describe('Browse - Tab Restoration', () => {
 
         await waitForStable(wrapper);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/tabs/1/items');
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
     });
 
     it('initializes masonry with restored items', async () => {
@@ -283,8 +285,8 @@ describe('Browse - Tab Restoration', () => {
         await vm.switchTab(tab2Id);
         await waitForStable(wrapper);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/tabs/2/items');
-        
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 2 }));
+
         // Note: TabContent unmounting behavior (destroy/cancelLoad) is handled by Vue's
         // key-based component lifecycle. The onUnmounted hook will call destroy if masonry
         // exists, but in test environment, the component may not fully unmount or masonry
@@ -323,7 +325,7 @@ describe('Browse - Tab Restoration', () => {
         const getNextPageResult = await tabContentVm.getNextPage(nextParam);
 
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(
-            expect.stringContaining(`/api/browse?page=${nextParam}`)
+            expect.stringContaining(`${browseIndex.definition.url}?page=${nextParam}`)
         );
         expect(getNextPageResult.nextPage).toBeDefined();
     });
@@ -343,30 +345,14 @@ describe('Browse - Tab Restoration', () => {
             notFound: false,
         }));
 
-        mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
-                return Promise.resolve({
-                    data: [{
-                        id: tabId,
-                        label: 'Scrolled Tab',
-                        query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
-                        file_ids: mockItems.map(item => item.id),
-                        position: 0,
-                        is_active: true,
-                    }],
-                });
-            }
-            if (url.includes('/api/tabs/1/items')) {
-                return Promise.resolve({
-                    data: {
-                        items: mockItems,
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
+            file_ids: mockItems.map(item => item.id),
+            items: mockItems,
         });
 
         const router = await createTestRouter('/browse');
+        setupAxiosMocks(mocks, tabConfig);
         const wrapper = mount(Browse, { global: { plugins: [router] } });
 
         await waitForStable(wrapper);
@@ -393,26 +379,18 @@ describe('Browse - Tab Restoration', () => {
             { id: 2, width: 120, height: 120, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
         ];
 
+        const tabConfig = createMockTabConfig(tabId, {
+            query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
+            items: mockItems,
+        });
+
+        setupAxiosMocks(mocks, tabConfig);
+
+        // Override browse API mock to handle cursor logic
+        const originalGetMock = mocks.mockAxios.get.getMockImplementation();
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs/1/items')) {
-                return Promise.resolve({
-                    data: {
-                        items: mockItems,
-                    },
-                });
-            }
-            if (url.includes('/api/tabs') && !url.includes('/items')) {
-                return Promise.resolve({
-                    data: [{
-                        id: tabId,
-                        label: 'Scrolled Tab',
-                        query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
-                        position: 0,
-                        is_active: true,
-                    }],
-                });
-            }
-            if (url.includes('/api/browse')) {
+            // Handle browse endpoint with cursor logic
+            if (url.includes(browseIndex.definition.url)) {
                 const parsed = new URL(url, 'http://localhost');
                 const requestedPage = parsed.searchParams.get('page') ?? '1';
                 const nextValue = requestedPage === cursorY ? 'cursor-z' : cursorY;
@@ -422,6 +400,10 @@ describe('Browse - Tab Restoration', () => {
                         services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
                     },
                 });
+            }
+            // Use original mock for other endpoints
+            if (originalGetMock) {
+                return originalGetMock(url);
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
         });
@@ -482,11 +464,11 @@ describe('Browse - Tab Restoration', () => {
         const browseCalls = mocks.mockAxios.get.mock.calls
             .map(call => call[0])
             .filter((callUrl: string) => {
-                return callUrl.includes('/api/browse?') || callUrl === '/api/browse';
+                return callUrl.includes(`${browseIndex.definition.url}?`) || callUrl === browseIndex.definition.url;
             });
 
         // Verify that the cursor was used in the API call
-        expect(browseCalls[browseCalls.length - 1]).toContain(`/api/browse?page=${cursorY}`);
+        expect(browseCalls[browseCalls.length - 1]).toContain(`${browseIndex.definition.url}?page=${cursorY}`);
         expect(tabContentVm.currentPage).toBe(cursorY);
     });
 });

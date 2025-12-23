@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import Users from './Users.vue';
 import Oruga from '@oruga-ui/oruga-next';
+import { index as usersIndex, destroy as usersDestroy } from '@/actions/App/Http/Controllers/UsersController';
 
 interface User {
     id: number;
@@ -109,10 +110,10 @@ function createHarmonieResponse(items: User[], currentPage = 1, total?: number, 
                 nextPage: currentPage < lastPage ? currentPage + 1 : null,
             },
             links: {
-                first: '/api/users?page=1',
-                last: `/api/users?page=${lastPage}`,
-                prev: currentPage > 1 ? `/api/users?page=${currentPage - 1}` : null,
-                next: currentPage < lastPage ? `/api/users?page=${currentPage + 1}` : null,
+                first: `${usersIndex.definition.url}?page=1`,
+                last: `${usersIndex.definition.url}?page=${lastPage}`,
+                prev: currentPage > 1 ? `${usersIndex.definition.url}?page=${currentPage - 1}` : null,
+                next: currentPage < lastPage ? `${usersIndex.definition.url}?page=${currentPage + 1}` : null,
             },
             filters: [],
         },
@@ -164,7 +165,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/users', {
+        expect(mockAxios.get).toHaveBeenCalledWith(usersIndex.definition.url, {
             params: {
                 page: 1,
                 per_page: 15,
@@ -381,7 +382,7 @@ describe('Users', () => {
         await waitForListingToLoad(wrapper);
 
         // Verify delete was called
-        expect(mockAxios.delete).toHaveBeenCalledWith('/api/users/1');
+        expect(mockAxios.delete).toHaveBeenCalledWith(usersDestroy.url({ user: 1 }));
 
         // Verify users list was refreshed
         expect(mockAxios.get).toHaveBeenCalledTimes(2);
@@ -536,7 +537,7 @@ describe('Users', () => {
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/users', {
+        expect(mockAxios.get).toHaveBeenCalledWith(usersIndex.definition.url, {
             params: expect.objectContaining({
                 page: 2,
                 search: 'john',

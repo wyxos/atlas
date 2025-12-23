@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
+import { items as tabItems, index as tabIndex } from '@/actions/App/Http/Controllers/TabController';
+import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -12,7 +14,7 @@ import {
     setupAxiosMocks,
     createMockBrowseResponse,
     type BrowseMocks,
-} from '../test/browse-test-utils';
+} from '@/test/browse-test-utils';
 
 // Define mocks using vi.hoisted so they're available for vi.mock factories
 const {
@@ -226,7 +228,7 @@ describe('Browse - Core', () => {
         const result = await getNextPage(2);
 
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(
-            expect.stringContaining('/api/browse?page=2')
+            expect.stringContaining(`${browseIndex.definition.url}?page=2`)
         );
         // Verify tab_id was included in the request (backend will update query_params)
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(
@@ -250,10 +252,10 @@ describe('Browse - Core', () => {
         const networkError = new Error('Network error');
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.reject(networkError);
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -304,10 +306,10 @@ describe('Browse - Core', () => {
         const mockResponse = createMockBrowseResponse(100, null);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({ data: mockResponse });
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -364,10 +366,10 @@ describe('Browse - Core', () => {
         const mockResponse = createMockBrowseResponse(cursor, nextCursor);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({ data: mockResponse });
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -425,10 +427,10 @@ describe('Browse - Core', () => {
         const mockResponse = createMockBrowseResponse(1, 2);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({ data: mockResponse });
             }
             return Promise.resolve({ data: { items: [], nextPage: null } });
@@ -509,7 +511,7 @@ describe('Browse - Core', () => {
             expect(tabContentVm.currentPage).toBe(pageParam);
             expect(tabContentVm.nextCursor).toBe(nextParam);
         }
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/tabs/1/items');
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
     });
 
     it('initializes with default values when no tabs exist', async () => {
@@ -532,7 +534,7 @@ describe('Browse - Core', () => {
 
     it('displays Pill components with correct values', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({
                     data: [{
                         id: 1,
@@ -544,7 +546,7 @@ describe('Browse - Core', () => {
                     }],
                 });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -615,7 +617,7 @@ describe('Browse - Core', () => {
         const pageParam = 'cursor-string-123';
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs') && !url.includes('/items')) {
+            if (url.includes(tabIndex.definition.url) && !url.includes('/items')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -626,7 +628,7 @@ describe('Browse - Core', () => {
                     }],
                 });
             }
-            if (url.includes('/api/tabs/1/items')) {
+            if (url.includes(tabItems.url({ tab: 1 }))) {
                 return Promise.resolve({
                     data: {
                         items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
@@ -655,7 +657,7 @@ describe('Browse - Core', () => {
         if (tabContentVm) {
             expect(tabContentVm.currentPage).toBe(pageParam);
         }
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/tabs/1/items');
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
     });
 
     it('handles tab with page in query_params correctly and loads items lazily', async () => {
@@ -663,7 +665,7 @@ describe('Browse - Core', () => {
         const pageValue = 123;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs') && !url.includes('/items')) {
+            if (url.includes(tabIndex.definition.url) && !url.includes('/items')) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -674,7 +676,7 @@ describe('Browse - Core', () => {
                     }],
                 });
             }
-            if (url.includes('/api/tabs/1/items')) {
+            if (url.includes(tabItems.url({ tab: 1 }))) {
                 return Promise.resolve({
                     data: {
                         items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
@@ -700,6 +702,6 @@ describe('Browse - Core', () => {
         if (tabContentVm) {
             expect(tabContentVm.currentPage).toBe(pageValue);
         }
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith('/api/tabs/1/items');
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
     });
 });

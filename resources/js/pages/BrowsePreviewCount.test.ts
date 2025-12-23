@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
+import { incrementSeen } from '@/actions/App/Http/Controllers/FilesController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -10,7 +11,7 @@ import {
     createMockTabConfig,
     setupAxiosMocks,
     type BrowseMocks,
-} from '../test/browse-test-utils';
+} from '@/test/browse-test-utils';
 
 // Define mocks using vi.hoisted so they're available for vi.mock factories
 const {
@@ -224,23 +225,23 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         // Scenario: Item has preview_count = 2, increments to 3, should show will_auto_dislike = true
         // and display progress bar. The UI should update reactively without needing scroll/resize.
         // This test reproduces the reactivity issue where components don't update until forced re-render.
-        const itemWithPreviewCount2 = { 
-            id: 1, 
-            width: 300, 
-            height: 400, 
-            src: 'test1.jpg', 
-            type: 'image', 
-            page: 1, 
-            index: 0, 
-            notFound: false, 
+        const itemWithPreviewCount2 = {
+            id: 1,
+            width: 300,
+            height: 400,
+            src: 'test1.jpg',
+            type: 'image',
+            page: 1,
+            index: 0,
+            notFound: false,
             previewed_count: 2, // Item has preview_count = 2
             will_auto_dislike: false,
         };
-        
+
         const tabConfig = createMockTabConfig(1, {
             items: [itemWithPreviewCount2],
         });
-        
+
         setupAxiosMocks(mocks, tabConfig);
         const router = await createTestRouter();
         const wrapper = mount(Browse, {
@@ -297,14 +298,14 @@ describe('Browse - Preview and Seen Count Tracking', () => {
 
             // Verify countdown was started
             expect(mockStartAutoDislikeCountdown).toHaveBeenCalledWith(1, expect.objectContaining({ id: 1 }));
-            
+
             // Mock countdown as active for progress bar visibility test
             // The mock needs to return true when called with item.id (1)
             mockHasActiveCountdown.mockImplementation((fileId: number) => fileId === 1);
             mockGetCountdownProgress.mockReturnValue(50);
             mockGetCountdownRemainingTime.mockReturnValue(2500);
             mockFormatCountdown.mockReturnValue('02:50');
-            
+
             // Force Vue to re-render after state updates
             await wrapper.vm.$nextTick();
             await flushPromises();
@@ -314,7 +315,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             await wrapper.vm.$nextTick();
             await flushPromises();
             await wrapper.vm.$nextTick();
-            
+
             // Force Vue to process any pending reactivity updates
             // In production, scroll/resize would trigger this, but we need to test without it
             await wrapper.vm.$nextTick();
@@ -334,10 +335,10 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             const itemInArray = tabContentVm.items.find((i: any) => i.id === 1);
             expect(itemInArray?.previewed_count).toBe(3);
             expect(itemInArray?.will_auto_dislike).toBe(true);
-            
+
             // Verify mock is set up correctly
             expect(mockHasActiveCountdown(1)).toBe(true);
-            
+
             // The reactivity fix ensures that when we replace items.value[itemIndex] with a new object,
             // Vue's reactivity system detects the change and updates dependent components.
             // The FileReactions test above confirms the fix works for props.
@@ -352,24 +353,24 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         // Scenario: Tab loads with files that already have preview_count = 3
         // When items come into view and preload, preview count should increment to 4
         // FileReactions should display preview_count = 4, not 3
-        const itemWithPreviewCount3 = { 
-            id: 1, 
-            width: 300, 
-            height: 400, 
-            src: 'test1.jpg', 
-            type: 'image', 
-            page: 1, 
-            index: 0, 
-            notFound: false, 
+        const itemWithPreviewCount3 = {
+            id: 1,
+            width: 300,
+            height: 400,
+            src: 'test1.jpg',
+            type: 'image',
+            page: 1,
+            index: 0,
+            notFound: false,
             previewed_count: 3, // Item already has preview_count = 3 from backend
             will_auto_dislike: false,
         };
-        
+
         // Create tab config with items to simulate tab with existing files loaded from backend
         const tabConfig = createMockTabConfig(1, {
             items: [itemWithPreviewCount3], // Items are loaded from backend with preview_count = 3
         });
-        
+
         setupAxiosMocks(mocks, tabConfig);
         const router = await createTestRouter();
         const wrapper = mount(Browse, {
@@ -433,7 +434,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             await wrapper.vm.$nextTick();
             await flushPromises();
             await wrapper.vm.$nextTick();
-            
+
             // Force Vue to process any pending reactivity updates
             await wrapper.vm.$nextTick();
             await flushPromises();
@@ -444,14 +445,14 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             // FileReactions receives :previewed-count="(item.previewed_count as number) ?? 0"
             // If shallowRef doesn't track the mutation, this prop will be stale
             const fileReactions = browseTabContentComponent.findComponent({ name: 'FileReactions' });
-            
+
             // The test should fail here if the reactivity issue exists:
             // - Item object is mutated: currentItem.previewed_count = 4 (works)
             // - But shallowRef doesn't detect the mutation, so Vue doesn't re-render
             // - FileReactions prop will still be 3 (the initial value)
             expect(fileReactions.exists()).toBe(true);
             const previewedCountProp = fileReactions.props('previewedCount');
-            
+
             // This assertion should fail if the reactivity issue exists
             // Expected: 4 (from updated item)
             // Actual: 3 (stale value due to shallowRef not tracking mutation)
@@ -524,7 +525,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             await flushPromises();
 
             const seenCall = mocks.mockAxios.post.mock.calls.find((call: any[]) =>
-                call[0]?.includes('/api/files/1/seen')
+                call[0]?.includes(incrementSeen.url({ file: 1 }))
             );
             expect(seenCall).toBeDefined();
         }

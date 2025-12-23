@@ -12,7 +12,7 @@ import {
     setupAxiosMocks,
     setupBoundingClientRectMock,
     type BrowseMocks,
-} from '../test/browse-test-utils';
+} from '@/test/browse-test-utils';
 
 const {
     mockAxios,
@@ -97,10 +97,10 @@ describe('Browse - Overlay Reactions', () => {
         const tabConfig = createMockTabConfig(1);
         setupAxiosMocks(mocks, tabConfig, browseResponse);
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [tabConfig] });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({ data: browseResponse });
             }
             if (url.includes('/api/files') && url.includes('/reaction')) {
