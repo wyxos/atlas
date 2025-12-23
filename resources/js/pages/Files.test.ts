@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import Files from './Files.vue';
 import Oruga from '@oruga-ui/oruga-next';
+import { index as filesIndex, destroy as filesDestroy, show as filesShow } from '@/actions/App/Http/Controllers/FilesController';
 
 interface File {
     id: number;
@@ -106,10 +107,10 @@ function createHarmonieResponse(items: File[], currentPage = 1, total?: number, 
                 nextPage: currentPage < lastPage ? currentPage + 1 : null,
             },
             links: {
-                first: '/api/files?page=1',
-                last: `/api/files?page=${lastPage}`,
-                prev: currentPage > 1 ? `/api/files?page=${currentPage - 1}` : null,
-                next: currentPage < lastPage ? `/api/files?page=${currentPage + 1}` : null,
+                first: `${filesIndex.definition.url}?page=1`,
+                last: `${filesIndex.definition.url}?page=${lastPage}`,
+                prev: currentPage > 1 ? `${filesIndex.definition.url}?page=${currentPage - 1}` : null,
+                next: currentPage < lastPage ? `${filesIndex.definition.url}?page=${currentPage + 1}` : null,
             },
             filters: [],
         },
@@ -177,7 +178,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/files', {
+        expect(mockAxios.get).toHaveBeenCalledWith(filesIndex.definition.url, {
             params: {
                 page: 1,
                 per_page: 15,
@@ -503,7 +504,7 @@ describe('Files', () => {
         await waitForListingToLoad(wrapper);
 
         // Verify delete was called
-        expect(mockAxios.delete).toHaveBeenCalledWith('/api/files/1');
+        expect(mockAxios.delete).toHaveBeenCalledWith(filesDestroy.url({ file: 1 }));
 
         // Verify files list was refreshed
         expect(mockAxios.get).toHaveBeenCalledTimes(2);
@@ -629,7 +630,7 @@ describe('Files', () => {
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/files', {
+        expect(mockAxios.get).toHaveBeenCalledWith(filesIndex.definition.url, {
             params: expect.objectContaining({
                 page: 2,
                 search: 'test',

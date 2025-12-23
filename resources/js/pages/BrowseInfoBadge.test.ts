@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
+import { show as filesShow } from '@/actions/App/Http/Controllers/FilesController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -10,7 +11,7 @@ import {
     createMockTabConfig,
     setupAxiosMocks,
     type BrowseMocks,
-} from '../test/browse-test-utils';
+} from '@/test/browse-test-utils';
 
 // Define mocks using vi.hoisted so they're available for vi.mock factories
 const {
@@ -195,7 +196,7 @@ describe('Browse - Info Badge and Prompt Tooltip', () => {
         setupAxiosMocks(mocks, tabConfig, browseResponse);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/files/1')) {
+            if (url.includes(filesShow.url({ file: 1 }))) {
                 return Promise.resolve({
                     data: {
                         file: {
@@ -233,7 +234,7 @@ describe('Browse - Info Badge and Prompt Tooltip', () => {
             await tabContentVmAny.loadPromptData(tabContentVm.items[0]);
             await flushPromises();
 
-            expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/files/1'));
+            expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(filesShow.url({ file: 1 })));
         }
     });
 });

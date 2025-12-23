@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
 import FileViewer from '../components/FileViewer.vue';
+import { store as fileReactionStore } from '@/actions/App/Http/Controllers/FileReactionController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -12,7 +13,7 @@ import {
     setupAxiosMocks,
     setupBoundingClientRectMock,
     type BrowseMocks,
-} from '../test/browse-test-utils';
+} from '@/test/browse-test-utils';
 
 const {
     mockAxios,
@@ -136,7 +137,7 @@ describe('Browse - ALT + Click Reactions', () => {
 
             // Verify API was called for reaction
             expect(mockAxios.post).toHaveBeenCalledWith(
-                expect.stringContaining('/api/files/1/reaction'),
+                expect.stringContaining(fileReactionStore.url({ file: 1 })),
                 expect.objectContaining({ type: 'like' })
             );
 
@@ -188,7 +189,7 @@ describe('Browse - ALT + Click Reactions', () => {
 
             // Verify API was called for reaction
             expect(mockAxios.post).toHaveBeenCalledWith(
-                expect.stringContaining('/api/files/2/reaction'),
+                expect.stringContaining(fileReactionStore.url({ file: 2 })),
                 expect.objectContaining({ type: 'dislike' })
             );
         }
@@ -236,7 +237,7 @@ describe('Browse - ALT + Click Reactions', () => {
 
             // Verify API call was made directly (no queueing)
             expect(mockAxios.post).toHaveBeenCalledWith(
-                expect.stringContaining('/api/files/3/reaction'),
+                expect.stringContaining(fileReactionStore.url({ file: 3 })),
                 expect.objectContaining({ type: 'love' })
             );
         }

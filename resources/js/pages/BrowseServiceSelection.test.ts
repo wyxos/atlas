@@ -2,13 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
+import { index as tabIndex } from '@/actions/App/Http/Controllers/TabController';
+import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
     getTabContent,
     waitForStable,
     type BrowseMocks,
-} from '../test/browse-test-utils';
+} from '@/test/browse-test-utils';
 
 // Define mocks using vi.hoisted so they're available for vi.mock factories
 const {
@@ -138,10 +140,10 @@ beforeEach(() => {
 describe('Browse - Service Selection', () => {
     it('new tab does not auto-load until service is selected', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -191,7 +193,7 @@ describe('Browse - Service Selection', () => {
             const itemLoadingCalls = mocks.mockAxios.get.mock.calls
                 .map(call => call[0])
                 .filter((callUrl: string) => {
-                    return callUrl.includes('/api/browse') && callUrl.includes('source=');
+                    return callUrl.includes(browseIndex.definition.url) && callUrl.includes('source=');
                 });
             expect(itemLoadingCalls.length).toBe(0);
         }
@@ -206,7 +208,7 @@ describe('Browse - Service Selection', () => {
 
     it('applies selected service and triggers loading', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({
                     data: [{
                         id: 1,
@@ -218,7 +220,7 @@ describe('Browse - Service Selection', () => {
                     }],
                 });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({
                     data: {
                         items: [
@@ -280,8 +282,8 @@ describe('Browse - Service Selection', () => {
             .map(call => call[0])
             .filter((callUrl: string) => {
                 return typeof callUrl === 'string'
-                    && callUrl.includes('/api/browse?')
-                    && !callUrl.includes('/api/tabs')
+                    && callUrl.includes(`${browseIndex.definition.url}?`)
+                    && !callUrl.includes(tabIndex.definition.url)
                     && !callUrl.includes('limit=1');
             });
         expect(browseCalls.length).toBeGreaterThan(0);
@@ -294,7 +296,7 @@ describe('Browse - Service Selection', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({
                     data: [
                         {
@@ -316,7 +318,7 @@ describe('Browse - Service Selection', () => {
                     ],
                 });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -363,7 +365,7 @@ describe('Browse - Service Selection', () => {
         const tabId = 1;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -374,7 +376,7 @@ describe('Browse - Service Selection', () => {
                     }],
                 });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({
                     data: {
                         items: [
@@ -409,7 +411,7 @@ describe('Browse - Service Selection', () => {
 
         const browseCalls = mocks.mockAxios.get.mock.calls
             .map(call => call[0])
-            .filter((callUrl: string) => callUrl.includes('/api/browse') && !callUrl.includes('services'));
+            .filter((callUrl: string) => callUrl.includes(browseIndex.definition.url) && !callUrl.includes('services'));
 
         expect(browseCalls.length).toBeGreaterThan(0);
         const lastCall = browseCalls[browseCalls.length - 1];
@@ -418,7 +420,7 @@ describe('Browse - Service Selection', () => {
 
     it('registers backfill event handlers on masonry component', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs')) {
+            if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({
                     data: [{
                         id: 1,
@@ -429,7 +431,7 @@ describe('Browse - Service Selection', () => {
                     }],
                 });
             }
-            if (url.includes('/api/browse')) {
+            if (url.includes(browseIndex.definition.url)) {
                 return Promise.resolve({
                     data: {
                         items: [],
