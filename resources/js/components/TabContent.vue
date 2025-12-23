@@ -104,7 +104,6 @@ const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number | null>(1);
 const nextCursor = ref<string | number | null>(null);
 const loadAtPage = ref<string | number | null>(null);
-const isTabRestored = ref(false);
 const selectedService = ref<string>('');
 const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
@@ -121,6 +120,9 @@ const itemPreview = useItemPreview(items, computed(() => props.tab), itemsMap);
 
 // Track if component is mounted to prevent accessing state after unmount
 const isMounted = ref(false);
+
+// Track if tab is initializing (loading metadata, restoring state)
+const isInitializing = ref(true);
 
 // Item virtualization composable - loads minimal items initially, then full data on-demand
 const itemVirtualization = useItemVirtualization(items);
@@ -428,7 +430,7 @@ const {
     applyService: applyServiceFromComposable,
 } = useBrowseService({
     hasServiceSelected,
-    isTabRestored,
+    isInitializing,
     items,
     nextCursor,
     currentPage,
@@ -597,7 +599,6 @@ const { initializeTab } = useTabInitialization({
     currentPage,
     nextCursor,
     loadAtPage,
-    isTabRestored,
     selectedService,
     clearPreviewedItems: itemPreview.clearPreviewedItems,
     onTabDataLoadingChange: props.onTabDataLoadingChange,
@@ -871,18 +872,24 @@ watch(
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
     isMounted.value = true;
+    isInitializing.value = true;
 
-    // Fetch services if not provided via prop (fallback for when tab mounts before parent fetches)
-    if (props.availableServices.length === 0) {
-        await fetchServices();
-    }
+    try {
+        // Fetch services if not provided via prop (fallback for when tab mounts before parent fetches)
+        if (props.availableServices.length === 0) {
+            await fetchServices();
+        }
 
-    if (props.tab) {
-        await initializeTab(props.tab);
+        if (props.tab) {
+            await initializeTab(props.tab);
+        }
+        // Initialize virtualization after items are loaded
+        await nextTick();
+        itemVirtualization.initialize();
+    } finally {
+        // Mark initialization as complete
+        isInitializing.value = false;
     }
-    // Initialize virtualization after items are loaded
-    await nextTick();
-    itemVirtualization.initialize();
 });
 
 // Sync selectedService with currentTabService when tab changes
@@ -1019,13 +1026,20 @@ onUnmounted(() => {
 
         <!-- Masonry Content -->
         <div class="flex-1 min-h-0">
-            <div v-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
+            <div v-if="isInitializing" class="flex items-center justify-center h-full"
+                data-test="initializing-tab-message">
+                <div class="flex flex-col items-center gap-3">
+                    <Loader2 :size="24" class="animate-spin text-smart-blue-400" />
+                    <p class="text-twilight-indigo-300 text-lg">Initializing tab...</p>
+                </div>
+            </div>
+            <div v-else-if="tab && hasServiceSelected" class="relative h-full masonry-container" ref="masonryContainer"
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :initial-page="currentPage" :initial-next-page="nextCursor" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" :skip-initial-load="true" :mode="masonryMode" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" :page-size="pageSize" @backfill:start="onBackfillStart"
-                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :mobile-breakpoint="768" :skip-initial-load="!isOfflineMode" :mode="masonryMode"
+                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
+                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
                     data-test="masonry-component">

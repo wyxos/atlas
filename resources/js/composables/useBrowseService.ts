@@ -16,7 +16,7 @@ export type ServiceOption = {
 
 export type UseBrowseServiceOptions = {
     hasServiceSelected: ComputedRef<boolean>;
-    isTabRestored: Ref<boolean>;
+    isInitializing: Ref<boolean>;
     items: Ref<MasonryItem[]>;
     nextCursor: Ref<string | number | null>;
     currentPage: Ref<string | number | null>;
@@ -54,14 +54,14 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         // Or if no source is selected (for offline mode)
         const activeTab = options.getActiveTab();
         const isOfflineMode = activeTab?.sourceType === 'offline';
-        
+
         if (!isOfflineMode && !options.hasServiceSelected.value) {
             return {
                 items: [],
                 nextPage: null,
             };
         }
-        
+
         // For offline mode, check if source is selected
         if (isOfflineMode && !activeTab?.queryParams?.source) {
             return {
@@ -70,10 +70,10 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             };
         }
 
-        // If we're restoring a tab and already have items, prevent any loading
-        // Masonry should only load when user scrolls to bottom, not during restoration
-        if (options.isTabRestored.value) {
-            // Return empty result to prevent loading during tab restoration
+        // If we're initializing a tab, prevent any loading
+        // Masonry should only load when user scrolls to bottom, not during initialization
+        if (options.isInitializing.value) {
+            // Return empty result to prevent loading during tab initialization
             return {
                 items: [],
                 nextPage: options.nextCursor.value,
@@ -116,8 +116,8 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         }
 
         // Always include limit (default to 20 if not set in queryParams)
-        queryParams.limit = activeTab?.queryParams?.limit 
-            ? Number(activeTab.queryParams.limit) 
+        queryParams.limit = activeTab?.queryParams?.limit
+            ? Number(activeTab.queryParams.limit)
             : 20;
 
         // Include tab_id if available
@@ -140,8 +140,8 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         };
 
         // Update currentPage to the page we just loaded
-        // Only skip if we're restoring a tab and already have items (to prevent reset during restoration)
-        if (!options.isTabRestored.value || options.items.value.length === 0) {
+        // Only skip if we're initializing a tab and already have items (to prevent reset during initialization)
+        if (!options.isInitializing.value || options.items.value.length === 0) {
             // Update current page to the page/cursor we just used
             options.currentPage.value = pageToRequest;
         }
@@ -150,8 +150,8 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         options.nextCursor.value = data.nextPage; // This is the cursor/page string from CivitAI
 
         // Update active tab with new items - backend is responsible for updating query_params
-        // Only update if we're not restoring a tab (to prevent overwriting restored state)
-        if (options.activeTabId.value && !options.isTabRestored.value) {
+        // Only update if we're not initializing a tab (to prevent overwriting restored state)
+        if (options.activeTabId.value && !options.isInitializing.value) {
             const activeTab = options.getActiveTab();
             if (activeTab) {
                 // Append new items to existing items (masonry will update items.value separately)

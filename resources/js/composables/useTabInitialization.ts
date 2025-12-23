@@ -16,7 +16,6 @@ interface TabInitializationDependencies {
     currentPage: Ref<string | number | null>;
     nextCursor: Ref<string | number | null>;
     loadAtPage: Ref<string | number | null>;
-    isTabRestored: Ref<boolean>;
     selectedService: Ref<string>;
 
     // Composable methods
@@ -86,15 +85,6 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         // Set items - Masonry will automatically call restoreItems() when skipInitialLoad is true
         // and items are provided via v-model, using initialPage and initialNextPage props
         deps.items.value = tab.itemsData ?? [];
-
-        // Set isTabRestored flag based on whether we have items to restore
-        // This prevents getNextPage from loading during restoration
-        deps.isTabRestored.value = (tab.itemsData?.length ?? 0) > 0;
-        
-        // Reset isTabRestored after initialization is complete
-        // This allows getNextPage to work normally after tab restoration
-        await nextTick();
-        deps.isTabRestored.value = false;
     }
 
     return {
