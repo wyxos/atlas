@@ -23,7 +23,7 @@
 }
 
 /* Ensure custom component content is visible */
-.Vue-Toastification__toast-component-body > * {
+.Vue-Toastification__toast-component-body>* {
     display: block;
     width: 100%;
 }
@@ -31,10 +31,3 @@
 .Vue-Toastification__toast.Vue-Toastification__toast--default {
     @apply !p-0;
 }
-
-
-
-
-
-
-
