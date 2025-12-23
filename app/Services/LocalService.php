@@ -136,6 +136,7 @@ class LocalService extends BaseService
 
                 $transformed[] = [
                     'file' => [
+                        'id' => $file->id, // Include file ID for Browser.php to match files in local mode
                         'referrer_url' => $file->referrer_url ?? "local://file/{$file->id}",
                         'url' => $file->url ?? $file->thumbnail_url,
                         'filename' => $file->filename,

@@ -137,13 +137,15 @@ class Browser
         // Only persist files if not in local mode (local files already exist in DB)
         // For local mode, convert transformed format back to File models for moderation
         if ($isLocalMode) {
-            // Extract file referrer URLs from transformed format
-            $referrers = collect($filesPayload)->map(function ($item) {
-                return $item['file']['referrer_url'] ?? null;
+            // Extract file IDs from transformed format
+            // LocalService.transform() now includes file IDs directly in the file structure
+            $fileIds = collect($filesPayload)->map(function ($item) {
+                // Get ID directly from file structure (LocalService now includes it)
+                return $item['file']['id'] ?? null;
             })->filter()->values()->all();
 
-            // Load File models with metadata
-            $persisted = File::with('metadata')->whereIn('referrer_url', $referrers)->get()->all();
+            // Load File models with metadata by ID
+            $persisted = File::with('metadata')->whereIn('id', $fileIds)->get()->all();
         } else {
             $persisted = app(BrowsePersister::class)->persist($filesPayload);
         }
@@ -173,20 +175,25 @@ class Browser
         // Store files before filtering (needed for immediate actions formatting)
         $allFilesBeforeFilter = collect($persisted)->keyBy('id');
 
-        // Filter out processed files (auto-disliked or blacklisted) from response
-        // This includes files that were processed in this request (via processedIds)
-        // and files that were already auto-disliked/blacklisted (defensive check)
-        $persisted = collect($persisted)->reject(function ($file) use ($processedIds) {
-            // Filter if file was processed in this request
-            if (in_array($file->id, $processedIds, true)) {
+        // Extract file IDs that were blacklisted (not auto-disliked) from immediate actions
+        // immediateActions only contains blacklisted files (auto-disliked files are not in immediateActions)
+        $blacklistedFileIds = array_column($immediateActions, 'file_id');
+
+        // Filter out only blacklisted files from response (auto-disliked files should be shown)
+        // This includes files that were blacklisted in this request (via immediateActions)
+        // and files that were already blacklisted (defensive check)
+        $persisted = collect($persisted)->reject(function ($file) use ($blacklistedFileIds) {
+            // Filter if file was blacklisted in this request
+            if (in_array($file->id, $blacklistedFileIds, true)) {
                 return true;
             }
 
-            // Defensive check: filter if file is already auto-disliked or blacklisted
+            // Defensive check: filter if file is already blacklisted
             // (refresh from DB to get latest state, as model instances may be stale)
+            // Note: We no longer filter auto_disliked files - they should be shown
             $fresh = $file->fresh();
 
-            return $fresh && ($fresh->auto_disliked || $fresh->blacklisted_at !== null);
+            return $fresh && $fresh->blacklisted_at !== null;
         })->values()->all();
 
         // Attach filtered files to tab if tab_id is provided and not in local mode
