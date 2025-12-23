@@ -65,7 +65,7 @@ describe('useBrowseService', () => {
     it('returns empty result when no service is selected', async () => {
         const options: UseBrowseServiceOptions = {
             hasServiceSelected: computed(() => false),
-            isTabRestored: ref(false),
+            isInitializing: ref(false),
             items: ref([]),
             nextCursor: ref(null),
             currentPage: ref(null),
@@ -84,10 +84,10 @@ describe('useBrowseService', () => {
         expect(mockAxios.get).not.toHaveBeenCalled();
     });
 
-    it('returns empty result when tab is restored', async () => {
+    it('returns empty result when tab is initializing', async () => {
         const options: UseBrowseServiceOptions = {
             hasServiceSelected: computed(() => true),
-            isTabRestored: ref(true),
+            isInitializing: ref(true),
             items: ref([]),
             nextCursor: ref('cursor-123'),
             currentPage: ref(null),
@@ -126,7 +126,7 @@ describe('useBrowseService', () => {
 
         const options: UseBrowseServiceOptions = {
             hasServiceSelected: computed(() => true),
-            isTabRestored: ref(false),
+            isInitializing: ref(false),
             items: ref([]),
             nextCursor: ref(null),
             currentPage: ref(null),
@@ -163,7 +163,7 @@ describe('useBrowseService', () => {
 
         const options: UseBrowseServiceOptions = {
             hasServiceSelected: computed(() => true),
-            isTabRestored: ref(false),
+            isInitializing: ref(false),
             items: ref([]),
             nextCursor: ref(null),
             currentPage: ref(null),
@@ -201,7 +201,7 @@ describe('useBrowseService', () => {
         // if source is selected in queryParams
         const options: UseBrowseServiceOptions = {
             hasServiceSelected: computed(() => false), // Service not selected, but source is
-            isTabRestored: ref(false),
+            isInitializing: ref(false),
             items: ref([]),
             nextCursor: ref(null),
             currentPage: ref(null),
