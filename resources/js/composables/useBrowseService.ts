@@ -1,4 +1,4 @@
-import { ref, type Ref, type ComputedRef } from 'vue';
+import { ref, type Ref, type ComputedRef, nextTick } from 'vue';
 import type { MasonryItem, TabData } from './useTabs';
 import { index as browseIndex, services as browseServices } from '@/actions/App/Http/Controllers/BrowseController';
 
@@ -63,21 +63,46 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         }
 
         // For offline mode, check if source is selected
+        // In offline mode, source should be set in queryParams (e.g., 'all', 'local', etc.)
+        // If not set yet and we're not initializing, wait for reactive updates to complete
+        // Note: We don't return early here - we'll use 'all' as default in the queryParams building below
+        let finalActiveTab = activeTab;
         if (isOfflineMode && !activeTab?.queryParams?.source) {
-            return {
-                items: [],
-                nextPage: null,
-            };
+            if (!options.isInitializing.value) {
+                // Wait for Vue's reactive updates (queryParams sync) to complete
+                // This handles the case where masonry loads before the watch has synced queryParams
+                // Wait multiple ticks to ensure the watch has completed
+                await nextTick();
+                await nextTick();
+                // Re-check after waiting
+                const retryActiveTab = options.getActiveTab();
+                if (retryActiveTab?.queryParams?.source) {
+                    // Source is now available, use the updated activeTab
+                    finalActiveTab = retryActiveTab;
+                }
+                // If still no source, we'll use 'all' as default in the queryParams building below
+            } else {
+                // Still initializing, return empty (unless we're allowing initial load)
+                // This is handled by the isInitializing check below
+            }
         }
 
         // If we're initializing a tab, prevent any loading
-        // Masonry should only load when user scrolls to bottom, not during initialization
+        // EXCEPT: In offline mode with skip-initial-load=false, we need to allow the initial load
+        // to happen so masonry can automatically load when it mounts (items.length === 0 means no items restored)
         if (options.isInitializing.value) {
-            // Return empty result to prevent loading during tab initialization
-            return {
-                items: [],
-                nextPage: options.nextCursor.value,
-            };
+            // In offline mode, allow initial load if items are empty (masonry needs to load from API)
+            // This allows masonry's automatic initial load when skip-initial-load=false
+            const shouldAllowInitialLoad = isOfflineMode && options.items.value.length === 0;
+
+            if (!shouldAllowInitialLoad) {
+                // In online mode or when items exist, prevent loading during initialization
+                return {
+                    items: [],
+                    nextPage: options.nextCursor.value,
+                };
+            }
+            // If shouldAllowInitialLoad is true, continue to the API call below
         }
 
         // Use the page parameter directly - Masonry will handle pagination state correctly
@@ -90,34 +115,37 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         };
 
         // Include filter parameters from tab's queryParams
-        // (activeTab already retrieved above)
-        if (activeTab?.queryParams) {
+        // Use finalActiveTab which may have been updated after waiting for reactive updates
+        if (finalActiveTab?.queryParams) {
             // In offline mode, source is set directly in queryParams
             // In online mode, service is converted to source parameter
-            if (activeTab.queryParams.source) {
-                queryParams.source = activeTab.queryParams.source;
+            if (finalActiveTab.queryParams.source) {
+                queryParams.source = finalActiveTab.queryParams.source;
             } else {
                 // Include service parameter if available (online mode)
                 const currentService = options.currentTabService.value;
                 if (currentService) {
                     queryParams.source = currentService;
+                } else if (isOfflineMode) {
+                    // In offline mode, default to 'all' if source is not set
+                    queryParams.source = 'all';
                 }
             }
 
-            if (activeTab.queryParams.nsfw !== undefined && activeTab.queryParams.nsfw !== null) {
-                queryParams.nsfw = activeTab.queryParams.nsfw;
+            if (finalActiveTab.queryParams.nsfw !== undefined && finalActiveTab.queryParams.nsfw !== null) {
+                queryParams.nsfw = finalActiveTab.queryParams.nsfw;
             }
-            if (activeTab.queryParams.type && activeTab.queryParams.type !== 'all') {
-                queryParams.type = activeTab.queryParams.type;
+            if (finalActiveTab.queryParams.type && finalActiveTab.queryParams.type !== 'all') {
+                queryParams.type = finalActiveTab.queryParams.type;
             }
-            if (activeTab.queryParams.sort && activeTab.queryParams.sort !== 'Newest') {
-                queryParams.sort = activeTab.queryParams.sort;
+            if (finalActiveTab.queryParams.sort && finalActiveTab.queryParams.sort !== 'Newest') {
+                queryParams.sort = finalActiveTab.queryParams.sort;
             }
         }
 
         // Always include limit (default to 20 if not set in queryParams)
-        queryParams.limit = activeTab?.queryParams?.limit
-            ? Number(activeTab.queryParams.limit)
+        queryParams.limit = finalActiveTab?.queryParams?.limit
+            ? Number(finalActiveTab.queryParams.limit)
             : 20;
 
         // Include tab_id if available
