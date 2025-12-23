@@ -868,7 +868,7 @@ onUnmounted(() => {
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :initial-page="currentPage" :initial-next-page="nextCursor" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" :skip-initial-load="true" :backfill-enabled="true"
+                    :mobile-breakpoint="768" :skip-initial-load="true" mode="backfill"
                     :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
                     @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"

@@ -50,7 +50,7 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                     ></slot>
                 </div>
             `,
-            props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'backfillEnabled', 'backfillDelayMs', 'backfillMaxCalls'],
+            props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
             emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
             setup(props: { items: any[] }, { emit }: { emit: (event: string, value: any) => void }) {
                 const removeFn = (item: any) => {
