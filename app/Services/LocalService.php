@@ -41,8 +41,9 @@ class LocalService extends BaseService
         $total = $query->count();
         $totalPages = (int) ceil($total / $limit);
 
-        // Paginate
-        $files = $query->skip(($page - 1) * $limit)
+        // Paginate with eager loaded metadata (needed for moderation)
+        $files = $query->with('metadata')
+            ->skip(($page - 1) * $limit)
             ->take($limit)
             ->get();
 
