@@ -39,7 +39,7 @@ const props = withDefaults(defineProps<Props>(), {
             </div>
 
             <!-- Queue Status Icon (outside progress bar, on the right) -->
-            <div class="shrink-0" :class="props.isFrozen ? 'text-yellow-400' : 'text-green-400'">
+            <div class="shrink-0 px-2" :class="props.isFrozen ? 'text-yellow-400' : 'text-green-400'">
                 <Pause v-if="props.isFrozen" :size="20" class="animate-pulse" />
                 <Play v-else :size="20" />
             </div>
