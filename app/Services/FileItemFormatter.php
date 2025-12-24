@@ -13,10 +13,9 @@ class FileItemFormatter
      *
      * @param  Collection<int, File>|array<int, File>  $files
      * @param  array<int>  $willAutoDislikeIds  IDs of files to flag with will_auto_dislike = true (includes both moderation and container blacklist)
-     * @param  bool  $minimal  If true, return only essential layout data (id, width, height, src, key, index) for virtualization
      * @return array<int, array<string, mixed>>
      */
-    public static function format($files, int $page = 1, array $willAutoDislikeIds = [], bool $minimal = false): array
+    public static function format($files, int $page = 1, array $willAutoDislikeIds = []): array
     {
         // Eager load containers relationship to avoid N+1 queries
         if ($files instanceof Collection) {
@@ -49,93 +48,47 @@ class FileItemFormatter
             $width = (int) ($metadata['width'] ?? 500);
             $height = (int) ($metadata['height'] ?? 500);
 
-            if ($minimal) {
-                // Minimal format: only essential layout data for virtualization
-                // Full data will be loaded on-demand when items come into viewport
-                // NOTE: originalUrl and containers are included because they're needed for:
-                // - FileViewer to show original images (not thumbnails)
-                // - Container badges to display and allow reactions
-                // These are relatively small properties, so including them doesn't significantly impact performance
+            // Extract prompt if available (used by usePromptData, but will fallback to API if missing)
+            $prompt = $metadata['prompt'] ?? null;
 
-                // Ensure containers relation is loaded (even if empty)
-                if (! $file->relationLoaded('containers')) {
-                    $file->load('containers');
-                }
-
-                $containers = $file->containers->map(function (Container $container) {
-                    return [
-                        'id' => $container->id,
-                        'type' => $container->type,
-                        'source' => $container->source,
-                        'source_id' => $container->source_id,
-                        'referrer' => $container->referrer,
-                        'action_type' => $container->action_type,
-                        'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
-                    ];
-                })->values()->all();
-
-                $item = [
-                    'id' => $file->id,
-                    'width' => $width,
-                    'height' => $height,
-                    'src' => $file->thumbnail_url ?? $file->url,
-                    'originalUrl' => $file->url, // Needed for FileViewer to show original images
-                    'thumbnail' => $file->thumbnail_url,
-                    'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
-                    'page' => $page,
-                    'key' => "{$page}-{$file->id}",
-                    'index' => $index,
-                    'notFound' => false,
-                    'previewed_count' => $file->previewed_count ?? 0,
-                    'seen_count' => $file->seen_count ?? 0,
-                    'auto_disliked' => $file->auto_disliked ?? false,
-                    'will_auto_dislike' => in_array($file->id, $willAutoDislikeIds, true),
-                    'containers' => $containers, // Needed for container badges and reactions
-                ];
-            } else {
-                // Full format: include all properties
-                // Extract prompt if available (used by usePromptData, but will fallback to API if missing)
-                $prompt = $metadata['prompt'] ?? null;
-
-                // Ensure containers relation is loaded (even if empty)
-                if (! $file->relationLoaded('containers')) {
-                    $file->load('containers');
-                }
-
-                $containers = $file->containers->map(function (Container $container) {
-                    return [
-                        'id' => $container->id,
-                        'type' => $container->type,
-                        'source' => $container->source,
-                        'source_id' => $container->source_id,
-                        'referrer' => $container->referrer,
-                        'action_type' => $container->action_type,
-                        'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
-                    ];
-                })->values()->all();
-
-                $item = [
-                    'id' => $file->id,
-                    'width' => $width,
-                    'height' => $height,
-                    'src' => $file->thumbnail_url ?? $file->url,
-                    'originalUrl' => $file->url,
-                    'thumbnail' => $file->thumbnail_url,
-                    'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
-                    'page' => $page,
-                    'key' => "{$page}-{$file->id}",
-                    'index' => $index,
-                    'notFound' => false,
-                    'previewed_count' => $file->previewed_count ?? 0,
-                    'seen_count' => $file->seen_count ?? 0,
-                    'auto_disliked' => $file->auto_disliked ?? false,
-                    'will_auto_dislike' => in_array($file->id, $willAutoDislikeIds, true),
-                    // Only include minimal metadata (prompt if available) - full metadata loaded on-demand
-                    'metadata' => $prompt ? ['prompt' => $prompt] : null,
-                    // listing_metadata removed - loaded on-demand in FileDetailsCard when needed
-                    'containers' => $containers,
-                ];
+            // Ensure containers relation is loaded (even if empty)
+            if (! $file->relationLoaded('containers')) {
+                $file->load('containers');
             }
+
+            $containers = $file->containers->map(function (Container $container) {
+                return [
+                    'id' => $container->id,
+                    'type' => $container->type,
+                    'source' => $container->source,
+                    'source_id' => $container->source_id,
+                    'referrer' => $container->referrer,
+                    'action_type' => $container->action_type,
+                    'blacklisted_at' => $container->blacklisted_at?->toIso8601String(),
+                ];
+            })->values()->all();
+
+            $item = [
+                'id' => $file->id,
+                'width' => $width,
+                'height' => $height,
+                'src' => $file->thumbnail_url ?? $file->url,
+                'originalUrl' => $file->url, // Needed for FileViewer to show original images
+                'thumbnail' => $file->thumbnail_url,
+                'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
+                'page' => $page,
+                'key' => "{$page}-{$file->id}",
+                'index' => $index,
+                'notFound' => false,
+                'previewed_count' => $file->previewed_count ?? 0,
+                'seen_count' => $file->seen_count ?? 0,
+                'auto_disliked' => $file->auto_disliked ?? false,
+                'will_auto_dislike' => in_array($file->id, $willAutoDislikeIds, true),
+                // Include metadata with prompt if available - full metadata loaded on-demand
+                'metadata' => $prompt ? ['prompt' => $prompt] : null,
+                // listing_metadata removed - loaded on-demand in FileDetailsCard when needed
+                'containers' => $containers, // Needed for container badges and reactions
+            ];
 
             $items[] = $item;
             $index++;

@@ -153,8 +153,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             queryParams.tab_id = options.activeTabId.value;
         }
 
-        // Add minimal=true to request minimal items for virtualization
-        const response = await window.axios.get(browseIndex.url({ query: { ...queryParams, minimal: true } }));
+        const response = await window.axios.get(browseIndex.url({ query: queryParams }));
         const data = response.data;
 
         // Collect files that were moderated out (blacklist) from moderation response
