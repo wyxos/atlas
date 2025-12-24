@@ -82,7 +82,7 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
         deps.currentPage.value = pageValue;
         deps.nextCursor.value = nextValue;
 
-        // Set items - Masonry will automatically call restoreItems() when skipInitialLoad is true
+        // Set items - Masonry will automatically call restoreItems() when init is 'auto'
         // and items are provided via v-model, using initialPage and initialNextPage props
         deps.items.value = tab.itemsData ?? [];
     }

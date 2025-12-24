@@ -319,7 +319,7 @@ const hasServiceSelected = computed(() => {
     return typeof service === 'string' && service.length > 0;
 });
 
-// Always skip initial load - we control loading explicitly via loadAtPage
+// Always use auto init - we control loading explicitly via loadAtPage
 // Masonry will load when loadAtPage is set, and auto-initialize pagination state via initialPage/initialNextPage props
 
 // Computed property for apply button disabled state
@@ -861,7 +861,7 @@ onUnmounted(() => {
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
                     :initial-page="currentPage" :initial-next-page="nextCursor" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" :skip-initial-load="true" mode="backfill"
+                    :mobile-breakpoint="768" :init="'auto'" mode="backfill"
                     :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
                     @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
