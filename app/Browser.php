@@ -135,17 +135,17 @@ class Browser
         }
 
         // Only persist files if not in local mode (local files already exist in DB)
-        // For local mode, convert transformed format back to File models for moderation
+        // For local mode, files are already File models from LocalService.transform()
         if ($isLocalMode) {
-            // Extract file IDs from transformed format
-            // LocalService.transform() now includes file IDs directly in the file structure
-            $fileIds = collect($filesPayload)->map(function ($item) {
-                // Get ID directly from file structure (LocalService now includes it)
-                return $item['file']['id'] ?? null;
-            })->filter()->values()->all();
+            // LocalService.transform() returns File models directly
+            // Ensure metadata is loaded for moderation
+            $persisted = collect($filesPayload)->map(function ($file) {
+                if ($file instanceof File && ! $file->relationLoaded('metadata')) {
+                    $file->load('metadata');
+                }
 
-            // Load File models with metadata by ID
-            $persisted = File::with('metadata')->whereIn('id', $fileIds)->get()->all();
+                return $file;
+            })->all();
         } else {
             $persisted = app(BrowsePersister::class)->persist($filesPayload);
         }
@@ -213,10 +213,8 @@ class Browser
 
         // Transform persisted files to items format for frontend
         // Pass flagged IDs so they get will_auto_dislike = true (includes both moderation and container blacklist)
-        // Use minimal format for virtualization (load full data on-demand)
         $page = (int) (request()->input('page', 1));
-        $minimal = request()->boolean('minimal', true); // Default to minimal for performance
-        $items = FileItemFormatter::format($persisted, $page, $flaggedIds, $minimal);
+        $items = FileItemFormatter::format($persisted, $page, $flaggedIds);
 
         // Format immediately processed files (auto-disliked/blacklisted) for frontend toast notifications
         // These are files that were immediately processed (before they were filtered out)

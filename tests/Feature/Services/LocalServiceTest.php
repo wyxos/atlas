@@ -33,13 +33,13 @@ test('fetch returns paginated local files', function () {
 
     $result = $this->service->fetch(['page' => 1, 'limit' => 20]);
 
-    expect($result)->toHaveKey('items');
+    expect($result)->toHaveKey('files');
     expect($result)->toHaveKey('metadata');
     expect($result['metadata'])->toHaveKey('nextCursor');
-    expect($result['items'])->toHaveCount(3);
-    expect($result['items'][0]['id'])->toBe($file3->id); // More recent first
-    expect($result['items'][1]['id'])->toBe($file2->id);
-    expect($result['items'][2]['id'])->toBe($file1->id);
+    expect($result['files'])->toHaveCount(3);
+    expect($result['files'][0]->id)->toBe($file3->id); // More recent first
+    expect($result['files'][1]->id)->toBe($file2->id);
+    expect($result['files'][2]->id)->toBe($file1->id);
 });
 
 test('fetch filters by source when provided', function () {
@@ -52,8 +52,8 @@ test('fetch filters by source when provided', function () {
 
     $result = $this->service->fetch(['page' => 1, 'limit' => 20, 'source' => 'CivitAI']);
 
-    expect($result['items'])->toHaveCount(1);
-    expect($result['items'][0]['id'])->toBe($file1->id);
+    expect($result['files'])->toHaveCount(1);
+    expect($result['files'][0]->id)->toBe($file1->id);
 });
 
 test('fetch returns all sources when source is all', function () {
@@ -66,7 +66,7 @@ test('fetch returns all sources when source is all', function () {
 
     $result = $this->service->fetch(['page' => 1, 'limit' => 20, 'source' => 'all']);
 
-    expect($result['items'])->toHaveCount(2);
+    expect($result['files'])->toHaveCount(2);
 });
 
 test('fetch handles pagination correctly', function () {
@@ -76,16 +76,15 @@ test('fetch handles pagination correctly', function () {
     $page2 = $this->service->fetch(['page' => 2, 'limit' => 10]);
     $page3 = $this->service->fetch(['page' => 3, 'limit' => 10]);
 
-    expect($page1['items'])->toHaveCount(10);
-    expect($page2['items'])->toHaveCount(10);
-    expect($page3['items'])->toHaveCount(5);
+    expect($page1['files'])->toHaveCount(10);
+    expect($page2['files'])->toHaveCount(10);
+    expect($page3['files'])->toHaveCount(5);
     expect($page1['metadata']['nextCursor'])->toBe(2);
     expect($page2['metadata']['nextCursor'])->toBe(3);
     expect($page3['metadata']['nextCursor'])->toBeNull();
 });
 
-
-test('transform converts file models to expected format', function () {
+test('transform returns file models directly', function () {
     $file = File::factory()->create([
         'url' => 'https://example.com/image.jpg',
         'thumbnail_url' => 'https://example.com/thumb.jpg',
@@ -98,9 +97,8 @@ test('transform converts file models to expected format', function () {
     expect($transformResult)->toHaveKey('files');
     expect($transformResult)->toHaveKey('filter');
     expect($transformResult['files'])->toBeArray();
-    expect($transformResult['files'][0])->toHaveKey('file');
-    expect($transformResult['files'][0])->toHaveKey('metadata');
-    expect($transformResult['files'][0]['file']['source'])->toBe('CivitAI');
+    expect($transformResult['files'][0])->toBeInstanceOf(File::class);
+    expect($transformResult['files'][0]->source)->toBe('CivitAI');
 });
 
 test('defaultParams returns correct defaults', function () {

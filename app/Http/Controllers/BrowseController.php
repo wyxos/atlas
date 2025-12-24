@@ -107,8 +107,8 @@ class BrowseController extends Controller
         $flaggedIds = [];
         // TODO: Add moderation check if needed
 
-        // Format as full items (not minimal)
-        $items = FileItemFormatter::format($files, 1, $flaggedIds, false);
+        // Format items
+        $items = FileItemFormatter::format($files, 1, $flaggedIds);
 
         // Return items keyed by ID for easy lookup
         $itemsById = [];
