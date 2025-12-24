@@ -88,11 +88,11 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         }
 
         // If we're initializing a tab, prevent any loading
-        // EXCEPT: In offline mode with skip-initial-load=false, we need to allow the initial load
+        // EXCEPT: In offline mode with init='manual', we need to allow the initial load
         // to happen so masonry can automatically load when it mounts (items.length === 0 means no items restored)
         if (options.isInitializing.value) {
             // In offline mode, allow initial load if items are empty (masonry needs to load from API)
-            // This allows masonry's automatic initial load when skip-initial-load=false
+            // This allows masonry's automatic initial load when init='manual'
             const shouldAllowInitialLoad = isOfflineMode && options.items.value.length === 0;
 
             if (!shouldAllowInitialLoad) {

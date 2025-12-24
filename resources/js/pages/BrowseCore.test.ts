@@ -90,7 +90,7 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'skipInitialLoad', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
+        props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
         setup() {
             const exposed = {
@@ -191,7 +191,7 @@ describe('Browse - Core', () => {
         expect(masonry.exists()).toBe(true);
         expect(masonry.props('layoutMode')).toBe('auto');
         expect(masonry.props('mobileBreakpoint')).toBe(768);
-        expect(masonry.props('skipInitialLoad')).toBe(true);
+        expect(masonry.props('init')).toBe('auto');
         expect(masonry.props('layout')).toEqual({
             gutterX: 12,
             gutterY: 12,
