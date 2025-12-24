@@ -135,16 +135,9 @@ class Browser
 
         // Only persist files if not in local mode (local files already exist in DB)
         // For local mode, files are already File models from LocalService.transform()
+        // LocalService.fetch() already eager loads metadata, so no additional query needed
         if ($isLocalMode) {
-            // LocalService.transform() returns File models directly
-            // Ensure metadata is loaded for moderation
-            $persisted = collect($filesPayload)->map(function ($file) {
-                if ($file instanceof File && ! $file->relationLoaded('metadata')) {
-                    $file->load('metadata');
-                }
-
-                return $file;
-            })->all();
+            $persisted = $filesPayload;
         } else {
             $persisted = app(BrowsePersister::class)->persist($filesPayload);
         }
