@@ -3,10 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Browser;
-use App\Models\File;
-use App\Services\FileItemFormatter;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class BrowseController extends Controller
 {
@@ -65,59 +62,6 @@ class BrowseController extends Controller
 
         return response()->json([
             'services' => $servicesMeta,
-        ]);
-    }
-
-    /**
-     * Load full item data for a batch of IDs (for virtualization).
-     * Used to load full data on-demand when items come into viewport.
-     */
-    public function items(Request $request): JsonResponse
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'integer',
-        ]);
-
-        $ids = $request->input('ids', []);
-        if (empty($ids)) {
-            return response()->json(['items' => []]);
-        }
-
-        // Load files with containers
-        $files = File::query()
-            ->whereIn('id', $ids)
-            ->with('containers')
-            ->get();
-
-        // Re-run moderation on files to catch files that should now be auto-disliked
-        $fileModerationService = app(\App\Services\FileModerationService::class);
-        $moderationResult = $fileModerationService->moderate($files);
-        $processedIds = $moderationResult['processedIds'];
-
-        // Filter out files that were just auto-disliked or blacklisted by moderation
-        // Also filter out files that are already marked as auto-disliked or blacklisted
-        $files = $files->reject(function ($file) use ($processedIds) {
-            return in_array($file->id, $processedIds, true)
-                || $file->auto_disliked
-                || $file->blacklisted_at !== null;
-        });
-
-        // Get will_auto_dislike IDs from moderation (if needed)
-        $flaggedIds = [];
-        // TODO: Add moderation check if needed
-
-        // Format items
-        $items = FileItemFormatter::format($files, 1, $flaggedIds);
-
-        // Return items keyed by ID for easy lookup
-        $itemsById = [];
-        foreach ($items as $item) {
-            $itemsById[$item['id']] = $item;
-        }
-
-        return response()->json([
-            'items' => $itemsById,
         ]);
     }
 }

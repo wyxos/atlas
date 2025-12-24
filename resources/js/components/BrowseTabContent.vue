@@ -43,7 +43,6 @@ import { useResetDialog } from '@/composables/useResetDialog';
 import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
-import { useItemVirtualization } from '@/composables/useItemVirtualization';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
@@ -120,9 +119,6 @@ const itemPreview = useItemPreview(items, computed(() => props.tab), itemsMap);
 
 // Track if component is mounted to prevent accessing state after unmount
 const isMounted = ref(false);
-
-// Item virtualization composable - loads minimal items initially, then full data on-demand
-const itemVirtualization = useItemVirtualization(items);
 
 // Browse service composable - fetch services if not provided via prop
 const { availableServices: localServices, fetchServices } = useBrowseService();
@@ -754,9 +750,6 @@ onMounted(async () => {
     if (props.tab) {
         await initializeTab(props.tab);
     }
-    // Initialize virtualization after items are loaded
-    await nextTick();
-    itemVirtualization.initialize();
 });
 
 // Sync selectedService with currentTabService when tab changes
