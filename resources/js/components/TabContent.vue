@@ -32,8 +32,7 @@ import {
     DialogTitle,
 } from './ui/dialog';
 import { useBackfill } from '@/composables/useBackfill';
-import { type GetPageResult, useBrowseService } from '@/composables/useBrowseService';
-import { update as tabsUpdate } from '@/actions/App/Http/Controllers/TabController';
+import { useBrowseService } from '@/composables/useBrowseService';
 import { useContainerBadges } from '@/composables/useContainerBadges';
 import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
 import { usePromptData } from '@/composables/usePromptData';
@@ -131,7 +130,7 @@ const isMounted = ref(false);
 const isInitializing = ref(true);
 
 // Browse service composable - fetch services if not provided via prop
-const { availableServices: localServices, fetchServices } = useBrowseService();
+const { availableServices: localServices, fetchServices, getNextPage: getNextPageFromService } = useBrowseService();
 
 // Use prop services if available, otherwise use local services
 const availableServices = computed(() => {
@@ -422,6 +421,7 @@ function handleModerationRulesChanged(): void {
 // Apply selected service to current tab (play button for new tabs)
 async function applyService(): Promise<void> {
     // TODO: Implement applyService logic from scratch
+    alert('test')
 }
 
 
@@ -453,6 +453,18 @@ function removeItemFromMasonry(item: MasonryItem): void {
 
 // Auto-dislike queue composable
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
+
+/**
+ * Wrapper function for Masonry's getNextPage callback
+ * This function calls the browse service with form data and tab ID
+ */
+async function getNextPage(page: number | string): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
+    alert("test get page")
+    if (!props.tab?.id) {
+        throw new Error('Tab ID is required for getNextPage');
+    }
+    return await getNextPageFromService(page, form.getData(), props.tab.id);
+}
 
 // Event handlers for masonry items
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
@@ -734,9 +746,8 @@ onUnmounted(() => {
 
                 <!-- Apply Service Button -->
                 <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
-                    title="Apply selected service">
-                    <Loader2 v-if="masonry?.isLoading" :size="14" class="mr-2 animate-spin" />
-                    <Play :size="14" v-else />
+                    :loading="masonry?.isLoading" title="Apply selected service">
+                    <Play :size="14" />
                 </Button>
             </div>
         </div>
@@ -774,7 +785,6 @@ onUnmounted(() => {
                             </SelectContent>
                         </Select>
                     </div>
-
                     <!-- Action Buttons -->
                     <div class="flex gap-3 w-full mt-2 items-center">
                         <!-- Play Button -->
@@ -790,8 +800,8 @@ onUnmounted(() => {
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :load-at-page="1" :layout="layout"
                     layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" :page-size="pageSize" @backfill:start="onBackfillStart"
-                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :backfill-max-calls="Infinity" :page-size="pageSize" :get-next-page="getNextPage"
+                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
                     data-test="masonry-component">
