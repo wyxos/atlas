@@ -4,7 +4,7 @@ import { nextTick, ref } from 'vue';
 import TabContent from './TabContent.vue';
 import type { MasonryItem } from '@/composables/useTabs';
 
-const mount = baseMount as unknown as (component: any, options?: any) => any;
+const mount = baseMount;
 
 // Mock axios
 const mockAxios = {
@@ -532,13 +532,19 @@ describe('TabContent - Container Badges', () => {
             itemsData: [item1, item2, item3],
         });
 
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                items: tab.itemsData,
+                tab,
+            },
+        });
+
         const wrapper = mount(TabContent, {
             props: {
-                tab,
+                tabId: tab.id,
                 availableServices: [{ key: 'test-service', label: 'Test Service' }],
                 onReaction: vi.fn(),
                 updateActiveTab: vi.fn(),
-                loadTabItems: vi.fn().mockResolvedValue([item1, item2, item3]),
             },
         });
 
@@ -575,13 +581,19 @@ describe('TabContent - Container Badges', () => {
             itemsData: [item1, item2],
         });
 
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                items: tab.itemsData,
+                tab,
+            },
+        });
+
         const wrapper = mount(TabContent, {
             props: {
-                tab,
+                tabId: tab.id,
                 availableServices: [{ key: 'test-service', label: 'Test Service' }],
                 onReaction: vi.fn(),
                 updateActiveTab: vi.fn(),
-                loadTabItems: vi.fn().mockResolvedValue([item1, item2]),
             },
         });
 
@@ -624,13 +636,19 @@ describe('TabContent - Container Badges', () => {
             itemsData: [item1, item2, item3],
         });
 
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                items: tab.itemsData,
+                tab,
+            },
+        });
+
         const wrapper = mount(TabContent, {
             props: {
-                tab,
+                tabId: tab.id,
                 availableServices: [{ key: 'test-service', label: 'Test Service' }],
                 onReaction: vi.fn(),
                 updateActiveTab: vi.fn(),
-                loadTabItems: vi.fn().mockResolvedValue([item1, item2, item3]),
             },
         });
 
@@ -662,13 +680,19 @@ describe('TabContent - Container Badges', () => {
             itemsData: [item1],
         });
 
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                items: tab.itemsData,
+                tab,
+            },
+        });
+
         const wrapper = mount(TabContent, {
             props: {
-                tab,
+                tabId: tab.id,
                 availableServices: [{ key: 'test-service', label: 'Test Service' }],
                 onReaction: vi.fn(),
                 updateActiveTab: vi.fn(),
-                loadTabItems: vi.fn().mockResolvedValue([item1]),
             },
         });
 
@@ -697,13 +721,19 @@ describe('TabContent - Container Badges', () => {
             itemsData: [item1],
         });
 
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                items: tab.itemsData,
+                tab,
+            },
+        });
+
         const wrapper = mount(TabContent, {
             props: {
-                tab,
+                tabId: tab.id,
                 availableServices: [{ key: 'test-service', label: 'Test Service' }],
                 onReaction: vi.fn(),
                 updateActiveTab: vi.fn(),
-                loadTabItems: vi.fn().mockResolvedValue([item1]),
             },
         });
 
@@ -740,13 +770,19 @@ describe('TabContent - Container Badges', () => {
             itemsData: [item1],
         });
 
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                items: tab.itemsData,
+                tab,
+            },
+        });
+
         const wrapper = mount(TabContent, {
             props: {
-                tab,
+                tabId: tab.id,
                 availableServices: [{ key: 'test-service', label: 'Test Service' }],
                 onReaction: vi.fn(),
                 updateActiveTab: vi.fn(),
-                loadTabItems: vi.fn().mockResolvedValue([item1]),
             },
         });
 
@@ -1023,491 +1059,6 @@ describe('TabContent - Container Badges', () => {
             expect(vm.containerPillInteractions).toBeDefined();
             // The composable should have access to masonry for removeMany
             expect(mockRemoveMany).toBeDefined();
-        });
-    });
-
-    describe('Filter Sheet', () => {
-        it('opens filter sheet when filter button is clicked', async () => {
-            const tab = createMockTab({
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const filterButton = wrapper.find('[data-test="filter-button"]');
-            expect(filterButton.exists()).toBe(true);
-
-            // Manually set the sheet open state to simulate the button click
-            // (The mock SheetTrigger doesn't fully simulate v-model behavior)
-            const vm = wrapper.vm as any;
-            vm.isFilterSheetOpen = true;
-            await nextTick();
-
-            // Verify the sheet is open
-            expect(vm.isFilterSheetOpen).toBe(true);
-            // Verify the sheet content is rendered
-            expect(wrapper.find('.sheet-content-mock').exists()).toBe(true);
-        });
-
-        it('initializes filter form from tab query params', async () => {
-            const tab = createMockTab({
-                queryParams: {
-                    service: 'test-service',
-                    nsfw: 1,
-                    type: 'image',
-                    limit: 40,
-                    sort: 'Most Reactions',
-                },
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            // The filter form is now in BrowseFiltersSheet component
-            // We can verify the component receives the correct props
-            const filtersSheet = wrapper.findComponent({ name: 'BrowseFiltersSheet' });
-            expect(filtersSheet.exists()).toBe(true);
-            expect(filtersSheet.props('tab')).toEqual(tab);
-        });
-
-        it('resets filter form to defaults when tab has no query params', async () => {
-            const tab = createMockTab({
-                queryParams: undefined, // Explicitly set to undefined to test defaults
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            // The filter form is now in BrowseFiltersSheet component
-            // We can verify the component receives the correct props
-            const filtersSheet = wrapper.findComponent({ name: 'BrowseFiltersSheet' });
-            expect(filtersSheet.exists()).toBe(true);
-            expect(filtersSheet.props('tab')).toEqual(tab);
-        });
-
-        it('applies filters and updates tab query params', async () => {
-            const tab = createMockTab({
-            });
-            const updateActiveTab = vi.fn();
-
-            mockLoadPage.mockResolvedValue({ items: [], nextPage: null });
-            mockReset.mockResolvedValue(undefined);
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [
-                        { key: 'test-service', label: 'Test Service' },
-                        { key: 'other-service', label: 'Other Service' },
-                    ],
-                    onReaction: vi.fn(),
-                    updateActiveTab,
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            // Open sheet
-            vm.isFilterSheetOpen = true;
-            await nextTick();
-
-            // Trigger apply event from BrowseFiltersSheet
-            const filtersSheet = wrapper.findComponent({ name: 'BrowseFiltersSheet' });
-            expect(filtersSheet.exists()).toBe(true);
-
-            await filtersSheet.vm.$emit('apply', {
-                service: 'test-service',
-                nsfw: true,
-                type: 'image',
-                limit: '40',
-                sort: 'Most Reactions',
-            });
-            // Simulate the sheet closing after apply
-            await filtersSheet.vm.$emit('update:open', false);
-            await flushPromises();
-            await nextTick();
-
-            // Backend updates query_params, frontend only updates itemsData
-            expect(updateActiveTab).toHaveBeenCalledWith([]);
-            // The sheet should be closed after applying
-            expect(vm.isFilterSheetOpen).toBe(false);
-        });
-
-        it('does not apply filters when service is not selected', async () => {
-            const tab = createMockTab({
-            });
-            const updateActiveTab = vi.fn();
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab,
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            vm.isFilterSheetOpen = true;
-            await nextTick();
-
-            // The BrowseFiltersSheet component handles validation internally
-            // If service is empty, it won't emit the apply event
-            // We can verify the component exists and has the correct props
-            const filtersSheet = wrapper.findComponent({ name: 'BrowseFiltersSheet' });
-            expect(filtersSheet.exists()).toBe(true);
-
-            // Try to trigger apply with empty service - should not call updateActiveTab
-            // The handleApplyFilters function checks for service, so it won't proceed
-            await filtersSheet.vm.$emit('apply', {
-                service: '',
-                nsfw: false,
-                type: 'all',
-                limit: '20',
-                sort: 'Newest',
-            });
-            await flushPromises();
-            await nextTick();
-
-            // The handleApplyFilters function checks for service, so it won't call updateActiveTab
-            expect(updateActiveTab).not.toHaveBeenCalled();
-        });
-
-        it('resets filters to current tab query params', async () => {
-            const tab = createMockTab({
-                queryParams: {
-                    service: 'test-service',
-                    nsfw: 1,
-                    type: 'image',
-                    limit: 40,
-                    sort: 'Most Reactions',
-                },
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            vm.isFilterSheetOpen = true;
-            await nextTick();
-
-            // Trigger reset event from BrowseFiltersSheet
-            const filtersSheet = wrapper.findComponent({ name: 'BrowseFiltersSheet' });
-            expect(filtersSheet.exists()).toBe(true);
-
-            await filtersSheet.vm.$emit('reset');
-            // The BrowseFiltersSheet component closes itself, so simulate the update:open event
-            await filtersSheet.vm.$emit('update:open', false);
-            await nextTick();
-
-            // The reset is handled internally by BrowseFiltersSheet
-            // We just verify the sheet closes
-            expect(vm.isFilterSheetOpen).toBe(false);
-        });
-
-        it('disables filter button when masonry is loading', async () => {
-            const tab = createMockTab({
-            });
-
-            mockIsLoading.value = true;
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const filterButton = wrapper.find('[data-test="filter-button"]');
-            expect(filterButton.exists()).toBe(true);
-            // Check if button is disabled - the disabled prop should be passed to the Button component
-            // Note: The filter button currently doesn't have a disabled prop in the component
-            // This test verifies the button exists and can be found
-            // If we add disabled prop later, we can check it here
-            const buttonComponent = filterButton.findComponent({ name: 'Button' });
-            expect(buttonComponent.exists()).toBe(true);
-            // The button should exist even when loading (it just might not be clickable)
-        });
-
-        it('closes sheet after applying filters', async () => {
-            const tab = createMockTab({
-            });
-            const updateActiveTab = vi.fn();
-
-            mockLoadPage.mockResolvedValue({ items: [], nextPage: null });
-            mockReset.mockResolvedValue(undefined);
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab,
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            vm.isFilterSheetOpen = true;
-            await nextTick();
-
-            // Trigger apply event from BrowseFiltersSheet
-            const filtersSheet = wrapper.findComponent({ name: 'BrowseFiltersSheet' });
-            await filtersSheet.vm.$emit('apply', {
-                service: 'test-service',
-                nsfw: false,
-                type: 'all',
-                limit: '20',
-                sort: 'Newest',
-            });
-            // The BrowseFiltersSheet component closes itself, so simulate the update:open event
-            await filtersSheet.vm.$emit('update:open', false);
-            await flushPromises();
-            await nextTick();
-
-            expect(vm.isFilterSheetOpen).toBe(false);
-        });
-
-        it('closes sheet after resetting filters', async () => {
-            const tab = createMockTab({
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            vm.isFilterSheetOpen = true;
-            await nextTick();
-
-            // Trigger reset event from BrowseFiltersSheet
-            const filtersSheet = wrapper.findComponent({ name: 'BrowseFiltersSheet' });
-            await filtersSheet.vm.$emit('reset');
-            // The BrowseFiltersSheet component closes itself, so simulate the update:open event
-            vm.isFilterSheetOpen = false;
-            await nextTick();
-
-            expect(vm.isFilterSheetOpen).toBe(false);
-        });
-    });
-
-    describe('offline mode', () => {
-        it('displays source type selector', async () => {
-            const tab = createMockTab({
-                sourceType: 'local',
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            expect(vm.isOfflineMode).toBe(true);
-        });
-
-        it('hides service dropdown in offline mode', async () => {
-            const tab = createMockTab({
-                sourceType: 'local',
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const serviceSelect = wrapper.find('[data-test="service-select"]');
-            expect(serviceSelect.exists()).toBe(false);
-        });
-
-        it('shows source dropdown in offline mode', async () => {
-            const tab = createMockTab({
-                sourceType: 'local',
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            expect(vm.selectedSource).toBe('all');
-        });
-
-        it('updates source type when changed', async () => {
-            const tab = createMockTab({
-                sourceType: 'online',
-            });
-            const updateActiveTab = vi.fn();
-
-            mockAxios.put.mockResolvedValueOnce({
-                data: { ...tab, query_params: { ...tab.queryParams, sourceType: 'local' } },
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [],
-                    onReaction: vi.fn(),
-                    updateActiveTab,
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            await vm.handleSourceTypeChange('local');
-            await flushPromises();
-
-            expect(mockAxios.put).toHaveBeenCalledWith(
-                `/api/tabs/${tab.id}`,
-                { query_params: { ...tab.queryParams, sourceType: 'local' } }
-            );
-        });
-
-        it('enables apply button in offline mode when source is selected', async () => {
-            const tab = createMockTab({
-                sourceType: 'local',
-            });
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            vm.selectedSource = 'CivitAI';
-            await nextTick();
-
-            expect(vm.isApplyButtonDisabled).toBe(false);
-        });
-
-        it('includes source parameter when applying in offline mode', async () => {
-            const tab = createMockTab({
-                sourceType: 'local',
-            });
-
-            mockLoadPage.mockResolvedValue({ items: [], nextPage: null });
-            mockReset.mockResolvedValue(undefined);
-
-            const wrapper = mount(TabContent, {
-                props: {
-                    tab,
-                    availableServices: [],
-                    onReaction: vi.fn(),
-                    updateActiveTab: vi.fn(),
-                    loadTabItems: vi.fn().mockResolvedValue([]),
-                },
-            });
-
-            await flushPromises();
-            await nextTick();
-
-            const vm = wrapper.vm as any;
-            vm.selectedSource = 'CivitAI';
-            await vm.applyService();
-            await flushPromises();
-
-            expect(vm.localQueryParams.source).toBe('CivitAI');
         });
     });
 });

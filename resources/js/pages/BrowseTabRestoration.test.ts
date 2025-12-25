@@ -324,9 +324,8 @@ describe('Browse - Tab Restoration', () => {
 
         const getNextPageResult = await tabContentVm.getPage(nextParam);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(
-            expect.stringContaining(`${browseIndex.definition.url}?page=${nextParam}`)
-        );
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(browseIndex.definition.url));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`next=${nextParam}`));
         expect(getNextPageResult.nextPage).toBeDefined();
     });
 

@@ -407,6 +407,7 @@ describe('Browse - Tab Management', () => {
         expect(vm.tabs[0].queryParams.page).toBeUndefined();
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
-        expect(masonry.exists()).toBe(false);
+        // Masonry is always mounted; new tabs show the "Start Browsing" form inside it.
+        expect(masonry.exists()).toBe(true);
     });
 });
