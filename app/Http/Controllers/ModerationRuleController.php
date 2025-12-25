@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ActionType;
 use App\Models\ModerationRule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

@@ -1,10 +1,10 @@
 <?php
 
 use App\Enums\ActionType;
-use App\Models\Tab;
 use App\Models\Container;
 use App\Models\File;
 use App\Models\ModerationRule;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;

@@ -53,4 +53,3 @@ class TabFactory extends Factory
         });
     }
 }
-
