@@ -422,8 +422,36 @@ function handleModerationRulesChanged(): void {
 
 // Apply selected service to current tab (play button for new tabs)
 async function applyService(): Promise<void> {
-    // TODO: Implement applyService logic from scratch
-    alert('test')
+    if (!props.tab?.id) {
+        return;
+    }
+
+    try {
+        // Update tab's source_type if it changed (convert frontend 'local' to backend 'offline')
+        const backendSourceType = form.data.sourceType === 'local' ? 'offline' : 'online';
+
+        // Update tab's source_type if it changed
+        if (props.tab.sourceType !== backendSourceType) {
+            await window.axios.put(`/api/tabs/${props.tab.id}`, {
+                source_type: backendSourceType,
+            });
+            // Update local tab state (convert backend 'offline' to frontend 'local')
+            if (props.tab) {
+                props.tab.sourceType = backendSourceType === 'offline' ? 'local' : 'online';
+            }
+        }
+
+        // Initialize tab with the selected service/source
+        await initializeTab(props.tab);
+
+        // Start loading the first page if masonry is initialized
+        if (masonry.value && typeof masonry.value.loadPage === 'function') {
+            await masonry.value.loadPage(1);
+        }
+    } catch (error) {
+        console.error('Failed to apply service:', error);
+        throw error;
+    }
 }
 
 
@@ -457,12 +485,12 @@ function removeItemFromMasonry(item: MasonryItem): void {
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
 
 /**
- * Wrapper function for Masonry's getNextPage callback
+ * Wrapper function for Masonry's getPage callback
  * This function calls the browse service with form data and tab ID
  */
-async function getNextPage(page: number | string): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
+async function getPage(page: number | string): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
     if (!props.tab?.id) {
-        throw new Error('Tab ID is required for getNextPage');
+        throw new Error('Tab ID is required for getPage');
     }
 
     return await getNextPageFromService(page, form.getData(), props.tab.id);
@@ -673,6 +701,11 @@ onUnmounted(() => {
         masonry.value.destroy();
     }
 });
+
+// Expose getPage for testing
+defineExpose({
+    getPage,
+});
 </script>
 
 <template>
@@ -771,7 +804,7 @@ onUnmounted(() => {
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :load-at-page="1" :layout="layout"
                     layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" :page-size="pageSize" :get-next-page="getNextPage"
+                    :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
                     @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
@@ -822,8 +855,7 @@ onUnmounted(() => {
                                 <!-- Action Buttons -->
                                 <div class="flex gap-3 w-full mt-2 items-center">
                                     <!-- Play Button -->
-                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
-                                        :disabled="form.processing || (form.data.sourceType === 'online' && !form.data.service)">
+                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button">
                                         <Play :size="16" />
                                     </Button>
                                 </div>

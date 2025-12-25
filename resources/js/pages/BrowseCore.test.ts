@@ -90,7 +90,7 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
+        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
         setup() {
             const exposed = {
@@ -199,7 +199,7 @@ describe('Browse - Core', () => {
         });
     });
 
-    it('provides getNextPage function that fetches from API', async () => {
+    it('provides getPage function that fetches from API', async () => {
         const mockResponse = createMockBrowseResponse(2, 3);
         const tabId = 1;
         const tabConfig = createMockTabConfig(tabId, { query_params: { service: 'civit-ai-images' } });
@@ -223,7 +223,7 @@ describe('Browse - Core', () => {
         if (activeTab && !activeTab.queryParams.service) {
             activeTab.queryParams.service = 'civit-ai-images';
         }
-        const getNextPage = tabContentVm.getNextPage;
+        const getNextPage = tabContentVm.getPage;
 
         const result = await getNextPage(2);
 
@@ -297,12 +297,12 @@ describe('Browse - Core', () => {
 
         tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
-        const getNextPage = tabContentVm.getNextPage;
+        const getNextPage = tabContentVm.getPage;
 
         await expect(getNextPage(1)).rejects.toThrow('Network error');
     });
 
-    it('returns correct structure from getNextPage with null nextPage', async () => {
+    it('returns correct structure from getPage with null nextPage', async () => {
         const mockResponse = createMockBrowseResponse(100, null);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
@@ -351,7 +351,7 @@ describe('Browse - Core', () => {
 
         tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
-        const result = await tabContentVm.getNextPage(100);
+        const result = await tabContentVm.getPage(100);
 
         expect(result).toHaveProperty('items');
         expect(result).toHaveProperty('nextPage');
@@ -411,7 +411,7 @@ describe('Browse - Core', () => {
 
         tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
-        const result = await tabContentVm.getNextPage(cursor);
+        const result = await tabContentVm.getPage(cursor);
 
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(
             expect.stringContaining(`/api/browse?page=${cursor}`)
@@ -472,7 +472,7 @@ describe('Browse - Core', () => {
 
         tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
-        await tabContentVm.getNextPage(1);
+        await tabContentVm.getPage(1);
 
         expect(tabContentVm.currentPage).toBe(1);
         expect(tabContentVm.nextCursor).toBe(2);
