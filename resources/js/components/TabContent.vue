@@ -45,7 +45,7 @@ import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
-import BrowseFiltersSheet from './BrowseFiltersSheet.vue';
+import BrowseFiltersSheet from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
@@ -103,7 +103,7 @@ const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number | null>(1);
 const nextCursor = ref<string | number | null>(null);
 const loadAtPage = ref<string | number | null>(null);
-const selectedService = ref<string>('');
+// TODO: Implement form state management from scratch
 const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
@@ -219,234 +219,12 @@ function onLoadingStop(): void {
 // Computed property to display page value
 const displayPage = computed(() => currentPage.value ?? 1);
 
-// Local reactive copy of queryParams to avoid prop mutation
-const localQueryParams = ref<Record<string, string | number | null>>({});
-
-// Sync localQueryParams with prop when tab changes
-watch(() => props.tab?.queryParams, (queryParams) => {
-    if (queryParams) {
-        localQueryParams.value = { ...queryParams };
-    } else {
-        localQueryParams.value = {};
-    }
-}, { immediate: true, deep: true });
-
-// Get current tab's service
-const currentTabService = computed(() => {
-    return localQueryParams.value?.service as string | null;
-});
-
-// Get current tab's source type (online/offline)
-const currentTabSourceType = computed(() => {
-    return props.tab?.sourceType ?? 'online';
-});
-
-// Make sourceType reactive for the select component
-// Use a ref for immediate UI updates, then sync with API
-const sourceTypeModel = ref<'online' | 'offline'>(currentTabSourceType.value);
-
-// Sync sourceTypeModel with currentTabSourceType when tab changes
-watch(() => currentTabSourceType.value, (newValue) => {
-    sourceTypeModel.value = newValue;
-}, { immediate: true });
-
-// Check if tab is in offline mode
-const isOfflineMode = computed(() => {
-    return currentTabSourceType.value === 'offline';
-});
-
-// Masonry mode: 'backfill' for online, 'refresh' for offline
-const masonryMode = computed(() => {
-    return isOfflineMode.value ? 'refresh' : 'backfill';
-});
-
-// Selected source for offline mode (default: 'all')
-const selectedSource = ref<string>('all');
+// TODO: Implement form field computed properties from scratch
 
 // Get pageSize from limit filter, defaulting to 20
 const pageSize = computed(() => {
-    const limit = localQueryParams.value?.limit;
+    const limit = props.tab?.queryParams?.limit;
     return limit ? Number(limit) : 20;
-});
-
-// Handle source type change from select component
-async function handleSourceTypeChangeFromSelect(newSourceType: 'online' | 'offline'): Promise<void> {
-    // Update UI immediately (sourceTypeModel is already updated by v-model)
-    // Then update via API
-    await handleSourceTypeChange(newSourceType);
-}
-
-// Handle source type change (internal function)
-async function handleSourceTypeChange(newSourceType: 'online' | 'offline'): Promise<void> {
-    if (!props.tab) {
-        return;
-    }
-
-    // Update tab's source_type via API
-    try {
-        const response = await window.axios.put(tabsUpdate.url(props.tab.id), {
-            source_type: newSourceType,
-        });
-
-        // Update local tab data with the response
-        // The tab prop is a reference to the tab in the tabs array, so updating it will update the source
-        if (props.tab && response.data) {
-            // Directly update the prop (Vue 3 allows this for object props)
-            // The response.data should contain the updated tab with source_type
-            const updatedSourceType = (response.data.source_type ?? newSourceType) as 'online' | 'offline';
-            props.tab.sourceType = updatedSourceType;
-            // The watch on currentTabSourceType will sync sourceTypeModel automatically
-        }
-
-        // Clear items and reset when switching modes
-        items.value = [];
-        currentPage.value = 1;
-        nextCursor.value = null;
-        loadAtPage.value = 1;
-        selectedService.value = '';
-        selectedSource.value = 'all';
-    } catch (error) {
-        console.error('Failed to update source type:', error);
-        // Revert the UI change on error by syncing back with the actual tab value
-        sourceTypeModel.value = currentTabSourceType.value;
-    }
-}
-
-// Handle filter apply from BrowseFiltersSheet
-async function handleApplyFilters(filters: {
-    service: string;
-    nsfw: boolean;
-    type: string;
-    limit: string;
-    sort: string;
-}): Promise<void> {
-    if (!props.tab) {
-        return;
-    }
-
-    // In offline mode, service is not required (we use LocalService)
-    if (!isOfflineMode.value && !filters.service) {
-        // Service is required for online mode
-        return;
-    }
-
-    // Clear existing items and reset pagination
-    items.value = [];
-    currentPage.value = 1;
-    nextCursor.value = null;
-    loadAtPage.value = 1;
-    if (!isOfflineMode.value) {
-        selectedService.value = filters.service;
-    }
-
-    // Update local queryParams immediately so getNextPage can read them
-    // Backend will update query_params in database when browse request is made
-    localQueryParams.value = {
-        ...localQueryParams.value,
-        ...(isOfflineMode.value ? { source: selectedSource.value } : { service: filters.service }),
-        nsfw: filters.nsfw ? 1 : 0,
-        type: filters.type,
-        limit: Number(filters.limit),
-        sort: filters.sort,
-        page: 1,
-        next: null,
-    };
-
-    // Update tab - backend will update query_params when browse request is made
-    props.updateActiveTab([]);
-
-    // Use the same approach as reset button: reset() and loadPage(1)
-    if (masonry.value) {
-        if (masonry.value.isLoading) {
-            masonry.value.cancelLoad();
-        }
-
-        // Use Masonry's built-in reset() method which properly handles animations
-        if (typeof masonry.value.reset === 'function') {
-            masonry.value.reset();
-
-            // After reset, load page 1 to populate content with new filters
-            await nextTick();
-
-            if (typeof masonry.value.loadPage === 'function') {
-                await masonry.value.loadPage(1);
-            }
-        } else {
-            // Fallback: destroy and reinitialize
-            masonry.value.destroy();
-            await nextTick();
-            await initializeTab(props.tab);
-        }
-    } else {
-        // If masonry doesn't exist yet, just initialize the tab
-        await initializeTab(props.tab);
-    }
-}
-
-// Handle moderation rules changes (e.g., reload to apply new rules)
-function handleModerationRulesChanged(): void {
-    // Rules are applied server-side on next API call, no action needed here
-}
-
-// Check if current tab has a service selected
-const hasServiceSelected = computed(() => {
-    // In offline mode, we don't need a service - source is sufficient
-    if (isOfflineMode.value) {
-        return true; // Offline mode always has a source (defaults to 'all')
-    }
-    // Check both tab's queryParams (from backend) and local selectedService (during selection)
-    const service = currentTabService.value || selectedService.value;
-    return typeof service === 'string' && service.length > 0;
-});
-
-// Track if tab has been restored (has items) vs is new (no items)
-const isTabRestored = computed(() => {
-    return props.tab && items.value.length > 0;
-});
-
-// Track if we should show the form (new tab with no service selected or no items)
-const shouldShowForm = computed(() => {
-    if (!props.tab) return false;
-    // Don't show form if we're initializing a restored tab (has items)
-    if (isInitializing.value && isTabRestored.value) {
-        return false;
-    }
-    // Show form if: no service selected OR (new tab with no items)
-    return !hasServiceSelected.value || !isTabRestored.value;
-});
-
-// Computed property for apply button disabled state
-// Button should only be disabled when:
-// - Service is currently being applied (masonry is loading)
-// - No service is selected (in online mode)
-// For new tabs, allow clicking even if service matches (to trigger first load)
-const isApplyButtonDisabled = computed(() => {
-    if (masonry?.value?.isLoading ?? false) {
-        return true;
-    }
-    // In offline mode, button is always enabled (source defaults to 'all')
-    if (isOfflineMode.value) {
-        return false;
-    }
-    // In online mode, only disable if no service is selected
-    // Allow clicking even if service matches (for new tabs to trigger first load)
-    return !selectedService.value || selectedService.value.length === 0;
-});
-
-// Browse service composable
-const {
-    getNextPage: getNextPageFromComposable,
-    applyService: applyServiceFromComposable,
-} = useBrowseService({
-    hasServiceSelected,
-    isInitializing,
-    items,
-    nextCursor,
-    currentPage,
-    currentTabService,
-    activeTabId: computed(() => props.tab?.id ?? null),
-    getActiveTab: () => props.tab ? { ...props.tab, queryParams: localQueryParams.value } : undefined,
-    updateActiveTab: props.updateActiveTab,
 });
 
 const layout = {
@@ -454,17 +232,6 @@ const layout = {
     gutterY: 12,
     sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
 };
-
-async function getNextPage(page: number | string): Promise<GetPageResult> {
-    const result = await getNextPageFromComposable(page);
-
-    // Accumulate moderation data from this page
-    if (result.immediateActions && result.immediateActions.length > 0) {
-        accumulatedModeration.value.push(...result.immediateActions);
-    }
-
-    return result;
-}
 
 function onMasonryClick(e: MouseEvent): void {
     // Check for ALT + mouse button combinations for quick reactions
@@ -546,7 +313,7 @@ const containerBlacklistManager = ref<InstanceType<typeof ContainerBlacklistMana
 function isContainerBlacklistable(container: { type: string; source?: string }): boolean {
     // Hardcoded mapping for now - in the future, this could come from service metadata
     // CivitAI: only 'User' type is blacklistable (case-sensitive match)
-    if (container.source === 'CivitAI' || currentTabService.value === 'civit-ai-images') {
+    if (container.source === 'CivitAI') {
         return container.type === 'User';
     }
     // Wallhaven: no containers are blacklistable yet
@@ -608,7 +375,7 @@ const { initializeTab } = useTabInitialization({
     currentPage,
     nextCursor,
     loadAtPage,
-    selectedService,
+    // TODO: Add selectedService when implementing form logic
     clearPreviewedItems: itemPreview.clearPreviewedItems,
     onTabDataLoadingChange: props.onTabDataLoadingChange,
     loadTabItems: props.loadTabItems,
@@ -629,69 +396,7 @@ const refreshDialog = useRefreshDialog(
 
 // Apply selected service to current tab (play button for new tabs)
 async function applyService(): Promise<void> {
-    if (!props.tab) {
-        return;
-    }
-
-    // In offline mode, we don't use applyServiceFromComposable
-    // Instead, we update queryParams and trigger masonry load directly
-    if (isOfflineMode.value) {
-        // Update local queryParams with source, preserving existing filters (limit, nsfw, type, sort)
-        // Ensure all required params have defaults if not set
-        localQueryParams.value = {
-            ...localQueryParams.value,
-            source: selectedSource.value,
-            page: 1,
-            next: null,
-            limit: localQueryParams.value.limit || 20,
-            nsfw: localQueryParams.value.nsfw ?? 0,
-            type: localQueryParams.value.type || 'all',
-            sort: localQueryParams.value.sort || 'Newest',
-        };
-
-        // Clear existing items and reset pagination
-        items.value = [];
-        currentPage.value = 1;
-        nextCursor.value = null;
-        loadAtPage.value = 1;
-
-        // Wait for masonry to be available (it's always rendered but might be hidden)
-        await nextTick();
-        await nextTick(); // Extra tick to ensure masonry is ready
-        
-        // Trigger masonry load
-        if (masonry.value) {
-            if (masonry.value.isLoading) {
-                masonry.value.cancelLoad();
-            }
-            if (typeof masonry.value.reset === 'function') {
-                masonry.value.reset();
-            }
-            await nextTick();
-            if (typeof masonry.value.loadPage === 'function') {
-                await masonry.value.loadPage(1);
-            }
-        }
-        return;
-    }
-
-    // Online mode: use the composable
-    // Wait for masonry to be available first
-    await nextTick();
-    await nextTick(); // Extra tick to ensure masonry is ready
-    
-    await applyServiceFromComposable(
-        selectedService,
-        ref(props.tab.id),
-        items,
-        currentPage,
-        nextCursor,
-        loadAtPage,
-        masonry as unknown as import('vue').Ref<{ isLoading: boolean; cancelLoad: () => void; destroy: () => void } | null>,
-        () => props.tab,
-        props.updateActiveTab,
-        nextTick
-    );
+    // TODO: Implement applyService logic from scratch
 }
 
 
@@ -899,11 +604,11 @@ watch(
             // Wait for masonry to be fully ready
             await nextTick();
             await nextTick(); // Extra tick for layout calculation
-            
+
             // Restore items with pagination state
             const page = currentPage.value ?? 1;
             const next = nextCursor.value;
-            
+
             try {
                 await masonryInstance.restoreItems(items.value, page, next);
             } catch (error) {
@@ -935,17 +640,7 @@ onMounted(async () => {
     }
 });
 
-// Sync selectedService with currentTabService when tab changes
-// This ensures the service selector shows the correct service when switching tabs
-watch(
-    () => currentTabService.value,
-    (newService) => {
-        if (newService) {
-            selectedService.value = newService;
-        }
-    },
-    { immediate: true }
-);
+// TODO: Implement service sync logic from scratch
 
 // Cleanup on unmount
 onUnmounted(() => {
@@ -977,10 +672,9 @@ onUnmounted(() => {
             <div class="flex items-center gap-3">
                 <!-- Source Type Toggle (Online/Offline) -->
                 <div>
-                    <Select v-model="sourceTypeModel" :disabled="masonry?.isLoading ?? false"
-                        @update:model-value="(value) => handleSourceTypeChangeFromSelect(value as 'online' | 'offline')">
+                    <Select :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
-                            <SelectValue :placeholder="currentTabSourceType === 'offline' ? 'Offline' : 'Online'" />
+                                <SelectValue placeholder="Online" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
@@ -988,12 +682,11 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <!-- Service Dropdown (only shown in online mode) -->
-                <div v-if="!isOfflineMode" class="flex-1">
-                    <Select v-model="selectedService" :disabled="masonry?.isLoading ?? false">
+                <!-- Service Dropdown -->
+                <div class="flex-1">
+                    <Select :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
-                            <SelectValue
-                                :placeholder="hasServiceSelected ? (availableServices.find(s => s.key === currentTabService)?.label || currentTabService || undefined) : 'Select a service...'" />
+                            <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem v-for="service in availableServices.filter(s => s.key !== 'local')"
@@ -1003,25 +696,10 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
-                <!-- Source Dropdown (only shown in offline mode) -->
-                <div v-else class="flex-1">
-                    <Select v-model="selectedSource" :disabled="masonry?.isLoading ?? false">
-                        <SelectTrigger class="w-[200px]" data-test="source-select-trigger">
-                            <SelectValue placeholder="All Sources" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all" data-test="source-select-all">All Sources</SelectItem>
-                            <SelectItem value="CivitAI" data-test="source-select-civitai">CivitAI</SelectItem>
-                            <SelectItem value="Wallhaven" data-test="source-select-wallhaven">Wallhaven</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
                 <!-- Filters Button (Primary) -->
-                <BrowseFiltersSheet v-model:open="isFilterSheetOpen" v-model="selectedService"
+                <BrowseFiltersSheet
                     :available-services="availableServices" :tab="tab" :masonry="masonry"
-                    :is-masonry-loading="masonry?.isLoading ?? false" :is-offline-mode="isOfflineMode"
-                    :selected-source="selectedSource" @update:selected-source="(value) => selectedSource = value"
-                    @apply="handleApplyFilters" />
+                    :is-masonry-loading="masonry?.isLoading ?? false" />
 
                 <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
@@ -1040,7 +718,7 @@ onUnmounted(() => {
                 <!-- Load Next Page Button -->
                 <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
                     data-test="load-next-page-button" title="Load next page"
-                    :disabled="masonry?.isLoading || nextCursor === null || !hasServiceSelected">
+                    :disabled="masonry?.isLoading || nextCursor === null">
                     <ChevronDown :size="14" />
                 </Button>
 
@@ -1052,14 +730,13 @@ onUnmounted(() => {
                 </Button>
 
                 <!-- Reset to First Page Button -->
-                <Button :disabled="(!hasServiceSelected && !resetDialog.isOnFirstPage)"
-                    @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
+                <Button @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                     data-test="reset-to-first-page-button" title="Reset to first page">
                     <ChevronsLeft :size="14"></ChevronsLeft>
                 </Button>
 
                 <!-- Apply Service Button -->
-                <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="h-10 w-10"
+                <Button @click="applyService" size="sm" class="h-10 w-10"
                     data-test="apply-service-button" title="Apply selected service">
                     <Loader2 v-if="masonry?.isLoading" :size="14" class="mr-2 animate-spin" />
                     <Play :size="14" v-else />
@@ -1077,32 +754,17 @@ onUnmounted(() => {
                     <p class="text-twilight-indigo-300 text-lg">Initializing tab...</p>
                 </div>
             </div>
-            <!-- Form for new tabs (no service selected or no items) -->
-            <div v-else-if="shouldShowForm" class="flex items-center justify-center h-full"
+            <!-- Form for new tabs -->
+            <div v-else-if="tab" class="flex items-center justify-center h-full"
                 data-test="new-tab-form">
                 <div class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
                     <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
                     <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click play to begin</p>
-                    
-                    <!-- Source Type Toggle -->
-                    <div class="w-full">
-                        <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Source Type</label>
-                        <Select v-model="sourceTypeModel" :disabled="masonry?.isLoading ?? false"
-                            @update:model-value="(value) => handleSourceTypeChangeFromSelect(value as 'online' | 'offline')">
-                            <SelectTrigger class="w-full" data-test="source-type-select-trigger">
-                                <SelectValue :placeholder="currentTabSourceType === 'offline' ? 'Offline' : 'Online'" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
-                                <SelectItem value="offline" data-test="source-type-offline">Offline</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
 
-                    <!-- Service Dropdown (only shown in online mode) -->
-                    <div v-if="!isOfflineMode" class="w-full">
+                    <!-- Service Dropdown -->
+                    <div class="w-full">
                         <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
-                        <Select v-model="selectedService" :disabled="masonry?.isLoading ?? false">
+                        <Select :disabled="masonry?.isLoading ?? false">
                             <SelectTrigger class="w-full" data-test="service-select-trigger">
                                 <SelectValue placeholder="Select a service..." />
                             </SelectTrigger>
@@ -1115,36 +777,19 @@ onUnmounted(() => {
                         </Select>
                     </div>
 
-                    <!-- Source Dropdown (only shown in offline mode) -->
-                    <div v-else class="w-full">
-                        <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Source</label>
-                        <Select v-model="selectedSource" :disabled="masonry?.isLoading ?? false">
-                            <SelectTrigger class="w-full" data-test="source-select-trigger">
-                                <SelectValue placeholder="All Sources" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all" data-test="source-select-all">All Sources</SelectItem>
-                                <SelectItem value="CivitAI" data-test="source-select-civitai">CivitAI</SelectItem>
-                                <SelectItem value="Wallhaven" data-test="source-select-wallhaven">Wallhaven</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
                     <!-- Action Buttons -->
                     <div class="flex gap-3 w-full mt-2 items-center">
                         <!-- Filters Button -->
-                        <BrowseFiltersSheet v-model:open="isFilterSheetOpen" v-model="selectedService"
+                        <BrowseFiltersSheet
                             :available-services="availableServices" :tab="tab" :masonry="masonry"
-                            :is-masonry-loading="masonry?.isLoading ?? false" :is-offline-mode="isOfflineMode"
-                            :selected-source="selectedSource" @update:selected-source="(value) => selectedSource = value"
-                            @apply="handleApplyFilters">
+                            :is-masonry-loading="masonry?.isLoading ?? false">
                             <Button variant="outline" size="sm" class="flex-1">
                                 Filters
                             </Button>
                         </BrowseFiltersSheet>
 
                         <!-- Play Button -->
-                        <Button @click="applyService" :disabled="isApplyButtonDisabled" size="sm" class="flex-1"
+                        <Button size="sm" class="flex-1"
                             data-test="play-button">
                             <Loader2 v-if="masonry?.isLoading" :size="16" class="animate-spin" />
                             <Play :size="16" v-else />
@@ -1152,12 +797,12 @@ onUnmounted(() => {
                     </div>
                 </div>
             </div>
-            <!-- Masonry (always rendered but hidden when form is shown) -->
-            <div v-if="tab" v-show="hasServiceSelected && !shouldShowForm" class="relative h-full masonry-container" ref="masonryContainer"
+            <!-- Masonry -->
+            <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer"
                 @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-next-page="getNextPage"
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items"
                     :load-at-page="1" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" init="manual" :mode="masonryMode"
+                    :mobile-breakpoint="768" init="manual" mode="backfill"
                     :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
                     @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
@@ -1281,10 +926,6 @@ onUnmounted(() => {
                     </template>
                 </Masonry>
             </div>
-            <div v-else-if="tab && !hasServiceSelected" class="flex items-center justify-center h-full"
-                data-test="no-service-message">
-                <p class="text-twilight-indigo-300 text-lg">Select a service to start browsing</p>
-            </div>
         </div>
 
         <!-- File Viewer -->
@@ -1297,7 +938,7 @@ onUnmounted(() => {
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible) -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-            :visible="tab !== null && tab !== undefined && hasServiceSelected && !shouldShowForm" />
+            :visible="tab !== null && tab !== undefined" />
 
         <!-- Reset to First Page Warning Dialog -->
         <Dialog v-model="resetDialog.resetDialogOpen.value">

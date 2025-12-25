@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { reactive, watch, computed } from 'vue';
+// TODO: Add necessary imports when implementing form logic
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SlidersHorizontal } from 'lucide-vue-next';
-import { Masonry } from '@wyxos/vibe';
 import type { TabData } from '@/composables/useTabs';
 
 interface Props {
@@ -16,16 +15,13 @@ interface Props {
     masonry?: InstanceType<typeof Masonry> | null;
     isMasonryLoading?: boolean;
     modelValue?: string; // v-model for selectedService
-    isOfflineMode?: boolean;
-    selectedSource?: string; // v-model for selectedSource in offline mode
+    // TODO: Add props when implementing form logic
 }
 
 const props = withDefaults(defineProps<Props>(), {
     open: false,
     masonry: null,
     isMasonryLoading: false,
-    isOfflineMode: false,
-    selectedSource: 'all',
 });
 
 const emit = defineEmits<{
@@ -42,94 +38,11 @@ const emit = defineEmits<{
     'reset': [];
 }>();
 
-// Computed property for service that syncs with parent's selectedService via v-model
-const selectedService = computed({
-    get: () => props.modelValue || '',
-    set: (value: string) => emit('update:modelValue', value),
-});
-
-// Computed property for source in offline mode
-const selectedSourceModel = computed({
-    get: () => props.selectedSource || 'all',
-    set: (value: string) => emit('update:selectedSource', value),
-});
-
-// Reactive form to track all filter query params (service is synced via v-model)
-const filterForm = reactive({
-    nsfw: false,
-    type: 'all',
-    limit: '20',
-    sort: 'Newest',
-});
-
-// Initialize filter form from tab's queryParams
-watch(() => props.tab?.queryParams, (queryParams) => {
-    if (queryParams) {
-        // Service is handled via v-model, so we don't set it here
-        const nsfwValue = queryParams.nsfw;
-        filterForm.nsfw = Boolean(nsfwValue && (nsfwValue === 1 || nsfwValue === '1' || nsfwValue === 'true'));
-        filterForm.type = (queryParams.type as string) || 'all';
-        filterForm.limit = String(queryParams.limit || '20');
-        filterForm.sort = (queryParams.sort as string) || 'Newest';
-    } else {
-        // Reset to defaults if no queryParams
-        filterForm.nsfw = false;
-        filterForm.type = 'all';
-        filterForm.limit = '20';
-        filterForm.sort = 'Newest';
-    }
-}, { immediate: true });
-
-const isOpen = computed({
-    get: () => props.open,
-    set: (value: boolean) => emit('update:open', value),
-});
-
-// Apply filters
-async function applyFilters(): Promise<void> {
-    // In offline mode, service is not required (we use LocalService)
-    // In online mode, service is required
-    if (!props.isOfflineMode && !selectedService.value) {
-        // Service is required for online mode
-        return;
-    }
-
-    emit('apply', {
-        service: props.isOfflineMode ? 'local' : selectedService.value,
-        nsfw: filterForm.nsfw,
-        type: filterForm.type,
-        limit: filterForm.limit,
-        sort: filterForm.sort,
-    });
-
-    // Close the sheet
-    isOpen.value = false;
-}
-
-// Reset filters
-function resetFilters(): void {
-    if (props.tab?.queryParams) {
-        // Service is handled via v-model, reset it through the computed property
-        selectedService.value = (props.tab.queryParams.service as string) || '';
-        const nsfwValue = props.tab.queryParams.nsfw;
-        filterForm.nsfw = Boolean(nsfwValue && (nsfwValue === 1 || nsfwValue === '1' || nsfwValue === 'true'));
-        filterForm.type = (props.tab.queryParams.type as string) || 'all';
-        filterForm.limit = String(props.tab.queryParams.limit || '20');
-        filterForm.sort = (props.tab.queryParams.sort as string) || 'Newest';
-    } else {
-        selectedService.value = '';
-        filterForm.nsfw = false;
-        filterForm.type = 'all';
-        filterForm.limit = '20';
-        filterForm.sort = 'Newest';
-    }
-    emit('reset');
-    isOpen.value = false;
-}
+// TODO: Implement form state management
 </script>
 
 <template>
-    <Sheet v-model:open="isOpen">
+    <Sheet :open="props.open">
         <SheetTrigger as-child>
             <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button" :disabled="isMasonryLoading">
                 <SlidersHorizontal :size="14" />
@@ -140,10 +53,10 @@ function resetFilters(): void {
                 <SheetTitle>Advanced Filters</SheetTitle>
             </SheetHeader>
             <div class="flex-1 p-6 overflow-y-auto space-y-6">
-                <!-- Service Filter (only shown in online mode) -->
-                <div v-if="!isOfflineMode" class="space-y-2">
+                <!-- Service Filter -->
+                <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Service</label>
-                    <Select v-model="selectedService">
+                    <Select>
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
@@ -155,31 +68,16 @@ function resetFilters(): void {
                     </Select>
                 </div>
 
-                <!-- Source Filter (only shown in offline mode) -->
-                <div v-if="isOfflineMode" class="space-y-2">
-                    <label class="text-sm font-medium text-regal-navy-100">Source</label>
-                    <Select v-model="selectedSourceModel">
-                        <SelectTrigger class="w-full">
-                            <SelectValue placeholder="All Sources" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Sources</SelectItem>
-                            <SelectItem value="CivitAI">CivitAI</SelectItem>
-                            <SelectItem value="Wallhaven">Wallhaven</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
                 <!-- NSFW Toggle -->
                 <div class="flex items-center justify-between">
                     <label class="text-sm font-medium text-regal-navy-100">NSFW</label>
-                    <Switch v-model="filterForm.nsfw" />
+                    <Switch />
                 </div>
 
                 <!-- Type Radio Group -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100 mb-4">Type</label>
-                    <RadioGroup v-model="filterForm.type" class="flex gap-4">
+                    <RadioGroup class="flex gap-4">
                         <div class="flex items-center gap-2">
                             <RadioGroupItem value="all" id="type-all" />
                             <label for="type-all" class="text-sm text-twilight-indigo-200 cursor-pointer">All</label>
@@ -200,7 +98,7 @@ function resetFilters(): void {
                 <!-- Limit Dropdown -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Limit</label>
-                    <Select v-model="filterForm.limit">
+                    <Select>
                         <SelectTrigger class="w-full">
                             <SelectValue />
                         </SelectTrigger>
@@ -218,7 +116,7 @@ function resetFilters(): void {
                 <!-- Sort Dropdown -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Sort</label>
-                    <Select v-model="filterForm.sort">
+                    <Select>
                         <SelectTrigger class="w-full">
                             <SelectValue />
                         </SelectTrigger>
@@ -234,10 +132,10 @@ function resetFilters(): void {
                 </div>
             </div>
             <SheetFooter>
-                <Button variant="destructive" @click="resetFilters">
+                <Button variant="destructive">
                     Reset
                 </Button>
-                <Button variant="default" @click="applyFilters" :disabled="!isOfflineMode && !selectedService">
+                <Button variant="default">
                     Apply
                 </Button>
             </SheetFooter>
