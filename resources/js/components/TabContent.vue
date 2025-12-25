@@ -10,7 +10,6 @@ import {
     Info,
     Loader2,
     Play,
-    RefreshCcw,
     TestTube,
     Video,
     X
@@ -41,7 +40,6 @@ import { useMasonryInteractions } from '@/composables/useMasonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { useMasonryRestore } from '@/composables/useMasonryRestore';
 import { useResetDialog } from '@/composables/useResetDialog';
-import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useBrowseForm } from '@/composables/useBrowseForm';
@@ -394,12 +392,6 @@ async function loadTabItems(tabId: number): Promise<{ items: MasonryItem[]; tab:
     }
 }
 
-const refreshDialog = useRefreshDialog(
-    items,
-    masonry,
-    computed(() => tab.value ?? undefined),
-    loadTabItems
-);
 
 
 // Handle apply event from TabFilter
@@ -756,13 +748,6 @@ defineExpose({
                     <ChevronDown :size="14" />
                 </Button>
 
-                <!-- Refresh Tab Button -->
-                <Button @click="refreshDialog.openRefreshDialog" size="sm" variant="ghost" class="h-10 w-10"
-                    color="danger" data-test="refresh-tab-button" title="Refresh tab"
-                    :disabled="masonry?.isLoading ?? false">
-                    <RefreshCcw :size="14" />
-                </Button>
-
                 <!-- Reset to First Page Button -->
                 <Button @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
                     data-test="reset-to-first-page-button" title="Reset to first page">
@@ -1049,29 +1034,6 @@ defineExpose({
             </DialogContent>
         </Dialog>
 
-        <!-- Refresh Tab Warning Dialog -->
-        <Dialog v-model="refreshDialog.refreshDialogOpen.value">
-            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
-                <DialogHeader>
-                    <DialogTitle class="text-danger-400">Refresh Tab</DialogTitle>
-                    <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
-                        Are you sure you want to refresh this tab? This will clear all currently loaded items and reload
-                        from
-                        the beginning.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                    <DialogClose as-child>
-                        <Button variant="outline" @click="refreshDialog.closeRefreshDialog">
-                            Cancel
-                        </Button>
-                    </DialogClose>
-                    <Button @click="refreshDialog.confirmRefreshTab" variant="destructive">
-                        Refresh Tab
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
     </div>
     <div v-else class="flex items-center justify-center h-full" data-test="no-tab-message">
         <p class="text-twilight-indigo-300 text-lg">No tab selected</p>
