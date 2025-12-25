@@ -15,7 +15,10 @@ export interface UseBrowseFormOptions {
     tab?: TabData;
 }
 
-export function useBrowseForm(options?: UseBrowseFormOptions) {
+// Singleton instances per tab (keyed by tab ID)
+const formInstances = new Map<number, ReturnType<typeof createFormInstance>>();
+
+function createFormInstance(options?: UseBrowseFormOptions) {
     const defaultData: BrowseFormData = {
         service: '',
         nsfw: false,
@@ -127,5 +130,25 @@ export function useBrowseForm(options?: UseBrowseFormOptions) {
     };
 }
 
-export type UseBrowseFormReturn = ReturnType<typeof useBrowseForm>;
+export function useBrowseForm(options?: UseBrowseFormOptions) {
+    // If no tab provided, create a new instance (for cases without tab context)
+    if (!options?.tab?.id) {
+        return createFormInstance(options);
+    }
+
+    const tabId = options.tab.id;
+
+    // Return existing instance if it exists for this tab
+    if (formInstances.has(tabId)) {
+        const instance = formInstances.get(tabId)!;
+        // Sync with latest tab data
+        instance.syncFromTab(options.tab);
+        return instance;
+    }
+
+    // Create new instance for this tab
+    const instance = createFormInstance(options);
+    formInstances.set(tabId, instance);
+    return instance;
+}
 

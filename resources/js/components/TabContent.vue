@@ -695,8 +695,8 @@ onUnmounted(() => {
                 </div>
                 <!-- Filters Button (Primary) -->
                 <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
-                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" :form="form"
-                    @apply="handleApplyFilters" @reset="handleResetFilters" />
+                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" @apply="handleApplyFilters"
+                    @reset="handleResetFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
@@ -779,7 +779,7 @@ onUnmounted(() => {
                     <div class="flex gap-3 w-full mt-2 items-center">
                         <!-- Filters Button -->
                         <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices"
-                            :tab="tab" :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" :form="form"
+                            :tab="tab" :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false"
                             @apply="handleApplyFilters" @reset="handleResetFilters">
                             <Button variant="outline" size="sm" class="flex-1">
                                 Filters
