@@ -156,7 +156,8 @@ class Browser
 
         // Transform persisted files to items format for frontend
         // Pass flagged IDs so they get will_auto_dislike = true (includes both moderation and container blacklist)
-        $page = (int) (request()->input('page', 1));
+        // Page can be int (page number) or string (cursor) for pagination tracking
+        $page = request()->input('page', 1);
         $items = FileItemFormatter::format($persisted, $page, $flaggedIds);
 
         return [

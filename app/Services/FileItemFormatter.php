@@ -12,10 +12,11 @@ class FileItemFormatter
      * Format files into items structure for frontend.
      *
      * @param  Collection<int, File>|array<int, File>  $files
+     * @param  int|string  $page  Page number or cursor for pagination tracking
      * @param  array<int>  $willAutoDislikeIds  IDs of files to flag with will_auto_dislike = true (includes both moderation and container blacklist)
      * @return array<int, array<string, mixed>>
      */
-    public static function format($files, int $page = 1, array $willAutoDislikeIds = []): array
+    public static function format($files, int|string $page = 1, array $willAutoDislikeIds = []): array
     {
         // Eager load containers relationship to avoid N+1 queries
         if ($files instanceof Collection) {
