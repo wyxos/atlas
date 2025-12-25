@@ -597,16 +597,22 @@ function handlePromptDialogUpdate(val: boolean): void {
     }
 }
 
-// Watch masonry loading state and emit to parent
-watch(
-    () => masonry.value?.isLoading ?? false,
-    (isLoading) => {
-        emit('update:loading', isLoading);
-        if (props.onLoadingChange) {
-            props.onLoadingChange(isLoading);
-        }
+// Handle masonry loading state changes via events
+function handleLoadingStart(): void {
+    emit('update:loading', true);
+    if (props.onLoadingChange) {
+        props.onLoadingChange(true);
     }
-);
+}
+
+function handleLoadingStop(): void {
+    emit('update:loading', false);
+    if (props.onLoadingChange) {
+        props.onLoadingChange(false);
+    }
+    // Also call onLoadingStop for moderation toast handling
+    onLoadingStop();
+}
 
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
@@ -631,30 +637,27 @@ onMounted(async () => {
         // Note: Items restoration happens via watcher above
         isInitializing.value = false;
     }
-});
+}); +
 
-// TODO: Implement service sync logic from scratch
+    // Cleanup on unmount
+    onUnmounted(() => {
+        // Mark component as unmounted to prevent callbacks from accessing state
+        isMounted.value = false;
 
-// Cleanup on unmount
-onUnmounted(() => {
-    // Mark component as unmounted to prevent callbacks from accessing state
-    isMounted.value = false;
-
-
-    // Clear loading state when component is destroyed
-    emit('update:loading', false);
-    if (props.onLoadingChange) {
-        props.onLoadingChange(false);
-    }
-
-    // Destroy masonry if it exists
-    if (masonry.value) {
-        if (masonry.value.isLoading) {
-            masonry.value.cancelLoad();
+        // Clear loading state when component is destroyed
+        emit('update:loading', false);
+        if (props.onLoadingChange) {
+            props.onLoadingChange(false);
         }
-        masonry.value.destroy();
-    }
-});
+
+        // Destroy masonry if it exists
+        if (masonry.value) {
+            if (masonry.value.isLoading) {
+                masonry.value.cancelLoad();
+            }
+            masonry.value.destroy();
+        }
+    });
 
 // Expose getPage for testing
 defineExpose({
@@ -759,9 +762,10 @@ defineExpose({
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :load-at-page="1" :layout="layout"
                     layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
-                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
-                    @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
+                    @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
                     data-test="masonry-component">
                     <!-- Loading message slot - show form for new tabs -->
                     <template #loading-message>
