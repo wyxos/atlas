@@ -43,7 +43,6 @@ import { useMasonryRestore } from '@/composables/useMasonryRestore';
 import { useResetDialog } from '@/composables/useResetDialog';
 import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
-import { useTabInitialization } from '@/composables/useTabInitialization';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 import BrowseFiltersSheet from './TabFilter.vue';
@@ -370,23 +369,13 @@ const masonryInteractions = useMasonryInteractions(
     handleMasonryReaction
 );
 
-// Tab initialization composable
-const { initializeTab } = useTabInitialization({
-    fileViewer,
-    masonry,
-    items,
-    selectedService: computed(() => form.data.service),
-    onTabDataLoadingChange: props.onTabDataLoadingChange,
-    loadTabItems: props.loadTabItems,
-});
-
 // Refresh dialog composable
 const refreshDialog = useRefreshDialog(
     items,
     masonry,
     computed(() => props.tab),
     props.updateActiveTab,
-    initializeTab
+    props.loadTabItems
 );
 
 
@@ -631,7 +620,11 @@ onMounted(async () => {
         }
 
         if (props.tab) {
-            await initializeTab(props.tab);
+            // Load tab details
+            await props.loadTabItems(props.tab.id);
+
+            // Assign query params to the form to restore any previous values
+            form.syncFromTab(props.tab);
         }
     } finally {
         // Mark initialization as complete
