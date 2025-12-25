@@ -10,7 +10,7 @@ export function useRefreshDialog(
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tab: Ref<TabData | undefined>,
     updateActiveTab: (itemsData: MasonryItem[]) => void,
-    initializeTab: (tab: TabData | undefined) => Promise<void>
+    loadTabItems: (tabId: number) => Promise<MasonryItem[]>
 ) {
     const refreshDialogOpen = ref(false);
 
@@ -39,12 +39,12 @@ export function useRefreshDialog(
         // Close dialog
         closeRefreshDialog();
 
-        // Refresh the tab by re-initializing it (as if switching to it for the first time)
+        // Refresh the tab by reloading items (as if switching to it for the first time)
         // This will:
         // - Reload items from database if they exist
         // - Preserve all query params (service, filters, etc.)
         // - Restore the tab state properly
-        await initializeTab(currentTab);
+        await loadTabItems(currentTab.id);
     }
 
     return {
