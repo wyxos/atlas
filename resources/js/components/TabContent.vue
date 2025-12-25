@@ -376,7 +376,6 @@ const { initializeTab } = useTabInitialization({
     masonry,
     items,
     selectedService: computed(() => form.data.service),
-    clearPreviewedItems: itemPreview.clearPreviewedItems,
     onTabDataLoadingChange: props.onTabDataLoadingChange,
     loadTabItems: props.loadTabItems,
 });

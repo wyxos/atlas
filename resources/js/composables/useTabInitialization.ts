@@ -11,9 +11,6 @@ interface TabInitializationDependencies {
     items: Ref<MasonryItem[]>;
     selectedService: Ref<string>;
 
-    // Composable methods
-    clearPreviewedItems: () => void;
-
     // Props callbacks
     onTabDataLoadingChange?: (isLoading: boolean) => void;
     loadTabItems: (tabId: number) => Promise<MasonryItem[]>;
@@ -29,9 +26,6 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
      */
     async function initializeTab(tab: TabData | undefined): Promise<void> {
         if (!tab) return;
-
-        // Reset previewed items tracking when switching tabs
-        deps.clearPreviewedItems();
 
         // Always reload items from database when initializing a tab
         // This ensures we always have fresh data when switching tabs
