@@ -591,34 +591,6 @@ watch(
     }
 );
 
-// Restore items to masonry when both are ready
-watch(
-    () => [masonry.value, items.value.length, isInitializing.value] as const,
-    async ([masonryInstance, itemsLength, isInit]) => {
-        // Only restore if:
-        // 1. Masonry is ready
-        // 2. We have items (restored tab)
-        // 3. We're initializing (to avoid restoring multiple times)
-        // 4. Tab exists
-        if (masonryInstance && itemsLength > 0 && isInit && props.tab) {
-            // Wait for masonry to be fully ready
-            await nextTick();
-            await nextTick(); // Extra tick for layout calculation
-
-            // Restore items with pagination state
-            const page = currentPage.value ?? 1;
-            const next = nextCursor.value;
-
-            try {
-                await masonryInstance.restoreItems(items.value, page, next);
-            } catch (error) {
-                console.error('Failed to restore items to masonry:', error);
-            }
-        }
-    },
-    { immediate: true }
-);
-
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
     isMounted.value = true;
