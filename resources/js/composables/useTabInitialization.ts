@@ -63,11 +63,9 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
             }
             const loadedItems = await deps.loadTabItems(tab.id);
             tab.itemsData = loadedItems;
-            // fileIds will be updated by loadTabItems
         } catch (error) {
             console.error('Failed to load tab items:', error);
             tab.itemsData = [];
-            tab.fileIds = [];
         } finally {
             // Notify parent that tab data loading is complete
             if (deps.onTabDataLoadingChange) {

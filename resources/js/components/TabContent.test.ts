@@ -488,7 +488,6 @@ describe('TabContent - Container Badges', () => {
         id: 1,
         label: 'Test Tab',
         queryParams: { service: 'test-service', page: 1, next: null },
-        fileIds: [],
         itemsData: [],
         position: 0,
         isActive: true,
@@ -530,7 +529,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1, item2, item3],
-            fileIds: [1, 2, 3],
         });
 
         const wrapper = mount(TabContent, {
@@ -574,7 +572,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1, item2],
-            fileIds: [1, 2],
         });
 
         const wrapper = mount(TabContent, {
@@ -624,7 +621,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1, item2, item3],
-            fileIds: [1, 2, 3],
         });
 
         const wrapper = mount(TabContent, {
@@ -663,7 +659,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1],
-            fileIds: [1],
         });
 
         const wrapper = mount(TabContent, {
@@ -699,7 +694,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1],
-            fileIds: [1],
         });
 
         const wrapper = mount(TabContent, {
@@ -743,7 +737,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1],
-            fileIds: [1],
         });
 
         const wrapper = mount(TabContent, {
@@ -792,7 +785,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1],
-            fileIds: [1],
         });
 
         const wrapper = mount(TabContent, {
@@ -827,7 +819,6 @@ describe('TabContent - Container Badges', () => {
 
         const tab = createMockTab({
             itemsData: [item1],
-            fileIds: [1],
         });
 
         const wrapper = mount(TabContent, {
@@ -860,7 +851,6 @@ describe('TabContent - Container Badges', () => {
                 { id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' },
             ]);
             const tab = createMockTab({
-                fileIds: [1],
             });
 
             const wrapper = mount(TabContent, {
@@ -888,7 +878,6 @@ describe('TabContent - Container Badges', () => {
                 { id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' },
             ]);
             const tab = createMockTab({
-                fileIds: [1],
             });
 
             const wrapper = mount(TabContent, {
@@ -929,7 +918,6 @@ describe('TabContent - Container Badges', () => {
                 { id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' },
             ]);
             const tab = createMockTab({
-                fileIds: [1],
             });
 
             const wrapper = mount(TabContent, {
@@ -970,7 +958,6 @@ describe('TabContent - Container Badges', () => {
                 { id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' },
             ]);
             const tab = createMockTab({
-                fileIds: [1],
             });
 
             const wrapper = mount(TabContent, {
@@ -1015,7 +1002,6 @@ describe('TabContent - Container Badges', () => {
                 { id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' },
             ]);
             const tab = createMockTab({
-                fileIds: [1],
             });
 
             const wrapper = mount(TabContent, {
@@ -1042,7 +1028,6 @@ describe('TabContent - Container Badges', () => {
     describe('Filter Sheet', () => {
         it('opens filter sheet when filter button is clicked', async () => {
             const tab = createMockTab({
-                fileIds: [],
             });
 
             const wrapper = mount(TabContent, {
@@ -1075,7 +1060,6 @@ describe('TabContent - Container Badges', () => {
 
         it('initializes filter form from tab query params', async () => {
             const tab = createMockTab({
-                fileIds: [],
                 queryParams: {
                     service: 'test-service',
                     nsfw: 1,
@@ -1107,7 +1091,6 @@ describe('TabContent - Container Badges', () => {
 
         it('resets filter form to defaults when tab has no query params', async () => {
             const tab = createMockTab({
-                fileIds: [],
                 queryParams: undefined, // Explicitly set to undefined to test defaults
             });
 
@@ -1133,7 +1116,6 @@ describe('TabContent - Container Badges', () => {
 
         it('applies filters and updates tab query params', async () => {
             const tab = createMockTab({
-                fileIds: [],
             });
             const updateActiveTab = vi.fn();
 
@@ -1185,7 +1167,6 @@ describe('TabContent - Container Badges', () => {
 
         it('does not apply filters when service is not selected', async () => {
             const tab = createMockTab({
-                fileIds: [],
             });
             const updateActiveTab = vi.fn();
 
@@ -1230,7 +1211,6 @@ describe('TabContent - Container Badges', () => {
 
         it('resets filters to current tab query params', async () => {
             const tab = createMockTab({
-                fileIds: [],
                 queryParams: {
                     service: 'test-service',
                     nsfw: 1,
@@ -1273,7 +1253,6 @@ describe('TabContent - Container Badges', () => {
 
         it('disables filter button when masonry is loading', async () => {
             const tab = createMockTab({
-                fileIds: [],
             });
 
             mockIsLoading.value = true;
@@ -1304,7 +1283,6 @@ describe('TabContent - Container Badges', () => {
 
         it('closes sheet after applying filters', async () => {
             const tab = createMockTab({
-                fileIds: [],
             });
             const updateActiveTab = vi.fn();
 
@@ -1347,7 +1325,6 @@ describe('TabContent - Container Badges', () => {
 
         it('closes sheet after resetting filters', async () => {
             const tab = createMockTab({
-                fileIds: [],
             });
 
             const wrapper = mount(TabContent, {

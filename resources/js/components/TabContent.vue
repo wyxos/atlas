@@ -227,9 +227,7 @@ function onLoadingStop(): void {
 const displayPage = computed(() => currentPage.value ?? 1);
 
 // Check if we should show the form (new tab with no items)
-const shouldShowForm = computed(() => {
-    return props.tab !== undefined && items.value.length === 0;
-});
+const shouldShowForm = ref(true);
 
 
 // Get pageSize from limit filter, defaulting to 20
@@ -426,6 +424,7 @@ async function applyService(): Promise<void> {
         return;
     }
 
+    shouldShowForm.value = false;
     await masonry.value.loadPage(1);
 }
 
