@@ -759,7 +759,7 @@ defineExpose({
             <!-- Masonry -->
             <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :load-at-page="1" :layout="layout"
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :layout="layout"
                     layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
                     @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
