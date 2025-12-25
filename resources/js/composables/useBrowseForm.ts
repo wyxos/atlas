@@ -127,3 +127,5 @@ export function useBrowseForm(options?: UseBrowseFormOptions) {
     };
 }
 
+export type UseBrowseFormReturn = ReturnType<typeof useBrowseForm>;
+

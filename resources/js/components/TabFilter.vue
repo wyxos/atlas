@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SlidersHorizontal } from 'lucide-vue-next';
 import type { TabData } from '@/composables/useTabs';
-import { useBrowseForm } from '@/composables/useBrowseForm';
+import type { UseBrowseFormReturn } from '@/composables/useBrowseForm';
 import { Masonry } from '@wyxos/vibe';
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
     tab?: TabData;
     masonry?: InstanceType<typeof Masonry> | null;
     isMasonryLoading?: boolean;
+    form: UseBrowseFormReturn;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -29,14 +30,9 @@ const emit = defineEmits<{
     'reset': [];
 }>();
 
-// Initialize form with tab
-const form = useBrowseForm({
-    tab: props.tab,
-});
-
-// Sync form when sheet opens
+// Sync form when sheet opens (form is passed from parent)
 function syncFormFromTab(): void {
-    form.syncFromTab(props.tab);
+    props.form.syncFromTab(props.tab);
 }
 
 // Handle apply button
@@ -47,7 +43,7 @@ function handleApply(): void {
 
 // Handle reset button
 function handleReset(): void {
-    form.reset();
+    props.form.reset();
     emit('reset');
 }
 </script>
@@ -68,7 +64,7 @@ function handleReset(): void {
                 <!-- Service Filter -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Service</label>
-                    <Select v-model="form.data.service">
+                    <Select v-model="props.form.data.service">
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
@@ -83,13 +79,13 @@ function handleReset(): void {
                 <!-- NSFW Toggle -->
                 <div class="flex items-center justify-between">
                     <label class="text-sm font-medium text-regal-navy-100">NSFW</label>
-                    <Switch v-model="form.data.nsfw" />
+                    <Switch v-model="props.form.data.nsfw" />
                 </div>
 
                 <!-- Type Radio Group -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100 mb-4">Type</label>
-                    <RadioGroup v-model="form.data.type" class="flex gap-4">
+                    <RadioGroup v-model="props.form.data.type" class="flex gap-4">
                         <div class="flex items-center gap-2">
                             <RadioGroupItem value="all" id="type-all" />
                             <label for="type-all" class="text-sm text-twilight-indigo-200 cursor-pointer">All</label>
@@ -110,7 +106,7 @@ function handleReset(): void {
                 <!-- Limit Dropdown -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Limit</label>
-                    <Select v-model="form.data.limit">
+                    <Select v-model="props.form.data.limit">
                         <SelectTrigger class="w-full">
                             <SelectValue />
                         </SelectTrigger>
@@ -128,7 +124,7 @@ function handleReset(): void {
                 <!-- Sort Dropdown -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Sort</label>
-                    <Select v-model="form.data.sort">
+                    <Select v-model="props.form.data.sort">
                         <SelectTrigger class="w-full">
                             <SelectValue />
                         </SelectTrigger>
@@ -147,7 +143,7 @@ function handleReset(): void {
                 <Button variant="destructive" @click="handleReset">
                     Reset
                 </Button>
-                <Button variant="default" @click="handleApply" :disabled="form.processing">
+                <Button variant="default" @click="handleApply" :disabled="props.form.processing">
                     Apply
                 </Button>
             </SheetFooter>

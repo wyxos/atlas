@@ -45,6 +45,7 @@ import { useRefreshDialog } from '@/composables/useRefreshDialog';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useTabInitialization } from '@/composables/useTabInitialization';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
+import { useBrowseForm } from '@/composables/useBrowseForm';
 import BrowseFiltersSheet from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -103,10 +104,16 @@ const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const currentPage = ref<string | number | null>(1);
 const nextCursor = ref<string | number | null>(null);
 const loadAtPage = ref<string | number | null>(null);
-// TODO: Implement form state management from scratch
 const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
+
+// Initialize browse form
+// Note: With :key="activeTab.id" in Browse.vue, this component is recreated on tab switch,
+// so the form is initialized fresh with the new tab data - no watch needed
+const form = useBrowseForm({
+    tab: props.tab,
+});
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -219,7 +226,10 @@ function onLoadingStop(): void {
 // Computed property to display page value
 const displayPage = computed(() => currentPage.value ?? 1);
 
-// TODO: Implement form field computed properties from scratch
+// Check if we should show the form (new tab with no items)
+const shouldShowForm = computed(() => {
+    return props.tab !== undefined && items.value.length === 0;
+});
 
 // Get pageSize from limit filter, defaulting to 20
 const pageSize = computed(() => {
@@ -375,7 +385,7 @@ const { initializeTab } = useTabInitialization({
     currentPage,
     nextCursor,
     loadAtPage,
-    // TODO: Add selectedService when implementing form logic
+    selectedService: computed(() => form.data.service),
     clearPreviewedItems: itemPreview.clearPreviewedItems,
     onTabDataLoadingChange: props.onTabDataLoadingChange,
     loadTabItems: props.loadTabItems,
@@ -393,6 +403,21 @@ const refreshDialog = useRefreshDialog(
     initializeTab
 );
 
+
+// Handle apply event from TabFilter
+function handleApplyFilters(): void {
+    applyService();
+}
+
+// Handle reset event from TabFilter
+function handleResetFilters(): void {
+    form.reset();
+}
+
+// Handle moderation rules changed
+function handleModerationRulesChanged(): void {
+    // TODO: Implement moderation rules changed logic
+}
 
 // Apply selected service to current tab (play button for new tabs)
 async function applyService(): Promise<void> {
@@ -656,7 +681,7 @@ onUnmounted(() => {
                 </div>
                 <!-- Service Dropdown -->
                 <div class="flex-1">
-                    <Select :disabled="masonry?.isLoading ?? false">
+                    <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
@@ -669,8 +694,9 @@ onUnmounted(() => {
                     </Select>
                 </div>
                 <!-- Filters Button (Primary) -->
-                <BrowseFiltersSheet :available-services="availableServices" :tab="tab" :masonry="masonry"
-                    :is-masonry-loading="masonry?.isLoading ?? false" />
+                <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
+                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" :form="form"
+                    @apply="handleApplyFilters" @reset="handleResetFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
@@ -736,7 +762,7 @@ onUnmounted(() => {
                     <!-- Service Dropdown -->
                     <div class="w-full">
                         <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
-                        <Select :disabled="masonry?.isLoading ?? false">
+                        <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
                             <SelectTrigger class="w-full" data-test="service-select-trigger">
                                 <SelectValue placeholder="Select a service..." />
                             </SelectTrigger>
@@ -752,15 +778,17 @@ onUnmounted(() => {
                     <!-- Action Buttons -->
                     <div class="flex gap-3 w-full mt-2 items-center">
                         <!-- Filters Button -->
-                        <BrowseFiltersSheet :available-services="availableServices" :tab="tab" :masonry="masonry"
-                            :is-masonry-loading="masonry?.isLoading ?? false">
+                        <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices"
+                            :tab="tab" :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" :form="form"
+                            @apply="handleApplyFilters" @reset="handleResetFilters">
                             <Button variant="outline" size="sm" class="flex-1">
                                 Filters
                             </Button>
                         </BrowseFiltersSheet>
 
                         <!-- Play Button -->
-                        <Button size="sm" class="flex-1" data-test="play-button">
+                        <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
+                            :disabled="form.processing || !form.data.service">
                             <Loader2 v-if="masonry?.isLoading" :size="16" class="animate-spin" />
                             <Play :size="16" v-else />
                         </Button>
@@ -793,7 +821,7 @@ onUnmounted(() => {
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
                                     :data-key="slotItem.key" :data-masonry-item-id="slotItem.id"
                                     :class="containerBadges.getMasonryItemClasses.value(slotItem)"
-                                    @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e, slotItem)"
+                                    @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e)"
                                     @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, slotItem)">
                                     <!-- Placeholder background - icon by default (before preloading starts) -->
                                     <!-- Note: Vibe's MasonryItem provides this, but we override for dark theme -->
