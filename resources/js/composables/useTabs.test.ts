@@ -67,11 +67,9 @@ describe('useTabs', () => {
         expect(tabs.value).toHaveLength(2);
         expect(tabs.value[0].id).toBe(1);
         expect(tabs.value[0].label).toBe('Tab 1');
-        expect(tabs.value[0].fileIds).toEqual([]); // fileIds should be empty on initial load
         expect(tabs.value[0].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(tabs.value[1].id).toBe(2);
         expect(tabs.value[1].label).toBe('Tab 2');
-        expect(tabs.value[1].fileIds).toEqual([]); // fileIds should be empty on initial load
         expect(tabs.value[1].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(isLoadingTabs.value).toBe(false);
     });
@@ -192,8 +190,8 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', queryParams: {}, itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 1; // Set active tab to the one we're closing
 
@@ -246,7 +244,7 @@ describe('useTabs', () => {
 
         // Set up single tab
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
@@ -267,8 +265,8 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', queryParams: {}, itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 2; // Active tab is different from the one we're closing
 
@@ -287,8 +285,8 @@ describe('useTabs', () => {
         const { tabs, activeTabId, getActiveTab } = useTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', queryParams: {}, fileIds: [], itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', queryParams: {}, itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 2;
 
@@ -312,7 +310,7 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test (simulating loaded state)
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
@@ -348,7 +346,7 @@ describe('useTabs', () => {
 
         // Set up tabs manually
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1, 2], itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
         ];
 
         const mockItemsData = [
@@ -376,14 +374,13 @@ describe('useTabs', () => {
 
         const tab = tabs.value.find(t => t.id === 1);
         expect(tab?.itemsData).toEqual(mockItemsData);
-        expect(tab?.fileIds).toEqual([1, 2]);
     });
 
     it('handles load tab items error gracefully', async () => {
         const { tabs, loadTabItems } = useTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [1], itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');
@@ -431,7 +428,7 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, fileIds: [], itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');

@@ -22,7 +22,6 @@ export type TabData = {
     id: number;
     label: string;
     queryParams: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
-    fileIds: number[]; // Database file IDs (loaded when tab is initialized)
     itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
     isActive: boolean;
@@ -54,7 +53,6 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 id: tab.id,
                 label: tab.label,
                 queryParams: tab.query_params || {},
-                fileIds: [], // Always empty on initial load - loaded when tab is initialized
                 itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
                 position: tab.position || 0,
                 isActive: tab.is_active ?? false,
@@ -83,7 +81,6 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             queryParams: {
                 // Don't set page or service - user must select service first
             },
-            fileIds: [],
             itemsData: [],
             position: maxPosition + 1,
             isActive: false,
@@ -209,7 +206,6 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             const tab = tabs.value.find(t => t.id === tabId);
             if (tab) {
                 tab.itemsData = data.items || [];
-                // fileIds can be derived from items if needed: data.items?.map(item => item.id) || []
             }
 
             return data.items || [];
