@@ -83,9 +83,6 @@ class Browser
                 ];
                 $response = [
                     'items' => [],
-                    'metadata' => [
-                        'nextCursor' => null,
-                    ],
                 ];
             }
         } catch (ConnectionException $e) {
@@ -96,9 +93,6 @@ class Browser
             ];
             $response = [
                 'items' => [],
-                'metadata' => [
-                    'nextCursor' => null,
-                ],
             ];
         } catch (\Throwable $e) {
             $serviceError = [
@@ -108,9 +102,6 @@ class Browser
             ];
             $response = [
                 'items' => [],
-                'metadata' => [
-                    'nextCursor' => null,
-                ],
             ];
         }
 
