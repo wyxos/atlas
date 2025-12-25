@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { mount as baseMount, flushPromises } from '@vue/test-utils';
 import { nextTick, ref } from 'vue';
 import TabContent from './TabContent.vue';
 import type { MasonryItem } from '@/composables/useTabs';
+
+const mount = baseMount as unknown as (component: any, options?: any) => any;
 
 // Mock axios
 const mockAxios = {
@@ -24,7 +26,7 @@ vi.mock('@/composables/useContainerBadges', async () => {
     const { ref, computed } = await import('vue');
     return {
         useContainerBadges: vi.fn((itemsRef: any) => {
-            const hoveredContainerId = ref(null);
+            const hoveredContainerId = ref<number | null>(null);
             const setHoveredContainerId = vi.fn((id: number | null) => {
                 hoveredContainerId.value = id;
             });
@@ -91,10 +93,9 @@ vi.mock('@/composables/usePromptData', async () => {
     };
 });
 
-vi.mock('@/composables/useMasonryInteractions', () => ({
-    useMasonryInteractions: vi.fn(() => ({
+vi.mock('@/utils/masonryInteractions', () => ({
+    createMasonryInteractions: vi.fn(() => ({
         handleAltClickReaction: vi.fn(),
-        handleAltClickOnMasonry: vi.fn(),
         handleMasonryItemMouseDown: vi.fn(),
         handleMasonryItemAuxClick: vi.fn(),
         openOriginalUrl: vi.fn(),
@@ -558,12 +559,12 @@ describe('TabContent - Container Badges', () => {
         expect(badgeContainers.length).toBeGreaterThan(0);
 
         // Verify badge content - should show type and count in separate spans
-        const badgeTexts = badgeContainers.map(badge => badge.text());
+        const badgeTexts = badgeContainers.map((badge: any) => badge.text());
 
         // Item 1 has container id=1 (gallery) - shared with item2, so count=2
         // Item 1 has container id=2 (album) - shared with item3, so count=2
-        expect(badgeTexts.some(text => text.includes('gallery') && text.includes('2'))).toBe(true);
-        expect(badgeTexts.some(text => text.includes('album') && text.includes('2'))).toBe(true);
+        expect(badgeTexts.some((text: string) => text.includes('gallery') && text.includes('2'))).toBe(true);
+        expect(badgeTexts.some((text: string) => text.includes('album') && text.includes('2'))).toBe(true);
     });
 
     it('does not display container badges when item has no containers', async () => {

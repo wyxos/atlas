@@ -1,5 +1,5 @@
 import { nextTick, type Ref } from 'vue';
-import { preloadImage, findMasonryItemByImageSrc, calculateBestFitSize, getAvailableWidth } from './useFileViewerUtils';
+import { preloadImage, findMasonryItemByImageSrc, calculateBestFitSize, getAvailableWidth } from '@/utils/fileViewer';
 
 export function useFileViewerOpen(
     overlay: {
@@ -103,11 +103,12 @@ export function useFileViewerOpen(
         overlay.overlayBorderRadius.value = radius || null;
         overlay.overlayIsAnimating.value = false;
 
+        const imageBorderWidth = 4; // border-4 = 4px
+
         // Calculate initial image center position immediately (before preload)
         // This ensures images are positioned correctly from the start
-        const borderWidth = 4; // border-4 = 4px
-        const initialContentWidth = width - (borderWidth * 2);
-        const initialContentHeight = height - (borderWidth * 2);
+        const initialContentWidth = width - (imageBorderWidth * 2);
+        const initialContentHeight = height - (imageBorderWidth * 2);
         // Initially image size equals container size (overlayImageSize is set to { width, height })
         const initialImageLeft = Math.round((initialContentWidth - imageSize.overlayImageSize.value.width) / 2);
         const initialImageTop = Math.round((initialContentHeight - imageSize.overlayImageSize.value.height) / 2);
@@ -156,16 +157,15 @@ export function useFileViewerOpen(
 
         // Update image center position after preload (image size may have changed)
         // Image container is inside border, so position relative to container (not border)
-        const borderWidth = 4; // border-4 = 4px
-        const initialContentWidth = width - (borderWidth * 2);
-        const initialContentHeight = height - (borderWidth * 2);
+        const contentWidthAfterPreload = width - (imageBorderWidth * 2);
+        const contentHeightAfterPreload = height - (imageBorderWidth * 2);
         // Initially image size equals container size (overlayImageSize is set to { width, height })
-        const initialImageLeft = Math.round((initialContentWidth - imageSize.overlayImageSize.value!.width) / 2);
-        const initialImageTop = Math.round((initialContentHeight - imageSize.overlayImageSize.value!.height) / 2);
+        const imageLeftAfterPreload = Math.round((contentWidthAfterPreload - imageSize.overlayImageSize.value!.width) / 2);
+        const imageTopAfterPreload = Math.round((contentHeightAfterPreload - imageSize.overlayImageSize.value!.height) / 2);
 
         imageSize.imageCenterPosition.value = {
-            top: initialImageTop,
-            left: initialImageLeft,
+            top: imageTopAfterPreload,
+            left: imageLeftAfterPreload,
         };
 
         // Wait for image to be displayed, then proceed with animations
