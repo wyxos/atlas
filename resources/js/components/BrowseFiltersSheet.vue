@@ -6,13 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SlidersHorizontal } from 'lucide-vue-next';
+import { Masonry } from '@wyxos/vibe';
 import type { TabData } from '@/composables/useTabs';
 
 interface Props {
     open: boolean;
     availableServices: Array<{ key: string; label: string }>;
     tab?: TabData;
-    masonry?: { isLoading?: boolean; reset?: () => void; loadPage?: (page: number) => Promise<void>; cancelLoad?: () => void; destroy?: () => void } | null;
+    masonry?: InstanceType<typeof Masonry> | null;
     isMasonryLoading?: boolean;
     modelValue?: string; // v-model for selectedService
     isOfflineMode?: boolean;
@@ -236,8 +237,7 @@ function resetFilters(): void {
                 <Button variant="destructive" @click="resetFilters">
                     Reset
                 </Button>
-                <Button variant="default" @click="applyFilters" 
-                    :disabled="!isOfflineMode && !selectedService">
+                <Button variant="default" @click="applyFilters" :disabled="!isOfflineMode && !selectedService">
                     Apply
                 </Button>
             </SheetFooter>
