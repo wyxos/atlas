@@ -1,5 +1,5 @@
 import { nextTick, type Ref } from 'vue';
-import { preloadImage, calculateBestFitSize, getAvailableWidth } from './useFileViewerUtils';
+import { preloadImage, calculateBestFitSize, getAvailableWidth } from '@/utils/fileViewer';
 
 const BORDER_WIDTH = 4;
 const PANEL_HEIGHT = 200;

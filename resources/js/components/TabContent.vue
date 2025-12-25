@@ -36,7 +36,7 @@ import {useBrowseService} from '@/composables/useBrowseService';
 import {useContainerBadges} from '@/composables/useContainerBadges';
 import {useContainerPillInteractions} from '@/composables/useContainerPillInteractions';
 import {usePromptData} from '@/composables/usePromptData';
-import {useMasonryInteractions} from '@/composables/useMasonryInteractions';
+import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import {useItemPreview} from '@/composables/useItemPreview';
 import {useMasonryRestore} from '@/composables/useMasonryRestore';
 import {useResetDialog} from '@/composables/useResetDialog';
@@ -364,7 +364,7 @@ const {handleMasonryReaction} = useMasonryReactionHandler(
 );
 
 // Masonry interactions composable (needs handleMasonryReaction)
-const masonryInteractions = useMasonryInteractions(
+const masonryInteractions = createMasonryInteractions(
     items,
     masonry,
     handleMasonryReaction
@@ -504,6 +504,8 @@ async function handleItemInView(payload: {
     item: { id?: number };
     type: 'image' | 'video'
 }, item: MasonryItem): Promise<void> {
+    void payload;
+    void item;
     // This event is kept for backward compatibility, but we now use in-view-and-loaded
     // for triggering preview count increment
 }
@@ -547,6 +549,8 @@ async function handleItemPreloadSuccess(payload: {
     type: 'image' | 'video';
     src: string
 }, item: MasonryItem): Promise<void> {
+    void payload;
+    void item;
     // Item preload successful - handler kept for potential future use
 }
 
@@ -604,6 +608,7 @@ function handleRemoveItem(remove: (item: MasonryItem) => void, item: MasonryItem
 }
 
 function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void): void {
+    void remove;
     // Cancel auto-dislike countdown if user reacts manually
     autoDislikeQueue.cancelAutoDislikeCountdown(itemId);
     // Note: remove parameter is kept for FileReactions component compatibility but not used here

@@ -1,5 +1,5 @@
 import { ref, watch } from 'vue';
-import { calculateBestFitSize, getAvailableWidth } from './useFileViewerUtils';
+import { calculateBestFitSize, getAvailableWidth } from '@/utils/fileViewer';
 
 const BORDER_WIDTH = 4;
 const PANEL_HEIGHT = 200;
