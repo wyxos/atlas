@@ -2,6 +2,7 @@ import { ref, type Ref } from 'vue';
 import type { MasonryItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
+import type { Masonry } from '@wyxos/vibe';
 
 type Container = {
     id: number;
@@ -16,12 +17,12 @@ type Container = {
  */
 export function useContainerPillInteractions(
     items: Ref<MasonryItem[]>,
-    masonry: Ref<{ removeMany?: (items: MasonryItem[]) => Promise<void> } | null>,
+    masonry: Ref<InstanceType<typeof Masonry> | null>,
     tabId: number | undefined,
     onReaction: (fileId: number, type: ReactionType) => void,
     restoreManyToMasonry?: (
         itemsToRestore: Array<{ item: MasonryItem; index: number }>,
-        masonryInstance?: any
+        masonryInstance?: InstanceType<typeof Masonry>
     ) => Promise<void>
 ) {
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);

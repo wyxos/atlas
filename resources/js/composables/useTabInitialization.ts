@@ -1,21 +1,14 @@
 import { nextTick, type Ref } from 'vue';
 import type { MasonryItem, TabData } from './useTabs';
+import type { Masonry } from '@wyxos/vibe';
 
 interface TabInitializationDependencies {
     // Component refs
     fileViewer: Ref<{ close: () => void } | null>;
-    masonry: Ref<{
-        isLoading: boolean;
-        cancelLoad: () => void;
-        destroy: () => void;
-        refreshLayout: (items: MasonryItem[]) => void;
-    } | null>;
+    masonry: Ref<InstanceType<typeof Masonry> | null>;
 
     // Component state refs
     items: Ref<MasonryItem[]>;
-    currentPage: Ref<string | number | null>;
-    nextCursor: Ref<string | number | null>;
-    loadAtPage: Ref<string | number | null>;
     selectedService: Ref<string>;
 
     // Composable methods
@@ -36,19 +29,6 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
      */
     async function initializeTab(tab: TabData | undefined): Promise<void> {
         if (!tab) return;
-
-        // Close fileviewer
-        if (deps.fileViewer.value) {
-            deps.fileViewer.value.close();
-        }
-
-        // Destroy existing masonry instance
-        if (deps.masonry.value) {
-            if (deps.masonry.value.isLoading) {
-                deps.masonry.value.cancelLoad();
-            }
-            deps.masonry.value.destroy();
-        }
 
         // Reset previewed items tracking when switching tabs
         deps.clearPreviewedItems();
@@ -73,15 +53,9 @@ export function useTabInitialization(deps: TabInitializationDependencies) {
             }
         }
 
-        // Restore pagination state from tab.queryParams
-        // These will be passed to Masonry via initialPage and initialNextPage props
-        const pageValue = (tab.queryParams?.page as string | number | undefined) ?? 1;
-        const nextValue = (tab.queryParams?.next as string | number | null | undefined) ?? null;
-        deps.currentPage.value = pageValue;
-        deps.nextCursor.value = nextValue;
-
         // Set items - Masonry will automatically call restoreItems() when init is 'auto'
-        // and items are provided via v-model, using initialPage and initialNextPage props
+        // and items are provided via v-model
+        // Pagination state is managed by Masonry itself via loadAtPage prop and queryParams
         deps.items.value = tab.itemsData ?? [];
     }
 

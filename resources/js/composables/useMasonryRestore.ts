@@ -1,18 +1,19 @@
 import type { Ref } from 'vue';
 import type { MasonryItem } from './useTabs';
+import type { Masonry } from '@wyxos/vibe';
 
 /**
  * Composable for restoring items to masonry layout.
  */
 export function useMasonryRestore(
     items: Ref<MasonryItem[]>,
-    masonry: Ref<any>
+    masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
     /**
      * Restore item to masonry at original index.
      * Delegates to Vibe's restore method which handles all index calculation and layout internally.
      */
-    async function restoreToMasonry(item: MasonryItem, index: number, masonryInstance?: any): Promise<void> {
+    async function restoreToMasonry(item: MasonryItem, index: number, masonryInstance?: InstanceType<typeof Masonry>): Promise<void> {
         // Check if item already exists
         const existingIndex = items.value.findIndex((i) => i.id === item.id);
         if (existingIndex !== -1) {
@@ -39,7 +40,7 @@ export function useMasonryRestore(
      */
     async function restoreManyToMasonry(
         itemsToRestore: Array<{ item: MasonryItem; index: number }>,
-        masonryInstance?: any
+        masonryInstance?: InstanceType<typeof Masonry>
     ): Promise<void> {
         if (itemsToRestore.length === 0) {
             return;
