@@ -482,6 +482,11 @@ async function applyService(): Promise<void> {
         return;
     }
 
+    // Online mode requires a service selection.
+    if (form.data.sourceType === 'online' && !form.data.service) {
+        return;
+    }
+
     shouldShowForm.value = false;
     loadAtPage.value = 1;
 
@@ -777,6 +782,23 @@ onMounted(async () => {
             if (loadedItems.length > 0) {
                 shouldShowForm.value = false;
             }
+
+            // Vibe Masonry with init="manual" requires calling restoreItems() to initialize.
+            // Without this, restored items may exist in v-model but Masonry will still show
+            // "Waiting for content to load..." after a full page refresh.
+            if (loadedItems.length > 0) {
+                await nextTick();
+
+                if (masonry.value?.restoreItems) {
+                    const rawPage = tabData.queryParams?.page;
+                    const page = (typeof rawPage === 'number')
+                        ? rawPage
+                        : (typeof rawPage === 'string' && rawPage.length > 0 && !Number.isNaN(Number(rawPage)) ? Number(rawPage) : 1);
+                    const next = tabData.queryParams?.next ?? null;
+
+                    await masonry.value.restoreItems(items.value, page, next);
+                }
+            }
         }
     } finally {
         // Mark initialization as complete
@@ -888,7 +910,9 @@ defineExpose({
 
                 <!-- Apply Service Button -->
                 <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
-                        :loading="masonry?.isLoading" title="Apply selected service">
+                        :loading="masonry?.isLoading"
+                        :disabled="(masonry?.isLoading ?? false) || (form.data.sourceType === 'online' && !form.data.service)"
+                        title="Apply selected service">
                     <Play :size="14"/>
                 </Button>
             </div>
@@ -961,7 +985,8 @@ defineExpose({
                                 <!-- Action Buttons -->
                                 <div class="flex gap-3 w-full mt-2 items-center">
                                     <!-- Play Button -->
-                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button">
+                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
+                                            :disabled="form.data.sourceType === 'online' && !form.data.service">
                                         <Play :size="16"/>
                                     </Button>
                                 </div>
