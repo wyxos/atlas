@@ -29,36 +29,14 @@ const emit = defineEmits<{
     'reset': [];
 }>();
 
-// Helper function to get form data from tab queryParams
-function getFormDataFromTab() {
-    const queryParams = props.tab?.queryParams;
-    if (!queryParams) {
-        return undefined;
-    }
-    return {
-        service: (queryParams.service as string) || '',
-        nsfw: Boolean(queryParams.nsfw && (queryParams.nsfw === 1 || queryParams.nsfw === '1' || queryParams.nsfw === 'true')),
-        type: (queryParams.type as string) || 'all',
-        limit: String(queryParams.limit || '20'),
-        sort: (queryParams.sort as string) || 'Newest',
-        page: Number(queryParams.page || 1),
-        next: queryParams.next ?? null,
-    };
-}
-
-// Initialize form
+// Initialize form with tab
 const form = useBrowseForm({
-    initialData: getFormDataFromTab(),
+    tab: props.tab,
 });
 
 // Sync form when sheet opens
 function syncFormFromTab(): void {
-    const formData = getFormDataFromTab();
-    if (formData) {
-        Object.assign(form.data, formData);
-    } else {
-        form.reset();
-    }
+    form.syncFromTab(props.tab);
 }
 
 // Handle apply button
@@ -75,7 +53,8 @@ function handleReset(): void {
 </script>
 
 <template>
-    <Sheet :open="props.open" @update:open="(value: boolean) => { emit('update:open', value); if (value) syncFormFromTab(); }">
+    <Sheet :open="props.open"
+        @update:open="(value: boolean) => { emit('update:open', value); if (value) syncFormFromTab(); }">
         <SheetTrigger as-child>
             <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button" :disabled="isMasonryLoading">
                 <SlidersHorizontal :size="14" />

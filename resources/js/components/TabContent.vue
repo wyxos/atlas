@@ -646,7 +646,7 @@ onUnmounted(() => {
                 <div>
                     <Select :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
-                                <SelectValue placeholder="Online" />
+                            <SelectValue placeholder="Online" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
@@ -669,8 +669,7 @@ onUnmounted(() => {
                     </Select>
                 </div>
                 <!-- Filters Button (Primary) -->
-                <BrowseFiltersSheet
-                    :available-services="availableServices" :tab="tab" :masonry="masonry"
+                <BrowseFiltersSheet :available-services="availableServices" :tab="tab" :masonry="masonry"
                     :is-masonry-loading="masonry?.isLoading ?? false" />
 
                 <!-- Moderation Rules Button (Info) -->
@@ -708,8 +707,8 @@ onUnmounted(() => {
                 </Button>
 
                 <!-- Apply Service Button -->
-                <Button @click="applyService" size="sm" class="h-10 w-10"
-                    data-test="apply-service-button" title="Apply selected service">
+                <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
+                    title="Apply selected service">
                     <Loader2 v-if="masonry?.isLoading" :size="14" class="mr-2 animate-spin" />
                     <Play :size="14" v-else />
                 </Button>
@@ -727,11 +726,12 @@ onUnmounted(() => {
                 </div>
             </div>
             <!-- Form for new tabs -->
-            <div v-else-if="tab" class="flex items-center justify-center h-full"
-                data-test="new-tab-form">
-                <div class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
+            <div v-else-if="tab" class="flex items-center justify-center h-full" data-test="new-tab-form">
+                <div
+                    class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
                     <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
-                    <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click play to begin</p>
+                    <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click play to
+                        begin</p>
 
                     <!-- Service Dropdown -->
                     <div class="w-full">
@@ -752,8 +752,7 @@ onUnmounted(() => {
                     <!-- Action Buttons -->
                     <div class="flex gap-3 w-full mt-2 items-center">
                         <!-- Filters Button -->
-                        <BrowseFiltersSheet
-                            :available-services="availableServices" :tab="tab" :masonry="masonry"
+                        <BrowseFiltersSheet :available-services="availableServices" :tab="tab" :masonry="masonry"
                             :is-masonry-loading="masonry?.isLoading ?? false">
                             <Button variant="outline" size="sm" class="flex-1">
                                 Filters
@@ -761,8 +760,7 @@ onUnmounted(() => {
                         </BrowseFiltersSheet>
 
                         <!-- Play Button -->
-                        <Button size="sm" class="flex-1"
-                            data-test="play-button">
+                        <Button size="sm" class="flex-1" data-test="play-button">
                             <Loader2 v-if="masonry?.isLoading" :size="16" class="animate-spin" />
                             <Play :size="16" v-else />
                         </Button>
@@ -770,13 +768,12 @@ onUnmounted(() => {
                 </div>
             </div>
             <!-- Masonry -->
-            <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer"
-                @click="onMasonryClick" @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items"
-                    :load-at-page="1" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" init="manual" mode="backfill"
-                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" :page-size="pageSize"
-                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+            <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
+                @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :load-at-page="1" :layout="layout"
+                    layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
+                    :backfill-max-calls="Infinity" :page-size="pageSize" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
                     data-test="masonry-component">

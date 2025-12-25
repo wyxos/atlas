@@ -1,4 +1,5 @@
-import { reactive, ref, type Ref } from 'vue';
+import { reactive, ref } from 'vue';
+import type { TabData } from './useTabs';
 
 export interface BrowseFormData {
     service: string;
@@ -11,7 +12,7 @@ export interface BrowseFormData {
 }
 
 export interface UseBrowseFormOptions {
-    initialData?: Partial<BrowseFormData>;
+    tab?: TabData;
 }
 
 export function useBrowseForm(options?: UseBrowseFormOptions) {
@@ -25,9 +26,28 @@ export function useBrowseForm(options?: UseBrowseFormOptions) {
         next: null,
     };
 
+    /**
+     * Get form data from tab queryParams
+     */
+    function getFormDataFromTab(tab?: TabData): Partial<BrowseFormData> | undefined {
+        const queryParams = tab?.queryParams;
+        if (!queryParams) {
+            return undefined;
+        }
+        return {
+            service: (queryParams.service as string) || '',
+            nsfw: Boolean(queryParams.nsfw && (queryParams.nsfw === 1 || queryParams.nsfw === '1' || queryParams.nsfw === 'true')),
+            type: (queryParams.type as string) || 'all',
+            limit: String(queryParams.limit || '20'),
+            sort: (queryParams.sort as string) || 'Newest',
+            page: Number(queryParams.page || 1),
+            next: queryParams.next ?? null,
+        };
+    }
+
     const data = reactive<BrowseFormData>({
         ...defaultData,
-        ...options?.initialData,
+        ...getFormDataFromTab(options?.tab),
     });
 
     const errors = reactive<Partial<Record<keyof BrowseFormData, string>>>({});
@@ -35,10 +55,22 @@ export function useBrowseForm(options?: UseBrowseFormOptions) {
     const wasSuccessful = ref(false);
 
     /**
+     * Sync form data from tab
+     */
+    function syncFromTab(tab?: TabData): void {
+        const formData = getFormDataFromTab(tab);
+        if (formData) {
+            Object.assign(data, formData);
+        } else {
+            reset();
+        }
+    }
+
+    /**
      * Reset the form to initial values
      */
     function reset(): void {
-        Object.assign(data, defaultData, options?.initialData);
+        Object.assign(data, defaultData, getFormDataFromTab(options?.tab));
         clearErrors();
         wasSuccessful.value = false;
     }
@@ -86,6 +118,7 @@ export function useBrowseForm(options?: UseBrowseFormOptions) {
         processing,
         wasSuccessful,
         reset,
+        syncFromTab,
         clearErrors,
         setError,
         clearError,
