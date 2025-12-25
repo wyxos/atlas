@@ -1358,7 +1358,7 @@ describe('TabContent - Container Badges', () => {
     describe('offline mode', () => {
         it('displays source type selector', async () => {
             const tab = createMockTab({
-                sourceType: 'offline',
+                sourceType: 'local',
             });
 
             const wrapper = mount(TabContent, {
@@ -1380,7 +1380,7 @@ describe('TabContent - Container Badges', () => {
 
         it('hides service dropdown in offline mode', async () => {
             const tab = createMockTab({
-                sourceType: 'offline',
+                sourceType: 'local',
             });
 
             const wrapper = mount(TabContent, {
@@ -1402,7 +1402,7 @@ describe('TabContent - Container Badges', () => {
 
         it('shows source dropdown in offline mode', async () => {
             const tab = createMockTab({
-                sourceType: 'offline',
+                sourceType: 'local',
             });
 
             const wrapper = mount(TabContent, {
@@ -1429,7 +1429,7 @@ describe('TabContent - Container Badges', () => {
             const updateActiveTab = vi.fn();
 
             mockAxios.put.mockResolvedValueOnce({
-                data: { ...tab, source_type: 'offline' },
+                data: { ...tab, query_params: { ...tab.queryParams, sourceType: 'local' } },
             });
 
             const wrapper = mount(TabContent, {
@@ -1446,18 +1446,18 @@ describe('TabContent - Container Badges', () => {
             await nextTick();
 
             const vm = wrapper.vm as any;
-            await vm.handleSourceTypeChange('offline');
+            await vm.handleSourceTypeChange('local');
             await flushPromises();
 
             expect(mockAxios.put).toHaveBeenCalledWith(
                 `/api/tabs/${tab.id}`,
-                { source_type: 'offline' }
+                { query_params: { ...tab.queryParams, sourceType: 'local' } }
             );
         });
 
         it('enables apply button in offline mode when source is selected', async () => {
             const tab = createMockTab({
-                sourceType: 'offline',
+                sourceType: 'local',
             });
 
             const wrapper = mount(TabContent, {
@@ -1482,7 +1482,7 @@ describe('TabContent - Container Badges', () => {
 
         it('includes source parameter when applying in offline mode', async () => {
             const tab = createMockTab({
-                sourceType: 'offline',
+                sourceType: 'local',
             });
 
             mockLoadPage.mockResolvedValue({ items: [], nextPage: null });

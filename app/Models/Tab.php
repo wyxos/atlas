@@ -49,7 +49,6 @@ class Tab extends Model
         'query_params',
         'position',
         'is_active',
-        'source_type',
     ];
 
     /**

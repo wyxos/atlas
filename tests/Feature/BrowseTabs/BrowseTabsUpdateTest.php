@@ -170,48 +170,44 @@ test('tab update maintains file order', function () {
     expect($files[2]->id)->toBe($file1->id);
 });
 
-test('tab update can change source type to offline', function () {
+test('tab update can change source type to local', function () {
     $user = User::factory()->create();
-    $tab = Tab::factory()->for($user)->create(['source_type' => 'online']);
+    $tab = Tab::factory()->for($user)->create(['query_params' => ['sourceType' => 'online']]);
 
     $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
-        'source_type' => 'offline',
+        'query_params' => ['sourceType' => 'local'],
     ]);
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['source_type'])->toBe('offline');
-    $this->assertDatabaseHas('tabs', [
-        'id' => $tab->id,
-        'source_type' => 'offline',
-    ]);
+    expect($data['query_params']['sourceType'] ?? null)->toBe('local');
+    $tab->refresh();
+    expect($tab->query_params['sourceType'] ?? null)->toBe('local');
 });
 
 test('tab update can change source type to online', function () {
     $user = User::factory()->create();
-    $tab = Tab::factory()->for($user)->create(['source_type' => 'offline']);
+    $tab = Tab::factory()->for($user)->create(['query_params' => ['sourceType' => 'local']]);
 
     $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
-        'source_type' => 'online',
+        'query_params' => ['sourceType' => 'online'],
     ]);
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['source_type'])->toBe('online');
-    $this->assertDatabaseHas('tabs', [
-        'id' => $tab->id,
-        'source_type' => 'online',
-    ]);
+    expect($data['query_params']['sourceType'] ?? null)->toBe('online');
+    $tab->refresh();
+    expect($tab->query_params['sourceType'] ?? null)->toBe('online');
 });
 
-test('validation fails when source_type is invalid', function () {
+test('validation fails when sourceType is invalid', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
     $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
-        'source_type' => 'invalid',
+        'query_params' => ['sourceType' => 'invalid'],
     ]);
 
     $response->assertStatus(422);
-    $response->assertJsonValidationErrors('source_type');
+    $response->assertJsonValidationErrors('query_params.sourceType');
 });

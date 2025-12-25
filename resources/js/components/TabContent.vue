@@ -53,15 +53,15 @@ import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
+import { items as tabsItems } from '@/actions/App/Http/Controllers/TabController';
 
 interface Props {
-    tab?: TabData;
+    tabId: number | null;
     availableServices: Array<{ key: string; label: string }>;
     onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
     updateActiveTab: (itemsData: MasonryItem[]) => void;
-    loadTabItems: (tabId: number) => Promise<MasonryItem[]>;
 }
 
 const props = defineProps<Props>();
@@ -104,12 +104,11 @@ const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
 
-// Initialize browse form
-// Note: With :key="activeTab.id" in Browse.vue, this component is recreated on tab switch,
-// so the form is initialized fresh with the new tab data - no watch needed
-const form = useBrowseForm({
-    tab: props.tab,
-});
+// Internal tab data - loaded from API
+const tab = ref<TabData | null>(null);
+
+// Initialize browse form - will be synced when tab loads
+const form = useBrowseForm();
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -118,7 +117,7 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Item preview composable (needs to be initialized early)
 // Pass itemsMap for O(1) item existence checks (important for 10k+ items)
-const itemPreview = useItemPreview(items, computed(() => props.tab), itemsMap);
+const itemPreview = useItemPreview(items, computed(() => tab.value ?? undefined), itemsMap);
 
 // Track if component is mounted to prevent accessing state after unmount
 const isMounted = ref(false);
@@ -143,7 +142,7 @@ const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(items, maso
 const resetDialog = useResetDialog(
     items,
     masonry,
-    computed(() => props.tab),
+    computed(() => tab.value ?? undefined),
     props.updateActiveTab
 );
 
@@ -217,7 +216,7 @@ function onLoadingStop(): void {
 }
 
 // Computed property to display page value
-const displayPage = computed(() => masonry.value?.currentPage ?? props.tab?.queryParams?.page ?? 1);
+const displayPage = computed(() => masonry.value?.currentPage ?? tab.value?.queryParams?.page ?? 1);
 
 // Check if we should show the form (new tab with no items)
 const shouldShowForm = ref(true);
@@ -225,7 +224,7 @@ const shouldShowForm = ref(true);
 
 // Get pageSize from limit filter, defaulting to 20
 const pageSize = computed(() => {
-    const limit = props.tab?.queryParams?.limit;
+    const limit = tab.value?.queryParams?.limit;
     return limit ? Number(limit) : 20;
 });
 
@@ -337,10 +336,11 @@ function handleContainerBan(container: { id: number; type: string; source?: stri
 }
 
 // Container pill interactions composable
+// tabId will be set when tab loads, using computed to reactively get the current value
 const containerPillInteractions = useContainerPillInteractions(
     items,
     masonry,
-    props.tab?.id,
+    computed(() => tab.value?.id ?? undefined),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
         props.onReaction(fileId, type);
     },
@@ -355,7 +355,7 @@ const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
     itemsMap,
     masonry,
-    computed(() => props.tab),
+    computed(() => tab.value ?? undefined),
     (fileId: number, type: ReactionType) => {
         props.onReaction(fileId, type);
     },
@@ -369,13 +369,36 @@ const masonryInteractions = useMasonryInteractions(
     handleMasonryReaction
 );
 
-// Refresh dialog composable
+// Internal function to load tab items and metadata
+async function loadTabItems(tabId: number): Promise<{ items: MasonryItem[]; tab: TabData }> {
+    try {
+        const response = await window.axios.get(tabsItems.url(tabId));
+        const data = response.data;
+        const queryParams = data.tab.queryParams || {};
+        const tabData: TabData = {
+            id: data.tab.id,
+            label: data.tab.label,
+            queryParams,
+            itemsData: [],
+            position: 0,
+            isActive: false,
+            sourceType: (queryParams.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
+        };
+        return {
+            items: data.items || [],
+            tab: tabData,
+        };
+    } catch (error) {
+        console.error('Failed to load tab items:', error);
+        throw error;
+    }
+}
+
 const refreshDialog = useRefreshDialog(
     items,
     masonry,
-    computed(() => props.tab),
-    props.updateActiveTab,
-    props.loadTabItems
+    computed(() => tab.value ?? undefined),
+    loadTabItems
 );
 
 
@@ -396,7 +419,7 @@ function handleModerationRulesChanged(): void {
 
 // Apply selected service to current tab (play button for new tabs)
 async function applyService(): Promise<void> {
-    if (!props.tab?.id || !masonry.value?.loadPage) {
+    if (!tab.value?.id || !masonry.value?.loadPage) {
         return;
     }
 
@@ -439,11 +462,11 @@ const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
  * This function calls the browse service with form data and tab ID
  */
 async function getPage(page: number | string): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
-    if (!props.tab?.id) {
+    if (!tab.value?.id) {
         throw new Error('Tab ID is required for getPage');
     }
 
-    return await getNextPageFromService(page, form.getData(), props.tab.id);
+    return await getNextPageFromService(page, form.getData(), tab.value.id);
 }
 
 // Event handlers for masonry items
@@ -625,12 +648,20 @@ onMounted(async () => {
             await fetchServices();
         }
 
-        if (props.tab) {
-            // Load tab details
-            await props.loadTabItems(props.tab.id);
+        if (props.tabId) {
+            // Load tab items and metadata from database
+            const { items: loadedItems, tab: tabData } = await loadTabItems(props.tabId);
+
+            // Store tab data locally
+            tab.value = tabData;
 
             // Assign query params to the form to restore any previous values
-            form.syncFromTab(props.tab);
+            form.syncFromTab(tabData);
+
+            // If tab has items, hide the form and show masonry
+            if (loadedItems.length > 0) {
+                shouldShowForm.value = false;
+            }
         }
     } finally {
         // Mark initialization as complete
@@ -759,8 +790,8 @@ defineExpose({
             <!-- Masonry -->
             <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :layout="layout"
-                    layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :layout="layout" layout-mode="auto"
+                    :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
                     @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
                     @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
@@ -944,12 +975,12 @@ defineExpose({
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading ?? false"
             :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
-            :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
+            :restore-to-masonry="restoreToMasonry" :tab-id="tab?.id ?? null" :masonry-instance="masonry"
             @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :display-page="displayPage"
-            :next-cursor="(masonry?.paginationHistory && masonry.paginationHistory.length > 0) ? masonry.paginationHistory[masonry.paginationHistory.length - 1] : (props.tab?.queryParams?.next ?? null)"
+            :next-cursor="(masonry?.paginationHistory && masonry.paginationHistory.length > 0) ? masonry.paginationHistory[masonry.paginationHistory.length - 1] : (tab?.queryParams?.next ?? null)"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
             :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 

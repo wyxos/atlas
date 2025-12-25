@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue';
+import { ref, computed, type Ref, type ComputedRef } from 'vue';
 import type { MasonryItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
@@ -18,13 +18,15 @@ type Container = {
 export function useContainerPillInteractions(
     items: Ref<MasonryItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
-    tabId: number | undefined,
+    tabId: number | undefined | ComputedRef<number | undefined>,
     onReaction: (fileId: number, type: ReactionType) => void,
     restoreManyToMasonry?: (
         itemsToRestore: Array<{ item: MasonryItem; index: number }>,
         masonryInstance?: InstanceType<typeof Masonry>
     ) => Promise<void>
 ) {
+    // Unwrap computed/ref to get the actual value
+    const tabIdValue = computed(() => typeof tabId === 'object' && 'value' in tabId ? tabId.value : tabId);
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
     const DOUBLE_CLICK_DELAY_MS = 300; // Maximum time between clicks to count as double-click
 
@@ -88,7 +90,8 @@ export function useContainerPillInteractions(
         }
 
         // Create batch restore callback if restoreManyToMasonry is available
-        const batchRestoreCallback = restoreManyToMasonry && tabId !== undefined
+        const currentTabId = tabIdValue.value;
+        const batchRestoreCallback = restoreManyToMasonry && currentTabId !== undefined
             ? async () => {
                 // Restore all items in the batch using restoreManyToMasonry
                 await restoreManyToMasonry(itemsToRestore, masonry.value);
