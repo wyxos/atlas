@@ -777,20 +777,10 @@ onUnmounted(() => {
 
                     <!-- Action Buttons -->
                     <div class="flex gap-3 w-full mt-2 items-center">
-                        <!-- Filters Button -->
-                        <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices"
-                            :tab="tab" :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false"
-                            @apply="handleApplyFilters" @reset="handleResetFilters">
-                            <Button variant="outline" size="sm" class="flex-1">
-                                Filters
-                            </Button>
-                        </BrowseFiltersSheet>
-
                         <!-- Play Button -->
                         <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
                             :disabled="form.processing || !form.data.service">
-                            <Loader2 v-if="masonry?.isLoading" :size="16" class="animate-spin" />
-                            <Play :size="16" v-else />
+                            <Play :size="16" />
                         </Button>
                     </div>
                 </div>
