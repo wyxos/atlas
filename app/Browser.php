@@ -53,7 +53,8 @@ class Browser
         $isLocalMode = false;
         if ($tabId) {
             $tab = \App\Models\Tab::find($tabId);
-            $isLocalMode = $tab && $tab->source_type === 'offline';
+            $queryParams = $tab->query_params ?? [];
+            $isLocalMode = isset($queryParams['sourceType']) && $queryParams['sourceType'] === 'local';
         }
 
         // Resolve service instance

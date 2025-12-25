@@ -48,16 +48,18 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 items?: MasonryItem[]; // Not included in initial load, loaded lazily when restoring a tab
                 position?: number;
                 is_active?: boolean;
-                source_type?: string;
-            }) => ({
-                id: tab.id,
-                label: tab.label,
-                queryParams: tab.query_params || {},
-                itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
-                position: tab.position || 0,
-                isActive: tab.is_active ?? false,
-                sourceType: tab.source_type === 'offline' ? 'local' : 'online',
-            }));
+            }) => {
+                const queryParams = tab.query_params || {};
+                return {
+                    id: tab.id,
+                    label: tab.label,
+                    queryParams,
+                    itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
+                    position: tab.position || 0,
+                    isActive: tab.is_active ?? false,
+                    sourceType: (queryParams.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
+                };
+            });
 
             // Sort by position
             tabs.value.sort((a, b) => a.position - b.position);
@@ -96,7 +98,9 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             const data = response.data;
             newTab.id = data.id;
             newTab.isActive = data.is_active ?? false;
-            newTab.sourceType = data.source_type === 'offline' ? 'local' : 'online';
+            const queryParams = data.query_params || {};
+            newTab.queryParams = queryParams;
+            newTab.sourceType = (queryParams.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local';
             tabs.value.push(newTab);
             activeTabId.value = newTab.id;
 

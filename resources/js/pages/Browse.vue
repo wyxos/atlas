@@ -45,7 +45,6 @@ const {
     closeTab,
     getActiveTab,
     updateActiveTab,
-    loadTabItems,
     setActiveTab,
 } = useTabs(switchTab);
 
@@ -161,9 +160,9 @@ onMounted(async () => {
                 </template>
             </TabPanel>
             <div class="flex-1 min-h-0 transition-all duration-300 flex flex-col relative">
-                <TabContent v-if="activeTab" :key="activeTab.id" :tab="activeTab"
+                <TabContent v-if="activeTab" :key="activeTab.id" :tab-id="activeTab.id"
                     :available-services="[]" :update-active-tab="updateActiveTab"
-                    :load-tab-items="loadTabItems" :on-reaction="handleReaction"
+                    :on-reaction="handleReaction"
                     :on-loading-change="handleMasonryLoadingChangeFromTab"
                     :on-tab-data-loading-change="handleTabDataLoadingChangeFromTab" />
                 <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">

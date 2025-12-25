@@ -28,7 +28,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         sort: 'Newest',
         page: 1,
         next: null,
-        sourceType: options?.tab?.sourceType ?? 'online',
+        sourceType: (options?.tab?.queryParams?.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
     };
 
     /**
@@ -47,7 +47,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
             sort: (queryParams?.sort as string) || 'Newest',
             page: Number(queryParams?.page || 1),
             next: queryParams?.next ?? null,
-            sourceType: tab?.sourceType ?? 'online',
+            sourceType: (queryParams?.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
         };
     }
 

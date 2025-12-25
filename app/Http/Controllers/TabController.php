@@ -41,12 +41,16 @@ class TabController extends Controller
         $maxPosition = Tab::forUser($userId)
             ->max('position') ?? -1;
 
+        $queryParams = $request->query_params ?? [];
+        if (! isset($queryParams['sourceType'])) {
+            $queryParams['sourceType'] = 'online';
+        }
+
         $tab = Tab::create([
             'user_id' => $userId,
             'label' => $request->label,
-            'query_params' => $request->query_params,
+            'query_params' => $queryParams,
             'position' => $request->position ?? ($maxPosition + 1),
-            'source_type' => $request->source_type ?? 'online',
         ]);
 
         // Sync files if file_ids are provided
@@ -188,8 +192,16 @@ class TabController extends Controller
             $itemsData = Tab::formatFilesToItems($files, $page);
         }
 
+        $queryParams = $tab->query_params ?? [];
+
         return response()->json([
             'items' => $itemsData,
+            'tab' => [
+                'id' => $tab->id,
+                'label' => $tab->label,
+                'queryParams' => $queryParams,
+                'sourceType' => $queryParams['sourceType'] ?? 'online',
+            ],
         ]);
     }
 

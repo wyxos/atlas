@@ -128,7 +128,7 @@ describe('useBrowseService', () => {
             activeTabId: ref(1),
             getActiveTab: () => ({
                 id: 1,
-                sourceType: 'offline',
+                sourceType: 'local',
                 queryParams: { source: 'CivitAI', limit: 20 },
                 itemsData: [],
             } as any),
@@ -199,7 +199,7 @@ describe('useBrowseService', () => {
             activeTabId: ref(1),
             getActiveTab: () => ({
                 id: 1,
-                sourceType: 'offline',
+                sourceType: 'local',
                 queryParams: { source: 'all', limit: 20 },
                 itemsData: [],
             } as any),

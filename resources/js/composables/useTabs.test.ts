@@ -74,23 +74,21 @@ describe('useTabs', () => {
         expect(isLoadingTabs.value).toBe(false);
     });
 
-    it('loads tabs with source_type field', async () => {
+    it('loads tabs with sourceType in queryParams', async () => {
         const mockTabs = [
             {
                 id: 1,
                 label: 'Online Tab',
-                query_params: { page: 1 },
+                query_params: { page: 1, sourceType: 'online' },
                 position: 0,
                 is_active: false,
-                source_type: 'online',
             },
             {
                 id: 2,
                 label: 'Offline Tab',
-                query_params: { page: 1 },
+                query_params: { page: 1, sourceType: 'local' },
                 position: 1,
                 is_active: false,
-                source_type: 'offline',
             },
         ];
 
@@ -101,7 +99,7 @@ describe('useTabs', () => {
         await loadTabs();
 
         expect(tabs.value[0].sourceType).toBe('online');
-        expect(tabs.value[1].sourceType).toBe('offline');
+        expect(tabs.value[1].sourceType).toBe('local');
     });
 
     it('defaults sourceType to online when not provided', async () => {

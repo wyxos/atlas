@@ -8,6 +8,7 @@ Under this section, you will regularly update the document with short rules corr
 - Use credentials from seeder when required to test the application via browser.
 - Use playwright-mcp to perform browser tests when requested to diagnose UI issues in combination with the browser-logs created by laravel-boost mcp.
 - You may add data-test attributes to elements to facilitate testing.
+- Never add legacy support/backwards compatibility code unless explicitly requested.
 
 ## Vue Composition API
 - Avoid using `watch` when possible. Prefer handling state changes directly in computed setters, event handlers, or lifecycle hooks. Use `watch` only when absolutely necessary for complex reactive dependencies that cannot be handled otherwise.
