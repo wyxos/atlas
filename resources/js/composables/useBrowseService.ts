@@ -1,6 +1,7 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
 import type { MasonryItem, TabData } from './useTabs';
 import { index as browseIndex, services as browseServices } from '@/actions/App/Http/Controllers/BrowseController';
+import type { BrowseFormData } from './useBrowseForm';
 
 export type GetPageResult = {
     items: MasonryItem[];
@@ -44,13 +45,46 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
 
     /**
      * Get next page of items from the browse API
+     * @param page - The page number or cursor to fetch (passed from Masonry component)
+     * @param formData - The browse form data containing filters and service selection
+     * @param tabId - Tab ID to include in the request
      */
-    async function getNextPage(page: number | string): Promise<GetPageResult> {
-        // TODO: Implement getNextPage logic from scratch
-        return {
-            items: [],
-            nextPage: null,
+    async function getNextPage(
+        page: number | string,
+        formData: BrowseFormData,
+        tabId: number
+    ): Promise<GetPageResult> {
+        // Build query parameters - backend handles all parameters via request()->all()
+        const queryParams: Record<string, any> = {
+            source: formData.service || 'civit-ai-images', // Backend expects 'source', not 'service'
+            tab_id: tabId,
+            nsfw: formData.nsfw ? 1 : 0,
+            type: formData.type,
+            limit: formData.limit,
+            sort: formData.sort,
         };
+
+        // Use the page parameter from Masonry as the primary pagination value
+        // Masonry passes either a page number or cursor from the previous response
+        if (typeof page === 'number') {
+            queryParams.page = page;
+        } else {
+            // If page is a string, it's likely a cursor - use 'next' parameter
+            queryParams.next = page;
+        }
+
+        try {
+            const response = await window.axios.get(browseIndex.url({ query: queryParams }));
+
+            return {
+                items: response.data.items || [],
+                nextPage: response.data.nextPage ?? null,
+                immediateActions: response.data.moderation?.toDislike || [],
+            };
+        } catch (error) {
+            console.error('Failed to fetch next page:', error);
+            throw error;
+        }
     }
 
     /**
