@@ -335,6 +335,7 @@ describe('useTabs', () => {
         expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/1', {
             label: 'Tab 1',
             position: 0,
+            file_ids: [1],
             // query_params are not sent - backend manages them
         });
     });

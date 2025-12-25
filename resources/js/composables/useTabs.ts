@@ -165,9 +165,17 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             return;
         }
 
+        const hadNoItems = activeTab.itemsData.length === 0;
         activeTab.itemsData = itemsData;
-        // Note: queryParams are updated by the backend (Browser.php) when browse requests are made
-        // Frontend only updates itemsData, not queryParams
+
+        // If we just loaded the first page of items, persist immediately so a quick refresh
+        // still restores the tab content (debounced persistence can be canceled by reload).
+        if (hadNoItems && itemsData.length > 0) {
+            void saveTab(activeTab);
+            return;
+        }
+        // Note: queryParams are updated by the backend (Browser.php) when browse requests are made.
+        // Frontend only updates itemsData (and therefore file_ids), not queryParams.
         saveTabDebounced(activeTab);
     }
 
@@ -183,13 +191,14 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
 
     async function saveTab(tab: TabData): Promise<void> {
         try {
-            // Only save UI-managed fields (label, position)
-            // query_params are managed by the backend (Browser.php) and should not be updated from frontend
-            // The backend updates query_params when browse requests are made with tab_id
+            // Save UI-managed fields (label, position) and the files in this tab (file_ids).
+            // query_params are managed by the backend (Browser.php) and should not be updated from frontend.
+            // The backend updates query_params when browse requests are made with tab_id.
             await window.axios.put(tabsUpdate.url(tab.id), {
                 label: tab.label,
                 position: tab.position,
-                // Do not send query_params - backend manages them
+                file_ids: tab.itemsData.map((item) => item.id),
+                // Do not send query_params - backend manages them.
             });
         } catch (error) {
             console.error('Failed to save tab:', error);
