@@ -80,7 +80,16 @@ class CivitAiImages extends BaseService
     {
         $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 20;
         $limit = max(0, min(200, $limit));
-        $cursor = (isset($this->params['page']) && (int) $this->params['page'] > 1) ? (string) $this->params['page'] : null;
+
+        // Check for 'next' parameter first (cursor-based pagination from frontend)
+        // If 'next' is provided, use it as the cursor; otherwise fall back to 'page'
+        $cursor = null;
+        if (isset($this->params['next']) && $this->params['next'] !== null) {
+            $cursor = (string) $this->params['next'];
+        } elseif (isset($this->params['page']) && (int) $this->params['page'] > 1) {
+            $cursor = (string) $this->params['page'];
+        }
+
         $sort = $this->params['sort'] ?? 'Newest';
         $nsfw = $this->params['nsfw'] ?? null; // boolean or enum: None|Soft|Mature|X
         $type = $this->resolveType($this->params['type'] ?? null);
