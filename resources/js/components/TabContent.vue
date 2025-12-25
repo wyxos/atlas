@@ -422,36 +422,11 @@ function handleModerationRulesChanged(): void {
 
 // Apply selected service to current tab (play button for new tabs)
 async function applyService(): Promise<void> {
-    if (!props.tab?.id) {
+    if (!props.tab?.id || !masonry.value?.loadPage) {
         return;
     }
 
-    try {
-        // Update tab's source_type if it changed (convert frontend 'local' to backend 'offline')
-        const backendSourceType = form.data.sourceType === 'local' ? 'offline' : 'online';
-
-        // Update tab's source_type if it changed
-        if (props.tab.sourceType !== backendSourceType) {
-            await window.axios.put(`/api/tabs/${props.tab.id}`, {
-                source_type: backendSourceType,
-            });
-            // Update local tab state (convert backend 'offline' to frontend 'local')
-            if (props.tab) {
-                props.tab.sourceType = backendSourceType === 'offline' ? 'local' : 'online';
-            }
-        }
-
-        // Initialize tab with the selected service/source
-        await initializeTab(props.tab);
-
-        // Start loading the first page if masonry is initialized
-        if (masonry.value && typeof masonry.value.loadPage === 'function') {
-            await masonry.value.loadPage(1);
-        }
-    } catch (error) {
-        console.error('Failed to apply service:', error);
-        throw error;
-    }
+    await masonry.value.loadPage(1);
 }
 
 
