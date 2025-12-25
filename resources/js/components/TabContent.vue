@@ -101,9 +101,6 @@ watch(
 );
 
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
-const currentPage = ref<string | number | null>(1);
-const nextCursor = ref<string | number | null>(null);
-const loadAtPage = ref<string | number | null>(null);
 const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
@@ -147,9 +144,6 @@ const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(items, maso
 const resetDialog = useResetDialog(
     items,
     masonry,
-    currentPage,
-    nextCursor,
-    loadAtPage,
     computed(() => props.tab),
     props.updateActiveTab
 );
@@ -224,7 +218,7 @@ function onLoadingStop(): void {
 }
 
 // Computed property to display page value
-const displayPage = computed(() => currentPage.value ?? 1);
+const displayPage = computed(() => masonry.value?.currentPage ?? props.tab?.queryParams?.page ?? 1);
 
 // Check if we should show the form (new tab with no items)
 const shouldShowForm = ref(true);
@@ -381,9 +375,6 @@ const { initializeTab } = useTabInitialization({
     fileViewer,
     masonry,
     items,
-    currentPage,
-    nextCursor,
-    loadAtPage,
     selectedService: computed(() => form.data.service),
     clearPreviewedItems: itemPreview.clearPreviewedItems,
     onTabDataLoadingChange: props.onTabDataLoadingChange,
@@ -394,9 +385,6 @@ const { initializeTab } = useTabInitialization({
 const refreshDialog = useRefreshDialog(
     items,
     masonry,
-    currentPage,
-    nextCursor,
-    loadAtPage,
     computed(() => props.tab),
     props.updateActiveTab,
     initializeTab
@@ -438,7 +426,7 @@ function cancelMasonryLoad(): void {
 
 // Load next page manually (used by both button click and carousel load more)
 async function loadNextPage(): Promise<void> {
-    if (nextCursor.value !== null && masonry.value && !masonry.value.isLoading) {
+    if (masonry.value && !masonry.value.isLoading && !masonry.value.hasReachedEnd) {
         if (typeof masonry.value.loadNext === 'function') {
             await masonry.value.loadNext();
         }
@@ -738,7 +726,7 @@ defineExpose({
                 <!-- Load Next Page Button -->
                 <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
                     data-test="load-next-page-button" title="Load next page"
-                    :disabled="masonry?.isLoading || nextCursor === null">
+                    :disabled="masonry?.isLoading || masonry?.hasReachedEnd">
                     <ChevronDown :size="14" />
                 </Button>
 
@@ -958,13 +946,14 @@ defineExpose({
 
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
-            :items="items" :has-more="nextCursor !== null" :is-loading="masonry?.isLoading ?? false"
+            :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading ?? false"
             :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
             :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
             @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
-        <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
+        <BrowseStatusBar :items="items" :display-page="displayPage"
+            :next-cursor="(masonry?.paginationHistory && masonry.paginationHistory.length > 0) ? masonry.paginationHistory[masonry.paginationHistory.length - 1] : (props.tab?.queryParams?.next ?? null)"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
             :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 

@@ -1,15 +1,13 @@
 import { ref, computed, nextTick, type Ref } from 'vue';
 import type { MasonryItem, TabData } from './useTabs';
+import type { Masonry } from '@wyxos/vibe';
 
 /**
  * Composable for managing the reset to first page dialog and reset logic.
  */
 export function useResetDialog(
     items: Ref<MasonryItem[]>,
-    masonry: Ref<any>,
-    currentPage: Ref<string | number | null>,
-    nextCursor: Ref<string | number | null>,
-    loadAtPage: Ref<string | number | null>,
+    masonry: Ref<InstanceType<typeof Masonry> | null>,
     tab: Ref<TabData | undefined>,
     updateActiveTab: (itemsData: MasonryItem[]) => void
 ) {
@@ -17,7 +15,8 @@ export function useResetDialog(
 
     // Check if we're on the first page
     const isOnFirstPage = computed(() => {
-        return currentPage.value === 1 || currentPage.value === null;
+        const currentPage = masonry.value?.currentPage ?? tab.value?.queryParams?.page;
+        return currentPage === 1 || currentPage === null || currentPage === undefined;
     });
 
     // Open reset dialog
@@ -36,11 +35,6 @@ export function useResetDialog(
         if (!currentTab) {
             return;
         }
-
-        // Reset state first
-        currentPage.value = 1;
-        nextCursor.value = null;
-        loadAtPage.value = 1;
 
         // Update tab data - backend will update query_params when browse request is made
         updateActiveTab([]);

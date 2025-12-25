@@ -19,8 +19,6 @@ export type UseBrowseServiceOptions = {
     hasServiceSelected: ComputedRef<boolean>;
     isInitializing: Ref<boolean>;
     items: Ref<MasonryItem[]>;
-    nextCursor: Ref<string | number | null>;
-    currentPage: Ref<string | number | null>;
     currentTabService: ComputedRef<string | null>;
     activeTabId: Ref<number | null>;
     getActiveTab: () => TabData | undefined;

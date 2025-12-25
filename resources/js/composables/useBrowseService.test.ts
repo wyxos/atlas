@@ -67,8 +67,6 @@ describe('useBrowseService', () => {
             hasServiceSelected: computed(() => false),
             isInitializing: ref(false),
             items: ref([]),
-            nextCursor: ref(null),
-            currentPage: ref(null),
             currentTabService: computed(() => null),
             activeTabId: ref(null),
             getActiveTab: () => undefined,
@@ -89,8 +87,6 @@ describe('useBrowseService', () => {
             hasServiceSelected: computed(() => true),
             isInitializing: ref(true),
             items: ref([]),
-            nextCursor: ref('cursor-123'),
-            currentPage: ref(null),
             currentTabService: computed(() => 'civit-ai-images'),
             activeTabId: ref(1),
             getActiveTab: () => undefined,
@@ -102,7 +98,7 @@ describe('useBrowseService', () => {
         const result = await getNextPage(1);
 
         expect(result.items).toEqual([]);
-        expect(result.nextPage).toBe('cursor-123');
+        expect(result.nextPage).toBeNull();
         expect(mockAxios.get).not.toHaveBeenCalled();
     });
 
@@ -128,8 +124,6 @@ describe('useBrowseService', () => {
             hasServiceSelected: computed(() => true),
             isInitializing: ref(false),
             items: ref([]),
-            nextCursor: ref(null),
-            currentPage: ref(null),
             currentTabService: computed(() => null),
             activeTabId: ref(1),
             getActiveTab: () => ({
@@ -165,8 +159,6 @@ describe('useBrowseService', () => {
             hasServiceSelected: computed(() => true),
             isInitializing: ref(false),
             items: ref([]),
-            nextCursor: ref(null),
-            currentPage: ref(null),
             currentTabService: computed(() => 'civit-ai-images'),
             activeTabId: ref(1),
             getActiveTab: () => ({
@@ -203,8 +195,6 @@ describe('useBrowseService', () => {
             hasServiceSelected: computed(() => false), // Service not selected, but source is
             isInitializing: ref(false),
             items: ref([]),
-            nextCursor: ref(null),
-            currentPage: ref(null),
             currentTabService: computed(() => null),
             activeTabId: ref(1),
             getActiveTab: () => ({

@@ -1,15 +1,13 @@
 import { ref, type Ref } from 'vue';
 import type { MasonryItem, TabData } from './useTabs';
+import type { Masonry } from '@wyxos/vibe';
 
 /**
  * Composable for managing the refresh tab dialog and refresh logic.
  */
 export function useRefreshDialog(
     items: Ref<MasonryItem[]>,
-    masonry: Ref<any>,
-    currentPage: Ref<string | number | null>,
-    nextCursor: Ref<string | number | null>,
-    loadAtPage: Ref<string | number | null>,
+    masonry: Ref<InstanceType<typeof Masonry> | null>,
     tab: Ref<TabData | undefined>,
     updateActiveTab: (itemsData: MasonryItem[]) => void,
     initializeTab: (tab: TabData | undefined) => Promise<void>
