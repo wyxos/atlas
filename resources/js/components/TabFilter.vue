@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// TODO: Add necessary imports when implementing form logic
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SlidersHorizontal } from 'lucide-vue-next';
 import type { TabData } from '@/composables/useTabs';
+import { useBrowseForm } from '@/composables/useBrowseForm';
+import { Masonry } from '@wyxos/vibe';
 
 interface Props {
     open: boolean;
@@ -14,8 +15,6 @@ interface Props {
     tab?: TabData;
     masonry?: InstanceType<typeof Masonry> | null;
     isMasonryLoading?: boolean;
-    modelValue?: string; // v-model for selectedService
-    // TODO: Add props when implementing form logic
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -26,23 +25,57 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
     'update:open': [value: boolean];
-    'update:modelValue': [value: string];
-    'update:selectedSource': [value: string];
-    'apply': [filters: {
-        service: string;
-        nsfw: boolean;
-        type: string;
-        limit: string;
-        sort: string;
-    }];
+    'apply': [];
     'reset': [];
 }>();
 
-// TODO: Implement form state management
+// Helper function to get form data from tab queryParams
+function getFormDataFromTab() {
+    const queryParams = props.tab?.queryParams;
+    if (!queryParams) {
+        return undefined;
+    }
+    return {
+        service: (queryParams.service as string) || '',
+        nsfw: Boolean(queryParams.nsfw && (queryParams.nsfw === 1 || queryParams.nsfw === '1' || queryParams.nsfw === 'true')),
+        type: (queryParams.type as string) || 'all',
+        limit: String(queryParams.limit || '20'),
+        sort: (queryParams.sort as string) || 'Newest',
+        page: Number(queryParams.page || 1),
+        next: queryParams.next ?? null,
+    };
+}
+
+// Initialize form
+const form = useBrowseForm({
+    initialData: getFormDataFromTab(),
+});
+
+// Sync form when sheet opens
+function syncFormFromTab(): void {
+    const formData = getFormDataFromTab();
+    if (formData) {
+        Object.assign(form.data, formData);
+    } else {
+        form.reset();
+    }
+}
+
+// Handle apply button
+function handleApply(): void {
+    emit('apply');
+    emit('update:open', false);
+}
+
+// Handle reset button
+function handleReset(): void {
+    form.reset();
+    emit('reset');
+}
 </script>
 
 <template>
-    <Sheet :open="props.open">
+    <Sheet :open="props.open" @update:open="(value: boolean) => { emit('update:open', value); if (value) syncFormFromTab(); }">
         <SheetTrigger as-child>
             <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button" :disabled="isMasonryLoading">
                 <SlidersHorizontal :size="14" />
@@ -56,7 +89,7 @@ const emit = defineEmits<{
                 <!-- Service Filter -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Service</label>
-                    <Select>
+                    <Select v-model="form.data.service">
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
@@ -71,13 +104,13 @@ const emit = defineEmits<{
                 <!-- NSFW Toggle -->
                 <div class="flex items-center justify-between">
                     <label class="text-sm font-medium text-regal-navy-100">NSFW</label>
-                    <Switch />
+                    <Switch v-model="form.data.nsfw" />
                 </div>
 
                 <!-- Type Radio Group -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100 mb-4">Type</label>
-                    <RadioGroup class="flex gap-4">
+                    <RadioGroup v-model="form.data.type" class="flex gap-4">
                         <div class="flex items-center gap-2">
                             <RadioGroupItem value="all" id="type-all" />
                             <label for="type-all" class="text-sm text-twilight-indigo-200 cursor-pointer">All</label>
@@ -98,7 +131,7 @@ const emit = defineEmits<{
                 <!-- Limit Dropdown -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Limit</label>
-                    <Select>
+                    <Select v-model="form.data.limit">
                         <SelectTrigger class="w-full">
                             <SelectValue />
                         </SelectTrigger>
@@ -116,7 +149,7 @@ const emit = defineEmits<{
                 <!-- Sort Dropdown -->
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100">Sort</label>
-                    <Select>
+                    <Select v-model="form.data.sort">
                         <SelectTrigger class="w-full">
                             <SelectValue />
                         </SelectTrigger>
@@ -132,10 +165,10 @@ const emit = defineEmits<{
                 </div>
             </div>
             <SheetFooter>
-                <Button variant="destructive">
+                <Button variant="destructive" @click="handleReset">
                     Reset
                 </Button>
-                <Button variant="default">
+                <Button variant="default" @click="handleApply" :disabled="form.processing">
                     Apply
                 </Button>
             </SheetFooter>
