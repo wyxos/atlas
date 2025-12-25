@@ -60,7 +60,7 @@ vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
         template: '<div class="masonry-mock"><slot v-for="(item, index) in items" :key="item.id || index" :item="item" :remove="() => {}" :index="index"></slot></div>',
-        props: ['items', 'getNextPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
+        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
         setup() {
             const exposed = { init: mockInit, refreshLayout: vi.fn(), cancelLoad: mockCancelLoad, destroy: mockDestroy, remove: mockRemove, removeMany: mockRemoveMany, restore: mockRestore, restoreMany: mockRestoreMany };
