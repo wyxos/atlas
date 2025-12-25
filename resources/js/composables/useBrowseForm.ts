@@ -1,4 +1,4 @@
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import type { TabData } from './useTabs';
 
 export interface BrowseFormData {
@@ -9,6 +9,7 @@ export interface BrowseFormData {
     sort: string;
     page: number;
     next: string | number | null;
+    sourceType: 'online' | 'local';
 }
 
 export interface UseBrowseFormOptions {
@@ -27,24 +28,26 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         sort: 'Newest',
         page: 1,
         next: null,
+        sourceType: options?.tab?.sourceType ?? 'online',
     };
 
     /**
-     * Get form data from tab queryParams
+     * Get form data from tab queryParams and sourceType
      */
     function getFormDataFromTab(tab?: TabData): Partial<BrowseFormData> | undefined {
         const queryParams = tab?.queryParams;
-        if (!queryParams) {
+        if (!queryParams && !tab) {
             return undefined;
         }
         return {
-            service: (queryParams.service as string) || '',
-            nsfw: Boolean(queryParams.nsfw && (queryParams.nsfw === 1 || queryParams.nsfw === '1' || queryParams.nsfw === 'true')),
-            type: (queryParams.type as string) || 'all',
-            limit: String(queryParams.limit || '20'),
-            sort: (queryParams.sort as string) || 'Newest',
-            page: Number(queryParams.page || 1),
-            next: queryParams.next ?? null,
+            service: (queryParams?.service as string) || '',
+            nsfw: Boolean(queryParams?.nsfw && (queryParams.nsfw === 1 || queryParams.nsfw === '1' || queryParams.nsfw === 'true')),
+            type: (queryParams?.type as string) || 'all',
+            limit: String(queryParams?.limit || '20'),
+            sort: (queryParams?.sort as string) || 'Newest',
+            page: Number(queryParams?.page || 1),
+            next: queryParams?.next ?? null,
+            sourceType: tab?.sourceType ?? 'online',
         };
     }
 
@@ -115,6 +118,14 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         return { ...data };
     }
 
+    // Computed for switch (true = local, false = online)
+    const isLocalMode = computed({
+        get: () => data.sourceType === 'local',
+        set: (value: boolean) => {
+            data.sourceType = value ? 'local' : 'online';
+        }
+    });
+
     return {
         data,
         errors,
@@ -127,6 +138,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         clearError,
         hasErrors,
         getData,
+        isLocalMode,
     };
 }
 

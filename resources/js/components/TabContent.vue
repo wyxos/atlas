@@ -21,6 +21,7 @@ import FileReactions from './FileReactions.vue';
 import DislikeProgressBar from './DislikeProgressBar.vue';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Switch } from '@/components/ui/switch';
 import Pill from './ui/Pill.vue';
 import {
     Dialog,
@@ -229,6 +230,7 @@ const displayPage = computed(() => currentPage.value ?? 1);
 const shouldShowForm = computed(() => {
     return props.tab !== undefined && items.value.length === 0;
 });
+
 
 // Get pageSize from limit filter, defaulting to 20
 const pageSize = computed(() => {
@@ -459,10 +461,10 @@ const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
  * This function calls the browse service with form data and tab ID
  */
 async function getNextPage(page: number | string): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
-    alert("test get page")
     if (!props.tab?.id) {
         throw new Error('Tab ID is required for getNextPage');
     }
+
     return await getNextPageFromService(page, form.getData(), props.tab.id);
 }
 
@@ -679,15 +681,17 @@ onUnmounted(() => {
         <div v-if="!shouldShowForm" class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
             data-test="service-selection-header">
             <div class="flex items-center gap-3">
-                <!-- Source Type Toggle (Online/Offline) -->
+                <!-- Source Type Toggle (Online/Local) -->
                 <div>
-                    <Select :disabled="masonry?.isLoading ?? false">
+                    <Select :model-value="form.data.sourceType"
+                        @update:model-value="(val: string) => { form.data.sourceType = val as 'online' | 'local'; }"
+                        :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
                             <SelectValue placeholder="Online" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
-                            <SelectItem value="offline" data-test="source-type-offline">Offline</SelectItem>
+                            <SelectItem value="local" data-test="source-type-local">Local</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -762,39 +766,6 @@ onUnmounted(() => {
                     <p class="text-twilight-indigo-300 text-lg">Initializing tab...</p>
                 </div>
             </div>
-            <!-- Form for new tabs -->
-            <div v-else-if="tab" class="flex items-center justify-center h-full" data-test="new-tab-form">
-                <div
-                    class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
-                    <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
-                    <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click play to
-                        begin</p>
-
-                    <!-- Service Dropdown -->
-                    <div class="w-full">
-                        <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
-                        <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
-                            <SelectTrigger class="w-full" data-test="service-select-trigger">
-                                <SelectValue placeholder="Select a service..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem v-for="service in availableServices.filter(s => s.key !== 'local')"
-                                    :key="service.key" :value="service.key" data-test="service-select-item">
-                                    {{ service.label }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <!-- Action Buttons -->
-                    <div class="flex gap-3 w-full mt-2 items-center">
-                        <!-- Play Button -->
-                        <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
-                            :disabled="form.processing || !form.data.service">
-                            <Play :size="16" />
-                        </Button>
-                    </div>
-                </div>
-            </div>
             <!-- Masonry -->
             <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
@@ -805,6 +776,60 @@ onUnmounted(() => {
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="onLoadingStop"
                     data-test="masonry-component">
+                    <!-- Loading message slot - show form for new tabs -->
+                    <template #loading-message>
+                        <div v-if="shouldShowForm" class="flex items-center justify-center h-full"
+                            data-test="new-tab-form">
+                            <div
+                                class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
+                                <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
+                                <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click
+                                    play to
+                                    begin</p>
+
+                                <!-- Online/Local Switch -->
+                                <div class="w-full flex items-center justify-between">
+                                    <label class="block text-sm font-medium text-twilight-indigo-200">Source</label>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-sm text-twilight-indigo-300"
+                                            :class="{ 'text-twilight-indigo-100 font-medium': !form.isLocalMode.value }">Online</span>
+                                        <Switch :model-value="form.isLocalMode.value"
+                                            @update:model-value="(val: boolean) => form.isLocalMode.value = val"
+                                            data-test="source-type-switch" />
+                                        <span class="text-sm text-twilight-indigo-300"
+                                            :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Local</span>
+                                    </div>
+                                </div>
+
+                                <!-- Service Dropdown (only show when Online) -->
+                                <div v-if="form.data.sourceType === 'online'" class="w-full">
+                                    <label
+                                        class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
+                                    <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
+                                        <SelectTrigger class="w-full" data-test="service-select-trigger">
+                                            <SelectValue placeholder="Select a service..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem
+                                                v-for="service in availableServices.filter(s => s.key !== 'local')"
+                                                :key="service.key" :value="service.key" data-test="service-select-item">
+                                                {{ service.label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex gap-3 w-full mt-2 items-center">
+                                    <!-- Play Button -->
+                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
+                                        :disabled="form.processing || (form.data.sourceType === 'online' && !form.data.service)">
+                                        <Play :size="16" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                     <template #default="{ item, index, remove }">
                         <!-- Get fresh item reference from itemsMap to ensure reactivity with shallowRef -->
                         <!-- The item from Masonry slot may be stale, so we look it up fresh from itemsMap -->
@@ -932,10 +957,10 @@ onUnmounted(() => {
             :restore-to-masonry="restoreToMasonry" :tab-id="props.tab?.id" :masonry-instance="masonry"
             @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
-        <!-- Status/Pagination Info at Bottom (only show when masonry is visible) -->
+        <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
             :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-            :visible="tab !== null && tab !== undefined" />
+            :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 
         <!-- Reset to First Page Warning Dialog -->
         <Dialog v-model="resetDialog.resetDialogOpen.value">
