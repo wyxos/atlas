@@ -47,12 +47,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
      * @param formData - The browse form data containing filters and service selection
      * @param tabId - Tab ID to include in the request
      */
-    async function getNextPage(
-        page: number | string,
-        formData: BrowseFormData,
-        tabId: number
-    ): Promise<GetPageResult> {
-        // Build query parameters - backend handles all parameters via request()->all()
+    function buildQueryParams(page: number | string, formData: BrowseFormData, tabId: number): Record<string, any> {
         const queryParams: Record<string, any> = {
             source: formData.service || 'civit-ai-images', // Backend expects 'source', not 'service'
             tab_id: tabId,
@@ -62,14 +57,17 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             sort: formData.sort,
         };
 
-        // Use the page parameter from Masonry as the primary pagination value
-        // Masonry passes either a page number or cursor from the previous response
         if (typeof page === 'number') {
             queryParams.page = page;
         } else {
-            // If page is a string, it's likely a cursor - use 'next' parameter
             queryParams.next = page;
         }
+
+        return queryParams;
+    }
+
+    async function fetchNextPage(page: number | string, formData: BrowseFormData, tabId: number): Promise<GetPageResult> {
+        const queryParams = buildQueryParams(page, formData, tabId);
 
         try {
             const response = await window.axios.get(browseIndex.url({ query: queryParams }));
@@ -83,6 +81,69 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             console.error('Failed to fetch next page:', error);
             throw error;
         }
+    }
+
+    /**
+     * Get next page of items.
+     *
+     * Supports two call styles:
+     * - TabContent usage: getNextPage(page, formData, tabId)
+     * - Browse page tests / higher-level usage: getNextPage(page) when `options` are provided
+     */
+    async function getNextPage(
+        page: number | string,
+        formData?: BrowseFormData,
+        tabId?: number
+    ): Promise<GetPageResult> {
+        // Direct mode (used by TabContent)
+        if (formData && typeof tabId === 'number') {
+            return await fetchNextPage(page, formData, tabId);
+        }
+
+        // Options-driven mode (used by useBrowseService unit tests)
+        if (!options) {
+            return { items: [], nextPage: null, immediateActions: [] };
+        }
+
+        if (options.isInitializing.value) {
+            return { items: [], nextPage: null, immediateActions: [] };
+        }
+
+        const activeTab = options.getActiveTab();
+        const activeTabId = options.activeTabId.value;
+
+        if (!activeTab || !activeTabId) {
+            return { items: [], nextPage: null, immediateActions: [] };
+        }
+
+        const isOffline = activeTab.sourceType === 'local';
+        const offlineSource = (activeTab.queryParams?.source as string | undefined) || '';
+
+        // When online, require a selected service. When offline, allow if source is present in query params.
+        if (!options.hasServiceSelected.value && !(isOffline && offlineSource)) {
+            return { items: [], nextPage: null, immediateActions: [] };
+        }
+
+        const effectiveService = isOffline
+            ? offlineSource
+            : (options.currentTabService.value || (activeTab.queryParams?.service as string | undefined) || 'civit-ai-images');
+
+        const limit = (activeTab.queryParams?.limit as string | number | undefined) ?? 20;
+
+        const derivedFormData: BrowseFormData = {
+            service: String(effectiveService || 'civit-ai-images'),
+            nsfw: Boolean(activeTab.queryParams?.nsfw && (activeTab.queryParams.nsfw === 1 || activeTab.queryParams.nsfw === '1' || activeTab.queryParams.nsfw === 'true')),
+            type: String(activeTab.queryParams?.type || 'all'),
+            limit: String(limit),
+            sort: String(activeTab.queryParams?.sort || 'Newest'),
+            page: Number(activeTab.queryParams?.page || 1),
+            next: (activeTab.queryParams?.next ?? null) as any,
+            sourceType: (activeTab.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
+        };
+
+        const result = await fetchNextPage(page, derivedFormData, activeTabId);
+        options.updateActiveTab(result.items);
+        return result;
     }
 
     /**

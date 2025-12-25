@@ -296,6 +296,22 @@ describe('Browse - Service Selection', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            if (url.includes('/api/tabs/') && url.includes('/items')) {
+                const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
+                const id = tabIdMatch ? Number(tabIdMatch[1]) : 0;
+                const service = id === tab2Id ? 'wallhaven' : 'civit-ai-images';
+                return Promise.resolve({
+                    data: {
+                        items: [],
+                        tab: {
+                            id,
+                            label: id === tab2Id ? 'Tab 2' : 'Tab 1',
+                            queryParams: { service, page: 1 },
+                            sourceType: 'online',
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({
                     data: [

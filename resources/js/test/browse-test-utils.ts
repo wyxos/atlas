@@ -1,9 +1,9 @@
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import { type Ref } from 'vue';
 import Browse from '../pages/Browse.vue';
-import { index as tabIndex, items as tabItems } from '@/actions/App/Http/Controllers/TabController';
+import { index as tabIndex } from '@/actions/App/Http/Controllers/TabController';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 
 /**
@@ -11,21 +11,21 @@ import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseContr
  */
 export interface BrowseMocks {
     mockAxios: {
-        get: ReturnType<typeof vi.fn>;
-        post: ReturnType<typeof vi.fn>;
-        put: ReturnType<typeof vi.fn>;
-        delete: ReturnType<typeof vi.fn>;
-        patch: ReturnType<typeof vi.fn>;
+        get: Mock;
+        post: Mock;
+        put: Mock;
+        delete: Mock;
+        patch: Mock;
     };
     mockIsLoading: Ref<boolean>;
-    mockCancelLoad: ReturnType<typeof vi.fn>;
-    mockDestroy: ReturnType<typeof vi.fn>;
-    mockInit: ReturnType<typeof vi.fn>;
-    mockRemove: ReturnType<typeof vi.fn>;
-    mockRemoveMany: ReturnType<typeof vi.fn>;
-    mockRestore: ReturnType<typeof vi.fn>;
-    mockRestoreMany: ReturnType<typeof vi.fn>;
-    mockQueuePreviewIncrement: ReturnType<typeof vi.fn>;
+    mockCancelLoad: Mock;
+    mockDestroy: Mock;
+    mockInit: Mock;
+    mockRemove: Mock;
+    mockRemoveMany: Mock;
+    mockRestore: Mock;
+    mockRestoreMany: Mock;
+    mockQueuePreviewIncrement: Mock;
 }
 
 /**
@@ -185,6 +185,21 @@ export function setupBrowseTestMocks(mocks: BrowseMocks): void {
         if (url.includes(tabIndex.definition.url) && !url.includes('/items')) {
             return Promise.resolve({ data: [] });
         }
+        if (url.includes(tabIndex.definition.url) && url.includes('/items')) {
+            const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
+            const tabId = tabIdMatch ? Number(tabIdMatch[1]) : 0;
+            return Promise.resolve({
+                data: {
+                    items: [],
+                    tab: {
+                        id: tabId,
+                        label: tabId ? `Test Tab ${tabId}` : 'Test Tab',
+                        queryParams: {},
+                        sourceType: 'online',
+                    },
+                },
+            });
+        }
         return Promise.resolve({ data: { items: [], nextPage: null } });
     });
 
@@ -269,8 +284,11 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             // Return tab configs for initial load without file-related data
             const configs = Array.isArray(tabConfig) ? tabConfig : [tabConfig];
             const tabsForIndex = configs.map((tab: any) => {
-                const { file_ids, has_files, items, ...rest } = tab;
-                return rest;
+                const withoutFileData = { ...tab };
+                delete withoutFileData.file_ids;
+                delete withoutFileData.has_files;
+                delete withoutFileData.items;
+                return withoutFileData;
             });
             return Promise.resolve({ data: tabsForIndex });
         }
@@ -279,14 +297,19 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
             const tabId = tabIdMatch ? tabIdMatch[1] : null;
             const tab = tabId ? (Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig) : null;
-            if (tab && tab.items) {
-                return Promise.resolve({
-                    data: {
-                        items: tab.items,
+            const queryParams = (tab?.query_params ?? {}) as Record<string, unknown>;
+            const sourceType = (typeof queryParams.sourceType === 'string' ? queryParams.sourceType : 'online') as string;
+            return Promise.resolve({
+                data: {
+                    items: tab?.items ?? [],
+                    tab: {
+                        id: tab?.id ?? (tabId ? Number(tabId) : 0),
+                        label: tab?.label ?? (tabId ? `Test Tab ${tabId}` : 'Test Tab'),
+                        queryParams,
+                        sourceType,
                     },
-                });
-            }
-            return Promise.resolve({ data: { items: [] } });
+                },
+            });
         }
         if (url.includes(browseIndex.definition.url)) {
             return Promise.resolve({

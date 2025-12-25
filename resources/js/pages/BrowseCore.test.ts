@@ -191,7 +191,8 @@ describe('Browse - Core', () => {
         expect(masonry.exists()).toBe(true);
         expect(masonry.props('layoutMode')).toBe('auto');
         expect(masonry.props('mobileBreakpoint')).toBe(768);
-        expect(masonry.props('init')).toBe('auto');
+        // Atlas uses manual init and triggers page loads explicitly.
+        expect(masonry.props('init')).toBe('manual');
         expect(masonry.props('layout')).toEqual({
             gutterX: 12,
             gutterY: 12,
@@ -227,9 +228,9 @@ describe('Browse - Core', () => {
 
         const result = await getNextPage(2);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(
-            expect.stringContaining(`${browseIndex.definition.url}?page=2`)
-        );
+        // Browse calls include additional query params; assert the important bits.
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(browseIndex.definition.url));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('page=2'));
         // Verify tab_id was included in the request (backend will update query_params)
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(
             expect.stringContaining(`tab_id=${tabId}`)
@@ -413,9 +414,9 @@ describe('Browse - Core', () => {
         tabContentVm.items = [];
         const result = await tabContentVm.getPage(cursor);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(
-            expect.stringContaining(`/api/browse?page=${cursor}`)
-        );
+        // Cursor-based pagination uses `next=` in current implementation.
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/browse'));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`next=${cursor}`));
         expect(result).toHaveProperty('items');
         expect(result).toHaveProperty('nextPage');
         expect(result.nextPage).toBe(nextCursor);
@@ -632,6 +633,12 @@ describe('Browse - Core', () => {
                 return Promise.resolve({
                     data: {
                         items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                        tab: {
+                            id: tabId,
+                            label: 'Test Tab',
+                            queryParams: { service: 'civit-ai-images', page: pageParam },
+                            sourceType: 'online',
+                        },
                     },
                 });
             }
@@ -680,6 +687,12 @@ describe('Browse - Core', () => {
                 return Promise.resolve({
                     data: {
                         items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
+                        tab: {
+                            id: tabId,
+                            label: 'Test Tab',
+                            queryParams: { service: 'civit-ai-images', page: pageValue },
+                            sourceType: 'online',
+                        },
                     },
                 });
             }
