@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Tab;
 use App\Models\File;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

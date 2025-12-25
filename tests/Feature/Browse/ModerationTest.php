@@ -258,6 +258,7 @@ test('batch flagging works correctly for multiple files', function () {
             'file_id' => $file->id,
             'payload' => ['prompt' => 'This is spam content'],
         ]);
+
         return $file->fresh()->load('metadata');
     });
 

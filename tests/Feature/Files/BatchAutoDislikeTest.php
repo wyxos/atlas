@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\Tab;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;

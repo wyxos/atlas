@@ -33,4 +33,3 @@ return new class extends Migration
         Schema::dropIfExists('tab_file');
     }
 };
-
