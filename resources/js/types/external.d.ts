@@ -45,27 +45,37 @@ declare module '@/actions/App/Http/Controllers/ProfileController' {
     export const deleteAccount: ActionHandler;
 }
 
+// Vibe now exports MasonryInstance type - this augmentation makes it available
+// Once Vibe is rebuilt and the type is properly exported, this can be removed
 declare module '@wyxos/vibe' {
-    export class Masonry {
-        remove?: (item: MasonryItem) => void;
-        removeMany?: (items: MasonryItem[]) => Promise<void> | void;
-        restore?: (item: MasonryItem, index: number) => Promise<void> | void;
-        restoreMany?: (items: MasonryItem[], indices: number[]) => Promise<void> | void;
-        reset?: () => void;
-        loadPage?: (page: number) => Promise<void> | void;
-        currentPage?: number;
-    }
-
-    export interface MasonryItem {
-        id: number | string;
-        width?: number;
-        height?: number;
-        page?: number;
-        key?: string;
-        index?: number;
-        src?: string;
-        thumbnail?: string;
-        originalUrl?: string;
-        [key: string]: unknown;
+    export interface MasonryInstance {
+        cancelLoad: () => void;
+        context: any;
+        containerHeight: number;
+        containerWidth: number;
+        currentBreakpoint: string;
+        currentPage: number | string | null;
+        destroy: () => void;
+        hasReachedEnd: boolean;
+        initialize: (items: any[], page: number | string, next: number | string | null) => void;
+        isInitialized: boolean;
+        isLoading: boolean;
+        loadError: Error | null;
+        loadNext: () => Promise<void>;
+        loadPage: (page: number | string) => Promise<void>;
+        paginationHistory: Array<number | string | null>;
+        refreshCurrentPage: () => Promise<void>;
+        refreshLayout: (items: any[]) => void;
+        remove: (item: any) => void;
+        removeAll: () => void;
+        removeMany: (items: any[]) => Promise<void> | void;
+        reset: () => void;
+        restore: (item: any, index: number) => Promise<void> | void;
+        restoreMany: (items: any[], indices: number[]) => Promise<void> | void;
+        scrollTo: (position: number) => void;
+        scrollToTop: () => void;
+        setContext: (val: any) => void;
+        setFixedDimensions: (dimensions: { width: number; height: number } | null) => void;
+        totalItems: number;
     }
 }
