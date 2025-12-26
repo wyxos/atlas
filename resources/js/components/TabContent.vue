@@ -46,6 +46,7 @@ import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from 'vue-toastification';
+import { items as tabsItems } from '@/actions/App/Http/Controllers/TabController';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
@@ -624,7 +625,26 @@ function handleLoadingStop(): void {
 
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
+    if (!props.tabId) {
+        return;
+    }
 
+    try {
+        const { data } = await window.axios.get(tabsItems.url(props.tabId));
+
+        if (data.tab) {
+            const { sourceType, ...tabData } = data.tab;
+            tab.value = {
+                ...tabData,
+                itemsData: data.items || [],
+                position: tabData.position ?? 0,
+                isActive: tabData.isActive ?? false,
+            };
+            items.value = tab.value.itemsData;
+        }
+    } catch (error) {
+        console.error('Failed to load tab details and files:', error);
+    }
 });
 
 // Cleanup on unmount
@@ -729,9 +749,8 @@ defineExpose({
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :context="masonryContext" :layout="layout"
                     layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" :page-size="pageSize"
-                    @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
-                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :backfill-max-calls="Infinity" :page-size="pageSize" @loading:start="handleLoadingStart"
+                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
                     data-test="masonry-component">
