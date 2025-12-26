@@ -9,7 +9,8 @@ export interface BrowseFormData {
     sort: string;
     page: string | number;
     next: string | number | null;
-    sourceType: 'online' | 'local';
+    feed: 'online' | 'local';
+    tab_id: number | null;
 }
 
 export interface UseBrowseFormOptions {
@@ -28,26 +29,20 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         sort: 'Newest',
         page: 1,
         next: null,
-        sourceType: (options?.tab?.queryParams?.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
+        feed: 'online',
+        tab_id: null,
     };
 
     /**
-     * Get form data from tab queryParams and sourceType
+     * Get form data from tab queryParams
      */
     function getFormDataFromTab(tab?: TabData): Partial<BrowseFormData> | undefined {
-        const queryParams = tab?.queryParams;
-        if (!queryParams && !tab) {
+        if (!tab?.queryParams) {
             return undefined;
         }
         return {
-            service: (queryParams?.service as string) || '',
-            nsfw: Boolean(queryParams?.nsfw && (queryParams.nsfw === 1 || queryParams.nsfw === '1' || queryParams.nsfw === 'true')),
-            type: (queryParams?.type as string) || 'all',
-            limit: String(queryParams?.limit || '20'),
-            sort: (queryParams?.sort as string) || 'Newest',
-            page: (typeof queryParams?.page === 'string' || typeof queryParams?.page === 'number') ? queryParams.page : 1,
-            next: queryParams?.next ?? null,
-            sourceType: (queryParams?.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
+            ...tab.queryParams,
+            tab_id: tab.id,
         };
     }
 
@@ -67,6 +62,9 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         const formData = getFormDataFromTab(tab);
         if (formData) {
             Object.assign(data, formData);
+            if (tab?.id) {
+                data.tab_id = tab.id;
+            }
         } else {
             reset();
         }
@@ -120,9 +118,9 @@ function createFormInstance(options?: UseBrowseFormOptions) {
 
     // Computed for switch (true = local, false = online)
     const isLocalMode = computed({
-        get: () => data.sourceType === 'local',
+        get: () => data.feed === 'local',
         set: (value: boolean) => {
-            data.sourceType = value ? 'local' : 'online';
+            data.feed = value ? 'local' : 'online';
         }
     });
 
