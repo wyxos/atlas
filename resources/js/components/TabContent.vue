@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import {computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch} from 'vue';
-import type {TabData, MasonryItem} from '@/composables/useTabs';
-import {Masonry, MasonryItem as VibeMasonryItem} from '@wyxos/vibe';
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import type { TabData, MasonryItem } from '@/composables/useTabs';
+import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
 import {
     ChevronDown,
-    ChevronsLeft,
     Copy,
     Image,
     Info,
@@ -18,9 +17,9 @@ import FileViewer from './FileViewer.vue';
 import BrowseStatusBar from './BrowseStatusBar.vue';
 import FileReactions from './FileReactions.vue';
 import DislikeProgressBar from './DislikeProgressBar.vue';
-import {Button} from '@/components/ui/button';
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from './ui/select';
-import {Switch} from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Switch } from '@/components/ui/switch';
 import Pill from './ui/Pill.vue';
 import {
     Dialog,
@@ -31,27 +30,26 @@ import {
     DialogHeader,
     DialogTitle,
 } from './ui/dialog';
-import {useBackfill} from '@/composables/useBackfill';
-import {useBrowseService} from '@/composables/useBrowseService';
-import {useContainerBadges} from '@/composables/useContainerBadges';
-import {useContainerPillInteractions} from '@/composables/useContainerPillInteractions';
-import {usePromptData} from '@/composables/usePromptData';
+import { useBackfill } from '@/composables/useBackfill';
+import { useBrowseService } from '@/composables/useBrowseService';
+import { useContainerBadges } from '@/composables/useContainerBadges';
+import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
+import { usePromptData } from '@/composables/usePromptData';
 import { createMasonryInteractions } from '@/utils/masonryInteractions';
-import {useItemPreview} from '@/composables/useItemPreview';
-import {useMasonryRestore} from '@/composables/useMasonryRestore';
-import {useResetDialog} from '@/composables/useResetDialog';
-import {useMasonryReactionHandler} from '@/composables/useMasonryReactionHandler';
-import {useAutoDislikeQueue} from '@/composables/useAutoDislikeQueue';
-import {useBrowseForm, type BrowseFormData} from '@/composables/useBrowseForm';
+import { useItemPreview } from '@/composables/useItemPreview';
+import { useMasonryRestore } from '@/composables/useMasonryRestore';
+import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
+import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
+import { useBrowseForm, type BrowseFormData } from '@/composables/useBrowseForm';
 import BrowseFiltersSheet from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
-import {useToast} from 'vue-toastification';
+import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
-import {analyzeItemSizes, logItemSizeDiagnostics} from '@/utils/itemSizeDiagnostics';
-import type {ReactionType} from '@/types/reaction';
-import {items as tabsItems} from '@/actions/App/Http/Controllers/TabController';
+import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
+import type { ReactionType } from '@/types/reaction';
+import { items as tabsItems } from '@/actions/App/Http/Controllers/TabController';
 
 interface Props {
     tabId: number | null;
@@ -98,7 +96,7 @@ watch(
             }
         }
     },
-    {immediate: true, deep: false}
+    { immediate: true, deep: false }
 );
 
 const masonry = ref<InstanceType<typeof Masonry> | null>(null);
@@ -133,7 +131,7 @@ const isMounted = ref(false);
 const isInitializing = ref(true);
 
 // Browse service composable - fetch services if not provided via prop
-const {availableServices: localServices, fetchServices, getNextPage: getNextPageFromService} = useBrowseService();
+const { availableServices: localServices, fetchServices, getNextPage: getNextPageFromService } = useBrowseService();
 
 // Use prop services if available, otherwise use local services
 const availableServices = computed(() => {
@@ -142,15 +140,7 @@ const availableServices = computed(() => {
 
 
 // Masonry restore composable
-const {restoreToMasonry, restoreManyToMasonry} = useMasonryRestore(items, masonry);
-
-// Reset dialog composable
-const resetDialog = useResetDialog(
-    items,
-    masonry,
-    computed(() => tab.value ?? undefined),
-    props.updateActiveTab
-);
+const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(items, masonry);
 
 // Backfill state and handlers
 const {
@@ -288,7 +278,7 @@ const pageSize = computed(() => {
 const layout = {
     gutterX: 12,
     gutterY: 12,
-    sizes: {base: 1, sm: 2, md: 3, lg: 4, '2xl': 10},
+    sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
 };
 
 function onMasonryClick(e: MouseEvent): void {
@@ -412,7 +402,7 @@ const containerPillInteractions = useContainerPillInteractions(
 const promptData = usePromptData(items);
 
 // Masonry reaction handler composable (needs restoreToMasonry)
-const {handleMasonryReaction} = useMasonryReactionHandler(
+const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
     itemsMap,
     masonry,
@@ -836,7 +826,7 @@ onMounted(async () => {
 
         if (props.tabId) {
             // Load tab items and metadata from database
-            const {items: loadedItems, tab: tabData} = await loadTabItems(props.tabId);
+            const { items: loadedItems, tab: tabData } = await loadTabItems(props.tabId);
 
             // Store tab data locally
             tab.value = tabData;
@@ -921,15 +911,15 @@ defineExpose({
     <div v-if="tab" ref="tabContentContainer" class="flex-1 min-h-0 flex flex-col relative">
         <!-- Service Selection Header (only show when not showing form) -->
         <div v-if="!shouldShowForm" class="px-4 py-3 border-b border-twilight-indigo-500/50 bg-prussian-blue-700/50"
-             data-test="service-selection-header">
+            data-test="service-selection-header">
             <div class="flex items-center gap-3">
                 <!-- Source Type Toggle (Online/Local) -->
                 <div>
                     <Select :model-value="form.data.sourceType"
-                            @update:model-value="(val: string) => { form.data.sourceType = val as 'online' | 'local'; }"
-                            :disabled="masonry?.isLoading ?? false">
+                        @update:model-value="(val: string) => { form.data.sourceType = val as 'online' | 'local'; }"
+                        :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
-                            <SelectValue placeholder="Online"/>
+                            <SelectValue placeholder="Online" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="online" data-test="source-type-online">Online</SelectItem>
@@ -941,11 +931,11 @@ defineExpose({
                 <div class="flex-1">
                     <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
-                            <SelectValue placeholder="Select a service..."/>
+                            <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem v-for="service in availableServices.filter(s => s.key !== 'local')"
-                                        :key="service.key" :value="service.key" data-test="service-select-item">
+                                :key="service.key" :value="service.key" data-test="service-select-item">
                                 {{ service.label }}
                             </SelectItem>
                         </SelectContent>
@@ -953,43 +943,36 @@ defineExpose({
                 </div>
                 <!-- Filters Button (Primary) -->
                 <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
-                                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false"
-                                    @apply="handleApplyFilters"
-                                    @reset="handleResetFilters"/>
+                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" @apply="handleApplyFilters"
+                    @reset="handleResetFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
-                                        @rules-changed="handleModerationRulesChanged"/>
+                    @rules-changed="handleModerationRulesChanged" />
 
                 <!-- Container Blacklists Button (Warning) -->
                 <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading ?? false"
-                                           @blacklists-changed="handleModerationRulesChanged"/>
+                    @blacklists-changed="handleModerationRulesChanged" />
 
                 <!-- Cancel Loading Button -->
                 <Button @click="cancelMasonryLoad" size="sm" variant="ghost" class="h-10 w-10" color="danger"
-                        data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
-                    <X :size="14"/>
+                    data-test="cancel-loading-button" title="Cancel loading" :disabled="!masonry?.isLoading">
+                    <X :size="14" />
                 </Button>
 
                 <!-- Load Next Page Button -->
                 <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
-                        data-test="load-next-page-button" title="Load next page"
-                        :disabled="masonry?.isLoading || masonry?.hasReachedEnd">
-                    <ChevronDown :size="14"/>
-                </Button>
-
-                <!-- Reset to First Page Button -->
-                <Button @click="resetDialog.openResetDialog" size="sm" variant="ghost" class="h-10 w-10" color="danger"
-                        data-test="reset-to-first-page-button" title="Reset to first page">
-                    <ChevronsLeft :size="14"></ChevronsLeft>
+                    data-test="load-next-page-button" title="Load next page"
+                    :disabled="masonry?.isLoading || masonry?.hasReachedEnd">
+                    <ChevronDown :size="14" />
                 </Button>
 
                 <!-- Apply Service Button -->
                 <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
-                        :loading="masonry?.isLoading"
-                        :disabled="(masonry?.isLoading ?? false) || (form.data.sourceType === 'online' && !form.data.service)"
-                        title="Apply selected service">
-                    <Play :size="14"/>
+                    :loading="masonry?.isLoading"
+                    :disabled="(masonry?.isLoading ?? false) || (form.data.sourceType === 'online' && !form.data.service)"
+                    title="Apply selected service">
+                    <Play :size="14" />
                 </Button>
             </div>
         </div>
@@ -998,27 +981,27 @@ defineExpose({
         <div class="flex-1 min-h-0">
             <!-- Initializing state (for restored tabs) -->
             <div v-if="isInitializing && tab && items.length > 0" class="flex items-center justify-center h-full"
-                 data-test="initializing-tab-message">
+                data-test="initializing-tab-message">
                 <div class="flex flex-col items-center gap-3">
-                    <Loader2 :size="24" class="animate-spin text-smart-blue-400"/>
+                    <Loader2 :size="24" class="animate-spin text-smart-blue-400" />
                     <p class="text-twilight-indigo-300 text-lg">Initializing tab...</p>
                 </div>
             </div>
             <!-- Masonry -->
             <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
-                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :context="masonryContext" :layout="layout" layout-mode="auto"
-                         :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
-                         :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
-                         @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
-                         @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
-                         @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
-                         @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
-                         data-test="masonry-component">
+                @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :context="masonryContext" :layout="layout"
+                    layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
+                    :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
+                    @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
+                    @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
+                    data-test="masonry-component">
                     <!-- Loading message slot - show form for new tabs -->
                     <template #loading-message>
                         <div v-if="shouldShowForm" class="flex items-center justify-center h-full"
-                             data-test="new-tab-form">
+                            data-test="new-tab-form">
                             <div
                                 class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
                                 <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
@@ -1031,12 +1014,12 @@ defineExpose({
                                     <label class="block text-sm font-medium text-twilight-indigo-200">Source</label>
                                     <div class="flex items-center gap-3">
                                         <span class="text-sm text-twilight-indigo-300"
-                                              :class="{ 'text-twilight-indigo-100 font-medium': !form.isLocalMode.value }">Online</span>
+                                            :class="{ 'text-twilight-indigo-100 font-medium': !form.isLocalMode.value }">Online</span>
                                         <Switch :model-value="form.isLocalMode.value"
-                                                @update:model-value="(val: boolean) => form.isLocalMode.value = val"
-                                                data-test="source-type-switch"/>
+                                            @update:model-value="(val: boolean) => form.isLocalMode.value = val"
+                                            data-test="source-type-switch" />
                                         <span class="text-sm text-twilight-indigo-300"
-                                              :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Local</span>
+                                            :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Local</span>
                                     </div>
                                 </div>
 
@@ -1046,7 +1029,7 @@ defineExpose({
                                         class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
                                     <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
                                         <SelectTrigger class="w-full" data-test="service-select-trigger">
-                                            <SelectValue placeholder="Select a service..."/>
+                                            <SelectValue placeholder="Select a service..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem
@@ -1062,8 +1045,8 @@ defineExpose({
                                 <div class="flex gap-3 w-full mt-2 items-center">
                                     <!-- Play Button -->
                                     <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
-                                            :disabled="form.data.sourceType === 'online' && !form.data.service">
-                                        <Play :size="16"/>
+                                        :disabled="form.data.sourceType === 'online' && !form.data.service">
+                                        <Play :size="16" />
                                     </Button>
                                 </div>
                             </div>
@@ -1074,16 +1057,15 @@ defineExpose({
                         <!-- The item from Masonry slot may be stale, so we look it up fresh from itemsMap -->
                         <!-- In templates, refs are auto-unwrapped, so use itemsMap not itemsMap.value -->
                         <VibeMasonryItem :item="itemsMap.get(item.id) || item" :remove="remove" :preload-threshold="0.5"
-                                         @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
-                                         @mouseleave="handleMasonryItemMouseLeave"
-                                         @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
-                                         @in-view-and-loaded="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)"
-                                         @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
+                            @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
+                            @mouseleave="handleMasonryItemMouseLeave"
+                            @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
+                            @in-view-and-loaded="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)"
+                            @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
                             <template
                                 #default="{ item: slotItem, imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
                                 <!-- Use item from slot props (reactive) instead of outer scope item (may be stale) -->
-                                <div
-                                    class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
+                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
                                     :data-key="slotItem.key" :data-masonry-item-id="slotItem.id"
                                     :class="containerBadges.getMasonryItemClasses.value(slotItem)"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e)"
@@ -1098,54 +1080,53 @@ defineExpose({
                                         <div
                                             class="w-12 h-12 rounded-full bg-prussian-blue-700/80 backdrop-blur-sm flex items-center justify-center shadow-sm border border-twilight-indigo-500/30">
                                             <Image v-if="mediaType === 'image'" :size="20"
-                                                   class="text-twilight-indigo-300"/>
+                                                class="text-twilight-indigo-300" />
                                             <Video v-else-if="mediaType === 'video'" :size="20"
-                                                   class="text-twilight-indigo-300"/>
+                                                class="text-twilight-indigo-300" />
                                         </div>
                                     </div>
 
                                     <!-- Spinner (only shown when loading/preloading) - centered vertically -->
                                     <div v-if="isLoading"
-                                         class="absolute inset-0 flex items-center justify-center z-10">
+                                        class="absolute inset-0 flex items-center justify-center z-10">
                                         <div
                                             class="bg-prussian-blue-700/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border border-twilight-indigo-500/30">
-                                            <Loader2 class="w-4 h-4 text-smart-blue-400 animate-spin"/>
+                                            <Loader2 class="w-4 h-4 text-smart-blue-400 animate-spin" />
                                         </div>
                                     </div>
 
                                     <!-- Error state -->
                                     <div v-if="imageError"
-                                         class="absolute inset-0 flex flex-col items-center justify-center bg-prussian-blue-800/50 text-twilight-indigo-300 text-sm p-4 text-center border border-twilight-indigo-500/30 rounded-lg">
-                                        <Image :size="32" class="mb-2 opacity-50"/>
+                                        class="absolute inset-0 flex flex-col items-center justify-center bg-prussian-blue-800/50 text-twilight-indigo-300 text-sm p-4 text-center border border-twilight-indigo-500/30 rounded-lg">
+                                        <Image :size="32" class="mb-2 opacity-50" />
                                         <span>Failed to load image</span>
                                     </div>
 
                                     <!-- Image (only render when imageSrc is available from Vibe's preloading) -->
                                     <img v-if="imageSrc && !imageError" :src="imageSrc" :alt="`Item ${slotItem.id}`"
-                                         :class="[
+                                        :class="[
                                             'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
                                             imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
-                                        ]"/>
+                                        ]" />
 
                                     <!-- Container badges (shows on hover with type and count) -->
                                     <Transition name="fade">
-                                        <div
-                                            v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(slotItem).length > 0"
+                                        <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(slotItem).length > 0"
                                             class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
                                             <div v-for="container in containerBadges.getContainersForItem(slotItem)"
-                                                 :key="container.id" class="cursor-pointer"
-                                                 @mouseenter="handleContainerPillMouseEnter(container.id)"
-                                                 @mouseleave="handleContainerPillMouseLeave"
-                                                 @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
-                                                 @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
-                                                 @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
-                                                 @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
-                                                 @mousedown.stop="handleContainerPillMouseDown">
+                                                :key="container.id" class="cursor-pointer"
+                                                @mouseenter="handleContainerPillMouseEnter(container.id)"
+                                                @mouseleave="handleContainerPillMouseLeave"
+                                                @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
+                                                @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
+                                                @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
+                                                @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
+                                                @mousedown.stop="handleContainerPillMouseDown">
                                                 <Pill :label="container.type"
-                                                      :value="containerBadges.getItemCountForContainerId(container.id)"
-                                                      :variant="containerBadges.getVariantForContainerType(container.type)"
-                                                      :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
-                                                      @dismiss="() => handlePillDismiss(container)"/>
+                                                    :value="containerBadges.getItemCountForContainerId(container.id)"
+                                                    :variant="containerBadges.getVariantForContainerType(container.type)"
+                                                    :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
+                                                    @dismiss="() => handlePillDismiss(container)" />
                                             </div>
                                         </div>
                                     </Transition>
@@ -1153,12 +1134,12 @@ defineExpose({
                                     <!-- Info badge (shows on hover, opens dialog on click) -->
                                     <Transition name="fade">
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
-                                             class="absolute top-2 right-2 z-50 pointer-events-auto">
+                                            class="absolute top-2 right-2 z-50 pointer-events-auto">
                                             <Button variant="ghost" size="sm"
-                                                    class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
-                                                    @click.stop="handlePromptDialogClick(slotItem)"
-                                                    aria-label="Show prompt">
-                                                <Info :size="14"/>
+                                                class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
+                                                @click.stop="handlePromptDialogClick(slotItem)"
+                                                aria-label="Show prompt">
+                                                <Info :size="14" />
                                             </Button>
                                         </div>
                                     </Transition>
@@ -1166,14 +1147,13 @@ defineExpose({
                                     <!-- Hover reactions overlay -->
                                     <Transition name="fade">
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
-                                             class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
+                                            class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
                                             <FileReactions :file-id="slotItem.id"
-                                                           :previewed-count="(slotItem.previewed_count as number) ?? 0"
-                                                           :viewed-count="(slotItem.seen_count as number) ?? 0"
-                                                           :current-index="index" :total-items="items.length"
-                                                           variant="small"
-                                                           :remove-item="() => handleRemoveItem(remove, slotItem)"
-                                                           @reaction="(type) => handleFileReaction(slotItem.id, type, remove)"/>
+                                                :previewed-count="(slotItem.previewed_count as number) ?? 0"
+                                                :viewed-count="(slotItem.seen_count as number) ?? 0"
+                                                :current-index="index" :total-items="items.length" variant="small"
+                                                :remove-item="() => handleRemoveItem(remove, slotItem)"
+                                                @reaction="(type) => handleFileReaction(slotItem.id, type, remove)" />
                                         </div>
                                     </Transition>
 
@@ -1183,7 +1163,7 @@ defineExpose({
                                         :progress="autoDislikeQueue.getCountdownProgress(slotItem.id)"
                                         :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(slotItem.id))"
                                         :is-frozen="autoDislikeQueue.isFrozen.value"
-                                        :is-hovered="hoveredItemId === slotItem.id && autoDislikeQueue.hasActiveCountdown(slotItem.id)"/>
+                                        :is-hovered="hoveredItemId === slotItem.id && autoDislikeQueue.hasActiveCountdown(slotItem.id)" />
                                 </div>
                             </template>
                         </VibeMasonryItem>
@@ -1194,40 +1174,15 @@ defineExpose({
 
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
-                    :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading ?? false"
-                    :on-load-more="loadNextPage" :on-reaction="props.onReaction"
-                    :remove-from-masonry="removeItemFromMasonry"
-                    :restore-to-masonry="restoreToMasonry" :tab-id="tab?.id ?? null" :masonry-instance="masonry"
-                    @open="handleFileViewerOpen" @close="handleFileViewerClose"/>
+            :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading ?? false"
+            :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
+            :restore-to-masonry="restoreToMasonry" :tab-id="tab?.id ?? null" :masonry-instance="masonry"
+            @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :next-cursor="nextCursor"
-                 :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-                 :visible="tab !== null && tab !== undefined && !shouldShowForm"/>
-
-        <!-- Reset to First Page Warning Dialog -->
-        <Dialog v-model="resetDialog.resetDialogOpen.value">
-            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
-                <DialogHeader>
-                    <DialogTitle class="text-danger-400">Reset to First Page</DialogTitle>
-                    <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
-                        Are you sure you want to go back to the first page? This will clear all currently loaded items
-                        and start
-                        from the beginning.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                    <DialogClose as-child>
-                        <Button variant="outline" @click="resetDialog.closeResetDialog">
-                            Cancel
-                        </Button>
-                    </DialogClose>
-                    <Button @click="resetDialog.resetToFirstPage" variant="destructive">
-                        Reset to First Page
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
+            :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 
         <!-- Prompt Dialog -->
         <Dialog v-model="promptData.promptDialogOpen.value" @update:model-value="handlePromptDialogUpdate">
@@ -1236,10 +1191,9 @@ defineExpose({
                     <DialogTitle class="text-twilight-indigo-100">Prompt</DialogTitle>
                 </DialogHeader>
                 <div class="space-y-4 mt-4">
-                    <div
-                        v-if="promptData.promptDialogItemId.value !== null && promptData.promptDataLoading.value.get(promptData.promptDialogItemId.value)"
+                    <div v-if="promptData.promptDialogItemId.value !== null && promptData.promptDataLoading.value.get(promptData.promptDialogItemId.value)"
                         class="flex items-center gap-2 text-sm text-twilight-indigo-100">
-                        <Loader2 :size="16" class="animate-spin"/>
+                        <Loader2 :size="16" class="animate-spin" />
                         <span>Loading prompt...</span>
                     </div>
                     <div v-else-if="promptData.currentPromptData.value" class="space-y-2">
@@ -1254,12 +1208,12 @@ defineExpose({
                 </div>
                 <DialogFooter>
                     <Button variant="outline" size="sm" @click="handleCopyPromptClick" aria-label="Copy prompt">
-                        <Copy :size="16" class="mr-2"/>
+                        <Copy :size="16" class="mr-2" />
                         Copy
                     </Button>
                     <Button v-if="promptData.currentPromptData.value" variant="outline" size="sm"
-                            @click="handleTestPromptClick" aria-label="Test prompt against moderation rules">
-                        <TestTube :size="16" class="mr-2"/>
+                        @click="handleTestPromptClick" aria-label="Test prompt against moderation rules">
+                        <TestTube :size="16" class="mr-2" />
                         Test
                     </Button>
                     <DialogClose as-child>
