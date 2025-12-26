@@ -633,14 +633,7 @@ onMounted(async () => {
         const { data } = await window.axios.get(tabsItems.url(props.tabId));
 
         if (data.tab) {
-            const { sourceType, ...tabData } = data.tab;
-            tab.value = {
-                ...tabData,
-                itemsData: data.items || [],
-                position: tabData.position ?? 0,
-                isActive: tabData.isActive ?? false,
-            };
-            items.value = tab.value.itemsData;
+            tab.value = data.tab;
         }
     } catch (error) {
         console.error('Failed to load tab details and files:', error);

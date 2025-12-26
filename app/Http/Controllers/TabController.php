@@ -195,12 +195,13 @@ class TabController extends Controller
         $queryParams = $tab->query_params ?? [];
 
         return response()->json([
-            'items' => $itemsData,
             'tab' => [
                 'id' => $tab->id,
                 'label' => $tab->label,
-                'queryParams' => $queryParams,
-                'sourceType' => $queryParams['sourceType'] ?? 'online',
+                'params' => $queryParams,
+                'itemsData' => $itemsData,
+                'position' => $tab->position ?? 0,
+                'isActive' => $tab->is_active ?? false,
             ],
         ]);
     }
