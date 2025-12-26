@@ -43,6 +43,10 @@
     "vendor",
     "public",
     "**/*.test.js",
-    "**/*.spec.js"
+    "**/*.spec.js",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/*.test.utils.ts",
+    "**/*.test.tsx"
   ]
 }
