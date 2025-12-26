@@ -42,6 +42,7 @@ const isMenuOpen = ref(window.innerWidth >= 1024);
 const menuItems = [
     { name: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { name: 'browse', path: '/browse', label: 'Browse', icon: Search },
+    { name: 'browse-v2', path: '/browse-v2', label: 'Browse V2', icon: Search },
     { name: 'audio', path: '/audio', label: 'Audio', icon: Music },
     { name: 'videos', path: '/videos', label: 'Videos', icon: Video },
     { name: 'photos', path: '/photos', label: 'Photos', icon: Image },

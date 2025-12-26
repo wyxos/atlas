@@ -18,9 +18,9 @@ const routes: RouteRecordRaw[] = [
         meta: { layout: 'DashboardLayout' },
     },
     {
-        path: '/browse-empty',
-        name: 'browse-empty',
-        component: () => import('./pages/BrowseEmpty.vue'),
+        path: '/browse-v2',
+        name: 'browse-v2',
+        component: () => import('./pages/BrowseV2.vue'),
         meta: { layout: 'DashboardLayout' },
     },
     {
