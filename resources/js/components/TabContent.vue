@@ -744,7 +744,7 @@ defineExpose({
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :context="masonryContext" :layout="layout"
                     layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" :page-size="pageSize" @loading:start="handleLoadingStart"
+                    :backfill-max-calls="Infinity" @loading:start="handleLoadingStart"
                     @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
