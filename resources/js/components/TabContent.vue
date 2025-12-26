@@ -122,7 +122,7 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Item preview composable (needs to be initialized early)
 // Pass itemsMap for O(1) item existence checks (important for 10k+ items)
-const itemPreview = useItemPreview(items, computed(() => tab.value ?? undefined), itemsMap);
+const itemPreview = useItemPreview(items, computed(() => tab.value), itemsMap);
 
 // Track if component is mounted to prevent accessing state after unmount
 const isMounted = ref(false);
@@ -268,7 +268,7 @@ async function getPage(page: number | string, context?: BrowseFormData) {
 
     return {
         items: data.items || [],
-        nextPage: data.nextPage ?? null,
+        nextPage: data.nextPage,
     };
 }
 
@@ -378,7 +378,7 @@ function handleContainerBan(container: {
             type: container.type,
             source: container.source,
             source_id: container.source_id,
-            referrer: container.referrer ?? null,
+            referrer: container.referrer,
         });
     }
 }
@@ -388,7 +388,7 @@ function handleContainerBan(container: {
 const containerPillInteractions = useContainerPillInteractions(
     items,
     masonry,
-    computed(() => tab.value?.id ?? undefined),
+    computed(() => tab.value.id),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
         props.onReaction(fileId, type);
     },
@@ -403,7 +403,7 @@ const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
     itemsMap,
     masonry,
-    computed(() => tab.value ?? undefined),
+    computed(() => tab.value),
     (fileId: number, type: ReactionType) => {
         props.onReaction(fileId, type);
     },
@@ -513,7 +513,7 @@ async function handleItemInViewAndLoaded(payload: {
     src: string
 }, item: MasonryItem): Promise<void> {
     // payload.item is the item passed to MasonryItem, which should have the id
-    const itemId = payload.item?.id ?? item?.id;
+    const itemId = payload.item.id ?? item.id;
     if (itemId) {
         // Increment preview count when item is fully in view AND media is loaded
         const result = await itemPreview.incrementPreviewCount(itemId);
@@ -693,7 +693,7 @@ defineExpose({
                 <div>
                     <Select :model-value="form.data.feed"
                         @update:model-value="(val: string) => { form.data.feed = val as 'online' | 'local'; }"
-                        :disabled="masonry?.isLoading ?? false">
+                        :disabled="masonry.isLoading">
                         <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
                             <SelectValue placeholder="Online" />
                         </SelectTrigger>
@@ -719,15 +719,13 @@ defineExpose({
                 </div>
                 <!-- Filters Button (Primary) -->
                 <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
-                    :masonry="masonry" :is-masonry-loading="masonry?.isLoading ?? false" @apply="handleApplyFilters"
-                    @reset="handleResetFilters" />
+                    :masonry="masonry" :is-masonry-loading="masonry.isLoading" @reset="handleResetFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
-                <ModerationRulesManager :disabled="masonry?.isLoading ?? false"
-                    @rules-changed="handleModerationRulesChanged" />
+                <ModerationRulesManager :disabled="masonry.isLoading" @rules-changed="handleModerationRulesChanged" />
 
                 <!-- Container Blacklists Button (Warning) -->
-                <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading ?? false"
+                <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry.isLoading"
                     @blacklists-changed="handleModerationRulesChanged" />
 
                 <!-- Cancel Loading Button -->
@@ -739,14 +737,14 @@ defineExpose({
                 <!-- Load Next Page Button -->
                 <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
                     data-test="load-next-page-button" title="Load next page"
-                    :disabled="masonry?.isLoading || masonry?.hasReachedEnd">
+                    :disabled="masonry.isLoading || masonry.hasReachedEnd">
                     <ChevronDown :size="14" />
                 </Button>
 
                 <!-- Apply Service Button -->
                 <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
-                    :loading="masonry?.isLoading"
-                    :disabled="(masonry?.isLoading ?? false) || (form.data.feed === 'online' && !form.data.service)"
+                    :loading="masonry.isLoading"
+                    :disabled="masonry.isLoading || (form.data.feed === 'online' && !form.data.service)"
                     title="Apply selected service">
                     <Play :size="14" />
                 </Button>
@@ -758,11 +756,10 @@ defineExpose({
             <!-- Masonry -->
             <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-page="getPage"
-                    :context="masonryContext" :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual"
-                    mode="backfill" :backfill-delay-ms="2000" :backfill-max-calls="Infinity"
-                    @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
-                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-page="getPage" :context="masonryContext"
+                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill"
+                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @loading:start="handleLoadingStart"
+                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
                     data-test="masonry-component">
@@ -917,9 +914,9 @@ defineExpose({
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
                                             class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
                                             <FileReactions :file-id="slotItem.id"
-                                                :previewed-count="(slotItem.previewed_count as number) ?? 0"
-                                                :viewed-count="(slotItem.seen_count as number) ?? 0"
-                                                :current-index="index" :total-items="items.length" variant="small"
+                                                :previewed-count="slotItem.previewed_count"
+                                                :viewed-count="slotItem.seen_count" :current-index="index"
+                                                :total-items="items.length" variant="small"
                                                 :remove-item="() => handleRemoveItem(remove, slotItem)"
                                                 @reaction="(type) => handleFileReaction(slotItem.id, type, remove)" />
                                         </div>
@@ -942,13 +939,13 @@ defineExpose({
 
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
-            :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading ?? false"
+            :items="items" :has-more="!masonry.hasReachedEnd" :is-loading="masonry.isLoading"
             :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
-            :restore-to-masonry="restoreToMasonry" :tab-id="tab?.id ?? null" :masonry-instance="masonry"
+            :restore-to-masonry="restoreToMasonry" :tab-id="tab.id" :masonry-instance="masonry"
             @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
-        <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading ?? false"
+        <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry.isLoading"
             :backfill="backfill" :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 
         <!-- Prompt Dialog -->
