@@ -250,7 +250,7 @@ vi.mock('./BrowseStatusBar.vue', () => ({
     default: {
         name: 'BrowseStatusBar',
         template: '<div class="browse-status-bar-mock"></div>',
-        props: ['items', 'displayPage', 'nextCursor', 'isLoading', 'backfill', 'visible'],
+        props: ['items', 'masonry', 'tab', 'nextCursor', 'isLoading', 'backfill', 'visible'],
     },
 }));
 

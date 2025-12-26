@@ -365,7 +365,9 @@ describe('Browse - Tab Restoration', () => {
         if (tabContentVm) {
             expect(tabContentVm.currentPage).toBe(cursorX);
             expect(tabContentVm.nextCursor).toBe(cursorY);
-            expect(tabContentVm.displayPage).toBe(cursorX);
+            // displayPage is now computed inside BrowseStatusBar from masonry.currentPage
+            // Verify masonry has the correct currentPage
+            expect(tabContentVm.masonry?.currentPage).toBe(cursorX);
         }
     });
 

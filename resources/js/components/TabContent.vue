@@ -221,10 +221,6 @@ function onLoadingStop(): void {
     }
 }
 
-// Computed property to display page value.
-// UX requirement: pills should reflect values stored in tab.queryParams.
-// Masonry is treated as a fallback (e.g. before tab loads).
-const displayPage = computed(() => tab.value?.queryParams?.page ?? masonry.value?.currentPage ?? 1);
 
 // Compatibility fields used by existing tests and some parent-level orchestration
 const currentPage = computed(() => tab.value?.queryParams?.page ?? 1);
@@ -611,6 +607,10 @@ async function getPage(
         if (typeof page === 'number') {
             tab.value.queryParams['page'] = page;
             form.data.page = page;
+            // Clear current cursor for numeric pages (page 1)
+            if (page === 1) {
+                tab.value.queryParams['currentCursor'] = null;
+            }
         } else {
             // Derive the numeric page index from Masonry's pagination history.
             // History is initialized as [page, nextCursor]. When loading via cursor, Masonry passes
@@ -622,6 +622,8 @@ async function getPage(
 
             tab.value.queryParams['page'] = derivedPage;
             form.data.page = derivedPage;
+            // Store the cursor that was used to load this page
+            tab.value.queryParams['currentCursor'] = page;
         }
 
         tab.value.queryParams['next'] = result.nextPage ?? null;
@@ -911,6 +913,7 @@ defineExpose({
     hasServiceSelected,
     loadAtPage,
     isTabRestored,
+    masonry, // Expose masonry for tests to access currentPage
 });
 </script>
 
@@ -1198,7 +1201,7 @@ defineExpose({
                     @open="handleFileViewerOpen" @close="handleFileViewerClose"/>
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
-        <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
+        <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :next-cursor="nextCursor"
                  :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
                  :visible="tab !== null && tab !== undefined && !shouldShowForm"/>
 
