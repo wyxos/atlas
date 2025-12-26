@@ -106,8 +106,7 @@ const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
 
 const masonryContext = computed(() => ({
-    tabId: tab.value?.id ?? null,
-    formData: form.getData(),
+    ...form.getData(),
 }));
 
 // Internal tab data - loaded from API
@@ -257,11 +256,8 @@ const layout = {
 };
 
 async function getPage(page: number | string, context?: BrowseFormData) {
-    if (!tab.value?.id) {
-        return { items: [], nextPage: null };
-    }
-
     const formData = context || form.getData();
+    console.log(formData)
     const queryParams = { ...formData, page };
 
     if (typeof page === 'string') {
@@ -759,16 +755,8 @@ defineExpose({
 
         <!-- Masonry Content -->
         <div class="flex-1 min-h-0">
-            <!-- Initializing state (for restored tabs) -->
-            <div v-if="isInitializing && tab && items.length > 0" class="flex items-center justify-center h-full"
-                data-test="initializing-tab-message">
-                <div class="flex flex-col items-center gap-3">
-                    <Loader2 :size="24" class="animate-spin text-smart-blue-400" />
-                    <p class="text-twilight-indigo-300 text-lg">Initializing tab...</p>
-                </div>
-            </div>
             <!-- Masonry -->
-            <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
+            <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-page="getPage"
                     :context="masonryContext" :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual"
