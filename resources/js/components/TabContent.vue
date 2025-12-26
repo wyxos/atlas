@@ -42,7 +42,7 @@ import {useMasonryRestore} from '@/composables/useMasonryRestore';
 import {useResetDialog} from '@/composables/useResetDialog';
 import {useMasonryReactionHandler} from '@/composables/useMasonryReactionHandler';
 import {useAutoDislikeQueue} from '@/composables/useAutoDislikeQueue';
-import {useBrowseForm} from '@/composables/useBrowseForm';
+import {useBrowseForm, type BrowseFormData} from '@/composables/useBrowseForm';
 import BrowseFiltersSheet from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -105,6 +105,11 @@ const masonry = ref<InstanceType<typeof Masonry> | null>(null);
 const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
+
+const masonryContext = computed(() => ({
+    tabId: tab.value?.id ?? null,
+    formData: form.getData(),
+}));
 
 // Internal tab data - loaded from API
 const tab = ref<TabData | null>(null);
@@ -216,16 +221,34 @@ function onLoadingStop(): void {
     }
 }
 
-// Computed property to display page value
-const displayPage = computed(() => masonry.value?.currentPage ?? tab.value?.queryParams?.page ?? 1);
+// Computed property to display page value.
+// UX requirement: pills should reflect values stored in tab.queryParams.
+// Masonry is treated as a fallback (e.g. before tab loads).
+const displayPage = computed(() => tab.value?.queryParams?.page ?? masonry.value?.currentPage ?? 1);
 
 // Compatibility fields used by existing tests and some parent-level orchestration
 const currentPage = computed(() => tab.value?.queryParams?.page ?? 1);
 const nextCursor = computed(() => {
-    if (masonry.value?.paginationHistory && masonry.value.paginationHistory.length > 0) {
-        return masonry.value.paginationHistory[masonry.value.paginationHistory.length - 1];
+    // Prefer persisted value for restoration correctness.
+    const fromTab = tab.value?.queryParams?.next;
+    if (fromTab !== null && fromTab !== undefined && fromTab !== '') {
+        return fromTab;
     }
-    return tab.value?.queryParams?.next ?? null;
+
+    // Fallback: last non-null entry from Masonry history.
+    const history = masonry.value?.paginationHistory;
+    if (!history || history.length === 0) {
+        return null;
+    }
+
+    for (let i = history.length - 1; i >= 0; i--) {
+        const val = history[i];
+        if (val !== null && val !== undefined && val !== '') {
+            return val;
+        }
+    }
+
+    return null;
 });
 
 const selectedService = computed({
@@ -432,6 +455,30 @@ async function loadTabItems(tabId: number): Promise<{ items: MasonryItem[]; tab:
             ? (rawQueryParams as Record<string, unknown>)
             : {};
 
+        // Normalize/upgrade legacy persisted query param keys so restored tabs behave consistently
+        // across backend/frontend versions.
+        if (typeof queryParams === 'object' && queryParams) {
+            const qp = queryParams as Record<string, unknown>;
+
+            // Cursor pagination: older payloads may use nextPage / next_cursor / nextCursor
+            if (qp.next === undefined) {
+                const legacyNext = qp.nextPage ?? qp.next_page ?? qp.nextCursor ?? qp.next_cursor;
+                if (legacyNext !== undefined) {
+                    qp.next = legacyNext;
+                }
+            }
+
+            // Service/source naming: frontend expects `service`
+            if (qp.service === undefined && qp.source !== undefined) {
+                qp.service = qp.source;
+            }
+
+            // sourceType naming: backend always stores sourceType now, but older rows may have source_type
+            if (qp.sourceType === undefined && qp.source_type !== undefined) {
+                qp.sourceType = qp.source_type;
+            }
+        }
+
         const resolvedTabIdRaw = tabObj && typeof tabObj.id === 'number' ? tabObj.id : tabId;
         const resolvedTabId = typeof resolvedTabIdRaw === 'number' ? resolvedTabIdRaw : tabId;
         const resolvedLabel = tabObj && typeof tabObj.label === 'string' ? tabObj.label : `Tab ${resolvedTabId}`;
@@ -533,12 +580,17 @@ const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
  * Wrapper function for Masonry's getPage callback
  * This function calls the browse service with form data and tab ID
  */
-async function getPage(page: number | string): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
-    if (!tab.value?.id) {
+async function getPage(
+    page: number | string,
+    ctx?: { tabId?: number | null; formData?: BrowseFormData }
+): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
+    const tabId = ctx?.tabId ?? tab.value?.id;
+    if (!tabId) {
         throw new Error('Tab ID is required for getPage');
     }
 
-    const result = await getNextPageFromService(page, form.getData(), tab.value.id);
+    const formData = ctx?.formData ?? form.getData();
+    const result = await getNextPageFromService(page, formData, tabId);
 
     // Some callers (notably unit tests) call getPage() directly without Masonry
     // pushing the returned page into the v-model:items array. If we're empty,
@@ -547,15 +599,33 @@ async function getPage(page: number | string): Promise<{ items: MasonryItem[]; n
         items.value = [...result.items];
     }
 
-    // Keep local tab state in sync for UI/status bar + tests.
-    // Backend may persist query_params when `tab_id` is provided, but we still reflect the
-    // latest requested page/cursor immediately.
+    // Keep local tab + form state in sync for UI/status bar + tests.
+    // IMPORTANT: when using cursor pagination, `page` passed from Masonry is a cursor string.
+    // We must NOT store that cursor in queryParams.page. Instead we keep a numeric page counter
+    // and store the returned next cursor in queryParams.next.
     if (tab.value) {
         if (!tab.value.queryParams || typeof tab.value.queryParams !== 'object') {
             tab.value.queryParams = {};
         }
-        tab.value.queryParams['page'] = page;
+
+        if (typeof page === 'number') {
+            tab.value.queryParams['page'] = page;
+            form.data.page = page;
+        } else {
+            // Derive the numeric page index from Masonry's pagination history.
+            // History is initialized as [page, nextCursor]. When loading via cursor, Masonry passes
+            // the cursor (history tail) into getPage(), so the numeric page is the history length.
+            const history = masonry.value?.paginationHistory;
+            const derivedPage = Array.isArray(history) && history.length > 0
+                ? history.length
+                : Number(tab.value.queryParams['page'] || form.data.page || 1);
+
+            tab.value.queryParams['page'] = derivedPage;
+            form.data.page = derivedPage;
+        }
+
         tab.value.queryParams['next'] = result.nextPage ?? null;
+        form.data.next = result.nextPage ?? null;
     }
 
     return result;
@@ -794,7 +864,10 @@ onMounted(async () => {
                     const page = (typeof rawPage === 'number')
                         ? rawPage
                         : (typeof rawPage === 'string' && rawPage.length > 0 && !Number.isNaN(Number(rawPage)) ? Number(rawPage) : 1);
-                    const next = tabData.queryParams?.next ?? null;
+                    const nextRaw = tabData.queryParams?.next;
+                    const next = (typeof nextRaw === 'string')
+                        ? (nextRaw.trim().length > 0 ? nextRaw : null)
+                        : (nextRaw ?? null);
 
                     await masonry.value.restoreItems(items.value, page, next);
                 }
@@ -931,7 +1004,7 @@ defineExpose({
             <!-- Masonry -->
             <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                  @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :layout="layout" layout-mode="auto"
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :context="masonryContext" :layout="layout" layout-mode="auto"
                          :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
                          :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
                          @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
@@ -1125,10 +1198,9 @@ defineExpose({
                     @open="handleFileViewerOpen" @close="handleFileViewerClose"/>
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
-        <BrowseStatusBar :items="items" :display-page="displayPage"
-                         :next-cursor="(masonry?.paginationHistory && masonry.paginationHistory.length > 0) ? masonry.paginationHistory[masonry.paginationHistory.length - 1] : (tab?.queryParams?.next ?? null)"
-                         :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-                         :visible="tab !== null && tab !== undefined && !shouldShowForm"/>
+        <BrowseStatusBar :items="items" :display-page="displayPage" :next-cursor="nextCursor"
+                 :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
+                 :visible="tab !== null && tab !== undefined && !shouldShowForm"/>
 
         <!-- Reset to First Page Warning Dialog -->
         <Dialog v-model="resetDialog.resetDialogOpen.value">

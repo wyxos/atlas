@@ -60,6 +60,10 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         if (typeof page === 'number') {
             queryParams.page = page;
         } else {
+            // Cursor-based pagination: we still send a numeric `page` counter so the backend can
+            // persist/restores the UI page pill, while `next` carries the actual cursor.
+            // Services that are cursor-first (e.g. CivitAI) will ignore `page` when `next` exists.
+            queryParams.page = Number(formData.page || 1);
             queryParams.next = page;
         }
 

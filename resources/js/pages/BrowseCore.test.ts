@@ -416,11 +416,14 @@ describe('Browse - Core', () => {
 
         // Cursor-based pagination uses `next=` in current implementation.
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/browse'));
+        // We always include a numeric page counter for persistence/restoration.
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('page=1'));
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`next=${cursor}`));
         expect(result).toHaveProperty('items');
         expect(result).toHaveProperty('nextPage');
         expect(result.nextPage).toBe(nextCursor);
-        expect(tabContentVm.currentPage).toBe(cursor);
+        // currentPage is a numeric page counter (cursor lives in nextCursor).
+        expect(tabContentVm.currentPage).toBe(1);
         expect(tabContentVm.nextCursor).toBe(nextCursor);
     });
 
