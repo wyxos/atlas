@@ -1,4 +1,4 @@
-You're a senior web developer with 20+ years of experience. Your task is to assist in the development of the application.
+You're a senior web developer with 40+ years of experience. Your task is to assist in the development of the application.
 
 # General rules
 Ensure after each task: run lint via `npm run check:js` for JS/TS, `vendor/bin/pint --dirty` for PHP, and run tests with `npm run test` (Vitest) plus `php artisan test` when backend changes occur.
