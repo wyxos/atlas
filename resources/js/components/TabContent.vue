@@ -635,6 +635,8 @@ onMounted(async () => {
         if (data.tab) {
             tab.value = data.tab;
         }
+
+        await fetchServices();
     } catch (error) {
         console.error('Failed to load tab details and files:', error);
     }
@@ -718,7 +720,7 @@ defineExpose({
                 </Button>
 
                 <!-- Apply Service Button -->
-                <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
+                <Button size="sm" class="h-10 w-10" data-test="apply-service-button"
                     :loading="masonry?.isLoading"
                     :disabled="(masonry?.isLoading ?? false) || (form.data.sourceType === 'online' && !form.data.service)"
                     title="Apply selected service">
@@ -793,7 +795,7 @@ defineExpose({
                                 <!-- Action Buttons -->
                                 <div class="flex gap-3 w-full mt-2 items-center">
                                     <!-- Play Button -->
-                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
+                                    <Button size="sm" class="flex-1" data-test="play-button"
                                         :disabled="form.data.sourceType === 'online' && !form.data.service">
                                         <Play :size="16" />
                                     </Button>
