@@ -49,7 +49,6 @@ import { useToast } from 'vue-toastification';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
-import { items as tabsItems } from '@/actions/App/Http/Controllers/TabController';
 
 interface Props {
     tabId: number | null;
@@ -210,32 +209,6 @@ function onLoadingStop(): void {
         accumulatedModeration.value = [];
     }
 }
-
-
-// Compatibility fields used by existing tests and some parent-level orchestration
-const currentPage = computed(() => tab.value?.queryParams?.page ?? 1);
-const nextCursor = computed(() => {
-    // Prefer persisted value for restoration correctness.
-    const fromTab = tab.value?.queryParams?.next;
-    if (fromTab !== null && fromTab !== undefined && fromTab !== '') {
-        return fromTab;
-    }
-
-    // Fallback: last non-null entry from Masonry history.
-    const history = masonry.value?.paginationHistory;
-    if (!history || history.length === 0) {
-        return null;
-    }
-
-    for (let i = history.length - 1; i >= 0; i--) {
-        const val = history[i];
-        if (val !== null && val !== undefined && val !== '') {
-            return val;
-        }
-    }
-
-    return null;
-});
 
 const selectedService = computed({
     get: () => form.data.service,
@@ -420,85 +393,6 @@ const masonryInteractions = createMasonryInteractions(
     handleMasonryReaction
 );
 
-// Internal function to load tab items and metadata
-async function loadTabItems(tabId: number): Promise<{ items: MasonryItem[]; tab: TabData }> {
-    try {
-        const response = await window.axios.get(tabsItems.url(tabId));
-        const data: unknown = response.data;
-
-        // Be defensive here: some tests mock this endpoint loosely.
-        const dataObj = (data && typeof data === 'object') ? (data as Record<string, unknown>) : null;
-        const tabFromResponse: unknown = dataObj && 'tab' in dataObj ? dataObj.tab : undefined;
-        const tabObj = (tabFromResponse && typeof tabFromResponse === 'object')
-            ? (tabFromResponse as Record<string, unknown>)
-            : null;
-
-        const rawQueryParams: unknown = tabObj
-            ? ('queryParams' in tabObj ? tabObj.queryParams : ('query_params' in tabObj ? tabObj.query_params : undefined))
-            : undefined;
-
-        const queryParams = (rawQueryParams && typeof rawQueryParams === 'object')
-            ? (rawQueryParams as Record<string, unknown>)
-            : {};
-
-        // Normalize/upgrade legacy persisted query param keys so restored tabs behave consistently
-        // across backend/frontend versions.
-        if (typeof queryParams === 'object' && queryParams) {
-            const qp = queryParams as Record<string, unknown>;
-
-            // Cursor pagination: older payloads may use nextPage / next_cursor / nextCursor
-            if (qp.next === undefined) {
-                const legacyNext = qp.nextPage ?? qp.next_page ?? qp.nextCursor ?? qp.next_cursor;
-                if (legacyNext !== undefined) {
-                    qp.next = legacyNext;
-                }
-            }
-
-            // Service/source naming: frontend expects `service`
-            if (qp.service === undefined && qp.source !== undefined) {
-                qp.service = qp.source;
-            }
-
-            // sourceType naming: backend always stores sourceType now, but older rows may have source_type
-            if (qp.sourceType === undefined && qp.source_type !== undefined) {
-                qp.sourceType = qp.source_type;
-            }
-        }
-
-        const resolvedTabIdRaw = tabObj && typeof tabObj.id === 'number' ? tabObj.id : tabId;
-        const resolvedTabId = typeof resolvedTabIdRaw === 'number' ? resolvedTabIdRaw : tabId;
-        const resolvedLabel = tabObj && typeof tabObj.label === 'string' ? tabObj.label : `Tab ${resolvedTabId}`;
-
-        const itemsFromResponse: unknown = dataObj && 'items' in dataObj ? dataObj.items : undefined;
-        const resolvedItems = Array.isArray(itemsFromResponse)
-            ? (itemsFromResponse as MasonryItem[])
-            : (Array.isArray(data) ? (data as MasonryItem[]) : []);
-
-        const tabData: TabData = {
-            id: resolvedTabId,
-            label: resolvedLabel,
-            queryParams,
-            itemsData: [],
-            position: 0,
-            isActive: false,
-            sourceType: (queryParams.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
-        };
-        return {
-            items: resolvedItems || [],
-            tab: tabData,
-        };
-    } catch (error) {
-        console.error('Failed to load tab items:', error);
-        throw error;
-    }
-}
-
-
-// Handle apply event from TabFilter
-function handleApplyFilters(): void {
-    applyService();
-}
-
 // Handle reset event from TabFilter
 function handleResetFilters(): void {
     form.reset();
@@ -508,30 +402,6 @@ function handleResetFilters(): void {
 function handleModerationRulesChanged(): void {
     // TODO: Implement moderation rules changed logic
 }
-
-// Apply selected service to current tab (play button for new tabs)
-async function applyService(): Promise<void> {
-    if (!tab.value?.id) {
-        return;
-    }
-
-    // Online mode requires a service selection.
-    if (form.data.sourceType === 'online' && !form.data.service) {
-        return;
-    }
-
-    shouldShowForm.value = false;
-    loadAtPage.value = 1;
-
-    // In production, Masonry exposes loadPage(). In tests, it may be mocked without it.
-    if (masonry.value?.loadPage) {
-        await masonry.value.loadPage(1);
-        return;
-    }
-
-    await getPage(1);
-}
-
 
 // Cancel masonry loading
 function cancelMasonryLoad(): void {
@@ -561,67 +431,6 @@ function removeItemFromMasonry(item: MasonryItem): void {
 
 // Auto-dislike queue composable
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
-
-/**
- * Wrapper function for Masonry's getPage callback
- * This function calls the browse service with form data and tab ID
- */
-async function getPage(
-    page: number | string,
-    ctx?: { tabId?: number | null; formData?: BrowseFormData }
-): Promise<{ items: MasonryItem[]; nextPage: string | number | null }> {
-    const tabId = ctx?.tabId ?? tab.value?.id;
-    if (!tabId) {
-        throw new Error('Tab ID is required for getPage');
-    }
-
-    const formData = ctx?.formData ?? form.getData();
-    const result = await getNextPageFromService(page, formData, tabId);
-
-    // Some callers (notably unit tests) call getPage() directly without Masonry
-    // pushing the returned page into the v-model:items array. If we're empty,
-    // hydrate items so the rest of the tab state stays consistent.
-    if (items.value.length === 0 && Array.isArray(result.items) && result.items.length > 0) {
-        items.value = [...result.items];
-    }
-
-    // Keep local tab + form state in sync for UI/status bar + tests.
-    // IMPORTANT: when using cursor pagination, `page` passed from Masonry is a cursor string.
-    // We must NOT store that cursor in queryParams.page. Instead we keep a numeric page counter
-    // and store the returned next cursor in queryParams.next.
-    if (tab.value) {
-        if (!tab.value.queryParams || typeof tab.value.queryParams !== 'object') {
-            tab.value.queryParams = {};
-        }
-
-        if (typeof page === 'number') {
-            tab.value.queryParams['page'] = page;
-            form.data.page = page;
-            // Clear current cursor for numeric pages (page 1)
-            if (page === 1) {
-                tab.value.queryParams['currentCursor'] = null;
-            }
-        } else {
-            // Derive the numeric page index from Masonry's pagination history.
-            // History is initialized as [page, nextCursor]. When loading via cursor, Masonry passes
-            // the cursor (history tail) into getPage(), so the numeric page is the history length.
-            const history = masonry.value?.paginationHistory;
-            const derivedPage = Array.isArray(history) && history.length > 0
-                ? history.length
-                : Number(tab.value.queryParams['page'] || form.data.page || 1);
-
-            tab.value.queryParams['page'] = derivedPage;
-            form.data.page = derivedPage;
-            // Store the cursor that was used to load this page
-            tab.value.queryParams['currentCursor'] = page;
-        }
-
-        tab.value.queryParams['next'] = result.nextPage ?? null;
-        form.data.next = result.nextPage ?? null;
-    }
-
-    return result;
-}
 
 // Event handlers for masonry items
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
@@ -815,89 +624,17 @@ function handleLoadingStop(): void {
 
 // Initialize tab state on mount - this will run every time the component is created (tab switch)
 onMounted(async () => {
-    isMounted.value = true;
-    isInitializing.value = true;
 
-    try {
-        // Fetch services if not provided via prop (fallback for when tab mounts before parent fetches)
-        if (props.availableServices.length === 0) {
-            await fetchServices();
-        }
-
-        if (props.tabId) {
-            // Load tab items and metadata from database
-            const { items: loadedItems, tab: tabData } = await loadTabItems(props.tabId);
-
-            // Store tab data locally
-            tab.value = tabData;
-
-            isTabRestored.value = true;
-
-            // Restore items into masonry state
-            // Use a new array reference so shallowRef + watchers update efficiently
-            items.value = [...(loadedItems ?? [])];
-
-            // Assign query params to the form to restore any previous values
-            form.syncFromTab(tabData);
-
-            // If tab has items, hide the form and show masonry
-            if (loadedItems.length > 0) {
-                shouldShowForm.value = false;
-            }
-
-            // Vibe Masonry with init="manual" requires calling restoreItems() to initialize.
-            // Without this, restored items may exist in v-model but Masonry will still show
-            // "Waiting for content to load..." after a full page refresh.
-            if (loadedItems.length > 0) {
-                await nextTick();
-
-                if (masonry.value?.restoreItems) {
-                    const rawPage = tabData.queryParams?.page;
-                    const page = (typeof rawPage === 'number')
-                        ? rawPage
-                        : (typeof rawPage === 'string' && rawPage.length > 0 && !Number.isNaN(Number(rawPage)) ? Number(rawPage) : 1);
-                    const nextRaw = tabData.queryParams?.next;
-                    const next = (typeof nextRaw === 'string')
-                        ? (nextRaw.trim().length > 0 ? nextRaw : null)
-                        : (nextRaw ?? null);
-
-                    await masonry.value.restoreItems(items.value, page, next);
-                }
-            }
-        }
-    } finally {
-        // Mark initialization as complete
-        // Note: Items restoration happens via watcher above
-        isInitializing.value = false;
-    }
 });
 
 // Cleanup on unmount
 onUnmounted(() => {
-    // Mark component as unmounted to prevent callbacks from accessing state
-    isMounted.value = false;
 
-    // Clear loading state when component is destroyed
-    emit('update:loading', false);
-    if (props.onLoadingChange) {
-        props.onLoadingChange(false);
-    }
-
-    // Destroy masonry if it exists
-    if (masonry.value) {
-        if (masonry.value.isLoading) {
-            masonry.value.cancelLoad();
-        }
-        masonry.value.destroy();
-    }
 });
 
 // Expose getPage for testing
 defineExpose({
-    getPage,
     // Expose compatibility fields used by some Browse tests
-    currentPage,
-    nextCursor,
     selectedService,
     currentTabService,
     hasServiceSelected,
@@ -992,7 +729,7 @@ defineExpose({
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :context="masonryContext" :layout="layout"
                     layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" :page-size="pageSize" :get-page="getPage"
+                    :backfill-max-calls="Infinity" :page-size="pageSize"
                     @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
                     @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
@@ -1180,9 +917,8 @@ defineExpose({
             @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
-        <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :next-cursor="nextCursor"
-            :is-loading="masonry?.isLoading ?? false" :backfill="backfill"
-            :visible="tab !== null && tab !== undefined && !shouldShowForm" />
+        <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading ?? false"
+            :backfill="backfill" :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 
         <!-- Prompt Dialog -->
         <Dialog v-model="promptData.promptDialogOpen.value" @update:model-value="handlePromptDialogUpdate">

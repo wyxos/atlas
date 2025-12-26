@@ -4,13 +4,12 @@ import { Loader2 } from 'lucide-vue-next';
 import Pill from './ui/Pill.vue';
 import type { BackfillState } from '../composables/useBackfill';
 import type { MasonryItem } from '../composables/useTabs';
-import type { Masonry } from '@wyxos/vibe';
+import type { MasonryInstance } from '@wyxos/vibe';
 
 interface Props {
     items: MasonryItem[];
-    masonry: InstanceType<typeof Masonry> | null;
+    masonry: MasonryInstance | null;
     tab: { queryParams?: { page?: string | number; next?: string | number | null } } | null;
-    nextCursor: string | number | null;
     isLoading?: boolean;
     backfill: BackfillState;
     visible?: boolean;
@@ -24,6 +23,16 @@ const props = withDefaults(defineProps<Props>(), {
 // Display page value - masonry.currentPage already contains the cursor string for cursor-based pagination.
 // Fallback to tab.queryParams.page when masonry isn't initialized yet.
 const displayPage = computed(() => props.masonry?.currentPage ?? props.tab?.queryParams?.page ?? 1);
+
+// Get next cursor directly from masonry - the last item in paginationHistory is the next page/cursor
+const nextCursor = computed(() => {
+    const history = props.masonry?.paginationHistory;
+    if (!history || history.length === 0) {
+        return null;
+    }
+    // The last item in paginationHistory is the next page/cursor to load
+    return history[history.length - 1] ?? null;
+});
 </script>
 
 <template>
@@ -59,7 +68,7 @@ const displayPage = computed(() => props.masonry?.currentPage ?? props.tab?.quer
                 <template v-if="backfill.active">
                     <span v-if="!backfill.waiting">
                         {{ backfill.fetched }} / {{ backfill.target }} ({{ backfill.calls }} call{{ backfill.calls !== 1
-                        ? 's' : '' }})
+                            ? 's' : '' }})
                     </span>
                     <template v-else>
                         <div class="h-2 w-20 overflow-hidden rounded bg-muted">
@@ -69,7 +78,7 @@ const displayPage = computed(() => props.masonry?.currentPage ?? props.tab?.quer
                         </div>
                         <span v-if="backfill.waitRemainingMs > 0" class="text-xs text-warning-100">next in {{
                             (backfill.waitRemainingMs /
-                            1000).toFixed(1) }}s</span>
+                                1000).toFixed(1) }}s</span>
                         <span v-else class="text-xs text-warning-100">Executing request...</span>
                     </template>
                 </template>
