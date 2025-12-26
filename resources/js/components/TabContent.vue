@@ -47,6 +47,7 @@ import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistM
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from 'vue-toastification';
 import { items as tabsItems } from '@/actions/App/Http/Controllers/TabController';
+import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
@@ -112,7 +113,7 @@ const masonryContext = computed(() => ({
 // Internal tab data - loaded from API
 const tab = ref<TabData | null>(null);
 
-// Initialize browse form - will be synced when tab loads
+// Initialize browse form - will be initialized when tab loads
 const form = useBrowseForm();
 
 // Container refs for FileViewer
@@ -131,7 +132,7 @@ const isMounted = ref(false);
 const isInitializing = ref(true);
 
 // Browse service composable - fetch services if not provided via prop
-const { availableServices: localServices, fetchServices, getNextPage: getNextPageFromService } = useBrowseService();
+const { availableServices: localServices, fetchServices } = useBrowseService();
 
 // Use prop services if available, otherwise use local services
 const availableServices = computed(() => {
@@ -225,7 +226,7 @@ const currentTabService = computed(() => {
 
 const hasServiceSelected = computed(() => {
     // In online mode, a service must be selected.
-    if (form.data.sourceType === 'online') {
+    if (form.data.feed === 'online') {
         return Boolean(form.data.service);
     }
 
@@ -254,6 +255,32 @@ const layout = {
     gutterY: 12,
     sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
 };
+
+async function getPage(page: number | string, context?: BrowseFormData) {
+    if (!tab.value?.id) {
+        return { items: [], nextPage: null };
+    }
+
+    const formData = context || form.getData();
+    const queryParams = { ...formData, page };
+
+    if (typeof page === 'string') {
+        queryParams.next = page;
+    }
+
+    const { data } = await window.axios.get(browseIndex.url({ query: queryParams }));
+
+    return {
+        items: data.items || [],
+        nextPage: data.nextPage ?? null,
+    };
+}
+
+async function applyService() {
+    masonry.value.reset();
+    form.data.next = null;
+    await masonry.value.loadPage(1);
+}
 
 function onMasonryClick(e: MouseEvent): void {
     // Check for ALT + mouse button combinations for quick reactions
@@ -634,6 +661,7 @@ onMounted(async () => {
 
         if (data.tab) {
             tab.value = data.tab;
+            form.syncFromTab(tab.value);
         }
 
         await fetchServices();
@@ -667,8 +695,8 @@ defineExpose({
             <div class="flex items-center gap-3">
                 <!-- Source Type Toggle (Online/Local) -->
                 <div>
-                    <Select :model-value="form.data.sourceType"
-                        @update:model-value="(val: string) => { form.data.sourceType = val as 'online' | 'local'; }"
+                    <Select :model-value="form.data.feed"
+                        @update:model-value="(val: string) => { form.data.feed = val as 'online' | 'local'; }"
                         :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
                             <SelectValue placeholder="Online" />
@@ -720,9 +748,9 @@ defineExpose({
                 </Button>
 
                 <!-- Apply Service Button -->
-                <Button size="sm" class="h-10 w-10" data-test="apply-service-button"
+                <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
                     :loading="masonry?.isLoading"
-                    :disabled="(masonry?.isLoading ?? false) || (form.data.sourceType === 'online' && !form.data.service)"
+                    :disabled="(masonry?.isLoading ?? false) || (form.data.feed === 'online' && !form.data.service)"
                     title="Apply selected service">
                     <Play :size="14" />
                 </Button>
@@ -742,10 +770,11 @@ defineExpose({
             <!-- Masonry -->
             <div v-if="tab" class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :context="masonryContext" :layout="layout"
-                    layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" @loading:start="handleLoadingStart"
-                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                <Masonry :key="tab?.id" ref="masonry" v-model:items="items" :get-page="getPage"
+                    :context="masonryContext" :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual"
+                    mode="backfill" :backfill-delay-ms="2000" :backfill-max-calls="Infinity"
+                    @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
                     data-test="masonry-component">
@@ -775,7 +804,7 @@ defineExpose({
                                 </div>
 
                                 <!-- Service Dropdown (only show when Online) -->
-                                <div v-if="form.data.sourceType === 'online'" class="w-full">
+                                <div v-if="form.data.feed === 'online'" class="w-full">
                                     <label
                                         class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
                                     <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
@@ -795,8 +824,8 @@ defineExpose({
                                 <!-- Action Buttons -->
                                 <div class="flex gap-3 w-full mt-2 items-center">
                                     <!-- Play Button -->
-                                    <Button size="sm" class="flex-1" data-test="play-button"
-                                        :disabled="form.data.sourceType === 'online' && !form.data.service">
+                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
+                                        :disabled="form.data.feed === 'online' && !form.data.service">
                                         <Play :size="16" />
                                     </Button>
                                 </div>
