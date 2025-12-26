@@ -1,22 +1,29 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Loader2 } from 'lucide-vue-next';
 import Pill from './ui/Pill.vue';
 import type { BackfillState } from '../composables/useBackfill';
 import type { MasonryItem } from '../composables/useTabs';
+import type { Masonry } from '@wyxos/vibe';
 
 interface Props {
     items: MasonryItem[];
-    displayPage: string | number;
+    masonry: InstanceType<typeof Masonry> | null;
+    tab: { queryParams?: { page?: string | number; next?: string | number | null } } | null;
     nextCursor: string | number | null;
     isLoading?: boolean;
     backfill: BackfillState;
     visible?: boolean;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
     isLoading: false,
     visible: true,
 });
+
+// Display page value - masonry.currentPage already contains the cursor string for cursor-based pagination.
+// Fallback to tab.queryParams.page when masonry isn't initialized yet.
+const displayPage = computed(() => props.masonry?.currentPage ?? props.tab?.queryParams?.page ?? 1);
 </script>
 
 <template>

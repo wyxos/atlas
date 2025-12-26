@@ -7,7 +7,7 @@ export interface BrowseFormData {
     type: string;
     limit: string;
     sort: string;
-    page: number;
+    page: string | number;
     next: string | number | null;
     sourceType: 'online' | 'local';
 }
@@ -45,7 +45,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
             type: (queryParams?.type as string) || 'all',
             limit: String(queryParams?.limit || '20'),
             sort: (queryParams?.sort as string) || 'Newest',
-            page: Number(queryParams?.page || 1),
+            page: (typeof queryParams?.page === 'string' || typeof queryParams?.page === 'number') ? queryParams.page : 1,
             next: queryParams?.next ?? null,
             sourceType: (queryParams?.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
         };
