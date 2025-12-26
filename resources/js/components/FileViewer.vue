@@ -291,33 +291,6 @@ async function handleReaction(type: ReactionType): Promise<void> {
         props.removeFromMasonry(currentItem);
     }
 
-    // Create restore callback to add item back to masonry at original index
-    const restoreItem = props.restoreToMasonry && props.tabId !== undefined ? async (restoreTabId: number, isTabActive: (tabId: number) => boolean) => {
-        // Only restore if the tab is active
-        const tabActive = isTabActive(restoreTabId);
-        if (!tabActive) {
-            return;
-        }
-
-        if (props.restoreToMasonry) {
-            await props.restoreToMasonry(currentItem, itemIndex, props.masonryInstance);
-        }
-
-        // After restore, check if we need to navigate to the restored item
-        // Wait for nextTick to ensure items array is updated
-        await nextTick();
-
-        // Find the restored item's new index in the items array
-        const restoredItemIndex = items.value.findIndex(i => i.id === currentItem.id);
-
-        // If the restored item is at the current index, navigate to refresh the display
-        // This ensures FileViewer shows the restored file instead of whatever was at that index
-        if (restoredItemIndex >= 0 && currentItemIndex.value === restoredItemIndex && overlayRect.value && overlayFillComplete.value) {
-            // Navigate to the restored item to refresh the display
-            await navigateToIndex(restoredItemIndex, 'left');
-        }
-    } : undefined;
-
     // Call reaction callback directly
     await createReactionCallback()(fileId, type);
 

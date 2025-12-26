@@ -1,6 +1,6 @@
 // Stubs for backend action endpoints used throughout the front-end tests/components.
-type ActionHandler = ((...args: any[]) => Promise<any>) & {
-    url: (...args: any[]) => string;
+type ActionHandler = ((...args: unknown[]) => Promise<unknown>) & {
+    url: (...args: unknown[]) => string;
     definition?: { url: string };
 };
 

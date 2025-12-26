@@ -16,27 +16,6 @@ export function useReactionHandler(options: ReactionHandlerOptions) {
     ): Promise<void> {
         const item = options.items.value.find((i) => i.id === fileId);
 
-        const itemIndex = item ? options.items.value.findIndex((i) => i.id === fileId) : -1;
-
-        // Create restore callback to add item back to masonry at original index
-        const restoreItem = item ? (tabId: number, isTabActive: (tabId: number) => boolean) => {
-            // Only restore if tab is active (if tabId provided)
-            if (tabId !== undefined && !isTabActive(tabId)) {
-                return;
-            }
-
-            // Check if item is already in the array (avoid duplicates)
-            const existingIndex = options.items.value.findIndex((i) => i.id === item.id);
-            if (existingIndex === -1) {
-                // Add item back at original index if available, otherwise at beginning
-                if (itemIndex !== -1 && itemIndex < options.items.value.length) {
-                    options.items.value.splice(itemIndex, 0, item);
-                } else {
-                    options.items.value.unshift(item);
-                }
-            }
-        } : undefined;
-
         // Remove from masonry if callback provided
         if (item && options.removeFromMasonry) {
             options.removeFromMasonry(item);
@@ -55,4 +34,3 @@ export function useReactionHandler(options: ReactionHandlerOptions) {
         handleReaction,
     };
 }
-

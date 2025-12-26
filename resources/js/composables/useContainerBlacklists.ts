@@ -5,6 +5,13 @@ const blacklists = ref<ContainerBlacklist[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 
+function getErrorMessage(err: unknown): string | undefined {
+    if (!err || typeof err !== 'object') {
+        return undefined;
+    }
+    return (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+}
+
 export function useContainerBlacklists() {
     /**
      * Fetch all blacklisted containers.
@@ -16,9 +23,9 @@ export function useContainerBlacklists() {
         try {
             const response = await window.axios.get<ContainerBlacklist[]>('/api/container-blacklists');
             blacklists.value = response.data;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to fetch container blacklists';
-            console.error('Failed to fetch container blacklists:', e);
+        } catch (err) {
+            error.value = getErrorMessage(err) || 'Failed to fetch container blacklists';
+            console.error('Failed to fetch container blacklists:', err);
         } finally {
             isLoading.value = false;
         }
@@ -56,9 +63,9 @@ export function useContainerBlacklists() {
             }
 
             return created;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to create container blacklist';
-            console.error('Failed to create container blacklist:', e);
+        } catch (err) {
+            error.value = getErrorMessage(err) || 'Failed to create container blacklist';
+            console.error('Failed to create container blacklist:', err);
             return null;
         } finally {
             isLoading.value = false;
@@ -82,9 +89,9 @@ export function useContainerBlacklists() {
             }
 
             return true;
-        } catch (e: any) {
-            error.value = e.response?.data?.message || 'Failed to delete container blacklist';
-            console.error('Failed to delete container blacklist:', e);
+        } catch (err) {
+            error.value = getErrorMessage(err) || 'Failed to delete container blacklist';
+            console.error('Failed to delete container blacklist:', err);
             return false;
         } finally {
             isLoading.value = false;
@@ -100,8 +107,8 @@ export function useContainerBlacklists() {
                 `/api/container-blacklists/${containerId}/check`
             );
             return response.data;
-        } catch (e: any) {
-            console.error('Failed to check container blacklist:', e);
+        } catch (err) {
+            console.error('Failed to check container blacklist:', err);
             return null;
         }
     }

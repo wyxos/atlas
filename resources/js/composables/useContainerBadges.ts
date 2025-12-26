@@ -1,6 +1,26 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import type { MasonryItem } from './useTabs';
-import type { PillVariant } from '@/components/ui/Pill.vue';
+import type { PillVariant } from '@/types/pill';
+
+type ContainerEntry = {
+    id?: number;
+    type?: string;
+    source?: string;
+    source_id?: string;
+    referrer?: string;
+};
+
+type Container = {
+    id: number;
+    type: string;
+    source?: string;
+    source_id?: string;
+    referrer?: string;
+};
+
+function isContainerEntry(container: ContainerEntry): container is Container {
+    return typeof container.id === 'number' && typeof container.type === 'string';
+}
 
 /**
  * Composable for managing container badges and their hover states.
@@ -84,11 +104,11 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
         const itemContainersMap = new Map<number, Set<number>>();
 
         for (const item of items.value) {
-            const containers = (item as any).containers || [];
+            const containers = (item.containers as ContainerEntry[] | undefined) ?? [];
             const itemContainerIds = new Set<number>();
 
             for (const container of containers) {
-                if (container?.id && container?.type) {
+                if (isContainerEntry(container)) {
                     // Update count cache
                     countMap.set(container.id, (countMap.get(container.id) || 0) + 1);
 
@@ -151,11 +171,11 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
 
     // Get containers for a specific item (returns full container data including referrer)
     // Containers are sorted by type priority first, then by ID for consistent ordering
-    function getContainersForItem(item: MasonryItem): Array<{ id: number; type: string; source?: string; source_id?: string; referrer?: string }> {
-        const containers = (item as any).containers || [];
-        const filtered = containers.filter((container: { id?: number; type?: string }) => container?.id && container?.type);
+    function getContainersForItem(item: MasonryItem): Container[] {
+        const containers = (item.containers as ContainerEntry[] | undefined) ?? [];
+        const filtered = containers.filter(isContainerEntry);
         // Sort by type priority first, then by ID as tiebreaker
-        return filtered.sort((a: { id: number; type: string }, b: { id: number; type: string }) => {
+        return filtered.sort((a, b) => {
             const priorityA = getContainerTypePriority(a.type);
             const priorityB = getContainerTypePriority(b.type);
             if (priorityA !== priorityB) {
@@ -292,4 +312,3 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
         getMasonryItemClasses,
     };
 }
-

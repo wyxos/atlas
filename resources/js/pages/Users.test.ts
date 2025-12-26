@@ -207,7 +207,7 @@ describe('Users', () => {
         // Verify onLoadError handler is working - should show customized message
         expect(wrapper.text()).toContain('Failed to load users');
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.error).toBe('Failed to load users. Please try again later.');
     });
@@ -227,7 +227,7 @@ describe('Users', () => {
         await waitForListingToLoad(wrapper);
 
         // Verify onLoadError handler customizes 403 error message
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.error).toBe('You do not have permission to view users.');
         expect(wrapper.text()).toContain('You do not have permission to view users.');
@@ -529,7 +529,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
         expect(vm.listing.filters.search).toBe('john');
@@ -560,7 +560,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         vm.listing.filters.search = 'test';
         vm.listing.filters.status = 'verified';
@@ -595,7 +595,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any 
+         
         const vm = wrapper.vm as any;
         await vm.listing.goToPage(2);
         await flushPromises();
@@ -616,7 +616,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.listing.isResetting).toBe(false);
         const resetPromise = vm.listing.resetFilters();
@@ -641,7 +641,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
 
         // Verify filters are initially set from URL
@@ -678,7 +678,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.listing.filters.search).toBe('test');
         expect(vm.listing.filters.status).toBe('verified');
@@ -709,7 +709,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
@@ -740,7 +740,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
@@ -771,7 +771,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.listing.filters.search).toBe('test');
         expect(vm.listing.filters.status).toBe('verified');
@@ -804,7 +804,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
 
@@ -836,7 +836,7 @@ describe('Users', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
 

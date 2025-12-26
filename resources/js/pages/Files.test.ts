@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import Files from './Files.vue';
 import Oruga from '@oruga-ui/oruga-next';
-import { index as filesIndex, destroy as filesDestroy, show as filesShow } from '@/actions/App/Http/Controllers/FilesController';
+import { index as filesIndex, destroy as filesDestroy } from '@/actions/App/Http/Controllers/FilesController';
 
 interface File {
     id: number;
@@ -34,6 +34,8 @@ interface FilesComponentInstance {
         isDeleting: boolean;
     };
 }
+
+const filesIndexUrl = filesIndex.definition?.url ?? filesIndex.url();
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -107,10 +109,10 @@ function createHarmonieResponse(items: File[], currentPage = 1, total?: number, 
                 nextPage: currentPage < lastPage ? currentPage + 1 : null,
             },
             links: {
-                first: `${filesIndex.definition.url}?page=1`,
-                last: `${filesIndex.definition.url}?page=${lastPage}`,
-                prev: currentPage > 1 ? `${filesIndex.definition.url}?page=${currentPage - 1}` : null,
-                next: currentPage < lastPage ? `${filesIndex.definition.url}?page=${currentPage + 1}` : null,
+                first: `${filesIndexUrl}?page=1`,
+                last: `${filesIndexUrl}?page=${lastPage}`,
+                prev: currentPage > 1 ? `${filesIndexUrl}?page=${currentPage - 1}` : null,
+                next: currentPage < lastPage ? `${filesIndexUrl}?page=${currentPage + 1}` : null,
             },
             filters: [],
         },
@@ -178,7 +180,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        expect(mockAxios.get).toHaveBeenCalledWith(filesIndex.definition.url, {
+        expect(mockAxios.get).toHaveBeenCalledWith(filesIndexUrl, {
             params: {
                 page: 1,
                 per_page: 15,
@@ -220,7 +222,7 @@ describe('Files', () => {
         // Verify onLoadError handler is working - should show customized message
         expect(wrapper.text()).toContain('Failed to load files');
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.error).toBe('Failed to load files. Please try again later.');
     });
@@ -240,7 +242,7 @@ describe('Files', () => {
         await waitForListingToLoad(wrapper);
 
         // Verify onLoadError handler customizes 403 error message
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.error).toBe('You do not have permission to view files.');
         expect(wrapper.text()).toContain('You do not have permission to view files.');
@@ -620,7 +622,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
         expect(vm.listing.filters.search).toBe('test');
@@ -630,7 +632,7 @@ describe('Files', () => {
         expect(vm.listing.filters.date_from).toBe('2024-01-01');
         expect(vm.listing.filters.date_to).toBe('2024-12-31');
 
-        expect(mockAxios.get).toHaveBeenCalledWith(filesIndex.definition.url, {
+        expect(mockAxios.get).toHaveBeenCalledWith(filesIndexUrl, {
             params: expect.objectContaining({
                 page: 2,
                 search: 'test',
@@ -655,7 +657,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         vm.listing.filters.search = 'test';
         vm.listing.filters.source = 'YouTube';
@@ -694,7 +696,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         await vm.listing.goToPage(2);
         await flushPromises();
@@ -715,7 +717,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.listing.isResetting).toBe(false);
         const resetPromise = vm.listing.resetFilters();
@@ -740,7 +742,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
 
         // Verify filters are initially set from URL
@@ -781,7 +783,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.listing.filters.search).toBe('test');
         expect(vm.listing.filters.source).toBe('local');
@@ -814,7 +816,7 @@ describe('Files', () => {
 
         await waitForListingToLoad(wrapper);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.currentPage).toBe(2);
 
@@ -830,4 +832,3 @@ describe('Files', () => {
         expect(vm.currentPage).toBe(1);
     });
 });
-

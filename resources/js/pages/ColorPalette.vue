@@ -196,7 +196,7 @@ function copyToClipboard(text: string, key: string): void {
     });
 }
 
-function getTextColor(shade: keyof ColorPalette['shades']): string {
+function getTextColor(): string {
     // Text is displayed below the swatch on the dark page background
     // So all text should be light for visibility on dark background
     return 'text-twilight-indigo-100';
@@ -220,7 +220,7 @@ function getTextColor(shade: keyof ColorPalette['shades']): string {
                 <div class="flex gap-1 overflow-x-auto pb-2 overflow-y-visible">
                     <div v-for="shade in shadeOrder" :key="shade"
                         class="shrink-0 flex flex-col items-center group cursor-pointer py-1"
-                        @click="copyToClipboard(palette.shades[shade].hex, `${palette.slug}-${shade}`)"
+                        @click.exact="copyToClipboard(palette.shades[shade].hex, `${palette.slug}-${shade}`)"
                         @click.shift="copyToClipboard(palette.shades[shade].class, `${palette.slug}-${shade}-class`)">
                         <div :class="[
                             'w-16 h-16 rounded transition-all hover:scale-105 hover:ring-2 hover:ring-smart-blue-400',
@@ -229,7 +229,7 @@ function getTextColor(shade: keyof ColorPalette['shades']): string {
                         <div class="mt-2 flex flex-col items-center gap-1">
                             <span :class="[
                                 'text-xs font-medium',
-                                getTextColor(shade),
+                                getTextColor(),
                             ]">
                                 {{ shade }}
                             </span>

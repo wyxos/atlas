@@ -30,6 +30,17 @@ export default tseslint.config(
         },
     },
     {
+        files: [
+            '**/*.test.{js,jsx,ts,tsx}',
+            '**/*.spec.{js,jsx,ts,tsx}',
+            '**/*.test.utils.{js,ts}',
+            'resources/js/test/**/*.{js,ts,tsx}',
+        ],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
+        },
+    },
+    {
         files: ['**/*.vue'],
         languageOptions: {
             globals: {
@@ -73,4 +84,3 @@ export default tseslint.config(
         ],
     }
 );
-

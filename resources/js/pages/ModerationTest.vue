@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import PageLayout from '@/components/PageLayout.vue';
-import { Button } from '@/components/ui/button';
 import Textarea from '@/components/ui/Textarea.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, Check, X, Loader2 } from 'lucide-vue-next';
@@ -15,10 +14,10 @@ interface ModerationRule {
     nsfw: boolean;
     action_type?: string;
     op: string;
-    terms?: any[] | null;
+    terms?: unknown[] | null;
     min?: number | null;
-    options?: any;
-    children?: any[] | null;
+    options?: Record<string, unknown> | null;
+    children?: unknown[] | null;
     created_at?: string;
     updated_at?: string;
 }
@@ -78,8 +77,9 @@ async function runTest(): Promise<void> {
             hits: Array.isArray(response.data.hits) ? response.data.hits : [],
             rule: response.data.rule || selectedRule.value!,
         };
-    } catch (error: any) {
-        testError.value = error?.response?.data?.message || error?.message || 'Failed to test rule';
+    } catch (error: unknown) {
+        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+        testError.value = axiosError.response?.data?.message || axiosError.message || 'Failed to test rule';
         testResult.value = null;
     } finally {
         isTesting.value = false;

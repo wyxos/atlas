@@ -4,7 +4,7 @@ import { batchShow as batchShowReactions } from '@/actions/App/Http/Controllers/
 interface PendingReaction {
     fileId: number;
     resolve: (value: { file_id: number; reaction: { type: string } | null }) => void;
-    reject: (error: any) => void;
+    reject: (error: unknown) => void;
 }
 
 const BATCH_DELAY_MS = 300; // Wait 300ms to collect requests before sending
@@ -133,4 +133,3 @@ export function useReactionBatch() {
         resetBatch, // Expose for testing
     };
 }
-

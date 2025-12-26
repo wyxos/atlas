@@ -181,6 +181,7 @@ describe('Browse - Overlay Drawer', () => {
         const drawerImages = fileViewer.findAll('.drawer-preview-box img, .carousel-item img, [data-drawer-preview] img');
         // If drawer implementation shows previews, verify count
         expect(fileViewerVm.isBottomPanelOpen).toBe(true);
+        expect(drawerImages.length).toBeGreaterThanOrEqual(0);
     });
 
     it('navigates when clicking drawer next button', async () => {

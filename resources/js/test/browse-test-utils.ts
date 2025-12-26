@@ -181,11 +181,13 @@ export function setupBrowseTestMocks(mocks: BrowseMocks): void {
     mocks.mockRestore.mockClear();
     mocks.mockRestoreMany.mockClear();
 
+    const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
+
     mocks.mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes(tabIndex.definition.url) && !url.includes('/items')) {
+        if (url.includes(tabIndexUrl) && !url.includes('/items')) {
             return Promise.resolve({ data: [] });
         }
-        if (url.includes(tabIndex.definition.url) && url.includes('/items')) {
+        if (url.includes(tabIndexUrl) && url.includes('/items')) {
             const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
             const tabId = tabIdMatch ? Number(tabIdMatch[1]) : 0;
             return Promise.resolve({
@@ -279,8 +281,11 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
  * Setup axios mocks for tabs and browse API
  */
 export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], browseResponse?: any) {
+    const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
+    const browseIndexUrl = browseIndex.definition?.url ?? browseIndex.url();
+
     mocks.mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes(tabIndex.definition.url) && !url.includes('/items')) {
+        if (url.includes(tabIndexUrl) && !url.includes('/items')) {
             // Return tab configs for initial load without file-related data
             const configs = Array.isArray(tabConfig) ? tabConfig : [tabConfig];
             const tabsForIndex = configs.map((tab: any) => {
@@ -292,7 +297,7 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             });
             return Promise.resolve({ data: tabsForIndex });
         }
-        if (url.includes(tabIndex.definition.url) && url.includes('/items')) {
+        if (url.includes(tabIndexUrl) && url.includes('/items')) {
             // Extract tab ID from URL (e.g., /api/tabs/1/items)
             const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
             const tabId = tabIdMatch ? tabIdMatch[1] : null;
@@ -311,7 +316,7 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
                 },
             });
         }
-        if (url.includes(browseIndex.definition.url)) {
+        if (url.includes(browseIndexUrl)) {
             return Promise.resolve({
                 data: browseResponse || {
                     items: [],

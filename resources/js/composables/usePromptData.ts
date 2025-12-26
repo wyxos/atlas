@@ -9,6 +9,7 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
     const promptDataCache = ref<Map<number, string>>(new Map());
     const promptDialogOpen = ref<boolean>(false);
     const promptDialogItemId = ref<number | null>(null);
+    type ItemMetadata = { prompt?: unknown };
 
     // Load prompt data for an item (from metadata or API)
     async function loadPromptData(item: MasonryItem): Promise<string | null> {
@@ -18,9 +19,10 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
         }
 
         // Check if prompt is already in metadata
-        const metadata = (item as any).metadata;
-        if (metadata?.prompt) {
-            const prompt = String(metadata.prompt);
+        const metadata = item.metadata as ItemMetadata | undefined;
+        const cachedPrompt = metadata?.prompt;
+        if (cachedPrompt) {
+            const prompt = String(cachedPrompt);
             promptDataCache.value.set(item.id, prompt);
             return prompt;
         }
@@ -35,8 +37,8 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
             const response = await window.axios.get(`/api/files/${item.id}`);
             const file = response.data?.file;
             // Check metadata payload (JSON) or detail_metadata
-            const metadataPayload = file?.metadata?.payload;
-            const prompt = (typeof metadataPayload === 'object' && metadataPayload?.prompt)
+            const metadataPayload = file?.metadata?.payload as ItemMetadata | undefined;
+            const prompt = (metadataPayload && typeof metadataPayload === 'object' && metadataPayload.prompt)
                 ? String(metadataPayload.prompt)
                 : (file?.detail_metadata?.prompt ? String(file.detail_metadata.prompt) : null);
             if (prompt) {
@@ -54,8 +56,8 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
 
     // Get prompt data for display (from cache or metadata)
     function getPromptData(item: MasonryItem): string | null {
-        const metadata = (item as any).metadata;
-        return promptDataCache.value.get(item.id) || metadata?.prompt || null;
+        const metadata = item.metadata as ItemMetadata | undefined;
+        return promptDataCache.value.get(item.id) || (metadata?.prompt ? String(metadata.prompt) : null);
     }
 
     // Get current prompt dialog item
@@ -113,4 +115,3 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
         copyPromptToClipboard,
     };
 }
-

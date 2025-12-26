@@ -57,6 +57,9 @@ const mocks: BrowseMocks = {
     mockQueuePreviewIncrement,
 };
 
+const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
+const browseIndexUrl = browseIndex.definition?.url ?? browseIndex.url();
+
 // Mock fetch
 global.fetch = vi.fn();
 
@@ -140,10 +143,10 @@ beforeEach(() => {
 describe('Browse - Service Selection', () => {
     it('new tab does not auto-load until service is selected', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({ data: [] });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -193,7 +196,7 @@ describe('Browse - Service Selection', () => {
             const itemLoadingCalls = mocks.mockAxios.get.mock.calls
                 .map(call => call[0])
                 .filter((callUrl: string) => {
-                    return callUrl.includes(browseIndex.definition.url) && callUrl.includes('source=');
+                    return callUrl.includes(browseIndexUrl) && callUrl.includes('source=');
                 });
             expect(itemLoadingCalls.length).toBe(0);
         }
@@ -208,7 +211,7 @@ describe('Browse - Service Selection', () => {
 
     it('applies selected service and triggers loading', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [{
                         id: 1,
@@ -220,7 +223,7 @@ describe('Browse - Service Selection', () => {
                     }],
                 });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [
@@ -262,7 +265,6 @@ describe('Browse - Service Selection', () => {
         await tabContentVm.applyService();
         await waitForStable(wrapper);
 
-        const activeTab = vm.getActiveTab();
         // QueryParams are updated by the backend when browse request is made, not immediately by frontend
         // The backend will update query_params.service when the browse API is called with source parameter
         // Frontend preserves existing queryParams until backend updates them
@@ -282,8 +284,8 @@ describe('Browse - Service Selection', () => {
             .map(call => call[0])
             .filter((callUrl: string) => {
                 return typeof callUrl === 'string'
-                    && callUrl.includes(`${browseIndex.definition.url}?`)
-                    && !callUrl.includes(tabIndex.definition.url)
+                    && callUrl.includes(`${browseIndexUrl}?`)
+                    && !callUrl.includes(tabIndexUrl)
                     && !callUrl.includes('limit=1');
             });
         expect(browseCalls.length).toBeGreaterThan(0);
@@ -312,7 +314,7 @@ describe('Browse - Service Selection', () => {
                     },
                 });
             }
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [
                         {
@@ -334,7 +336,7 @@ describe('Browse - Service Selection', () => {
                     ],
                 });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -381,7 +383,7 @@ describe('Browse - Service Selection', () => {
         const tabId = 1;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -392,7 +394,7 @@ describe('Browse - Service Selection', () => {
                     }],
                 });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [
@@ -427,7 +429,7 @@ describe('Browse - Service Selection', () => {
 
         const browseCalls = mocks.mockAxios.get.mock.calls
             .map(call => call[0])
-            .filter((callUrl: string) => callUrl.includes(browseIndex.definition.url) && !callUrl.includes('services'));
+            .filter((callUrl: string) => callUrl.includes(browseIndexUrl) && !callUrl.includes('services'));
 
         expect(browseCalls.length).toBeGreaterThan(0);
         const lastCall = browseCalls[browseCalls.length - 1];
@@ -436,7 +438,7 @@ describe('Browse - Service Selection', () => {
 
     it('registers backfill event handlers on masonry component', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [{
                         id: 1,
@@ -447,7 +449,7 @@ describe('Browse - Service Selection', () => {
                     }],
                 });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [],

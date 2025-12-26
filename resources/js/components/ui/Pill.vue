@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-
-export type PillVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+import type { PillVariant } from '@/types/pill';
 
 type PillSize = 'sm' | 'default' | 'lg';
 
@@ -198,4 +197,3 @@ function handleDismiss(): void {
         </button>
     </span>
 </template>
-

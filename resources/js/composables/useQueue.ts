@@ -6,7 +6,7 @@ export interface QueueItem {
     remainingTime: number;
     onComplete: () => void | Promise<void>;
     onStart?: () => void | Promise<void>;
-    metadata?: any;
+    metadata?: unknown;
     isPaused: boolean;
     isStarted: boolean;
     startTime: number;
@@ -175,7 +175,7 @@ export function useQueue() {
         duration: number;
         onComplete: () => void | Promise<void>;
         onStart?: () => void | Promise<void>;
-        metadata?: any;
+        metadata?: unknown;
         startImmediately?: boolean;
     }): string {
         // If item already exists, remove it first
@@ -527,4 +527,3 @@ export function useQueue() {
         queue: computed(() => queue.value),
     };
 }
-

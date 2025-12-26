@@ -8,7 +8,6 @@ import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseContr
 import {
     setupBrowseTestMocks,
     createTestRouter,
-    getTabContent,
     waitForStable,
     type BrowseMocks,
 } from '@/test/browse-test-utils';
@@ -57,6 +56,9 @@ const mocks: BrowseMocks = {
     mockRestoreMany,
     mockQueuePreviewIncrement,
 };
+
+const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
+const browseIndexUrl = browseIndex.definition?.url ?? browseIndex.url();
 
 // Sync the hoisted mockIsLoading with the ref
 Object.defineProperty(mocks, 'mockIsLoading', {
@@ -162,7 +164,7 @@ describe('Browse - Tab Management', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [
                         {
@@ -186,7 +188,7 @@ describe('Browse - Tab Management', () => {
                     ],
                 });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -242,7 +244,7 @@ describe('Browse - Tab Management', () => {
         const tab1Id = 1;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [
                         {
@@ -257,7 +259,7 @@ describe('Browse - Tab Management', () => {
                     ],
                 });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -295,7 +297,7 @@ describe('Browse - Tab Management', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [
                         {
@@ -319,7 +321,7 @@ describe('Browse - Tab Management', () => {
                     ],
                 });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [],
@@ -364,10 +366,10 @@ describe('Browse - Tab Management', () => {
 
     it('creates a new tab and does not auto-load until service is selected', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({ data: [] });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({
                     data: {
                         items: [],

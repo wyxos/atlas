@@ -4,13 +4,8 @@ export interface CopyToClipboardOptions {
 
 export async function copyToClipboard(
     text: string,
-    label: string,
-    options?: CopyToClipboardOptions
+    _label: string,
+    _options?: CopyToClipboardOptions
 ): Promise<void> {
-    try {
-        await navigator.clipboard.writeText(text);
-    } catch (err) {
-        throw err;
-    }
+    await navigator.clipboard.writeText(text);
 }
-

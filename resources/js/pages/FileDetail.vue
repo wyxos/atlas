@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { show, destroy } from '@/actions/App/Http/Controllers/FilesController';
+import { show } from '@/actions/App/Http/Controllers/FilesController';
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowLeft, Download, FileText, Copy, ExternalLink, Trash2, Eye, Info } from 'lucide-vue-next';
+import { ArrowLeft, FileText, Trash2, Info } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 import FileDetailsCard from '../components/FileDetailsCard.vue';
 import FileDetailsPanel from '../components/ui/FileDetailsPanel.vue';
@@ -15,7 +15,7 @@ import {
     DialogTitle,
     DialogClose,
 } from '../components/ui/dialog';
-import { formatFileSize, getMimeTypeCategory } from '@/utils/file';
+import { getMimeTypeCategory } from '@/utils/file';
 import type { File } from '@/types/file';
 
 const route = useRoute();

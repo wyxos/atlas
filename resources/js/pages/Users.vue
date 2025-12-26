@@ -141,7 +141,7 @@ onMounted(async () => {
 
             <!-- Active Filters Display -->
             <ActiveFilters :listing="listing">
-                <template #filter="{ filter, isRemoving, isAnyRemoving, remove }">
+                <template #filter="{ filter, isRemoving, remove }">
                     <Pill :label="filter.label" :value="filter.value" variant="primary" reversed dismissible
                         @dismiss="remove">
                         <template v-if="isRemoving" #value>

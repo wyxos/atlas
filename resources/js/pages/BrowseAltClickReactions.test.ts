@@ -108,7 +108,6 @@ describe('Browse - ALT + Click Reactions', () => {
 
         await waitForStable(wrapper);
 
-        const vm = wrapper.vm as any;
 
         const tabContentVm = await waitForTabContent(wrapper);
         expect(tabContentVm).toBeDefined();
@@ -160,7 +159,6 @@ describe('Browse - ALT + Click Reactions', () => {
 
         await waitForStable(wrapper);
 
-        const vm = wrapper.vm as any;
 
         const tabContentVm = await waitForTabContent(wrapper);
         expect(tabContentVm).toBeDefined();
@@ -208,7 +206,6 @@ describe('Browse - ALT + Click Reactions', () => {
 
         await waitForStable(wrapper);
 
-        const vm = wrapper.vm as any;
 
         const tabContentVm = await waitForTabContent(wrapper);
         expect(tabContentVm).toBeDefined();
@@ -251,7 +248,6 @@ describe('Browse - ALT + Click Reactions', () => {
 
         await waitForStable(wrapper);
 
-        const vm = wrapper.vm as any;
 
         const tabContentVm = await waitForTabContent(wrapper);
         expect(tabContentVm).toBeDefined();
@@ -301,7 +297,6 @@ describe('Browse - ALT + Click Reactions', () => {
 
         await waitForStable(wrapper);
 
-        const vm = wrapper.vm as any;
 
         const tabContentVm = await waitForTabContent(wrapper);
         expect(tabContentVm).toBeDefined();
@@ -351,7 +346,6 @@ describe('Browse - ALT + Click Reactions', () => {
 
         await waitForStable(wrapper);
 
-        const vm = wrapper.vm as any;
 
         const tabContentVm = await waitForTabContent(wrapper);
         expect(tabContentVm).toBeDefined();
@@ -406,7 +400,6 @@ describe('Browse - ALT + Click Reactions', () => {
 
         await waitForStable(wrapper);
 
-        const vm = wrapper.vm as any;
 
         const tabContentVm = await waitForTabContent(wrapper);
         expect(tabContentVm).toBeDefined();

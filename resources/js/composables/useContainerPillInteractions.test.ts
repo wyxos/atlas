@@ -143,16 +143,12 @@ describe('useContainerPillInteractions', () => {
             removeMany: mockRemoveMany,
         });
 
-        const { handlePillAuxClick, batchReactToSiblings } = useContainerPillInteractions(
+        const { handlePillAuxClick } = useContainerPillInteractions(
             items,
             masonry,
             1,
             mockOnReaction
         );
-
-        // Mock batchReactToSiblings to verify it's called
-        const mockBatchReact = vi.fn();
-        // We can't directly mock it, so we'll verify via the onReaction callback
 
         // Simulate alt + middle click
         const mockEvent = {
@@ -445,4 +441,3 @@ describe('useContainerPillInteractions', () => {
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 });
-
