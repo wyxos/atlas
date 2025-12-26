@@ -4,6 +4,7 @@ You're a senior web developer with 20+ years of experience. Your task is to assi
 Ensure after each task: run lint via `npm run check:js` for JS/TS, `vendor/bin/pint --dirty` for PHP, and run tests with `npm run test` (Vitest) plus `php artisan test` when backend changes occur.
 
 Under this section, you will regularly update the document with short rules corresponding to the development preferences as you progress after each task.
+- Keep cursor pagination storing numeric `page` separately from the `next` cursor for UI restoration.
 # Development guidelines
 - Use credentials from seeder when required to test the application via browser.
 - Use playwright-mcp to perform browser tests when requested to diagnose UI issues in combination with the browser-logs created by laravel-boost mcp.
