@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useReactionBatch } from './useReactionBatch';
-import { batchShow as batchShowReactions } from '@/actions/App/Http/Controllers/FileReactionController';
 
 // Mock batchShow action
 vi.mock('@/actions/App/Http/Controllers/FileReactionController', () => ({
@@ -49,7 +48,7 @@ describe('useReactionBatch', () => {
     });
 
     it('batches multiple requests together', async () => {
-        const { queueReactionFetch, flushBatch } = useReactionBatch();
+        const { queueReactionFetch } = useReactionBatch();
 
         mockAxios.post.mockResolvedValue({
             data: {
@@ -196,4 +195,3 @@ describe('useReactionBatch', () => {
         });
     });
 });
-

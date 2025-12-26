@@ -1,5 +1,6 @@
 import { ref, watch } from 'vue';
 import { show as getFile } from '@/actions/App/Http/Controllers/FilesController';
+import type { File } from '@/types/file';
 
 export function useFileViewerFileData(
     currentItemIndex: () => number | null,
@@ -7,7 +8,7 @@ export function useFileViewerFileData(
     isSheetOpen: () => boolean,
     overlayFillComplete: () => boolean
 ) {
-    const fileData = ref<any>(null);
+    const fileData = ref<File | null>(null);
     const isLoadingFileData = ref(false);
 
     async function fetchFileData(fileId: number): Promise<void> {

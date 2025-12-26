@@ -116,6 +116,7 @@ describe('useContainerBadges', () => {
             const classesAfter = getMasonryItemClasses.value(items.value[0] || { id: 1 } as MasonryItem);
             // Note: classesAfter might still not contain the border if item doesn't have container 10
             // But the debounced value should be set
+            expect(classesAfter).toContain('border-2');
         });
 
         it('updates immediately when clearing hover (no debounce)', () => {
@@ -256,4 +257,3 @@ describe('useContainerBadges', () => {
         });
     });
 });
-

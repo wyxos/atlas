@@ -6,6 +6,8 @@ Ensure after each task: run lint via `npm run check:js` for JS/TS, `vendor/bin/p
 Under this section, you will regularly update the document with short rules corresponding to the development preferences as you progress after each task.
 - Keep cursor pagination storing numeric `page` separately from the `next` cursor for UI restoration.
 - For example content, cover at least one advanced workflow and one edge case.
+- When using route helpers in tests, guard `definition.url` with optional chaining and fallback to `.url()`.
+- For test-only helpers, relax `no-explicit-any` via ESLint overrides instead of file-level disables.
 # Development guidelines
 - Use credentials from seeder when required to test the application via browser.
 - Use playwright-mcp to perform browser tests when requested to diagnose UI issues in combination with the browser-logs created by laravel-boost mcp.

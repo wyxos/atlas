@@ -12,7 +12,7 @@ export type GetPageResult = {
 export type ServiceOption = {
     key: string;
     label: string;
-    defaults?: Record<string, any>;
+    defaults?: Record<string, unknown>;
 };
 
 export type UseBrowseServiceOptions = {
@@ -47,8 +47,12 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
      * @param formData - The browse form data containing filters and service selection
      * @param tabId - Tab ID to include in the request
      */
-    function buildQueryParams(page: number | string, formData: BrowseFormData, tabId: number): Record<string, any> {
-        const queryParams: Record<string, any> = {
+    function buildQueryParams(
+        page: number | string,
+        formData: BrowseFormData,
+        tabId: number
+    ): Record<string, string | number | null> {
+        const queryParams: Record<string, string | number | null> = {
             source: formData.service || 'civit-ai-images', // Backend expects 'source', not 'service'
             tab_id: tabId,
             nsfw: formData.nsfw ? 1 : 0,
@@ -134,6 +138,8 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
 
         const limit = (activeTab.queryParams?.limit as string | number | undefined) ?? 20;
 
+        const rawNext = activeTab.queryParams?.next;
+        const next = typeof rawNext === 'string' || typeof rawNext === 'number' ? rawNext : null;
         const derivedFormData: BrowseFormData = {
             service: String(effectiveService || 'civit-ai-images'),
             nsfw: Boolean(activeTab.queryParams?.nsfw && (activeTab.queryParams.nsfw === 1 || activeTab.queryParams.nsfw === '1' || activeTab.queryParams.nsfw === 'true')),
@@ -141,7 +147,7 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
             limit: String(limit),
             sort: String(activeTab.queryParams?.sort || 'Newest'),
             page: Number(activeTab.queryParams?.page || 1),
-            next: (activeTab.queryParams?.next ?? null) as any,
+            next,
             sourceType: (activeTab.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
         };
 
@@ -167,4 +173,3 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
         getCurrentService,
     };
 }
-

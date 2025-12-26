@@ -129,7 +129,7 @@ vi.mock('@wyxos/vibe', () => ({
             const restoreMany = (itemsToRestore: any[], indices: number[]) => {
                 mockRestoreMany(itemsToRestore, indices);
                 const existingIds = new Set(props.items.map((i: any) => i.id));
-                const itemsToAdd = itemsToRestore.filter((item: any, i: number) => !existingIds.has(item.id));
+                const itemsToAdd = itemsToRestore.filter((item: any) => !existingIds.has(item.id));
 
                 const restoredByIndex = new Map<number, any>();
                 itemsToAdd.forEach((item: any, i: number) => {
@@ -273,7 +273,7 @@ export function createMockBrowseResponse(
     nextPageValue: number | string | null = null
 ) {
     const pageNum = typeof page === 'number' ? page : 1;
-                const items = Array.from({ length: 40 }, () => {
+    const items = Array.from({ length: 40 }, (_, i) => {
         const itemId = typeof page === 'number' ? i + 1 : parseInt(`item-${page}-${i}`) || i + 1;
         return {
             id: itemId,

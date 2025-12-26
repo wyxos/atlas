@@ -12,6 +12,18 @@ type Container = {
     referrer?: string;
 };
 
+type ContainerEntry = {
+    id?: number;
+    type?: string;
+    source?: string;
+    source_id?: string;
+    referrer?: string;
+};
+
+function isContainerEntry(container: ContainerEntry): container is Container {
+    return typeof container.id === 'number' && typeof container.type === 'string';
+}
+
 /**
  * Composable for handling container pill interactions (clicks, batch reactions, etc.).
  */
@@ -34,8 +46,8 @@ export function useContainerPillInteractions(
      * Get full container data for an item (including referrer URL).
      */
     function getContainersForItem(item: MasonryItem): Container[] {
-        const containers = (item as any).containers || [];
-        return containers.filter((container: any) => container?.id && container?.type) as Container[];
+        const containers = (item.containers as ContainerEntry[] | undefined) ?? [];
+        return containers.filter(isContainerEntry);
     }
 
     /**
@@ -91,10 +103,11 @@ export function useContainerPillInteractions(
 
         // Create batch restore callback if restoreManyToMasonry is available
         const currentTabId = tabIdValue.value;
+        const masonryInstance = masonry.value ?? undefined;
         const batchRestoreCallback = restoreManyToMasonry && currentTabId !== undefined
             ? async () => {
                 // Restore all items in the batch using restoreManyToMasonry
-                await restoreManyToMasonry(itemsToRestore, masonry.value);
+                await restoreManyToMasonry(itemsToRestore, masonryInstance);
             }
             : undefined;
 
@@ -247,4 +260,3 @@ export function useContainerPillInteractions(
         handlePillAuxClick,
     };
 }
-

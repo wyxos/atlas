@@ -109,7 +109,7 @@ describe('FileReactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         // Wait for watch to complete
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -134,7 +134,7 @@ describe('FileReactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.like).toBe(true);
         expect(vm.currentReaction).toBe('like');
@@ -155,7 +155,7 @@ describe('FileReactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.dislike).toBe(true);
         expect(vm.currentReaction).toBe('dislike');
@@ -176,7 +176,7 @@ describe('FileReactions', () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const vm = wrapper.vm as any;
         expect(vm.funny).toBe(true);
         expect(vm.currentReaction).toBe('funny');

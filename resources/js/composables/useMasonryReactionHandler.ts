@@ -1,4 +1,4 @@
-import { nextTick, type Ref } from 'vue';
+import { type Ref } from 'vue';
 import type { MasonryItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
@@ -37,7 +37,7 @@ export function useMasonryReactionHandler(
         const restoreCallback = item && tabId !== undefined && itemIndex !== -1
             ? async () => {
                 // Restore item using the provided restore function
-                await restoreToMasonry(item, itemIndex, masonry.value);
+                await restoreToMasonry(item, itemIndex, masonry.value ?? undefined);
             }
             : undefined;
 
@@ -53,4 +53,3 @@ export function useMasonryReactionHandler(
         handleMasonryReaction,
     };
 }
-

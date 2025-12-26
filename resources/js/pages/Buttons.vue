@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import PageHeader from '../components/ui/PageHeader.vue';
-import Heading from '../components/ui/Heading.vue';
 import Section from '../components/ui/Section.vue';
 import Button from '../components/ui/button/Button.vue';
 

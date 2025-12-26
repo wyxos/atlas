@@ -21,7 +21,7 @@ import Pill from '../components/ui/Pill.vue';
 import { DeletionHandler } from '../lib/DeletionHandler';
 import { formatDate } from '../utils/date';
 import { copyToClipboard } from '../utils/clipboard';
-import { formatFileSize, getMimeTypeCategory, getMimeTypeBadgeClasses } from '../utils/file';
+import { formatFileSize, getMimeTypeBadgeClasses } from '../utils/file';
 import type { File } from '../types/file';
 
 const route = useRoute();
@@ -129,7 +129,7 @@ onMounted(async () => {
 
             <!-- Active Filters Display -->
             <ActiveFilters :listing="listing">
-                <template #filter="{ filter, isRemoving, isAnyRemoving, remove }">
+                <template #filter="{ filter, isRemoving, remove }">
                     <Pill :label="filter.label" :value="filter.value" variant="primary" reversed dismissible
                         @dismiss="remove">
                         <template v-if="isRemoving" #value>

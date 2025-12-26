@@ -73,19 +73,6 @@ function estimateObjectSize(obj: unknown, visited = new WeakSet()): number {
 }
 
 /**
- * Get size of a single property across all items
- */
-function getPropertySize(property: string, items: unknown[]): number {
-    let totalSize = 0;
-    for (const item of items) {
-        if (typeof item === 'object' && item !== null && property in item) {
-            totalSize += estimateObjectSize((item as Record<string, unknown>)[property]);
-        }
-    }
-    return totalSize;
-}
-
-/**
  * Analyze item sizes and provide diagnostics
  */
 export function analyzeItemSizes(items: unknown[]): ItemSizeDiagnostics {
@@ -326,5 +313,4 @@ export async function compareItemPerformance<T extends Record<string, unknown>>(
 
     console.groupEnd();
 }
-
 

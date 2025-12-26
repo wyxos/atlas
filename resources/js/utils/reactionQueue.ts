@@ -9,6 +9,9 @@ const toast = useToast();
 
 const queue = useQueue();
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
+type ReactionQueueMetadata = {
+    restoreCallback?: () => Promise<void> | void;
+};
 
 /**
  * Queue a reaction with countdown toast.
@@ -160,7 +163,7 @@ export async function cancelQueuedReaction(fileId: number, reactionType: Reactio
     const item = queue.getAll().find((item) => item.id === queueId);
     
     // Get restore callback from metadata before removing
-    const restoreCallback = item?.metadata?.restoreCallback as (() => Promise<void> | void) | undefined;
+    const restoreCallback = (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback;
     
     // Remove from queue
     queue.remove(queueId);
@@ -183,7 +186,7 @@ export async function cancelBatchQueuedReaction(queueId: string): Promise<void> 
     const item = queue.getAll().find((item) => item.id === queueId);
     
     // Get restore callback from metadata before removing
-    const restoreCallback = item?.metadata?.restoreCallback as (() => Promise<void> | void) | undefined;
+    const restoreCallback = (item?.metadata as ReactionQueueMetadata | undefined)?.restoreCallback;
     
     // Remove from queue
     queue.remove(queueId);
@@ -198,4 +201,6 @@ export async function cancelBatchQueuedReaction(queueId: string): Promise<void> 
         }
     }
 }
+
+
 

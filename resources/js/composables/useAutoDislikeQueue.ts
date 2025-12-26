@@ -55,7 +55,7 @@ export function useAutoDislikeQueue(
 
         // Remove items from masonry first (batch removal)
         if (masonry.value && itemsToRemove.length > 0) {
-            await masonry.value.removeMany(itemsToRemove);
+            await masonry.value.removeMany?.(itemsToRemove);
         }
 
         // Batch dislike API call
@@ -226,4 +226,3 @@ export function useAutoDislikeQueue(
         isFrozen, // Expose frozen state for UI indicators
     };
 }
-

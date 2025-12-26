@@ -44,14 +44,6 @@ const textColor = computed(() => {
 });
 
 /**
- * Secondary text color classes - danger theme.
- * Use white for better visibility on red background.
- */
-const secondaryTextColor = computed(() => {
-    return 'text-white';
-});
-
-/**
  * Icon color classes - danger theme.
  * Use white for better visibility on red background.
  */
@@ -221,4 +213,3 @@ function handleDismiss(): void {
     max-width: 600px;
 }
 </style>
-

@@ -4,7 +4,7 @@ import { batchIncrementPreview } from '@/actions/App/Http/Controllers/FilesContr
 interface PendingPreview {
     fileId: number;
     resolve: (value: { previewed_count: number; will_auto_dislike: boolean }) => void;
-    reject: (error: any) => void;
+    reject: (error: unknown) => void;
 }
 
 const BATCH_DELAY_MS = 300; // Wait 300ms to collect requests before sending
@@ -130,4 +130,3 @@ export function usePreviewBatch() {
         flushBatch, // Expose for manual flushing if needed
     };
 }
-

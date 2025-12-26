@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
-import FileViewer from '../components/FileViewer.vue';
+import { index as tabIndex } from '@/actions/App/Http/Controllers/TabController';
+import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -96,11 +97,14 @@ describe('Browse - Overlay Reactions', () => {
         };
         const tabConfig = createMockTabConfig(1);
         setupAxiosMocks(mocks, tabConfig, browseResponse);
+        const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
+        const browseIndexUrl = browseIndex.definition?.url ?? browseIndex.url();
+
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url)) {
+            if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({ data: [tabConfig] });
             }
-            if (url.includes(browseIndex.definition.url)) {
+            if (url.includes(browseIndexUrl)) {
                 return Promise.resolve({ data: browseResponse });
             }
             if (url.includes('/api/files') && url.includes('/reaction')) {
