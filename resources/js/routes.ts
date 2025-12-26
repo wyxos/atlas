@@ -18,6 +18,12 @@ const routes: RouteRecordRaw[] = [
         meta: { layout: 'DashboardLayout' },
     },
     {
+        path: '/browse-empty',
+        name: 'browse-empty',
+        component: () => import('./pages/BrowseEmpty.vue'),
+        meta: { layout: 'DashboardLayout' },
+    },
+    {
         path: '/audio',
         name: 'audio',
         component: () => import('./pages/Audio.vue'),
