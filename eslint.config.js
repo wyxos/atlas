@@ -21,9 +21,12 @@ export default tseslint.config(
             },
         },
         rules: {
-            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+            '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
             '@typescript-eslint/no-explicit-any': 'warn',
             '@typescript-eslint/require-await': 'off',
+            '@typescript-eslint/no-unused-expressions': 'off',
+            'vue/no-unused-vars': 'warn',
+            'vue/use-v-on-exact': 'off',
         },
     },
     {

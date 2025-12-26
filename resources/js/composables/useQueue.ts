@@ -339,7 +339,7 @@ export function useQueue() {
      */
     function getProgress(id: string): number {
         // Access updateTrigger to make this reactive
-        updateTrigger.value; // eslint-disable-line @typescript-eslint/no-unused-expressions
+        updateTrigger.value;  
 
         const item = queue.value.get(id);
         if (!item) {
@@ -358,7 +358,7 @@ export function useQueue() {
      */
     function getRemainingTime(id: string): number {
         // Access updateTrigger to make this reactive
-        updateTrigger.value; // eslint-disable-line @typescript-eslint/no-unused-expressions
+        updateTrigger.value;  
 
         const item = queue.value.get(id);
         if (!item) {
@@ -390,7 +390,7 @@ export function useQueue() {
      */
     function getAll(): QueueItem[] {
         // Access updateTrigger to make this reactive
-        updateTrigger.value; // eslint-disable-line @typescript-eslint/no-unused-expressions
+        updateTrigger.value;  
         return Array.from(queue.value.values());
     }
 
