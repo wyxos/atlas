@@ -44,14 +44,14 @@ describe('useTabs', () => {
             {
                 id: 1,
                 label: 'Tab 1',
-                query_params: { page: 1 },
+                params: { page: 1 },
                 position: 0,
                 is_active: false,
             },
             {
                 id: 2,
                 label: 'Tab 2',
-                query_params: { page: 2 },
+                params: { page: 2 },
                 position: 1,
                 is_active: false,
             },
@@ -74,19 +74,19 @@ describe('useTabs', () => {
         expect(isLoadingTabs.value).toBe(false);
     });
 
-    it('loads tabs with sourceType in queryParams', async () => {
+    it('loads tabs with sourceType in params', async () => {
         const mockTabs = [
             {
                 id: 1,
                 label: 'Online Tab',
-                query_params: { page: 1, sourceType: 'online' },
+                params: { page: 1, sourceType: 'online' },
                 position: 0,
                 is_active: false,
             },
             {
                 id: 2,
                 label: 'Offline Tab',
-                query_params: { page: 1, sourceType: 'local' },
+                params: { page: 1, sourceType: 'local' },
                 position: 1,
                 is_active: false,
             },
@@ -107,7 +107,7 @@ describe('useTabs', () => {
             {
                 id: 1,
                 label: 'Tab 1',
-                query_params: { page: 1 },
+                params: { page: 1 },
                 position: 0,
                 is_active: false,
             },
@@ -124,9 +124,9 @@ describe('useTabs', () => {
 
     it('sorts tabs by position', async () => {
         const mockTabs = [
-            { id: 3, label: 'Tab 3', query_params: {}, position: 2, is_active: false },
-            { id: 1, label: 'Tab 1', query_params: {}, position: 0, is_active: false },
-            { id: 2, label: 'Tab 2', query_params: {}, position: 1, is_active: false },
+            { id: 3, label: 'Tab 3', params: {}, position: 2, is_active: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, is_active: false },
+            { id: 2, label: 'Tab 2', params: {}, position: 1, is_active: false },
         ];
 
         mockAxios.get.mockResolvedValueOnce({ data: mockTabs });
@@ -146,8 +146,7 @@ describe('useTabs', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },
@@ -156,8 +155,7 @@ describe('useTabs', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: true,
             },
@@ -171,7 +169,7 @@ describe('useTabs', () => {
 
         expect(mockAxios.post).toHaveBeenCalledWith('/api/tabs', {
             label: 'Browse 1',
-            query_params: {},
+            params: {},
             position: 0,
         });
         expect(mockAxios.patch).toHaveBeenCalledWith('/api/tabs/1/active');
@@ -188,8 +186,8 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', queryParams: {}, itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', params: {}, itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 1; // Set active tab to the one we're closing
 
@@ -198,7 +196,7 @@ describe('useTabs', () => {
             data: {
                 id: 2,
                 label: 'Tab 2',
-                query_params: {},
+                params: {},
                 position: 1,
                 is_active: true,
             },
@@ -221,8 +219,7 @@ describe('useTabs', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },
@@ -231,8 +228,7 @@ describe('useTabs', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: true,
             },
@@ -242,7 +238,7 @@ describe('useTabs', () => {
 
         // Set up single tab
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
@@ -263,8 +259,8 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', queryParams: {}, itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', params: {}, itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 2; // Active tab is different from the one we're closing
 
@@ -283,8 +279,8 @@ describe('useTabs', () => {
         const { tabs, activeTabId, getActiveTab } = useTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', queryParams: {}, itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', params: {}, itemsData: [], position: 1, isActive: false },
         ];
         activeTabId.value = 2;
 
@@ -308,7 +304,7 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test (simulating loaded state)
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
@@ -318,7 +314,7 @@ describe('useTabs', () => {
             { id: 1, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false },
         ];
         // QueryParams are preserved from existing tab state (not updated by frontend)
-        const existingQueryParams = tabs.value.find(t => t.id === 1)?.queryParams || {};
+        const existingQueryParams = tabs.value.find(t => t.id === 1)?.params || {};
 
         updateActiveTab(itemsData);
 
@@ -326,7 +322,7 @@ describe('useTabs', () => {
         expect(activeTab).toBeDefined();
         expect(activeTab?.itemsData).toEqual(itemsData);
         // QueryParams should be preserved (not updated by frontend)
-        expect(activeTab?.queryParams).toEqual(existingQueryParams);
+        expect(activeTab?.params).toEqual(existingQueryParams);
 
         // Wait for debounce
         await new Promise(resolve => setTimeout(resolve, 600));
@@ -335,8 +331,7 @@ describe('useTabs', () => {
         expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/1', {
             label: 'Tab 1',
             position: 0,
-            file_ids: [1],
-            // query_params are not sent - backend manages them
+            // params are not sent - backend manages them
         });
     });
 
@@ -345,7 +340,7 @@ describe('useTabs', () => {
 
         // Set up tabs manually
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
         ];
 
         const mockItemsData = [
@@ -379,7 +374,7 @@ describe('useTabs', () => {
         const { tabs, loadTabItems } = useTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');
@@ -427,7 +422,7 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', queryParams: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');

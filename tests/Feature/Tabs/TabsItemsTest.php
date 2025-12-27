@@ -54,12 +54,12 @@ test('items are formatted correctly', function () {
     expect($item['key'])->toBe("{$item['page']}-{$item['id']}");
 });
 
-test('items use correct page number from query_params', function () {
+test('items use correct page number from params', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
 
     $tab = Tab::factory()->for($user)
-        ->withQueryParams(['page' => 5])
+        ->withParams(['page' => 5])
         ->withFiles([$file->id])
         ->create();
 
@@ -70,12 +70,12 @@ test('items use correct page number from query_params', function () {
     expect($data['items'][0]['page'])->toBe(5);
 });
 
-test('items default to page 1 when query_params page is missing', function () {
+test('items default to page 1 when params page is missing', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
 
     $tab = Tab::factory()->for($user)
-        ->withQueryParams([])
+        ->withParams([])
         ->withFiles([$file->id])
         ->create();
 

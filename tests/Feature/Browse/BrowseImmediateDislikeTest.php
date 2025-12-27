@@ -67,7 +67,7 @@ test('immediately blacklisted files from moderation rules are excluded from brow
     // Create a tab
     $tab = Tab::factory()->for($user)->create([
         'label' => 'Test Tab',
-        'query_params' => [
+        'params' => [
             'service' => 'civit-ai-images',
             'page' => 1,
         ],
@@ -157,7 +157,7 @@ test('immediately blacklisted files are excluded from browse response items', fu
     // Create a tab
     $tab = Tab::factory()->for($user)->create([
         'label' => 'Test Tab',
-        'query_params' => [
+        'params' => [
             'service' => 'civit-ai-images',
             'page' => 1,
         ],
@@ -245,7 +245,7 @@ test('immediately blacklisted files from blacklisted containers are excluded fro
     // Create a tab
     $tab = Tab::factory()->for($user)->create([
         'label' => 'Test Tab',
-        'query_params' => [
+        'params' => [
             'service' => 'civit-ai-images',
             'page' => 1,
         ],

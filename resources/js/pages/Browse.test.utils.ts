@@ -298,8 +298,7 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
     return {
         id: tabId,
         label: `Test Tab ${tabId}`,
-        query_params: { service: 'civit-ai-images', page: 1 },
-        file_ids: [],
+        params: { service: 'civit-ai-images', page: 1 },
         items: [],
         position: 0,
         is_active: false,

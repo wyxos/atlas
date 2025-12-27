@@ -269,7 +269,7 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
     return {
         id: tabId,
         label: `Test Tab ${tabId}`,
-        query_params: { service: 'civit-ai-images', page: 1 },
+        params: { service: 'civit-ai-images', page: 1 },
         items: [],
         position: 0,
         is_active: true, // Default to active so tests can access tab content
@@ -290,7 +290,6 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             const configs = Array.isArray(tabConfig) ? tabConfig : [tabConfig];
             const tabsForIndex = configs.map((tab: any) => {
                 const withoutFileData = { ...tab };
-                delete withoutFileData.file_ids;
                 delete withoutFileData.has_files;
                 delete withoutFileData.items;
                 return withoutFileData;
@@ -302,15 +301,15 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
             const tabId = tabIdMatch ? tabIdMatch[1] : null;
             const tab = tabId ? (Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig) : null;
-            const queryParams = (tab?.query_params ?? {}) as Record<string, unknown>;
-            const sourceType = (typeof queryParams.sourceType === 'string' ? queryParams.sourceType : 'online') as string;
+            const params = (tab?.params ?? {}) as Record<string, unknown>;
+            const sourceType = (typeof params.sourceType === 'string' ? params.sourceType : 'online') as string;
             return Promise.resolve({
                 data: {
                     items: tab?.items ?? [],
                     tab: {
                         id: tab?.id ?? (tabId ? Number(tabId) : 0),
                         label: tab?.label ?? (tabId ? `Test Tab ${tabId}` : 'Test Tab'),
-                        queryParams,
+                        params: params,
                         sourceType,
                     },
                 },

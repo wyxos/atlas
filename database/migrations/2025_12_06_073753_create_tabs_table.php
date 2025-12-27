@@ -15,8 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('label');
-            $table->json('query_params')->nullable();
-            $table->json('file_ids')->nullable();
+            $table->json('params')->nullable();
             $table->integer('position')->default(0);
             $table->timestamps();
         });

@@ -170,8 +170,7 @@ describe('Browse - Tab Management', () => {
                         {
                             id: tab1Id,
                             label: 'Tab 1',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
+                            params: { service: 'civit-ai-images', page: 1 },
                             items: [],
                             position: 0,
                             is_active: true,
@@ -179,8 +178,7 @@ describe('Browse - Tab Management', () => {
                         {
                             id: tab2Id,
                             label: 'Tab 2',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
+                            params: { service: 'civit-ai-images', page: 1 },
                             items: [],
                             position: 1,
                             is_active: false,
@@ -250,8 +248,7 @@ describe('Browse - Tab Management', () => {
                         {
                             id: tab1Id,
                             label: 'Tab 1',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
+                            params: { service: 'civit-ai-images', page: 1 },
                             items: [],
                             position: 0,
                             is_active: true,
@@ -303,8 +300,7 @@ describe('Browse - Tab Management', () => {
                         {
                             id: tab1Id,
                             label: 'Tab 1',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
+                            params: { service: 'civit-ai-images', page: 1 },
                             items: [],
                             position: 0,
                             is_active: true,
@@ -312,8 +308,7 @@ describe('Browse - Tab Management', () => {
                         {
                             id: tab2Id,
                             label: 'Tab 2',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
+                            params: { service: 'civit-ai-images', page: 1 },
                             items: [],
                             position: 1,
                             is_active: false,
@@ -386,8 +381,7 @@ describe('Browse - Tab Management', () => {
             data: {
                 id: newTabId,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },

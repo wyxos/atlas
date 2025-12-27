@@ -36,37 +36,17 @@ test('tab creation requires label', function () {
     $response->assertJsonValidationErrors('label');
 });
 
-test('tab creation accepts optional query_params', function () {
+test('tab creation accepts optional params', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'query_params' => ['page' => 2, 'filter' => 'test'],
+        'params' => ['page' => 2, 'filter' => 'test'],
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['query_params'])->toBe(['page' => 2, 'filter' => 'test']);
-});
-
-test('tab creation accepts optional file_ids', function () {
-    $user = User::factory()->create();
-    $file1 = File::factory()->create();
-    $file2 = File::factory()->create();
-
-    $response = $this->actingAs($user)->postJson('/api/tabs', [
-        'label' => 'My Tab',
-        'file_ids' => [$file1->id, $file2->id],
-    ]);
-
-    $response->assertStatus(201);
-    $data = $response->json();
-    expect($data['file_ids'])->toBe([$file1->id, $file2->id]);
-
-    // Verify files are attached via relationship
-    $tab = Tab::find($data['id']);
-    expect($tab->files)->toHaveCount(2);
-    expect($tab->files->pluck('id')->toArray())->toBe([$file1->id, $file2->id]);
+    expect($data['params'])->toBe(['page' => 2, 'filter' => 'test']);
 });
 
 test('tab creation accepts optional position', function () {
@@ -184,52 +164,16 @@ test('validation fails when position is negative', function () {
     $response->assertJsonValidationErrors('position');
 });
 
-test('validation fails when query_params is not array', function () {
+test('validation fails when params is not array', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'query_params' => 'not-an-array',
+        'params' => 'not-an-array',
     ]);
 
     $response->assertStatus(422);
-    $response->assertJsonValidationErrors('query_params');
-});
-
-test('validation fails when file_ids is not array', function () {
-    $user = User::factory()->create();
-
-    $response = $this->actingAs($user)->postJson('/api/tabs', [
-        'label' => 'My Tab',
-        'file_ids' => 'not-an-array',
-    ]);
-
-    $response->assertStatus(422);
-    $response->assertJsonValidationErrors('file_ids');
-});
-
-test('validation fails when file_ids contains non-existent file', function () {
-    $user = User::factory()->create();
-
-    $response = $this->actingAs($user)->postJson('/api/tabs', [
-        'label' => 'My Tab',
-        'file_ids' => [99999], // Non-existent file ID
-    ]);
-
-    $response->assertStatus(422);
-    $response->assertJsonValidationErrors('file_ids.0');
-});
-
-test('validation fails when file_ids contains non-integer', function () {
-    $user = User::factory()->create();
-
-    $response = $this->actingAs($user)->postJson('/api/tabs', [
-        'label' => 'My Tab',
-        'file_ids' => ['not-an-integer'],
-    ]);
-
-    $response->assertStatus(422);
-    $response->assertJsonValidationErrors('file_ids.0');
+    $response->assertJsonValidationErrors('params');
 });
 
 test('tab creation defaults to online source type', function () {
@@ -241,12 +185,12 @@ test('tab creation defaults to online source type', function () {
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['query_params']['sourceType'] ?? null)->toBe('online');
+    expect($data['params']['sourceType'] ?? null)->toBe('online');
     $this->assertDatabaseHas('tabs', [
         'id' => $data['id'],
     ]);
     $tab = \App\Models\Tab::find($data['id']);
-    expect($tab->query_params['sourceType'] ?? null)->toBe('online');
+    expect($tab->params['sourceType'] ?? null)->toBe('online');
 });
 
 test('tab creation accepts offline source type', function () {
@@ -254,17 +198,17 @@ test('tab creation accepts offline source type', function () {
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'query_params' => ['sourceType' => 'local'],
+        'params' => ['sourceType' => 'local'],
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['query_params']['sourceType'] ?? null)->toBe('local');
+    expect($data['params']['sourceType'] ?? null)->toBe('local');
     $this->assertDatabaseHas('tabs', [
         'id' => $data['id'],
     ]);
     $tab = \App\Models\Tab::find($data['id']);
-    expect($tab->query_params['sourceType'] ?? null)->toBe('local');
+    expect($tab->params['sourceType'] ?? null)->toBe('local');
 });
 
 test('tab creation accepts online source type', function () {
@@ -272,12 +216,12 @@ test('tab creation accepts online source type', function () {
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'query_params' => ['sourceType' => 'online'],
+        'params' => ['sourceType' => 'online'],
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['query_params']['sourceType'] ?? null)->toBe('online');
+    expect($data['params']['sourceType'] ?? null)->toBe('online');
 });
 
 test('validation fails when sourceType is invalid', function () {
@@ -285,9 +229,9 @@ test('validation fails when sourceType is invalid', function () {
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'query_params' => ['sourceType' => 'invalid'],
+        'params' => ['sourceType' => 'invalid'],
     ]);
 
     $response->assertStatus(422);
-    $response->assertJsonValidationErrors('query_params.sourceType');
+    $response->assertJsonValidationErrors('params.sourceType');
 });

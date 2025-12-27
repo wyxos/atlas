@@ -48,8 +48,6 @@ test('tabs do not include items_data in index response (lazy loading)', function
     $tabData = collect($data)->firstWhere('id', $tab->id);
     // items_data should NOT be included in index response (for performance with 1000+ tabs)
     expect($tabData)->not->toHaveKey('items_data');
-    // file_ids should NOT be included in index response (for performance)
-    expect($tabData)->not->toHaveKey('file_ids');
     // has_files should NOT be included - frontend will check by calling items endpoint
     expect($tabData)->not->toHaveKey('has_files');
 });
@@ -71,8 +69,6 @@ test('tabs do not include file-related data in index response', function () {
     $tabData = collect($data)->firstWhere('id', $tab->id);
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
-    // file_ids should NOT be included in index response
-    expect($tabData)->not->toHaveKey('file_ids');
     // has_files should NOT be included - frontend will check by calling items endpoint
     expect($tabData)->not->toHaveKey('has_files');
 });
@@ -93,8 +89,6 @@ test('tabs do not include file-related data regardless of file count', function 
     $tabData = collect($data)->firstWhere('id', $tab->id);
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
-    // file_ids should NOT be included in index response
-    expect($tabData)->not->toHaveKey('file_ids');
     // has_files should NOT be included - frontend will check by calling items endpoint
     expect($tabData)->not->toHaveKey('has_files');
 });
@@ -110,8 +104,6 @@ test('tabs without files do not include file-related data', function () {
     $tabData = collect($data)->firstWhere('id', $tab->id);
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
-    // file_ids should NOT be included in index response
-    expect($tabData)->not->toHaveKey('file_ids');
     // has_files should NOT be included - frontend will check by calling items endpoint
     expect($tabData)->not->toHaveKey('has_files');
 });
@@ -139,7 +131,7 @@ test('guest cannot view browse tabs', function () {
     $response->assertUnauthorized();
 });
 
-test('tabs include query_params in index response', function () {
+test('tabs include params in index response', function () {
     $user = User::factory()->create();
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
 
@@ -153,9 +145,9 @@ test('tabs include query_params in index response', function () {
     $response->assertSuccessful();
     $data = $response->json();
     $tabData = collect($data)->firstWhere('id', $tab->id);
-    expect($tabData['query_params'])->toBeArray();
-    expect($tabData['query_params']['page'])->toBe(3);
-    expect($tabData['query_params']['next'])->toBe('cursor-123');
+    expect($tabData['params'])->toBeArray();
+    expect($tabData['params']['page'])->toBe(3);
+    expect($tabData['params']['next'])->toBe('cursor-123');
     // items_data should NOT be included
     expect($tabData)->not->toHaveKey('items_data');
 });

@@ -53,7 +53,7 @@ class Browser
         $isLocalMode = false;
         if ($tabId) {
             $tab = \App\Models\Tab::find($tabId);
-            $queryParams = $tab->query_params ?? [];
+            $queryParams = $tab->params ?? [];
             $isLocalMode = isset($queryParams['sourceType']) && $queryParams['sourceType'] === 'local';
         }
 
@@ -144,7 +144,7 @@ class Browser
         // Local mode doesn't attach files to tabs as they get updated every time
         if ($tabId && ! $isLocalMode) {
             $this->attachFilesToTab($tabId, $persisted);
-            // Update tab's query_params with current filter state (backend is responsible for this)
+            // Update tab's params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation
             $this->updateTabQueryParams($tabId, [
                 'service' => $source, // Store the service key as 'service' for frontend compatibility
@@ -228,7 +228,7 @@ class Browser
     }
 
     /**
-     * Update a browse tab's query_params.
+     * Update a browse tab's params.
      *
      * @param  array<string, mixed>  $queryParams
      */
@@ -240,9 +240,9 @@ class Browser
             return; // Tab doesn't exist or user doesn't own it
         }
 
-        // Update query_params with the provided params
+        // Update params with the provided params
         $tab->update([
-            'query_params' => $queryParams,
+            'params' => $queryParams,
         ]);
     }
 }
