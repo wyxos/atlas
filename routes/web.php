@@ -35,6 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/browse', [\App\Http\Controllers\BrowseController::class, 'index'])->name('api.browse.index');
     Route::get('/api/browse/services', [\App\Http\Controllers\BrowseController::class, 'services'])->name('api.browse.services');
     Route::get('/api/tabs', [\App\Http\Controllers\TabController::class, 'index'])->name('api.tabs.index');
+    Route::get('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'show'])->name('api.tabs.show');
     Route::get('/api/tabs/{tab}/items', [\App\Http\Controllers\TabController::class, 'items'])->name('api.tabs.items');
     Route::post('/api/tabs', [\App\Http\Controllers\TabController::class, 'store'])->name('api.tabs.store');
     Route::put('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'update'])->name('api.tabs.update');

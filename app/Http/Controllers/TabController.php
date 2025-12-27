@@ -42,9 +42,6 @@ class TabController extends Controller
             ->max('position') ?? -1;
 
         $params = $request->params ?? [];
-        if (! isset($params['feed'])) {
-            $params['feed'] = 'online';
-        }
 
         $tab = Tab::create([
             'user_id' => $userId,
@@ -101,10 +98,10 @@ class TabController extends Controller
     }
 
     /**
-     * Get items for a specific tab.
-     * This endpoint is used to lazy-load items when restoring a tab.
+     * Get a single tab with its items.
+     * This endpoint returns the tab data including itemsData for restoring a tab.
      */
-    public function items(Tab $tab): JsonResponse
+    public function show(Tab $tab): JsonResponse
     {
         /** @var Guard $auth */
         $auth = auth();
@@ -175,6 +172,16 @@ class TabController extends Controller
                 'isActive' => $tab->is_active ?? false,
             ],
         ]);
+    }
+
+    /**
+     * Get items for a specific tab.
+     * This endpoint is used to lazy-load items when restoring a tab.
+     * @deprecated Use show() method instead
+     */
+    public function items(Tab $tab): JsonResponse
+    {
+        return $this->show($tab);
     }
 
     /**
