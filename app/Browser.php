@@ -190,6 +190,7 @@ class Browser
         return [
             'items' => $items,
             'filter' => [
+                'service' => $source, // Store the service key as 'service' for frontend compatibility
                 ...$service->defaultParams(),
                 ...$filter,
                 'page' => request()->input('page', 1),
