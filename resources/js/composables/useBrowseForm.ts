@@ -33,22 +33,9 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         tab_id: null,
     };
 
-    /**
-     * Get form data from tab params
-     */
-    function getFormDataFromTab(tab?: TabData): Partial<BrowseFormData> | undefined {
-        if (!tab?.params) {
-            return undefined;
-        }
-        return {
-            ...tab.params,
-            tab_id: tab.id,
-        };
-    }
-
     const data = reactive<BrowseFormData>({
         ...defaultData,
-        ...getFormDataFromTab(options?.tab),
+        ...(options?.tab?.params ? { ...options.tab.params, tab_id: options.tab.id } : {}),
     });
 
     const errors = reactive<Partial<Record<keyof BrowseFormData, string>>>({});
@@ -59,12 +46,8 @@ function createFormInstance(options?: UseBrowseFormOptions) {
      * Sync form data from tab
      */
     function syncFromTab(tab?: TabData): void {
-        const formData = getFormDataFromTab(tab);
-        if (formData) {
-            Object.assign(data, formData);
-            if (tab?.id) {
-                data.tab_id = tab.id;
-            }
+        if (tab?.params) {
+            Object.assign(data, tab.params, { tab_id: tab.id });
         } else {
             reset();
         }
@@ -74,7 +57,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
      * Reset the form to initial values
      */
     function reset(): void {
-        Object.assign(data, defaultData, getFormDataFromTab(options?.tab));
+        Object.assign(data, defaultData, options?.tab?.params ? { ...options.tab.params, tab_id: options.tab.id } : {});
         clearErrors();
         wasSuccessful.value = false;
     }
