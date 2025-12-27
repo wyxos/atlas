@@ -167,6 +167,9 @@ class Browser
         // Local mode doesn't attach files to tabs as they get updated every time
         if ($tabId && ! $isLocalMode) {
             $this->attachFilesToTab($tabId, $persisted);
+        }
+
+        if($tabId){
             // Update tab's params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation
             $this->updateTabParams($tabId, [
