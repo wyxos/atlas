@@ -1,7 +1,5 @@
 - [ ] Browse feature improvements
     - [ ] Local files support
-        - [ ] Render local files in browse interface
-        - [ ] Handle page refresh instead of backfill for local files
     - [ ] Video handling
       - [ ] Display video from CivitAI in masonry and fileviewer 
       - [ ] Implement video playback and controls in browse interface
