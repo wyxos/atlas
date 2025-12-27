@@ -163,7 +163,7 @@ class TabController extends Controller
             $itemsData = Tab::formatFilesToItems($files, $page);
         }
 
-        $params = $tab->params ?? [];
+        $params = $tab->params ?? (object) [];
 
         return response()->json([
             'tab' => [
