@@ -488,7 +488,7 @@ describe('TabContent - Container Badges', () => {
     const createMockTab = (overrides = {}) => ({
         id: 1,
         label: 'Test Tab',
-        queryParams: { service: 'test-service', page: 1, next: null },
+        params: { service: 'test-service', page: 1, next: null },
         itemsData: [],
         position: 0,
         isActive: true,

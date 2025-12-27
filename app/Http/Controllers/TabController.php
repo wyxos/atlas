@@ -41,15 +41,15 @@ class TabController extends Controller
         $maxPosition = Tab::forUser($userId)
             ->max('position') ?? -1;
 
-        $queryParams = $request->params ?? [];
-        if (! isset($queryParams['sourceType'])) {
-            $queryParams['sourceType'] = 'online';
+        $params = $request->params ?? [];
+        if (! isset($params['feed'])) {
+            $params['feed'] = 'online';
         }
 
         $tab = Tab::create([
             'user_id' => $userId,
             'label' => $request->label,
-            'params' => $queryParams,
+            'params' => $params,
             'position' => $request->position ?? ($maxPosition + 1),
         ]);
 
@@ -163,13 +163,13 @@ class TabController extends Controller
             $itemsData = Tab::formatFilesToItems($files, $page);
         }
 
-        $queryParams = $tab->params ?? [];
+        $params = $tab->params ?? [];
 
         return response()->json([
             'tab' => [
                 'id' => $tab->id,
                 'label' => $tab->label,
-                'params' => $queryParams,
+                'params' => $params,
                 'itemsData' => $itemsData,
                 'position' => $tab->position ?? 0,
                 'isActive' => $tab->is_active ?? false,

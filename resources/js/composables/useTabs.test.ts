@@ -74,19 +74,19 @@ describe('useTabs', () => {
         expect(isLoadingTabs.value).toBe(false);
     });
 
-    it('loads tabs with sourceType in params', async () => {
+    it('loads tabs with feed in params', async () => {
         const mockTabs = [
             {
                 id: 1,
                 label: 'Online Tab',
-                params: { page: 1, sourceType: 'online' },
+                params: { page: 1, feed: 'online' },
                 position: 0,
                 is_active: false,
             },
             {
                 id: 2,
                 label: 'Offline Tab',
-                params: { page: 1, sourceType: 'local' },
+                params: { page: 1, feed: 'local' },
                 position: 1,
                 is_active: false,
             },
@@ -98,11 +98,11 @@ describe('useTabs', () => {
 
         await loadTabs();
 
-        expect(tabs.value[0].sourceType).toBe('online');
-        expect(tabs.value[1].sourceType).toBe('local');
+        expect(tabs.value[0].feed).toBe('online');
+        expect(tabs.value[1].feed).toBe('local');
     });
 
-    it('defaults sourceType to online when not provided', async () => {
+    it('defaults feed to online when not provided', async () => {
         const mockTabs = [
             {
                 id: 1,
@@ -119,7 +119,7 @@ describe('useTabs', () => {
 
         await loadTabs();
 
-        expect(tabs.value[0].sourceType).toBe('online');
+        expect(tabs.value[0].feed).toBe('online');
     });
 
     it('sorts tabs by position', async () => {
@@ -313,21 +313,21 @@ describe('useTabs', () => {
         const itemsData = [
             { id: 1, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false },
         ];
-        // QueryParams are preserved from existing tab state (not updated by frontend)
-        const existingQueryParams = tabs.value.find(t => t.id === 1)?.params || {};
+        // params are preserved from existing tab state (not updated by frontend)
+        const existingParams = tabs.value.find(t => t.id === 1)?.params || {};
 
         updateActiveTab(itemsData);
 
         const activeTab = tabs.value.find(t => t.id === 1);
         expect(activeTab).toBeDefined();
         expect(activeTab?.itemsData).toEqual(itemsData);
-        // QueryParams should be preserved (not updated by frontend)
-        expect(activeTab?.params).toEqual(existingQueryParams);
+        // params should be preserved (not updated by frontend)
+        expect(activeTab?.params).toEqual(existingParams);
 
         // Wait for debounce
         await new Promise(resolve => setTimeout(resolve, 600));
 
-        // QueryParams are managed by the backend (Browser.php), not sent from frontend
+        // params are managed by the backend (Browser.php), not sent from frontend
         expect(mockAxios.put).toHaveBeenCalledWith('/api/tabs/1', {
             label: 'Tab 1',
             position: 0,

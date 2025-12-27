@@ -400,7 +400,7 @@ describe('Browse - Tab Management', () => {
 
         expect(vm.activeTabId).toBe(newTabId);
         expect(vm.tabs.length).toBe(1);
-        expect(vm.tabs[0].queryParams.page).toBeUndefined();
+        expect(vm.tabs[0].params.page).toBeUndefined();
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         // Masonry is always mounted; new tabs show the "Start Browsing" form inside it.

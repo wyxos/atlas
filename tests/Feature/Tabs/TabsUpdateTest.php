@@ -121,42 +121,42 @@ test('updating non-existent tab returns 404', function () {
 
 test('tab update can change source type to local', function () {
     $user = User::factory()->create();
-    $tab = Tab::factory()->for($user)->create(['params' => ['sourceType' => 'online']]);
+    $tab = Tab::factory()->for($user)->create(['params' => ['feed' => 'online']]);
 
     $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
-        'params' => ['sourceType' => 'local'],
+        'params' => ['feed' => 'local'],
     ]);
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['params']['sourceType'] ?? null)->toBe('local');
+    expect($data['params']['feed'] ?? null)->toBe('local');
     $tab->refresh();
-    expect($tab->params['sourceType'] ?? null)->toBe('local');
+    expect($tab->params['feed'] ?? null)->toBe('local');
 });
 
 test('tab update can change source type to online', function () {
     $user = User::factory()->create();
-    $tab = Tab::factory()->for($user)->create(['params' => ['sourceType' => 'local']]);
+    $tab = Tab::factory()->for($user)->create(['params' => ['feed' => 'local']]);
 
     $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
-        'params' => ['sourceType' => 'online'],
+        'params' => ['feed' => 'online'],
     ]);
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['params']['sourceType'] ?? null)->toBe('online');
+    expect($data['params']['feed'] ?? null)->toBe('online');
     $tab->refresh();
-    expect($tab->params['sourceType'] ?? null)->toBe('online');
+    expect($tab->params['feed'] ?? null)->toBe('online');
 });
 
-test('validation fails when sourceType is invalid', function () {
+test('validation fails when feed is invalid', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
     $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
-        'params' => ['sourceType' => 'invalid'],
+        'params' => ['feed' => 'invalid'],
     ]);
 
     $response->assertStatus(422);
-    $response->assertJsonValidationErrors('params.sourceType');
+    $response->assertJsonValidationErrors('params.feed');
 });

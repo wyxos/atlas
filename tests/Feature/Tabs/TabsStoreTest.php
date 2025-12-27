@@ -185,12 +185,12 @@ test('tab creation defaults to online source type', function () {
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['params']['sourceType'] ?? null)->toBe('online');
+    expect($data['params']['feed'] ?? null)->toBe('online');
     $this->assertDatabaseHas('tabs', [
         'id' => $data['id'],
     ]);
     $tab = \App\Models\Tab::find($data['id']);
-    expect($tab->params['sourceType'] ?? null)->toBe('online');
+    expect($tab->params['feed'] ?? null)->toBe('online');
 });
 
 test('tab creation accepts offline source type', function () {
@@ -198,17 +198,17 @@ test('tab creation accepts offline source type', function () {
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'params' => ['sourceType' => 'local'],
+        'params' => ['feed' => 'local'],
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['params']['sourceType'] ?? null)->toBe('local');
+    expect($data['params']['feed'] ?? null)->toBe('local');
     $this->assertDatabaseHas('tabs', [
         'id' => $data['id'],
     ]);
     $tab = \App\Models\Tab::find($data['id']);
-    expect($tab->params['sourceType'] ?? null)->toBe('local');
+    expect($tab->params['feed'] ?? null)->toBe('local');
 });
 
 test('tab creation accepts online source type', function () {
@@ -216,22 +216,22 @@ test('tab creation accepts online source type', function () {
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'params' => ['sourceType' => 'online'],
+        'params' => ['feed' => 'online'],
     ]);
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['params']['sourceType'] ?? null)->toBe('online');
+    expect($data['params']['feed'] ?? null)->toBe('online');
 });
 
-test('validation fails when sourceType is invalid', function () {
+test('validation fails when feed is invalid', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
         'label' => 'My Tab',
-        'params' => ['sourceType' => 'invalid'],
+        'params' => ['feed' => 'invalid'],
     ]);
 
     $response->assertStatus(422);
-    $response->assertJsonValidationErrors('params.sourceType');
+    $response->assertJsonValidationErrors('params.feed');
 });

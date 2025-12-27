@@ -9,7 +9,7 @@ import type { MasonryInstance } from '@wyxos/vibe';
 interface Props {
     items: MasonryItem[];
     masonry: MasonryInstance | null;
-    tab: { queryParams?: { page?: string | number; next?: string | number | null } } | null;
+    tab: { params?: { page?: string | number; next?: string | number | null } } | null;
     isLoading?: boolean;
     backfill: BackfillState;
     visible?: boolean;
@@ -21,8 +21,8 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 // Display page value - masonry.currentPage already contains the cursor string for cursor-based pagination.
-// Fallback to tab.queryParams.page when masonry isn't initialized yet.
-const displayPage = computed(() => props.masonry?.currentPage ?? props.tab?.queryParams?.page ?? 1);
+// Fallback to tab.params.page when masonry isn't initialized yet.
+const displayPage = computed(() => props.masonry?.currentPage ?? props.tab?.params?.page ?? 1);
 
 // Get next cursor directly from masonry - the last item in paginationHistory is the next page/cursor
 const nextCursor = computed(() => {
