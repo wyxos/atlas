@@ -84,10 +84,6 @@ watch(
         }
         itemsMap.value = newMap;
 
-        // Keep parent tab state in sync with the currently rendered items.
-        // This is used for tab restoration and for Browse page tests.
-        props.updateActiveTab(newItems);
-
         // Diagnostic: Log item size analysis when items change (only in dev mode)
         if (import.meta.env.DEV && newItems.length > 0) {
             // Only log when we have a significant number of items to avoid spam
