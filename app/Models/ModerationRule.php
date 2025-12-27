@@ -23,8 +23,6 @@ class ModerationRule extends Model
 
     /**
      * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
      */
     protected function casts(): array
     {
@@ -40,8 +38,6 @@ class ModerationRule extends Model
 
     /**
      * Convert the rule to a node structure.
-     *
-     * @return array<string, mixed>
      */
     public function toNode(): array
     {

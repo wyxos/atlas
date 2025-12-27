@@ -55,8 +55,6 @@ abstract class BaseService
 
     /**
      * Persist transformed rows using the shared BrowsePersister helper.
-     *
-     * @return array<int, File>
      */
     public function persists(array $transformedItems): array
     {
@@ -66,8 +64,6 @@ abstract class BaseService
     /**
      * Validate download consistency after a file has been downloaded.
      * Services can override this to perform source-specific validation.
-     *
-     * @return bool True if download is valid, false if it needs to be fixed
      */
     public function validateDownload(File $file): bool
     {
@@ -78,8 +74,6 @@ abstract class BaseService
      * Get the container types that are eligible for blacklisting.
      * Services should override this to define which container types can be blacklisted.
      * For example, users and models can be blacklisted, but posts cannot.
-     *
-     * @return array<string> Array of container type strings (e.g., ['user', 'model'])
      */
     public function getBlacklistableContainerTypes(): array
     {

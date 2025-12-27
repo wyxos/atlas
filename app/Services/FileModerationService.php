@@ -23,9 +23,6 @@ final class FileModerationService extends BaseModerationService
 
     /**
      * Apply file moderation rules to files based on their action_type.
-     *
-     * @param  Collection<int, File>  $files
-     * @return array{flaggedIds:array<int>, processedIds:array<int>}
      */
     public function moderate(Collection $files): array
     {

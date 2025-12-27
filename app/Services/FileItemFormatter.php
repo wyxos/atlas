@@ -10,11 +10,6 @@ class FileItemFormatter
 {
     /**
      * Format files into items structure for frontend.
-     *
-     * @param  Collection<int, File>|array<int, File>  $files
-     * @param  int|string  $page  Page number or cursor for pagination tracking
-     * @param  array<int>  $willAutoDislikeIds  IDs of files to flag with will_auto_dislike = true (includes both moderation and container blacklist)
-     * @return array<int, array<string, mixed>>
      */
     public static function format($files, int|string $page = 1, array $willAutoDislikeIds = []): array
     {

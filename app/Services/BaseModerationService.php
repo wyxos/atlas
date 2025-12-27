@@ -50,9 +50,6 @@ abstract class BaseModerationService
 
     /**
      * Process files and apply moderation rules.
-     *
-     * @param  Collection<int, File>  $files
-     * @return array{flaggedIds:array<int>, processedIds:array<int>, immediateActions:array<int, array{file_id:int, action_type:string}>}
      */
     public function process(Collection $files): array
     {
@@ -137,8 +134,6 @@ abstract class BaseModerationService
 
     /**
      * Process files with auto-dislike and blacklist actions.
-     *
-     * @return array<int> Combined processed file IDs
      */
     protected function processFiles(): array
     {
@@ -190,8 +185,6 @@ abstract class BaseModerationService
 
     /**
      * Create an empty result structure.
-     *
-     * @return array{flaggedIds:array<int>, processedIds:array<int>, immediateActions:array<int, array{file_id:int, action_type:string}>}
      */
     protected function emptyResult(): array
     {
@@ -214,16 +207,11 @@ abstract class BaseModerationService
 
     /**
      * Get the matched rule/container for a file.
-     *
-     * @return object|null The matched rule/container, or null if no match
      */
     abstract protected function getMatchForFile(File $file): ?object;
 
     /**
      * Get the action type from a matched rule/container.
-     *
-     * @param  object  $match  The matched rule/container
-     * @return string The action type
      */
     abstract protected function getActionType(object $match): string;
 }

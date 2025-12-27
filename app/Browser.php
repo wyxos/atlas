@@ -200,8 +200,6 @@ class Browser
 
     /**
      * Get available browse services.
-     *
-     * @return array<string, class-string<BaseService>>
      */
     protected function getAvailableServices(): array
     {
@@ -214,8 +212,6 @@ class Browser
 
     /**
      * Attach files to a browse tab with positions.
-     *
-     * @param  array<int, \App\Models\File>  $files
      */
     protected function attachFilesToTab(int $tabId, array $files): void
     {
@@ -252,8 +248,6 @@ class Browser
 
     /**
      * Update a browse tab's params.
-     *
-     * @param  array<string, mixed>  $params
      */
     protected function updateTabParams(int $tabId, array $params): void
     {

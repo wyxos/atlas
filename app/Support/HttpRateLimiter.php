@@ -15,9 +15,6 @@ class HttpRateLimiter
 {
     /**
      * Make an HTTP request with rate limiting and retry logic for 429 errors and connection timeouts.
-     *
-     * @param  callable(): PendingRequest  $clientFactory
-     * @param  array<string, mixed>  $options
      */
     public static function requestWithRetry(
         callable $clientFactory,

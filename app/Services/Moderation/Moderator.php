@@ -268,9 +268,6 @@ final class Moderator
     /**
      * Clean and normalize the list of terms, dropping empties.
      * Terms can be strings or objects with 'term' and optional 'allow_digit_prefix' flag.
-     *
-     * @param  array<int, mixed>  $terms
-     * @return array<int, array{term: string, allow_digit_prefix: bool}>
      */
     private function sanitizeTerms(array $terms): array
     {
@@ -297,8 +294,6 @@ final class Moderator
 
     /**
      * Extract matching options with sensible defaults.
-     *
-     * @return array{case_sensitive: bool, whole_word: bool, allow_digit_prefix: bool}
      */
     private function extractOptions(array $node): array
     {
