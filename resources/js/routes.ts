@@ -18,12 +18,6 @@ const routes: RouteRecordRaw[] = [
         meta: { layout: 'DashboardLayout' },
     },
     {
-        path: '/browse-v2',
-        name: 'browse-v2',
-        component: () => import('./pages/BrowseV2.vue'),
-        meta: { layout: 'DashboardLayout' },
-    },
-    {
         path: '/audio',
         name: 'audio',
         component: () => import('./pages/Audio.vue'),
