@@ -286,6 +286,17 @@ async function getPage(page: number | string, context?: BrowseFormData) {
     };
 }
 
+async function applyFilters() {
+    // cancel ongoing load
+    masonry.value.cancelLoad();
+    // clear all items and pagination history
+    masonry.value.clear();
+    shouldShowForm.value = false;
+    form.data.page = 1;
+    form.data.next = null;
+    await masonry.value.loadPage(1)
+}
+
 async function applyService() {
     shouldShowForm.value = false;
     masonry.value.reset();
@@ -701,7 +712,7 @@ onMounted(async () => {
                     nextPage
                 );
 
-                if(tab.value.params.feed === 'local'){
+                if (tab.value.params.feed === 'local') {
                     // In local feed, we need to load the first page to kick off loading
                     await masonry.value.loadPage(currentPage);
                 }
@@ -711,6 +722,8 @@ onMounted(async () => {
 
     await fetchServices();
 });
+
+
 
 // Cleanup on unmount
 onUnmounted(() => {
@@ -765,7 +778,8 @@ defineExpose({
                 </div>
                 <!-- Filters Button (Primary) -->
                 <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
-                    :masonry="masonry" :is-masonry-loading="masonry.isLoading" @reset="handleResetFilters" />
+                    :masonry="masonry" :is-masonry-loading="masonry.isLoading" @reset="handleResetFilters"
+                    @apply="applyFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry.isLoading" @rules-changed="handleModerationRulesChanged" />
@@ -803,9 +817,10 @@ defineExpose({
             <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-page="getPage" :context="masonryContext"
-                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual" :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'"
-                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @loading:start="handleLoadingStart"
-                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual"
+                    :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'" :backfill-delay-ms="2000"
+                    :backfill-max-calls="Infinity" @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
+                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
                     data-test="masonry-component">
