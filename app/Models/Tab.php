@@ -53,8 +53,6 @@ class Tab extends Model
 
     /**
      * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
      */
     protected function casts(): array
     {
@@ -101,9 +99,6 @@ class Tab extends Model
 
     /**
      * Format files into items structure for frontend.
-     *
-     * @param  \Illuminate\Database\Eloquent\Collection<int, \App\Models\File>  $files
-     * @return array<int, array<string, mixed>>
      */
     public static function formatFilesToItems($files, int $page = 1): array
     {

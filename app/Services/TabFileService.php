@@ -27,8 +27,6 @@ class TabFileService
 
     /**
      * Detach multiple files from all tabs belonging to a user.
-     *
-     * @param  array<int>  $fileIds
      */
     public function detachFilesFromUserTabs(int $userId, array $fileIds): void
     {

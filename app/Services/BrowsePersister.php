@@ -11,8 +11,6 @@ class BrowsePersister
 {
     /**
      * Persist transformed rows produced by a browse service.
-     *
-     * @return array<int, File> Persisted files that are ready for UI consumption.
      */
     public function persist(array $transformedItems): array
     {

@@ -30,8 +30,6 @@ class File extends Model
 
     /**
      * The attributes that should be cast.
-     *
-     * @return array<string, string>
      */
     protected function casts(): array
     {
@@ -57,11 +55,6 @@ class File extends Model
      *
      * Structure: {type}/{hash[0:2]}/{hash[2:4]}/{filename}
      * Example: images/ab/cd/abcdef123456.jpg
-     *
-     * @param  string  $type  The file type directory (images, audio, videos)
-     * @param  string  $filename  The filename
-     * @param  string|null  $hash  Optional hash to use for subfolder generation (falls back to filename hash)
-     * @return string The storage path relative to storage/app/private
      */
     public static function generateStoragePath(string $type, string $filename, ?string $hash = null): string
     {

@@ -14,8 +14,6 @@ class LocalService extends BaseService
 
     /**
      * Fetch local files from database (will use Scout when installed).
-     *
-     * @return array{files: array<int, File>, metadata: array{nextCursor: int|null}}
      */
     public function fetch(array $params = []): array
     {

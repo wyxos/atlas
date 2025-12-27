@@ -9,13 +9,6 @@ class BrowseModerationService
 {
     /**
      * Process moderation for browse files.
-     *
-     * @param  Collection<int, File>|array<int, File>  $files
-     * @return array{
-     *     files: array<int, File>,
-     *     flaggedIds: array<int>,
-     *     immediateActions: array<int, array{id: int, action_type: string, thumbnail?: string}>
-     * }
      */
     public function process(Collection|array $files): array
     {
