@@ -1193,6 +1193,7 @@ defineExpose({
                 <div v-if="overlayFillComplete && !overlayIsClosing"
                     class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
                     <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
+                        :reaction="items[currentItemIndex]?.reaction"
                         :previewed-count="(items[currentItemIndex]?.previewed_count as number) ?? 0"
                         :viewed-count="(items[currentItemIndex]?.seen_count as number) ?? 0"
                         :current-index="currentItemIndex ?? undefined" :total-items="items.length"

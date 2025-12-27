@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Reaction;
 
 class File extends Model
 {
@@ -77,11 +78,6 @@ class File extends Model
 
     /**
      * Get the full storage path for a file, ensuring directories exist.
-     *
-     * @param  string  $type  The file type directory (images, audio, videos)
-     * @param  string  $filename  The filename
-     * @param  string|null  $hash  Optional hash to use for subfolder generation
-     * @return string The full absolute path where the file should be stored
      */
     public static function getStoragePath(string $type, string $filename, ?string $hash = null): string
     {
@@ -111,5 +107,13 @@ class File extends Model
     public function containers(): BelongsToMany
     {
         return $this->belongsToMany(Container::class);
+    }
+
+    /**
+     * Get all reactions for this file.
+     */
+    public function reactions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Reaction::class);
     }
 }
