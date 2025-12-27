@@ -658,6 +658,31 @@ onMounted(async () => {
         if (data.tab) {
             tab.value = data.tab;
             form.syncFromTab(tab.value);
+
+            // Check if params is not an empty object (has keys) - means a search has been applied
+            if (tab.value && tab.value.params && Object.keys(tab.value.params).length > 0) {
+                // Scenario 2: Restore items and pagination state
+                // Wait for masonry to be fully mounted
+                await nextTick();
+
+                if (masonry.value && tab.value) {
+                    // Hide form since we're restoring a search
+                    shouldShowForm.value = false;
+                    isTabRestored.value = true;
+
+                    const itemsToRestore = tab.value.itemsData || [];
+                    const currentPage = tab.value.params.page || 1;
+                    const nextPage = tab.value.params.next || null;
+
+                    // Restore items and pagination state to masonry
+                    // Even if itemsToRestore is empty, we restore pagination state so masonry knows where to continue
+                    masonry.value.initialize(
+                        itemsToRestore,
+                        currentPage,
+                        nextPage
+                    );
+                }
+            }
         }
 
         await fetchServices();
@@ -913,8 +938,7 @@ defineExpose({
                                     <Transition name="fade">
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
                                             class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                            <FileReactions :file-id="slotItem.id"
-                                                :reaction="slotItem.reaction"
+                                            <FileReactions :file-id="slotItem.id" :reaction="slotItem.reaction"
                                                 :previewed-count="slotItem.previewed_count"
                                                 :viewed-count="slotItem.seen_count" :current-index="index"
                                                 :total-items="items.length" variant="small"
