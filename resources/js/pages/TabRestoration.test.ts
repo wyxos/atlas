@@ -152,7 +152,7 @@ describe('Browse - Tab Restoration', () => {
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+            params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
             items: mockItems,
         });
 
@@ -172,7 +172,7 @@ describe('Browse - Tab Restoration', () => {
         }
     });
 
-    it('loads tab items when file_ids exist', async () => {
+    it('loads tab items when items exist', async () => {
         const tabId = 1;
         const mockItems = [
             { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
@@ -180,8 +180,7 @@ describe('Browse - Tab Restoration', () => {
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            query_params: { service: 'civit-ai-images', page: 1 },
-            file_ids: [1, 2],
+            params: { service: 'civit-ai-images', page: 1 },
             items: mockItems,
         });
 
@@ -202,8 +201,7 @@ describe('Browse - Tab Restoration', () => {
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            query_params: { service: 'civit-ai-images', page: 1 },
-            file_ids: [1, 2],
+            params: { service: 'civit-ai-images', page: 1 },
             items: mockItems,
         });
 
@@ -225,10 +223,10 @@ describe('Browse - Tab Restoration', () => {
 
         const tabConfigs = [
             createMockTabConfig(tab1Id, {
-                query_params: { service: 'civit-ai-images', page: 1 },
+                params: { service: 'civit-ai-images', page: 1 },
             }),
             createMockTabConfig(tab2Id, {
-                query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+                params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
                 position: 1,
             }),
         ];
@@ -254,7 +252,7 @@ describe('Browse - Tab Restoration', () => {
         }
     });
 
-    it('restores items when switching to tab with file_ids', async () => {
+    it('restores items when switching to tab with items', async () => {
         const tab1Id = 1;
         const tab2Id = 2;
         const mockItems = [
@@ -264,11 +262,10 @@ describe('Browse - Tab Restoration', () => {
 
         const tabConfigs = [
             createMockTabConfig(tab1Id, {
-                query_params: { service: 'civit-ai-images', page: 1 },
+                params: { service: 'civit-ai-images', page: 1 },
             }),
             createMockTabConfig(tab2Id, {
-                query_params: { service: 'civit-ai-images', page: 1 },
-                file_ids: [3, 4],
+                params: { service: 'civit-ai-images', page: 1 },
                 items: mockItems,
                 position: 1,
             }),
@@ -302,7 +299,7 @@ describe('Browse - Tab Restoration', () => {
         };
 
         const tabConfig = createMockTabConfig(tabId, {
-            query_params: { service: 'civit-ai-images', page: 1, next: nextParam },
+            params: { service: 'civit-ai-images', page: 1, next: nextParam },
         });
 
         setupAxiosMocks(mocks, tabConfig, browseResponse);
@@ -345,8 +342,7 @@ describe('Browse - Tab Restoration', () => {
         }));
 
         const tabConfig = createMockTabConfig(tabId, {
-            query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
-            file_ids: mockItems.map(item => item.id),
+            params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
             items: mockItems,
         });
 
@@ -381,7 +377,7 @@ describe('Browse - Tab Restoration', () => {
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            query_params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
+            params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
             items: mockItems,
         });
 
@@ -413,8 +409,7 @@ describe('Browse - Tab Restoration', () => {
             data: {
                 id: 2,
                 label: 'Browse 2',
-                query_params: { page: 1 },
-                file_ids: [],
+                params: { page: 1 },
                 position: 1,
             },
         });

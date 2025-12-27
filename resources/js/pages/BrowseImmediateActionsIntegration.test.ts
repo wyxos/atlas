@@ -131,7 +131,7 @@ describe('Browse - Immediate Actions Integration', () => {
 
     it('collects immediate actions when files are auto-disliked', async () => {
         const tabConfig = createMockTabConfig(1, {
-            query_params: { service: 'civit-ai-images', page: 1 },
+            params: { service: 'civit-ai-images', page: 1 },
         });
 
         const immediateActions = [

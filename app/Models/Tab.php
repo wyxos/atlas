@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int id
  * @property int user_id
  * @property string label
- * @property array|null query_params
+ * @property array|null params
  * @property int position
  * @property bool is_active
  * @property Carbon|null created_at
@@ -46,7 +46,7 @@ class Tab extends Model
     protected $fillable = [
         'user_id',
         'label',
-        'query_params',
+        'params',
         'position',
         'is_active',
     ];
@@ -59,7 +59,7 @@ class Tab extends Model
     protected function casts(): array
     {
         return [
-            'query_params' => 'array',
+            'params' => 'array',
             'position' => 'integer',
             'is_active' => 'boolean',
         ];

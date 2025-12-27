@@ -41,7 +41,7 @@ class TabController extends Controller
         $maxPosition = Tab::forUser($userId)
             ->max('position') ?? -1;
 
-        $queryParams = $request->query_params ?? [];
+        $queryParams = $request->params ?? [];
         if (! isset($queryParams['sourceType'])) {
             $queryParams['sourceType'] = 'online';
         }
@@ -49,24 +49,11 @@ class TabController extends Controller
         $tab = Tab::create([
             'user_id' => $userId,
             'label' => $request->label,
-            'query_params' => $queryParams,
+            'params' => $queryParams,
             'position' => $request->position ?? ($maxPosition + 1),
         ]);
 
-        // Sync files if file_ids are provided
-        if ($request->has('file_ids') && is_array($request->file_ids)) {
-            $fileIds = $request->file_ids;
-            $syncData = [];
-            foreach ($fileIds as $index => $fileId) {
-                $syncData[$fileId] = ['position' => $index];
-            }
-            $tab->files()->sync($syncData);
-        }
-
         $tab->load('files.metadata');
-
-        // Add file_ids to response for frontend compatibility
-        $tab->file_ids = $tab->files->pluck('id')->toArray();
 
         return response()->json($tab, 201);
     }
@@ -87,25 +74,9 @@ class TabController extends Controller
 
         $validated = $request->validated();
 
-        // Extract file_ids before updating (they're not a fillable attribute)
-        $fileIds = $validated['file_ids'] ?? null;
-        unset($validated['file_ids']);
-
         $tab->update($validated);
 
-        // Sync files if file_ids are provided
-        if ($fileIds !== null && is_array($fileIds)) {
-            $syncData = [];
-            foreach ($fileIds as $index => $fileId) {
-                $syncData[$fileId] = ['position' => $index];
-            }
-            $tab->files()->sync($syncData);
-        }
-
         $tab->load('files.metadata');
-
-        // Add file_ids to response for frontend compatibility
-        $tab->file_ids = $tab->files->pluck('id')->toArray();
 
         return response()->json($tab);
     }
@@ -185,14 +156,14 @@ class TabController extends Controller
         $itemsData = [];
 
         if ($files->isNotEmpty()) {
-            // Get page from query_params, default to 1
-            $page = isset($tab->query_params['page']) && is_numeric($tab->query_params['page'])
-                ? (int) $tab->query_params['page']
+            // Get page from params, default to 1
+            $page = isset($tab->params['page']) && is_numeric($tab->params['page'])
+                ? (int) $tab->params['page']
                 : 1;
             $itemsData = Tab::formatFilesToItems($files, $page);
         }
 
-        $queryParams = $tab->query_params ?? [];
+        $queryParams = $tab->params ?? [];
 
         return response()->json([
             'tab' => [

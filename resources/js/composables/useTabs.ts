@@ -21,7 +21,7 @@ export type MasonryItem = {
 export type TabData = {
     id: number;
     label: string;
-    queryParams: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
+    params: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
     itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
     isActive: boolean;
@@ -44,12 +44,12 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             tabs.value = data.map((tab: {
                 id: number;
                 label: string;
-                query_params?: Record<string, string | number | null>;
+                params?: Record<string, string | number | null>;
                 items?: MasonryItem[]; // Not included in initial load, loaded lazily when restoring a tab
                 position?: number;
                 is_active?: boolean;
             }) => {
-                const queryParams = tab.query_params || {};
+                const queryParams = tab.params || {};
                 return {
                     id: tab.id,
                     label: tab.label,
@@ -80,7 +80,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         const newTab: TabData = {
             id: 0, // Temporary ID, will be set from response
             label: `Browse ${tabs.value.length + 1}`,
-            queryParams: {
+            params: {
                 // Don't set page or service - user must select service first
             },
             itemsData: [],
@@ -91,14 +91,14 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         try {
             const response = await window.axios.post(tabsStore.url(), {
                 label: newTab.label,
-                query_params: newTab.queryParams,
+                params: newTab.queryParams,
                 position: newTab.position,
             });
 
             const data = response.data;
             newTab.id = data.id;
             newTab.isActive = data.is_active ?? false;
-            const queryParams = data.query_params || {};
+            const queryParams = data.params || {};
             newTab.queryParams = queryParams;
             newTab.sourceType = (queryParams.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local';
             tabs.value.push(newTab);
@@ -174,8 +174,8 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             void saveTab(activeTab);
             return;
         }
-        // Note: queryParams are updated by the backend (Browser.php) when browse requests are made.
-        // Frontend only updates itemsData (and therefore file_ids), not queryParams.
+        // Note: params are updated by the backend (Browser.php) when browse requests are made.
+        // Frontend only updates itemsData, not params.
         saveTabDebounced(activeTab);
     }
 
@@ -191,14 +191,14 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
 
     async function saveTab(tab: TabData): Promise<void> {
         try {
-            // Save UI-managed fields (label, position) and the files in this tab (file_ids).
-            // query_params are managed by the backend (Browser.php) and should not be updated from frontend.
-            // The backend updates query_params when browse requests are made with tab_id.
+            // Save UI-managed fields (label, position).
+            // params are managed by the backend (Browser.php) and should not be updated from frontend.
+            // The backend updates params when browse requests are made with tab_id.
+            // Files are managed via the tab_file relationship, not through file_ids.
             await window.axios.put(tabsUpdate.url(tab.id), {
                 label: tab.label,
                 position: tab.position,
-                file_ids: tab.itemsData.map((item) => item.id),
-                // Do not send query_params - backend manages them.
+                // Do not send params - backend manages them.
             });
         } catch (error) {
             console.error('Failed to save tab:', error);

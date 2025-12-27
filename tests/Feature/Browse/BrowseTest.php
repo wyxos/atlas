@@ -15,7 +15,7 @@ it('restores cursor values for a browsed tab after reload', function () {
     // Persist a tab that already scrolled deep into CivitAI (cursor pagination)
     $tab = Tab::factory()
         ->for($user)
-        ->withQueryParams([
+        ->withParams([
             'service' => 'civit-ai-images',
             'page' => 'cursor-x',
             'next' => 'cursor-y',

@@ -227,7 +227,7 @@ test('browse returns empty items array when service fails', function () {
 test('browse uses LocalService when tab source_type is offline', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
-        'query_params' => ['sourceType' => 'local'],
+        'params' => ['sourceType' => 'local'],
     ]);
 
     // Create local files with downloaded_at set
@@ -264,7 +264,7 @@ test('browse uses LocalService when tab source_type is offline', function () {
 test('browse filters by source in offline mode', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
-        'query_params' => ['sourceType' => 'local'],
+        'params' => ['sourceType' => 'local'],
     ]);
 
     $file1 = \App\Models\File::factory()->create([

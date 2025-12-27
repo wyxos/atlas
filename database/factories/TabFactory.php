@@ -20,7 +20,7 @@ class TabFactory extends Factory
         return [
             'user_id' => User::factory(),
             'label' => fake()->words(2, true),
-            'query_params' => [
+            'params' => [
                 'page' => fake()->numberBetween(1, 100),
                 'next' => fake()->optional()->numerify('###|##########'),
             ],
@@ -30,12 +30,12 @@ class TabFactory extends Factory
     }
 
     /**
-     * Set the query params with page and next.
+     * Set the params with page and next.
      */
-    public function withQueryParams(array $queryParams): static
+    public function withParams(array $params): static
     {
         return $this->state(fn (array $attributes) => [
-            'query_params' => $queryParams,
+            'params' => $params,
         ]);
     }
 

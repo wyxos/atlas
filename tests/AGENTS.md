@@ -341,3 +341,4 @@ it('can browse files in browser', function () {
 - Test user interactions (click, type, scroll)
 - Assert no JavaScript errors: `assertNoJavascriptErrors()`
 
+

@@ -165,8 +165,7 @@ describe('Browse - Service Selection', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },
@@ -216,8 +215,7 @@ describe('Browse - Service Selection', () => {
                     data: [{
                         id: 1,
                         label: 'Test Tab',
-                        query_params: {},
-                        file_ids: [],
+                        params: {},
                         position: 0,
                         is_active: true,
                     }],
@@ -266,7 +264,7 @@ describe('Browse - Service Selection', () => {
         await waitForStable(wrapper);
 
         // QueryParams are updated by the backend when browse request is made, not immediately by frontend
-        // The backend will update query_params.service when the browse API is called with source parameter
+        // The backend will update params.service when the browse API is called with source parameter
         // Frontend preserves existing queryParams until backend updates them
         expect(tabContentVm.loadAtPage).toBe(1);
         expect(tabContentVm.hasServiceSelected).toBe(true);
@@ -320,16 +318,14 @@ describe('Browse - Service Selection', () => {
                         {
                             id: tab1Id,
                             label: 'Tab 1',
-                            query_params: { service: 'civit-ai-images', page: 1 },
-                            file_ids: [],
+                            params: { service: 'civit-ai-images', page: 1 },
                             position: 0,
                             is_active: true,
                         },
                         {
                             id: tab2Id,
                             label: 'Tab 2',
-                            query_params: { service: 'wallhaven', page: 1 },
-                            file_ids: [],
+                            params: { service: 'wallhaven', page: 1 },
                             position: 1,
                             is_active: false,
                         },
@@ -388,8 +384,7 @@ describe('Browse - Service Selection', () => {
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: { service: 'wallhaven', page: 1 },
-                        file_ids: [],
+                        params: { service: 'wallhaven', page: 1 },
                         position: 0,
                     }],
                 });
@@ -443,8 +438,7 @@ describe('Browse - Service Selection', () => {
                     data: [{
                         id: 1,
                         label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: 1 },
-                        file_ids: [],
+                        params: { service: 'civit-ai-images', page: 1 },
                         position: 0,
                     }],
                 });

@@ -25,11 +25,9 @@ class UpdateTabRequest extends FormRequest
     {
         return [
             'label' => ['sometimes', 'required', 'string', 'max:255'],
-            'query_params' => ['nullable', 'array'],
-            'query_params.sourceType' => ['nullable', 'string', 'in:online,local'],
+            'params' => ['nullable', 'array'],
+            'params.sourceType' => ['nullable', 'string', 'in:online,local'],
             'position' => ['nullable', 'integer', 'min:0'],
-            'file_ids' => ['nullable', 'array'],
-            'file_ids.*' => ['required', 'integer', 'exists:files,id'],
         ];
     }
 }

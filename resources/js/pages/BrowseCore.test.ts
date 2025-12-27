@@ -203,7 +203,7 @@ describe('Browse - Core', () => {
     it('provides getPage function that fetches from API', async () => {
         const mockResponse = createMockBrowseResponse(2, 3);
         const tabId = 1;
-        const tabConfig = createMockTabConfig(tabId, { query_params: { service: 'civit-ai-images' } });
+        const tabConfig = createMockTabConfig(tabId, { params: { service: 'civit-ai-images' } });
         const browseResponse = {
             ...mockResponse,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
@@ -231,7 +231,7 @@ describe('Browse - Core', () => {
         // Browse calls include additional query params; assert the important bits.
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(browseIndex.definition.url));
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('page=2'));
-        // Verify tab_id was included in the request (backend will update query_params)
+        // Verify tab_id was included in the request (backend will update params)
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(
             expect.stringContaining(`tab_id=${tabId}`)
         );
@@ -245,7 +245,7 @@ describe('Browse - Core', () => {
         expect(updatedTab).toBeDefined();
         expect(updatedTab.itemsData.length).toBe(40);
         // QueryParams are updated by the backend, not the frontend
-        // The backend updates query_params in the database when tab_id is provided
+        // The backend updates params in the database when tab_id is provided
         // Frontend preserves existing queryParams (they will be updated on next tab load)
     });
 
@@ -276,8 +276,7 @@ describe('Browse - Core', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },
@@ -330,8 +329,7 @@ describe('Browse - Core', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },
@@ -390,8 +388,7 @@ describe('Browse - Core', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },
@@ -454,8 +451,7 @@ describe('Browse - Core', () => {
             data: {
                 id: 1,
                 label: 'Browse 1',
-                query_params: {},
-                file_ids: [],
+                params: {},
                 position: 0,
                 is_active: false,
             },
@@ -492,8 +488,7 @@ describe('Browse - Core', () => {
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            query_params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
-            file_ids: [1, 2],
+            params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
             items: mockItems,
         });
 
@@ -543,8 +538,7 @@ describe('Browse - Core', () => {
                     data: [{
                         id: 1,
                         label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: 1 },
-                        file_ids: [],
+                        params: { service: 'civit-ai-images', page: 1 },
                         items: [],
                         position: 0,
                     }],
@@ -616,7 +610,7 @@ describe('Browse - Core', () => {
         }
     });
 
-    it('handles tab with page parameter in query_params and loads items lazily', async () => {
+    it('handles tab with page parameter in params and loads items lazily', async () => {
         const tabId = 1;
         const pageParam = 'cursor-string-123';
 
@@ -626,7 +620,7 @@ describe('Browse - Core', () => {
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: pageParam },
+                        params: { service: 'civit-ai-images', page: pageParam },
                         position: 0,
                         is_active: true,
                     }],
@@ -670,7 +664,7 @@ describe('Browse - Core', () => {
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
     });
 
-    it('handles tab with page in query_params correctly and loads items lazily', async () => {
+    it('handles tab with page in params correctly and loads items lazily', async () => {
         const tabId = 1;
         const pageValue = 123;
 
@@ -680,7 +674,7 @@ describe('Browse - Core', () => {
                     data: [{
                         id: tabId,
                         label: 'Test Tab',
-                        query_params: { service: 'civit-ai-images', page: pageValue },
+                        params: { service: 'civit-ai-images', page: pageValue },
                         position: 0,
                         is_active: true,
                     }],
