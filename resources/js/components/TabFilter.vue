@@ -147,7 +147,7 @@ function handleReset(): void {
                 <Button variant="destructive" @click="handleReset">
                     Reset
                 </Button>
-                <Button variant="default" @click="handleApply" :disabled="form.processing">
+                <Button variant="default" @click="handleApply">
                     Apply
                 </Button>
             </SheetFooter>
