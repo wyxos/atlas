@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { index as tabsIndex, store as tabsStore, update as tabsUpdate, destroy as tabsDestroy, items as tabsItems, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
+import { index as tabsIndex, store as tabsStore, update as tabsUpdate, destroy as tabsDestroy, show as tabsShow, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
 
 export type MasonryItem = {
     id: number; // Database file ID
@@ -212,16 +212,16 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
      */
     async function loadTabItems(tabId: number): Promise<MasonryItem[]> {
         try {
-            const response = await window.axios.get(tabsItems.url(tabId));
+            const response = await window.axios.get(tabsShow.url(tabId));
             const data = response.data;
 
             // Update the tab with loaded items
             const tab = tabs.value.find(t => t.id === tabId);
-            if (tab) {
-                tab.itemsData = data.items || [];
+            if (tab && data.tab) {
+                tab.itemsData = data.tab.itemsData || [];
             }
 
-            return data.items || [];
+            return data.tab?.itemsData || [];
         } catch (error) {
             console.error('Failed to load tab items:', error);
             throw error;

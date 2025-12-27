@@ -46,7 +46,7 @@ import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from 'vue-toastification';
-import { items as tabsItems } from '@/actions/App/Http/Controllers/TabController';
+import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
@@ -676,7 +676,7 @@ onMounted(async () => {
     }
 
     try {
-        const { data } = await window.axios.get(tabsItems.url(props.tabId));
+        const { data } = await window.axios.get(tabsShow.url(props.tabId));
 
         if (data.tab) {
             tab.value = data.tab;
