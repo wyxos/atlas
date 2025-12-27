@@ -287,6 +287,7 @@ async function getPage(page: number | string, context?: BrowseFormData) {
 }
 
 async function applyService() {
+    shouldShowForm.value = false;
     masonry.value.reset();
     form.data.next = null;
     await masonry.value.loadPage(1);
@@ -671,46 +672,44 @@ onMounted(async () => {
         return;
     }
 
-    try {
-        const { data } = await window.axios.get(tabsShow.url(props.tabId));
+    const { data } = await window.axios.get(tabsShow.url(props.tabId));
 
-        if (data.tab) {
-            tab.value = data.tab;
-            form.syncFromTab(tab.value);
+    if (data.tab) {
+        tab.value = data.tab;
+        form.syncFromTab(tab.value);
 
-            // Check if params is not an empty object (has keys) - means a search has been applied
-            if (tab.value && tab.value.params && Object.keys(tab.value.params).length > 0) {
-                // Scenario 2: Restore items and pagination state
-                // Wait for masonry to be fully mounted
-                await nextTick();
+        // Check if params is not an empty object (has keys) - means a search has been applied
+        if (tab.value && tab.value.params && Object.keys(tab.value.params).length > 0) {
+            // Scenario 2: Restore items and pagination state
+            // Wait for masonry to be fully mounted
+            await nextTick();
 
-                if (masonry.value && tab.value) {
-                    // Hide form since we're restoring a search
-                    shouldShowForm.value = false;
-                    isTabRestored.value = true;
+            if (masonry.value && tab.value) {
+                // Hide form since we're restoring a search
+                shouldShowForm.value = false;
+                isTabRestored.value = true;
 
-                    const itemsToRestore = tab.value.itemsData || [];
-                    const currentPage = tab.value.params.page || 1;
-                    const nextPage = tab.value.params.next || null;
+                const itemsToRestore = tab.value.itemsData || [];
+                const currentPage = tab.value.params.page || 1;
+                const nextPage = tab.value.params.next || null;
 
-                    console.log(currentPage)
-                    console.log(nextPage)
+                // Restore items and pagination state to masonry
+                // Even if itemsToRestore is empty, we restore pagination state so masonry knows where to continue
+                masonry.value.initialize(
+                    itemsToRestore,
+                    currentPage,
+                    nextPage
+                );
 
-                    // Restore items and pagination state to masonry
-                    // Even if itemsToRestore is empty, we restore pagination state so masonry knows where to continue
-                    masonry.value.initialize(
-                        itemsToRestore,
-                        currentPage,
-                        nextPage
-                    );
+                if(tab.value.params.feed === 'local'){
+                    // In local feed, we need to load the first page to kick off loading
+                    await masonry.value.loadPage(currentPage);
                 }
             }
         }
-
-        await fetchServices();
-    } catch (error) {
-        console.error('Failed to load tab details and files:', error);
     }
+
+    await fetchServices();
 });
 
 // Cleanup on unmount
@@ -804,7 +803,7 @@ defineExpose({
             <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-page="getPage" :context="masonryContext"
-                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual" mode="backfill"
+                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual" :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'"
                     :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @loading:start="handleLoadingStart"
                     @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
