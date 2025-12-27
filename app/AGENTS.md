@@ -89,6 +89,34 @@ php artisan test --filter=FeatureName
 - **Commands auto-register** - files in `app/Console/Commands/` are automatically available
 - **Casts in method**: Use `casts()` method instead of `$casts` property when appropriate
 
+### PHPDoc Comments
+
+- **Do not include `@param` or `@return` tags** - Type information is already provided by PHP type hints and return types
+- Keep descriptive comments that explain *why* or provide context, but remove redundant type annotations
+- Example: Use `/** Generate a subfolder-based storage path for a file. */` instead of including `@param` and `@return` tags
+
+**✅ DO: Descriptive comments without redundant type info**
+```php
+/** Generate a subfolder-based storage path for a file. */
+public function getStoragePath(string $filename): string
+{
+    // Implementation
+}
+```
+
+**❌ DON'T: Redundant type annotations**
+```php
+/**
+ * Generate a subfolder-based storage path for a file.
+ * @param string $filename The filename to process
+ * @return string The storage path
+ */
+public function getStoragePath(string $filename): string
+{
+    // Implementation
+}
+```
+
 ### Code Examples
 
 **Controller Pattern**:

@@ -52,10 +52,10 @@ npm run test                # Run Vitest tests
 ## Universal Conventions
 
 ### Code Style
-- **PHP**: Laravel Pint (run `vendor/bin/pint --dirty` before commits)
-- **TypeScript/JavaScript**: ESLint + TypeScript strict mode
-- **Vue**: Composition API only, `<script setup>` syntax
-- **CSS**: Tailwind CSS v4 (CSS-first config, no `tailwind.config.js`)
+- **PHP**: Laravel Pint (run `vendor/bin/pint --dirty` before commits) → [see app/AGENTS.md for PHP conventions](app/AGENTS.md)
+- **TypeScript/JavaScript**: ESLint + TypeScript strict mode → [see resources/js/AGENTS.md for JS/TS conventions](resources/js/AGENTS.md)
+- **Vue**: Composition API only, `<script setup>` syntax → [see resources/js/AGENTS.md for Vue conventions](resources/js/AGENTS.md)
+- **CSS**: Tailwind CSS v4 (CSS-first config, no `tailwind.config.js`) → [see resources/js/AGENTS.md for Tailwind conventions](resources/js/AGENTS.md)
 
 ### Coding Style Principles
 
