@@ -939,13 +939,13 @@ defineExpose({
 
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
-            :items="items" :has-more="!masonry.hasReachedEnd" :is-loading="masonry.isLoading"
+            :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading"
             :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
             :restore-to-masonry="restoreToMasonry" :tab-id="tab.id" :masonry-instance="masonry"
             @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
-        <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry.isLoading"
+        <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
             :backfill="backfill" :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 
         <!-- Prompt Dialog -->
