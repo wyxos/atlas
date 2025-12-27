@@ -37,29 +37,29 @@ export function useBackfill() {
     });
 
     // Backfill event handlers
-    function onBackfillStart(payload: { target: number; fetched: number; calls?: number }): void {
+    function onBackfillStart(payload: { target: number; fetched: number; calls: number; currentPage: any; nextPage: any }): void {
         backfill.active = true;
         backfill.target = payload.target;
         backfill.fetched = payload.fetched;
-        backfill.calls = payload.calls ?? 0;
+        backfill.calls = payload.calls;
         backfill.waiting = false;
     }
 
-    function onBackfillTick(payload: { fetched: number; target: number; calls?: number; remainingMs: number; totalMs: number }): void {
+    function onBackfillTick(payload: { fetched: number; target: number; calls: number; remainingMs: number; totalMs: number; currentPage: any; nextPage: any }): void {
         backfill.active = true;
         backfill.fetched = payload.fetched;
         backfill.target = payload.target;
-        backfill.calls = payload.calls ?? backfill.calls;
+        backfill.calls = payload.calls;
         backfill.waiting = true;
         backfill.waitRemainingMs = payload.remainingMs;
         backfill.waitTotalMs = payload.totalMs;
     }
 
-    function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
+    function onBackfillStop(payload: { fetched: number; calls: number; cancelled?: boolean; currentPage: any; nextPage: any }): void {
         backfill.active = false;
         backfill.waiting = false;
-        if (payload.fetched != null) backfill.fetched = payload.fetched;
-        if (payload.calls != null) backfill.calls = payload.calls;
+        backfill.fetched = payload.fetched;
+        backfill.calls = payload.calls;
         backfill.waitRemainingMs = 0;
         backfill.waitTotalMs = 0;
     }
