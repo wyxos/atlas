@@ -146,16 +146,31 @@ const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(items, maso
 const {
     backfill,
     onBackfillStart,
-    onBackfillTick,
+    onBackfillTick: onBackfillTickOriginal,
     onBackfillStop: onBackfillStopOriginal,
     onBackfillRetryStart,
     onBackfillRetryTick,
     onBackfillRetryStop,
 } = useBackfill();
 
+// Wrap onBackfillTick to update form pagination state during backfill
+function onBackfillTick(payload: { fetched: number; target: number; calls: number; remainingMs: number; totalMs: number; currentPage: any; nextPage: any }): void {
+    onBackfillTickOriginal(payload);
+
+    // Update form.data.page and form.data.next from backfill event payload
+    // This keeps the form in sync with masonry pagination state during backfill
+    form.data.page = payload.currentPage;
+    form.data.next = payload.nextPage;
+}
+
 // Wrap onBackfillStop to call original handler (backfill still needs its handler)
-function onBackfillStop(payload: { fetched?: number; calls?: number }): void {
+// Also update form.data.page and form.data.next from backfill event payload
+function onBackfillStop(payload: { fetched: number; calls: number; cancelled?: boolean; currentPage: any; nextPage: any }): void {
     onBackfillStopOriginal(payload);
+
+    // Update form.data.page and form.data.next from backfill event payload
+    form.data.page = payload.currentPage;
+    form.data.next = payload.nextPage;
 }
 
 // Accumulate moderation data from each page load
@@ -265,6 +280,9 @@ async function getPage(page: number | string, context?: BrowseFormData) {
     }
 
     const { data } = await window.axios.get(browseIndex.url({ query: params }));
+
+    // update next value
+
 
     return {
         items: data.items || [],
@@ -637,11 +655,16 @@ function handleLoadingStart(): void {
     }
 }
 
-function handleLoadingStop(): void {
+function handleLoadingStop(payload: { fetched: number; currentPage: any; nextPage: any }): void {
     emit('update:loading', false);
     if (props.onLoadingChange) {
         props.onLoadingChange(false);
     }
+
+    // Update form.data.page and form.data.next from loading event payload
+    form.data.page = payload.currentPage;
+    form.data.next = payload.nextPage;
+
     // Also call onLoadingStop for moderation toast handling
     onLoadingStop();
 }
