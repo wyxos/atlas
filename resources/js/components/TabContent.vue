@@ -693,6 +693,9 @@ onMounted(async () => {
                     const currentPage = tab.value.params.page || 1;
                     const nextPage = tab.value.params.next || null;
 
+                    console.log(currentPage)
+                    console.log(nextPage)
+
                     // Restore items and pagination state to masonry
                     // Even if itemsToRestore is empty, we restore pagination state so masonry knows where to continue
                     masonry.value.initialize(
