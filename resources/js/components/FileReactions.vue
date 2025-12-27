@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { Heart, ThumbsUp, ThumbsDown, Smile, Eye, EyeOff, Hash } from 'lucide-vue-next';
-import { useReactionBatch } from '@/composables/useReactionBatch';
 import type { ReactionType } from '@/types/reaction';
 
 interface Props {
     fileId?: number;
+    reaction?: { type: string } | null;
     previewedCount?: number;
     viewedCount?: number;
     currentIndex?: number;
@@ -18,6 +18,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
     fileId: undefined,
+    reaction: null,
     previewedCount: 0,
     viewedCount: 0,
     currentIndex: undefined,
@@ -32,39 +33,15 @@ const emit = defineEmits<{
     reaction: [type: ReactionType];
 }>();
 
-// Reaction state
-const currentReaction = ref<string | null>(null);
-const isUpdating = ref(false);
-
-// Use batched reaction fetching
-const { queueReactionFetch } = useReactionBatch();
-
 // Computed properties for each reaction type
-const favorite = computed(() => currentReaction.value === 'love');
-const like = computed(() => currentReaction.value === 'like');
-const dislike = computed(() => currentReaction.value === 'dislike');
-const funny = computed(() => currentReaction.value === 'funny');
-
-// Fetch current reaction when fileId changes (batched)
-async function fetchReaction(): Promise<void> {
-    if (!props.fileId) {
-        currentReaction.value = null;
-        return;
-    }
-
-    try {
-        // Queue the reaction fetch (will be batched with other requests)
-        const result = await queueReactionFetch(props.fileId);
-        currentReaction.value = result.reaction?.type || null;
-    } catch (error) {
-        console.error('Failed to fetch reaction:', error);
-        currentReaction.value = null;
-    }
-}
+const favorite = computed(() => props.reaction?.type === 'love');
+const like = computed(() => props.reaction?.type === 'like');
+const dislike = computed(() => props.reaction?.type === 'dislike');
+const funny = computed(() => props.reaction?.type === 'funny');
 
 // Handle reaction click
-async function handleReactionClick(type: ReactionType): Promise<void> {
-    if (!props.fileId || isUpdating.value) {
+function handleReactionClick(type: ReactionType): void {
+    if (!props.fileId) {
         return;
     }
 
@@ -116,9 +93,6 @@ const indexDisplay = computed(() => {
     }
     return null;
 });
-
-// Watch fileId and fetch reaction when it changes
-watch(() => props.fileId, fetchReaction, { immediate: true });
 </script>
 
 <template>
@@ -126,7 +100,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
         <!-- Reaction Icons -->
         <div class="flex items-center gap-2">
             <!-- Favorite -->
-            <button @click="handleFavoriteClick" :disabled="isUpdating" :class="[
+            <button @click="handleFavoriteClick" :class="[
                 'rounded transition-colors',
                 isSmall ? 'p-1' : 'p-2',
                 favorite ? 'bg-red-500 text-white' : 'text-white hover:text-red-400'
@@ -135,7 +109,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             </button>
 
             <!-- Like -->
-            <button @click="handleLikeClick" :disabled="isUpdating" :class="[
+            <button @click="handleLikeClick" :class="[
                 'rounded transition-colors',
                 isSmall ? 'p-1' : 'p-2',
                 like ? 'bg-smart-blue-500 text-white' : 'text-white hover:text-smart-blue-400'
@@ -144,7 +118,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             </button>
 
             <!-- Dislike -->
-            <button v-if="!hideDislike && !isReactionOnly" @click="handleDislikeClick" :disabled="isUpdating" :class="[
+            <button v-if="!hideDislike && !isReactionOnly" @click="handleDislikeClick" :class="[
                 'rounded transition-colors',
                 isSmall ? 'p-1' : 'p-2',
                 dislike ? 'bg-gray-500 text-white' : 'text-white hover:text-gray-400'
@@ -153,7 +127,7 @@ watch(() => props.fileId, fetchReaction, { immediate: true });
             </button>
 
             <!-- Funny -->
-            <button @click="handleFunnyClick" :disabled="isUpdating" :class="[
+            <button @click="handleFunnyClick" :class="[
                 'rounded transition-colors',
                 isSmall ? 'p-1' : 'p-2',
                 funny ? 'bg-yellow-500 text-white' : 'text-white hover:text-yellow-400'

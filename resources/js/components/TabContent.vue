@@ -914,6 +914,7 @@ defineExpose({
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
                                             class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
                                             <FileReactions :file-id="slotItem.id"
+                                                :reaction="slotItem.reaction"
                                                 :previewed-count="slotItem.previewed_count"
                                                 :viewed-count="slotItem.seen_count" :current-index="index"
                                                 :total-items="items.length" variant="small"

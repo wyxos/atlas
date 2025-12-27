@@ -106,8 +106,6 @@ class Browser
             ];
         }
 
-        Storage::disk('local')->put('temp/'.time().'-response.json', json_encode($response, JSON_PRETTY_PRINT));
-
         try {
             $transformed = $service->transform($response, $params);
             $filesPayload = $transformed['files'] ?? [];
@@ -132,6 +130,31 @@ class Browser
             $persisted = $filesPayload;
         } else {
             $persisted = app(BrowsePersister::class)->persist($filesPayload);
+        }
+
+        // Eager load reactions for the current user
+        if (auth()->check() && !empty($persisted)) {
+            $fileIds = [];
+            foreach ($persisted as $file) {
+                if ($file instanceof \App\Models\File) {
+                    $fileIds[] = $file->id;
+                }
+            }
+
+            if (!empty($fileIds)) {
+                $userReactions = \App\Models\Reaction::where('user_id', auth()->id())
+                    ->whereIn('file_id', $fileIds)
+                    ->get()
+                    ->keyBy('file_id');
+
+                // Attach reactions to files
+                foreach ($persisted as $file) {
+                    if ($file instanceof \App\Models\File) {
+                        $reaction = $userReactions->get($file->id);
+                        $file->setRelation('reaction', $reaction);
+                    }
+                }
+            }
         }
 
         // Process moderation (file and container moderation, filtering, immediate actions)

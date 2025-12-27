@@ -1,27 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { describe, it, expect, vi } from 'vitest';
+import { mount } from '@vue/test-utils';
 import FileReactions from './FileReactions.vue';
-
-// Mock useReactionBatch composable
-const mockQueueReactionFetch = vi.fn();
-
-vi.mock('@/composables/useReactionBatch', () => ({
-    useReactionBatch: () => ({
-        queueReactionFetch: mockQueueReactionFetch,
-    }),
-}));
-
-beforeEach(() => {
-    vi.clearAllMocks();
-    mockQueueReactionFetch.mockReset();
-    // Reset default mock
-    mockQueueReactionFetch.mockImplementation((fileId: number) => 
-        Promise.resolve({ 
-            file_id: fileId, 
-            reaction: null 
-        })
-    );
-});
 
 describe('FileReactions', () => {
     it('renders all reaction buttons', () => {
@@ -67,137 +46,76 @@ describe('FileReactions', () => {
         expect(wrapper.text()).not.toContain('/20');
     });
 
-    it('fetches reaction on mount when fileId is provided', async () => {
-        mockQueueReactionFetch.mockResolvedValueOnce({
-            file_id: 1,
-            reaction: { type: 'like' },
-        });
-
-        mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-
-        expect(mockQueueReactionFetch).toHaveBeenCalledWith(1);
-    });
-
-    it('does not fetch reaction when fileId is not provided', async () => {
-        mount(FileReactions, {
-            props: {},
-        });
-
-        await flushPromises();
-
-        expect(mockQueueReactionFetch).not.toHaveBeenCalled();
-    });
-
-    it('displays favorite reaction as active', async () => {
-        mockQueueReactionFetch.mockResolvedValueOnce({
-            file_id: 1,
-            reaction: { type: 'love' },
-        });
-
+    it('displays reaction from props', () => {
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
+                reaction: { type: 'like' },
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-         
-        const vm = wrapper.vm as any;
-        // Wait for watch to complete
-        await new Promise(resolve => setTimeout(resolve, 50));
-        await wrapper.vm.$nextTick();
-
-        expect(vm.favorite).toBe(true);
-        expect(vm.currentReaction).toBe('love');
-    });
-
-    it('displays like reaction as active', async () => {
-        mockQueueReactionFetch.mockResolvedValue({
-            file_id: 1,
-            reaction: { type: 'like' },
-        });
-
-        const wrapper = mount(FileReactions, {
-            props: {
-                fileId: 1,
-            },
-        });
-
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-         
         const vm = wrapper.vm as any;
         expect(vm.like).toBe(true);
-        expect(vm.currentReaction).toBe('like');
     });
 
-    it('displays dislike reaction as active', async () => {
-        mockQueueReactionFetch.mockResolvedValue({
-            file_id: 1,
-            reaction: { type: 'dislike' },
-        });
-
+    it('displays favorite reaction as active', () => {
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
+                reaction: { type: 'love' },
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
+        const vm = wrapper.vm as any;
+        expect(vm.favorite).toBe(true);
+    });
 
-         
+    it('displays like reaction as active', () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                reaction: { type: 'like' },
+            },
+        });
+
+        const vm = wrapper.vm as any;
+        expect(vm.like).toBe(true);
+    });
+
+    it('displays dislike reaction as active', () => {
+        const wrapper = mount(FileReactions, {
+            props: {
+                fileId: 1,
+                reaction: { type: 'dislike' },
+            },
+        });
+
         const vm = wrapper.vm as any;
         expect(vm.dislike).toBe(true);
-        expect(vm.currentReaction).toBe('dislike');
     });
 
-    it('displays funny reaction as active', async () => {
-        mockQueueReactionFetch.mockResolvedValue({
-            file_id: 1,
-            reaction: { type: 'funny' },
-        });
-
+    it('displays funny reaction as active', () => {
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
+                reaction: { type: 'funny' },
             },
         });
 
-        await flushPromises();
-        await wrapper.vm.$nextTick();
-
-         
         const vm = wrapper.vm as any;
         expect(vm.funny).toBe(true);
-        expect(vm.currentReaction).toBe('funny');
     });
 
 
     it('calls removeItem and emits reaction event when removeItem prop is provided', async () => {
-        mockQueueReactionFetch.mockResolvedValueOnce({
-            file_id: 1,
-            reaction: null,
-        });
-
         const removeItem = vi.fn();
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
+                reaction: null,
                 removeItem,
             },
         });
-
-        await flushPromises();
 
         const favoriteButton = wrapper.find('button[aria-label="Favorite"]');
         await favoriteButton.trigger('click');
@@ -209,92 +127,66 @@ describe('FileReactions', () => {
         // Verify reaction event was emitted
         expect(wrapper.emitted('reaction')).toBeTruthy();
         expect(wrapper.emitted('reaction')?.[0]).toEqual(['love']);
-
-        // Verify reaction fetch was queued
-        expect(mockQueueReactionFetch).toHaveBeenCalled();
     });
 
     it('emits reaction event when removeItem prop is not provided', async () => {
-        mockQueueReactionFetch.mockResolvedValueOnce({
-            file_id: 1,
-            reaction: null,
-        });
-
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
+                reaction: null,
                 // No removeItem prop
             },
         });
 
-        await flushPromises();
-
         const likeButton = wrapper.find('button[aria-label="Like"]');
         await likeButton.trigger('click');
-        await flushPromises();
+        await wrapper.vm.$nextTick();
 
         // Verify reaction event was emitted (parent will handle API call)
         expect(wrapper.emitted('reaction')).toBeTruthy();
         expect(wrapper.emitted('reaction')?.[0]).toEqual(['like']);
-
-        // Verify reaction fetch was queued
-        expect(mockQueueReactionFetch).toHaveBeenCalled();
     });
 
-    it('does not call API when fileId is not provided', async () => {
+    it('does not emit reaction when fileId is not provided', async () => {
         const wrapper = mount(FileReactions, {
-            props: {},
+            props: {
+                reaction: null,
+            },
         });
-
-        await flushPromises();
 
         const likeButton = wrapper.find('button[aria-label="Like"]');
         await likeButton.trigger('click');
-        await flushPromises();
+        await wrapper.vm.$nextTick();
 
-        expect(mockQueueReactionFetch).not.toHaveBeenCalled();
+        // Should not emit reaction when fileId is missing
+        expect(wrapper.emitted('reaction')).toBeFalsy();
     });
 
-    it('fetches reaction when fileId changes', async () => {
-        mockQueueReactionFetch.mockResolvedValue({
-            file_id: 1,
-            reaction: null,
-        });
-
+    it('updates reaction display when reaction prop changes', async () => {
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
+                reaction: null,
             },
         });
 
-        await flushPromises();
+        let vm = wrapper.vm as any;
+        expect(vm.like).toBe(false);
 
-        expect(mockQueueReactionFetch).toHaveBeenCalledWith(1);
+        await wrapper.setProps({ reaction: { type: 'like' } });
+        await wrapper.vm.$nextTick();
 
-        // Change fileId
-        mockQueueReactionFetch.mockResolvedValue({
-            file_id: 2,
-            reaction: null,
-        });
-        await wrapper.setProps({ fileId: 2 });
-        await flushPromises();
-
-        expect(mockQueueReactionFetch).toHaveBeenCalledWith(2);
+        vm = wrapper.vm as any;
+        expect(vm.like).toBe(true);
     });
 
-    it('stops click event propagation', async () => {
-        mockQueueReactionFetch.mockResolvedValue({
-            file_id: 1,
-            reaction: null,
-        });
-
+    it('stops click event propagation', () => {
         const wrapper = mount(FileReactions, {
             props: {
                 fileId: 1,
+                reaction: null,
             },
         });
-
-        await flushPromises();
 
         const rootDiv = wrapper.find('div');
         // Verify the component has @click.stop by checking it exists and renders

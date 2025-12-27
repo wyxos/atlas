@@ -69,6 +69,17 @@ class FileItemFormatter
                 ];
             })->values()->all();
 
+            // Get reaction if loaded
+            $reaction = null;
+            if ($file->relationLoaded('reaction')) {
+                $reactionModel = $file->getRelation('reaction');
+                if ($reactionModel) {
+                    $reaction = [
+                        'type' => $reactionModel->type,
+                    ];
+                }
+            }
+
             $item = [
                 'id' => $file->id,
                 'width' => $width,
@@ -85,6 +96,7 @@ class FileItemFormatter
                 'seen_count' => $file->seen_count ?? 0,
                 'auto_disliked' => $file->auto_disliked ?? false,
                 'will_auto_dislike' => in_array($file->id, $willAutoDislikeIds, true),
+                'reaction' => $reaction, // Current user's reaction for this file
                 // Include metadata with prompt if available - full metadata loaded on-demand
                 'metadata' => $prompt ? ['prompt' => $prompt] : null,
                 // listing_metadata removed - loaded on-demand in FileDetailsCard when needed

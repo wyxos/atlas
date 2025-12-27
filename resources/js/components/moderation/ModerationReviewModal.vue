@@ -99,7 +99,7 @@ function formatActionType(actionType: string): string {
                             </div>
                             <!-- File Reactions Component -->
                             <div class="absolute bottom-8 left-0 right-0 flex justify-center px-1">
-                                <FileReactions :file-id="file.id" mode="reaction-only" variant="small"
+                                <FileReactions :file-id="file.id" :reaction="undefined" mode="reaction-only" variant="small"
                                     @reaction="(type) => handleFileReaction(file.id, type)" />
                             </div>
                         </div>
