@@ -37,9 +37,6 @@ const nextCursor = computed(() => {
 
 <template>
     <div v-if="visible" class="my-2 flex flex-wrap items-center justify-center gap-3" data-test="pagination-info">
-        <p class="text-white">
-            {{ masonry?.paginationHistory }} test
-        </p>
         <!-- Count Pill -->
         <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
         <!-- Current Page Pill -->
