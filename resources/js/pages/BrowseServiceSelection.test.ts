@@ -263,9 +263,9 @@ describe('Browse - Service Selection', () => {
         await tabContentVm.applyService();
         await waitForStable(wrapper);
 
-        // QueryParams are updated by the backend when browse request is made, not immediately by frontend
+        // params are updated by the backend when browse request is made, not immediately by frontend
         // The backend will update params.service when the browse API is called with source parameter
-        // Frontend preserves existing queryParams until backend updates them
+        // Frontend preserves existing params until backend updates them
         expect(tabContentVm.loadAtPage).toBe(1);
         expect(tabContentVm.hasServiceSelected).toBe(true);
 
@@ -306,8 +306,8 @@ describe('Browse - Service Selection', () => {
                         tab: {
                             id,
                             label: id === tab2Id ? 'Tab 2' : 'Tab 1',
-                            queryParams: { service, page: 1 },
-                            sourceType: 'online',
+                            params: { service, page: 1 },
+                            feed: 'online',
                         },
                     },
                 });

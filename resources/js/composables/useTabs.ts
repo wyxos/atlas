@@ -25,7 +25,7 @@ export type TabData = {
     itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
     isActive: boolean;
-    sourceType?: 'online' | 'local'; // Defaults to 'online' if not set
+    feed?: 'online' | 'local'; // Defaults to 'online' if not set
 };
 
 export type OnTabSwitchCallback = (tabId: number) => Promise<void> | void;
@@ -49,15 +49,15 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 position?: number;
                 is_active?: boolean;
             }) => {
-                const queryParams = tab.params || {};
+                const params = tab.params || {};
                 return {
                     id: tab.id,
                     label: tab.label,
-                    queryParams,
+                    params: params,
                     itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
                     position: tab.position || 0,
                     isActive: tab.is_active ?? false,
-                    sourceType: (queryParams.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local',
+                    feed: (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local',
                 };
             });
 
@@ -91,16 +91,16 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         try {
             const response = await window.axios.post(tabsStore.url(), {
                 label: newTab.label,
-                params: newTab.queryParams,
+                params: newTab.params,
                 position: newTab.position,
             });
 
             const data = response.data;
             newTab.id = data.id;
             newTab.isActive = data.is_active ?? false;
-            const queryParams = data.params || {};
-            newTab.queryParams = queryParams;
-            newTab.sourceType = (queryParams.sourceType === 'local' ? 'local' : 'online') as 'online' | 'local';
+            const params = data.params || {};
+            newTab.params = params;
+            newTab.feed = (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local';
             tabs.value.push(newTab);
             activeTabId.value = newTab.id;
 

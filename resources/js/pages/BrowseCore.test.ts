@@ -221,8 +221,8 @@ describe('Browse - Core', () => {
         tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
         const activeTab = vm.getActiveTab();
-        if (activeTab && !activeTab.queryParams.service) {
-            activeTab.queryParams.service = 'civit-ai-images';
+        if (activeTab && !activeTab.params.service) {
+            activeTab.params.service = 'civit-ai-images';
         }
         const getNextPage = tabContentVm.getPage;
 
@@ -244,9 +244,9 @@ describe('Browse - Core', () => {
         const updatedTab = vm.tabs.find((t: any) => t.id === tabId);
         expect(updatedTab).toBeDefined();
         expect(updatedTab.itemsData.length).toBe(40);
-        // QueryParams are updated by the backend, not the frontend
+        // params are updated by the backend, not the frontend
         // The backend updates params in the database when tab_id is provided
-        // Frontend preserves existing queryParams (they will be updated on next tab load)
+        // Frontend preserves existing params (they will be updated on next tab load)
     });
 
     it('handles API errors gracefully', async () => {
@@ -286,7 +286,7 @@ describe('Browse - Core', () => {
         await vm.createTab();
         const activeTab = vm.getActiveTab();
         if (activeTab) {
-            activeTab.queryParams.service = 'civit-ai-images';
+            activeTab.params.service = 'civit-ai-images';
         }
         await waitForStable(wrapper);
 
@@ -339,7 +339,7 @@ describe('Browse - Core', () => {
         await vm.createTab();
         const activeTab = vm.getActiveTab();
         if (activeTab) {
-            activeTab.queryParams.service = 'civit-ai-images';
+            activeTab.params.service = 'civit-ai-images';
         }
         await waitForStable(wrapper);
 
@@ -398,7 +398,7 @@ describe('Browse - Core', () => {
         await vm.createTab();
         const activeTab = vm.getActiveTab();
         if (activeTab) {
-            activeTab.queryParams.service = 'civit-ai-images';
+            activeTab.params.service = 'civit-ai-images';
         }
         await waitForStable(wrapper);
 
@@ -461,7 +461,7 @@ describe('Browse - Core', () => {
         await vm.createTab();
         const activeTab = vm.getActiveTab();
         if (activeTab) {
-            activeTab.queryParams.service = 'civit-ai-images';
+            activeTab.params.service = 'civit-ai-images';
         }
         await waitForStable(wrapper);
 
@@ -633,8 +633,8 @@ describe('Browse - Core', () => {
                         tab: {
                             id: tabId,
                             label: 'Test Tab',
-                            queryParams: { service: 'civit-ai-images', page: pageParam },
-                            sourceType: 'online',
+                            params: { service: 'civit-ai-images', page: pageParam },
+                            feed: 'online',
                         },
                     },
                 });
@@ -687,8 +687,8 @@ describe('Browse - Core', () => {
                         tab: {
                             id: tabId,
                             label: 'Test Tab',
-                            queryParams: { service: 'civit-ai-images', page: pageValue },
-                            sourceType: 'online',
+                            params: { service: 'civit-ai-images', page: pageValue },
+                            feed: 'online',
                         },
                     },
                 });

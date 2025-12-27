@@ -34,7 +34,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
     };
 
     /**
-     * Get form data from tab queryParams
+     * Get form data from tab params
      */
     function getFormDataFromTab(tab?: TabData): Partial<BrowseFormData> | undefined {
         if (!tab?.params) {

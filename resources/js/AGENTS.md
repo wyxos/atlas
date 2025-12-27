@@ -199,7 +199,7 @@ files.value = data
 
 **5. No Unnecessary Mappings**
 ```typescript
-// ❌ DON'T: Map params to queryParams unnecessarily
+// ❌ DON'T: Rename params unnecessarily
 const { params } = await axios.get('/api/browse')
 const queryParams = params // Unnecessary rename
 
@@ -207,7 +207,7 @@ const queryParams = params // Unnecessary rename
 const { params } = await axios.get('/api/browse')
 // Use params directly
 
-// ✅ DO: If you need queryParams, update backend to return queryParams
+// ✅ DO: If you need a different structure, update backend to return it
 // Edit: app/Http/Controllers/BrowseController.php
 // Not: Map in resources/js/composables/useBrowseService.ts
 ```

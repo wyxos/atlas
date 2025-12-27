@@ -26,7 +26,7 @@ class UpdateTabRequest extends FormRequest
         return [
             'label' => ['sometimes', 'required', 'string', 'max:255'],
             'params' => ['nullable', 'array'],
-            'params.sourceType' => ['nullable', 'string', 'in:online,local'],
+            'params.feed' => ['nullable', 'string', 'in:online,local'],
             'position' => ['nullable', 'integer', 'min:0'],
         ];
     }

@@ -53,8 +53,8 @@ class Browser
         $isLocalMode = false;
         if ($tabId) {
             $tab = \App\Models\Tab::find($tabId);
-            $queryParams = $tab->params ?? [];
-            $isLocalMode = isset($queryParams['sourceType']) && $queryParams['sourceType'] === 'local';
+            $params = $tab->params ?? [];
+            $isLocalMode = isset($params['feed']) && $params['feed'] === 'local';
         }
 
         // Resolve service instance
@@ -146,7 +146,7 @@ class Browser
             $this->attachFilesToTab($tabId, $persisted);
             // Update tab's params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation
-            $this->updateTabQueryParams($tabId, [
+            $this->updateTabParams($tabId, [
                 'service' => $source, // Store the service key as 'service' for frontend compatibility
                 ...$service->defaultParams(),
                 ...$filter,
@@ -230,9 +230,9 @@ class Browser
     /**
      * Update a browse tab's params.
      *
-     * @param  array<string, mixed>  $queryParams
+     * @param  array<string, mixed>  $params
      */
-    protected function updateTabQueryParams(int $tabId, array $queryParams): void
+    protected function updateTabParams(int $tabId, array $params): void
     {
         $tab = \App\Models\Tab::find($tabId);
 
@@ -242,7 +242,7 @@ class Browser
 
         // Update params with the provided params
         $tab->update([
-            'params' => $queryParams,
+            'params' => $params,
         ]);
     }
 }

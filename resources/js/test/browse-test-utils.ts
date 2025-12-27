@@ -196,8 +196,8 @@ export function setupBrowseTestMocks(mocks: BrowseMocks): void {
                     tab: {
                         id: tabId,
                         label: tabId ? `Test Tab ${tabId}` : 'Test Tab',
-                        queryParams: {},
-                        sourceType: 'online',
+                        params: {},
+                        feed: 'online',
                     },
                 },
             });
@@ -302,7 +302,7 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             const tabId = tabIdMatch ? tabIdMatch[1] : null;
             const tab = tabId ? (Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig) : null;
             const params = (tab?.params ?? {}) as Record<string, unknown>;
-            const sourceType = (typeof params.sourceType === 'string' ? params.sourceType : 'online') as string;
+            const feed = (typeof params.feed === 'string' ? params.feed : 'online') as string;
             return Promise.resolve({
                 data: {
                     items: tab?.items ?? [],
@@ -310,7 +310,7 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
                         id: tab?.id ?? (tabId ? Number(tabId) : 0),
                         label: tab?.label ?? (tabId ? `Test Tab ${tabId}` : 'Test Tab'),
                         params: params,
-                        sourceType,
+                        feed,
                     },
                 },
             });

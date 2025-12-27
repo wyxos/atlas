@@ -219,7 +219,7 @@ const selectedService = computed({
 });
 
 const currentTabService = computed(() => {
-    const fromTab = tab.value?.queryParams?.service;
+    const fromTab = tab.value?.params?.service;
     return (typeof fromTab === 'string' && fromTab.length > 0) ? fromTab : (form.data.service || null);
 });
 
@@ -245,7 +245,7 @@ const shouldShowForm = ref(true);
 
 // Get pageSize from limit filter, defaulting to 20
 const pageSize = computed(() => {
-    const limit = tab.value?.queryParams?.limit;
+    const limit = tab.value?.params?.limit;
     return limit ? Number(limit) : 20;
 });
 
@@ -258,13 +258,13 @@ const layout = {
 async function getPage(page: number | string, context?: BrowseFormData) {
     const formData = context || form.getData();
     console.log(formData)
-    const queryParams = { ...formData, page };
+    const params = { ...formData, page };
 
     if (typeof page === 'string') {
-        queryParams.next = page;
+        params.next = page;
     }
 
-    const { data } = await window.axios.get(browseIndex.url({ query: queryParams }));
+    const { data } = await window.axios.get(browseIndex.url({ query: params }));
 
     return {
         items: data.items || [],

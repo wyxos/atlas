@@ -128,8 +128,8 @@ describe('useBrowseService', () => {
             activeTabId: ref(1),
             getActiveTab: () => ({
                 id: 1,
-                sourceType: 'local',
-                queryParams: { source: 'CivitAI', limit: 20 },
+                feed: 'local',
+                params: { source: 'CivitAI', limit: 20 },
                 itemsData: [],
             } as any),
             updateActiveTab: vi.fn(),
@@ -163,8 +163,8 @@ describe('useBrowseService', () => {
             activeTabId: ref(1),
             getActiveTab: () => ({
                 id: 1,
-                sourceType: 'online',
-                queryParams: {},
+                feed: 'online',
+                params: {},
                 itemsData: [],
             } as any),
             updateActiveTab: vi.fn(),
@@ -190,7 +190,7 @@ describe('useBrowseService', () => {
         mockAxios.get.mockResolvedValueOnce(mockResponse);
 
         // In offline mode, hasServiceSelected can be false but we still allow the call
-        // if source is selected in queryParams
+        // if source is selected in params
         const options: UseBrowseServiceOptions = {
             hasServiceSelected: computed(() => false), // Service not selected, but source is
             isInitializing: ref(false),
@@ -199,8 +199,8 @@ describe('useBrowseService', () => {
             activeTabId: ref(1),
             getActiveTab: () => ({
                 id: 1,
-                sourceType: 'local',
-                queryParams: { source: 'all', limit: 20 },
+                feed: 'local',
+                params: { source: 'all', limit: 20 },
                 itemsData: [],
             } as any),
             updateActiveTab: vi.fn(),
