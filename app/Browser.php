@@ -50,12 +50,7 @@ class Browser
 
         // Check if this is a local/offline tab
         $tabId = request()->input('tab_id');
-        $isLocalMode = false;
-        if ($tabId) {
-            $tab = \App\Models\Tab::find($tabId);
-            $params = $tab->params ?? [];
-            $isLocalMode = isset($params['feed']) && $params['feed'] === 'local';
-        }
+        $isLocalMode = $params['feed'] === 'local';
 
         // Resolve service instance
         // If local mode, use LocalService; otherwise use the selected service
