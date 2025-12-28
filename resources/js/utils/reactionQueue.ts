@@ -1,7 +1,10 @@
 import { useToast } from 'vue-toastification';
 import { useQueue } from '@/composables/useQueue';
 import { createReactionCallback } from './reactions';
+import updateReactionState from '@/utils/reactionStateUpdater';
 import type { ReactionType } from '@/types/reaction';
+import type { Ref } from 'vue';
+import type { MasonryItem } from '@/composables/useTabs';
 import ReactionQueueToast from '@/components/toasts/ReactionQueueToast.vue';
 import BatchReactionQueueToast from '@/components/toasts/BatchReactionQueueToast.vue';
 
@@ -11,6 +14,7 @@ const queue = useQueue();
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
 type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
+    items?: Ref<MasonryItem[]>;
 };
 
 /**
@@ -21,7 +25,8 @@ export function queueReaction(
     fileId: number,
     reactionType: ReactionType,
     thumbnail?: string,
-    restoreCallback?: () => Promise<void> | void
+    restoreCallback?: () => Promise<void> | void,
+    items?: Ref<MasonryItem[]>
 ): void {
     const queueId = `${reactionType}-${fileId}`;
 
@@ -44,6 +49,12 @@ export function queueReaction(
             try {
                 // Execute the reaction
                 await reactionCallback(fileId, reactionType);
+                
+                // Update reaction state in local mode (if items provided)
+                if (items) {
+                    updateReactionState(items, fileId, reactionType);
+                }
+                
                 // Dismiss toast on success
                 toast.dismiss(queueId);
             } catch (error) {
@@ -61,6 +72,7 @@ export function queueReaction(
             reactionType,
             thumbnail,
             restoreCallback,
+            items,
         },
     });
 
@@ -94,7 +106,8 @@ export function queueBatchReaction(
     fileIds: number[],
     reactionType: ReactionType,
     previews: Array<{ fileId: number; thumbnail?: string }>,
-    restoreCallback?: () => Promise<void> | void
+    restoreCallback?: () => Promise<void> | void,
+    items?: Ref<MasonryItem[]>
 ): void {
     if (fileIds.length === 0) {
         return;
@@ -113,6 +126,14 @@ export function queueBatchReaction(
             try {
                 // Execute all reactions in the batch
                 await Promise.all(fileIds.map((fileId) => reactionCallback(fileId, reactionType)));
+                
+                // Update reaction state in local mode for all files (if items provided)
+                if (items) {
+                    fileIds.forEach((fileId) => {
+                        updateReactionState(items, fileId, reactionType);
+                    });
+                }
+                
                 // Dismiss toast on success
                 toast.dismiss(queueId);
             } catch (error) {
@@ -130,6 +151,7 @@ export function queueBatchReaction(
             reactionType,
             previews,
             restoreCallback,
+            items,
         },
     });
 
