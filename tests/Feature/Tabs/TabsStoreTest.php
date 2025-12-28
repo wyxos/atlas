@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\File;
 use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -176,7 +175,7 @@ test('validation fails when params is not array', function () {
     $response->assertJsonValidationErrors('params');
 });
 
-test('tab creation defaults to online source type', function () {
+test('tab creation does not set default feed value', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
@@ -185,12 +184,13 @@ test('tab creation defaults to online source type', function () {
 
     $response->assertStatus(201);
     $data = $response->json();
-    expect($data['params']['feed'] ?? null)->toBe('online');
+    // Feed is not set by default - it's only set when explicitly provided
+    expect($data['params']['feed'] ?? null)->toBeNull();
     $this->assertDatabaseHas('tabs', [
         'id' => $data['id'],
     ]);
     $tab = \App\Models\Tab::find($data['id']);
-    expect($tab->params['feed'] ?? null)->toBe('online');
+    expect($tab->params['feed'] ?? null)->toBeNull();
 });
 
 test('tab creation accepts offline source type', function () {

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\ContainerModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Scout\Jobs\MakeSearchable;
 
 uses(RefreshDatabase::class);
 
@@ -156,7 +157,12 @@ test('does not dispatch delete job when file has no path', function () {
 
     expect($result['processedIds'])->toContain($file->id);
     expect($file->fresh()->blacklisted_at)->not->toBeNull();
-    Bus::assertNothingDispatched();
+
+    // Assert DeleteAutoDislikedFileJob was not dispatched
+    Bus::assertNotDispatched(DeleteAutoDislikedFileJob::class);
+
+    // Scout's MakeSearchable job may be dispatched when files are updated
+    // This is expected behavior - we only care that DeleteAutoDislikedFileJob wasn't dispatched
 });
 
 test('handles multiple files with different action types', function () {

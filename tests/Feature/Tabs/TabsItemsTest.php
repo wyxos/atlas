@@ -18,9 +18,10 @@ test('authenticated user can load items for their tab', function () {
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data)->toHaveKey('items');
-    expect($data['items'])->toBeArray();
-    expect(count($data['items']))->toBe(2);
+    expect($data)->toHaveKey('tab');
+    expect($data['tab'])->toHaveKey('itemsData');
+    expect($data['tab']['itemsData'])->toBeArray();
+    expect(count($data['tab']['itemsData']))->toBe(2);
 });
 
 test('items are formatted correctly', function () {
@@ -37,10 +38,12 @@ test('items are formatted correctly', function () {
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['items'])->toBeArray();
-    expect(count($data['items']))->toBe(1);
+    expect($data)->toHaveKey('tab');
+    expect($data['tab'])->toHaveKey('itemsData');
+    expect($data['tab']['itemsData'])->toBeArray();
+    expect(count($data['tab']['itemsData']))->toBe(1);
 
-    $item = $data['items'][0];
+    $item = $data['tab']['itemsData'][0];
     expect($item)->toHaveKey('id');
     expect($item['id'])->toBe($file->id);
     expect($item)->toHaveKey('src');
@@ -67,7 +70,7 @@ test('items use correct page number from params', function () {
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['items'][0]['page'])->toBe(5);
+    expect($data['tab']['itemsData'][0]['page'])->toBe(5);
 });
 
 test('items default to page 1 when params page is missing', function () {
@@ -83,7 +86,7 @@ test('items default to page 1 when params page is missing', function () {
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['items'][0]['page'])->toBe(1);
+    expect($data['tab']['itemsData'][0]['page'])->toBe(1);
 });
 
 test('tab without files returns empty items', function () {
@@ -94,8 +97,9 @@ test('tab without files returns empty items', function () {
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect($data['items'])->toBeArray();
-    expect($data['items'])->toBeEmpty();
+    expect($data['tab'])->toHaveKey('itemsData');
+    expect($data['tab']['itemsData'])->toBeArray();
+    expect($data['tab']['itemsData'])->toBeEmpty();
 });
 
 test('user cannot load items for another users tab', function () {
@@ -132,9 +136,9 @@ test('items maintain file order based on pivot position', function () {
 
     $response->assertSuccessful();
     $data = $response->json();
-    expect(count($data['items']))->toBe(3);
+    expect(count($data['tab']['itemsData']))->toBe(3);
     // Verify order by checking id matches the order we specified
-    expect($data['items'][0]['id'])->toBe($file3->id);
-    expect($data['items'][1]['id'])->toBe($file1->id);
-    expect($data['items'][2]['id'])->toBe($file2->id);
+    expect($data['tab']['itemsData'][0]['id'])->toBe($file3->id);
+    expect($data['tab']['itemsData'][1]['id'])->toBe($file1->id);
+    expect($data['tab']['itemsData'][2]['id'])->toBe($file2->id);
 });
