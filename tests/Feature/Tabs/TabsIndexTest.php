@@ -11,7 +11,7 @@ test('authenticated user can view their browse tabs', function () {
     $user = User::factory()->create();
     Tab::factory()->for($user)->count(3)->create();
 
-    $response = $this->actingAs($user)->getJson('/api/tabs');
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -25,7 +25,7 @@ test('tabs are returned ordered by position', function () {
     $tab2 = Tab::factory()->for($user)->create(['position' => 0]);
     $tab3 = Tab::factory()->for($user)->create(['position' => 1]);
 
-    $response = $this->actingAs($user)->getJson('/api/tabs');
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -41,7 +41,7 @@ test('tabs do not include items_data in index response (lazy loading)', function
 
     $tab = Tab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->getJson('/api/tabs');
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -62,7 +62,7 @@ test('tabs do not include file-related data in index response', function () {
 
     $tab = Tab::factory()->for($user)->withFiles([$file->id])->create();
 
-    $response = $this->actingAs($user)->getJson('/api/tabs');
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -82,7 +82,7 @@ test('tabs do not include file-related data regardless of file count', function 
     // Create tab with files in specific order: file3, file1, file2
     $tab = Tab::factory()->for($user)->withFiles([$file3->id, $file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->getJson('/api/tabs');
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -97,7 +97,7 @@ test('tabs without files do not include file-related data', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->getJson('/api/tabs');
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -126,7 +126,7 @@ test('user only sees their own tabs', function () {
 });
 
 test('guest cannot view browse tabs', function () {
-    $response = $this->getJson('/api/tabs');
+    $response = $this->getJson(route('api.tabs.index'));
 
     $response->assertUnauthorized();
 });
@@ -140,7 +140,7 @@ test('tabs include params in index response', function () {
         ->withFiles([$file->id])
         ->create();
 
-    $response = $this->actingAs($user)->getJson('/api/tabs');
+    $response = $this->actingAs($user)->getJson(route('api.tabs.index'));
 
     $response->assertSuccessful();
     $data = $response->json();

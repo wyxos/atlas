@@ -268,7 +268,6 @@ const layout = {
 
 async function getPage(page: number | string, context?: BrowseFormData) {
     const formData = context || form.getData();
-    console.log(formData)
     const params = { ...formData, page };
 
     if (typeof page === 'string') {

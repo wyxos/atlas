@@ -14,7 +14,7 @@ test('authenticated user can load items for their tab', function () {
 
     $tab = Tab::factory()->for($user)->withFiles([$file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->getJson("/api/tabs/{$tab->id}/items");
+    $response = $this->actingAs($user)->getJson(route('api.tabs.items', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -34,7 +34,7 @@ test('items are formatted correctly', function () {
 
     $tab = Tab::factory()->for($user)->withFiles([$file->id])->create();
 
-    $response = $this->actingAs($user)->getJson("/api/tabs/{$tab->id}/items");
+    $response = $this->actingAs($user)->getJson(route('api.tabs.items', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -66,7 +66,7 @@ test('items use correct page number from params', function () {
         ->withFiles([$file->id])
         ->create();
 
-    $response = $this->actingAs($user)->getJson("/api/tabs/{$tab->id}/items");
+    $response = $this->actingAs($user)->getJson(route('api.tabs.items', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -82,7 +82,7 @@ test('items default to page 1 when params page is missing', function () {
         ->withFiles([$file->id])
         ->create();
 
-    $response = $this->actingAs($user)->getJson("/api/tabs/{$tab->id}/items");
+    $response = $this->actingAs($user)->getJson(route('api.tabs.items', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -93,7 +93,7 @@ test('tab without files returns empty items', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->getJson("/api/tabs/{$tab->id}/items");
+    $response = $this->actingAs($user)->getJson(route('api.tabs.items', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -118,7 +118,7 @@ test('guest cannot load tab items', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->getJson("/api/tabs/{$tab->id}/items");
+    $response = $this->getJson(route('api.tabs.items', ['tab' => $tab->id]));
 
     $response->assertUnauthorized();
 });
@@ -132,7 +132,7 @@ test('items maintain file order based on pivot position', function () {
     // Create tab with files in specific order: file3, file1, file2
     $tab = Tab::factory()->for($user)->withFiles([$file3->id, $file1->id, $file2->id])->create();
 
-    $response = $this->actingAs($user)->getJson("/api/tabs/{$tab->id}/items");
+    $response = $this->actingAs($user)->getJson(route('api.tabs.items', ['tab' => $tab->id]));
 
     $response->assertSuccessful();
     $data = $response->json();
