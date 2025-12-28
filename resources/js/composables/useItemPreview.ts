@@ -16,16 +16,17 @@ export function useItemPreview(
     // Increment preview count when item comes into view (batched)
     async function incrementPreviewCount(fileId: number): Promise<{ will_auto_dislike: boolean } | null> {
         // Skip if we've already incremented preview count for this item
+        // Mark as previewed IMMEDIATELY to prevent race conditions (before queueing)
         if (previewedItems.value.has(fileId)) {
             return null;
         }
 
+        // Mark as previewed immediately to prevent duplicate calls while request is pending
+        previewedItems.value.add(fileId);
+
         try {
             // Queue the preview increment (will be batched with other requests)
             const response = await queuePreviewIncrement(fileId);
-
-            // Mark as previewed
-            previewedItems.value.add(fileId);
 
             // Get existing will_auto_dislike flag before updating (to preserve moderation flags)
             // Use itemsMap for O(1) item existence check, then findIndex only if item exists
@@ -99,8 +100,18 @@ export function useItemPreview(
             // Return the combined will_auto_dislike flag (existing OR response)
             return { will_auto_dislike: combinedWillAutoDislike === true };
         } catch (error) {
+            // If the error is "already queued", it means another call is handling it - that's fine
+            if (error instanceof Error && error.message.includes('already queued')) {
+                // Another call is already handling this - return null silently
+                return null;
+            }
+            
+            // For other errors, log but don't throw - preview count is not critical
             console.error('Failed to increment preview count:', error);
-            // Don't throw - preview count is not critical
+            
+            // Remove from previewedItems so it can be retried if needed
+            previewedItems.value.delete(fileId);
+            
             return null;
         }
     }
