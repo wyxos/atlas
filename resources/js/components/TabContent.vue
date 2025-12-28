@@ -478,7 +478,7 @@ function removeItemFromMasonry(item: MasonryItem): void {
     if (form.data.feed === 'local') {
         return;
     }
-    
+
     if (masonry.value?.remove) {
         const masonryItem = itemsMap.value.get(item.id);
         if (masonryItem) {
@@ -950,16 +950,6 @@ defineExpose({
                                             'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
                                             imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
                                         ]" />
-
-                                    <!-- Reacted overlay indicator (only in local mode) -->
-                                    <Transition name="fade">
-                                        <div v-if="form.data.feed === 'local' && slotItem.reaction"
-                                            class="absolute inset-0 bg-black/20 pointer-events-none z-40 flex items-center justify-center">
-                                            <div class="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5 text-white text-xs font-medium">
-                                                {{ slotItem.reaction.type === 'love' ? '❤️' : slotItem.reaction.type === 'like' ? '👍' : slotItem.reaction.type === 'dislike' ? '👎' : '😄' }}
-                                            </div>
-                                        </div>
-                                    </Transition>
 
                                     <!-- Container badges (shows on hover with type and count) -->
                                     <Transition name="fade">
