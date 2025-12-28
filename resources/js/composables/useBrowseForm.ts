@@ -13,14 +13,10 @@ export interface BrowseFormData {
     tab_id: number | null;
 }
 
-export interface UseBrowseFormOptions {
-    tab?: TabData;
-}
+// Singleton instance
+let formInstance: ReturnType<typeof createFormInstance> | null = null;
 
-// Singleton instances per tab (keyed by tab ID)
-const formInstances = new Map<number, ReturnType<typeof createFormInstance>>();
-
-function createFormInstance(options?: UseBrowseFormOptions) {
+function createFormInstance() {
     const defaultData: BrowseFormData = {
         service: '',
         nsfw: false,
@@ -33,10 +29,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
         tab_id: null,
     };
 
-    const data = reactive<BrowseFormData>({
-        ...defaultData,
-        ...(options?.tab?.params ? { ...options.tab.params, tab_id: options.tab.id } : {}),
-    });
+    const data = reactive<BrowseFormData>({ ...defaultData });
 
     const errors = reactive<Partial<Record<keyof BrowseFormData, string>>>({});
     const processing = ref(false);
@@ -57,7 +50,7 @@ function createFormInstance(options?: UseBrowseFormOptions) {
      * Reset the form to initial values
      */
     function reset(): void {
-        Object.assign(data, defaultData, options?.tab?.params ? { ...options.tab.params, tab_id: options.tab.id } : {});
+        Object.assign(data, defaultData);
         clearErrors();
         wasSuccessful.value = false;
     }
@@ -123,25 +116,12 @@ function createFormInstance(options?: UseBrowseFormOptions) {
     };
 }
 
-export function useBrowseForm(options?: UseBrowseFormOptions) {
-    // If no tab provided, create a new instance (for cases without tab context)
-    if (!options?.tab?.id) {
-        return createFormInstance(options);
+export function useBrowseForm() {
+    // Return singleton instance
+    if (!formInstance) {
+        formInstance = createFormInstance();
     }
 
-    const tabId = options.tab.id;
-
-    // Return existing instance if it exists for this tab
-    if (formInstances.has(tabId)) {
-        const instance = formInstances.get(tabId)!;
-        // Sync with latest tab data
-        instance.syncFromTab(options.tab);
-        return instance;
-    }
-
-    // Create new instance for this tab
-    const instance = createFormInstance(options);
-    formInstances.set(tabId, instance);
-    return instance;
+    return formInstance;
 }
 

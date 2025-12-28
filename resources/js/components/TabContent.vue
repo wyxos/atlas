@@ -41,7 +41,7 @@ import { useMasonryRestore } from '@/composables/useMasonryRestore';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useBrowseForm, type BrowseFormData } from '@/composables/useBrowseForm';
-import BrowseFiltersSheet from './TabFilter.vue';
+import TabFilter from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
 import BatchModerationToast from './toasts/BatchModerationToast.vue';
@@ -777,9 +777,8 @@ defineExpose({
                     </Select>
                 </div>
                 <!-- Filters Button (Primary) -->
-                <BrowseFiltersSheet v-model:open="isFilterSheetOpen" :available-services="availableServices" :tab="tab"
-                    :masonry="masonry" :is-masonry-loading="masonry.isLoading" @reset="handleResetFilters"
-                    @apply="applyFilters" />
+                <TabFilter v-model:open="isFilterSheetOpen" :available-services="availableServices"
+                    :masonry="masonry" @reset="handleResetFilters" @apply="applyFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry.isLoading" @rules-changed="handleModerationRulesChanged" />

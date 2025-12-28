@@ -5,22 +5,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { SlidersHorizontal } from 'lucide-vue-next';
-import type { TabData } from '@/composables/useTabs';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 import { Masonry } from '@wyxos/vibe';
 
 interface Props {
     open: boolean;
     availableServices: Array<{ key: string; label: string }>;
-    tab?: TabData;
     masonry?: InstanceType<typeof Masonry> | null;
-    isMasonryLoading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     open: false,
     masonry: null,
-    isMasonryLoading: false,
 });
 
 const emit = defineEmits<{
@@ -29,15 +25,8 @@ const emit = defineEmits<{
     'reset': [];
 }>();
 
-// Use the composable directly - it will return the same instance for the same tab
-const form = useBrowseForm({
-    tab: props.tab,
-});
-
-// Sync form when sheet opens
-function syncFormFromTab(): void {
-    form.syncFromTab(props.tab);
-}
+// Use the singleton composable
+const form = useBrowseForm();
 
 // Handle apply button
 function handleApply(): void {
@@ -53,10 +42,9 @@ function handleReset(): void {
 </script>
 
 <template>
-    <Sheet :open="props.open"
-        @update:open="(value: boolean) => { emit('update:open', value); if (value) syncFormFromTab(); }">
+    <Sheet :open="props.open" @update:open="emit('update:open', $event)">
         <SheetTrigger as-child>
-            <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button" :disabled="isMasonryLoading">
+            <Button size="sm" variant="ghost" class="h-10 w-10" data-test="filter-button" :disabled="masonry?.isLoading">
                 <SlidersHorizontal :size="14" />
             </Button>
         </SheetTrigger>
