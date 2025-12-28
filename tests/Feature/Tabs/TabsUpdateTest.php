@@ -10,7 +10,7 @@ test('user can update their own browse tab', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create(['label' => 'Old Label']);
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'label' => 'New Label',
     ]);
 
@@ -46,7 +46,7 @@ test('tab update accepts partial data sometimes rules', function () {
         'params' => ['page' => 1],
     ]);
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'label' => 'Updated Label',
     ]);
 
@@ -61,7 +61,7 @@ test('tab update validates label when provided', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'label' => str_repeat('a', 256),
     ]);
 
@@ -73,7 +73,7 @@ test('tab update validates position when provided', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'position' => -1,
     ]);
 
@@ -86,7 +86,7 @@ test('tab update returns updated tab', function () {
     // Create tab with empty params to avoid factory defaults interfering
     $tab = Tab::factory()->for($user)->withParams([])->create();
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'label' => 'Updated Label',
         'params' => ['page' => 2],
     ]);
@@ -104,7 +104,7 @@ test('guest cannot update browse tabs', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'label' => 'Updated Label',
     ]);
 
@@ -114,7 +114,7 @@ test('guest cannot update browse tabs', function () {
 test('updating non-existent tab returns 404', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->putJson('/api/tabs/99999', [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => 99999]), [
         'label' => 'Updated Label',
     ]);
 
@@ -125,7 +125,7 @@ test('tab update can change source type to local', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create(['params' => ['feed' => 'online']]);
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'params' => ['feed' => 'local'],
     ]);
 
@@ -140,7 +140,7 @@ test('tab update can change source type to online', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create(['params' => ['feed' => 'local']]);
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'params' => ['feed' => 'online'],
     ]);
 
@@ -155,7 +155,7 @@ test('validation fails when feed is invalid', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create();
 
-    $response = $this->actingAs($user)->putJson("/api/tabs/{$tab->id}", [
+    $response = $this->actingAs($user)->putJson(route('api.tabs.update', ['tab' => $tab->id]), [
         'params' => ['feed' => 'invalid'],
     ]);
 
