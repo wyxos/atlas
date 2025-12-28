@@ -3,6 +3,7 @@ import type { MasonryItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import type { Masonry } from '@wyxos/vibe';
+import { useBrowseForm } from './useBrowseForm';
 
 /**
  * Composable for handling masonry item reactions with restore functionality.
@@ -15,9 +16,12 @@ export function useMasonryReactionHandler(
     onReaction: (fileId: number, type: ReactionType) => void,
     restoreToMasonry: (item: MasonryItem, index: number, masonryInstance?: InstanceType<typeof Masonry>) => Promise<void>
 ) {
+    const { isLocal } = useBrowseForm();
 
     /**
-     * Handle reaction - removes item from masonry and queues reaction.
+     * Handle reaction - conditionally removes item from masonry based on feed mode and queues reaction.
+     * In local mode: items are NOT removed (visual treatment only).
+     * In online mode: items are removed immediately.
      */
     async function handleMasonryReaction(
         fileId: number,
@@ -28,13 +32,13 @@ export function useMasonryReactionHandler(
         const itemIndex = item ? items.value.findIndex((i) => i.id === fileId) : -1;
         const tabId = tab.value?.id;
 
-        // Remove from masonry BEFORE queueing
-        if (item && masonry.value?.remove) {
+        // Only remove from masonry in online mode (not in local mode)
+        if (!isLocal.value && item && masonry.value?.remove) {
             masonry.value.remove(item);
         }
 
-        // Create restore callback for undo functionality
-        const restoreCallback = item && tabId !== undefined && itemIndex !== -1
+        // Create restore callback for undo functionality (only in online mode where items are removed)
+        const restoreCallback = !isLocal.value && item && tabId !== undefined && itemIndex !== -1
             ? async () => {
                 // Restore item using the provided restore function
                 await restoreToMasonry(item, itemIndex, masonry.value ?? undefined);

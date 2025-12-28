@@ -3,6 +3,7 @@ import type { MasonryItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
 import type { Masonry } from '@wyxos/vibe';
+import { useBrowseForm } from './useBrowseForm';
 
 type Container = {
     id: number;
@@ -37,6 +38,7 @@ export function useContainerPillInteractions(
         masonryInstance?: InstanceType<typeof Masonry>
     ) => Promise<void>
 ) {
+    const { isLocal } = useBrowseForm();
     // Unwrap computed/ref to get the actual value
     const tabIdValue = computed(() => typeof tabId === 'object' && 'value' in tabId ? tabId.value : tabId);
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
@@ -87,24 +89,26 @@ export function useContainerPillInteractions(
             return;
         }
 
-        // IMPORTANT: Capture indices BEFORE removing items
+        // IMPORTANT: Capture indices BEFORE removing items (only needed in online mode)
         // Collect items with their original indices for batch restore (before removal)
-        const itemsToRestore = siblings.map((item) => {
-            const itemIndex = items.value.findIndex((i) => i.id === item.id);
-            return { item, index: itemIndex !== -1 ? itemIndex : items.value.length };
-        });
+        const itemsToRestore = !isLocal.value
+            ? siblings.map((item) => {
+                const itemIndex = items.value.findIndex((i) => i.id === item.id);
+                return { item, index: itemIndex !== -1 ? itemIndex : items.value.length };
+            })
+            : [];
 
-        // Use removeMany for efficient batch removal
-        if (masonry.value?.removeMany) {
+        // Only remove from masonry in online mode (not in local mode)
+        if (!isLocal.value && masonry.value?.removeMany) {
             await masonry.value.removeMany(siblings);
-        } else {
+        } else if (!isLocal.value) {
             console.warn('[useContainerPillInteractions] removeMany not available on masonry instance');
         }
 
-        // Create batch restore callback if restoreManyToMasonry is available
+        // Create batch restore callback if restoreManyToMasonry is available (only in online mode)
         const currentTabId = tabIdValue.value;
         const masonryInstance = masonry.value ?? undefined;
-        const batchRestoreCallback = restoreManyToMasonry && currentTabId !== undefined
+        const batchRestoreCallback = !isLocal.value && restoreManyToMasonry && currentTabId !== undefined
             ? async () => {
                 // Restore all items in the batch using restoreManyToMasonry
                 await restoreManyToMasonry(itemsToRestore, masonryInstance);

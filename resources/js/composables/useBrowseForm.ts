@@ -100,6 +100,9 @@ function createFormInstance() {
         }
     });
 
+    // Computed for checking if in local mode (read-only, for use in composables)
+    const isLocal = computed(() => data.feed === 'local');
+
     return {
         data,
         errors,
@@ -113,6 +116,7 @@ function createFormInstance() {
         hasErrors,
         getData,
         isLocalMode,
+        isLocal,
     };
 }
 

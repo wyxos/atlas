@@ -3,6 +3,7 @@ import { useQueue } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
 import type { MasonryItem } from './useTabs';
 import type { Masonry } from '@wyxos/vibe';
+import { useBrowseForm } from './useBrowseForm';
 
 const COUNTDOWN_DURATION_MS = 5 * 1000; // 5 seconds
 const DEBOUNCE_DELAY_MS = 500; // 500ms debounce for batch operations
@@ -21,11 +22,13 @@ let fileViewerUnfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
 /**
  * Composable for managing auto-dislike countdown timers with debounced batch execution.
  * When countdown expires, items are removed from masonry and disliked in batches.
+ * In local mode, items are NOT removed (visual treatment only).
  */
 export function useAutoDislikeQueue(
     items: Ref<MasonryItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
+    const { isLocal } = useBrowseForm();
     const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen, stop, resume, getAll } = useQueue();
     
     // Track auto-dislike items that are frozen (for FileViewer)
@@ -36,6 +39,7 @@ export function useAutoDislikeQueue(
     /**
      * Execute batch dislike operation (debounced).
      * Removes items from masonry and calls backend to dislike them.
+     * In local mode, items are NOT removed (visual treatment only).
      */
     async function executeBatchDislike(): Promise<void> {
         if (pendingDislikes.value.size === 0) {
@@ -53,8 +57,8 @@ export function useAutoDislikeQueue(
         const fileIds = Array.from(dislikes.keys());
         const itemsToRemove = Array.from(dislikes.values()).map((pending) => pending.item);
 
-        // Remove items from masonry first (batch removal)
-        if (masonry.value && itemsToRemove.length > 0) {
+        // Only remove items from masonry in online mode (not in local mode)
+        if (!isLocal.value && masonry.value && itemsToRemove.length > 0) {
             await masonry.value.removeMany?.(itemsToRemove);
         }
 
@@ -65,8 +69,9 @@ export function useAutoDislikeQueue(
             });
         } catch (error) {
             console.error('Failed to batch perform auto-dislike:', error);
-            // Note: Items are already removed from masonry, but dislike failed
+            // Note: In online mode, items are already removed from masonry, but dislike failed
             // This is acceptable - the items are gone from view anyway
+            // In local mode, items remain visible with visual treatment
         }
     }
 
