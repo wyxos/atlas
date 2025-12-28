@@ -136,7 +136,7 @@ test('tabs include params in index response', function () {
     $file = File::factory()->create(['referrer_url' => 'https://example.com/file.jpg']);
 
     $tab = Tab::factory()->for($user)
-        ->withQueryParams(['page' => 3, 'next' => 'cursor-123'])
+        ->withParams(['page' => 3, 'next' => 'cursor-123'])
         ->withFiles([$file->id])
         ->create();
 
