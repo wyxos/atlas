@@ -325,11 +325,6 @@ it('reflects model changes in searchable array', function () {
 // Integration test for Typesense (only runs when Typesense is available)
 // To run this test, set SCOUT_DRIVER=typesense in your .env.testing
 it('can index and search files in Typesense when driver is typesense', function () {
-    // Skip if not using Typesense driver
-    if (config('scout.driver') !== 'typesense') {
-        $this->markTestSkipped('Typesense driver not configured. Set SCOUT_DRIVER=typesense to run this test.');
-    }
-
     // Flush the index first to ensure clean state
     File::removeAllFromSearch();
 

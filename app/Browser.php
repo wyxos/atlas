@@ -3,7 +3,6 @@
 namespace App;
 
 use App\Models\File;
-use App\Services\BaseService;
 use App\Services\BrowseModerationService;
 use App\Services\BrowsePersister;
 use App\Services\CivitAiImages;
@@ -11,7 +10,6 @@ use App\Services\FileItemFormatter;
 use App\Services\LocalService;
 use App\Services\Wallhaven;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Storage;
 
 class Browser
 {
@@ -50,7 +48,19 @@ class Browser
 
         // Check if this is a local/offline tab
         $tabId = request()->input('tab_id');
-        $isLocalMode = $params['feed'] === 'local';
+        $feed = null;
+
+        // Get feed from tab params if tab_id is provided, otherwise from request params
+        if ($tabId) {
+            $tab = \App\Models\Tab::find($tabId);
+            if ($tab && isset($tab->params['feed'])) {
+                $feed = $tab->params['feed'];
+            }
+        } else {
+            $feed = $params['feed'] ?? null;
+        }
+
+        $isLocalMode = $feed === 'local';
 
         // Resolve service instance
         // If local mode, use LocalService; otherwise use the selected service
@@ -128,7 +138,7 @@ class Browser
         }
 
         // Eager load reactions for the current user
-        if (auth()->check() && !empty($persisted)) {
+        if (auth()->check() && ! empty($persisted)) {
             $fileIds = [];
             foreach ($persisted as $file) {
                 if ($file instanceof \App\Models\File) {
@@ -136,7 +146,7 @@ class Browser
                 }
             }
 
-            if (!empty($fileIds)) {
+            if (! empty($fileIds)) {
                 $userReactions = \App\Models\Reaction::where('user_id', auth()->id())
                     ->whereIn('file_id', $fileIds)
                     ->get()
@@ -164,7 +174,7 @@ class Browser
             $this->attachFilesToTab($tabId, $persisted);
         }
 
-        if($tabId){
+        if ($tabId) {
             // Update tab's params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation
             $this->updateTabParams($tabId, [
