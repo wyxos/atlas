@@ -289,8 +289,8 @@ async function getPage(page: number | string, context?: BrowseFormData) {
 async function applyFilters() {
     // cancel ongoing load
     masonry.value.cancelLoad();
-    // clear all items and pagination history
-    masonry.value.clear();
+    // reset
+    masonry.value.reset();
     shouldShowForm.value = false;
     form.data.page = 1;
     form.data.next = null;
@@ -820,7 +820,7 @@ defineExpose({
             <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-page="getPage" :context="masonryContext"
-                         :pageSize="form.data.limit"
+                         :page-size="form.data.limit"
                     :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual"
                     :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
