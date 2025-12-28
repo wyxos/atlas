@@ -212,6 +212,27 @@ const { params } = await axios.get('/api/browse')
 // Not: Map in resources/js/composables/useBrowseService.ts
 ```
 
+**6. Explicit Parameters Over Indirection**
+```typescript
+// ❌ DON'T: Use callbacks/global state/registration patterns when simple parameters work
+function queueReaction(fileId: number, callback: () => void) { }
+registerUpdater(items) // Global registration
+let globalItems: Ref<Item[]> // Global state
+
+// ✅ DO: Pass data as explicit parameters
+function queueReaction(fileId: number, items?: Ref<Item[]>) {
+  if (items) {
+    updateReactionState(items, fileId)
+  }
+}
+
+// ❌ DON'T: Create composables for simple utility functions
+export function useReactionUpdater() { } // Not reactive, not a composable
+
+// ✅ DO: Use utils for pure functions, composables only for reactive logic
+export default function updateReactionState(items: Ref<Item[]>, fileId: number) { }
+```
+
 ### Tailwind CSS v4
 
 **✅ DO: Use Tailwind utilities**

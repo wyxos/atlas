@@ -38,11 +38,11 @@ export function useContainerPillInteractions(
         masonryInstance?: InstanceType<typeof Masonry>
     ) => Promise<void>
 ) {
-    const { isLocal } = useBrowseForm();
     // Unwrap computed/ref to get the actual value
     const tabIdValue = computed(() => typeof tabId === 'object' && 'value' in tabId ? tabId.value : tabId);
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
     const DOUBLE_CLICK_DELAY_MS = 300; // Maximum time between clicks to count as double-click
+    const { isLocal } = useBrowseForm();
 
     /**
      * Get full container data for an item (including referrer URL).
@@ -122,8 +122,8 @@ export function useContainerPillInteractions(
             thumbnail: item.thumbnail || item.src,
         }));
 
-        // Queue batch reaction with countdown toast
-        queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback);
+        // Queue batch reaction with countdown toast (pass items for local mode updates)
+        queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback, items);
 
         // Call onReaction once for the batch (not per item)
         // This is just a callback to notify parent
