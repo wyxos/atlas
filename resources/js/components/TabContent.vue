@@ -777,8 +777,8 @@ defineExpose({
                     </Select>
                 </div>
                 <!-- Filters Button (Primary) -->
-                <TabFilter v-model:open="isFilterSheetOpen" :available-services="availableServices"
-                    :masonry="masonry" @reset="handleResetFilters" @apply="applyFilters" />
+                <TabFilter v-model:open="isFilterSheetOpen" :available-services="availableServices" :masonry="masonry"
+                    @reset="handleResetFilters" @apply="applyFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
                 <ModerationRulesManager :disabled="masonry.isLoading" @rules-changed="handleModerationRulesChanged" />
