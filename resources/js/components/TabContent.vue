@@ -687,6 +687,10 @@ onMounted(async () => {
 
     if (data.tab) {
         tab.value = data.tab;
+
+        // reset form to default
+        form.reset()
+
         form.syncFromTab(tab.value);
 
         // Check if params is not an empty object (has keys) - means a search has been applied
@@ -816,6 +820,7 @@ defineExpose({
             <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-page="getPage" :context="masonryContext"
+                         :pageSize="form.data.limit"
                     :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual"
                     :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'" :backfill-delay-ms="2000"
                     :backfill-max-calls="Infinity" @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
