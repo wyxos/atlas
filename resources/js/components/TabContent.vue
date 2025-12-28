@@ -472,7 +472,13 @@ async function loadNextPage(): Promise<void> {
 }
 
 // Remove item from masonry using Map lookup
+// Only removes in online mode (not in local mode)
 function removeItemFromMasonry(item: MasonryItem): void {
+    // Only remove in online mode (not in local mode)
+    if (form.data.feed === 'local') {
+        return;
+    }
+    
     if (masonry.value?.remove) {
         const masonryItem = itemsMap.value.get(item.id);
         if (masonryItem) {
@@ -899,7 +905,11 @@ defineExpose({
                                 <!-- Use item from slot props (reactive) instead of outer scope item (may be stale) -->
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
                                     :data-key="slotItem.key" :data-masonry-item-id="slotItem.id"
-                                    :class="containerBadges.getMasonryItemClasses.value(slotItem)"
+                                    :class="[
+                                        containerBadges.getMasonryItemClasses.value(slotItem),
+                                        // Visual treatment for reacted items in local mode (gray out, overlay)
+                                        form.data.feed === 'local' && slotItem.reaction ? 'opacity-60 grayscale-[0.3]' : ''
+                                    ]"
                                     @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e)"
                                     @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, slotItem)">
                                     <!-- Placeholder background - icon by default (before preloading starts) -->
@@ -940,6 +950,16 @@ defineExpose({
                                             'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
                                             imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
                                         ]" />
+
+                                    <!-- Reacted overlay indicator (only in local mode) -->
+                                    <Transition name="fade">
+                                        <div v-if="form.data.feed === 'local' && slotItem.reaction"
+                                            class="absolute inset-0 bg-black/20 pointer-events-none z-40 flex items-center justify-center">
+                                            <div class="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5 text-white text-xs font-medium">
+                                                {{ slotItem.reaction.type === 'love' ? '❤️' : slotItem.reaction.type === 'like' ? '👍' : slotItem.reaction.type === 'dislike' ? '👎' : '😄' }}
+                                            </div>
+                                        </div>
+                                    </Transition>
 
                                     <!-- Container badges (shows on hover with type and count) -->
                                     <Transition name="fade">
