@@ -91,9 +91,65 @@ vi.mock('@wyxos/vibe', () => ({
         `,
         props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-        setup() {
+        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
+            let currentPage: number | string | null = null;
+            let nextPage: number | string | null = null;
+            let hasReachedEnd = false;
+            let paginationHistory: Array<number | string> = [];
+
+            const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
+                mockInit(itemsToRestore, page, next);
+                props.items.splice(0, props.items.length, ...itemsToRestore);
+                emit('update:items', props.items);
+                currentPage = page;
+                nextPage = next ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+            };
+
+            const loadPage = async (page: number | string) => {
+                if (!props.getPage) {
+                    return;
+                }
+                currentPage = page;
+                const result = await props.getPage(page);
+                const newItems = result?.items ?? [];
+                props.items.splice(0, props.items.length, ...newItems);
+                emit('update:items', props.items);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const loadNext = async () => {
+                if (!props.getPage || nextPage === null || nextPage === undefined) {
+                    return;
+                }
+                const pageToLoad = nextPage;
+                currentPage = pageToLoad;
+                const result = await props.getPage(pageToLoad);
+                const newItems = result?.items ?? [];
+                props.items.push(...newItems);
+                emit('update:items', props.items);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const reset = () => {
+                props.items.splice(0, props.items.length);
+                emit('update:items', props.items);
+                currentPage = null;
+                nextPage = null;
+                paginationHistory = [];
+                hasReachedEnd = false;
+            };
+
             const exposed = {
                 init: mockInit,
+                initialize,
                 refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
@@ -101,8 +157,15 @@ vi.mock('@wyxos/vibe', () => ({
                 removeMany: mockRemoveMany,
                 restore: mockRestore,
                 restoreMany: mockRestoreMany,
+                loadPage,
+                loadNext,
+                reset,
             };
             Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
+            Object.defineProperty(exposed, 'hasReachedEnd', { get: () => hasReachedEnd, enumerable: true });
+            Object.defineProperty(exposed, 'currentPage', { get: () => currentPage, enumerable: true });
+            Object.defineProperty(exposed, 'nextPage', { get: () => nextPage, enumerable: true });
+            Object.defineProperty(exposed, 'paginationHistory', { get: () => paginationHistory, enumerable: true });
             return exposed;
         },
     },
@@ -143,6 +206,21 @@ beforeEach(() => {
 describe('Browse - Service Selection', () => {
     it('new tab does not auto-load until service is selected', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: `Browse ${id}`,
+                            params: {},
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({ data: [] });
             }
@@ -195,7 +273,7 @@ describe('Browse - Service Selection', () => {
             const itemLoadingCalls = mocks.mockAxios.get.mock.calls
                 .map(call => call[0])
                 .filter((callUrl: string) => {
-                    return callUrl.includes(browseIndexUrl) && callUrl.includes('source=');
+                return callUrl.includes(browseIndexUrl) && callUrl.includes('service=');
                 });
             expect(itemLoadingCalls.length).toBe(0);
         }
@@ -203,13 +281,28 @@ describe('Browse - Service Selection', () => {
         const itemLoadingCalls = mocks.mockAxios.get.mock.calls
             .map(call => call[0])
             .filter((callUrl: string) => {
-                return callUrl.includes('/api/browse') && callUrl.includes('source=');
+                return callUrl.includes('/api/browse') && callUrl.includes('service=');
             });
         expect(itemLoadingCalls.length).toBe(0);
     });
 
     it('applies selected service and triggers loading', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: 'Test Tab',
+                            params: {},
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [{
@@ -266,14 +359,13 @@ describe('Browse - Service Selection', () => {
         // params are updated by the backend when browse request is made, not immediately by frontend
         // The backend will update params.service when the browse API is called with source parameter
         // Frontend preserves existing params until backend updates them
-        expect(tabContentVm.loadAtPage).toBe(1);
         expect(tabContentVm.hasServiceSelected).toBe(true);
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
 
-        if (tabContentVm.masonry && tabContentVm.loadAtPage !== null && tabContentVm.items.length === 0) {
-            await tabContentVm.getPage(tabContentVm.loadAtPage);
+        if (tabContentVm.masonry && tabContentVm.items.length === 0) {
+            await tabContentVm.getPage(1);
             await flushPromises();
             await wrapper.vm.$nextTick();
         }
@@ -288,7 +380,7 @@ describe('Browse - Service Selection', () => {
             });
         expect(browseCalls.length).toBeGreaterThan(0);
         const lastCall = browseCalls[browseCalls.length - 1];
-        expect(lastCall).toContain('source=civit-ai-images');
+        expect(lastCall).toContain('service=civit-ai-images');
     });
 
     it('restores service when switching to tab with saved service', async () => {
@@ -296,18 +388,18 @@ describe('Browse - Service Selection', () => {
         const tab2Id = 2;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes('/api/tabs/') && url.includes('/items')) {
-                const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
+            if (url.match(/\/api\/tabs\/\d+(?:\?|$)/)) {
+                const tabIdMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
                 const id = tabIdMatch ? Number(tabIdMatch[1]) : 0;
                 const service = id === tab2Id ? 'wallhaven' : 'civit-ai-images';
                 return Promise.resolve({
                     data: {
-                        items: [],
                         tab: {
                             id,
                             label: id === tab2Id ? 'Tab 2' : 'Tab 1',
                             params: { service, page: 1 },
                             feed: 'online',
+                            itemsData: [],
                         },
                     },
                 });
@@ -379,6 +471,21 @@ describe('Browse - Service Selection', () => {
         const tabId = 1;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: 'Test Tab',
+                            params: { service: 'wallhaven', page: 1 },
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [{
@@ -417,7 +524,6 @@ describe('Browse - Service Selection', () => {
         }
 
         tabContentVm.isTabRestored = false;
-        tabContentVm.loadAtPage = 1;
 
         await tabContentVm.getPage(1);
         await flushPromises();
@@ -428,11 +534,26 @@ describe('Browse - Service Selection', () => {
 
         expect(browseCalls.length).toBeGreaterThan(0);
         const lastCall = browseCalls[browseCalls.length - 1];
-        expect(lastCall).toContain('source=wallhaven');
+        expect(lastCall).toContain('service=wallhaven');
     });
 
     it('registers backfill event handlers on masonry component', async () => {
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: 'Test Tab',
+                            params: { service: 'civit-ai-images', page: 1 },
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndexUrl)) {
                 return Promise.resolve({
                     data: [{
