@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
-import { items as tabItems } from '@/actions/App/Http/Controllers/TabController';
+import { show as tabShow } from '@/actions/App/Http/Controllers/TabController';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import {
     setupBrowseTestMocks,
@@ -92,9 +92,65 @@ vi.mock('@wyxos/vibe', () => ({
         `,
         props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-        setup() {
+        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
+            let currentPage: number | string | null = null;
+            let nextPage: number | string | null = null;
+            let hasReachedEnd = false;
+            let paginationHistory: Array<number | string> = [];
+
+            const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
+                mockInit(itemsToRestore, page, next);
+                props.items.splice(0, props.items.length, ...itemsToRestore);
+                emit('update:items', props.items);
+                currentPage = page;
+                nextPage = next ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+            };
+
+            const loadPage = async (page: number | string) => {
+                if (!props.getPage) {
+                    return;
+                }
+                currentPage = page;
+                const result = await props.getPage(page);
+                const newItems = result?.items ?? [];
+                props.items.splice(0, props.items.length, ...newItems);
+                emit('update:items', props.items);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const loadNext = async () => {
+                if (!props.getPage || nextPage === null || nextPage === undefined) {
+                    return;
+                }
+                const pageToLoad = nextPage;
+                currentPage = pageToLoad;
+                const result = await props.getPage(pageToLoad);
+                const newItems = result?.items ?? [];
+                props.items.push(...newItems);
+                emit('update:items', props.items);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const reset = () => {
+                props.items.splice(0, props.items.length);
+                emit('update:items', props.items);
+                currentPage = null;
+                nextPage = null;
+                paginationHistory = [];
+                hasReachedEnd = false;
+            };
+
             const exposed = {
                 init: mockInit,
+                initialize,
                 refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
@@ -102,8 +158,15 @@ vi.mock('@wyxos/vibe', () => ({
                 removeMany: mockRemoveMany,
                 restore: mockRestore,
                 restoreMany: mockRestoreMany,
+                loadPage,
+                loadNext,
+                reset,
             };
             Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
+            Object.defineProperty(exposed, 'hasReachedEnd', { get: () => hasReachedEnd, enumerable: true });
+            Object.defineProperty(exposed, 'currentPage', { get: () => currentPage, enumerable: true });
+            Object.defineProperty(exposed, 'nextPage', { get: () => nextPage, enumerable: true });
+            Object.defineProperty(exposed, 'paginationHistory', { get: () => paginationHistory, enumerable: true });
             return exposed;
         },
     },
@@ -167,8 +230,8 @@ describe('Browse - Tab Restoration', () => {
 
         const tabContentVm = await waitForTabContent(wrapper);
         if (tabContentVm) {
-            expect(tabContentVm.currentPage).toBe(pageParam);
-            expect(tabContentVm.nextCursor).toBe(nextParam);
+            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
+            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(nextParam);
         }
     });
 
@@ -190,7 +253,7 @@ describe('Browse - Tab Restoration', () => {
 
         await waitForStable(wrapper);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 
     it('initializes masonry with restored items', async () => {
@@ -247,8 +310,8 @@ describe('Browse - Tab Restoration', () => {
 
         const tabContentVm = await waitForTabContent(wrapper);
         if (tabContentVm) {
-            expect(tabContentVm.currentPage).toBe(pageParam);
-            expect(tabContentVm.nextCursor).toBe(nextParam);
+            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
+            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(nextParam);
         }
     });
 
@@ -282,7 +345,7 @@ describe('Browse - Tab Restoration', () => {
         await vm.switchTab(tab2Id);
         await waitForStable(wrapper);
 
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 2 }));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 2 }));
 
         // Note: TabContent unmounting behavior (destroy/cancelLoad) is handled by Vue's
         // key-based component lifecycle. The onUnmounted hook will call destroy if masonry
@@ -317,7 +380,6 @@ describe('Browse - Tab Restoration', () => {
 
         tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
-        tabContentVm.nextCursor = nextParam;
 
         const getNextPageResult = await tabContentVm.getPage(nextParam);
 
@@ -359,11 +421,8 @@ describe('Browse - Tab Restoration', () => {
 
         const tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
-            expect(tabContentVm.currentPage).toBe(cursorX);
-            expect(tabContentVm.nextCursor).toBe(cursorY);
-            // displayPage is now computed inside BrowseStatusBar from masonry.currentPage
-            // Verify masonry has the correct currentPage
             expect(tabContentVm.masonry?.currentPage).toBe(cursorX);
+            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(cursorY);
         }
     });
 
@@ -441,8 +500,7 @@ describe('Browse - Tab Restoration', () => {
         }
 
         // With the new approach, Masonry handles pagination state via initialPage/initialNextPage props
-        // Verify that nextCursor is set correctly (which will be passed to Masonry as initialNextPage)
-        expect(tabContentVm.nextCursor).toBe(cursorY);
+        expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(cursorY);
 
         // After removing pendingRestoreNextCursor, Masonry uses the cursor from paginationHistory
         // when loadNext() is called. The cursor is set via initialNextPage prop.
@@ -453,7 +511,7 @@ describe('Browse - Tab Restoration', () => {
         } else {
             // Fallback: if masonry.loadNext is not available, verify the cursor is set correctly
             // and will be used on the next load
-            expect(tabContentVm.nextCursor).toBe(cursorY);
+            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(cursorY);
             return; // Skip the API call verification if loadNext is not available
         }
 
@@ -464,7 +522,7 @@ describe('Browse - Tab Restoration', () => {
             });
 
         // Verify that the cursor was used in the API call
-        expect(browseCalls[browseCalls.length - 1]).toContain(`${browseIndex.definition.url}?page=${cursorY}`);
-        expect(tabContentVm.currentPage).toBe(cursorY);
+        expect(browseCalls[browseCalls.length - 1]).toContain(`page=${cursorY}`);
+        expect(tabContentVm.masonry?.currentPage).toBe(cursorY);
     });
 });

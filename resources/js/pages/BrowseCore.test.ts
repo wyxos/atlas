@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
-import { items as tabItems, index as tabIndex } from '@/actions/App/Http/Controllers/TabController';
+import { show as tabShow, index as tabIndex } from '@/actions/App/Http/Controllers/TabController';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
 import {
     setupBrowseTestMocks,
@@ -92,9 +92,65 @@ vi.mock('@wyxos/vibe', () => ({
         `,
         props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
         emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-        setup() {
+        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
+            let currentPage: number | string | null = null;
+            let nextPage: number | string | null = null;
+            let hasReachedEnd = false;
+            let paginationHistory: Array<number | string> = [];
+
+            const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
+                mockInit(itemsToRestore, page, next);
+                props.items.splice(0, props.items.length, ...itemsToRestore);
+                emit('update:items', props.items);
+                currentPage = page;
+                nextPage = next ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+            };
+
+            const loadPage = async (page: number | string) => {
+                if (!props.getPage) {
+                    return;
+                }
+                currentPage = page;
+                const result = await props.getPage(page);
+                const newItems = result?.items ?? [];
+                props.items.splice(0, props.items.length, ...newItems);
+                emit('update:items', props.items);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const loadNext = async () => {
+                if (!props.getPage || nextPage === null || nextPage === undefined) {
+                    return;
+                }
+                const pageToLoad = nextPage;
+                currentPage = pageToLoad;
+                const result = await props.getPage(pageToLoad);
+                const newItems = result?.items ?? [];
+                props.items.push(...newItems);
+                emit('update:items', props.items);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const reset = () => {
+                props.items.splice(0, props.items.length);
+                emit('update:items', props.items);
+                currentPage = null;
+                nextPage = null;
+                paginationHistory = [];
+                hasReachedEnd = false;
+            };
+
             const exposed = {
                 init: mockInit,
+                initialize,
                 refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
@@ -102,8 +158,15 @@ vi.mock('@wyxos/vibe', () => ({
                 removeMany: mockRemoveMany,
                 restore: mockRestore,
                 restoreMany: mockRestoreMany,
+                loadPage,
+                loadNext,
+                reset,
             };
             Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
+            Object.defineProperty(exposed, 'hasReachedEnd', { get: () => hasReachedEnd, enumerable: true });
+            Object.defineProperty(exposed, 'currentPage', { get: () => currentPage, enumerable: true });
+            Object.defineProperty(exposed, 'nextPage', { get: () => nextPage, enumerable: true });
+            Object.defineProperty(exposed, 'paginationHistory', { get: () => paginationHistory, enumerable: true });
             return exposed;
         },
     },
@@ -243,16 +306,28 @@ describe('Browse - Core', () => {
 
         const updatedTab = vm.tabs.find((t: any) => t.id === tabId);
         expect(updatedTab).toBeDefined();
-        expect(updatedTab.itemsData.length).toBe(40);
-        // params are updated by the backend, not the frontend
-        // The backend updates params in the database when tab_id is provided
-        // Frontend preserves existing params (they will be updated on next tab load)
+        // itemsData is populated by masonry/restoration; getPage only returns the response.
     });
 
     it('handles API errors gracefully', async () => {
         const networkError = new Error('Network error');
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: `Browse ${id}`,
+                            params: {},
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
@@ -306,6 +381,21 @@ describe('Browse - Core', () => {
         const mockResponse = createMockBrowseResponse(100, null);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: `Browse ${id}`,
+                            params: {},
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
@@ -365,6 +455,21 @@ describe('Browse - Core', () => {
         const mockResponse = createMockBrowseResponse(cursor, nextCursor);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: `Browse ${id}`,
+                            params: {},
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
@@ -413,21 +518,34 @@ describe('Browse - Core', () => {
 
         // Cursor-based pagination uses `next=` in current implementation.
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/browse'));
-        // We always include a numeric page counter for persistence/restoration.
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('page=1'));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`page=${cursor}`));
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`next=${cursor}`));
         expect(result).toHaveProperty('items');
         expect(result).toHaveProperty('nextPage');
         expect(result.nextPage).toBe(nextCursor);
         // currentPage is a numeric page counter (cursor lives in nextCursor).
-        expect(tabContentVm.currentPage).toBe(1);
-        expect(tabContentVm.nextCursor).toBe(nextCursor);
+        // Pagination state is handled by Masonry; getPage only returns the response.
     });
 
     it('updates currentPage to 1 when fetching first page', async () => {
         const mockResponse = createMockBrowseResponse(1, 2);
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
+            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+            if (tabShowMatch) {
+                const id = Number(tabShowMatch[1]);
+                return Promise.resolve({
+                    data: {
+                        tab: {
+                            id,
+                            label: `Browse ${id}`,
+                            params: {},
+                            feed: 'online',
+                            itemsData: [],
+                        },
+                    },
+                });
+            }
             if (url.includes(tabIndex.definition.url)) {
                 return Promise.resolve({ data: [] });
             }
@@ -474,8 +592,7 @@ describe('Browse - Core', () => {
         tabContentVm.items = [];
         await tabContentVm.getPage(1);
 
-        expect(tabContentVm.currentPage).toBe(1);
-        expect(tabContentVm.nextCursor).toBe(2);
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('page=1'));
     });
 
     it('initializes with first tab when tabs exist and loads items if tab has files', async () => {
@@ -507,10 +624,10 @@ describe('Browse - Core', () => {
 
         const tabContentVm = await waitForTabContent(wrapper);
         if (tabContentVm) {
-            expect(tabContentVm.currentPage).toBe(pageParam);
-            expect(tabContentVm.nextCursor).toBe(nextParam);
+            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
+            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(nextParam);
         }
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 
     it('initializes with default values when no tabs exist', async () => {
@@ -571,8 +688,10 @@ describe('Browse - Core', () => {
         }
 
         tabContentVm.items = [{ id: '1' }, { id: '2' }, { id: '3' }];
-        tabContentVm.currentPage = 2;
-        tabContentVm.nextCursor = 'cursor-123';
+        if (tabContentVm.masonry) {
+            tabContentVm.masonry.currentPage = 2;
+            tabContentVm.masonry.paginationHistory = ['cursor-123'];
+        }
 
         await wrapper.vm.$nextTick();
 
@@ -597,8 +716,8 @@ describe('Browse - Core', () => {
         await wrapper.vm.$nextTick();
 
         const tabContentVm = await waitForTabContent(wrapper);
-        if (tabContentVm) {
-            tabContentVm.nextCursor = null;
+        if (tabContentVm?.masonry) {
+            tabContentVm.masonry.paginationHistory = [];
             await wrapper.vm.$nextTick();
 
             const nextPill = wrapper
@@ -615,7 +734,7 @@ describe('Browse - Core', () => {
         const pageParam = 'cursor-string-123';
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url) && !url.includes('/items')) {
+            if (url.includes(tabIndex.definition.url) && !url.match(/\/api\/tabs\/\d+/)) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -626,15 +745,15 @@ describe('Browse - Core', () => {
                     }],
                 });
             }
-            if (url.includes(tabItems.url({ tab: 1 }))) {
+            if (url.includes(tabShow.url({ tab: 1 }))) {
                 return Promise.resolve({
                     data: {
-                        items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         tab: {
                             id: tabId,
                             label: 'Test Tab',
                             params: { service: 'civit-ai-images', page: pageParam },
                             feed: 'online',
+                            itemsData: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         },
                     },
                 });
@@ -659,9 +778,9 @@ describe('Browse - Core', () => {
 
         const tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
-            expect(tabContentVm.currentPage).toBe(pageParam);
+            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
         }
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 
     it('handles tab with page in params correctly and loads items lazily', async () => {
@@ -669,7 +788,7 @@ describe('Browse - Core', () => {
         const pageValue = 123;
 
         mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(tabIndex.definition.url) && !url.includes('/items')) {
+            if (url.includes(tabIndex.definition.url) && !url.match(/\/api\/tabs\/\d+/)) {
                 return Promise.resolve({
                     data: [{
                         id: tabId,
@@ -680,15 +799,15 @@ describe('Browse - Core', () => {
                     }],
                 });
             }
-            if (url.includes(tabItems.url({ tab: 1 }))) {
+            if (url.includes(tabShow.url({ tab: 1 }))) {
                 return Promise.resolve({
                     data: {
-                        items: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         tab: {
                             id: tabId,
                             label: 'Test Tab',
                             params: { service: 'civit-ai-images', page: pageValue },
                             feed: 'online',
+                            itemsData: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         },
                     },
                 });
@@ -710,8 +829,8 @@ describe('Browse - Core', () => {
 
         const tabContentVm = getTabContent(wrapper);
         if (tabContentVm) {
-            expect(tabContentVm.currentPage).toBe(pageValue);
+            expect(tabContentVm.masonry?.currentPage).toBe(pageValue);
         }
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabItems.url({ tab: 1 }));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 });

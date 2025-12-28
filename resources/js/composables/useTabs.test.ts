@@ -351,10 +351,13 @@ describe('useTabs', () => {
         // Clear previous mocks and set up specific mock for items endpoint
         mockAxios.get.mockReset();
         mockAxios.get.mockImplementation((url: string) => {
-            if (url === '/api/tabs/1/items' || url.includes('/api/tabs/1/items')) {
+            if (url === '/api/tabs/1') {
                 return Promise.resolve({
                     data: {
-                        items: mockItemsData,
+                        tab: {
+                            id: 1,
+                            itemsData: mockItemsData,
+                        },
                     },
                 });
             }
@@ -363,7 +366,7 @@ describe('useTabs', () => {
 
         const result = await loadTabItems(1);
 
-        expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs/1/items');
+        expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs/1');
         expect(result).toEqual(mockItemsData);
 
         const tab = tabs.value.find(t => t.id === 1);
@@ -381,7 +384,7 @@ describe('useTabs', () => {
         // Clear previous mocks and set up specific mock for items endpoint to reject
         mockAxios.get.mockReset();
         mockAxios.get.mockImplementation((url: string) => {
-            if (url === '/api/tabs/1/items' || url.includes('/api/tabs/1/items')) {
+            if (url === '/api/tabs/1') {
                 return Promise.reject(error);
             }
             return Promise.resolve({ data: [] });
@@ -433,4 +436,3 @@ describe('useTabs', () => {
         expect(tabs.value).toHaveLength(1);
     });
 });
-

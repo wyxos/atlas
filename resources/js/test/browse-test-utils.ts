@@ -54,7 +54,12 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
             `,
             props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
             emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-            setup(props: { items: any[] }, { emit }: { emit: (event: string, value: any) => void }) {
+            setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
+                let currentPage: number | string | null = null;
+                let nextPage: number | string | null = null;
+                let hasReachedEnd = false;
+                let paginationHistory: Array<number | string> = [];
+
                 const removeFn = (item: any) => {
                     mocks.mockRemove(item);
                     const index = props.items.findIndex((i: any) => i.id === item.id);
@@ -122,10 +127,61 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                     emit('update:items', props.items);
                 };
 
+                const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
+                    mocks.mockInit(itemsToRestore, page, next);
+                    props.items.splice(0, props.items.length, ...itemsToRestore);
+                    emit('update:items', props.items);
+                    currentPage = page;
+                    nextPage = next ?? null;
+                    paginationHistory = nextPage === null ? [] : [nextPage];
+                    hasReachedEnd = nextPage === null;
+                };
+
+                const loadPage = async (page: number | string) => {
+                    if (!props.getPage) {
+                        return;
+                    }
+                    currentPage = page;
+                    const result = await props.getPage(page);
+                    const newItems = result?.items ?? [];
+                    props.items.splice(0, props.items.length, ...newItems);
+                    emit('update:items', props.items);
+                    nextPage = result?.nextPage ?? null;
+                    paginationHistory = nextPage === null ? [] : [nextPage];
+                    hasReachedEnd = nextPage === null;
+                    return result;
+                };
+
+                const loadNext = async () => {
+                    if (!props.getPage || nextPage === null || nextPage === undefined) {
+                        return;
+                    }
+                    const pageToLoad = nextPage;
+                    currentPage = pageToLoad;
+                    const result = await props.getPage(pageToLoad);
+                    const newItems = result?.items ?? [];
+                    props.items.push(...newItems);
+                    emit('update:items', props.items);
+                    nextPage = result?.nextPage ?? null;
+                    paginationHistory = nextPage === null ? [] : [nextPage];
+                    hasReachedEnd = nextPage === null;
+                    return result;
+                };
+
+                const reset = () => {
+                    props.items.splice(0, props.items.length);
+                    emit('update:items', props.items);
+                    currentPage = null;
+                    nextPage = null;
+                    paginationHistory = [];
+                    hasReachedEnd = false;
+                };
+
                 // Use getter to mimic Vue's ref auto-unwrapping behavior
                 // When accessing masonry.value.isLoading, it returns boolean, not ref
                 const exposed = {
                     init: mocks.mockInit,
+                    initialize,
                     refreshLayout: vi.fn(),
                     cancelLoad: mocks.mockCancelLoad,
                     destroy: mocks.mockDestroy,
@@ -133,10 +189,33 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                     removeMany,
                     restore,
                     restoreMany,
+                    loadPage,
+                    loadNext,
+                    reset,
                 };
                 Object.defineProperty(exposed, 'isLoading', {
                     get() { return mocks.mockIsLoading.value; },
                     set(val: boolean) { mocks.mockIsLoading.value = val; },
+                    enumerable: true,
+                });
+                Object.defineProperty(exposed, 'hasReachedEnd', {
+                    get() { return hasReachedEnd; },
+                    set(val: boolean) { hasReachedEnd = val; },
+                    enumerable: true,
+                });
+                Object.defineProperty(exposed, 'currentPage', {
+                    get() { return currentPage; },
+                    set(val: number | string | null) { currentPage = val; },
+                    enumerable: true,
+                });
+                Object.defineProperty(exposed, 'nextPage', {
+                    get() { return nextPage; },
+                    set(val: number | string | null) { nextPage = val; },
+                    enumerable: true,
+                });
+                Object.defineProperty(exposed, 'paginationHistory', {
+                    get() { return paginationHistory; },
+                    set(val: Array<number | string>) { paginationHistory = val; },
                     enumerable: true,
                 });
                 return exposed;
@@ -184,23 +263,23 @@ export function setupBrowseTestMocks(mocks: BrowseMocks): void {
     const tabIndexUrl = tabIndex.definition?.url ?? tabIndex.url();
 
     mocks.mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes(tabIndexUrl) && !url.includes('/items')) {
-            return Promise.resolve({ data: [] });
-        }
-        if (url.includes(tabIndexUrl) && url.includes('/items')) {
-            const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
-            const tabId = tabIdMatch ? Number(tabIdMatch[1]) : 0;
+        const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+        if (tabShowMatch) {
+            const tabId = Number(tabShowMatch[1]);
             return Promise.resolve({
                 data: {
-                    items: [],
                     tab: {
                         id: tabId,
-                        label: tabId ? `Test Tab ${tabId}` : 'Test Tab',
+                        label: `Test Tab ${tabId}`,
                         params: {},
                         feed: 'online',
+                        itemsData: [],
                     },
                 },
             });
+        }
+        if (url.includes(tabIndexUrl)) {
+            return Promise.resolve({ data: [] });
         }
         return Promise.resolve({ data: { items: [], nextPage: null } });
     });
@@ -285,35 +364,36 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
     const browseIndexUrl = browseIndex.definition?.url ?? browseIndex.url();
 
     mocks.mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes(tabIndexUrl) && !url.includes('/items')) {
+        const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
+        if (tabShowMatch) {
+            const tabId = Number(tabShowMatch[1]);
+            const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === tabId) : tabConfig;
+            const params = (tab?.params ?? {}) as Record<string, unknown>;
+            const feed = (typeof params.feed === 'string' ? params.feed : 'online') as string;
+            const itemsData = tab?.itemsData ?? tab?.items ?? [];
+            return Promise.resolve({
+                data: {
+                    tab: {
+                        id: tab?.id ?? tabId,
+                        label: tab?.label ?? `Test Tab ${tabId}`,
+                        params: params,
+                        feed,
+                        itemsData,
+                    },
+                },
+            });
+        }
+        if (url.includes(tabIndexUrl)) {
             // Return tab configs for initial load without file-related data
             const configs = Array.isArray(tabConfig) ? tabConfig : [tabConfig];
             const tabsForIndex = configs.map((tab: any) => {
                 const withoutFileData = { ...tab };
                 delete withoutFileData.has_files;
                 delete withoutFileData.items;
+                delete withoutFileData.itemsData;
                 return withoutFileData;
             });
             return Promise.resolve({ data: tabsForIndex });
-        }
-        if (url.includes(tabIndexUrl) && url.includes('/items')) {
-            // Extract tab ID from URL (e.g., /api/tabs/1/items)
-            const tabIdMatch = url.match(/\/api\/tabs\/(\d+)\/items/);
-            const tabId = tabIdMatch ? tabIdMatch[1] : null;
-            const tab = tabId ? (Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig) : null;
-            const params = (tab?.params ?? {}) as Record<string, unknown>;
-            const feed = (typeof params.feed === 'string' ? params.feed : 'online') as string;
-            return Promise.resolve({
-                data: {
-                    items: tab?.items ?? [],
-                    tab: {
-                        id: tab?.id ?? (tabId ? Number(tabId) : 0),
-                        label: tab?.label ?? (tabId ? `Test Tab ${tabId}` : 'Test Tab'),
-                        params: params,
-                        feed,
-                    },
-                },
-            });
         }
         if (url.includes(browseIndexUrl)) {
             return Promise.resolve({

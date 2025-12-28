@@ -124,6 +124,7 @@ const mockRefreshLayout = vi.fn();
 const mockLoadPage = vi.fn();
 const mockLoadNext = vi.fn();
 const mockReset = vi.fn();
+const mockInitialize = vi.fn();
 
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
@@ -140,19 +141,89 @@ vi.mock('@wyxos/vibe', () => ({
             </div>
         `,
         props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop'],
-        setup(props: { items: any[] }, { expose }: any) {
+        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { expose, emit }: any) {
+            let currentPage: number | string | null = null;
+            let nextPage: number | string | null = null;
+            let hasReachedEnd = false;
+            let paginationHistory: Array<number | string> = [];
+
+            const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
+                mockInitialize(itemsToRestore, page, next);
+                const nextItems = [...itemsToRestore];
+                props.items.splice(0, props.items.length, ...nextItems);
+                emit('update:items', nextItems);
+                currentPage = page;
+                nextPage = next ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+            };
+
+            const loadPage = async (page: number | string) => {
+                mockLoadPage(page);
+                if (!props.getPage) {
+                    return;
+                }
+                currentPage = page;
+                const result = await props.getPage(page);
+                const newItems = result?.items ?? [];
+                const nextItems = [...newItems];
+                props.items.splice(0, props.items.length, ...nextItems);
+                emit('update:items', nextItems);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const loadNext = async () => {
+                mockLoadNext();
+                if (!props.getPage || nextPage === null || nextPage === undefined) {
+                    return;
+                }
+                const pageToLoad = nextPage;
+                currentPage = pageToLoad;
+                const result = await props.getPage(pageToLoad);
+                const newItems = result?.items ?? [];
+                const nextItems = [...props.items, ...newItems];
+                props.items.splice(0, props.items.length, ...nextItems);
+                emit('update:items', [...nextItems]);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const reset = () => {
+                mockReset();
+                props.items.splice(0, props.items.length);
+                emit('update:items', []);
+                currentPage = null;
+                nextPage = null;
+                paginationHistory = [];
+                hasReachedEnd = false;
+            };
+
             expose({
                 isLoading: mockIsLoading,
                 init: mockInit,
+                initialize,
                 refreshLayout: mockRefreshLayout,
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,
                 removeMany: mockRemoveMany,
-                loadPage: mockLoadPage,
-                loadNext: mockLoadNext,
-                reset: mockReset,
+                loadPage,
+                loadNext,
+                reset,
+                get currentPage() { return currentPage; },
+                set currentPage(value: number | string | null) { currentPage = value; },
+                get nextPage() { return nextPage; },
+                set nextPage(value: number | string | null) { nextPage = value; },
+                get paginationHistory() { return paginationHistory; },
+                set paginationHistory(value: Array<number | string>) { paginationHistory = value; },
+                get hasReachedEnd() { return hasReachedEnd; },
+                set hasReachedEnd(value: boolean) { hasReachedEnd = value; },
             });
             return {
                 remove: mockRemove,
@@ -475,6 +546,7 @@ beforeEach(() => {
     mockLoadPage.mockClear();
     mockLoadNext.mockClear();
     mockReset.mockClear();
+    mockInitialize.mockClear();
 
     // Default mock for axios
     mockAxios.get.mockResolvedValue({ data: { items: [], nextPage: null } });
@@ -1062,4 +1134,3 @@ describe('TabContent - Container Badges', () => {
         });
     });
 });
-
