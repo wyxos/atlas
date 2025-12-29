@@ -25,7 +25,6 @@ import {
     Dialog,
     DialogClose,
     DialogContent,
-    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -109,12 +108,6 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Item preview composable (needs to be initialized early)
 const itemPreview = useItemPreview(items, computed(() => tab.value));
-
-// Track if component is mounted to prevent accessing state after unmount
-const isMounted = ref(false);
-
-// Track if tab is initializing (loading metadata, restoring state)
-const isInitializing = ref(true);
 
 // Browse service composable - fetch services if not provided via prop
 const { availableServices: localServices, availableSources, fetchServices, fetchSources } = useBrowseService();
@@ -242,13 +235,6 @@ const isTabRestored = ref(false);
 
 // Check if we should show the form (new tab with no items)
 const shouldShowForm = ref(true);
-
-
-// Get pageSize from limit filter, defaulting to 20
-const pageSize = computed(() => {
-    const limit = tab.value?.params?.limit;
-    return limit ? Number(limit) : 20;
-});
 
 const layout = {
     gutterX: 12,

@@ -7,7 +7,7 @@ import { usePreviewBatch } from './usePreviewBatch';
  */
 export function useItemPreview(
     items: import('vue').Ref<MasonryItem[]>,
-    tab: import('vue').Ref<TabData | undefined>
+    _tab: import('vue').Ref<TabData | undefined>
 ) {
     const previewedItems = ref<Set<number>>(new Set());
     const { queuePreviewIncrement } = usePreviewBatch();

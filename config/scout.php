@@ -43,7 +43,7 @@ return [
     */
 
     'queue' => env('SCOUT_QUEUE') ? [
-        'queue' => env('SCOUT_QUEUE')
+        'queue' => env('SCOUT_QUEUE'),
     ] : null,
 
     /*

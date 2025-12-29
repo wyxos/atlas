@@ -18,7 +18,7 @@ export type UseBrowseServiceOptions = {
     updateActiveTab: (items: MasonryItem[]) => void;
 };
 
-export function useBrowseService(options?: UseBrowseServiceOptions) {
+export function useBrowseService(_options?: UseBrowseServiceOptions) {
     const availableServices = ref<ServiceOption[]>([]);
     const availableSources = ref<string[]>([]);
 
