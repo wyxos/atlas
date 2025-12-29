@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/files/{file}/seen', [\App\Http\Controllers\FilesController::class, 'incrementSeen'])->name('api.files.seen');
     Route::get('/api/browse', [\App\Http\Controllers\BrowseController::class, 'index'])->name('api.browse.index');
     Route::get('/api/browse/services', [\App\Http\Controllers\BrowseController::class, 'services'])->name('api.browse.services');
+    Route::get('/api/browse/sources', [\App\Http\Controllers\BrowseController::class, 'sources'])->name('api.browse.sources');
     Route::get('/api/tabs', [\App\Http\Controllers\TabController::class, 'index'])->name('api.tabs.index');
     Route::get('/api/tabs/{tab}', [\App\Http\Controllers\TabController::class, 'show'])->name('api.tabs.show');
     Route::get('/api/tabs/{tab}/items', [\App\Http\Controllers\TabController::class, 'items'])->name('api.tabs.items');
