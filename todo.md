@@ -1,5 +1,8 @@
 - [ ] Browse feature improvements
-    - [ ] Local files support
+    - [ ] Browse
+      - [ ] Form building via class
+      - [ ] Local service to use scout
+      - [ ] Reaction filtering
     - [ ] Video handling
       - [ ] Display video from CivitAI in masonry and fileviewer 
       - [ ] Implement video playback and controls in browse interface

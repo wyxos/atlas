@@ -10,6 +10,7 @@ export interface BrowseFormData {
     page: string | number;
     next: string | number | null;
     feed: 'online' | 'local';
+    source: string;
     tab_id: number | null;
 }
 
@@ -26,6 +27,7 @@ function createFormInstance() {
         page: 1,
         next: null,
         feed: 'online',
+        source: 'all',
         tab_id: null,
     };
 

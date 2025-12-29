@@ -1,6 +1,6 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
 import type { MasonryItem, TabData } from './useTabs';
-import { services as browseServices } from '@/actions/App/Http/Controllers/BrowseController';
+import { services as browseServices, sources as browseSources } from '@/actions/App/Http/Controllers/BrowseController';
 
 export type ServiceOption = {
     key: string;
@@ -20,6 +20,7 @@ export type UseBrowseServiceOptions = {
 
 export function useBrowseService(options?: UseBrowseServiceOptions) {
     const availableServices = ref<ServiceOption[]>([]);
+    const availableSources = ref<string[]>([]);
 
     /**
      * Fetch available services from the services endpoint
@@ -35,6 +36,19 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
     }
 
     /**
+     * Fetch available sources from the sources endpoint
+     */
+    async function fetchSources(): Promise<void> {
+        try {
+            const response = await window.axios.get(browseSources.url());
+            availableSources.value = response.data.sources || ['all'];
+        } catch (error) {
+            console.error('Failed to fetch sources:', error);
+            availableSources.value = ['all'];
+        }
+    }
+
+    /**
      * Get the current service from a tab's query params
      */
     function getCurrentService(tabQueryParams?: Record<string, string | number | null>): string | null {
@@ -46,7 +60,9 @@ export function useBrowseService(options?: UseBrowseServiceOptions) {
 
     return {
         availableServices,
+        availableSources,
         fetchServices,
+        fetchSources,
         getCurrentService,
     };
 }

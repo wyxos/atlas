@@ -52,4 +52,25 @@ class BrowseController extends Controller
             'services' => $servicesMeta,
         ]);
     }
+
+    /**
+     * Get available sources for local feed.
+     */
+    public function sources(): JsonResponse
+    {
+        $sources = \App\Models\File::query()
+            ->distinct()
+            ->whereNotNull('source')
+            ->where('source', '!=', '')
+            ->orderBy('source')
+            ->pluck('source')
+            ->toArray();
+
+        // Add 'all' as the first option
+        $sourcesWithAll = array_merge(['all'], $sources);
+
+        return response()->json([
+            'sources' => $sourcesWithAll,
+        ]);
+    }
 }

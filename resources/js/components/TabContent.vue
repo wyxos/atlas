@@ -127,7 +127,7 @@ const isMounted = ref(false);
 const isInitializing = ref(true);
 
 // Browse service composable - fetch services if not provided via prop
-const { availableServices: localServices, fetchServices } = useBrowseService();
+const { availableServices: localServices, availableSources, fetchServices, fetchSources } = useBrowseService();
 
 // Use prop services if available, otherwise use local services
 const availableServices = computed(() => {
@@ -732,6 +732,7 @@ onMounted(async () => {
     }
 
     await fetchServices();
+    await fetchSources();
 });
 
 
@@ -773,8 +774,8 @@ defineExpose({
                         </SelectContent>
                     </Select>
                 </div>
-                <!-- Service Dropdown -->
-                <div class="flex-1">
+                <!-- Service Dropdown (only show when feed is 'online') -->
+                <div v-if="form.data.feed === 'online'" class="flex-1">
                     <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
                         <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
                             <SelectValue placeholder="Select a service..." />
@@ -783,6 +784,20 @@ defineExpose({
                             <SelectItem v-for="service in availableServices.filter(s => s.key !== 'local')"
                                 :key="service.key" :value="service.key" data-test="service-select-item">
                                 {{ service.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <!-- Source Dropdown (only show when feed is 'local') -->
+                <div v-if="form.data.feed === 'local'" class="flex-1">
+                    <Select v-model="form.data.source" :disabled="masonry?.isLoading ?? false">
+                        <SelectTrigger class="w-[200px]" data-test="source-select-trigger">
+                            <SelectValue placeholder="Select a source..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem v-for="source in availableSources" :key="source" :value="source"
+                                data-test="source-select-item">
+                                {{ source }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
@@ -872,6 +887,22 @@ defineExpose({
                                                 v-for="service in availableServices.filter(s => s.key !== 'local')"
                                                 :key="service.key" :value="service.key" data-test="service-select-item">
                                                 {{ service.label }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <!-- Source Dropdown (only show when Local) -->
+                                <div v-if="form.data.feed === 'local'" class="w-full">
+                                    <label
+                                        class="block text-sm font-medium text-twilight-indigo-200 mb-2">Source</label>
+                                    <Select v-model="form.data.source" :disabled="masonry?.isLoading ?? false">
+                                        <SelectTrigger class="w-full" data-test="source-select-trigger">
+                                            <SelectValue placeholder="Select a source..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem v-for="source in availableSources" :key="source" :value="source"
+                                                data-test="source-select-item">
+                                                {{ source }}
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
