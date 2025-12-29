@@ -342,3 +342,4 @@ it('can browse files in browser', function () {
 - Assert no JavaScript errors: `assertNoJavascriptErrors()`
 
 
+

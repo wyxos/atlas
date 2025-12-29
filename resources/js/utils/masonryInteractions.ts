@@ -6,9 +6,9 @@ import type { ReactionType } from '@/types/reaction';
 export function createMasonryInteractions(
     items: Ref<MasonryItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
-    handleMasonryReaction: (fileId: number, type: ReactionType) => Promise<void>
+    handleMasonryReaction: (item: MasonryItem, type: ReactionType) => Promise<void>
 ) {
-    function handleAltClickReaction(e: MouseEvent, fileId: number): void {
+    function handleAltClickReaction(e: MouseEvent, item: MasonryItem): void {
         e.preventDefault();
         e.stopPropagation();
 
@@ -26,12 +26,8 @@ export function createMasonryInteractions(
             return;
         }
 
-        const item = items.value.find((i) => i.id === fileId);
-        if (!item || !masonry.value?.remove) {
-            return;
-        }
-
-        void handleMasonryReaction(fileId, reactionType);
+        // Pass item directly - this is the exact object reference that Vibe is tracking
+        void handleMasonryReaction(item, reactionType);
     }
 
     function handleMasonryItemMouseDown(e: MouseEvent): void {

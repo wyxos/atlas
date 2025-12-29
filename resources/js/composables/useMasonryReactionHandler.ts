@@ -10,7 +10,6 @@ import { useBrowseForm } from './useBrowseForm';
  */
 export function useMasonryReactionHandler(
     items: Ref<MasonryItem[]>,
-    itemsMap: Ref<Map<number, MasonryItem>>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tab: Ref<TabData | undefined>,
     onReaction: (fileId: number, type: ReactionType) => void,
@@ -22,18 +21,21 @@ export function useMasonryReactionHandler(
      * Handle reaction - conditionally removes item from masonry based on feed mode and queues reaction.
      * In local mode: items are NOT removed (visual treatment only).
      * In online mode: items are removed immediately.
+     * 
+     * @param item - The exact item object reference that Vibe is tracking (required for proper animations)
+     * @param type - The reaction type
      */
     async function handleMasonryReaction(
-        fileId: number,
+        item: MasonryItem,
         type: ReactionType
     ): Promise<void> {
-        // Use Map lookup instead of O(n) find operations
-        const item = itemsMap.value.get(fileId);
-        const itemIndex = item ? items.value.findIndex((i) => i.id === fileId) : -1;
+        const fileId = item.id;
+        const itemIndex = items.value.findIndex((i) => i.id === fileId);
         const tabId = tab.value?.id;
 
         // Only remove from masonry in online mode (not in local mode)
-        if (!isLocal.value && item && masonry.value?.remove) {
+        // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
+        if (!isLocal.value && masonry.value?.remove) {
             masonry.value.remove(item);
         }
 
@@ -45,9 +47,9 @@ export function useMasonryReactionHandler(
             }
             : undefined;
 
-        // Queue reaction with countdown toast (pass thumbnail, restore callback, items, and itemsMap for local mode updates)
-        const thumbnail = item?.thumbnail || item?.src || '';
-        queueReaction(fileId, type, thumbnail, restoreCallback, items, itemsMap);
+        // Queue reaction with countdown toast (pass thumbnail, restore callback, and items for local mode updates)
+        const thumbnail = item.thumbnail || item.src || '';
+        queueReaction(fileId, type, thumbnail, restoreCallback, items);
 
         // Emit to parent (reaction is queued, not executed yet)
         onReaction(fileId, type);

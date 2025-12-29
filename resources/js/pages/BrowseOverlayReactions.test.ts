@@ -183,7 +183,6 @@ describe('Browse - Overlay Reactions', () => {
                             label: `Test Tab ${id}`,
                             params: { service: 'civit-ai-images', page: 1 },
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });

@@ -58,7 +58,7 @@ interface Props {
     onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
-    updateActiveTab: (itemsData: MasonryItem[]) => void;
+    updateActiveTab: (items: MasonryItem[]) => void;
 }
 
 const props = defineProps<Props>();
@@ -71,20 +71,11 @@ const emit = defineEmits<{
 // Use shallowRef to reduce Vue reactivity overhead with large arrays (3k+ items)
 // This prevents deep reactivity tracking on each item, significantly improving performance
 const items = shallowRef<MasonryItem[]>([]);
-// Map-based lookup for O(1) item access instead of O(n) find() operations
-const itemsMap = ref<Map<number, MasonryItem>>(new Map());
 
-// Sync itemsMap whenever items array changes
+// Diagnostic: Log item size analysis when items change (only in dev mode)
 watch(
     () => items.value,
     (newItems) => {
-        const newMap = new Map<number, MasonryItem>();
-        for (const item of newItems) {
-            newMap.set(item.id, item);
-        }
-        itemsMap.value = newMap;
-
-        // Diagnostic: Log item size analysis when items change (only in dev mode)
         if (import.meta.env.DEV && newItems.length > 0) {
             // Only log when we have a significant number of items to avoid spam
             if (newItems.length >= 100 && newItems.length % 500 === 0) {
@@ -117,8 +108,7 @@ const tabContentContainer = ref<HTMLElement | null>(null);
 const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 
 // Item preview composable (needs to be initialized early)
-// Pass itemsMap for O(1) item existence checks (important for 10k+ items)
-const itemPreview = useItemPreview(items, computed(() => tab.value), itemsMap);
+const itemPreview = useItemPreview(items, computed(() => tab.value));
 
 // Track if component is mounted to prevent accessing state after unmount
 const isMounted = ref(false);
@@ -349,7 +339,7 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
         // This is less common than id lookup, so O(n) is acceptable here
         for (const item of items.value) {
             if (item.key === itemKeyAttr) {
-                masonryInteractions.handleAltClickReaction(e, item.id);
+                masonryInteractions.handleAltClickReaction(e, item);
                 return;
             }
         }
@@ -364,7 +354,7 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
             const itemSrc = (item.src || item.thumbnail || '').split('?')[0].split('#')[0];
             const baseSrc = src.split('?')[0].split('#')[0];
             if (baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc)) {
-                masonryInteractions.handleAltClickReaction(e, item.id);
+                masonryInteractions.handleAltClickReaction(e, item);
                 break;
             }
         }
@@ -414,7 +404,6 @@ function handleContainerBan(container: {
 // tabId will be set when tab loads, using computed to reactively get the current value
 const containerPillInteractions = useContainerPillInteractions(
     items,
-    itemsMap,
     masonry,
     computed(() => tab.value.id),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
@@ -429,7 +418,6 @@ const promptData = usePromptData(items);
 // Masonry reaction handler composable (needs restoreToMasonry)
 const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
-    itemsMap,
     masonry,
     computed(() => tab.value),
     (fileId: number, type: ReactionType) => {
@@ -471,7 +459,7 @@ async function loadNextPage(): Promise<void> {
     }
 }
 
-// Remove item from masonry using Map lookup
+// Remove item from masonry
 // Only removes in online mode (not in local mode)
 function removeItemFromMasonry(item: MasonryItem): void {
     // Only remove in online mode (not in local mode)
@@ -480,15 +468,13 @@ function removeItemFromMasonry(item: MasonryItem): void {
     }
 
     if (masonry.value?.remove) {
-        const masonryItem = itemsMap.value.get(item.id);
-        if (masonryItem) {
-            masonry.value.remove(masonryItem);
-        }
+        // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
+        masonry.value.remove(item);
     }
 }
 
 // Auto-dislike queue composable
-const autoDislikeQueue = useAutoDislikeQueue(items, masonry, itemsMap);
+const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
 
 // Event handlers for masonry items
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
@@ -639,7 +625,11 @@ function handleFileReaction(itemId: number, type: ReactionType, remove: (item: M
     // Cancel auto-dislike countdown if user reacts manually
     autoDislikeQueue.cancelAutoDislikeCountdown(itemId);
     // Note: remove parameter is kept for FileReactions component compatibility but not used here
-    handleMasonryReaction(itemId, type);
+    // Find item - but we should ideally pass the item directly from the component
+    const item = items.value.find((i) => i.id === itemId);
+    if (item) {
+        handleMasonryReaction(item, type);
+    }
 }
 
 function handleCopyPromptClick(): void {
@@ -712,7 +702,8 @@ onMounted(async () => {
                 shouldShowForm.value = false;
                 isTabRestored.value = true;
 
-                const itemsToRestore = tab.value.itemsData || [];
+                // Get items from API response
+                const itemsToRestore = data.tab.items || [];
                 const currentPage = tab.value.params.page || 1;
                 const nextPage = tab.value.params.next || null;
 
@@ -921,10 +912,9 @@ defineExpose({
                         </div>
                     </template>
                     <template #default="{ item, index, remove }">
-                        <!-- Get fresh item reference from itemsMap to ensure reactivity with shallowRef -->
-                        <!-- The item from Masonry slot may be stale, so we look it up fresh from itemsMap -->
-                        <!-- In templates, refs are auto-unwrapped, so use itemsMap not itemsMap.value -->
-                        <VibeMasonryItem :item="itemsMap.get(item.id) || item" :remove="remove" :preload-threshold="0.5"
+                        <!-- Pass item directly to preserve object reference for Vibe's FLIP animation tracking -->
+                        <!-- Vibe tracks items by object reference, so we must use the item prop directly -->
+                        <VibeMasonryItem :item="item" :remove="remove" :preload-threshold="0.5"
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
                             @mouseleave="handleMasonryItemMouseLeave"
                             @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
@@ -1019,12 +1009,11 @@ defineExpose({
                                     <Transition name="fade">
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
                                             class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                            <!-- Use itemsMap to get fresh item data instead of stale slotItem from Masonry -->
-                                            <FileReactions :file-id="slotItem.id"
-                                                :reaction="(itemsMap.get(slotItem.id) || slotItem).reaction"
-                                                :previewed-count="(itemsMap.get(slotItem.id) || slotItem).previewed_count"
-                                                :viewed-count="(itemsMap.get(slotItem.id) || slotItem).seen_count"
-                                                :current-index="index" :total-items="items.length" variant="small"
+                                            <!-- Use slotItem directly - Vibe re-renders with fresh object references after updates -->
+                                            <FileReactions :file-id="slotItem.id" :reaction="slotItem.reaction"
+                                                :previewed-count="slotItem.previewed_count"
+                                                :viewed-count="slotItem.seen_count" :current-index="index"
+                                                :total-items="items.length" variant="small"
                                                 :remove-item="() => handleRemoveItem(remove, slotItem)"
                                                 @reaction="(type) => handleFileReaction(slotItem.id, type, remove)" />
                                         </div>

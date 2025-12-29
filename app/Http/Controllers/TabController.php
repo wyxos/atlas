@@ -99,7 +99,7 @@ class TabController extends Controller
 
     /**
      * Get a single tab with its items.
-     * This endpoint returns the tab data including itemsData for restoring a tab.
+     * This endpoint returns the tab data including items for restoring a tab.
      */
     public function show(Tab $tab): JsonResponse
     {
@@ -150,14 +150,14 @@ class TabController extends Controller
                 || $file->blacklisted_at !== null;
         });
 
-        $itemsData = [];
+        $items = [];
 
         if ($files->isNotEmpty()) {
             // Get page from params, default to 1
             $page = isset($tab->params['page']) && is_numeric($tab->params['page'])
                 ? (int) $tab->params['page']
                 : 1;
-            $itemsData = Tab::formatFilesToItems($files, $page);
+            $items = Tab::formatFilesToItems($files, $page);
         }
 
         $params = $tab->params ?? (object) [];
@@ -167,7 +167,7 @@ class TabController extends Controller
                 'id' => $tab->id,
                 'label' => $tab->label,
                 'params' => $params,
-                'itemsData' => $itemsData,
+                'items' => $items,
                 'position' => $tab->position ?? 0,
                 'isActive' => $tab->is_active ?? false,
             ],

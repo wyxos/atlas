@@ -306,7 +306,6 @@ describe('Browse - Core', () => {
 
         const updatedTab = vm.tabs.find((t: any) => t.id === tabId);
         expect(updatedTab).toBeDefined();
-        // itemsData is populated by masonry/restoration; getPage only returns the response.
     });
 
     it('handles API errors gracefully', async () => {
@@ -323,7 +322,6 @@ describe('Browse - Core', () => {
                             label: `Browse ${id}`,
                             params: {},
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -391,7 +389,6 @@ describe('Browse - Core', () => {
                             label: `Browse ${id}`,
                             params: {},
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -465,7 +462,6 @@ describe('Browse - Core', () => {
                             label: `Browse ${id}`,
                             params: {},
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -541,7 +537,6 @@ describe('Browse - Core', () => {
                             label: `Browse ${id}`,
                             params: {},
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -753,7 +748,6 @@ describe('Browse - Core', () => {
                             label: 'Test Tab',
                             params: { service: 'civit-ai-images', page: pageParam },
                             feed: 'online',
-                            itemsData: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         },
                     },
                 });
@@ -807,7 +801,6 @@ describe('Browse - Core', () => {
                             label: 'Test Tab',
                             params: { service: 'civit-ai-images', page: pageValue },
                             feed: 'online',
-                            itemsData: [{ id: 123, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         },
                     },
                 });

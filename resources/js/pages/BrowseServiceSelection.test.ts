@@ -216,7 +216,6 @@ describe('Browse - Service Selection', () => {
                             label: `Browse ${id}`,
                             params: {},
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -298,7 +297,6 @@ describe('Browse - Service Selection', () => {
                             label: 'Test Tab',
                             params: {},
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -399,7 +397,6 @@ describe('Browse - Service Selection', () => {
                             label: id === tab2Id ? 'Tab 2' : 'Tab 1',
                             params: { service, page: 1 },
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -481,7 +478,6 @@ describe('Browse - Service Selection', () => {
                             label: 'Test Tab',
                             params: { service: 'wallhaven', page: 1 },
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -549,7 +545,6 @@ describe('Browse - Service Selection', () => {
                             label: 'Test Tab',
                             params: { service: 'civit-ai-images', page: 1 },
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });

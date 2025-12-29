@@ -238,7 +238,6 @@ describe('Browse - Tab Management', () => {
                             label: isSecond ? 'Tab 2' : 'Tab 1',
                             params: { service: 'civit-ai-images', page: 1 },
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -331,7 +330,6 @@ describe('Browse - Tab Management', () => {
                             label: 'Tab 1',
                             params: { service: 'civit-ai-images', page: 1 },
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -399,7 +397,6 @@ describe('Browse - Tab Management', () => {
                             label: isSecond ? 'Tab 2' : 'Tab 1',
                             params: { service: 'civit-ai-images', page: 1 },
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });
@@ -481,7 +478,6 @@ describe('Browse - Tab Management', () => {
                             label: 'Browse 1',
                             params: {},
                             feed: 'online',
-                            itemsData: [],
                         },
                     },
                 });

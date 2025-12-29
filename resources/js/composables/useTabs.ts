@@ -22,7 +22,6 @@ export type TabData = {
     id: number;
     label: string;
     params: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
-    itemsData: MasonryItem[]; // Loaded from API, not stored in DB
     position: number;
     isActive: boolean;
     feed?: 'online' | 'local'; // Defaults to 'online' if not set
@@ -54,7 +53,6 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                     id: tab.id,
                     label: tab.label,
                     params: params,
-                    itemsData: [], // Always empty on initial load - items are loaded lazily when restoring a tab
                     position: tab.position || 0,
                     isActive: tab.is_active ?? false,
                     feed: (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local',
@@ -83,7 +81,6 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             params: {
                 // Don't set page or service - user must select service first
             },
-            itemsData: [],
             position: maxPosition + 1,
             isActive: false,
         };
@@ -158,24 +155,22 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     }
 
     function updateActiveTab(
-        itemsData: MasonryItem[]
+        items: MasonryItem[]
     ): void {
         const activeTab = getActiveTab();
         if (!activeTab) {
             return;
         }
 
-        const hadNoItems = activeTab.itemsData.length === 0;
-        activeTab.itemsData = itemsData;
-
+        // Note: items are managed in component state, not in tab
+        // Tab persistence is handled by backend based on params
         // If we just loaded the first page of items, persist immediately so a quick refresh
         // still restores the tab content (debounced persistence can be canceled by reload).
-        if (hadNoItems && itemsData.length > 0) {
+        if (items.length > 0) {
             void saveTab(activeTab);
             return;
         }
         // Note: params are updated by the backend (Browser.php) when browse requests are made.
-        // Frontend only updates itemsData, not params.
         saveTabDebounced(activeTab);
     }
 
@@ -215,13 +210,8 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             const response = await window.axios.get(tabsShow.url(tabId));
             const data = response.data;
 
-            // Update the tab with loaded items
-            const tab = tabs.value.find(t => t.id === tabId);
-            if (tab && data.tab) {
-                tab.itemsData = data.tab.itemsData || [];
-            }
-
-            return data.tab?.itemsData || [];
+            // Return items from API response
+            return data.items || [];
         } catch (error) {
             console.error('Failed to load tab items:', error);
             throw error;

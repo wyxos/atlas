@@ -563,7 +563,6 @@ describe('TabContent - Container Badges', () => {
         id: 1,
         label: 'Test Tab',
         params: { service: 'test-service', page: 1, next: null },
-        itemsData: [],
         position: 0,
         isActive: true,
         ...overrides,
@@ -602,13 +601,12 @@ describe('TabContent - Container Badges', () => {
             { type: 'album', id: 2 }, // Same container ID as item1's album
         ]);
 
-        const tab = createMockTab({
-            itemsData: [item1, item2, item3],
-        });
+        const tab = createMockTab();
+        const items = [item1, item2, item3];
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items: tab.itemsData,
+                items,
                 tab,
             },
         });
@@ -651,13 +649,12 @@ describe('TabContent - Container Badges', () => {
         const item1 = createMockItem(1, []);
         const item2 = createMockItem(2, [{ type: 'gallery', id: 1 }]);
 
-        const tab = createMockTab({
-            itemsData: [item1, item2],
-        });
+        const tab = createMockTab();
+        const items = [item1, item2];
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items: tab.itemsData,
+                items,
                 tab,
             },
         });
@@ -706,13 +703,12 @@ describe('TabContent - Container Badges', () => {
             { type: 'album', id: 2 }, // Same container ID as item1
         ]);
 
-        const tab = createMockTab({
-            itemsData: [item1, item2, item3],
-        });
+        const tab = createMockTab();
+        const items = [item1, item2, item3];
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items: tab.itemsData,
+                items,
                 tab,
             },
         });
@@ -750,13 +746,12 @@ describe('TabContent - Container Badges', () => {
             { type: 'album', id: 3 },
         ]);
 
-        const tab = createMockTab({
-            itemsData: [item1],
-        });
+        const tab = createMockTab();
+        const items = [item1];
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items: tab.itemsData,
+                items,
                 tab,
             },
         });
@@ -791,13 +786,12 @@ describe('TabContent - Container Badges', () => {
         const item1 = createMockItem(1, [{ type: 'gallery', id: 1 }]);
         const item2 = createMockItem(2, [{ type: 'gallery', id: 1 }]); // Same container ID
 
-        const tab = createMockTab({
-            itemsData: [item1],
-        });
+        const tab = createMockTab();
+        const items = [item1];
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items: tab.itemsData,
+                items,
                 tab,
             },
         });
@@ -840,13 +834,12 @@ describe('TabContent - Container Badges', () => {
     it('only shows container badges when image is loaded and item is hovered', async () => {
         const item1 = createMockItem(1, [{ type: 'gallery', id: 1 }]);
 
-        const tab = createMockTab({
-            itemsData: [item1],
-        });
+        const tab = createMockTab();
+        const items = [item1];
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items: tab.itemsData,
+                items,
                 tab,
             },
         });
@@ -895,7 +888,6 @@ describe('TabContent - Container Badges', () => {
         const item1 = createMockItem(1, []);
 
         const tab = createMockTab({
-            itemsData: [item1],
         });
 
         const wrapper = mount(TabContent, {
@@ -929,7 +921,6 @@ describe('TabContent - Container Badges', () => {
         const item1 = createMockItem(1, []);
 
         const tab = createMockTab({
-            itemsData: [item1],
         });
 
         const wrapper = mount(TabContent, {
