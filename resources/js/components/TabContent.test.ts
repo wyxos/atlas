@@ -516,7 +516,9 @@ vi.mock('@/composables/useBrowseService', async () => {
     return {
         useBrowseService: () => ({
             availableServices: ref([]),
+            availableSources: ref([]),
             fetchServices: vi.fn(),
+            fetchSources: vi.fn(),
             getPage: vi.fn().mockResolvedValue({ items: [], nextPage: null }),
             applyService: vi.fn().mockResolvedValue(undefined),
         }),
