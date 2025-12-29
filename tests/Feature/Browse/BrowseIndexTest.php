@@ -224,7 +224,7 @@ test('browse returns empty items array when service fails', function () {
     expect($data['items'])->toBeEmpty();
 });
 
-test('browse uses LocalService when tab feed is local', function () {
+test('browse uses LocalService when feed is local', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
         'params' => ['feed' => 'local'],
@@ -246,7 +246,7 @@ test('browse uses LocalService when tab feed is local', function () {
         'source' => 'Wallhaven',
     ]);
 
-    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&source=all&limit=20");
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20");
 
     $response->assertSuccessful();
     $data = $response->json();
@@ -257,11 +257,11 @@ test('browse uses LocalService when tab feed is local', function () {
     // Verify files are not persisted again (they already exist)
     expect(\App\Models\File::count())->toBe(2);
 
-    // Verify files are not attached to tab in offline mode
+    // Verify files are not attached to tab in local mode
     expect($tab->files()->count())->toBe(0);
 });
 
-test('browse filters by source in offline mode', function () {
+test('browse filters by source in local mode', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create([
         'params' => ['feed' => 'local'],
@@ -282,7 +282,7 @@ test('browse filters by source in offline mode', function () {
         'source' => 'Wallhaven',
     ]);
 
-    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&source=CivitAI&limit=20");
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=CivitAI&limit=20");
 
     $response->assertSuccessful();
     $data = $response->json();
