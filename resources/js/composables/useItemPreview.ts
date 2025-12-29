@@ -105,13 +105,13 @@ export function useItemPreview(
                 // Another call is already handling this - return null silently
                 return null;
             }
-            
+
             // For other errors, log but don't throw - preview count is not critical
             console.error('Failed to increment preview count:', error);
-            
+
             // Remove from previewedItems so it can be retried if needed
             previewedItems.value.delete(fileId);
-            
+
             return null;
         }
     }
