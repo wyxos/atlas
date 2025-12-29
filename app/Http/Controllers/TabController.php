@@ -177,6 +177,7 @@ class TabController extends Controller
     /**
      * Get items for a specific tab.
      * This endpoint is used to lazy-load items when restoring a tab.
+     *
      * @deprecated Use show() method instead
      */
     public function items(Tab $tab): JsonResponse
