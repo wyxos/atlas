@@ -3,6 +3,8 @@
       - [ ] Form building via class
       - [ ] Local service to use scout
       - [ ] Reaction filtering
+      - [ ] Stabilize Wallhaven
+      - [ ] Evaluate other default feeds (Youtube, etc)
     - [ ] Video handling
       - [ ] Display video from CivitAI in masonry and fileviewer 
       - [ ] Implement video playback and controls in browse interface
