@@ -827,11 +827,10 @@ defineExpose({
             <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
                 <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-page="getPage" :context="masonryContext"
-                         :page-size="Number(form.data.limit) || 20"
-                    :layout="layout" layout-mode="auto" :mobile-breakpoint="768" init="manual"
-                    :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'" :backfill-delay-ms="2000"
-                    :backfill-max-calls="Infinity" @loading:start="handleLoadingStart" @backfill:start="onBackfillStart"
-                    @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
+                    :page-size="Number(form.data.limit) || 20" :layout="layout" layout-mode="auto"
+                    :mobile-breakpoint="768" init="manual" :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'"
+                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @loading:start="handleLoadingStart"
+                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
                     @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
                     @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
                     data-test="masonry-component">
@@ -903,8 +902,7 @@ defineExpose({
                                 #default="{ item: slotItem, imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
                                 <!-- Use item from slot props (reactive) instead of outer scope item (may be stale) -->
                                 <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
-                                    :data-key="slotItem.key" :data-masonry-item-id="slotItem.id"
-                                    :class="[
+                                    :data-key="slotItem.key" :data-masonry-item-id="slotItem.id" :class="[
                                         containerBadges.getMasonryItemClasses.value(slotItem),
                                         // Visual treatment for reacted items in local mode (gray out, overlay)
                                         form.data.feed === 'local' && slotItem.reaction ? 'opacity-60 grayscale-[0.3]' : ''
