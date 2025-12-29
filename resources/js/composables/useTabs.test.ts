@@ -67,10 +67,8 @@ describe('useTabs', () => {
         expect(tabs.value).toHaveLength(2);
         expect(tabs.value[0].id).toBe(1);
         expect(tabs.value[0].label).toBe('Tab 1');
-        expect(tabs.value[0].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(tabs.value[1].id).toBe(2);
         expect(tabs.value[1].label).toBe('Tab 2');
-        expect(tabs.value[1].itemsData).toEqual([]); // itemsData should be empty on initial load
         expect(isLoadingTabs.value).toBe(false);
     });
 
@@ -186,8 +184,8 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', params: {}, itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', params: {}, position: 1, isActive: false },
         ];
         activeTabId.value = 1; // Set active tab to the one we're closing
 
@@ -238,7 +236,7 @@ describe('useTabs', () => {
 
         // Set up single tab
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
@@ -259,8 +257,8 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', params: {}, itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', params: {}, position: 1, isActive: false },
         ];
         activeTabId.value = 2; // Active tab is different from the one we're closing
 
@@ -279,8 +277,8 @@ describe('useTabs', () => {
         const { tabs, activeTabId, getActiveTab } = useTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
-            { id: 2, label: 'Tab 2', params: {}, itemsData: [], position: 1, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
+            { id: 2, label: 'Tab 2', params: {}, position: 1, isActive: false },
         ];
         activeTabId.value = 2;
 
@@ -304,23 +302,23 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test (simulating loaded state)
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
         ];
         activeTabId.value = 1;
 
         mockAxios.put.mockResolvedValueOnce({});
 
-        const itemsData = [
+        const items = [
             { id: 1, width: 100, height: 100, src: 'test.jpg', type: 'image', page: 1, index: 0, notFound: false },
         ];
         // params are preserved from existing tab state (not updated by frontend)
         const existingParams = tabs.value.find(t => t.id === 1)?.params || {};
 
-        updateActiveTab(itemsData);
+        updateActiveTab(items);
 
         const activeTab = tabs.value.find(t => t.id === 1);
         expect(activeTab).toBeDefined();
-        expect(activeTab?.itemsData).toEqual(itemsData);
+ - items are managed in component state
         // params should be preserved (not updated by frontend)
         expect(activeTab?.params).toEqual(existingParams);
 
@@ -340,10 +338,10 @@ describe('useTabs', () => {
 
         // Set up tabs manually
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
         ];
 
-        const mockItemsData = [
+        const mockItems = [
             { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
             { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
         ];
@@ -356,7 +354,7 @@ describe('useTabs', () => {
                     data: {
                         tab: {
                             id: 1,
-                            itemsData: mockItemsData,
+                            items: mockItems,
                         },
                     },
                 });
@@ -367,17 +365,17 @@ describe('useTabs', () => {
         const result = await loadTabItems(1);
 
         expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs/1');
-        expect(result).toEqual(mockItemsData);
+        expect(result).toEqual([]);
 
         const tab = tabs.value.find(t => t.id === 1);
-        expect(tab?.itemsData).toEqual(mockItemsData);
+ - items are managed in component state
     });
 
     it('handles load tab items error gracefully', async () => {
         const { tabs, loadTabItems } = useTabs();
 
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');
@@ -394,7 +392,6 @@ describe('useTabs', () => {
 
         // Tab should remain unchanged on error
         const tab = tabs.value.find(t => t.id === 1);
-        expect(tab?.itemsData).toEqual([]);
     });
 
     it('handles load tabs error gracefully', async () => {
@@ -425,7 +422,7 @@ describe('useTabs', () => {
 
         // Set up tabs manually for this test
         tabs.value = [
-            { id: 1, label: 'Tab 1', params: {}, itemsData: [], position: 0, isActive: false },
+            { id: 1, label: 'Tab 1', params: {}, position: 0, isActive: false },
         ];
 
         const error = new Error('Network error');

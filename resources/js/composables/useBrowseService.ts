@@ -15,7 +15,7 @@ export type UseBrowseServiceOptions = {
     currentTabService: ComputedRef<string | null>;
     activeTabId: Ref<number | null>;
     getActiveTab: () => TabData | undefined;
-    updateActiveTab: (itemsData: MasonryItem[]) => void;
+    updateActiveTab: (items: MasonryItem[]) => void;
 };
 
 export function useBrowseService(options?: UseBrowseServiceOptions) {

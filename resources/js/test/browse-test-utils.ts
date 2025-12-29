@@ -273,7 +273,6 @@ export function setupBrowseTestMocks(mocks: BrowseMocks): void {
                         label: `Test Tab ${tabId}`,
                         params: {},
                         feed: 'online',
-                        itemsData: [],
                     },
                 },
             });
@@ -370,7 +369,7 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
             const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === tabId) : tabConfig;
             const params = (tab?.params ?? {}) as Record<string, unknown>;
             const feed = (typeof params.feed === 'string' ? params.feed : 'online') as string;
-            const itemsData = tab?.itemsData ?? tab?.items ?? [];
+            const items = tab?.items ?? [];
             return Promise.resolve({
                 data: {
                     tab: {
@@ -378,8 +377,8 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
                         label: tab?.label ?? `Test Tab ${tabId}`,
                         params: params,
                         feed,
-                        itemsData,
                     },
+                    items,
                 },
             });
         }
@@ -390,7 +389,6 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
                 const withoutFileData = { ...tab };
                 delete withoutFileData.has_files;
                 delete withoutFileData.items;
-                delete withoutFileData.itemsData;
                 return withoutFileData;
             });
             return Promise.resolve({ data: tabsForIndex });

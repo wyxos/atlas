@@ -61,14 +61,12 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const masonry = ref({
             removeMany: mockRemoveMany,
         });
 
         const { batchReactToSiblings } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -109,14 +107,12 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const masonry = ref({
             // No removeMany method
         });
 
         const { batchReactToSiblings } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -152,7 +148,6 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -160,7 +155,6 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillAuxClick } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -201,7 +195,6 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const masonry = ref({});
 
         // Mock window.open
@@ -211,7 +204,6 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillAuxClick } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -258,7 +250,6 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -266,7 +257,6 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -318,7 +308,6 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -326,7 +315,6 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -378,7 +366,6 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -386,7 +373,6 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -446,7 +432,6 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
-        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -454,7 +439,6 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
-            itemsMap,
             masonry,
             1,
             mockOnReaction
