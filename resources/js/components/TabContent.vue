@@ -414,6 +414,7 @@ function handleContainerBan(container: {
 // tabId will be set when tab loads, using computed to reactively get the current value
 const containerPillInteractions = useContainerPillInteractions(
     items,
+    itemsMap,
     masonry,
     computed(() => tab.value.id),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
@@ -487,7 +488,7 @@ function removeItemFromMasonry(item: MasonryItem): void {
 }
 
 // Auto-dislike queue composable
-const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
+const autoDislikeQueue = useAutoDislikeQueue(items, masonry, itemsMap);
 
 // Event handlers for masonry items
 function handleMasonryItemMouseEnter(index: number, itemId: number): void {
@@ -1018,10 +1019,12 @@ defineExpose({
                                     <Transition name="fade">
                                         <div v-if="hoveredItemIndex === index && imageLoaded"
                                             class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                            <FileReactions :file-id="slotItem.id" :reaction="slotItem.reaction"
-                                                :previewed-count="slotItem.previewed_count"
-                                                :viewed-count="slotItem.seen_count" :current-index="index"
-                                                :total-items="items.length" variant="small"
+                                            <!-- Use itemsMap to get fresh item data instead of stale slotItem from Masonry -->
+                                            <FileReactions :file-id="slotItem.id"
+                                                :reaction="(itemsMap.get(slotItem.id) || slotItem).reaction"
+                                                :previewed-count="(itemsMap.get(slotItem.id) || slotItem).previewed_count"
+                                                :viewed-count="(itemsMap.get(slotItem.id) || slotItem).seen_count"
+                                                :current-index="index" :total-items="items.length" variant="small"
                                                 :remove-item="() => handleRemoveItem(remove, slotItem)"
                                                 @reaction="(type) => handleFileReaction(slotItem.id, type, remove)" />
                                         </div>
