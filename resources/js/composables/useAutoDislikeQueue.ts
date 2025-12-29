@@ -27,7 +27,8 @@ let fileViewerUnfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
  */
 export function useAutoDislikeQueue(
     items: Ref<MasonryItem[]>,
-    masonry: Ref<InstanceType<typeof Masonry> | null>
+    masonry: Ref<InstanceType<typeof Masonry> | null>,
+    itemsMap?: Ref<Map<number, MasonryItem>>
 ) {
     const { isLocal } = useBrowseForm();
     const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen, stop, resume, getAll } = useQueue();
@@ -72,7 +73,7 @@ export function useAutoDislikeQueue(
             // Update reaction state in local mode (if items provided)
             if (isLocal.value && items) {
                 fileIds.forEach((fileId) => {
-                    updateReactionState(items, fileId, 'dislike');
+                    updateReactionState(items, fileId, 'dislike', itemsMap);
                 });
             }
         } catch (error) {

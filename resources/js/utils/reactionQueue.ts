@@ -26,7 +26,8 @@ export function queueReaction(
     reactionType: ReactionType,
     thumbnail?: string,
     restoreCallback?: () => Promise<void> | void,
-    items?: Ref<MasonryItem[]>
+    items?: Ref<MasonryItem[]>,
+    itemsMap?: Ref<Map<number, MasonryItem>>
 ): void {
     const queueId = `${reactionType}-${fileId}`;
 
@@ -52,7 +53,7 @@ export function queueReaction(
                 
                 // Update reaction state in local mode (if items provided)
                 if (items) {
-                    updateReactionState(items, fileId, reactionType);
+                    updateReactionState(items, fileId, reactionType, itemsMap);
                 }
                 
                 // Dismiss toast on success
@@ -107,7 +108,8 @@ export function queueBatchReaction(
     reactionType: ReactionType,
     previews: Array<{ fileId: number; thumbnail?: string }>,
     restoreCallback?: () => Promise<void> | void,
-    items?: Ref<MasonryItem[]>
+    items?: Ref<MasonryItem[]>,
+    itemsMap?: Ref<Map<number, MasonryItem>>
 ): void {
     if (fileIds.length === 0) {
         return;
@@ -130,7 +132,7 @@ export function queueBatchReaction(
                 // Update reaction state in local mode for all files (if items provided)
                 if (items) {
                     fileIds.forEach((fileId) => {
-                        updateReactionState(items, fileId, reactionType);
+                        updateReactionState(items, fileId, reactionType, itemsMap);
                     });
                 }
                 

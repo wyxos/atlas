@@ -30,6 +30,7 @@ function isContainerEntry(container: ContainerEntry): container is Container {
  */
 export function useContainerPillInteractions(
     items: Ref<MasonryItem[]>,
+    itemsMap: Ref<Map<number, MasonryItem>>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tabId: number | undefined | ComputedRef<number | undefined>,
     onReaction: (fileId: number, type: ReactionType) => void,
@@ -122,8 +123,8 @@ export function useContainerPillInteractions(
             thumbnail: item.thumbnail || item.src,
         }));
 
-        // Queue batch reaction with countdown toast (pass items for local mode updates)
-        queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback, items);
+        // Queue batch reaction with countdown toast (pass items and itemsMap for local mode updates)
+        queueBatchReaction(fileIds, reactionType, previews, batchRestoreCallback, items, itemsMap);
 
         // Call onReaction once for the batch (not per item)
         // This is just a callback to notify parent

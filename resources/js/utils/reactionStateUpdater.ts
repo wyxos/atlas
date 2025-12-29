@@ -9,7 +9,8 @@ import { useBrowseForm } from '@/composables/useBrowseForm';
 export default function updateReactionState(
     items: Ref<MasonryItem[]>,
     fileId: number,
-    reactionType: string
+    reactionType: string,
+    itemsMap?: Ref<Map<number, MasonryItem>>
 ): void {
     const { isLocal } = useBrowseForm();
     
@@ -30,8 +31,12 @@ export default function updateReactionState(
     };
 
     // Update items array using splice for shallowRef reactivity
-    // itemsMap is automatically synced via watcher
     items.value.splice(itemIndex, 1, updatedItem);
+
+    // Manually update itemsMap since watcher with deep:false doesn't fire on splice()
+    if (itemsMap) {
+        itemsMap.value.set(fileId, updatedItem);
+    }
 
     // Trigger reactivity for shallowRef
     triggerRef(items);
