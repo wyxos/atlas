@@ -1,11 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
 import type { MasonryItem } from './useTabs';
 
 // Mock dependencies
 vi.mock('@/utils/reactions', () => ({
     createReactionCallback: vi.fn(() => vi.fn()),
+}));
+
+vi.mock('@/utils/reactionQueue', () => ({
+    queueBatchReaction: vi.fn(),
+}));
+
+vi.mock('./useBrowseForm', () => ({
+    useBrowseForm: () => ({
+        isLocal: computed(() => false), // Online mode for tests
+    }),
 }));
 
 describe('useContainerPillInteractions', () => {
@@ -51,12 +61,14 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const masonry = ref({
             removeMany: mockRemoveMany,
         });
 
         const { batchReactToSiblings } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -97,12 +109,14 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const masonry = ref({
             // No removeMany method
         });
 
         const { batchReactToSiblings } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -138,6 +152,7 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -145,6 +160,7 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillAuxClick } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -159,6 +175,9 @@ describe('useContainerPillInteractions', () => {
         } as unknown as MouseEvent;
 
         handlePillAuxClick(1, mockEvent);
+
+        // Wait for async batchReactToSiblings to complete
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -182,6 +201,7 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const masonry = ref({});
 
         // Mock window.open
@@ -191,6 +211,7 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillAuxClick } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -237,6 +258,7 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -244,6 +266,7 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -259,6 +282,9 @@ describe('useContainerPillInteractions', () => {
         } as unknown as MouseEvent;
 
         handlePillClick(1, mockEvent);
+
+        // Wait for async batchReactToSiblings to complete
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -292,6 +318,7 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -299,6 +326,7 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -314,6 +342,9 @@ describe('useContainerPillInteractions', () => {
         } as unknown as MouseEvent;
 
         handlePillClick(1, mockEvent, true); // isDoubleClick = true
+
+        // Wait for async batchReactToSiblings to complete
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -347,6 +378,7 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -354,6 +386,7 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -381,6 +414,9 @@ describe('useContainerPillInteractions', () => {
         } as unknown as MouseEvent;
 
         handlePillClick(1, secondClick, true); // isDoubleClick = true
+
+        // Wait for async batchReactToSiblings to complete
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         // Verify removeMany was called (indicating batchReactToSiblings was called with 'dislike')
         expect(mockRemoveMany).toHaveBeenCalled();
@@ -410,6 +446,7 @@ describe('useContainerPillInteractions', () => {
             } as MasonryItem,
         ]);
 
+        const itemsMap = ref(new Map(items.value.map(item => [item.id, item])));
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
             removeMany: mockRemoveMany,
@@ -417,6 +454,7 @@ describe('useContainerPillInteractions', () => {
 
         const { handlePillClick } = useContainerPillInteractions(
             items,
+            itemsMap,
             masonry,
             1,
             mockOnReaction
@@ -432,6 +470,9 @@ describe('useContainerPillInteractions', () => {
         } as unknown as MouseEvent;
 
         handlePillClick(1, mockEvent, true); // isDoubleClick = true
+
+        // Wait for async batchReactToSiblings to complete
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
