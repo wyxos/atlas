@@ -46,19 +46,9 @@ class Browser
             ];
         }
 
-        // Check if this is a local/offline tab
+        // Check if this is a local tab
         $tabId = request()->input('tab_id');
-        $feed = null;
-
-        // Get feed from tab params if tab_id is provided, otherwise from request params
-        if ($tabId) {
-            $tab = \App\Models\Tab::find($tabId);
-            if ($tab && isset($tab->params['feed'])) {
-                $feed = $tab->params['feed'];
-            }
-        } else {
-            $feed = $params['feed'] ?? null;
-        }
+        $feed = $params['feed'] ?? null;
 
         $isLocalMode = $feed === 'local';
 
@@ -177,13 +167,17 @@ class Browser
         if ($tabId) {
             // Update tab's params with current filter state (backend is responsible for this)
             // Store 'service' key (not 'source') to match frontend expectation
-            $this->updateTabParams($tabId, [
-                'service' => $source, // Store the service key as 'service' for frontend compatibility
-                ...$service->defaultParams(),
-                ...$filter,
-                'page' => request()->input('page', 1),
-                'next' => $filter['next'] ?? null,
-            ]);
+            \App\Models\Tab::where('id', $tabId)
+                ->where('user_id', auth()->id())
+                ->update([
+                    'params' => [
+                        'service' => $source, // Store the service key as 'service' for frontend compatibility
+                        ...$service->defaultParams(),
+                        ...$filter,
+                        'page' => request()->input('page', 1),
+                        'next' => $filter['next'] ?? null,
+                    ],
+                ]);
         }
 
         // Transform persisted files to items format for frontend
@@ -253,22 +247,5 @@ class Browser
 
         // Sync files to tab (without detaching existing files)
         $tab->files()->syncWithoutDetaching($syncData);
-    }
-
-    /**
-     * Update a browse tab's params.
-     */
-    protected function updateTabParams(int $tabId, array $params): void
-    {
-        $tab = \App\Models\Tab::find($tabId);
-
-        if (! $tab || $tab->user_id !== auth()->id()) {
-            return; // Tab doesn't exist or user doesn't own it
-        }
-
-        // Update params with the provided params
-        $tab->update([
-            'params' => $params,
-        ]);
     }
 }

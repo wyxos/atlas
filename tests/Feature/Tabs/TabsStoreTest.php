@@ -193,7 +193,7 @@ test('tab creation does not set default feed value', function () {
     expect($tab->params['feed'] ?? null)->toBeNull();
 });
 
-test('tab creation accepts offline source type', function () {
+test('tab creation accepts local source type', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson('/api/tabs', [
