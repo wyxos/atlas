@@ -308,20 +308,29 @@ export function createMockTabConfig(tabId: number, overrides: Record<string, any
 
 export function setupAxiosMocks(tabConfig: any | any[], browseResponse?: any) {
     mockAxios.get.mockImplementation((url: string) => {
-        if (url.includes('/api/tabs')) {
-            return Promise.resolve({ data: Array.isArray(tabConfig) ? tabConfig : [tabConfig] });
-        }
-        if (url.includes('/api/tabs/') && url.includes('/items')) {
-            const tabId = url.match(/\/api\/tabs\/(\d+)\/items/)?.[1];
+        // Handle /api/tabs/{id} (show) - returns single tab with items
+        if (url.match(/\/api\/tabs\/\d+$/)) {
+            const tabId = url.match(/\/api\/tabs\/(\d+)$/)?.[1];
             const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig;
             if (tab) {
                 return Promise.resolve({
                     data: {
-                        items: tab.items,
+                        tab: {
+                            id: tab.id,
+                            label: tab.label,
+                            params: tab.params || {},
+                            items: tab.items || [],
+                            position: tab.position || 0,
+                            isActive: tab.isActive || false,
+                        },
                     },
                 });
             }
-            return Promise.resolve({ data: { items: [] } });
+            return Promise.resolve({ data: { tab: { items: [] } } });
+        }
+        // Handle /api/tabs (index) - returns array of tabs
+        if (url.includes('/api/tabs')) {
+            return Promise.resolve({ data: Array.isArray(tabConfig) ? tabConfig : [tabConfig] });
         }
         if (url.includes('/api/browse')) {
             return Promise.resolve({
