@@ -4,7 +4,6 @@ import { X, Loader2, Menu } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
 import type { MasonryItem } from '@/composables/useTabs';
-import { useReactionHandler } from '@/composables/useReactionHandler';
 import { createReactionCallback } from '@/utils/reactions';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { ReactionType } from '@/types/reaction';
@@ -250,13 +249,6 @@ function closeOverlay(): void {
         emit('close');
     }
 }
-
-// Reaction handler - we'll handle masonry removal separately to ensure correct item reference
-useReactionHandler({
-    items,
-    onReaction: props.onReaction,
-    // Don't pass removeFromMasonry here - we'll call it directly with the correct item reference
-});
 
 // Handle reaction in FileViewer - removes from carousel and auto-navigates
 async function handleReaction(type: ReactionType): Promise<void> {
