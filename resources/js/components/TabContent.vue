@@ -702,7 +702,7 @@ onMounted(async () => {
                 shouldShowForm.value = false;
                 isTabRestored.value = true;
 
-                // Get items from API response
+                // Get items from API response (backend returns items under tab)
                 const itemsToRestore = data.tab.items || [];
                 const currentPage = tab.value.params.page || 1;
                 const nextPage = tab.value.params.next || null;

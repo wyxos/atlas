@@ -210,8 +210,8 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             const response = await window.axios.get(tabsShow.url(tabId));
             const data = response.data;
 
-            // Return items from API response
-            return data.items || [];
+            // Return items from API response (backend returns items under tab)
+            return data.tab?.items || [];
         } catch (error) {
             console.error('Failed to load tab items:', error);
             throw error;
