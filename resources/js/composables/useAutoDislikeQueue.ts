@@ -4,6 +4,7 @@ import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesCon
 import type { MasonryItem } from './useTabs';
 import type { Masonry } from '@wyxos/vibe';
 import { useBrowseForm } from './useBrowseForm';
+import updateReactionState from '@/utils/reactionStateUpdater';
 
 const COUNTDOWN_DURATION_MS = 5 * 1000; // 5 seconds
 const DEBOUNCE_DELAY_MS = 500; // 500ms debounce for batch operations
@@ -67,6 +68,13 @@ export function useAutoDislikeQueue(
             await window.axios.post(batchPerformAutoDislike.url(), {
                 file_ids: fileIds,
             });
+            
+            // Update reaction state in local mode (if items provided)
+            if (isLocal.value && items) {
+                fileIds.forEach((fileId) => {
+                    updateReactionState(items, fileId, 'dislike');
+                });
+            }
         } catch (error) {
             console.error('Failed to batch perform auto-dislike:', error);
             // Note: In online mode, items are already removed from masonry, but dislike failed
