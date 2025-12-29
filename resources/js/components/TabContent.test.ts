@@ -606,8 +606,10 @@ describe('TabContent - Container Badges', () => {
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items,
-                tab,
+                tab: {
+                    ...tab,
+                    items, // Backend returns items under tab
+                },
             },
         });
 
@@ -654,8 +656,10 @@ describe('TabContent - Container Badges', () => {
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items,
-                tab,
+                tab: {
+                    ...tab,
+                    items, // Backend returns items under tab
+                },
             },
         });
 
@@ -708,8 +712,10 @@ describe('TabContent - Container Badges', () => {
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items,
-                tab,
+                tab: {
+                    ...tab,
+                    items, // Backend returns items under tab
+                },
             },
         });
 
@@ -751,8 +757,10 @@ describe('TabContent - Container Badges', () => {
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items,
-                tab,
+                tab: {
+                    ...tab,
+                    items, // Backend returns items under tab
+                },
             },
         });
 
@@ -791,8 +799,10 @@ describe('TabContent - Container Badges', () => {
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items,
-                tab,
+                tab: {
+                    ...tab,
+                    items, // Backend returns items under tab
+                },
             },
         });
 
@@ -839,8 +849,10 @@ describe('TabContent - Container Badges', () => {
 
         mockAxios.get.mockResolvedValueOnce({
             data: {
-                items,
-                tab,
+                tab: {
+                    ...tab,
+                    items, // Backend returns items under tab
+                },
             },
         });
 

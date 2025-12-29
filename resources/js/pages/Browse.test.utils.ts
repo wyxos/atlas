@@ -314,7 +314,7 @@ export function setupAxiosMocks(tabConfig: any | any[], browseResponse?: any) {
         if (url.includes('/api/tabs/') && url.includes('/items')) {
             const tabId = url.match(/\/api\/tabs\/(\d+)\/items/)?.[1];
             const tab = Array.isArray(tabConfig) ? tabConfig.find((t: any) => t.id === Number(tabId)) : tabConfig;
-            if (tab && tab.items) {
+            if (tab) {
                 return Promise.resolve({
                     data: {
                         items: tab.items,

@@ -377,8 +377,8 @@ export function setupAxiosMocks(mocks: BrowseMocks, tabConfig: any | any[], brow
                         label: tab?.label ?? `Test Tab ${tabId}`,
                         params: params,
                         feed,
+                        items, // Backend returns items under tab
                     },
-                    items,
                 },
             });
         }

@@ -318,7 +318,7 @@ describe('useTabs', () => {
 
         const activeTab = tabs.value.find(t => t.id === 1);
         expect(activeTab).toBeDefined();
- - items are managed in component state
+        // items are managed in component state, not in tab object
         // params should be preserved (not updated by frontend)
         expect(activeTab?.params).toEqual(existingParams);
 
@@ -354,7 +354,7 @@ describe('useTabs', () => {
                     data: {
                         tab: {
                             id: 1,
-                            items: mockItems,
+                            items: mockItems, // Backend returns items under tab
                         },
                     },
                 });
@@ -365,10 +365,11 @@ describe('useTabs', () => {
         const result = await loadTabItems(1);
 
         expect(mockAxios.get).toHaveBeenCalledWith('/api/tabs/1');
-        expect(result).toEqual([]);
+        // loadTabItems now returns items from API response
+        expect(result).toEqual(mockItems);
 
         const tab = tabs.value.find(t => t.id === 1);
- - items are managed in component state
+        // items are managed in component state, not in tab object
     });
 
     it('handles load tab items error gracefully', async () => {
