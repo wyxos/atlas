@@ -17,9 +17,8 @@ interface Props {
     onLoadMore?: () => Promise<void>;
     onReaction?: (fileId: number, type: ReactionType) => void;
     removeFromMasonry?: (item: MasonryItem) => void;
-    restoreToMasonry?: (item: MasonryItem, index: number, masonryInstance?: InstanceType<typeof import('@wyxos/vibe').Masonry>) => void | Promise<void>;
+    restoreToMasonry?: (item: MasonryItem, index: number) => void | Promise<void>;
     tabId?: number;
-    masonryInstance?: InstanceType<typeof import('@wyxos/vibe').Masonry>; // Masonry component instance for restore method
 }
 
 const props = defineProps<Props>();
