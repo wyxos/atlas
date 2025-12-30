@@ -481,16 +481,6 @@ function handleFileViewerClose(): void {
     autoDislikeQueue.unfreezeAutoDislikeOnly();
 }
 
-async function handleItemInView(payload: {
-    item: { id?: number };
-    type: 'image' | 'video'
-}, item: MasonryItem): Promise<void> {
-    void payload;
-    void item;
-    // This event is kept for backward compatibility, but we now use in-view-and-loaded
-    // for triggering preview count increment
-}
-
 /**
  * Handle when item is both fully in view AND media is loaded.
  * This is when we should increment preview count and check for auto-dislike.
@@ -570,10 +560,6 @@ function handlePillDismiss(container: {
 
 function handlePromptDialogClick(item: MasonryItem): void {
     promptData.openPromptDialog(item);
-}
-
-function handleRemoveItem(remove: (item: MasonryItem) => void, item: MasonryItem): void {
-    remove(item);
 }
 
 function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void, index?: number): void {
@@ -874,7 +860,6 @@ defineExpose({
                         <VibeMasonryItem :item="item" :remove="remove" :preload-threshold="0.5"
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
                             @mouseleave="handleMasonryItemMouseLeave"
-                            @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
                             @in-view-and-loaded="(payload: { type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)">
                             <template
                                 #default="{ item: slotItem, imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
@@ -970,7 +955,7 @@ defineExpose({
                                                 :previewed-count="slotItem.previewed_count"
                                                 :viewed-count="slotItem.seen_count" :current-index="index"
                                                 :total-items="items.length" variant="small"
-                                                :remove-item="() => handleRemoveItem(remove, slotItem)"
+                                                :remove-item="() => remove(slotItem)"
                                                 @reaction="(type) => handleFileReaction(slotItem.id, type, remove, index)" />
                                         </div>
                                     </Transition>
