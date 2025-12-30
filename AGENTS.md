@@ -65,7 +65,7 @@ npm run test                # Run Vitest tests
 
 **2. Backend Alignment**
 - The backend should return data in the exact format the frontend needs. If the frontend needs specific field names or structure, update the backend rather than transforming in the frontend.
-- Prefer changing `app/Http/Resources/FileResource.php` over mapping in `resources/js/composables/useFiles.ts`
+- Prefer changing `app/Http/Resources/FileResource.php` over mapping in frontend composables
 
 **3. Minimal Code**
 - No intermediate variables when direct assignment works

@@ -121,11 +121,14 @@ public function getStoragePath(string $filename): string
 
 **Controller Pattern**:
 ```php
-// ✅ DO: Thin controller, delegate to service
-public function index(BrowseRequest $request): JsonResponse
+// ✅ DO: Thin controller, delegate to service or Browser class
+public function index(): JsonResponse
 {
-    $items = $this->browseService->getItems($request->validated());
-    return response()->json($items);
+    $payload = Browser::handle();
+    return response()->json([
+        'items' => $payload['items'],
+        'nextPage' => $payload['filter']['next'] ?? null,
+    ]);
 }
 ```
 
@@ -304,7 +307,7 @@ return $file->toArray(); // May include fields frontend doesn't need
 
 ### Example Endpoint Pattern
 See `app/Http/Controllers/BrowseController.php`:
-- Form Request for validation
-- Service for business logic
+- Uses `Browser::handle()` for business logic
 - JSON response with proper status codes
+- Returns frontend-ready structure directly
 
