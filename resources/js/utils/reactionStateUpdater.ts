@@ -1,4 +1,4 @@
-import { type Ref, triggerRef } from 'vue';
+import { type Ref } from 'vue';
 import type { MasonryItem } from '@/composables/useTabs';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 
@@ -23,16 +23,16 @@ export default function updateReactionState(
         return; // Item not found
     }
 
-    // Create updated item with new reaction
-    const updatedItem = {
-        ...items.value[itemIndex],
-        reaction: { type: reactionType },
-    };
+    // Update the item's reaction property in place (mutate the object)
+    // This is efficient as we're only updating one property on one object
+    const item = items.value[itemIndex];
+    item.reaction = { type: reactionType };
 
-    // Update items array using splice for shallowRef reactivity
-    items.value.splice(itemIndex, 1, updatedItem);
-
-    // Trigger reactivity for shallowRef
-    triggerRef(items);
+    // Reassign array reference to trigger reactivity with shallowRef
+    // Using slice() creates a shallow copy (O(n) but only copies references, not objects)
+    // This is necessary because shallowRef only tracks reference changes, not deep mutations
+    // Vibe's Masonry component reads from props.items, so it needs to see a reference change
+    // For 10k items, this copies ~80KB of references (8 bytes each), which is acceptable
+    items.value = items.value.slice();
 }
 
