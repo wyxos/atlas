@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue';
 import type { TabData, MasonryItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
 import {
@@ -496,23 +496,17 @@ async function handleItemInView(payload: {
  * This is when we should increment preview count and check for auto-dislike.
  */
 async function handleItemInViewAndLoaded(payload: {
-    item: { id?: number };
     type: 'image' | 'video';
     src: string
 }, item: MasonryItem): Promise<void> {
-    // payload.item is the item passed to MasonryItem, which should have the id
-    const itemId = payload.item.id ?? item.id;
+    const itemId = item.id;
     if (itemId) {
         // Increment preview count when item is fully in view AND media is loaded
         const result = await itemPreview.incrementPreviewCount(itemId);
 
-        // Get fresh item reference from items array after update (item might have been updated)
-        // This ensures we have the latest will_auto_dislike and previewed_count values
-        await nextTick(); // Wait for item update to complete
-        const updatedItem = items.value.find((i) => i.id === itemId) || item;
-
         // Check if item is already flagged for auto-dislike (from moderation rules)
-        const isModerationFlagged = updatedItem.will_auto_dislike === true;
+        // incrementPreviewCount mutates the item in place, so item already has updated values
+        const isModerationFlagged = item.will_auto_dislike === true;
 
         // Start countdown if:
         // 1. Item was already flagged for auto-dislike (from moderation rules) OR
@@ -520,19 +514,13 @@ async function handleItemInViewAndLoaded(payload: {
         const shouldAutoDislike = isModerationFlagged || result?.will_auto_dislike === true;
 
         if (shouldAutoDislike) {
-            autoDislikeQueue.startAutoDislikeCountdown(itemId, updatedItem);
+            autoDislikeQueue.startAutoDislikeCountdown(itemId, item);
+            // Force items array reference update to trigger Vibe's computed to re-evaluate
+            // This ensures the progress bar component sees the updated will_auto_dislike value immediately
+            triggerRef(items);
+            await nextTick();
         }
     }
-}
-
-async function handleItemPreloadSuccess(payload: {
-    item: { id?: number };
-    type: 'image' | 'video';
-    src: string
-}, item: MasonryItem): Promise<void> {
-    void payload;
-    void item;
-    // Item preload successful - handler kept for potential future use
 }
 
 function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
@@ -887,8 +875,7 @@ defineExpose({
                             @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
                             @mouseleave="handleMasonryItemMouseLeave"
                             @in-view="(payload: { item: { id?: number }; type: 'image' | 'video' }) => handleItemInView(payload, item)"
-                            @in-view-and-loaded="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)"
-                            @preload:success="(payload: { item: { id?: number }; type: 'image' | 'video'; src: string }) => handleItemPreloadSuccess(payload, item)">
+                            @in-view-and-loaded="(payload: { type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)">
                             <template
                                 #default="{ item: slotItem, imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
                                 <!-- Use item from slot props (reactive) instead of outer scope item (may be stale) -->
@@ -1007,8 +994,8 @@ defineExpose({
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading"
             :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
-            :restore-to-masonry="restoreToMasonry" :tab-id="tab.id"
-            @open="handleFileViewerOpen" @close="handleFileViewerClose" />
+            :restore-to-masonry="restoreToMasonry" :tab-id="tab.id" @open="handleFileViewerOpen"
+            @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
