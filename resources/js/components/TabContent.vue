@@ -417,7 +417,7 @@ function handleModerationRulesChanged(): void {
 
 // Cancel masonry loading
 function cancelMasonryLoad(): void {
-    if (masonry.value?.isLoading && typeof masonry.value.cancelLoad === 'function') {
+    if (masonry.value?.isLoading) {
         masonry.value.cancelLoad();
     }
 }
@@ -425,9 +425,7 @@ function cancelMasonryLoad(): void {
 // Load next page manually (used by both button click and carousel load more)
 async function loadNextPage(): Promise<void> {
     if (masonry.value && !masonry.value.isLoading && !masonry.value.hasReachedEnd) {
-        if (typeof masonry.value.loadNext === 'function') {
-            await masonry.value.loadNext();
-        }
+        await masonry.value.loadNext();
     }
 }
 
@@ -439,10 +437,8 @@ function removeItemFromMasonry(item: MasonryItem): void {
         return;
     }
 
-    if (masonry.value?.remove) {
-        // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
-        masonry.value.remove(item);
-    }
+    // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
+    masonry.value?.remove(item);
 }
 
 // Auto-dislike queue composable

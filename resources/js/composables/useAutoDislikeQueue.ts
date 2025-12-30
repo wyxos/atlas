@@ -59,8 +59,8 @@ export function useAutoDislikeQueue(
         const itemsToRemove = Array.from(dislikes.values()).map((pending) => pending.item);
 
         // Only remove items from masonry in online mode (not in local mode)
-        if (!isLocal.value && masonry.value && itemsToRemove.length > 0) {
-            await masonry.value.removeMany?.(itemsToRemove);
+        if (!isLocal.value && itemsToRemove.length > 0) {
+            await masonry.value?.removeMany(itemsToRemove);
         }
 
         // Batch dislike API call

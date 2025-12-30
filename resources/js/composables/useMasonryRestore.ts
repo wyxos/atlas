@@ -14,17 +14,8 @@ export function useMasonryRestore(
      * Vibe's restore already checks for existing items, so no need to check here.
      */
     async function restoreToMasonry(item: MasonryItem, index: number): Promise<void> {
-        if (!masonry.value) {
-            return;
-        }
-
         // Use Vibe's restore - it handles duplicate checks, index calculation and layout internally
-        if (typeof masonry.value.restore === 'function') {
-            await masonry.value.restore(item, index);
-        } else {
-            // Fallback if restore doesn't exist (shouldn't happen with Vibe)
-            console.warn('[useMasonryRestore] restore not available on masonry instance');
-        }
+        await masonry.value?.restore(item, index);
     }
 
     /**
@@ -39,19 +30,10 @@ export function useMasonryRestore(
             return;
         }
 
-        if (!masonry.value) {
-            return;
-        }
-
         // Use Vibe's restoreMany - it handles duplicate checks, index calculation and layout internally
-        if (typeof masonry.value.restoreMany === 'function') {
-            const items = itemsToRestore.map(({ item }) => item);
-            const indices = itemsToRestore.map(({ index }) => index);
-            await masonry.value.restoreMany(items, indices);
-        } else {
-            // Fallback if restoreMany doesn't exist (shouldn't happen with Vibe)
-            console.warn('[useMasonryRestore] restoreMany not available on masonry instance');
-        }
+        const items = itemsToRestore.map(({ item }) => item);
+        const indices = itemsToRestore.map(({ index }) => index);
+        await masonry.value?.restoreMany(items, indices);
     }
 
     return {
