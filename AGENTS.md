@@ -76,6 +76,10 @@ npm run test                # Run Vitest tests
 **4. Simplicity Over Abstraction**
 - Don't over-engineer. Write straightforward, readable code that does exactly what's needed - nothing more.
 - Avoid creating abstractions "just in case" - add them when you have 3+ concrete use cases
+- **Don't wrap single method calls** - If a library method exists, call it directly: `masonry.value?.restore(item)` not `useMasonryRestore(masonry, item)`
+- **Trust TypeScript** - Don't add runtime `typeof` checks for methods TypeScript guarantees exist
+- **Trust library contracts** - Don't duplicate validation the library already performs (duplicate checks, empty array checks, etc.)
+- **Delete dead code immediately** - Remove empty functions, don't keep them "for future use" or "backward compatibility"
 
 **5. No Unnecessary Mappings**
 - If the backend returns `params`, use `params`. Don't map it to `queryParams` unless absolutely necessary.
@@ -167,6 +171,9 @@ Before creating a PR:
 - [ ] Frontend builds successfully: `npm run build`
 - [ ] No linter errors or warnings
 - [ ] Code follows existing patterns (check sibling files)
+- [ ] No unnecessary wrappers around single method calls
+- [ ] No redundant type checks or validation (trust TypeScript and libraries)
+- [ ] No dead code (empty functions, unused code)
 
 ---
 
