@@ -323,25 +323,11 @@ function handleAltClickOnMasonry(e: MouseEvent): void {
     if (itemKeyAttr) {
         // Match by key (provided by backend) - iterate items array for key lookup (key not in Map)
         // This is less common than id lookup, so O(n) is acceptable here
-        for (const item of items.value) {
+        for (let i = 0; i < items.value.length; i++) {
+            const item = items.value[i];
             if (item.key === itemKeyAttr) {
-                masonryInteractions.handleAltClickReaction(e, item);
+                masonryInteractions.handleAltClickReaction(e, item, i);
                 return;
-            }
-        }
-    }
-
-    // Fallback: try to find by image src - iterate items array for src lookup
-    // This is less common than id lookup, so O(n) is acceptable here
-    const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
-    if (imgEl) {
-        const src = imgEl.currentSrc || imgEl.getAttribute('src') || '';
-        for (const item of items.value) {
-            const itemSrc = (item.src || item.thumbnail || '').split('?')[0].split('#')[0];
-            const baseSrc = src.split('?')[0].split('#')[0];
-            if (baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc)) {
-                masonryInteractions.handleAltClickReaction(e, item);
-                break;
             }
         }
     }
@@ -606,15 +592,16 @@ function handleRemoveItem(remove: (item: MasonryItem) => void, item: MasonryItem
     remove(item);
 }
 
-function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void): void {
+function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void, index?: number): void {
     void remove;
     // Cancel auto-dislike countdown if user reacts manually
     autoDislikeQueue.cancelAutoDislikeCountdown(itemId);
     // Note: remove parameter is kept for FileReactions component compatibility but not used here
-    // Find item - but we should ideally pass the item directly from the component
-    const item = items.value.find((i) => i.id === itemId);
+    // Find item and index if not provided
+    const itemIndex = index !== undefined ? index : items.value.findIndex((i) => i.id === itemId);
+    const item = itemIndex !== -1 ? items.value[itemIndex] : items.value.find((i) => i.id === itemId);
     if (item) {
-        handleMasonryReaction(item, type);
+        handleMasonryReaction(item, type, itemIndex !== -1 ? itemIndex : undefined);
     }
 }
 
@@ -1001,7 +988,7 @@ defineExpose({
                                                 :viewed-count="slotItem.seen_count" :current-index="index"
                                                 :total-items="items.length" variant="small"
                                                 :remove-item="() => handleRemoveItem(remove, slotItem)"
-                                                @reaction="(type) => handleFileReaction(slotItem.id, type, remove)" />
+                                                @reaction="(type) => handleFileReaction(slotItem.id, type, remove, index)" />
                                         </div>
                                     </Transition>
 

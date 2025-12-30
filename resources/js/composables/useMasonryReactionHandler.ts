@@ -24,13 +24,15 @@ export function useMasonryReactionHandler(
      * 
      * @param item - The exact item object reference that Vibe is tracking (required for proper animations)
      * @param type - The reaction type
+     * @param index - Optional index of the item in the items array (avoids findIndex lookup)
      */
     async function handleMasonryReaction(
         item: MasonryItem,
-        type: ReactionType
+        type: ReactionType,
+        index?: number
     ): Promise<void> {
         const fileId = item.id;
-        const itemIndex = items.value.findIndex((i) => i.id === fileId);
+        const itemIndex = index !== undefined ? index : items.value.findIndex((i) => i.id === fileId);
         const tabId = tab.value?.id;
 
         // Only remove from masonry in online mode (not in local mode)
