@@ -23,6 +23,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { isLocal } = useBrowseForm();
 
 const emit = defineEmits<{
     close: [];
