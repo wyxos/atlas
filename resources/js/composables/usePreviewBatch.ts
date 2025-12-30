@@ -20,7 +20,7 @@ let batchTimeout: ReturnType<typeof setTimeout> | null = null;
 export function usePreviewBatch() {
     async function executeBatchIncrementPreview(fileIds: number[]): Promise<Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>> {
         try {
-            const response = await window.axios.post<{
+            const { data } = await window.axios.post<{
                 message: string;
                 results: Array<{ id: number; previewed_count: number; will_auto_dislike: boolean }>;
             }>(batchIncrementPreview.url(), {
@@ -28,7 +28,7 @@ export function usePreviewBatch() {
             });
 
             // Return both previewed_count and will_auto_dislike
-            return response.data.results.map((r) => ({
+            return data.results.map((r) => ({
                 id: r.id,
                 previewed_count: r.previewed_count,
                 will_auto_dislike: r.will_auto_dislike ?? false

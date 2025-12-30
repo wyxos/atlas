@@ -38,9 +38,9 @@ async function handlePasswordUpdate(): Promise<void> {
     passwordLoading.value = true;
 
     try {
-        const response = await window.axios.post(updatePassword.url(), passwordForm.value);
+        const { data } = await window.axios.post(updatePassword.url(), passwordForm.value);
 
-        passwordSuccess.value = response.data.message || 'Password updated successfully.';
+        passwordSuccess.value = data.message || 'Password updated successfully.';
         passwordForm.value = {
             current_password: '',
             password: '',

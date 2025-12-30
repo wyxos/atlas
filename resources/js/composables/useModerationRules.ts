@@ -23,8 +23,8 @@ export function useModerationRules() {
         error.value = null;
 
         try {
-            const response = await window.axios.get<ModerationRule[]>(API_BASE);
-            rules.value = response.data;
+            const { data } = await window.axios.get<ModerationRule[]>(API_BASE);
+            rules.value = data;
         } catch (e) {
             error.value = 'Failed to fetch moderation rules';
             console.error('Failed to fetch moderation rules:', e);
@@ -41,8 +41,7 @@ export function useModerationRules() {
         error.value = null;
 
         try {
-            const response = await window.axios.post<ModerationRule>(API_BASE, payload);
-            const newRule = response.data;
+            const { data: newRule } = await window.axios.post<ModerationRule>(API_BASE, payload);
             rules.value.push(newRule);
             return newRule;
         } catch (e) {
@@ -62,8 +61,7 @@ export function useModerationRules() {
         error.value = null;
 
         try {
-            const response = await window.axios.put<ModerationRule>(`${API_BASE}/${id}`, payload);
-            const updatedRule = response.data;
+            const { data: updatedRule } = await window.axios.put<ModerationRule>(`${API_BASE}/${id}`, payload);
 
             // Update local state
             const index = rules.value.findIndex(r => r.id === id);

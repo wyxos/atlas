@@ -294,12 +294,10 @@ describe('Browse - Overlay Drawer', () => {
 
         expect(fileViewerVm.currentItemIndex).toBe(0);
 
-        // Use navigateForward method if it exists
-        if (typeof fileViewerVm.navigateForward === 'function') {
-            fileViewerVm.navigateForward();
-            await wrapper.vm.$nextTick();
-            expect(fileViewerVm.currentItemIndex).toBe(1);
-        }
+        // Use navigateForward method
+        fileViewerVm.navigateForward?.();
+        await wrapper.vm.$nextTick();
+        expect(fileViewerVm.currentItemIndex).toBe(1);
     });
 
     it('navigates when clicking drawer previous button', async () => {
@@ -340,12 +338,10 @@ describe('Browse - Overlay Drawer', () => {
 
         expect(fileViewerVm.currentItemIndex).toBe(1);
 
-        // Use navigateBackward method if it exists
-        if (typeof fileViewerVm.navigateBackward === 'function') {
-            fileViewerVm.navigateBackward();
-            await wrapper.vm.$nextTick();
-            expect(fileViewerVm.currentItemIndex).toBe(0);
-        }
+        // Use navigateBackward method
+        fileViewerVm.navigateBackward?.();
+        await wrapper.vm.$nextTick();
+        expect(fileViewerVm.currentItemIndex).toBe(0);
     });
 
     it('disables previous button when at first item', async () => {

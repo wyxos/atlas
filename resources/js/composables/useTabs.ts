@@ -38,8 +38,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     async function loadTabs(): Promise<void> {
         isLoadingTabs.value = true;
         try {
-            const response = await window.axios.get(tabsIndex.url());
-            const data = response.data;
+            const { data } = await window.axios.get(tabsIndex.url());
             tabs.value = data.map((tab: {
                 id: number;
                 label: string;
@@ -86,13 +85,12 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         };
 
         try {
-            const response = await window.axios.post(tabsStore.url(), {
+            const { data } = await window.axios.post(tabsStore.url(), {
                 label: newTab.label,
                 params: newTab.params,
                 position: newTab.position,
             });
 
-            const data = response.data;
             newTab.id = data.id;
             newTab.isActive = data.is_active ?? false;
             const params = data.params || {};
@@ -207,8 +205,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
      */
     async function loadTabItems(tabId: number): Promise<MasonryItem[]> {
         try {
-            const response = await window.axios.get(tabsShow.url(tabId));
-            const data = response.data;
+            const { data } = await window.axios.get(tabsShow.url(tabId));
 
             // Return items from API response (backend returns items under tab)
             return data.tab?.items || [];

@@ -229,9 +229,7 @@ describe('Browse - Immediate Actions Integration', () => {
         await nextTick();
 
         // Trigger loading:stop
-        if (tabContent && typeof tabContent.onLoadingStop === 'function') {
-            await tabContent.onLoadingStop({ fetched: 10 });
-        }
+        await tabContent?.onLoadingStop?.({ fetched: 10 });
 
         await flushPromises();
         await nextTick();

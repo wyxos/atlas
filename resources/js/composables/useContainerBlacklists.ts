@@ -21,8 +21,8 @@ export function useContainerBlacklists() {
         error.value = null;
 
         try {
-            const response = await window.axios.get<ContainerBlacklist[]>('/api/container-blacklists');
-            blacklists.value = response.data;
+            const { data } = await window.axios.get<ContainerBlacklist[]>('/api/container-blacklists');
+            blacklists.value = data;
         } catch (err) {
             error.value = getErrorMessage(err) || 'Failed to fetch container blacklists';
             console.error('Failed to fetch container blacklists:', err);
@@ -51,8 +51,7 @@ export function useContainerBlacklists() {
                 action_type: actionType,
             };
 
-            const response = await window.axios.post<ContainerBlacklist>('/api/container-blacklists', payload);
-            const created = response.data;
+            const { data: created } = await window.axios.post<ContainerBlacklist>('/api/container-blacklists', payload);
 
             // Update or add to list
             const index = blacklists.value.findIndex((b) => b.id === created.id);
@@ -103,10 +102,10 @@ export function useContainerBlacklists() {
      */
     async function checkBlacklist(containerId: number): Promise<{ blacklisted: boolean; blacklisted_at: string | null; action_type: string | null } | null> {
         try {
-            const response = await window.axios.get<{ blacklisted: boolean; blacklisted_at: string | null; action_type: string | null }>(
+            const { data } = await window.axios.get<{ blacklisted: boolean; blacklisted_at: string | null; action_type: string | null }>(
                 `/api/container-blacklists/${containerId}/check`
             );
-            return response.data;
+            return data;
         } catch (err) {
             console.error('Failed to check container blacklist:', err);
             return null;

@@ -77,11 +77,11 @@ export function useQueue() {
         });
 
         // Remove expired items
+        itemsToRemove.forEach((id) => {
+            queue.value.delete(id);
+        });
+        // Trigger reactivity for removal
         if (itemsToRemove.length > 0) {
-            itemsToRemove.forEach((id) => {
-                queue.value.delete(id);
-            });
-            // Trigger reactivity for removal
             updateTrigger.value++;
         }
 

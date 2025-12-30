@@ -27,8 +27,8 @@ export function useBrowseService(_options?: UseBrowseServiceOptions) {
      */
     async function fetchServices(): Promise<void> {
         try {
-            const response = await window.axios.get(browseServices.url());
-            availableServices.value = response.data.services || [];
+            const { data } = await window.axios.get(browseServices.url());
+            availableServices.value = data.services || [];
         } catch (error) {
             console.error('Failed to fetch services:', error);
             availableServices.value = [];
@@ -40,8 +40,8 @@ export function useBrowseService(_options?: UseBrowseServiceOptions) {
      */
     async function fetchSources(): Promise<void> {
         try {
-            const response = await window.axios.get(browseSources.url());
-            availableSources.value = response.data.sources || ['all'];
+            const { data } = await window.axios.get(browseSources.url());
+            availableSources.value = data.sources || ['all'];
         } catch (error) {
             console.error('Failed to fetch sources:', error);
             availableSources.value = ['all'];

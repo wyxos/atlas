@@ -96,7 +96,7 @@ export function useContainerPillInteractions(
 
         // Only remove from masonry in online mode (not in local mode)
         if (!isLocal.value) {
-            await masonry.value?.removeMany?.(siblings);
+            await masonry.value?.removeMany(siblings);
         }
 
         // Create batch restore callback (only in online mode)
