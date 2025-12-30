@@ -57,6 +57,8 @@ npm run check:js
 - ✅ DO: Extract reusable logic to composables (prefix with `use`)
 - ✅ DO: Return reactive state and methods
 - ✅ DO: Colocate tests: `useFeature.ts` + `useFeature.test.ts`
+- ❌ DON'T: Create composables that only wrap a single method call
+- ❌ DON'T: Use composables for pure utility functions (use `utils/` instead)
 - ✅ Example: `resources/js/composables/useBrowseService.ts` - browse logic
 - ✅ Example: `resources/js/composables/useTabs.ts` - tab management
 
@@ -255,6 +257,122 @@ export function useTabs() {
 - ❌ `flex-shrink-*` → ✅ `shrink-*`
 - ❌ `flex-grow-*` → ✅ `grow-*`
 
+### Anti-Patterns to Avoid
+
+**1. Don't Wrap Single Method Calls**
+```typescript
+// ❌ DON'T: Create composable that only wraps a single method call
+export function useMasonryRestore(masonry: Ref<MasonryInstance>) {
+  return (item: Item) => {
+    masonry.value?.restore(item)
+  }
+}
+
+// ✅ DO: Call library methods directly
+masonry.value?.restore(item, index)
+```
+
+**2. Trust TypeScript - No Runtime Type Checks**
+```typescript
+// ❌ DON'T: Check for methods TypeScript already guarantees exist
+if (typeof masonry.value?.restore === 'function') {
+  masonry.value.restore(item)
+}
+
+// ✅ DO: Trust TypeScript types, use optional chaining
+masonry.value?.restore(item)
+```
+
+**3. Trust Library Contracts - Don't Duplicate Validation**
+```typescript
+// ❌ DON'T: Duplicate checks the library already handles
+if (itemsToRemove.length > 0) {
+  masonry.value?.removeMany(itemsToRemove)
+}
+const existingIndex = items.findIndex(i => i.id === item.id)
+if (existingIndex === -1) {
+  masonry.value?.restore(item) // Library already handles duplicates
+}
+
+// ✅ DO: Let the library handle edge cases
+masonry.value?.removeMany(itemsToRemove) // Handles empty arrays
+masonry.value?.restore(item) // Handles duplicates internally
+```
+
+**4. Eliminate Prop Drilling - Pass Refs Directly**
+```typescript
+// ❌ DON'T: Pass wrapper functions through multiple layers
+<ChildComponent 
+  :removeFromMasonry="removeFromMasonry"
+  :restoreToMasonry="restoreToMasonry"
+/>
+
+// ✅ DO: Pass the ref/instance directly
+<ChildComponent :masonry="masonry" />
+// Child can call: props.masonry?.restore(item)
+```
+
+**5. Delete Dead Code Immediately**
+```typescript
+// ❌ DON'T: Keep empty functions "for future use" or "backward compatibility"
+function handleItemInView() {
+  // Kept for backward compatibility
+}
+
+function handleRemoveItem(item: Item) {
+  remove(item) // Just calls another function with same params
+}
+
+// ✅ DO: Remove dead code, inline simple wrappers
+// Delete empty functions entirely
+// If function only calls another with same params, inline it: remove(item)
+```
+
+**6. Prefer Simple Reactivity Patterns**
+```typescript
+// ❌ DON'T: Over-engineer reactivity with spreading and lookups
+const updatedItem = { ...item, reaction: { type } }
+const index = items.value.findIndex(i => i.id === item.id)
+items.value.splice(index, 1, updatedItem)
+await nextTick()
+const freshItem = items.value.find(i => i.id === item.id)
+
+// ✅ DO: Mutate in place and trigger reactivity
+item.reaction = { type }
+triggerRef(items) // For shallowRef, or Vue handles ref automatically
+```
+
+**7. Simplify Conditionals - Use Optional Chaining**
+```typescript
+// ❌ DON'T: Unnecessary conditional wrappers
+if (masonry.value?.isLoading) {
+  masonry.value.cancelLoad()
+}
+
+// ✅ DO: Let optional chaining handle it
+masonry.value?.cancelLoad() // Method handles state internally
+```
+
+**8. Composables vs Utils - Know the Difference**
+```typescript
+// ❌ DON'T: Create composable for non-reactive utility
+export function useReactionUpdater() {
+  return (items: Ref<Item[]>, fileId: number) => {
+    // Pure function, no reactive state
+  }
+}
+
+// ✅ DO: Use utils for pure functions, composables for reactive logic
+// utils/reactionStateUpdater.ts
+export default function updateReactionState(items: Ref<Item[]>, fileId: number) { }
+
+// composables/useTabs.ts
+export function useTabs() {
+  const tabs = ref<Tab[]>([]) // Reactive state
+  return { tabs, addTab, removeTab }
+}
+```
+
 ### Component Examples
 
 **✅ DO: Component with props and emits**
@@ -398,6 +516,26 @@ find resources/js/pages -name "*.vue"
 
 7. **Build**: Run `npm run build` after changes, or use `npm run dev` for HMR
 
+8. **Library Methods**: Call library methods directly - don't wrap single method calls in composables
+   ```typescript
+   // ✅ DO: Direct call
+   masonry.value?.restore(item)
+   
+   // ❌ DON'T: Unnecessary wrapper
+   useMasonryRestore(masonry)(item)
+   ```
+
+9. **TypeScript Trust**: Don't add runtime type checks for methods TypeScript guarantees exist
+   ```typescript
+   // ✅ DO: Trust TypeScript
+   masonry.value?.restore(item)
+   
+   // ❌ DON'T: Redundant runtime check
+   if (typeof masonry.value?.restore === 'function') { ... }
+   ```
+
+10. **Dead Code**: Delete empty functions and simple wrappers immediately - don't keep "for future use"
+
 ---
 
 ## Pre-PR Checks
@@ -405,6 +543,18 @@ find resources/js/pages -name "*.vue"
 ```bash
 npm run check && npm run test && npm run build
 ```
+
+### Code Review Checklist
+
+Before submitting code, verify:
+
+- [ ] **No wrapper functions** - Does this function/composable do more than wrap a single method call?
+- [ ] **Trust TypeScript** - Are we checking something TypeScript already guarantees?
+- [ ] **Trust libraries** - Are we duplicating validation the library already does?
+- [ ] **No prop drilling** - Can we pass the instance/ref directly instead of a wrapper function?
+- [ ] **No dead code** - Is there any empty/unused code that should be removed?
+- [ ] **Simple reactivity** - Is this the simplest reactivity pattern that works?
+- [ ] **Direct calls** - Are we calling library methods directly, not through wrappers?
 
 ---
 
