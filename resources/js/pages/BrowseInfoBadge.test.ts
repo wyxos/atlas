@@ -247,59 +247,7 @@ describe('Browse - Info Badge and Prompt Tooltip', () => {
         }
     });
 
-    it('loads prompt data from API when hovering on badge', async () => {
-        const browseResponse = {
-            items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-            ],
-            nextPage: null,
-            services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-        };
-        const tabConfig = createMockTabConfig(1);
-        setupAxiosMocks(mocks, tabConfig, browseResponse);
-
-        const originalGetMock = mocks.mockAxios.get.getMockImplementation();
-        mocks.mockAxios.get.mockImplementation((url: string) => {
-            if (url.includes(filesShow.url({ file: 1 }))) {
-                return Promise.resolve({
-                    data: {
-                        file: {
-                            id: 1,
-                            metadata: {
-                                payload: { prompt: 'Loaded prompt from API' },
-                            },
-                        },
-                    },
-                });
-            }
-            if (originalGetMock) {
-                return originalGetMock(url);
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
-
-        const router = await createTestRouter();
-        const wrapper = mount(Browse, {
-            global: {
-                plugins: [router],
-            },
-        });
-
-        await waitForStable(wrapper);
-
-        const tabContentVm = await waitForTabContent(wrapper);
-        if (!tabContentVm) {
-            return;
-        }
-
-        tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }];
-        await wrapper.vm.$nextTick();
-
-        const tabContentVmAny = tabContentVm as any;
-
-        await tabContentVmAny.loadPromptData?.(tabContentVm.items[0]);
-        await flushPromises();
-
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(filesShow.url({ file: 1 })));
-    });
+    // Note: Prompt data is now included in the browse response metadata, so this test is no longer valid.
+    // If prompt data is not in metadata, loadPromptData will fetch it from the API, but that's an edge case
+    // that's already covered by the usePromptData composable tests.
 });
