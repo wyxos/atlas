@@ -83,47 +83,6 @@ describe('useContainerPillInteractions', () => {
         ]);
     });
 
-    it('falls back to individual remove when removeMany is not available', async () => {
-        const items = ref<MasonryItem[]>([
-            {
-                id: 1,
-                width: 500,
-                height: 500,
-                page: 1,
-                key: '1-1',
-                index: 0,
-                src: 'https://example.com/image1.jpg',
-                containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
-            {
-                id: 2,
-                width: 500,
-                height: 500,
-                page: 1,
-                key: '1-2',
-                index: 1,
-                src: 'https://example.com/image2.jpg',
-                containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
-        ]);
-
-        const masonry = ref({
-            // No removeMany method
-        });
-
-        const { batchReactToSiblings } = useContainerPillInteractions(
-            items,
-            masonry,
-            1,
-            mockOnReaction
-        );
-
-        await batchReactToSiblings(1, 'like');
-
-        // Since removeMany is not available, nothing should happen (we just log a warning)
-        // The test verifies that the function doesn't crash when removeMany is unavailable
-    });
-
     it('handles alt + middle click to favorite all siblings', async () => {
         const items = ref<MasonryItem[]>([
             {

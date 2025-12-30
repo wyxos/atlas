@@ -505,15 +505,7 @@ describe('Browse - Tab Restoration', () => {
         // After removing pendingRestoreNextCursor, Masonry uses the cursor from paginationHistory
         // when loadNext() is called. The cursor is set via initialNextPage prop.
         // Call loadNext() which will use the cursor from paginationHistory
-        const masonryInstance = tabContentVm.masonry;
-        if (masonryInstance && typeof masonryInstance.loadNext === 'function') {
-            await masonryInstance.loadNext();
-        } else {
-            // Fallback: if masonry.loadNext is not available, verify the cursor is set correctly
-            // and will be used on the next load
-            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(cursorY);
-            return; // Skip the API call verification if loadNext is not available
-        }
+        await tabContentVm.masonry?.loadNext();
 
         const browseCalls = mocks.mockAxios.get.mock.calls
             .map(call => call[0])
