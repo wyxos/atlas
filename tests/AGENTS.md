@@ -44,7 +44,7 @@ npm run test:ui
 npm run test:coverage
 
 # Run specific test file
-npm run test tests/calculateLayout.test.js
+npm run test resources/js/components/AppHeader.test.ts
 ```
 
 ---
@@ -57,7 +57,7 @@ npm run test tests/calculateLayout.test.js
 - ✅ DO: Test HTTP endpoints and full request/response cycle
 - ✅ DO: Use factories for test data
 - ✅ DO: Group by feature area (e.g., `Browse/`, `Files/`, `Users/`)
-- ✅ Example: `tests/Feature/Browse/BrowseTest.php` - browse endpoint tests
+- ✅ Example: `tests/Feature/Browse/BrowseIndexTest.php` - browse endpoint tests
 - ✅ Example: `tests/Feature/Files/FilesIndexTest.php` - file listing tests
 
 **Browser Tests** (`tests/Browser/`)
@@ -212,9 +212,9 @@ $response->assertJson(['success' => true]);
 ### Example Tests
 
 **Feature Tests**:
-- `tests/Feature/Browse/BrowseTest.php` - Browse endpoint tests
+- `tests/Feature/Browse/BrowseIndexTest.php` - Browse endpoint tests
 - `tests/Feature/Files/FilesIndexTest.php` - File listing
-- `tests/Feature/FileReaction/FileReactionStoreTest.php` - Reaction creation
+- `tests/Feature/FileReactionStoreTest.php` - Reaction creation
 
 **Browser Tests**:
 - `tests/Browser/OfflineTabRestorationTest.php` - Offline behavior

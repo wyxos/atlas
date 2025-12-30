@@ -156,7 +156,7 @@ const params = data.params // Use what backend returns
 
 // ✅ DO: If frontend needs different structure, update backend Resource
 // Edit: app/Http/Resources/FileResource.php
-// Not: Transform in resources/js/composables/useFiles.ts
+// Not: Transform in frontend composables
 ```
 
 **3. Minimal Code - No intermediate variables**
@@ -209,28 +209,28 @@ const { params } = await axios.get('/api/browse')
 
 // ✅ DO: If you need a different structure, update backend to return it
 // Edit: app/Http/Controllers/BrowseController.php
-// Not: Map in resources/js/composables/useBrowseService.ts
+// Not: Map in frontend composables
 ```
 
-**6. Explicit Parameters Over Indirection**
+**6. Utils vs Composables**
 ```typescript
-// ❌ DON'T: Use callbacks/global state/registration patterns when simple parameters work
-function queueReaction(fileId: number, callback: () => void) { }
-registerUpdater(items) // Global registration
-let globalItems: Ref<Item[]> // Global state
-
-// ✅ DO: Pass data as explicit parameters
-function queueReaction(fileId: number, items?: Ref<Item[]>) {
-  if (items) {
-    updateReactionState(items, fileId)
-  }
-}
-
 // ❌ DON'T: Create composables for simple utility functions
 export function useReactionUpdater() { } // Not reactive, not a composable
 
 // ✅ DO: Use utils for pure functions, composables only for reactive logic
-export default function updateReactionState(items: Ref<Item[]>, fileId: number) { }
+// See: resources/js/utils/reactionStateUpdater.ts
+export default function updateReactionState(
+  items: Ref<Item[]>, 
+  fileId: number, 
+  reactionType: string
+) { }
+
+// ✅ DO: Use composables for reactive state and lifecycle
+export function useTabs() {
+  const tabs = ref<Tab[]>([])
+  // ... reactive logic
+  return { tabs, addTab, removeTab }
+}
 ```
 
 ### Tailwind CSS v4
@@ -307,8 +307,9 @@ See `resources/js/composables/useBrowseService.ts`:
 ### Key Composables
 - `resources/js/composables/useBrowseService.ts` - Browse API integration
 - `resources/js/composables/useTabs.ts` - Tab management
-- `resources/js/composables/useFileViewer*.ts` - File viewer logic (multiple files)
+- `resources/js/composables/useBrowseForm.ts` - Browse form state
 - `resources/js/composables/useModerationRules.ts` - Moderation rules
+- `resources/js/composables/useAutoDislikeQueue.ts` - Auto-dislike queue management
 
 ### Types
 - `resources/js/types/file.ts` - File types
@@ -319,7 +320,9 @@ See `resources/js/composables/useBrowseService.ts`:
 ### Utils
 - `resources/js/utils/date.ts` - Date formatting
 - `resources/js/utils/file.ts` - File utilities
+- `resources/js/utils/fileViewer.ts` - File viewer helpers (image preloading, sizing)
 - `resources/js/utils/reactionQueue.ts` - Reaction queue management
+- `resources/js/utils/reactionStateUpdater.ts` - Reaction state update utility
 - `resources/js/utils/masonryInteractions.ts` - Masonry layout interactions
 
 ---
