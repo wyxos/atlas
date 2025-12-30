@@ -36,7 +36,6 @@ import { useContainerPillInteractions } from '@/composables/useContainerPillInte
 import { usePromptData } from '@/composables/usePromptData';
 import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
-import { useMasonryRestore } from '@/composables/useMasonryRestore';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useBrowseForm, type BrowseFormData } from '@/composables/useBrowseForm';
@@ -118,8 +117,19 @@ const availableServices = computed(() => {
 });
 
 
-// Masonry restore composable
-const { restoreToMasonry, restoreManyToMasonry } = useMasonryRestore(masonry);
+// Restore functions - direct calls to Vibe's masonry methods
+const restoreToMasonry = async (item: MasonryItem, index: number): Promise<void> => {
+    await masonry.value?.restore(item, index);
+};
+
+const restoreManyToMasonry = async (itemsToRestore: Array<{ item: MasonryItem; index: number }>): Promise<void> => {
+    if (itemsToRestore.length === 0) {
+        return;
+    }
+    const items = itemsToRestore.map(({ item }) => item);
+    const indices = itemsToRestore.map(({ index }) => index);
+    await masonry.value?.restoreMany(items, indices);
+};
 
 // Backfill state and handlers
 const {
