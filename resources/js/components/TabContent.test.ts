@@ -265,7 +265,7 @@ vi.mock('./FileViewer.vue', () => ({
     default: {
         name: 'FileViewer',
         template: '<div class="file-viewer-mock"></div>',
-        props: ['containerRef', 'masonryContainerRef', 'items', 'hasMore', 'isLoading', 'onLoadMore', 'onReaction', 'removeFromMasonry', 'restoreToMasonry', 'tabId', 'masonryInstance'],
+        props: ['containerRef', 'masonryContainerRef', 'items', 'hasMore', 'isLoading', 'onLoadMore', 'onReaction', 'removeFromMasonry', 'restoreToMasonry', 'tabId'],
         emits: ['close'],
         methods: {
             openFromClick: vi.fn(),

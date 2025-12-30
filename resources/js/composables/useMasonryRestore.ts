@@ -6,28 +6,21 @@ import type { Masonry } from '@wyxos/vibe';
  * Composable for restoring items to masonry layout.
  */
 export function useMasonryRestore(
-    items: Ref<MasonryItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
     /**
      * Restore item to masonry at original index.
      * Delegates to Vibe's restore method which handles all index calculation and layout internally.
+     * Vibe's restore already checks for existing items, so no need to check here.
      */
-    async function restoreToMasonry(item: MasonryItem, index: number, masonryInstance?: InstanceType<typeof Masonry>): Promise<void> {
-        // Check if item already exists
-        const existingIndex = items.value.findIndex((i) => i.id === item.id);
-        if (existingIndex !== -1) {
-            return; // Item already exists
-        }
-
-        const instance = masonryInstance || masonry.value;
-        if (!instance) {
+    async function restoreToMasonry(item: MasonryItem, index: number): Promise<void> {
+        if (!masonry.value) {
             return;
         }
 
-        // Use Vibe's restore - it handles all index calculation and layout internally
-        if (typeof instance.restore === 'function') {
-            await instance.restore(item, index);
+        // Use Vibe's restore - it handles duplicate checks, index calculation and layout internally
+        if (typeof masonry.value.restore === 'function') {
+            await masonry.value.restore(item, index);
         } else {
             // Fallback if restore doesn't exist (shouldn't happen with Vibe)
             console.warn('[useMasonryRestore] restore not available on masonry instance');
@@ -37,34 +30,24 @@ export function useMasonryRestore(
     /**
      * Restore multiple items to masonry at their original indices.
      * Delegates to Vibe's restoreMany method which handles all index calculation and layout internally.
+     * Vibe's restoreMany already filters out existing items, so no need to check here.
      */
     async function restoreManyToMasonry(
-        itemsToRestore: Array<{ item: MasonryItem; index: number }>,
-        masonryInstance?: InstanceType<typeof Masonry>
+        itemsToRestore: Array<{ item: MasonryItem; index: number }>
     ): Promise<void> {
         if (itemsToRestore.length === 0) {
             return;
         }
 
-        const instance = masonryInstance || masonry.value;
-        if (!instance) {
+        if (!masonry.value) {
             return;
         }
 
-        // Filter out items that already exist
-        const itemsToAdd = itemsToRestore.filter(
-            ({ item }) => items.value.findIndex((i) => i.id === item.id) === -1
-        );
-
-        if (itemsToAdd.length === 0) {
-            return; // All items already exist
-        }
-
-        // Use Vibe's restoreMany - it handles all index calculation and layout internally
-        if (typeof instance.restoreMany === 'function') {
-            const sortedItems = itemsToAdd.map(({ item }) => item);
-            const sortedIndices = itemsToAdd.map(({ index }) => index);
-            await instance.restoreMany(sortedItems, sortedIndices);
+        // Use Vibe's restoreMany - it handles duplicate checks, index calculation and layout internally
+        if (typeof masonry.value.restoreMany === 'function') {
+            const items = itemsToRestore.map(({ item }) => item);
+            const indices = itemsToRestore.map(({ index }) => index);
+            await masonry.value.restoreMany(items, indices);
         } else {
             // Fallback if restoreMany doesn't exist (shouldn't happen with Vibe)
             console.warn('[useMasonryRestore] restoreMany not available on masonry instance');
