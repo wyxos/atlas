@@ -54,8 +54,8 @@ async function loadFile(): Promise<void> {
     error.value = null;
 
     try {
-        const response = await window.axios.get<{ file: File }>(show.url(fileId));
-        file.value = response.data.file;
+        const { data } = await window.axios.get<{ file: File }>(show.url(fileId));
+        file.value = data.file;
     } catch (err: unknown) {
         const axiosError = err as { response?: { status?: number; data?: { message?: string } } };
         const statusCode = axiosError.response?.status;

@@ -46,8 +46,8 @@ const selectedRule = computed<ModerationRule | null>(() => {
 async function loadRules(): Promise<void> {
     isLoadingRules.value = true;
     try {
-        const response = await window.axios.get('/api/moderation-rules');
-        rules.value = Array.isArray(response.data) ? response.data : [];
+        const { data } = await window.axios.get('/api/moderation-rules');
+        rules.value = Array.isArray(data) ? data : [];
     } catch (error) {
         console.error('Failed to load rules:', error);
         testError.value = 'Failed to load moderation rules';
@@ -67,15 +67,15 @@ async function runTest(): Promise<void> {
     testError.value = null;
 
     try {
-        const response = await window.axios.post('/api/moderation-rules/test', {
+        const { data } = await window.axios.post('/api/moderation-rules/test', {
             text: testText.value,
             rule_id: selectedRuleId.value,
         });
 
         testResult.value = {
-            matches: response.data.matches ?? false,
-            hits: Array.isArray(response.data.hits) ? response.data.hits : [],
-            rule: response.data.rule || selectedRule.value!,
+            matches: data.matches ?? false,
+            hits: Array.isArray(data.hits) ? data.hits : [],
+            rule: data.rule || selectedRule.value!,
         };
     } catch (error: unknown) {
         const axiosError = error as { response?: { data?: { message?: string } }; message?: string };

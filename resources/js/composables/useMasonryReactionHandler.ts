@@ -36,8 +36,8 @@ export function useMasonryReactionHandler(
 
         // Only remove from masonry in online mode (not in local mode)
         // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
-        if (!isLocal.value && masonry.value?.remove) {
-            masonry.value.remove(item);
+        if (!isLocal.value) {
+            masonry.value?.remove(item);
         }
 
         // Create restore callback for undo functionality (only in online mode where items are removed)

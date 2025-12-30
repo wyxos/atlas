@@ -84,12 +84,12 @@ function preloadImage(url: string): Promise<{ width: number; height: number }> {
 // This increments every time a file comes into view (including when navigating back to it)
 async function handleItemSeen(fileId: number): Promise<void> {
     try {
-        const response = await window.axios.post<{ seen_count: number }>(incrementSeen.url(fileId));
+        const { data } = await window.axios.post<{ seen_count: number }>(incrementSeen.url(fileId));
 
         // Update local item state
         const item = items.value.find((i) => i.id === fileId);
         if (item) {
-            item.seen_count = response.data.seen_count;
+            item.seen_count = data.seen_count;
         }
     } catch (error) {
         console.error('Failed to increment seen count:', error);
@@ -983,8 +983,8 @@ async function fetchFileData(fileId: number): Promise<void> {
 
     isLoadingFileData.value = true;
     try {
-        const response = await window.axios.get(getFile.url(fileId));
-        fileData.value = response.data.file;
+        const { data } = await window.axios.get(getFile.url(fileId));
+        fileData.value = data.file;
     } catch (error) {
         console.error('Failed to fetch file data:', error);
         fileData.value = null;

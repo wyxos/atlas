@@ -34,8 +34,8 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
 
         promptDataLoading.value.set(item.id, true);
         try {
-            const response = await window.axios.get(`/api/files/${item.id}`);
-            const file = response.data?.file;
+            const { data } = await window.axios.get(`/api/files/${item.id}`);
+            const file = data?.file;
             // Check metadata payload (JSON) or detail_metadata
             const metadataPayload = file?.metadata?.payload as ItemMetadata | undefined;
             const prompt = (metadataPayload && typeof metadataPayload === 'object' && metadataPayload.prompt)

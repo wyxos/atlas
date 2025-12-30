@@ -297,11 +297,9 @@ describe('Browse - Info Badge and Prompt Tooltip', () => {
 
         const tabContentVmAny = tabContentVm as any;
 
-        if (typeof tabContentVmAny.loadPromptData === 'function') {
-            await tabContentVmAny.loadPromptData(tabContentVm.items[0]);
-            await flushPromises();
+        await tabContentVmAny.loadPromptData?.(tabContentVm.items[0]);
+        await flushPromises();
 
-            expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(filesShow.url({ file: 1 })));
-        }
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(filesShow.url({ file: 1 })));
     });
 });
