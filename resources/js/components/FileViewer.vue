@@ -1085,6 +1085,11 @@ onUnmounted(() => {
 defineExpose({
     openFromClick,
     close: closeOverlay,
+    navigateForward: navigateToNext,
+    navigateBackward: navigateToPrevious,
+    currentItemIndex,
+    items,
+    isBottomPanelOpen,
 });
 </script>
 
