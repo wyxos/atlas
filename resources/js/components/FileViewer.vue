@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, onUnmounted, watch } from 'vue';
+import { ref, nextTick, onUnmounted, watch, type Ref } from 'vue';
 import { X, Loader2, Menu } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
@@ -7,6 +7,8 @@ import type { MasonryItem } from '@/composables/useTabs';
 import { createReactionCallback } from '@/utils/reactions';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { ReactionType } from '@/types/reaction';
+import type { Masonry } from '@wyxos/vibe';
+import { useBrowseForm } from '@/composables/useBrowseForm';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -16,8 +18,7 @@ interface Props {
     isLoading?: boolean;
     onLoadMore?: () => Promise<void>;
     onReaction?: (fileId: number, type: ReactionType) => void;
-    removeFromMasonry?: (item: MasonryItem) => void;
-    restoreToMasonry?: (item: MasonryItem, index: number) => void | Promise<void>;
+    masonry?: Ref<InstanceType<typeof Masonry> | null>;
     tabId?: number;
 }
 
@@ -277,9 +278,10 @@ async function handleReaction(type: ReactionType): Promise<void> {
 
     // IMPORTANT: Remove from masonry FIRST (before removing from carousel)
     // This ensures masonry can find and properly remove the item
-    // Pass the item directly to removeFromMasonry to ensure correct reference
-    if (props.removeFromMasonry) {
-        props.removeFromMasonry(currentItem);
+    // Only remove in online mode (not in local mode)
+    // Pass the item directly to ensure correct reference
+    if (!isLocal.value) {
+        props.masonry?.value?.remove(currentItem);
     }
 
     // Call reaction callback directly
@@ -291,7 +293,7 @@ async function handleReaction(type: ReactionType): Promise<void> {
     }
 
     // Remove from carousel (items array) AFTER masonry removal
-    // Note: removeFromMasonry removes from TabContent's items, which should sync to FileViewer's props.items
+    // Note: masonry removal updates TabContent's items, which should sync to FileViewer's props.items
     // via the watch. However, we need to remove from FileViewer's items directly for immediate carousel update.
     // The watch is blocked by isRemovingItem flag to prevent double removal.
     isRemovingItem.value = true;
