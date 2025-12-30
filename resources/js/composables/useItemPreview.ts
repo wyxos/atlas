@@ -34,21 +34,16 @@ export function useItemPreview(
             const combinedWillAutoDislike = existingFlag || response.will_auto_dislike;
 
             // Update local item state
-            // Note: items uses shallowRef, so we need to use splice() to ensure v-for in Masonry sees the change.
-            // Direct assignment + triggerRef doesn't always trigger v-for re-evaluation with shallowRef.
             if (itemIndex !== -1) {
-                // Create updated item object (backend already includes all properties)
-                const updatedItem = {
-                    ...items.value[itemIndex],
-                    previewed_count: response.previewed_count,
-                    will_auto_dislike: combinedWillAutoDislike,
-                };
+                // Mutate item properties in place
+                // This is efficient as we're only updating properties on one object
+                const item = items.value[itemIndex];
+                item.previewed_count = response.previewed_count;
+                item.will_auto_dislike = combinedWillAutoDislike;
 
-                // Use splice to replace the element - Vue tracks splice() mutations better than direct assignment
-                // This ensures Masonry's v-for sees the change and updates the slot prop
-                items.value.splice(itemIndex, 1, updatedItem);
-
-                // Manually trigger reactivity for shallowRef (still needed)
+                // Manually trigger reactivity for shallowRef
+                // shallowRef only tracks reference changes, not deep mutations
+                // triggerRef() notifies Vue that the ref's value has changed, causing Vibe's computed to re-evaluate
                 triggerRef(items);
 
                 // Force Vue to process the change before continuing
