@@ -31,7 +31,7 @@ export function useAutoDislikeQueue(
 ) {
     const { isLocal } = useBrowseForm();
     const { add: addToQueue, remove: removeFromQueue, getRemainingTime, getProgress, has: hasInQueue, freezeAll, unfreezeAll, isFrozen, stop, resume, getAll } = useQueue();
-    
+
     // Track auto-dislike items that are frozen (for FileViewer)
     const frozenAutoDislikeItems = ref<Set<number>>(new Set());
     // Track if FileViewer is currently open (so we can freeze new items immediately)
@@ -68,7 +68,7 @@ export function useAutoDislikeQueue(
             await window.axios.post(batchPerformAutoDislike.url(), {
                 file_ids: fileIds,
             });
-            
+
             // Update reaction state in local mode (if items provided)
             if (isLocal.value && items) {
                 fileIds.forEach((fileId) => {
@@ -145,7 +145,7 @@ export function useAutoDislikeQueue(
 
         // Also remove from pending dislikes if it's there
         pendingDislikes.value.delete(fileId);
-        
+
         // Remove from frozen items if it was frozen
         frozenAutoDislikeItems.value.delete(fileId);
     }
@@ -186,7 +186,7 @@ export function useAutoDislikeQueue(
      */
     function freezeAutoDislikeOnly(): void {
         isFileViewerOpen.value = true;
-        
+
         // Find all auto-dislike items in the queue and stop them individually
         const allItems = getAll();
         allItems.forEach((item) => {
@@ -206,7 +206,7 @@ export function useAutoDislikeQueue(
      */
     function unfreezeAutoDislikeOnly(): void {
         isFileViewerOpen.value = false;
-        
+
         // Clear any pending unfreeze timeout
         if (fileViewerUnfreezeTimeout) {
             clearTimeout(fileViewerUnfreezeTimeout);
