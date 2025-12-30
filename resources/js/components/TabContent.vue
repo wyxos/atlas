@@ -117,19 +117,6 @@ const availableServices = computed(() => {
 });
 
 
-// Restore functions - direct calls to Vibe's masonry methods
-const restoreToMasonry = async (item: MasonryItem, index: number): Promise<void> => {
-    await masonry.value?.restore(item, index);
-};
-
-const restoreManyToMasonry = async (itemsToRestore: Array<{ item: MasonryItem; index: number }>): Promise<void> => {
-    if (itemsToRestore.length === 0) {
-        return;
-    }
-    const items = itemsToRestore.map(({ item }) => item);
-    const indices = itemsToRestore.map(({ index }) => index);
-    await masonry.value?.restoreMany(items, indices);
-};
 
 // Backfill state and handlers
 const {
@@ -390,22 +377,20 @@ const containerPillInteractions = useContainerPillInteractions(
     computed(() => tab.value.id),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
         props.onReaction(fileId, type);
-    },
-    restoreManyToMasonry
+    }
 );
 
 // Prompt data composable
 const promptData = usePromptData(items);
 
-// Masonry reaction handler composable (needs restoreToMasonry)
+// Masonry reaction handler composable
 const { handleMasonryReaction } = useMasonryReactionHandler(
     items,
     masonry,
     computed(() => tab.value),
     (fileId: number, type: ReactionType) => {
         props.onReaction(fileId, type);
-    },
-    restoreToMasonry
+    }
 );
 
 // Masonry interactions composable (needs handleMasonryReaction)
@@ -427,9 +412,7 @@ function handleModerationRulesChanged(): void {
 
 // Cancel masonry loading
 function cancelMasonryLoad(): void {
-    if (masonry.value?.isLoading) {
-        masonry.value.cancelLoad();
-    }
+    masonry.value?.cancelLoad();
 }
 
 // Load next page manually (used by both button click and carousel load more)
@@ -439,17 +422,6 @@ async function loadNextPage(): Promise<void> {
     }
 }
 
-// Remove item from masonry
-// Only removes in online mode (not in local mode)
-function removeItemFromMasonry(item: MasonryItem): void {
-    // Only remove in online mode (not in local mode)
-    if (form.data.feed === 'local') {
-        return;
-    }
-
-    // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
-    masonry.value?.remove(item);
-}
 
 // Auto-dislike queue composable
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
@@ -988,9 +960,8 @@ defineExpose({
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading"
-            :on-load-more="loadNextPage" :on-reaction="props.onReaction" :remove-from-masonry="removeItemFromMasonry"
-            :restore-to-masonry="restoreToMasonry" :tab-id="tab.id" @open="handleFileViewerOpen"
-            @close="handleFileViewerClose" />
+            :on-load-more="loadNextPage" :on-reaction="props.onReaction" :masonry="masonry" :tab-id="tab.id"
+            @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"

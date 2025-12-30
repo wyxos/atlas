@@ -12,8 +12,7 @@ export function useMasonryReactionHandler(
     items: Ref<MasonryItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tab: Ref<TabData | undefined>,
-    onReaction: (fileId: number, type: ReactionType) => void,
-    restoreToMasonry: (item: MasonryItem, index: number) => Promise<void>
+    onReaction: (fileId: number, type: ReactionType) => void
 ) {
     const { isLocal } = useBrowseForm();
 
@@ -44,8 +43,8 @@ export function useMasonryReactionHandler(
         // Create restore callback for undo functionality (only in online mode where items are removed)
         const restoreCallback = !isLocal.value && item && tabId !== undefined && itemIndex !== -1
             ? async () => {
-                // Restore item using the provided restore function
-                await restoreToMasonry(item, itemIndex);
+                // Restore item directly using masonry
+                await masonry.value?.restore(item, itemIndex);
             }
             : undefined;
 

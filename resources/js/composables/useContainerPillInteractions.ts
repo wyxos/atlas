@@ -32,10 +32,7 @@ export function useContainerPillInteractions(
     items: Ref<MasonryItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tabId: number | undefined | ComputedRef<number | undefined>,
-    onReaction: (fileId: number, type: ReactionType) => void,
-    restoreManyToMasonry?: (
-        itemsToRestore: Array<{ item: MasonryItem; index: number }>
-    ) => Promise<void>
+    onReaction: (fileId: number, type: ReactionType) => void
 ) {
     // Unwrap computed/ref to get the actual value
     const tabIdValue = computed(() => typeof tabId === 'object' && 'value' in tabId ? tabId.value : tabId);
@@ -102,12 +99,14 @@ export function useContainerPillInteractions(
             await masonry.value?.removeMany?.(siblings);
         }
 
-        // Create batch restore callback if restoreManyToMasonry is available (only in online mode)
+        // Create batch restore callback (only in online mode)
         const currentTabId = tabIdValue.value;
-        const batchRestoreCallback = !isLocal.value && restoreManyToMasonry && currentTabId !== undefined
+        const batchRestoreCallback = !isLocal.value && currentTabId !== undefined
             ? async () => {
-                // Restore all items in the batch using restoreManyToMasonry
-                await restoreManyToMasonry(itemsToRestore);
+                // Restore all items in the batch directly using masonry
+                const items = itemsToRestore.map(({ item }) => item);
+                const indices = itemsToRestore.map(({ index }) => index);
+                await masonry.value?.restoreMany(items, indices);
             }
             : undefined;
 
