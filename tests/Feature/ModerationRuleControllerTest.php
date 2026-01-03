@@ -34,6 +34,7 @@ test('can create a moderation rule with any operation', function () {
         'terms' => ['spam', 'advertisement', 'promo'],
         'active' => true,
         'nsfw' => false,
+        'action_type' => 'dislike',
         'options' => [
             'case_sensitive' => false,
             'whole_word' => true,
@@ -49,11 +50,13 @@ test('can create a moderation rule with any operation', function () {
             'terms' => ['spam', 'advertisement', 'promo'],
             'active' => true,
             'nsfw' => false,
+            'action_type' => 'dislike',
         ]);
 
     $this->assertDatabaseHas('moderation_rules', [
         'name' => 'Block spam terms',
         'op' => 'any',
+        'action_type' => 'dislike',
     ]);
 });
 
