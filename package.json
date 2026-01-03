@@ -1,11 +1,13 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
     "private": true,
+    "version": "1.0.0-alpha",
     "type": "module",
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "test": "vitest run",
+        "test": "vitest",
+        "test:run": "vitest run",
         "test:ui": "vitest --ui",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",

@@ -41,11 +41,55 @@ function createFormInstance() {
      * Sync form data from tab
      */
     function syncFromTab(tab?: TabData): void {
-        if (tab?.params) {
-            Object.assign(data, tab.params, { tab_id: tab.id });
-        } else {
-            reset();
+        reset();
+
+        if (!tab?.params) {
+            return;
         }
+
+        const params = tab.params as Record<string, unknown>;
+
+        const parseBool = (value: unknown, fallback: boolean): boolean => {
+            if (typeof value === 'boolean') return value;
+            if (typeof value === 'number') return value === 1;
+            if (typeof value === 'string') {
+                const v = value.trim().toLowerCase();
+                if (v === 'true' || v === '1') return true;
+                if (v === 'false' || v === '0' || v === '') return false;
+            }
+            return fallback;
+        };
+
+        const parseString = (value: unknown, fallback: string): string => {
+            return typeof value === 'string' && value.length ? value : fallback;
+        };
+
+        const parseStringOrNumber = (
+            value: unknown,
+            fallback: string | number | null
+        ): string | number | null => {
+            if (typeof value === 'string') return value;
+            if (typeof value === 'number') return value;
+            return fallback;
+        };
+
+        data.tab_id = tab.id;
+        data.service = parseString(params.service, defaultData.service);
+        data.nsfw = parseBool(params.nsfw, defaultData.nsfw);
+        data.type = parseString(params.type, defaultData.type);
+        data.sort = parseString(params.sort, defaultData.sort);
+        data.feed = params.feed === 'local' ? 'local' : 'online';
+        data.source = parseString(params.source, defaultData.source);
+
+        const limitValue = params.limit;
+        if (typeof limitValue === 'number' && Number.isFinite(limitValue)) {
+            data.limit = String(limitValue);
+        } else {
+            data.limit = parseString(limitValue, defaultData.limit);
+        }
+
+        data.page = parseStringOrNumber(params.page, defaultData.page) ?? defaultData.page;
+        data.next = parseStringOrNumber(params.next, defaultData.next);
     }
 
     /**

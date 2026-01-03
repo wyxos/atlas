@@ -291,3 +291,48 @@ test('browse filters by source in local mode', function () {
     // The actual count depends on how Browser transforms the LocalService response
     expect(count($data['items']))->toBeGreaterThanOrEqual(0);
 });
+
+test('browse detaches all tab files when page is 1', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create();
+
+    $existingFile = \App\Models\File::factory()->create();
+    $tab->files()->attach($existingFile->id, ['position' => 0]);
+    expect($tab->files()->count())->toBe(1);
+
+    // Return zero items so we can assert detaching happens even when nothing new is attached.
+    Http::fake([
+        '*' => Http::response([
+            'items' => [],
+            'metadata' => [],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?source=civit-ai-images&page=1&tab_id={$tab->id}");
+    $response->assertSuccessful();
+
+    $tab->refresh();
+    expect($tab->files()->count())->toBe(0);
+});
+
+test('browse does not detach tab files when page is not 1', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create();
+
+    $existingFile = \App\Models\File::factory()->create();
+    $tab->files()->attach($existingFile->id, ['position' => 0]);
+    expect($tab->files()->count())->toBe(1);
+
+    Http::fake([
+        '*' => Http::response([
+            'items' => [],
+            'metadata' => [],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?source=civit-ai-images&page=2&tab_id={$tab->id}");
+    $response->assertSuccessful();
+
+    $tab->refresh();
+    expect($tab->files()->count())->toBe(1);
+});

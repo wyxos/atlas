@@ -1,6 +1,9 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
-import type { MasonryItem, TabData } from './useTabs';
-import { services as browseServices, sources as browseSources } from '@/actions/App/Http/Controllers/BrowseController';
+import type { FeedItem, TabData } from './useTabs';
+import BrowseController from '@/actions/App/Http/Controllers/BrowseController';
+
+const browseServices = BrowseController.services;
+const browseSources = BrowseController.sources;
 
 export type ServiceOption = {
     key: string;
@@ -11,11 +14,11 @@ export type ServiceOption = {
 export type UseBrowseServiceOptions = {
     hasServiceSelected: ComputedRef<boolean>;
     isInitializing: Ref<boolean>;
-    items: Ref<MasonryItem[]>;
+    items: Ref<FeedItem[]>;
     currentTabService: ComputedRef<string | null>;
     activeTabId: Ref<number | null>;
     getActiveTab: () => TabData | undefined;
-    updateActiveTab: (items: MasonryItem[]) => void;
+    updateActiveTab: (items: FeedItem[]) => void;
 };
 
 export function useBrowseService(_options?: UseBrowseServiceOptions) {

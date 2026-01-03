@@ -3,7 +3,7 @@ import { ref, nextTick, onUnmounted, watch, type Ref } from 'vue';
 import { X, Loader2, Menu } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
-import type { MasonryItem } from '@/composables/useTabs';
+import type { FeedItem } from '@/composables/useTabs';
 import { createReactionCallback } from '@/utils/reactions';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { ReactionType } from '@/types/reaction';
@@ -13,7 +13,7 @@ import { useBrowseForm } from '@/composables/useBrowseForm';
 interface Props {
     containerRef: HTMLElement | null;
     masonryContainerRef: HTMLElement | null;
-    items: MasonryItem[];
+    items: FeedItem[];
     hasMore?: boolean;
     isLoading?: boolean;
     onLoadMore?: () => Promise<void>;
@@ -31,7 +31,7 @@ const emit = defineEmits<{
 }>();
 
 // Make items reactive for carousel removal
-const items = ref<MasonryItem[]>(props.items);
+const items = ref<FeedItem[]>(props.items);
 
 // Watch props.items and sync to reactive items (only when props change externally)
 // Use a flag to prevent syncing when we're removing items internally
@@ -145,7 +145,7 @@ function calculateBestFitSize(
     };
 }
 
-function findMasonryItemByImageSrc(imageSrc: string, itemElement: HTMLElement): MasonryItem | null {
+function findMasonryItemByImageSrc(imageSrc: string, itemElement: HTMLElement): FeedItem | null {
     // Try to find item by checking data attributes on the masonry item element
     const itemKeyAttr = itemElement.getAttribute('data-key');
     if (itemKeyAttr) {
@@ -329,7 +329,7 @@ async function handleReaction(type: ReactionType): Promise<void> {
 }
 
 // Handle carousel item click
-function handleCarouselItemClick(item: MasonryItem): void {
+function handleCarouselItemClick(item: FeedItem): void {
     const itemIndex = items.value.findIndex(i => i.id === item.id);
     if (itemIndex >= 0 && currentItemIndex.value !== null) {
         // Determine direction based on index comparison BEFORE updating

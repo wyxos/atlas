@@ -4,7 +4,7 @@ import { createReactionCallback } from './reactions';
 import updateReactionState from '@/utils/reactionStateUpdater';
 import type { ReactionType } from '@/types/reaction';
 import type { Ref } from 'vue';
-import type { MasonryItem } from '@/composables/useTabs';
+import type { FeedItem } from '@/composables/useTabs';
 import ReactionQueueToast from '@/components/toasts/ReactionQueueToast.vue';
 import BatchReactionQueueToast from '@/components/toasts/BatchReactionQueueToast.vue';
 
@@ -14,7 +14,7 @@ const queue = useQueue();
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
 type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
-    items?: Ref<MasonryItem[]>;
+    items?: Ref<FeedItem[]>;
 };
 
 /**
@@ -26,7 +26,7 @@ export function queueReaction(
     reactionType: ReactionType,
     thumbnail?: string,
     restoreCallback?: () => Promise<void> | void,
-    items?: Ref<MasonryItem[]>
+    items?: Ref<FeedItem[]>
 ): void {
     const queueId = `${reactionType}-${fileId}`;
 
@@ -107,7 +107,7 @@ export function queueBatchReaction(
     reactionType: ReactionType,
     previews: Array<{ fileId: number; thumbnail?: string }>,
     restoreCallback?: () => Promise<void> | void,
-    items?: Ref<MasonryItem[]>
+    items?: Ref<FeedItem[]>
 ): void {
     if (fileIds.length === 0) {
         return;

@@ -1,10 +1,10 @@
 import { ref, computed } from 'vue';
-import type { MasonryItem } from './useTabs';
+import type { FeedItem } from './useTabs';
 
 /**
  * Composable for managing prompt data loading, caching, and dialog state.
  */
-export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
+export function usePromptData(items: import('vue').Ref<FeedItem[]>) {
     const promptDataLoading = ref<Map<number, boolean>>(new Map());
     const promptDataCache = ref<Map<number, string>>(new Map());
     const promptDialogOpen = ref<boolean>(false);
@@ -12,7 +12,7 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
     type ItemMetadata = { prompt?: unknown };
 
     // Load prompt data for an item (from metadata or API)
-    async function loadPromptData(item: MasonryItem): Promise<string | null> {
+    async function loadPromptData(item: FeedItem): Promise<string | null> {
         // Check cache first
         if (promptDataCache.value.has(item.id)) {
             return promptDataCache.value.get(item.id) ?? null;
@@ -55,7 +55,7 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
     }
 
     // Get prompt data for display (from cache or metadata)
-    function getPromptData(item: MasonryItem): string | null {
+    function getPromptData(item: FeedItem): string | null {
         const metadata = item.metadata as ItemMetadata | undefined;
         return promptDataCache.value.get(item.id) || (metadata?.prompt ? String(metadata.prompt) : null);
     }
@@ -74,7 +74,7 @@ export function usePromptData(items: import('vue').Ref<MasonryItem[]>) {
     });
 
     // Open prompt dialog for an item
-    async function openPromptDialog(item: MasonryItem): Promise<void> {
+    async function openPromptDialog(item: FeedItem): Promise<void> {
         promptDialogItemId.value = item.id;
         promptDialogOpen.value = true;
         // Load prompt data if not already loaded

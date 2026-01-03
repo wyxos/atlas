@@ -12,17 +12,33 @@ Object.defineProperty(window, 'axios', {
 });
 
 // Mock browseIndex and browseServices actions
-vi.mock('@/actions/App/Http/Controllers/BrowseController', () => ({
-    index: {
+vi.mock('@/actions/App/Http/Controllers/BrowseController', () => {
+    const services = {
+        url: vi.fn(() => '/api/browse/services'),
+    };
+
+    const sources = {
+        url: vi.fn(() => '/api/browse/sources'),
+    };
+
+    const index = {
         url: vi.fn((params: any) => {
             const query = new URLSearchParams(params?.query || {}).toString();
             return `/api/browse?${query}`;
         }),
-    },
-    services: {
-        url: vi.fn(() => '/api/browse/services'),
-    },
-}));
+    };
+
+    return {
+        default: {
+            index,
+            services,
+            sources,
+        },
+        index,
+        services,
+        sources,
+    };
+});
 
 beforeEach(() => {
     vi.clearAllMocks();

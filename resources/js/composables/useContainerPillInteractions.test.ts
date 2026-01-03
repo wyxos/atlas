@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref, computed } from 'vue';
 import { useContainerPillInteractions } from './useContainerPillInteractions';
-import type { MasonryItem } from './useTabs';
+import type { FeedItem } from './useTabs';
 
 // Mock dependencies
 vi.mock('@/utils/reactions', () => ({
@@ -20,15 +20,15 @@ vi.mock('./useBrowseForm', () => ({
 
 describe('useContainerPillInteractions', () => {
     const mockOnReaction = vi.fn();
-    const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
+    const mockRemove = vi.fn().mockResolvedValue(undefined);
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mockRemoveMany.mockResolvedValue(undefined);
+        mockRemove.mockResolvedValue(undefined);
     });
 
-    it('uses removeMany when batch reacting to multiple siblings', async () => {
-        const items = ref<MasonryItem[]>([
+    it('uses remove when batch reacting to multiple siblings', async () => {
+        const items = ref<FeedItem[]>([
             {
                 id: 1,
                 width: 500,
@@ -38,7 +38,7 @@ describe('useContainerPillInteractions', () => {
                 index: 0,
                 src: 'https://example.com/image1.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
             {
                 id: 2,
                 width: 500,
@@ -48,7 +48,7 @@ describe('useContainerPillInteractions', () => {
                 index: 1,
                 src: 'https://example.com/image2.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
             {
                 id: 3,
                 width: 500,
@@ -58,11 +58,11 @@ describe('useContainerPillInteractions', () => {
                 index: 2,
                 src: 'https://example.com/image3.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
         ]);
 
         const masonry = ref({
-            removeMany: mockRemoveMany,
+            remove: mockRemove,
         });
 
         const { batchReactToSiblings } = useContainerPillInteractions(
@@ -74,9 +74,9 @@ describe('useContainerPillInteractions', () => {
 
         await batchReactToSiblings(1, 'like');
 
-        // Verify removeMany was called with all siblings
-        expect(mockRemoveMany).toHaveBeenCalledTimes(1);
-        expect(mockRemoveMany).toHaveBeenCalledWith([
+        // Verify remove was called with all siblings
+        expect(mockRemove).toHaveBeenCalledTimes(1);
+        expect(mockRemove).toHaveBeenCalledWith([
             expect.objectContaining({ id: 1 }),
             expect.objectContaining({ id: 2 }),
             expect.objectContaining({ id: 3 }),
@@ -84,7 +84,7 @@ describe('useContainerPillInteractions', () => {
     });
 
     it('handles alt + middle click to favorite all siblings', async () => {
-        const items = ref<MasonryItem[]>([
+        const items = ref<FeedItem[]>([
             {
                 id: 1,
                 width: 500,
@@ -94,7 +94,7 @@ describe('useContainerPillInteractions', () => {
                 index: 0,
                 src: 'https://example.com/image1.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
             {
                 id: 2,
                 width: 500,
@@ -104,12 +104,12 @@ describe('useContainerPillInteractions', () => {
                 index: 1,
                 src: 'https://example.com/image2.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
         ]);
 
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
-            removeMany: mockRemoveMany,
+            remove: mockRemoveMany,
         });
 
         const { handlePillAuxClick } = useContainerPillInteractions(
@@ -141,7 +141,7 @@ describe('useContainerPillInteractions', () => {
     });
 
     it('handles middle click without alt to open URL', () => {
-        const items = ref<MasonryItem[]>([
+        const items = ref<FeedItem[]>([
             {
                 id: 1,
                 width: 500,
@@ -151,7 +151,7 @@ describe('useContainerPillInteractions', () => {
                 index: 0,
                 src: 'https://example.com/image1.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
         ]);
 
         const masonry = ref({});
@@ -186,7 +186,7 @@ describe('useContainerPillInteractions', () => {
     });
 
     it('handles alt + right click to dislike all siblings', async () => {
-        const items = ref<MasonryItem[]>([
+        const items = ref<FeedItem[]>([
             {
                 id: 1,
                 width: 500,
@@ -196,7 +196,7 @@ describe('useContainerPillInteractions', () => {
                 index: 0,
                 src: 'https://example.com/image1.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
             {
                 id: 2,
                 width: 500,
@@ -206,12 +206,12 @@ describe('useContainerPillInteractions', () => {
                 index: 1,
                 src: 'https://example.com/image2.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
         ]);
 
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
-            removeMany: mockRemoveMany,
+            remove: mockRemoveMany,
         });
 
         const { handlePillClick } = useContainerPillInteractions(
@@ -244,7 +244,7 @@ describe('useContainerPillInteractions', () => {
     });
 
     it('handles double left click (without alt) to like all siblings', async () => {
-        const items = ref<MasonryItem[]>([
+        const items = ref<FeedItem[]>([
             {
                 id: 1,
                 width: 500,
@@ -254,7 +254,7 @@ describe('useContainerPillInteractions', () => {
                 index: 0,
                 src: 'https://example.com/image1.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
             {
                 id: 2,
                 width: 500,
@@ -264,12 +264,12 @@ describe('useContainerPillInteractions', () => {
                 index: 1,
                 src: 'https://example.com/image2.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
         ]);
 
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
-            removeMany: mockRemoveMany,
+            remove: mockRemoveMany,
         });
 
         const { handlePillClick } = useContainerPillInteractions(
@@ -302,7 +302,7 @@ describe('useContainerPillInteractions', () => {
     });
 
     it('handles double right click (without alt) to dislike all siblings', async () => {
-        const items = ref<MasonryItem[]>([
+        const items = ref<FeedItem[]>([
             {
                 id: 1,
                 width: 500,
@@ -312,7 +312,7 @@ describe('useContainerPillInteractions', () => {
                 index: 0,
                 src: 'https://example.com/image1.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
             {
                 id: 2,
                 width: 500,
@@ -322,12 +322,12 @@ describe('useContainerPillInteractions', () => {
                 index: 1,
                 src: 'https://example.com/image2.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
         ]);
 
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
-            removeMany: mockRemoveMany,
+            remove: mockRemoveMany,
         });
 
         const { handlePillClick } = useContainerPillInteractions(
@@ -368,7 +368,7 @@ describe('useContainerPillInteractions', () => {
     });
 
     it('handles double middle click (without alt) to love all siblings', async () => {
-        const items = ref<MasonryItem[]>([
+        const items = ref<FeedItem[]>([
             {
                 id: 1,
                 width: 500,
@@ -378,7 +378,7 @@ describe('useContainerPillInteractions', () => {
                 index: 0,
                 src: 'https://example.com/image1.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
             {
                 id: 2,
                 width: 500,
@@ -388,12 +388,12 @@ describe('useContainerPillInteractions', () => {
                 index: 1,
                 src: 'https://example.com/image2.jpg',
                 containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
-            } as MasonryItem,
+            } as FeedItem,
         ]);
 
         const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
         const masonry = ref({
-            removeMany: mockRemoveMany,
+            remove: mockRemoveMany,
         });
 
         const { handlePillClick } = useContainerPillInteractions(

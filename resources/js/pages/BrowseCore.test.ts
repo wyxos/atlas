@@ -90,83 +90,101 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
-            let currentPage: number | string | null = null;
+        props: ['items', 'getContent', 'page', 'restoredPages', 'pageSize', 'gapX', 'gapY', 'mode'],
+        emits: ['update:items'],
+        setup(
+            props: {
+                items: any[];
+                getContent?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }>;
+                page?: number | string;
+                restoredPages?: Array<number | string>;
+            },
+            { emit }: { emit: (event: string, value: any) => void }
+        ) {
             let nextPage: number | string | null = null;
+            let pagesLoaded: Array<number | string> = [];
             let hasReachedEnd = false;
-            let paginationHistory: Array<number | string> = [];
+
+            if (Array.isArray(props.restoredPages)) {
+                pagesLoaded = [...props.restoredPages];
+            } else if (props.page !== undefined && props.page !== null) {
+                pagesLoaded = [props.page];
+            }
 
             const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
                 mockInit(itemsToRestore, page, next);
                 props.items.splice(0, props.items.length, ...itemsToRestore);
                 emit('update:items', props.items);
-                currentPage = page;
                 nextPage = next ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
                 hasReachedEnd = nextPage === null;
+                pagesLoaded = [page];
             };
 
             const loadPage = async (page: number | string) => {
-                if (!props.getPage) {
+                if (!props.getContent) {
                     return;
                 }
-                currentPage = page;
-                const result = await props.getPage(page);
+                const result = await props.getContent(page);
                 const newItems = result?.items ?? [];
                 props.items.splice(0, props.items.length, ...newItems);
                 emit('update:items', props.items);
                 nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
                 hasReachedEnd = nextPage === null;
+                pagesLoaded = [page];
                 return result;
             };
 
-            const loadNext = async () => {
-                if (!props.getPage || nextPage === null || nextPage === undefined) {
+            const loadNextPage = async () => {
+                if (!props.getContent || nextPage === null || nextPage === undefined) {
                     return;
                 }
                 const pageToLoad = nextPage;
-                currentPage = pageToLoad;
-                const result = await props.getPage(pageToLoad);
+                const result = await props.getContent(pageToLoad);
                 const newItems = result?.items ?? [];
                 props.items.push(...newItems);
                 emit('update:items', props.items);
                 nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
                 hasReachedEnd = nextPage === null;
+                pagesLoaded = [...pagesLoaded, pageToLoad];
                 return result;
             };
 
             const reset = () => {
                 props.items.splice(0, props.items.length);
                 emit('update:items', props.items);
-                currentPage = null;
                 nextPage = null;
-                paginationHistory = [];
                 hasReachedEnd = false;
+                pagesLoaded = [];
             };
 
             const exposed = {
                 init: mockInit,
                 initialize,
                 refreshLayout: vi.fn(),
-                cancelLoad: mockCancelLoad,
+                cancel: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,
                 removeMany: mockRemoveMany,
                 restore: mockRestore,
                 restoreMany: mockRestoreMany,
                 loadPage,
-                loadNext,
+                loadNextPage,
+                undo: vi.fn(),
+                forget: vi.fn(),
                 reset,
             };
             Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
             Object.defineProperty(exposed, 'hasReachedEnd', { get: () => hasReachedEnd, enumerable: true });
-            Object.defineProperty(exposed, 'currentPage', { get: () => currentPage, enumerable: true });
-            Object.defineProperty(exposed, 'nextPage', { get: () => nextPage, enumerable: true });
-            Object.defineProperty(exposed, 'paginationHistory', { get: () => paginationHistory, enumerable: true });
+            Object.defineProperty(exposed, 'nextPage', {
+                get: () => nextPage,
+                set: (val: number | string | null) => { nextPage = val; },
+                enumerable: true,
+            });
+            Object.defineProperty(exposed, 'pagesLoaded', {
+                get: () => pagesLoaded,
+                set: (val: Array<number | string>) => { pagesLoaded = val; },
+                enumerable: true,
+            });
             return exposed;
         },
     },
@@ -252,15 +270,12 @@ describe('Browse - Core', () => {
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
-        expect(masonry.props('layoutMode')).toBe('auto');
-        expect(masonry.props('mobileBreakpoint')).toBe(768);
-        // Atlas uses manual init and triggers page loads explicitly.
-        expect(masonry.props('init')).toBe('manual');
-        expect(masonry.props('layout')).toEqual({
-            gutterX: 12,
-            gutterY: 12,
-            sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
-        });
+        expect(masonry.props('page')).toBe(1);
+        expect(typeof masonry.props('getContent')).toBe('function');
+        expect(masonry.props('pageSize')).toBe(20);
+        expect(masonry.props('gapX')).toBe(12);
+        expect(masonry.props('gapY')).toBe(12);
+        expect(masonry.props('mode')).toBe('backfill');
     });
 
     it('provides getPage function that fetches from API', async () => {
@@ -618,10 +633,11 @@ describe('Browse - Core', () => {
         expect(vm.activeTabId).toBe(tabId);
 
         const tabContentVm = await waitForTabContent(wrapper);
-        if (tabContentVm) {
-            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
-            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(nextParam);
-        }
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        // Restoration sets `startPageToken` to the saved next cursor (when available).
+        expect(masonry.props('page')).toBe(nextParam);
+        expect(masonry.props('restoredPages')).toEqual([1]);
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 
@@ -684,8 +700,8 @@ describe('Browse - Core', () => {
 
         tabContentVm.items = [{ id: '1' }, { id: '2' }, { id: '3' }];
         if (tabContentVm.masonry) {
-            tabContentVm.masonry.currentPage = 2;
-            tabContentVm.masonry.paginationHistory = ['cursor-123'];
+            tabContentVm.masonry.pagesLoaded = [1, 2];
+            tabContentVm.masonry.nextPage = 'cursor-123';
         }
 
         await wrapper.vm.$nextTick();
@@ -712,7 +728,7 @@ describe('Browse - Core', () => {
 
         const tabContentVm = await waitForTabContent(wrapper);
         if (tabContentVm?.masonry) {
-            tabContentVm.masonry.paginationHistory = [];
+            tabContentVm.masonry.nextPage = null;
             await wrapper.vm.$nextTick();
 
             const nextPill = wrapper
@@ -770,10 +786,9 @@ describe('Browse - Core', () => {
 
         await waitForStable(wrapper);
 
-        const tabContentVm = getTabContent(wrapper);
-        if (tabContentVm) {
-            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
-        }
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        expect(masonry.props('page')).toBe(pageParam);
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 
@@ -820,10 +835,9 @@ describe('Browse - Core', () => {
 
         await waitForStable(wrapper);
 
-        const tabContentVm = getTabContent(wrapper);
-        if (tabContentVm) {
-            expect(tabContentVm.masonry?.currentPage).toBe(pageValue);
-        }
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        expect(masonry.props('page')).toBe(pageValue);
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 });

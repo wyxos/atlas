@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref, nextTick } from 'vue';
 import { useContainerBadges } from './useContainerBadges';
-import type { MasonryItem } from './useTabs';
+import type { FeedItem } from './useTabs';
 
 describe('useContainerBadges', () => {
     beforeEach(() => {
@@ -14,19 +14,19 @@ describe('useContainerBadges', () => {
 
     describe('Caching optimizations', () => {
         it('caches container counts for O(1) lookup', async () => {
-            const items = ref<MasonryItem[]>([
+            const items = ref<FeedItem[]>([
                 {
                     id: 1,
                     containers: [{ id: 10, type: 'gallery' }],
-                } as MasonryItem,
+                } as FeedItem,
                 {
                     id: 2,
                     containers: [{ id: 10, type: 'gallery' }],
-                } as MasonryItem,
+                } as FeedItem,
                 {
                     id: 3,
                     containers: [{ id: 10, type: 'gallery' }],
-                } as MasonryItem,
+                } as FeedItem,
             ]);
 
             const { getItemCountForContainerId } = useContainerBadges(items);
@@ -43,11 +43,11 @@ describe('useContainerBadges', () => {
         });
 
         it('rebuilds cache when items change', async () => {
-            const items = ref<MasonryItem[]>([
+            const items = ref<FeedItem[]>([
                 {
                     id: 1,
                     containers: [{ id: 10, type: 'gallery' }],
-                } as MasonryItem,
+                } as FeedItem,
             ]);
 
             const { getItemCountForContainerId } = useContainerBadges(items);
@@ -61,7 +61,7 @@ describe('useContainerBadges', () => {
             items.value.push({
                 id: 2,
                 containers: [{ id: 10, type: 'gallery' }],
-            } as MasonryItem);
+            } as FeedItem);
 
             // Wait for Vue reactivity and watchers to process
             // The watch defers rebuildCaches to nextTick, so we need to wait for it
@@ -73,15 +73,15 @@ describe('useContainerBadges', () => {
         });
 
         it('uses Map-based lookup for isSiblingItem', async () => {
-            const items = ref<MasonryItem[]>([
+            const items = ref<FeedItem[]>([
                 {
                     id: 1,
                     containers: [{ id: 10, type: 'gallery' }],
-                } as MasonryItem,
+                } as FeedItem,
                 {
                     id: 2,
                     containers: [{ id: 20, type: 'album' }],
-                } as MasonryItem,
+                } as FeedItem,
             ]);
 
             const { isSiblingItem, setHoveredContainerId } = useContainerBadges(items);
@@ -99,32 +99,32 @@ describe('useContainerBadges', () => {
 
     describe('Debounced hover state', () => {
         it('debounces hover state changes', () => {
-            const items = ref<MasonryItem[]>([]);
+            const items = ref<FeedItem[]>([]);
             const { setHoveredContainerId, getMasonryItemClasses } = useContainerBadges(items);
 
             // Set hover state
             setHoveredContainerId(10);
 
             // Immediately check - should not be updated yet (debounced)
-            const classesBefore = getMasonryItemClasses.value(items.value[0] || { id: 1 } as MasonryItem);
+            const classesBefore = getMasonryItemClasses.value(items.value[0] || { id: 1 } as FeedItem);
             expect(classesBefore).not.toContain('border-smart-blue-500');
 
             // Advance timer past debounce delay
             vi.advanceTimersByTime(60);
 
             // Now should be updated
-            const classesAfter = getMasonryItemClasses.value(items.value[0] || { id: 1 } as MasonryItem);
+            const classesAfter = getMasonryItemClasses.value(items.value[0] || { id: 1 } as FeedItem);
             // Note: classesAfter might still not contain the border if item doesn't have container 10
             // But the debounced value should be set
             expect(classesAfter).toContain('border-2');
         });
 
         it('updates immediately when clearing hover (no debounce)', () => {
-            const items = ref<MasonryItem[]>([
+            const items = ref<FeedItem[]>([
                 {
                     id: 1,
                     containers: [{ id: 10, type: 'gallery' }],
-                } as MasonryItem,
+                } as FeedItem,
             ]);
 
             const { setHoveredContainerId, getMasonryItemClasses } = useContainerBadges(items);
@@ -142,7 +142,7 @@ describe('useContainerBadges', () => {
         });
 
         it('cancels previous debounce when hover changes rapidly', () => {
-            const items = ref<MasonryItem[]>([]);
+            const items = ref<FeedItem[]>([]);
             const { setHoveredContainerId } = useContainerBadges(items);
 
             // Rapid hover changes
@@ -161,15 +161,15 @@ describe('useContainerBadges', () => {
     describe('Performance with large arrays', () => {
         it('handles 3000+ items efficiently', async () => {
             // Create a large array of items
-            const largeItems: MasonryItem[] = [];
+            const largeItems: FeedItem[] = [];
             for (let i = 0; i < 3000; i++) {
                 largeItems.push({
                     id: i,
                     containers: [{ id: Math.floor(i / 100), type: 'gallery' }],
-                } as MasonryItem);
+                } as FeedItem);
             }
 
-            const items = ref<MasonryItem[]>(largeItems);
+            const items = ref<FeedItem[]>(largeItems);
             const { getItemCountForContainerId } = useContainerBadges(items);
 
             // Wait for cache to be built
@@ -188,14 +188,14 @@ describe('useContainerBadges', () => {
 
     describe('Container ordering', () => {
         it('sorts containers by type priority (User before Post)', () => {
-            const items = ref<MasonryItem[]>([
+            const items = ref<FeedItem[]>([
                 {
                     id: 1,
                     containers: [
                         { id: 2, type: 'Post' },
                         { id: 1, type: 'User' },
                     ],
-                } as MasonryItem,
+                } as FeedItem,
             ]);
 
             const { getContainersForItem } = useContainerBadges(items);
@@ -210,7 +210,7 @@ describe('useContainerBadges', () => {
         });
 
         it('sorts containers by ID when types have same priority', () => {
-            const items = ref<MasonryItem[]>([
+            const items = ref<FeedItem[]>([
                 {
                     id: 1,
                     containers: [
@@ -218,7 +218,7 @@ describe('useContainerBadges', () => {
                         { id: 1, type: 'album' },
                         { id: 2, type: 'gallery' },
                     ],
-                } as MasonryItem,
+                } as FeedItem,
             ]);
 
             const { getContainersForItem } = useContainerBadges(items);
@@ -235,14 +235,14 @@ describe('useContainerBadges', () => {
         });
 
         it('sorts User before Post even when Post has lower ID', () => {
-            const items = ref<MasonryItem[]>([
+            const items = ref<FeedItem[]>([
                 {
                     id: 1,
                     containers: [
                         { id: 1, type: 'Post' },
                         { id: 2, type: 'User' },
                     ],
-                } as MasonryItem,
+                } as FeedItem,
             ]);
 
             const { getContainersForItem } = useContainerBadges(items);

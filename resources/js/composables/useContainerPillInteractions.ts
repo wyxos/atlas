@@ -1,8 +1,8 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue';
-import type { MasonryItem } from './useTabs';
+import type { FeedItem } from './useTabs';
 import { queueBatchReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
-import type { Masonry } from '@wyxos/vibe';
+import { Masonry } from '@wyxos/vibe';
 import { useBrowseForm } from './useBrowseForm';
 
 type Container = {
@@ -29,7 +29,7 @@ function isContainerEntry(container: ContainerEntry): container is Container {
  * Composable for handling container pill interactions (clicks, batch reactions, etc.).
  */
 export function useContainerPillInteractions(
-    items: Ref<MasonryItem[]>,
+    items: Ref<FeedItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tabId: number | undefined | ComputedRef<number | undefined>,
     onReaction: (fileId: number, type: ReactionType) => void
@@ -43,7 +43,7 @@ export function useContainerPillInteractions(
     /**
      * Get full container data for an item (including referrer URL).
      */
-    function getContainersForItem(item: MasonryItem): Container[] {
+    function getContainersForItem(item: FeedItem): Container[] {
         const containers = (item.containers as ContainerEntry[] | undefined) ?? [];
         return containers.filter(isContainerEntry);
     }
@@ -51,7 +51,7 @@ export function useContainerPillInteractions(
     /**
      * Get all sibling items (items with the same container ID).
      */
-    function getSiblingItems(containerId: number): MasonryItem[] {
+    function getSiblingItems(containerId: number): FeedItem[] {
         return items.value.filter((item) => {
             const containers = getContainersForItem(item);
             return containers.some((container) => container.id === containerId);
@@ -85,28 +85,17 @@ export function useContainerPillInteractions(
             return;
         }
 
-        // IMPORTANT: Capture indices BEFORE removing items (only needed in online mode)
-        // Collect items with their original indices for batch restore (before removal)
-        const itemsToRestore = !isLocal.value
-            ? siblings.map((item) => {
-                const itemIndex = items.value.findIndex((i) => i.id === item.id);
-                return { item, index: itemIndex !== -1 ? itemIndex : items.value.length };
-            })
-            : [];
-
         // Only remove from masonry in online mode (not in local mode)
+        // Vibe tracks removals and restores internally; restoring does not require indices.
         if (!isLocal.value) {
-            await masonry.value?.removeMany(siblings);
+            await masonry.value?.remove(siblings);
         }
 
         // Create batch restore callback (only in online mode)
         const currentTabId = tabIdValue.value;
         const batchRestoreCallback = !isLocal.value && currentTabId !== undefined
             ? async () => {
-                // Restore all items in the batch directly using masonry
-                const items = itemsToRestore.map(({ item }) => item);
-                const indices = itemsToRestore.map(({ index }) => index);
-                await masonry.value?.restoreMany(items, indices);
+                await masonry.value?.restore(siblings);
             }
             : undefined;
 

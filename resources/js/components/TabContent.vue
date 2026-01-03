@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue';
-import type { TabData, MasonryItem } from '@/composables/useTabs';
-import { Masonry, MasonryItem as VibeMasonryItem } from '@wyxos/vibe';
+import type { TabData, FeedItem } from '@/composables/useTabs';
+import { Masonry, MasonryItem } from '@wyxos/vibe';
+import type { MasonryInstance } from '@wyxos/vibe';
 import {
     ChevronDown,
     Copy,
-    Image,
     Info,
     Loader2,
     Play,
     TestTube,
-    Video,
     X
 } from 'lucide-vue-next';
 import FileViewer from './FileViewer.vue';
@@ -29,7 +28,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from './ui/dialog';
-import { useBackfill } from '@/composables/useBackfill';
 import { useBrowseService } from '@/composables/useBrowseService';
 import { useContainerBadges } from '@/composables/useContainerBadges';
 import { useContainerPillInteractions } from '@/composables/useContainerPillInteractions';
@@ -56,7 +54,7 @@ interface Props {
     onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
-    updateActiveTab: (items: MasonryItem[]) => void;
+    updateActiveTab: (items: FeedItem[]) => void;
 }
 
 const props = defineProps<Props>();
@@ -68,7 +66,7 @@ const emit = defineEmits<{
 // Local state for this tab
 // Use shallowRef to reduce Vue reactivity overhead with large arrays (3k+ items)
 // This prevents deep reactivity tracking on each item, significantly improving performance
-const items = shallowRef<MasonryItem[]>([]);
+const items = shallowRef<FeedItem[]>([]);
 
 // Diagnostic: Log item size analysis when items change (only in dev mode)
 watch(
@@ -85,14 +83,31 @@ watch(
     { immediate: true, deep: false }
 );
 
-const masonry = ref<InstanceType<typeof Masonry> | null>(null);
+const masonry = ref<MasonryInstance | null>(null);
 const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
 
-const masonryContext = computed(() => ({
-    ...form.getData(),
-}));
+const masonryRenderKey = ref(0);
+const startPageToken = ref<number | string>(1);
+const restoredPages = ref<number[] | null>(null);
+
+// Track which items have successfully preloaded so overlays can gate UI like the old implementation did.
+const preloadedItemIds = ref<Set<number>>(new Set());
+
+function markItemsPreloaded(batch: FeedItem[]): void {
+    const next = new Set(preloadedItemIds.value);
+    for (const it of batch) {
+        if (typeof it?.id === 'number') {
+            next.add(it.id);
+        }
+    }
+    preloadedItemIds.value = next;
+}
+
+function isItemPreloaded(itemId: number): boolean {
+    return preloadedItemIds.value.has(itemId);
+}
 
 // Internal tab data - loaded from API
 const tab = ref<TabData | null>(null);
@@ -115,39 +130,6 @@ const { availableServices: localServices, availableSources, fetchServices, fetch
 const availableServices = computed(() => {
     return props.availableServices.length > 0 ? props.availableServices : localServices.value;
 });
-
-
-
-// Backfill state and handlers
-const {
-    backfill,
-    onBackfillStart,
-    onBackfillTick: onBackfillTickOriginal,
-    onBackfillStop: onBackfillStopOriginal,
-    onBackfillRetryStart,
-    onBackfillRetryTick,
-    onBackfillRetryStop,
-} = useBackfill();
-
-// Wrap onBackfillTick to update form pagination state during backfill
-function onBackfillTick(payload: { fetched: number; target: number; calls: number; remainingMs: number; totalMs: number; currentPage: any; nextPage: any }): void {
-    onBackfillTickOriginal(payload);
-
-    // Update form.data.page and form.data.next from backfill event payload
-    // This keeps the form in sync with masonry pagination state during backfill
-    form.data.page = payload.currentPage;
-    form.data.next = payload.nextPage;
-}
-
-// Wrap onBackfillStop to call original handler (backfill still needs its handler)
-// Also update form.data.page and form.data.next from backfill event payload
-function onBackfillStop(payload: { fetched: number; calls: number; cancelled?: boolean; currentPage: any; nextPage: any }): void {
-    onBackfillStopOriginal(payload);
-
-    // Update form.data.page and form.data.next from backfill event payload
-    form.data.page = payload.currentPage;
-    form.data.next = payload.nextPage;
-}
 
 // Accumulate moderation data from each page load
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
@@ -247,44 +229,48 @@ async function getPage(page: number | string, context?: BrowseFormData) {
         params.next = page;
     }
 
-    const { data } = await window.axios.get(browseIndex.url({ query: params }));
+    handleLoadingStart();
+    try {
+        const { data } = await window.axios.get(browseIndex.url({ query: params }));
 
-    // update next value
+        // Keep the form pagination state in sync for persistence.
+        form.data.next = data.nextPage;
 
-
-    return {
-        items: data.items || [],
-        nextPage: data.nextPage,
-    };
+        return {
+            items: data.items || [],
+            nextPage: data.nextPage,
+        };
+    } finally {
+        // Best-effort: Masonry no longer emits loading:stop, so we stop here.
+        handleLoadingStop();
+    }
 }
 
 async function applyFilters() {
-    // cancel ongoing load
-    masonry.value.cancelLoad();
-    // reset
-    masonry.value.reset();
+    // Best-effort cancel/reset: remount Masonry.
     shouldShowForm.value = false;
     form.data.page = 1;
     form.data.next = null;
+    items.value = [];
+    preloadedItemIds.value = new Set();
+    restoredPages.value = null;
+    startPageToken.value = 1;
+    masonryRenderKey.value += 1;
     // Wait for next tick to ensure form data updates are reactive
     await nextTick();
-    await masonry.value.loadPage(1)
 }
 
 async function applyService() {
     shouldShowForm.value = false;
-    masonry.value.reset();
     form.data.next = null;
-    await masonry.value.loadPage(1);
+    items.value = [];
+    preloadedItemIds.value = new Set();
+    restoredPages.value = null;
+    startPageToken.value = 1;
+    masonryRenderKey.value += 1;
 }
 
 function onMasonryClick(e: MouseEvent): void {
-    // Check for ALT + mouse button combinations for quick reactions
-    if (e.altKey) {
-        handleAltClickOnMasonry(e);
-        return;
-    }
-
     // Normal click behavior - open overlay (only for left click)
     if (e.button === 0 || (e.type === 'click' && !e.button)) {
         fileViewer.value?.openFromClick(e);
@@ -292,41 +278,10 @@ function onMasonryClick(e: MouseEvent): void {
 }
 
 function onMasonryMouseDown(e: MouseEvent): void {
-    // Handle ALT + Middle Click (mousedown event needed for middle button)
-    if (e.altKey && e.button === 1) {
-        handleAltClickOnMasonry(e);
-    }
     // Prevent browser scroll for middle click (without ALT) - actual opening happens on auxclick
     if (!e.altKey && e.button === 1) {
         e.preventDefault();
         e.stopPropagation();
-    }
-}
-
-// Wrapper for handleAltClickOnMasonry that finds the item from the DOM
-function handleAltClickOnMasonry(e: MouseEvent): void {
-    const container = masonryContainer.value;
-    if (!container) return;
-
-    const target = e.target as HTMLElement | null;
-    if (!target) return;
-
-    // Find the nearest masonry item element
-    const itemEl = target.closest('.masonry-item') as HTMLElement | null;
-    if (!itemEl || !container.contains(itemEl)) return;
-
-    // Find the masonry item data using the key
-    const itemKeyAttr = itemEl.getAttribute('data-key');
-    if (itemKeyAttr) {
-        // Match by key (provided by backend) - iterate items array for key lookup (key not in Map)
-        // This is less common than id lookup, so O(n) is acceptable here
-        for (let i = 0; i < items.value.length; i++) {
-            const item = items.value[i];
-            if (item.key === itemKeyAttr) {
-                masonryInteractions.handleAltClickReaction(e, item, i);
-                return;
-            }
-        }
     }
 }
 
@@ -412,14 +367,12 @@ function handleModerationRulesChanged(): void {
 
 // Cancel masonry loading
 function cancelMasonryLoad(): void {
-    masonry.value?.cancelLoad();
+    masonry.value?.cancel?.();
 }
 
 // Load next page manually (used by both button click and carousel load more)
 async function loadNextPage(): Promise<void> {
-    if (masonry.value && !masonry.value.isLoading && !masonry.value.hasReachedEnd) {
-        await masonry.value.loadNext();
-    }
+    await masonry.value?.loadNextPage?.();
 }
 
 
@@ -427,8 +380,9 @@ async function loadNextPage(): Promise<void> {
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
 
 // Event handlers for masonry items
-function handleMasonryItemMouseEnter(index: number, itemId: number): void {
-    hoveredItemIndex.value = index;
+function handleMasonryItemMouseEnter(itemId: number): void {
+    const index = items.value.findIndex((i) => i.id === itemId);
+    hoveredItemIndex.value = index === -1 ? null : index;
     hoveredItemId.value = itemId;
 
     // Freeze auto-dislike queue only if hovering over an item with an active countdown
@@ -467,10 +421,7 @@ function handleFileViewerClose(): void {
  * Handle when item is both fully in view AND media is loaded.
  * This is when we should increment preview count and check for auto-dislike.
  */
-async function handleItemInViewAndLoaded(payload: {
-    type: 'image' | 'video';
-    src: string
-}, item: MasonryItem): Promise<void> {
+async function handleItemInViewAndLoaded(item: FeedItem): Promise<void> {
     const itemId = item.id;
     if (itemId) {
         // Increment preview count when item is fully in view AND media is loaded
@@ -495,7 +446,24 @@ async function handleItemInViewAndLoaded(payload: {
     }
 }
 
-function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
+async function handleItemPreloaded(item: FeedItem): Promise<void> {
+    // Vibe loader success is gated by intersection >= 0.5, so this matches the old intent.
+    await handleItemInViewAndLoaded(item);
+}
+
+function handleBatchPreloaded(batch: FeedItem[]): void {
+    markItemsPreloaded(batch);
+    for (const it of batch) {
+        void handleItemPreloaded(it);
+    }
+}
+
+function handleBatchFailures(_payloads: Array<{ item: FeedItem; error: unknown }>): void {
+    // Intentionally no-op for now; per-item errors can still show via Vibe loader UI.
+    void _payloads;
+}
+
+function handleMasonryItemAuxClick(e: MouseEvent, item: FeedItem): void {
     masonryInteractions.handleMasonryItemAuxClick(e, item);
 }
 
@@ -540,11 +508,11 @@ function handlePillDismiss(container: {
     handleContainerBan(container);
 }
 
-function handlePromptDialogClick(item: MasonryItem): void {
+function handlePromptDialogClick(item: FeedItem): void {
     promptData.openPromptDialog(item);
 }
 
-function handleFileReaction(itemId: number, type: ReactionType, remove: (item: MasonryItem) => void, index?: number): void {
+function handleFileReaction(itemId: number, type: ReactionType, remove: (() => void) | ((item: FeedItem) => void), index?: number): void {
     void remove;
     // Cancel auto-dislike countdown if user reacts manually
     autoDislikeQueue.cancelAutoDislikeCountdown(itemId);
@@ -586,15 +554,11 @@ function handleLoadingStart(): void {
     }
 }
 
-function handleLoadingStop(payload: { fetched: number; currentPage: any; nextPage: any }): void {
+function handleLoadingStop(): void {
     emit('update:loading', false);
     if (props.onLoadingChange) {
         props.onLoadingChange(false);
     }
-
-    // Update form.data.page and form.data.next from loading event payload
-    form.data.page = payload.currentPage;
-    form.data.next = payload.nextPage;
 
     // Also call onLoadingStop for moderation toast handling
     onLoadingStop();
@@ -616,35 +580,56 @@ onMounted(async () => {
 
         form.syncFromTab(tab.value);
 
-        // Check if params is not an empty object (has keys) - means a search has been applied
-        if (tab.value && tab.value.params && Object.keys(tab.value.params).length > 0) {
-            // Scenario 2: Restore items and pagination state
-            // Wait for masonry to be fully mounted
-            await nextTick();
+        const params = (tab.value?.params ?? {}) as Record<string, unknown>;
 
-            if (masonry.value && tab.value) {
-                // Hide form since we're restoring a search
-                shouldShowForm.value = false;
-                isTabRestored.value = true;
+        const itemsToRestore = Array.isArray(data.tab.items) ? data.tab.items : [];
+        const hasRestoredItems = itemsToRestore.length > 0;
 
-                // Get items from API response (backend returns items under tab)
-                const itemsToRestore = data.tab.items || [];
-                const currentPage = tab.value.params.page || 1;
-                const nextPage = tab.value.params.next || null;
+        const hasMeaningfulParams = Object.keys(params).length > 0;
+        const shouldRestoreUi = hasRestoredItems || hasMeaningfulParams;
 
-                // Restore items and pagination state to masonry
-                // Even if itemsToRestore is empty, we restore pagination state so masonry knows where to continue
-                masonry.value.initialize(
-                    itemsToRestore,
-                    currentPage,
-                    nextPage
+        if (shouldRestoreUi) {
+            // Restore items + pagination state.
+            // Hide form since we're resuming a previous session/search.
+            shouldShowForm.value = false;
+            isTabRestored.value = hasRestoredItems;
+
+            const savedPage = params.page as string | number | null | undefined;
+            const savedNext = params.next as string | number | null | undefined;
+            const parsedPage = typeof savedPage === 'number' ? savedPage : Number(savedPage);
+            const lastLoadedPage = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.floor(parsedPage) : 1;
+
+            items.value = itemsToRestore as FeedItem[];
+            preloadedItemIds.value = new Set();
+
+            if (hasRestoredItems) {
+                // Inform Vibe Masonry that items are restored, so it doesn't refetch on mount.
+                // If the backend didn't include per-item page values, fall back to the tab's last page.
+                const restored = Array.from(
+                    new Set<number>(
+                        (itemsToRestore as FeedItem[])
+                            .map((it) => Number((it as any).page))
+                            .filter((p) => Number.isFinite(p) && p > 0)
+                    )
                 );
+                restoredPages.value = restored.length ? restored : [lastLoadedPage];
 
-                if (tab.value.params.feed === 'local') {
-                    // In local feed, we need to load the first page to kick off loading
-                    await masonry.value.loadPage(currentPage);
-                }
+                // Resume pagination using the saved next token when present; otherwise fall back to saved page.
+                // (In this UI we call these fields page/next; they may be numeric pages or string tokens.)
+                startPageToken.value = (savedNext ?? savedPage ?? lastLoadedPage) as string | number;
+            } else {
+                // No items to restore.
+                // If we have a saved next token, treat the first page as already loaded so Masonry doesn't refetch.
+                // Otherwise allow normal initial load/backfill.
+                restoredPages.value = savedNext != null ? [lastLoadedPage] : null;
+                startPageToken.value = (savedNext ?? savedPage ?? 1) as string | number;
             }
+
+            // Ensure Masonry is remounted after restoring state.
+            masonryRenderKey.value += 1;
+
+            // Let the DOM catch up before any follow-up work.
+            await nextTick();
         }
     }
 
@@ -659,7 +644,6 @@ onUnmounted(() => {
 
 });
 
-// Expose getPage for testing
 defineExpose({
     // Expose compatibility fields used by some Browse tests
     selectedService,
@@ -667,7 +651,7 @@ defineExpose({
     hasServiceSelected,
     loadAtPage,
     isTabRestored,
-    masonry, // Expose masonry for tests to access currentPage
+    masonry,
 });
 </script>
 
@@ -681,7 +665,7 @@ defineExpose({
                 <div>
                     <Select :model-value="form.data.feed"
                         @update:model-value="(val: string) => { form.data.feed = val as 'online' | 'local'; }"
-                        :disabled="masonry.isLoading">
+                        :disabled="masonry?.isLoading">
                         <SelectTrigger class="w-[120px]" data-test="source-type-select-trigger">
                             <SelectValue placeholder="Online" />
                         </SelectTrigger>
@@ -693,7 +677,7 @@ defineExpose({
                 </div>
                 <!-- Service Dropdown (only show when feed is 'online') -->
                 <div v-if="form.data.feed === 'online'" class="flex-1">
-                    <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
+                    <Select v-model="form.data.service" :disabled="masonry?.isLoading">
                         <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
@@ -707,7 +691,7 @@ defineExpose({
                 </div>
                 <!-- Source Dropdown (only show when feed is 'local') -->
                 <div v-if="form.data.feed === 'local'" class="flex-1">
-                    <Select v-model="form.data.source" :disabled="masonry?.isLoading ?? false">
+                    <Select v-model="form.data.source" :disabled="masonry?.isLoading">
                         <SelectTrigger class="w-[200px]" data-test="source-select-trigger">
                             <SelectValue placeholder="Select a source..." />
                         </SelectTrigger>
@@ -724,10 +708,10 @@ defineExpose({
                     @reset="handleResetFilters" @apply="applyFilters" />
 
                 <!-- Moderation Rules Button (Info) -->
-                <ModerationRulesManager :disabled="masonry.isLoading" @rules-changed="handleModerationRulesChanged" />
+                <ModerationRulesManager :disabled="masonry?.isLoading" @rules-changed="handleModerationRulesChanged" />
 
                 <!-- Container Blacklists Button (Warning) -->
-                <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry.isLoading"
+                <ContainerBlacklistManager ref="containerBlacklistManager" :disabled="masonry?.isLoading"
                     @blacklists-changed="handleModerationRulesChanged" />
 
                 <!-- Cancel Loading Button -->
@@ -739,14 +723,14 @@ defineExpose({
                 <!-- Load Next Page Button -->
                 <Button @click="loadNextPage" size="sm" variant="ghost" class="h-10 w-10"
                     data-test="load-next-page-button" title="Load next page"
-                    :disabled="masonry.isLoading || masonry.hasReachedEnd">
+                    :disabled="masonry?.isLoading || masonry?.hasReachedEnd">
                     <ChevronDown :size="14" />
                 </Button>
 
                 <!-- Apply Service Button -->
                 <Button @click="applyService" size="sm" class="h-10 w-10" data-test="apply-service-button"
-                    :loading="masonry.isLoading"
-                    :disabled="masonry.isLoading || (form.data.feed === 'online' && !form.data.service)"
+                    :loading="masonry?.isLoading"
+                    :disabled="masonry?.isLoading || (form.data.feed === 'online' && !form.data.service)"
                     title="Apply selected service">
                     <Play :size="14" />
                 </Button>
@@ -754,205 +738,144 @@ defineExpose({
         </div>
 
         <!-- Masonry Content -->
-        <div class="flex-1 min-h-0">
+        <div class="flex-1 min-h-0 overflow-hidden">
             <!-- Masonry -->
-            <div class="relative h-full masonry-container" ref="masonryContainer" @click="onMasonryClick"
+            <div class="relative flex h-full min-h-0 flex-col overflow-hidden masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
-                <Masonry :key="tab.id" ref="masonry" v-model:items="items" :get-page="getPage" :context="masonryContext"
-                    :page-size="Number(form.data.limit) || 20" :layout="layout" layout-mode="auto"
-                    :mobile-breakpoint="768" init="manual" :mode="form.data.feed === 'local' ? 'refresh' : 'backfill'"
-                    :backfill-delay-ms="2000" :backfill-max-calls="Infinity" @loading:start="handleLoadingStart"
-                    @backfill:start="onBackfillStart" @backfill:tick="onBackfillTick" @backfill:stop="onBackfillStop"
-                    @backfill:retry-start="onBackfillRetryStart" @backfill:retry-tick="onBackfillRetryTick"
-                    @backfill:retry-stop="onBackfillRetryStop" @loading:stop="handleLoadingStop"
-                    data-test="masonry-component">
-                    <!-- Loading message slot - show form for new tabs -->
-                    <template #loading-message>
-                        <div v-if="shouldShowForm" class="flex items-center justify-center h-full"
-                            data-test="new-tab-form">
-                            <div
-                                class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
-                                <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
-                                <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click
-                                    play to
-                                    begin</p>
+                <div v-if="shouldShowForm" class="flex items-center justify-center h-full" data-test="new-tab-form">
+                    <div
+                        class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
+                        <h2 class="text-xl font-semibold text-twilight-indigo-100 mb-2">Start Browsing</h2>
+                        <p class="text-sm text-twilight-indigo-300 mb-6 text-center">Select a service and click play to begin</p>
 
-                                <!-- Online/Local Switch -->
-                                <div class="w-full flex items-center justify-between">
-                                    <label class="block text-sm font-medium text-twilight-indigo-200">Source</label>
-                                    <div class="flex items-center gap-3">
-                                        <span class="text-sm text-twilight-indigo-300"
-                                            :class="{ 'text-twilight-indigo-100 font-medium': !form.isLocalMode.value }">Online</span>
-                                        <Switch :model-value="form.isLocalMode.value"
-                                            @update:model-value="(val: boolean) => form.isLocalMode.value = val"
-                                            data-test="source-type-switch" />
-                                        <span class="text-sm text-twilight-indigo-300"
-                                            :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Local</span>
-                                    </div>
-                                </div>
-
-                                <!-- Service Dropdown (only show when Online) -->
-                                <div v-if="form.data.feed === 'online'" class="w-full">
-                                    <label
-                                        class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
-                                    <Select v-model="form.data.service" :disabled="masonry?.isLoading ?? false">
-                                        <SelectTrigger class="w-full" data-test="service-select-trigger">
-                                            <SelectValue placeholder="Select a service..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem
-                                                v-for="service in availableServices.filter(s => s.key !== 'local')"
-                                                :key="service.key" :value="service.key" data-test="service-select-item">
-                                                {{ service.label }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <!-- Source Dropdown (only show when Local) -->
-                                <div v-if="form.data.feed === 'local'" class="w-full">
-                                    <label
-                                        class="block text-sm font-medium text-twilight-indigo-200 mb-2">Source</label>
-                                    <Select v-model="form.data.source" :disabled="masonry?.isLoading ?? false">
-                                        <SelectTrigger class="w-full" data-test="source-select-trigger">
-                                            <SelectValue placeholder="Select a source..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem v-for="source in availableSources" :key="source" :value="source"
-                                                data-test="source-select-item">
-                                                {{ source }}
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <!-- Action Buttons -->
-                                <div class="flex gap-3 w-full mt-2 items-center">
-                                    <!-- Play Button -->
-                                    <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
-                                        :disabled="form.data.feed === 'online' && !form.data.service">
-                                        <Play :size="16" />
-                                    </Button>
-                                </div>
+                        <!-- Online/Local Switch -->
+                        <div class="w-full flex items-center justify-between">
+                            <label class="block text-sm font-medium text-twilight-indigo-200">Source</label>
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm text-twilight-indigo-300"
+                                    :class="{ 'text-twilight-indigo-100 font-medium': !form.isLocalMode.value }">Online</span>
+                                <Switch :model-value="form.isLocalMode.value"
+                                    @update:model-value="(val: boolean) => form.isLocalMode.value = val"
+                                    data-test="source-type-switch" />
+                                <span class="text-sm text-twilight-indigo-300"
+                                    :class="{ 'text-twilight-indigo-100 font-medium': form.isLocalMode.value }">Local</span>
                             </div>
                         </div>
-                    </template>
-                    <template #default="{ item, index, remove }">
-                        <!-- Pass item directly to preserve object reference for Vibe's FLIP animation tracking -->
-                        <!-- Vibe tracks items by object reference, so we must use the item prop directly -->
-                        <VibeMasonryItem :item="item" :remove="remove" :preload-threshold="0.5"
-                            @mouseenter="handleMasonryItemMouseEnter(index, item.id)"
-                            @mouseleave="handleMasonryItemMouseLeave"
-                            @in-view-and-loaded="(payload: { type: 'image' | 'video'; src: string }) => handleItemInViewAndLoaded(payload, item)">
-                            <template
-                                #default="{ item: slotItem, imageLoaded, imageError, isLoading, showMedia, imageSrc, mediaType }">
-                                <!-- Use item from slot props (reactive) instead of outer scope item (may be stale) -->
-                                <div class="relative w-full h-full overflow-hidden rounded-lg group masonry-item bg-prussian-blue-500 transition-[opacity,border-color] duration-300 ease-in-out"
-                                    :data-key="slotItem.key" :data-masonry-item-id="slotItem.id" :class="[
-                                        containerBadges.getMasonryItemClasses.value(slotItem),
-                                        // Visual treatment for reacted items in local mode (gray out, overlay)
-                                        form.data.feed === 'local' && slotItem.reaction ? 'opacity-60 grayscale-[0.3]' : ''
-                                    ]"
-                                    @mousedown="(e: MouseEvent) => masonryInteractions.handleMasonryItemMouseDown(e)"
-                                    @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, slotItem)">
-                                    <!-- Placeholder background - icon by default (before preloading starts) -->
-                                    <!-- Note: Vibe's MasonryItem provides this, but we override for dark theme -->
-                                    <div v-if="!imageLoaded && !imageError" :class="[
-                                        'absolute inset-0 flex items-center justify-center transition-opacity duration-500',
-                                        showMedia ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                                    ]">
-                                        <!-- Media type indicator badge - shown BEFORE preloading starts -->
-                                        <div
-                                            class="w-12 h-12 rounded-full bg-prussian-blue-700/80 backdrop-blur-sm flex items-center justify-center shadow-sm border border-twilight-indigo-500/30">
-                                            <Image v-if="mediaType === 'image'" :size="20"
-                                                class="text-twilight-indigo-300" />
-                                            <Video v-else-if="mediaType === 'video'" :size="20"
-                                                class="text-twilight-indigo-300" />
+
+                        <!-- Service Dropdown (only show when Online) -->
+                        <div v-if="form.data.feed === 'online'" class="w-full">
+                            <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
+                            <Select v-model="form.data.service" :disabled="masonry?.isLoading">
+                                <SelectTrigger class="w-full" data-test="service-select-trigger">
+                                    <SelectValue placeholder="Select a service..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="service in availableServices.filter(s => s.key !== 'local')"
+                                        :key="service.key" :value="service.key" data-test="service-select-item">
+                                        {{ service.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <!-- Source Dropdown (only show when Local) -->
+                        <div v-if="form.data.feed === 'local'" class="w-full">
+                            <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Source</label>
+                            <Select v-model="form.data.source" :disabled="masonry?.isLoading">
+                                <SelectTrigger class="w-full" data-test="source-select-trigger">
+                                    <SelectValue placeholder="Select a source..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="source in availableSources" :key="source" :value="source"
+                                        data-test="source-select-item">
+                                        {{ source }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="flex gap-3 w-full mt-2 items-center">
+                            <Button @click="applyService" size="sm" class="flex-1" data-test="play-button"
+                                :disabled="form.data.feed === 'online' && !form.data.service">
+                                <Play :size="16" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                <Masonry v-else :key="`${tab.id}-${masonryRenderKey}`" ref="masonry" v-model:items="items"
+                    class="min-h-0 flex-1"
+                    :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
+                    :page-size="Number(form.data.limit)"
+                    :gap-x="layout.gutterX" :gap-y="layout.gutterY"
+                    :mode="form.data.feed === 'online' && !isTabRestored ? 'backfill' : 'default'"
+                    @preloaded="handleBatchPreloaded" @failures="handleBatchFailures" data-test="masonry-component">
+                    <MasonryItem @preloaded="handleItemPreloaded">
+                        <template #overlay="{ item, remove }">
+                            <div class="relative h-full w-full"
+                                @mouseenter="handleMasonryItemMouseEnter((item as FeedItem).id as number)"
+                                @mouseleave="handleMasonryItemMouseLeave"
+                                @click="(e: MouseEvent) => { if (e.altKey) masonryInteractions.handleAltClickReaction(e, item as FeedItem) }"
+                                @contextmenu="(e: MouseEvent) => { if (e.altKey) masonryInteractions.handleAltClickReaction(e, item as FeedItem) }"
+                                @mousedown="(e: MouseEvent) => { if (e.altKey && e.button === 1) masonryInteractions.handleAltClickReaction(e, item as FeedItem) }"
+                                @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item as FeedItem)">
+                                <!-- Container badges (shows on hover with type and count) -->
+                                <Transition name="fade">
+                                    <div v-if="hoveredItemId === ((item as FeedItem).id as number) && isItemPreloaded((item as FeedItem).id as number) && containerBadges.getContainersForItem(item as FeedItem).length > 0"
+                                        class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
+                                        <div v-for="container in containerBadges.getContainersForItem(item as FeedItem)"
+                                            :key="container.id" class="cursor-pointer"
+                                            @mouseenter="handleContainerPillMouseEnter(container.id)"
+                                            @mouseleave="handleContainerPillMouseLeave"
+                                            @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
+                                            @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
+                                            @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
+                                            @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
+                                            @mousedown.stop="handleContainerPillMouseDown">
+                                            <Pill :label="container.type"
+                                                :value="containerBadges.getItemCountForContainerId(container.id)"
+                                                :variant="containerBadges.getVariantForContainerType(container.type)"
+                                                :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
+                                                @dismiss="() => handlePillDismiss(container)" />
                                         </div>
                                     </div>
+                                </Transition>
 
-                                    <!-- Spinner (only shown when loading/preloading) - centered vertically -->
-                                    <div v-if="isLoading"
-                                        class="absolute inset-0 flex items-center justify-center z-10">
-                                        <div
-                                            class="bg-prussian-blue-700/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border border-twilight-indigo-500/30">
-                                            <Loader2 class="w-4 h-4 text-smart-blue-400 animate-spin" />
-                                        </div>
+                                <!-- Info badge -->
+                                <Transition name="fade">
+                                    <div v-if="hoveredItemId === ((item as FeedItem).id as number) && isItemPreloaded((item as FeedItem).id as number)"
+                                        class="absolute top-2 right-2 z-50 pointer-events-auto">
+                                        <Button variant="ghost" size="sm"
+                                            class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
+                                            @click.stop="handlePromptDialogClick(item as FeedItem)" aria-label="Show prompt">
+                                            <Info :size="14" />
+                                        </Button>
                                     </div>
+                                </Transition>
 
-                                    <!-- Error state -->
-                                    <div v-if="imageError"
-                                        class="absolute inset-0 flex flex-col items-center justify-center bg-prussian-blue-800/50 text-twilight-indigo-300 text-sm p-4 text-center border border-twilight-indigo-500/30 rounded-lg">
-                                        <Image :size="32" class="mb-2 opacity-50" />
-                                        <span>Failed to load image</span>
+                                <!-- Hover reactions overlay -->
+                                <Transition name="fade">
+                                    <div v-if="hoveredItemId === ((item as FeedItem).id as number) && isItemPreloaded((item as FeedItem).id as number)"
+                                        class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
+                                        <FileReactions :file-id="(item as FeedItem).id as number" :reaction="(item as FeedItem).reaction as ({ type: string } | null | undefined)"
+                                            :previewed-count="(item as FeedItem).previewed_count"
+                                            :viewed-count="(item as FeedItem).seen_count"
+                                            :current-index="hoveredItemIndex === null ? undefined : hoveredItemIndex"
+                                            :total-items="items.length" variant="small" :remove-item="remove"
+                                            @reaction="(type) => handleFileReaction((item as FeedItem).id as number, type, remove)" />
                                     </div>
+                                </Transition>
 
-                                    <!-- Image (only render when imageSrc is available from Vibe's preloading) -->
-                                    <img v-if="imageSrc && !imageError" :src="imageSrc" :alt="`Item ${slotItem.id}`"
-                                        :class="[
-                                            'w-full h-full object-cover transition-opacity duration-700 ease-in-out',
-                                            imageLoaded && showMedia ? 'opacity-100' : 'opacity-0'
-                                        ]" />
-
-                                    <!-- Container badges (shows on hover with type and count) -->
-                                    <Transition name="fade">
-                                        <div v-if="hoveredItemIndex === index && imageLoaded && containerBadges.getContainersForItem(slotItem).length > 0"
-                                            class="absolute top-2 left-2 z-50 pointer-events-auto flex flex-col gap-1">
-                                            <div v-for="container in containerBadges.getContainersForItem(slotItem)"
-                                                :key="container.id" class="cursor-pointer"
-                                                @mouseenter="handleContainerPillMouseEnter(container.id)"
-                                                @mouseleave="handleContainerPillMouseLeave"
-                                                @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
-                                                @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
-                                                @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
-                                                @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
-                                                @mousedown.stop="handleContainerPillMouseDown">
-                                                <Pill :label="container.type"
-                                                    :value="containerBadges.getItemCountForContainerId(container.id)"
-                                                    :variant="containerBadges.getVariantForContainerType(container.type)"
-                                                    :dismissible="isContainerBlacklistable(container) ? 'danger' : false"
-                                                    @dismiss="() => handlePillDismiss(container)" />
-                                            </div>
-                                        </div>
-                                    </Transition>
-
-                                    <!-- Info badge (shows on hover, opens dialog on click) -->
-                                    <Transition name="fade">
-                                        <div v-if="hoveredItemIndex === index && imageLoaded"
-                                            class="absolute top-2 right-2 z-50 pointer-events-auto">
-                                            <Button variant="ghost" size="sm"
-                                                class="h-7 w-7 p-0 bg-black/50 hover:bg-black/70 text-white"
-                                                @click.stop="handlePromptDialogClick(slotItem)"
-                                                aria-label="Show prompt">
-                                                <Info :size="14" />
-                                            </Button>
-                                        </div>
-                                    </Transition>
-
-                                    <!-- Hover reactions overlay -->
-                                    <Transition name="fade">
-                                        <div v-if="hoveredItemIndex === index && imageLoaded"
-                                            class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
-                                            <!-- Use slotItem directly - Vibe re-renders with fresh object references after updates -->
-                                            <FileReactions :file-id="slotItem.id" :reaction="slotItem.reaction"
-                                                :previewed-count="slotItem.previewed_count"
-                                                :viewed-count="slotItem.seen_count" :current-index="index"
-                                                :total-items="items.length" variant="small"
-                                                :remove-item="() => remove(slotItem)"
-                                                @reaction="(type) => handleFileReaction(slotItem.id, type, remove, index)" />
-                                        </div>
-                                    </Transition>
-
-                                    <!-- Progress Bar Overlay (only show if will_auto_dislike is true and countdown is active) -->
-                                    <DislikeProgressBar
-                                        v-if="slotItem.will_auto_dislike && autoDislikeQueue.hasActiveCountdown(slotItem.id)"
-                                        :progress="autoDislikeQueue.getCountdownProgress(slotItem.id)"
-                                        :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime(slotItem.id))"
-                                        :is-frozen="autoDislikeQueue.isFrozen.value"
-                                        :is-hovered="hoveredItemId === slotItem.id && autoDislikeQueue.hasActiveCountdown(slotItem.id)" />
-                                </div>
-                            </template>
-                        </VibeMasonryItem>
-                    </template>
+                                <!-- Progress Bar Overlay (only show if will_auto_dislike is true and countdown is active) -->
+                                <DislikeProgressBar
+                                    v-if="(item as FeedItem).will_auto_dislike && autoDislikeQueue.hasActiveCountdown((item as FeedItem).id as number)"
+                                    :progress="autoDislikeQueue.getCountdownProgress((item as FeedItem).id as number)"
+                                    :countdown="autoDislikeQueue.formatCountdown(autoDislikeQueue.getCountdownRemainingTime((item as FeedItem).id as number))"
+                                    :is-frozen="autoDislikeQueue.isFrozen.value"
+                                    :is-hovered="hoveredItemId === ((item as FeedItem).id as number) && autoDislikeQueue.hasActiveCountdown((item as FeedItem).id as number)" />
+                            </div>
+                        </template>
+                    </MasonryItem>
                 </Masonry>
             </div>
         </div>
@@ -965,7 +888,7 @@ defineExpose({
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
-            :backfill="backfill" :visible="tab !== null && tab !== undefined && !shouldShowForm" />
+            :visible="tab !== null && tab !== undefined && !shouldShowForm" />
 
         <!-- Prompt Dialog -->
         <Dialog v-model="promptData.promptDialogOpen.value" @update:model-value="handlePromptDialogUpdate">

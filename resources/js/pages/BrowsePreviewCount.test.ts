@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { ref } from 'vue';
+import { cloneVNode, h, ref } from 'vue';
 import Browse from './Browse.vue';
 import { incrementSeen } from '@/actions/App/Http/Controllers/FilesController';
 import {
@@ -76,20 +76,20 @@ Object.defineProperty(window, 'axios', {
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
-        template: `
-            <div class="masonry-mock">
-                <slot
-                    v-for="(item, index) in items"
-                    :key="item.id || index"
-                    :item="item"
-                    :remove="() => {}"
-                    :index="index"
-                ></slot>
-            </div>
-        `,
         props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
+        emits: ['preloaded', 'failures', 'update:items'],
+        setup(
+            props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> },
+            {
+                emit,
+                expose,
+                slots,
+            }: {
+                emit: (event: string, value: any) => void;
+                expose: (exposed: any) => void;
+                slots: { default?: () => any[] };
+            },
+        ) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
             let hasReachedEnd = false;
@@ -164,29 +164,38 @@ vi.mock('@wyxos/vibe', () => ({
             Object.defineProperty(exposed, 'currentPage', { get: () => currentPage, enumerable: true });
             Object.defineProperty(exposed, 'nextPage', { get: () => nextPage, enumerable: true });
             Object.defineProperty(exposed, 'paginationHistory', { get: () => paginationHistory, enumerable: true });
-            return exposed;
+
+            expose(exposed);
+
+            return () => {
+                const slotNodes = slots.default?.() ?? [];
+                const templateVNode = slotNodes[0];
+
+                return h(
+                    'div',
+                    { class: 'masonry-mock' },
+                    props.items.map((definition, index) =>
+                        templateVNode
+                            ? cloneVNode(templateVNode, {
+                                  definition,
+                                  remove: () => {},
+                                  index,
+                              })
+                            : null,
+                    ),
+                );
+            };
         },
     },
     MasonryItem: {
         name: 'MasonryItem',
         template: `
-            <div @mouseenter="$emit('mouseenter', $event)" @mouseleave="$emit('mouseleave', $event)">
-                <slot
-                    :item="item"
-                    :remove="remove"
-                    :imageLoaded="true"
-                    :imageError="false"
-                    :videoLoaded="false"
-                    :videoError="false"
-                    :isLoading="false"
-                    :showMedia="true"
-                    :imageSrc="item?.src || item?.thumbnail || ''"
-                    :videoSrc="null"
-                ></slot>
+            <div>
+                <slot name="overlay" :item="definition" :remove="remove"></slot>
             </div>
         `,
-        props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave', 'preload:success', 'in-view', 'in-view-and-loaded'],
+        props: ['definition', 'remove'],
+        emits: ['mouseenter', 'mouseleave', 'preloaded'],
     },
 }));
 
@@ -260,16 +269,11 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             will_auto_dislike: false,
         });
 
-        const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
-        const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
 
-        if (masonryItem.exists()) {
-            // Emit in-view-and-loaded event (the new event that triggers preview count increment)
-            await masonryItem.vm.$emit('in-view-and-loaded', {
-                item: { id: 1 },
-                type: 'image',
-                src: 'test1.jpg',
-            });
+        // Drive the real batch path: Masonry emits `preloaded`, TabContent marks preloaded + increments preview.
+        await masonry.vm.$emit('preloaded', [tabContentVm.items[0]]);
 
             await flushPromises();
             await wrapper.vm.$nextTick();
@@ -281,7 +285,6 @@ describe('Browse - Preview and Seen Count Tracking', () => {
 
             const updatedItem = tabContentVm.items.find((i: any) => i.id === 1);
             expect(updatedItem?.previewed_count).toBe(1);
-        }
     });
 
     it('reactively updates preview count and shows progress bar without requiring scroll/resize', async () => {
@@ -335,15 +338,11 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         });
 
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
-        const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
-        if (masonryItem.exists()) {
-            // Trigger in-view-and-loaded event
-            await masonryItem.vm.$emit('in-view-and-loaded', {
-                item: { id: 1 },
-                type: 'image',
-                src: 'test1.jpg',
-            });
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+
+        await masonry.vm.$emit('preloaded', [tabContentVm.items[0]]);
 
             await flushPromises();
             await wrapper.vm.$nextTick();
@@ -374,7 +373,9 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             await flushPromises();
 
             // Hover to show FileReactions and progress bar
-            await masonryItem.vm.$emit('mouseenter', { item: { id: 1 }, type: 'image' });
+            const overlayRoot = wrapper.find('.masonry-mock .relative.h-full.w-full');
+            expect(overlayRoot.exists()).toBe(true);
+            await overlayRoot.trigger('mouseenter');
             await wrapper.vm.$nextTick();
             await flushPromises();
             await wrapper.vm.$nextTick();
@@ -409,7 +410,6 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             // which should also be reactive with the fix. However, in the test environment with mocks,
             // the template might not re-render immediately. The core fix (replacing the item object
             // instead of mutating it) is verified by the FileReactions test and the itemInArray check above.
-        }
     });
 
     it('updates preview count in FileReactions when item with existing preview_count increments on initial load', async () => {
@@ -465,15 +465,12 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         });
 
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
-        const masonryItem = browseTabContentComponent.findComponent({ name: 'MasonryItem' });
 
-        if (masonryItem.exists()) {
-            // Simulate item coming into view and preloading (triggers in-view-and-loaded)
-            await masonryItem.vm.$emit('in-view-and-loaded', {
-                item: { id: 1 },
-                type: 'image',
-                src: 'test1.jpg',
-            });
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+
+        // Simulate item preloading via Masonry batch event
+        await masonry.vm.$emit('preloaded', [tabContentVm.items[0]]);
 
             await flushPromises();
             await wrapper.vm.$nextTick();
@@ -493,7 +490,9 @@ describe('Browse - Preview and Seen Count Tracking', () => {
 
             // Hover over the item to show FileReactions
             // This should trigger the component to render with the updated preview_count
-            await masonryItem.vm.$emit('mouseenter', { item: { id: 1 }, type: 'image' });
+            const overlayRoot = wrapper.find('.masonry-mock .relative.h-full.w-full');
+            expect(overlayRoot.exists()).toBe(true);
+            await overlayRoot.trigger('mouseenter');
             await wrapper.vm.$nextTick();
             await flushPromises();
             await wrapper.vm.$nextTick();
@@ -520,7 +519,6 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             // Expected: 4 (from updated item)
             // Actual: 3 (stale value due to shallowRef not tracking mutation)
             expect(previewedCountProp).toBe(4);
-        }
     });
 
     it('increments seen count when file is loaded in FileViewer', async () => {

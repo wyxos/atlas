@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount as baseMount, flushPromises } from '@vue/test-utils';
-import { nextTick, ref } from 'vue';
+import { cloneVNode, defineComponent, h, nextTick, ref } from 'vue';
 import TabContent from './TabContent.vue';
-import type { MasonryItem } from '@/composables/useTabs';
+import type { FeedItem } from '@/composables/useTabs';
 
 const mount = baseMount;
 
@@ -126,27 +126,41 @@ const mockLoadNext = vi.fn();
 const mockReset = vi.fn();
 const mockInitialize = vi.fn();
 
-vi.mock('@wyxos/vibe', () => ({
-    Masonry: {
+vi.mock('@wyxos/vibe', () => {
+    const Masonry = defineComponent({
         name: 'Masonry',
-        template: `
-            <div class="masonry-mock" data-test="masonry-component">
-                <slot
-                    v-for="(item, index) in items"
-                    :key="item.id || index"
-                    :item="item"
-                    :remove="remove"
-                    :index="index"
-                ></slot>
-            </div>
-        `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { expose, emit }: any) {
+        props: [
+            'items',
+            'getContent',
+            'getPage',
+            'page',
+            'layout',
+            'layoutMode',
+            'mobileBreakpoint',
+            'init',
+            'mode',
+            'backfillDelayMs',
+            'backfillMaxCalls',
+            'restoredPages',
+            'pageSize',
+            'gapX',
+            'gapY',
+        ],
+        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items', 'preloaded', 'failures'],
+        setup(props: any, { expose, emit, slots }: any) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
             let hasReachedEnd = false;
             let paginationHistory: Array<number | string> = [];
+
+            const remove = (itemToRemove: any) => {
+                mockRemove(itemToRemove);
+                const idx = (props.items ?? []).findIndex((i: any) => i?.id === itemToRemove?.id);
+                if (idx !== -1) {
+                    props.items.splice(idx, 1);
+                    emit('update:items', props.items);
+                }
+            };
 
             const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
                 mockInitialize(itemsToRestore, page, next);
@@ -159,41 +173,6 @@ vi.mock('@wyxos/vibe', () => ({
                 hasReachedEnd = nextPage === null;
             };
 
-            const loadPage = async (page: number | string) => {
-                mockLoadPage(page);
-                if (!props.getPage) {
-                    return;
-                }
-                currentPage = page;
-                const result = await props.getPage(page);
-                const newItems = result?.items ?? [];
-                const nextItems = [...newItems];
-                props.items.splice(0, props.items.length, ...nextItems);
-                emit('update:items', nextItems);
-                nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
-                hasReachedEnd = nextPage === null;
-                return result;
-            };
-
-            const loadNext = async () => {
-                mockLoadNext();
-                if (!props.getPage || nextPage === null || nextPage === undefined) {
-                    return;
-                }
-                const pageToLoad = nextPage;
-                currentPage = pageToLoad;
-                const result = await props.getPage(pageToLoad);
-                const newItems = result?.items ?? [];
-                const nextItems = [...props.items, ...newItems];
-                props.items.splice(0, props.items.length, ...nextItems);
-                emit('update:items', [...nextItems]);
-                nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
-                hasReachedEnd = nextPage === null;
-                return result;
-            };
-
             const reset = () => {
                 mockReset();
                 props.items.splice(0, props.items.length);
@@ -204,18 +183,43 @@ vi.mock('@wyxos/vibe', () => ({
                 hasReachedEnd = false;
             };
 
+            const loadNextPage = async () => {
+                mockLoadNext();
+                const getContent = props.getContent ?? props.getPage;
+                if (!getContent || nextPage === null || nextPage === undefined) {
+                    return;
+                }
+                const pageToLoad = nextPage;
+                currentPage = pageToLoad;
+                const result = await getContent(pageToLoad);
+                const newItems = result?.items ?? [];
+                const nextItems = [...props.items, ...newItems];
+                props.items.splice(0, props.items.length, ...nextItems);
+                emit('update:items', [...nextItems]);
+                nextPage = result?.nextPage ?? null;
+                paginationHistory = nextPage === null ? [] : [nextPage];
+                hasReachedEnd = nextPage === null;
+                return result;
+            };
+
+            const cancel = () => {
+                mockCancelLoad();
+            };
+
             expose({
-                isLoading: mockIsLoading,
                 init: mockInit,
                 initialize,
                 refreshLayout: mockRefreshLayout,
                 cancelLoad: mockCancelLoad,
+                cancel,
                 destroy: mockDestroy,
-                remove: mockRemove,
+                remove,
                 removeMany: mockRemoveMany,
-                loadPage,
-                loadNext,
+                loadNext: loadNextPage,
+                loadNextPage,
                 reset,
+                get isLoading() { return mockIsLoading.value; },
+                set isLoading(value: boolean) { mockIsLoading.value = value; },
                 get currentPage() { return currentPage; },
                 set currentPage(value: number | string | null) { currentPage = value; },
                 get nextPage() { return nextPage; },
@@ -225,40 +229,60 @@ vi.mock('@wyxos/vibe', () => ({
                 get hasReachedEnd() { return hasReachedEnd; },
                 set hasReachedEnd(value: boolean) { hasReachedEnd = value; },
             });
-            return {
-                remove: mockRemove,
+
+            // Simulate Vibe's debounced batch preloaded emit for items already "in view".
+            // TabContent uses this to mark items as preloaded (for hover overlays).
+            Promise.resolve().then(() => {
+                if ((props.items ?? []).length > 0) {
+                    emit('preloaded', [...props.items]);
+                }
+            });
+
+            return () => {
+                const definition = slots.default?.()?.[0];
+                const children = (props.items ?? []).map((item: any, index: number) => {
+                    if (!definition) {
+                        return null;
+                    }
+                    return cloneVNode(definition, {
+                        key: item?.id ?? index,
+                        item,
+                        remove,
+                        index,
+                    });
+                });
+
+                return h('div', { class: 'masonry-mock', 'data-test': 'masonry-component' }, children);
             };
         },
-    },
-    MasonryItem: {
+    });
+
+    const MasonryItem = defineComponent({
         name: 'MasonryItem',
-        template: `
-            <div
-                class="masonry-item"
-                :data-key="item.key"
-                @mouseenter="$emit('mouseenter', $event)"
-                @mouseleave="$emit('mouseleave', $event)"
-                @mousedown="$emit('mousedown', $event)"
-                @auxclick="$emit('auxclick', $event)"
-            >
-                <slot
-                    :item="item"
-                    :remove="remove"
-                    :imageLoaded="true"
-                    :imageError="false"
-                    :videoLoaded="false"
-                    :videoError="false"
-                    :isLoading="false"
-                    :showMedia="true"
-                    :imageSrc="item?.src || item?.thumbnail || ''"
-                    :videoSrc="null"
-                ></slot>
-            </div>
-        `,
         props: ['item', 'remove'],
-        emits: ['mouseenter', 'mouseleave', 'mousedown', 'auxclick', 'preload:success'],
-    },
-}));
+        emits: ['preloaded', 'failed'],
+        setup(props: any, { slots }: any) {
+            return () => {
+                const overlayNodes = slots.overlay?.({ item: props.item, remove: props.remove }) ?? [];
+                const node = overlayNodes[0];
+
+                if (!node) {
+                    return h('div', { class: 'masonry-item', 'data-key': props.item?.key ?? '' });
+                }
+
+                return cloneVNode(node, {
+                    class: [
+                        (node.props as any)?.class,
+                        'masonry-item',
+                    ],
+                    'data-key': props.item?.key ?? '',
+                });
+            };
+        },
+    });
+
+    return { Masonry, MasonryItem };
+});
 
 // Mock FileViewer
 vi.mock('./FileViewer.vue', () => ({
@@ -499,18 +523,6 @@ vi.mock('lucide-vue-next', () => ({
 }));
 
 // Mock composables
-vi.mock('@/composables/useBackfill', () => ({
-    useBackfill: () => ({
-        backfill: { value: { isRunning: false, calls: 0 } },
-        onBackfillStart: vi.fn(),
-        onBackfillTick: vi.fn(),
-        onBackfillStop: vi.fn(),
-        onBackfillRetryStart: vi.fn(),
-        onBackfillRetryTick: vi.fn(),
-        onBackfillRetryStop: vi.fn(),
-    }),
-}));
-
 vi.mock('@/composables/useBrowseService', async () => {
     const { ref } = await import('vue');
     return {
@@ -558,6 +570,60 @@ beforeEach(() => {
     mockAxios.patch.mockResolvedValue({ data: {} });
 });
 
+describe('TabContent - Resume Session', () => {
+    it('uses tab.params.page when it is a numeric string (restoredPages should not default to 1)', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab: {
+                    id: 123,
+                    label: 'Browse 1',
+                    params: {
+                        page: '5',
+                        next: 'CURSOR_NEXT',
+                        service: 'test-service',
+                    },
+                    items: [
+                        {
+                            id: 1,
+                            width: 500,
+                            height: 500,
+                            page: 5,
+                            key: '5-1',
+                            index: 0,
+                            src: 'https://example.com/image1.jpg',
+                            originalUrl: 'https://example.com/original1.jpg',
+                            thumbnail: 'https://example.com/thumb1.jpg',
+                            type: 'image',
+                            notFound: false,
+                        },
+                    ],
+                    position: 0,
+                    isActive: true,
+                },
+            },
+        });
+
+        const wrapper = mount(TabContent, {
+            props: {
+                tabId: 123,
+                availableServices: [{ key: 'test-service', label: 'Test Service' }],
+                onReaction: vi.fn(),
+                updateActiveTab: vi.fn(),
+            },
+        });
+
+        await flushPromises();
+        await nextTick();
+
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        expect(masonry.props('restoredPages')).toEqual([5]);
+        expect(masonry.props('page')).toBe('CURSOR_NEXT');
+        // Restored sessions should not run backfill (which can auto-fetch on mount).
+        expect(masonry.props('mode')).toBe('default');
+    });
+});
+
 describe('TabContent - Container Badges', () => {
     const createMockTab = (overrides = {}) => ({
         id: 1,
@@ -568,7 +634,7 @@ describe('TabContent - Container Badges', () => {
         ...overrides,
     });
 
-    const createMockItem = (id: number, containers: Array<{ type: string; id?: number; source?: string; source_id?: string; referrer?: string }> = []): MasonryItem => ({
+    const createMockItem = (id: number, containers: Array<{ type: string; id?: number; source?: string; source_id?: string; referrer?: string }> = []): FeedItem => ({
         id,
         width: 500,
         height: 500,
@@ -583,7 +649,7 @@ describe('TabContent - Container Badges', () => {
         previewed_count: 0,
         seen_count: 0,
         containers,
-    } as MasonryItem);
+    } as FeedItem);
 
     it('displays container badges with type and count when item has containers', async () => {
         // Item 1 has container id=1 (gallery) and id=2 (album)
@@ -831,7 +897,7 @@ describe('TabContent - Container Badges', () => {
         expect(vm.containerBadges.getItemCountForContainerId(1)).toBe(2);
 
         // Remove item1
-        const item1Index = vm.items.findIndex((i: MasonryItem) => i.id === 1);
+        const item1Index = vm.items.findIndex((i: FeedItem) => i.id === 1);
         if (item1Index !== -1) {
             vm.items.splice(item1Index, 1);
             await nextTick();

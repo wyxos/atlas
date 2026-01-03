@@ -52,6 +52,14 @@ class Browser
 
         $isLocalMode = $feed === 'local';
 
+        // If we're starting a new browse session (page=1), clear the tab's existing file attachments.
+        // This keeps tab history consistent and prevents results from accumulating across new searches.
+        // Note: we do this even if the upcoming fetch returns zero items.
+        $pageParam = request()->input('page', 1);
+        if ($tabId && (string) $pageParam === '1') {
+            $this->detachFilesFromTab((int) $tabId);
+        }
+
         // Resolve service instance
         // If local mode, use LocalService; otherwise use the selected service
         if ($isLocalMode) {
@@ -247,5 +255,19 @@ class Browser
 
         // Sync files to tab (without detaching existing files)
         $tab->files()->syncWithoutDetaching($syncData);
+    }
+
+    /**
+     * Detach all files currently attached to a browse tab.
+     */
+    protected function detachFilesFromTab(int $tabId): void
+    {
+        $tab = \App\Models\Tab::find($tabId);
+
+        if (! $tab || $tab->user_id !== auth()->id()) {
+            return;
+        }
+
+        $tab->files()->detach();
     }
 }
