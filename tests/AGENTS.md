@@ -2,7 +2,7 @@
 
 ## Package Identity
 
-**Purpose**: Test suite for Atlas v2 application  
+**Purpose**: Test suite for Atlas application  
 **Backend Testing**: Pest (PHP) - Feature, Browser, and Unit tests  
 **Frontend Testing**: Vitest (TypeScript) - Component and composable tests  
 **Browser Testing**: Playwright via Pest Browser plugin
