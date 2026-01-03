@@ -1,8 +1,8 @@
 import { ref, type Ref } from 'vue';
 import { useQueue } from './useQueue';
 import { batchPerformAutoDislike } from '@/actions/App/Http/Controllers/FilesController';
-import type { MasonryItem } from './useTabs';
-import type { Masonry } from '@wyxos/vibe';
+import type { FeedItem } from './useTabs';
+import { Masonry } from '@wyxos/vibe';
 import { useBrowseForm } from './useBrowseForm';
 import updateReactionState from '@/utils/reactionStateUpdater';
 
@@ -11,7 +11,7 @@ const DEBOUNCE_DELAY_MS = 500; // 500ms debounce for batch operations
 
 interface PendingDislike {
     fileId: number;
-    item: MasonryItem;
+    item: FeedItem;
 }
 
 // Global state for pending dislikes (debounced batch)
@@ -26,7 +26,7 @@ let fileViewerUnfreezeTimeout: ReturnType<typeof setTimeout> | null = null;
  * In local mode, items are NOT removed (visual treatment only).
  */
 export function useAutoDislikeQueue(
-    items: Ref<MasonryItem[]>,
+    items: Ref<FeedItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>
 ) {
     const { isLocal } = useBrowseForm();
@@ -60,7 +60,7 @@ export function useAutoDislikeQueue(
 
         // Only remove items from masonry in online mode (not in local mode)
         if (!isLocal.value) {
-            await masonry.value?.removeMany(itemsToRemove);
+            await masonry.value?.remove(itemsToRemove);
         }
 
         // Batch dislike API call
@@ -101,7 +101,7 @@ export function useAutoDislikeQueue(
      * Start countdown for an item that needs to be auto-disliked.
      * When countdown expires, the item will be removed and disliked (batched with others).
      */
-    function startAutoDislikeCountdown(fileId: number, item: MasonryItem): void {
+    function startAutoDislikeCountdown(fileId: number, item: FeedItem): void {
         // Don't start if already queued
         if (hasInQueue(`auto-dislike-${fileId}`)) {
             return;

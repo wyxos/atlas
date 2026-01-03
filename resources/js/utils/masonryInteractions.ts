@@ -1,14 +1,14 @@
 import type { Ref } from 'vue';
-import type { Masonry } from '@wyxos/vibe';
-import type { MasonryItem } from '@/composables/useTabs';
+import { Masonry } from '@wyxos/vibe';
+import type { FeedItem } from '@/composables/useTabs';
 import type { ReactionType } from '@/types/reaction';
 
 export function createMasonryInteractions(
-    items: Ref<MasonryItem[]>,
+    items: Ref<FeedItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
-    handleMasonryReaction: (item: MasonryItem, type: ReactionType, index?: number) => Promise<void>
+    handleMasonryReaction: (item: FeedItem, type: ReactionType, index?: number) => Promise<void>
 ) {
-    function handleAltClickReaction(e: MouseEvent, item: MasonryItem, index?: number): void {
+    function handleAltClickReaction(e: MouseEvent, item: FeedItem, index?: number): void {
         e.preventDefault();
         e.stopPropagation();
 
@@ -38,7 +38,7 @@ export function createMasonryInteractions(
         }
     }
 
-    function handleMasonryItemAuxClick(e: MouseEvent, item: MasonryItem): void {
+    function handleMasonryItemAuxClick(e: MouseEvent, item: FeedItem): void {
         if (!e.altKey && e.button === 1) {
             e.preventDefault();
             e.stopPropagation();
@@ -56,7 +56,7 @@ export function createMasonryInteractions(
         }
     }
 
-    function openOriginalUrl(item: MasonryItem): void {
+    function openOriginalUrl(item: FeedItem): void {
         const url = item.originalUrl || item.src;
         if (!url) {
             return;

@@ -1,15 +1,15 @@
 import { type Ref } from 'vue';
-import type { MasonryItem, TabData } from './useTabs';
+import type { FeedItem, TabData } from './useTabs';
 import { queueReaction } from '@/utils/reactionQueue';
 import type { ReactionType } from '@/types/reaction';
-import type { Masonry } from '@wyxos/vibe';
+import { Masonry } from '@wyxos/vibe';
 import { useBrowseForm } from './useBrowseForm';
 
 /**
  * Composable for handling masonry item reactions with restore functionality.
  */
 export function useMasonryReactionHandler(
-    items: Ref<MasonryItem[]>,
+    items: Ref<FeedItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tab: Ref<TabData | undefined>,
     onReaction: (fileId: number, type: ReactionType) => void
@@ -26,12 +26,11 @@ export function useMasonryReactionHandler(
      * @param index - Optional index of the item in the items array (avoids findIndex lookup)
      */
     async function handleMasonryReaction(
-        item: MasonryItem,
+        item: FeedItem,
         type: ReactionType,
         index?: number
     ): Promise<void> {
         const fileId = item.id;
-        const itemIndex = index !== undefined ? index : items.value.findIndex((i) => i.id === fileId);
         const tabId = tab.value?.id;
 
         // Only remove from masonry in online mode (not in local mode)
@@ -41,10 +40,9 @@ export function useMasonryReactionHandler(
         }
 
         // Create restore callback for undo functionality (only in online mode where items are removed)
-        const restoreCallback = !isLocal.value && item && tabId !== undefined && itemIndex !== -1
+        const restoreCallback = !isLocal.value && item && tabId !== undefined
             ? async () => {
-                // Restore item directly using masonry
-                await masonry.value?.restore(item, itemIndex);
+                await masonry.value?.restore(item);
             }
             : undefined;
 

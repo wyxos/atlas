@@ -1,7 +1,14 @@
 import { ref } from 'vue';
-import { index as tabsIndex, store as tabsStore, update as tabsUpdate, destroy as tabsDestroy, show as tabsShow, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
+import TabController from '@/actions/App/Http/Controllers/TabController';
 
-export type MasonryItem = {
+const tabsIndex = TabController.index;
+const tabsStore = TabController.store;
+const tabsUpdate = TabController.update;
+const tabsDestroy = TabController.destroy;
+const tabsShow = TabController.show;
+const tabsSetActive = TabController.setActive;
+
+export type FeedItem = {
     id: number; // Database file ID
     width: number;
     height: number;
@@ -9,12 +16,16 @@ export type MasonryItem = {
     key: string; // Combined key from backend: "page-id"
     index: number;
     src: string; // Preview/thumbnail URL for masonry grid
+    preview?: string; // Vibe loader preview URL
+    original?: string; // Vibe loader original URL
     originalUrl?: string; // Original full-size URL
     thumbnail?: string; // Thumbnail URL (may be same as src)
     type?: 'image' | 'video';
     notFound?: boolean;
+    reaction?: { type: string } | null;
     previewed_count?: number;
     seen_count?: number;
+    will_auto_dislike?: boolean;
     [key: string]: unknown;
 };
 
@@ -43,7 +54,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
                 id: number;
                 label: string;
                 params?: Record<string, string | number | null>;
-                items?: MasonryItem[]; // Not included in initial load, loaded lazily when restoring a tab
+                items?: FeedItem[]; // Not included in initial load, loaded lazily when restoring a tab
                 position?: number;
                 is_active?: boolean;
             }) => {
@@ -153,7 +164,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     }
 
     function updateActiveTab(
-        items: MasonryItem[]
+        items: FeedItem[]
     ): void {
         const activeTab = getActiveTab();
         if (!activeTab) {
@@ -203,7 +214,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
      * Load items for a specific tab.
      * This is called lazily when restoring a tab to avoid loading items for all tabs.
      */
-    async function loadTabItems(tabId: number): Promise<MasonryItem[]> {
+    async function loadTabItems(tabId: number): Promise<FeedItem[]> {
         try {
             const { data } = await window.axios.get(tabsShow.url(tabId));
 

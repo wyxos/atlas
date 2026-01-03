@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next';
-import type { MasonryItem } from '../composables/useTabs';
+import type { FeedItem } from '../composables/useTabs';
 
 interface Props {
-    items: MasonryItem[];
+    items: FeedItem[];
     currentItemIndex: number | null;
     visible?: boolean;
     hasMore?: boolean;
@@ -24,7 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
     next: [];
     previous: [];
-    'item-click': [item: MasonryItem];
+    'item-click': [item: FeedItem];
 }>();
 
 // Item dimensions
@@ -135,7 +135,7 @@ function handleNext(): void {
     emit('next');
 }
 
-function handleItemClick(item: MasonryItem): void {
+function handleItemClick(item: FeedItem): void {
     // Find the index of the clicked item
     const itemIndex = props.items.findIndex(i => i.id === item.id);
 
@@ -166,7 +166,7 @@ function handleItemClick(item: MasonryItem): void {
     }
 }
 
-function isCurrentItem(item: MasonryItem): boolean {
+function isCurrentItem(item: FeedItem): boolean {
     // Check if this is the clicked item (immediate active state)
     if (clickedItemId.value === item.id) return true;
 

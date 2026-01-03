@@ -1,5 +1,5 @@
 import { ref, computed, watch, nextTick } from 'vue';
-import type { MasonryItem } from './useTabs';
+import type { FeedItem } from './useTabs';
 import type { PillVariant } from '@/types/pill';
 
 type ContainerEntry = {
@@ -26,7 +26,7 @@ function isContainerEntry(container: ContainerEntry): container is Container {
  * Composable for managing container badges and their hover states.
  * Optimized for large item arrays (3k+) with caching and Map-based lookups.
  */
-export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
+export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
     const hoveredContainerId = ref<number | null>(null);
     const debouncedHoveredContainerId = ref<number | null>(null);
 
@@ -44,7 +44,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     const itemContainersCache = ref<Map<number, Set<number>>>(new Map());
 
     // Track previous items to detect removals for incremental updates
-    const previousItems = ref<Map<number, MasonryItem>>(new Map());
+    const previousItems = ref<Map<number, FeedItem>>(new Map());
 
     // Incrementally update caches when items are removed (much faster than full rebuild)
     function updateCachesForRemovedItems(removedItemIds: number[]): void {
@@ -171,7 +171,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
 
     // Get containers for a specific item (returns full container data including referrer)
     // Containers are sorted by type priority first, then by ID for consistent ordering
-    function getContainersForItem(item: MasonryItem): Container[] {
+    function getContainersForItem(item: FeedItem): Container[] {
         const containers = (item.containers as ContainerEntry[] | undefined) ?? [];
         const filtered = containers.filter(isContainerEntry);
         // Sort by type priority first, then by ID as tiebreaker
@@ -230,7 +230,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
     }
 
     // Check if an item is a sibling (has the same container ID as the hovered one) - O(1) lookup
-    function isSiblingItem(item: MasonryItem, hoveredContainerId: number | null): boolean {
+    function isSiblingItem(item: FeedItem, hoveredContainerId: number | null): boolean {
         if (hoveredContainerId === null) {
             return false;
         }
@@ -277,7 +277,7 @@ export function useContainerBadges(items: import('vue').Ref<MasonryItem[]>) {
 
     // Get classes for masonry item based on hover state (uses debounced value)
     // Both opacity and border (ring) transitions are smooth for better UX
-    const getMasonryItemClasses = computed(() => (item: MasonryItem) => {
+    const getMasonryItemClasses = computed(() => (item: FeedItem) => {
         const classes: string[] = [];
         const hoveredId = debouncedHoveredContainerId.value;
 

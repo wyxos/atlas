@@ -90,83 +90,101 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
-        setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
-            let currentPage: number | string | null = null;
+        props: ['items', 'getContent', 'page', 'restoredPages', 'pageSize', 'gapX', 'gapY', 'mode'],
+        emits: ['update:items'],
+        setup(
+            props: {
+                items: any[];
+                getContent?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }>;
+                page?: number | string;
+                restoredPages?: Array<number | string>;
+            },
+            { emit }: { emit: (event: string, value: any) => void }
+        ) {
             let nextPage: number | string | null = null;
+            let pagesLoaded: Array<number | string> = [];
             let hasReachedEnd = false;
-            let paginationHistory: Array<number | string> = [];
+
+            if (Array.isArray(props.restoredPages)) {
+                pagesLoaded = [...props.restoredPages];
+            } else if (props.page !== undefined && props.page !== null) {
+                pagesLoaded = [props.page];
+            }
 
             const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
                 mockInit(itemsToRestore, page, next);
                 props.items.splice(0, props.items.length, ...itemsToRestore);
                 emit('update:items', props.items);
-                currentPage = page;
                 nextPage = next ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
                 hasReachedEnd = nextPage === null;
+                pagesLoaded = [page];
             };
 
             const loadPage = async (page: number | string) => {
-                if (!props.getPage) {
+                if (!props.getContent) {
                     return;
                 }
-                currentPage = page;
-                const result = await props.getPage(page);
+                const result = await props.getContent(page);
                 const newItems = result?.items ?? [];
                 props.items.splice(0, props.items.length, ...newItems);
                 emit('update:items', props.items);
                 nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
                 hasReachedEnd = nextPage === null;
+                pagesLoaded = [page];
                 return result;
             };
 
-            const loadNext = async () => {
-                if (!props.getPage || nextPage === null || nextPage === undefined) {
+            const loadNextPage = async () => {
+                if (!props.getContent || nextPage === null || nextPage === undefined) {
                     return;
                 }
                 const pageToLoad = nextPage;
-                currentPage = pageToLoad;
-                const result = await props.getPage(pageToLoad);
+                const result = await props.getContent(pageToLoad);
                 const newItems = result?.items ?? [];
                 props.items.push(...newItems);
                 emit('update:items', props.items);
                 nextPage = result?.nextPage ?? null;
-                paginationHistory = nextPage === null ? [] : [nextPage];
                 hasReachedEnd = nextPage === null;
+                pagesLoaded = [...pagesLoaded, pageToLoad];
                 return result;
             };
 
             const reset = () => {
                 props.items.splice(0, props.items.length);
                 emit('update:items', props.items);
-                currentPage = null;
                 nextPage = null;
-                paginationHistory = [];
                 hasReachedEnd = false;
+                pagesLoaded = [];
             };
 
             const exposed = {
                 init: mockInit,
                 initialize,
                 refreshLayout: vi.fn(),
-                cancelLoad: mockCancelLoad,
+                cancel: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,
                 removeMany: mockRemoveMany,
                 restore: mockRestore,
                 restoreMany: mockRestoreMany,
                 loadPage,
-                loadNext,
+                loadNextPage,
+                undo: vi.fn(),
+                forget: vi.fn(),
                 reset,
             };
             Object.defineProperty(exposed, 'isLoading', { get: () => mockIsLoading.value, enumerable: true });
             Object.defineProperty(exposed, 'hasReachedEnd', { get: () => hasReachedEnd, enumerable: true });
-            Object.defineProperty(exposed, 'currentPage', { get: () => currentPage, enumerable: true });
-            Object.defineProperty(exposed, 'nextPage', { get: () => nextPage, enumerable: true });
-            Object.defineProperty(exposed, 'paginationHistory', { get: () => paginationHistory, enumerable: true });
+            Object.defineProperty(exposed, 'nextPage', {
+                get: () => nextPage,
+                set: (val: number | string | null) => { nextPage = val; },
+                enumerable: true,
+            });
+            Object.defineProperty(exposed, 'pagesLoaded', {
+                get: () => pagesLoaded,
+                set: (val: Array<number | string>) => { pagesLoaded = val; },
+                enumerable: true,
+            });
             return exposed;
         },
     },
@@ -229,10 +247,13 @@ describe('Browse - Tab Restoration', () => {
         expect(vm.activeTabId).toBe(tabId);
 
         const tabContentVm = await waitForTabContent(wrapper);
-        if (tabContentVm) {
-            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
-            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(nextParam);
-        }
+        expect(tabContentVm).not.toBeNull();
+
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        // Restoration sets `startPageToken` to the saved next cursor (when available).
+        expect(masonry.props('page')).toBe(nextParam);
+        expect(masonry.props('restoredPages')).toEqual([1]);
     });
 
     it('loads tab items when items exist', async () => {
@@ -309,10 +330,12 @@ describe('Browse - Tab Restoration', () => {
         expect(vm.activeTabId).toBe(tab2Id);
 
         const tabContentVm = await waitForTabContent(wrapper);
-        if (tabContentVm) {
-            expect(tabContentVm.masonry?.currentPage).toBe(pageParam);
-            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(nextParam);
-        }
+        expect(tabContentVm).not.toBeNull();
+
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        expect(masonry.props('page')).toBe(nextParam);
+        expect(masonry.props('restoredPages')).toEqual([1]);
     });
 
     it('restores items when switching to tab with items', async () => {
@@ -420,10 +443,12 @@ describe('Browse - Tab Restoration', () => {
         await waitForStable(wrapper);
 
         const tabContentVm = getTabContent(wrapper);
-        if (tabContentVm) {
-            expect(tabContentVm.masonry?.currentPage).toBe(cursorX);
-            expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(cursorY);
-        }
+        expect(tabContentVm).not.toBeNull();
+
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        // Cursor-based restoration uses the saved `next` as the next request token.
+        expect(masonry.props('page')).toBe(cursorY);
     });
 
     it('continues saved cursor after creating a new tab and switching back', async () => {
@@ -499,13 +524,13 @@ describe('Browse - Tab Restoration', () => {
             return;
         }
 
-        // With the new approach, Masonry handles pagination state via initialPage/initialNextPage props
-        expect(tabContentVm.masonry?.paginationHistory?.[0]).toBe(cursorY);
+        // Switching back should restore the next cursor as the Masonry `page` token.
+        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        expect(masonry.exists()).toBe(true);
+        expect(masonry.props('page')).toBe(cursorY);
 
-        // After removing pendingRestoreNextCursor, Masonry uses the cursor from paginationHistory
-        // when loadNext() is called. The cursor is set via initialNextPage prop.
-        // Call loadNext() which will use the cursor from paginationHistory
-        await tabContentVm.masonry?.loadNext();
+        // Ensure the restored token is usable for fetching.
+        await tabContentVm.getPage(cursorY);
 
         const browseCalls = mocks.mockAxios.get.mock.calls
             .map(call => call[0])
@@ -515,6 +540,5 @@ describe('Browse - Tab Restoration', () => {
 
         // Verify that the cursor was used in the API call
         expect(browseCalls[browseCalls.length - 1]).toContain(`page=${cursorY}`);
-        expect(tabContentVm.masonry?.currentPage).toBe(cursorY);
     });
 });

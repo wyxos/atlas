@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import ImageCarousel from './ImageCarousel.vue';
-import type { MasonryItem } from '../composables/useTabs';
+import type { FeedItem } from '../composables/useTabs';
 
 // Mock lucide-vue-next icons
 vi.mock('lucide-vue-next', () => ({
@@ -11,9 +11,14 @@ vi.mock('lucide-vue-next', () => ({
 }));
 
 describe('ImageCarousel', () => {
-    const createMockItems = (count: number): MasonryItem[] => {
+    const createMockItems = (count: number): FeedItem[] => {
         return Array.from({ length: count }, (_, i) => ({
             id: i + 1,
+            width: 500,
+            height: 500,
+            page: 1,
+            key: `1-${i + 1}`,
+            index: i,
             src: `https://example.com/image${i + 1}.jpg`,
             thumbnail: `https://example.com/thumb${i + 1}.jpg`,
             originalUrl: `https://example.com/original${i + 1}.jpg`,

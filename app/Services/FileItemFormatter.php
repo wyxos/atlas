@@ -80,6 +80,10 @@ class FileItemFormatter
                 'width' => $width,
                 'height' => $height,
                 'src' => $file->thumbnail_url ?? $file->url,
+                // Vibe (new) expects preview/original for the internal MasonryLoader.
+                // Keep existing src/originalUrl for backward compatibility in the Atlas UI.
+                'preview' => $file->thumbnail_url ?? $file->url,
+                'original' => $file->url,
                 'originalUrl' => $file->url, // Needed for FileViewer to show original images
                 'thumbnail' => $file->thumbnail_url,
                 'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',

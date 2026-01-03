@@ -1,5 +1,5 @@
 import { type Ref, triggerRef } from 'vue';
-import type { MasonryItem } from '@/composables/useTabs';
+import type { FeedItem } from '@/composables/useTabs';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 
 /**
@@ -7,7 +7,7 @@ import { useBrowseForm } from '@/composables/useBrowseForm';
  * Called by reactionQueue after reaction completes.
  */
 export default function updateReactionState(
-    items: Ref<MasonryItem[]>,
+    items: Ref<FeedItem[]>,
     fileId: number,
     reactionType: string
 ): void {

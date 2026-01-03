@@ -1,12 +1,12 @@
 import { ref, nextTick, triggerRef } from 'vue';
-import type { MasonryItem, TabData } from './useTabs';
+import type { FeedItem, TabData } from './useTabs';
 import { usePreviewBatch } from './usePreviewBatch';
 
 /**
  * Composable for handling item preview count increments.
  */
 export function useItemPreview(
-    items: import('vue').Ref<MasonryItem[]>,
+    items: import('vue').Ref<FeedItem[]>,
     _tab: import('vue').Ref<TabData | undefined>
 ) {
     const previewedItems = ref<Set<number>>(new Set());
