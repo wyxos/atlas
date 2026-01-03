@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ActionType;
 use App\Models\ModerationRule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class ModerationRuleController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
             'active' => ['boolean'],
             'nsfw' => ['boolean'],
-            'action_type' => ['nullable', 'string', 'in:ui_countdown,auto_dislike,blacklist'],
+            'action_type' => ['nullable', 'string', 'in:dislike,blacklist'],
             'op' => ['required', 'string', 'in:any,all,not_any,at_least,and,or'],
             'terms' => ['nullable', 'array'],
             'terms.*' => ['nullable'], // Can be string or object with term and allow_digit_prefix
@@ -42,7 +43,7 @@ class ModerationRuleController extends Controller
             'name' => $validated['name'] ?? null,
             'active' => $validated['active'] ?? true,
             'nsfw' => $validated['nsfw'] ?? false,
-            'action_type' => $validated['action_type'] ?? 'ui_countdown',
+            'action_type' => $validated['action_type'] ?? ActionType::DISLIKE,
             'op' => $validated['op'],
             'terms' => $validated['terms'] ?? null,
             'min' => $validated['min'] ?? null,
@@ -70,7 +71,7 @@ class ModerationRuleController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
             'active' => ['boolean'],
             'nsfw' => ['boolean'],
-            'action_type' => ['nullable', 'string', 'in:ui_countdown,auto_dislike,blacklist'],
+            'action_type' => ['nullable', 'string', 'in:dislike,blacklist'],
             'op' => ['string', 'in:any,all,not_any,at_least,and,or'],
             'terms' => ['nullable', 'array'],
             'terms.*' => ['nullable'], // Can be string or object with term and allow_digit_prefix
