@@ -32,7 +32,8 @@ class Browser
     public function run(): array
     {
         $params = request()->all();
-        $source = (string) ($params['source'] ?? CivitAiImages::key());
+        $requestedService = (string) ($params['service'] ?? '');
+        $serviceKey = $requestedService !== '' ? $requestedService : CivitAiImages::key();
 
         // Get available services
         $services = $this->getAvailableServices();
@@ -65,7 +66,7 @@ class Browser
         if ($isLocalMode) {
             $service = app(LocalService::class);
         } else {
-            $serviceClass = $services[$source] ?? $services[CivitAiImages::key()] ?? CivitAiImages::class;
+            $serviceClass = $services[$serviceKey] ?? $services[CivitAiImages::key()] ?? CivitAiImages::class;
             $service = app($serviceClass);
         }
 
@@ -174,18 +175,80 @@ class Browser
 
         if ($tabId) {
             // Update tab's params with current filter state (backend is responsible for this)
-            // Store 'service' key (not 'source') to match frontend expectation
-            \App\Models\Tab::where('id', $tabId)
+            // Store 'service' key (not 'source') to match frontend expectation.
+
+            $tab = \App\Models\Tab::query()
+                ->where('id', (int) $tabId)
                 ->where('user_id', auth()->id())
-                ->update([
+                ->first();
+
+            if ($tab) {
+                $existingParams = $tab->params;
+                if (! is_array($existingParams)) {
+                    $existingParams = [];
+                }
+
+                $existingServiceFilters = $existingParams['serviceFiltersByKey'] ?? [];
+                if (! is_array($existingServiceFilters)) {
+                    $existingServiceFilters = [];
+                }
+
+                // Vibe contract: `page` is the next token to load.
+                // Persist the *next* page token from the service response when available.
+                $pageToPersist = $filter['next'] ?? request()->input('page', 1);
+
+                // Canonical UI filter state for this service.
+                // Keep global keys (page/limit) and service-specific keys, but exclude non-filter envelope keys.
+                $reserved = [
+                    'service' => true,
+                    'feed' => true,
+                    'source' => true,
+                    'tab_id' => true,
+                    'serviceFiltersByKey' => true,
+                    'page' => true,
+                    'limit' => true,
+                    'next' => true,
+                ];
+
+                $serviceEntry = [];
+                foreach ([...$service->defaultParams(), ...$filter] as $k => $v) {
+                    if (isset($reserved[$k])) {
+                        continue;
+                    }
+                    $serviceEntry[$k] = $v;
+                }
+
+                // Always sync current pagination state into the per-service entry.
+                $serviceEntry['page'] = $pageToPersist;
+                $serviceEntry['limit'] = $filter['limit'] ?? request()->input('limit', $service->defaultParams()['limit'] ?? 20);
+
+                // Only keep per-service filters for online services.
+                if (! $isLocalMode) {
+                    $existingServiceFilters[$serviceKey] = $serviceEntry;
+                }
+
+                $flatFilter = $filter;
+                unset($flatFilter['next']);
+                unset($flatFilter['page']);
+                unset($flatFilter['limit']);
+
+                $tab->update([
                     'params' => [
-                        'service' => $source, // Store the service key as 'service' for frontend compatibility
+                        // Active selection envelope
+                        'service' => $serviceKey,
+                        'feed' => $isLocalMode ? 'local' : 'online',
+                        // Keep local source around (used by local mode UI)
+                        'source' => $params['source'] ?? ($existingParams['source'] ?? 'all'),
+
                         ...$service->defaultParams(),
-                        ...$filter,
-                        'page' => request()->input('page', 1),
-                        'next' => $filter['next'] ?? null,
+                        ...$flatFilter,
+                        // Persist the next token to load.
+                        'page' => $pageToPersist,
+                        // Per-service cache
+                        'serviceFiltersByKey' => $existingServiceFilters,
                     ],
                 ]);
+            }
         }
 
         // Transform persisted files to items format for frontend
@@ -197,7 +260,7 @@ class Browser
         return [
             'items' => $items,
             'filter' => [
-                'service' => $source, // Store the service key as 'service' for frontend compatibility
+                'service' => $serviceKey, // Store the service key as 'service' for frontend compatibility
                 ...$service->defaultParams(),
                 ...$filter,
                 'page' => request()->input('page', 1),

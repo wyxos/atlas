@@ -6,10 +6,9 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "test": "vitest",
-        "test:run": "vitest run",
-        "test:ui": "vitest --ui",
+        "test": "vitest run",
         "test:watch": "vitest",
+        "test:ui": "vitest --ui",
         "test:coverage": "vitest run --coverage",
         "check": "tsx scripts/check.ts",
         "check:js": "tsx scripts/check-js.ts",

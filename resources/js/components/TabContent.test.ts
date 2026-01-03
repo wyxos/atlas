@@ -578,8 +578,7 @@ describe('TabContent - Resume Session', () => {
                     id: 123,
                     label: 'Browse 1',
                     params: {
-                        page: '5',
-                        next: 'CURSOR_NEXT',
+                        page: 'CURSOR_NEXT',
                         service: 'test-service',
                     },
                     items: [
@@ -617,7 +616,7 @@ describe('TabContent - Resume Session', () => {
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
-        expect(masonry.props('restoredPages')).toEqual([5]);
+        expect(masonry.props('restoredPages')).toBeUndefined();
         expect(masonry.props('page')).toBe('CURSOR_NEXT');
         // Restored sessions should not run backfill (which can auto-fetch on mount).
         expect(masonry.props('mode')).toBe('default');

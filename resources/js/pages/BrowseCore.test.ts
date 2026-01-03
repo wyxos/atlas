@@ -527,10 +527,9 @@ describe('Browse - Core', () => {
         tabContentVm.items = [];
         const result = await tabContentVm.getPage(cursor);
 
-        // Cursor-based pagination uses `next=` in current implementation.
+        // Cursor-based pagination uses `page=` token.
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining('/api/browse'));
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`page=${cursor}`));
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`next=${cursor}`));
         expect(result).toHaveProperty('items');
         expect(result).toHaveProperty('nextPage');
         expect(result.nextPage).toBe(nextCursor);
@@ -607,15 +606,14 @@ describe('Browse - Core', () => {
 
     it('initializes with first tab when tabs exist and loads items if tab has files', async () => {
         const tabId = 1;
-        const pageParam = 'cursor-page-123';
-        const nextParam = 'cursor-next-456';
+        const nextToken = 'cursor-next-456';
         const mockItems = [
             { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
             { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+            params: { service: 'civit-ai-images', page: nextToken },
             items: mockItems,
         });
 
@@ -635,9 +633,9 @@ describe('Browse - Core', () => {
         const tabContentVm = await waitForTabContent(wrapper);
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
-        // Restoration sets `startPageToken` to the saved next cursor (when available).
-        expect(masonry.props('page')).toBe(nextParam);
-        expect(masonry.props('restoredPages')).toEqual([1]);
+        // New contract: `page` is the next token to load.
+        expect(masonry.props('page')).toBe(nextToken);
+        expect(masonry.props('restoredPages')).toBeUndefined();
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(tabShow.url({ tab: 1 }));
     });
 

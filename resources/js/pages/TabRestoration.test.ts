@@ -225,15 +225,14 @@ beforeEach(() => {
 describe('Browse - Tab Restoration', () => {
     it('restores tab query params after refresh', async () => {
         const tabId = 1;
-        const pageParam = 'cursor-page-123';
-        const nextParam = 'cursor-next-456';
+        const nextToken = 'cursor-next-456';
         const mockItems = [
             { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
             { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+            params: { service: 'civit-ai-images', page: nextToken },
             items: mockItems,
         });
 
@@ -251,9 +250,9 @@ describe('Browse - Tab Restoration', () => {
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
-        // Restoration sets `startPageToken` to the saved next cursor (when available).
-        expect(masonry.props('page')).toBe(nextParam);
-        expect(masonry.props('restoredPages')).toEqual([1]);
+        // New contract: `page` is the next token to load.
+        expect(masonry.props('page')).toBe(nextToken);
+        expect(masonry.props('restoredPages')).toBeUndefined();
     });
 
     it('loads tab items when items exist', async () => {
@@ -302,15 +301,14 @@ describe('Browse - Tab Restoration', () => {
     it('switches to tab with saved query params', async () => {
         const tab1Id = 1;
         const tab2Id = 2;
-        const pageParam = 'cursor-page-456';
-        const nextParam = 'cursor-next-789';
+        const nextToken = 'cursor-next-789';
 
         const tabConfigs = [
             createMockTabConfig(tab1Id, {
                 params: { service: 'civit-ai-images', page: 1 },
             }),
             createMockTabConfig(tab2Id, {
-                params: { service: 'civit-ai-images', page: pageParam, next: nextParam },
+                params: { service: 'civit-ai-images', page: nextToken },
                 position: 1,
             }),
         ];
@@ -334,8 +332,8 @@ describe('Browse - Tab Restoration', () => {
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
-        expect(masonry.props('page')).toBe(nextParam);
-        expect(masonry.props('restoredPages')).toEqual([1]);
+        expect(masonry.props('page')).toBe(nextToken);
+        expect(masonry.props('restoredPages')).toBeUndefined();
     });
 
     it('restores items when switching to tab with items', async () => {
@@ -378,14 +376,14 @@ describe('Browse - Tab Restoration', () => {
 
     it('resumes pagination from next cursor value', async () => {
         const tabId = 1;
-        const nextParam = 'cursor-next-789';
+        const nextToken = 'cursor-next-789';
         const browseResponse = {
-            ...createMockBrowseResponse(nextParam, 'cursor-next-999'),
+            ...createMockBrowseResponse(nextToken, 'cursor-next-999'),
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
         };
 
         const tabConfig = createMockTabConfig(tabId, {
-            params: { service: 'civit-ai-images', page: 1, next: nextParam },
+            params: { service: 'civit-ai-images', page: nextToken },
         });
 
         setupAxiosMocks(mocks, tabConfig, browseResponse);
@@ -404,10 +402,10 @@ describe('Browse - Tab Restoration', () => {
         tabContentVm.isTabRestored = false;
         tabContentVm.items = [];
 
-        const getNextPageResult = await tabContentVm.getPage(nextParam);
+        const getNextPageResult = await tabContentVm.getPage(nextToken);
 
         expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(browseIndex.definition.url));
-        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`next=${nextParam}`));
+        expect(mocks.mockAxios.get).toHaveBeenCalledWith(expect.stringContaining(`page=${nextToken}`));
         expect(getNextPageResult.nextPage).toBeDefined();
     });
 
@@ -427,7 +425,7 @@ describe('Browse - Tab Restoration', () => {
         }));
 
         const tabConfig = createMockTabConfig(tabId, {
-            params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
+            params: { service: 'civit-ai-images', page: cursorY },
             items: mockItems,
         });
 
@@ -447,7 +445,7 @@ describe('Browse - Tab Restoration', () => {
 
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
-        // Cursor-based restoration uses the saved `next` as the next request token.
+        // New contract: cursor token is stored in `page`.
         expect(masonry.props('page')).toBe(cursorY);
     });
 
@@ -461,7 +459,7 @@ describe('Browse - Tab Restoration', () => {
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            params: { service: 'civit-ai-images', page: cursorX, next: cursorY },
+            params: { service: 'civit-ai-images', page: cursorY },
             items: mockItems,
         });
 

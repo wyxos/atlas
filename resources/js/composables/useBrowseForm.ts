@@ -3,15 +3,14 @@ import type { TabData } from './useTabs';
 
 export interface BrowseFormData {
     service: string;
-    nsfw: boolean;
-    type: string;
     limit: string;
-    sort: string;
     page: string | number;
-    next: string | number | null;
     feed: 'online' | 'local';
     source: string;
     tab_id: number | null;
+    // Service-specific UI filters (excluding global keys like service/feed/source/tab_id).
+    // These are persisted/restored per service key.
+    serviceFilters: Record<string, unknown>;
 }
 
 // Singleton instance
@@ -20,18 +19,19 @@ let formInstance: ReturnType<typeof createFormInstance> | null = null;
 function createFormInstance() {
     const defaultData: BrowseFormData = {
         service: '',
-        nsfw: false,
-        type: 'all',
         limit: '20',
-        sort: 'Newest',
         page: 1,
-        next: null,
         feed: 'online',
         source: 'all',
         tab_id: null,
+        serviceFilters: {},
     };
 
     const data = reactive<BrowseFormData>({ ...defaultData });
+
+    // In-memory cache to preserve per-service filter values when switching services.
+    // This avoids the "switch away and back loses values" glitch.
+    const filtersByServiceKey = reactive<Record<string, Record<string, unknown>>>({});
 
     const errors = reactive<Partial<Record<keyof BrowseFormData, string>>>({});
     const processing = ref(false);
@@ -49,17 +49,6 @@ function createFormInstance() {
 
         const params = tab.params as Record<string, unknown>;
 
-        const parseBool = (value: unknown, fallback: boolean): boolean => {
-            if (typeof value === 'boolean') return value;
-            if (typeof value === 'number') return value === 1;
-            if (typeof value === 'string') {
-                const v = value.trim().toLowerCase();
-                if (v === 'true' || v === '1') return true;
-                if (v === 'false' || v === '0' || v === '') return false;
-            }
-            return fallback;
-        };
-
         const parseString = (value: unknown, fallback: string): string => {
             return typeof value === 'string' && value.length ? value : fallback;
         };
@@ -75,9 +64,6 @@ function createFormInstance() {
 
         data.tab_id = tab.id;
         data.service = parseString(params.service, defaultData.service);
-        data.nsfw = parseBool(params.nsfw, defaultData.nsfw);
-        data.type = parseString(params.type, defaultData.type);
-        data.sort = parseString(params.sort, defaultData.sort);
         data.feed = params.feed === 'local' ? 'local' : 'online';
         data.source = parseString(params.source, defaultData.source);
 
@@ -89,7 +75,51 @@ function createFormInstance() {
         }
 
         data.page = parseStringOrNumber(params.page, defaultData.page) ?? defaultData.page;
-        data.next = parseStringOrNumber(params.next, defaultData.next);
+
+        // Restore per-service filters. Prefer an explicit per-service map, if present.
+        // Otherwise, fall back to storing unknown keys as serviceFilters for the current service.
+        const serviceKey = data.service;
+        const serviceFiltersByKey = params.serviceFiltersByKey;
+        if (serviceKey && typeof serviceFiltersByKey === 'object' && serviceFiltersByKey) {
+            const raw = (serviceFiltersByKey as Record<string, unknown>)[serviceKey];
+            if (raw && typeof raw === 'object') {
+                filtersByServiceKey[serviceKey] = { ...(raw as Record<string, unknown>) };
+            }
+        } else if (serviceKey) {
+            const reserved = new Set(['service', 'feed', 'source', 'tab_id', 'page', 'limit']);
+            const inferred: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(params)) {
+                if (reserved.has(k)) {
+                    continue;
+                }
+                inferred[k] = v;
+            }
+            if (Object.keys(inferred).length > 0) {
+                filtersByServiceKey[serviceKey] = { ...inferred };
+            }
+        }
+
+        if (serviceKey) {
+            // Seed current service filters from cache (if any)
+            const cached = filtersByServiceKey[serviceKey];
+            if (cached) {
+                // Extract global-ish values if present.
+                if ('page' in cached) {
+                    data.page = (cached.page as string | number) ?? data.page;
+                }
+                if ('limit' in cached) {
+                    const lv = cached.limit;
+                    if (typeof lv === 'number' && Number.isFinite(lv)) {
+                        data.limit = String(lv);
+                    } else if (typeof lv === 'string') {
+                        data.limit = lv;
+                    }
+                }
+
+                const { page: _p, limit: _l, ...rest } = cached;
+                data.serviceFilters = { ...rest };
+            }
+        }
     }
 
     /**
@@ -97,6 +127,7 @@ function createFormInstance() {
      */
     function reset(): void {
         Object.assign(data, defaultData);
+        data.serviceFilters = {};
         clearErrors();
         wasSuccessful.value = false;
     }
@@ -138,6 +169,76 @@ function createFormInstance() {
         return { ...data };
     }
 
+    function setService(nextService: string, nextDefaults?: Record<string, unknown>): void {
+        const prevService = data.service;
+
+        if (prevService) {
+            filtersByServiceKey[prevService] = {
+                ...data.serviceFilters,
+                page: data.page,
+                limit: data.limit,
+            };
+        }
+
+        data.service = nextService;
+
+        if (!nextService) {
+            data.serviceFilters = {};
+            data.page = 1;
+            return;
+        }
+
+        const cached = filtersByServiceKey[nextService];
+        if (cached) {
+            if ('page' in cached) {
+                data.page = (cached.page as string | number) ?? 1;
+            } else {
+                data.page = 1;
+            }
+
+            if ('limit' in cached) {
+                const lv = cached.limit;
+                if (typeof lv === 'number' && Number.isFinite(lv)) {
+                    data.limit = String(lv);
+                } else if (typeof lv === 'string' && lv.length) {
+                    data.limit = lv;
+                }
+            }
+
+            const { page: _p, limit: _l, ...rest } = cached;
+            data.serviceFilters = { ...rest };
+            return;
+        }
+
+        // No cache: start from defaults for this service (if provided)
+        data.page = 1;
+        data.serviceFilters = {};
+
+        if (nextDefaults && typeof nextDefaults === 'object') {
+            const reserved = new Set(['service', 'feed', 'source', 'tab_id']);
+            for (const [k, v] of Object.entries(nextDefaults)) {
+                if (reserved.has(k)) {
+                    continue;
+                }
+                if (k === 'limit') {
+                    if (typeof v === 'number' && Number.isFinite(v)) {
+                        data.limit = String(v);
+                    } else if (typeof v === 'string' && v.length) {
+                        data.limit = v;
+                    }
+                    continue;
+                }
+                if (k === 'page') {
+                    if (typeof v === 'number' || typeof v === 'string') {
+                        data.page = v as string | number;
+                    }
+                    continue;
+                }
+                data.serviceFilters[k] = v;
+            }
+        }
+    }
+
     // Computed for switch (true = local, false = online)
     const isLocalMode = computed({
         get: () => data.feed === 'local',
@@ -156,6 +257,7 @@ function createFormInstance() {
         wasSuccessful,
         reset,
         syncFromTab,
+        setService,
         clearErrors,
         setError,
         clearError,

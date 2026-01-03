@@ -81,18 +81,25 @@ class CivitAiImages extends BaseService
         $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 20;
         $limit = max(0, min(200, $limit));
 
-        // Check for 'next' parameter first (cursor-based pagination from frontend)
-        // If 'next' is provided, use it as the cursor; otherwise fall back to 'page'
+        // Vibe contract: `page` is the next token to load.
+        // For CivitAI this is a cursor string; `1` means "start" (no cursor).
         $cursor = null;
-        if (isset($this->params['next']) && $this->params['next'] !== null) {
-            $cursor = (string) $this->params['next'];
-        } elseif (isset($this->params['page']) && (int) $this->params['page'] > 1) {
-            $cursor = (string) $this->params['page'];
+        $page = $this->params['page'] ?? null;
+        if (is_string($page) && $page !== '' && $page !== '1') {
+            $cursor = $page;
         }
 
         $sort = $this->params['sort'] ?? 'Newest';
         $nsfw = $this->params['nsfw'] ?? null; // boolean or enum: None|Soft|Mature|X
         $type = $this->resolveType($this->params['type'] ?? null);
+
+        $postId = isset($this->params['postId']) ? (int) $this->params['postId'] : null;
+        $modelId = isset($this->params['modelId']) ? (int) $this->params['modelId'] : null;
+        $modelVersionId = isset($this->params['modelVersionId']) ? (int) $this->params['modelVersionId'] : null;
+        $username = isset($this->params['username']) && is_string($this->params['username'])
+            ? trim($this->params['username'])
+            : null;
+        $period = $this->params['period'] ?? null;
 
         $query = [
             'limit' => $limit,
@@ -113,6 +120,26 @@ class CivitAiImages extends BaseService
             $query['type'] = $type;
         }
 
+        if ($postId && $postId > 0) {
+            $query['postId'] = $postId;
+        }
+
+        if ($modelId && $modelId > 0) {
+            $query['modelId'] = $modelId;
+        }
+
+        if ($modelVersionId && $modelVersionId > 0) {
+            $query['modelVersionId'] = $modelVersionId;
+        }
+
+        if ($username !== null && $username !== '') {
+            $query['username'] = $username;
+        }
+
+        if (is_string($period) && $period !== '') {
+            $query['period'] = $period;
+        }
+
         $this->params['type'] = $type;
 
         return $query;
@@ -121,10 +148,124 @@ class CivitAiImages extends BaseService
     public function defaultParams(): array
     {
         return [
-            'nsfw' => 0,
             'limit' => 20,
             'sort' => 'Newest',
             // Normalize to UI 'sorting' if consumer needs it; Wallhaven service reads 'sort' and maps to 'sorting'.
+        ];
+    }
+
+    public function filterSchema(): array
+    {
+        return [
+            'fields' => [
+                // Global keys (canonical UI keys)
+                [
+                    'uiKey' => 'page',
+                    'serviceKey' => 'cursor',
+                    'type' => 'hidden',
+                    'label' => 'Page',
+                    'description' => 'Pagination cursor (managed automatically).',
+                ],
+                [
+                    'uiKey' => 'limit',
+                    'serviceKey' => 'limit',
+                    'type' => 'number',
+                    'label' => 'Limit',
+                    'description' => 'The number of results per page (0-200).',
+                    'min' => 0,
+                    'max' => 200,
+                    'step' => 1,
+                ],
+
+                // Service-specific keys
+                [
+                    'uiKey' => 'postId',
+                    'serviceKey' => 'postId',
+                    'type' => 'number',
+                    'label' => 'Post ID',
+                    'description' => 'The ID of a post to get images from.',
+                    'min' => 1,
+                    'step' => 1,
+                ],
+                [
+                    'uiKey' => 'modelId',
+                    'serviceKey' => 'modelId',
+                    'type' => 'number',
+                    'label' => 'Model ID',
+                    'description' => 'The ID of a model to get images from.',
+                    'min' => 1,
+                    'step' => 1,
+                ],
+                [
+                    'uiKey' => 'modelVersionId',
+                    'serviceKey' => 'modelVersionId',
+                    'type' => 'number',
+                    'label' => 'Model Version ID',
+                    'description' => 'The ID of a model version to get images from.',
+                    'min' => 1,
+                    'step' => 1,
+                ],
+                [
+                    'uiKey' => 'username',
+                    'serviceKey' => 'username',
+                    'type' => 'text',
+                    'label' => 'Username',
+                    'description' => 'Filter to images from a specific user.',
+                    'placeholder' => 'e.g. someUser',
+                ],
+                [
+                    'uiKey' => 'nsfw',
+                    'serviceKey' => 'nsfw',
+                    'type' => 'select',
+                    'label' => 'NSFW',
+                    'description' => 'Filter by mature content flags (or show all).',
+                    'options' => [
+                        ['label' => 'All', 'value' => null],
+                        ['label' => 'None', 'value' => 'None'],
+                        ['label' => 'Soft', 'value' => 'Soft'],
+                        ['label' => 'Mature', 'value' => 'Mature'],
+                        ['label' => 'X', 'value' => 'X'],
+                    ],
+                ],
+                [
+                    'uiKey' => 'type',
+                    'serviceKey' => 'type',
+                    'type' => 'select',
+                    'label' => 'Type',
+                    'description' => 'Filter by media type.',
+                    'options' => [
+                        ['label' => 'All', 'value' => 'all'],
+                        ['label' => 'Image', 'value' => 'image'],
+                        ['label' => 'Video', 'value' => 'video'],
+                    ],
+                ],
+                [
+                    'uiKey' => 'sort',
+                    'serviceKey' => 'sort',
+                    'type' => 'select',
+                    'label' => 'Sort',
+                    'description' => 'Order of results.',
+                    'options' => [
+                        ['label' => 'Newest', 'value' => 'Newest'],
+                        ['label' => 'Most Reactions', 'value' => 'Most Reactions'],
+                        ['label' => 'Most Comments', 'value' => 'Most Comments'],
+                    ],
+                ],
+                [
+                    'uiKey' => 'period',
+                    'serviceKey' => 'period',
+                    'type' => 'select',
+                    'label' => 'Period',
+                    'description' => 'Time window for sorting.',
+                    'options' => [
+                        ['label' => 'All Time', 'value' => 'AllTime'],
+                        ['label' => 'Year', 'value' => 'Year'],
+                        ['label' => 'Month', 'value' => 'Month'],
+                        ['label' => 'Week', 'value' => 'Week'],
+                        ['label' => 'Day', 'value' => 'Day'],
+                    ],
+                ],
+            ],
         ];
     }
 
