@@ -90,7 +90,7 @@ class CivitAiImages extends BaseService
         }
 
         $sort = $this->params['sort'] ?? 'Newest';
-        $nsfw = $this->params['nsfw'] ?? null; // boolean or enum: None|Soft|Mature|X
+        $nsfw = $this->resolveNsfw($this->params['nsfw'] ?? null);
         $type = $this->resolveType($this->params['type'] ?? null);
 
         $postId = isset($this->params['postId']) ? (int) $this->params['postId'] : null;
@@ -112,7 +112,6 @@ class CivitAiImages extends BaseService
         }
 
         if ($nsfw !== null) {
-            // Pass through as-is; API accepts boolean or string levels depending on endpoint
             $query['nsfw'] = $nsfw;
         }
 
@@ -150,6 +149,9 @@ class CivitAiImages extends BaseService
         return [
             'limit' => 20,
             'sort' => 'Newest',
+            // CivitAI supports `nsfw` as a boolean.
+            // Default to safe mode (false) unless user opts in.
+            'nsfw' => false,
             // Normalize to UI 'sorting' if consumer needs it; Wallhaven service reads 'sort' and maps to 'sorting'.
         ];
     }
@@ -216,16 +218,9 @@ class CivitAiImages extends BaseService
                 [
                     'uiKey' => 'nsfw',
                     'serviceKey' => 'nsfw',
-                    'type' => 'select',
+                    'type' => 'boolean',
                     'label' => 'NSFW',
-                    'description' => 'Filter by mature content flags (or show all).',
-                    'options' => [
-                        ['label' => 'All', 'value' => null],
-                        ['label' => 'None', 'value' => 'None'],
-                        ['label' => 'Soft', 'value' => 'Soft'],
-                        ['label' => 'Mature', 'value' => 'Mature'],
-                        ['label' => 'X', 'value' => 'X'],
-                    ],
+                    'description' => 'Include NSFW results.',
                 ],
                 [
                     'uiKey' => 'type',
@@ -362,6 +357,36 @@ class CivitAiImages extends BaseService
         $normalized = strtolower(trim($value));
 
         return in_array($normalized, ['image', 'video'], true) ? $normalized : null;
+    }
+
+    protected function resolveNsfw(mixed $value): ?bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (bool) $value;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim($value));
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (in_array($normalized, ['true', '1', 'yes', 'on'], true)) {
+            return true;
+        }
+
+        if (in_array($normalized, ['false', '0', 'no', 'off'], true)) {
+            return false;
+        }
+
+        return null;
     }
 
     public function getBlacklistableContainerTypes(): array
