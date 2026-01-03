@@ -145,30 +145,19 @@ function calculateBestFitSize(
     };
 }
 
-function findMasonryItemByImageSrc(imageSrc: string, itemElement: HTMLElement): FeedItem | null {
-    // Try to find item by checking data attributes on the masonry item element
-    const itemKeyAttr = itemElement.getAttribute('data-key');
-    if (itemKeyAttr) {
-        // Match by key (provided by backend)
-        const itemByKey = items.value.find(i => i.key === itemKeyAttr);
-        if (itemByKey) return itemByKey;
-
-        // Fallback: parse and match by id only (for backward compatibility with old data)
-        const parts = itemKeyAttr.split('-');
-        const fileId = parts.length > 1 ? Number(parts[parts.length - 1]) : Number(itemKeyAttr);
-        if (!isNaN(fileId)) {
-            const item = items.value.find(i => i.id === fileId);
-            if (item) return item;
-        }
+function getClickedItemId(target: HTMLElement): number | null {
+    const el = target.closest('[data-file-id]') as HTMLElement | null;
+    if (!el) {
+        return null;
     }
 
-    // Fallback: try to match by URL (compare src with item.src or thumbnail)
-    // Extract base URL without query params for comparison
-    const baseSrc = imageSrc.split('?')[0].split('#')[0];
-    return items.value.find(item => {
-        const itemSrc = (item.src || item.thumbnail || '').split('?')[0].split('#')[0];
-        return baseSrc === itemSrc || baseSrc.includes(itemSrc) || itemSrc.includes(baseSrc);
-    }) || null;
+    const raw = el.getAttribute('data-file-id');
+    if (!raw) {
+        return null;
+    }
+
+    const id = Number(raw);
+    return Number.isFinite(id) ? id : null;
 }
 
 function closeOverlay(): void {
@@ -464,11 +453,24 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const target = e.target as HTMLElement | null;
     if (!target) return;
 
-    // Find the nearest masonry item element
-    const itemEl = target.closest('.masonry-item') as HTMLElement | null;
+    // Vibe 2.x renders each masonry card as an <article data-testid="item-card">.
+    const itemEl = target.closest('[data-testid="item-card"]') as HTMLElement | null;
 
     if (!itemEl || !container.contains(itemEl)) {
         // Clicked outside an item → clear overlay
+        closeOverlay();
+        return;
+    }
+
+    const clickedItemId = getClickedItemId(target);
+    if (clickedItemId === null) {
+        // The click did not originate from an item overlay we control.
+        closeOverlay();
+        return;
+    }
+
+    const masonryItem = items.value.find((i) => i.id === clickedItemId) ?? null;
+    if (!masonryItem) {
         closeOverlay();
         return;
     }
@@ -503,13 +505,8 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const computed = window.getComputedStyle(itemEl);
     const radius = computed.borderRadius || '';
 
-    // Find the masonry item data to get the full-size URL
-    const masonryItem = findMasonryItemByImageSrc(src, itemEl);
-    const fullSizeUrl = masonryItem?.originalUrl || src; // Fallback to current src if no originalUrl
-
-    // Find and set the current item index
-    const itemIndex = masonryItem ? items.value.findIndex(item => item.id === masonryItem.id) : -1;
-    currentItemIndex.value = itemIndex >= 0 ? itemIndex : null;
+    const fullSizeUrl = masonryItem.originalUrl || masonryItem.original || masonryItem.src;
+    currentItemIndex.value = items.value.findIndex((it) => it.id === masonryItem.id);
 
     // Increment key to force image element recreation (prevents showing previous image)
     overlayKey.value++;
@@ -546,9 +543,7 @@ async function openFromClick(e: MouseEvent): Promise<void> {
         overlayIsLoading.value = false;
 
         // Increment seen count when file is fully loaded
-        if (masonryItem?.id) {
-            await handleItemSeen(masonryItem.id);
-        }
+        await handleItemSeen(masonryItem.id);
 
         // Wait for image to be displayed, then proceed with animations
         await nextTick();

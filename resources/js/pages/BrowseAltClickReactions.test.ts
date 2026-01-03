@@ -191,16 +191,19 @@ describe('Browse - ALT + Click Reactions', () => {
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
-            const mockItem = document.createElement('div');
-            mockItem.className = 'masonry-item';
-            mockItem.setAttribute('data-key', '1');
+            const mockItem = document.createElement('article');
+            mockItem.setAttribute('data-testid', 'item-card');
             const mockImg = document.createElement('img');
             mockImg.src = 'test1.jpg';
             mockItem.appendChild(mockImg);
+
+            const mockOverlay = document.createElement('div');
+            mockOverlay.setAttribute('data-file-id', '1');
+            mockItem.appendChild(mockOverlay);
             masonryContainer.element.appendChild(mockItem);
 
             const clickEvent = new MouseEvent('click', { bubbles: true, altKey: true, button: 0 });
-            Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+            Object.defineProperty(clickEvent, 'target', { value: mockOverlay, enumerable: true });
             masonryContainer.element.dispatchEvent(clickEvent);
 
             await flushPromises();
@@ -242,16 +245,19 @@ describe('Browse - ALT + Click Reactions', () => {
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
-            const mockItem = document.createElement('div');
-            mockItem.className = 'masonry-item';
-            mockItem.setAttribute('data-key', '2');
+            const mockItem = document.createElement('article');
+            mockItem.setAttribute('data-testid', 'item-card');
             const mockImg = document.createElement('img');
             mockImg.src = 'test2.jpg';
             mockItem.appendChild(mockImg);
+
+            const mockOverlay = document.createElement('div');
+            mockOverlay.setAttribute('data-file-id', '2');
+            mockItem.appendChild(mockOverlay);
             masonryContainer.element.appendChild(mockItem);
 
             const contextMenuEvent = new MouseEvent('contextmenu', { bubbles: true, altKey: true, button: 2 });
-            Object.defineProperty(contextMenuEvent, 'target', { value: mockImg, enumerable: true });
+            Object.defineProperty(contextMenuEvent, 'target', { value: mockOverlay, enumerable: true });
             masonryContainer.element.dispatchEvent(contextMenuEvent);
 
             await flushPromises();
@@ -289,16 +295,19 @@ describe('Browse - ALT + Click Reactions', () => {
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
-            const mockItem = document.createElement('div');
-            mockItem.className = 'masonry-item';
-            mockItem.setAttribute('data-key', '3');
+            const mockItem = document.createElement('article');
+            mockItem.setAttribute('data-testid', 'item-card');
             const mockImg = document.createElement('img');
             mockImg.src = 'test3.jpg';
             mockItem.appendChild(mockImg);
+
+            const mockOverlay = document.createElement('div');
+            mockOverlay.setAttribute('data-file-id', '3');
+            mockItem.appendChild(mockOverlay);
             masonryContainer.element.appendChild(mockItem);
 
             const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, altKey: true, button: 1 });
-            Object.defineProperty(mouseDownEvent, 'target', { value: mockImg, enumerable: true });
+            Object.defineProperty(mouseDownEvent, 'target', { value: mockOverlay, enumerable: true });
             masonryContainer.element.dispatchEvent(mouseDownEvent);
 
             await flushPromises();
@@ -483,24 +492,31 @@ describe('Browse - ALT + Click Reactions', () => {
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
-            const mockItem = document.createElement('div');
-            mockItem.className = 'masonry-item';
-            mockItem.setAttribute('data-key', '1');
+            const mockItem = document.createElement('article');
+            mockItem.setAttribute('data-testid', 'item-card');
             const mockImg = document.createElement('img');
             mockImg.src = 'test1.jpg';
             mockItem.appendChild(mockImg);
+
+            const mockOverlay = document.createElement('div');
+            mockOverlay.setAttribute('data-file-id', '1');
+            mockItem.appendChild(mockOverlay);
             masonryContainer.element.appendChild(mockItem);
 
             // Click WITHOUT altKey
             const clickEvent = new MouseEvent('click', { bubbles: true, altKey: false, button: 0 });
-            Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+            Object.defineProperty(clickEvent, 'target', { value: mockOverlay, enumerable: true });
             masonryContainer.element.dispatchEvent(clickEvent);
 
             await flushPromises();
             await wrapper.vm.$nextTick();
 
-            // No reaction API call should be made when ALT key is not pressed
-            expect(mockAxios.post).not.toHaveBeenCalled();
+            // No *reaction* API call should be made when ALT key is not pressed.
+            // Normal click now opens FileViewer again, which may POST preview/seen updates.
+            const reactionCalls = mockAxios.post.mock.calls.filter((call: any[]) =>
+                typeof call?.[0] === 'string' && call[0].includes('/reaction')
+            );
+            expect(reactionCalls).toHaveLength(0);
         }
     });
 });

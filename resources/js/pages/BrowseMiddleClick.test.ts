@@ -235,7 +235,7 @@ describe('Browse - Middle Click Shortcuts', () => {
         await wrapper.vm.$nextTick();
 
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
-        const masonryItem = browseTabContentComponent.find('.masonry-item');
+        const masonryItem = browseTabContentComponent.find('[data-file-id="1"]');
 
         if (masonryItem.exists()) {
             const middleClickEvent = new MouseEvent('mousedown', {
