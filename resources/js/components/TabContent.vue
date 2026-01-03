@@ -625,7 +625,8 @@ onMounted(async () => {
 
 // Cleanup on unmount
 onUnmounted(() => {
-
+    // cancel any in-flight masonry requests
+    masonry.value?.cancel?.();
 });
 
 defineExpose({
@@ -788,7 +789,7 @@ defineExpose({
                 </div>
 
                 <Masonry v-else :key="`${tab.id}-${masonryRenderKey}`" ref="masonry" v-model:items="items"
-                    class="min-h-0 flex-1"
+                    class="min-h-0 flex-1 !mt-0 !py-0 !border-0"
                     :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
