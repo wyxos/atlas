@@ -30,9 +30,10 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
     const hoveredContainerId = ref<number | null>(null);
     const debouncedHoveredContainerId = ref<number | null>(null);
 
-    // Debounce hover state changes to reduce rapid recalculations (50ms delay)
+    // Debounce hover state changes to reduce rapid recalculations.
+    // This also avoids a "disco" effect when moving quickly between pills.
     let hoverDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const HOVER_DEBOUNCE_MS = 50;
+    const HOVER_DEBOUNCE_MS = 120;
 
     // Cache: Map<containerId, count> - O(1) lookup instead of O(n) iteration
     const containerCountCache = ref<Map<number, number>>(new Map());
@@ -296,6 +297,8 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
 
     return {
         hoveredContainerId,
+        // Debounced/"active" hover state used for visual effects.
+        activeHoveredContainerId: debouncedHoveredContainerId,
         setHoveredContainerId,
         getContainersForItem,
         getItemCountForContainerId,
