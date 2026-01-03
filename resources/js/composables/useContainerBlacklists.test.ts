@@ -37,7 +37,7 @@ describe('useContainerBlacklists', () => {
                 type: 'User',
                 source: 'CivitAI',
                 source_id: '123',
-                action_type: 'ui_countdown',
+                action_type: 'dislike',
                 blacklisted_at: '2024-01-15T10:00:00Z',
             },
             {
@@ -81,7 +81,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'ui_countdown',
+            action_type: 'dislike',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 
@@ -89,11 +89,11 @@ describe('useContainerBlacklists', () => {
 
         const { createBlacklist, blacklists } = useContainerBlacklists();
 
-        const result = await createBlacklist(1, 'ui_countdown');
+        const result = await createBlacklist(1, 'dislike');
 
         expect(mockAxios.post).toHaveBeenCalledWith('/api/container-blacklists', {
             container_id: 1,
-            action_type: 'ui_countdown',
+            action_type: 'dislike',
         });
         expect(result).toEqual(mockContainer);
         expect(blacklists.value.length).toBeGreaterThan(0);
@@ -106,7 +106,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'ui_countdown',
+            action_type: 'dislike',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
         const updated = {
@@ -139,7 +139,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'ui_countdown',
+            action_type: 'dislike',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 
@@ -172,7 +172,7 @@ describe('useContainerBlacklists', () => {
         const mockStatus = {
             blacklisted: true,
             blacklisted_at: '2024-01-15T10:00:00Z',
-            action_type: 'ui_countdown',
+            action_type: 'dislike',
         };
 
         mockAxios.get.mockResolvedValue({ data: mockStatus });
@@ -201,7 +201,7 @@ describe('useContainerBlacklists', () => {
             type: 'User',
             source: 'CivitAI',
             source_id: '123',
-            action_type: 'ui_countdown',
+            action_type: 'dislike',
             blacklisted_at: '2024-01-15T10:00:00Z',
         };
 
