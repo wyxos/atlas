@@ -1,4 +1,4 @@
-# Atlas v2 - Agent Guidelines
+# Atlas - Agent Guidelines
 
 ## Project Snapshot
 
@@ -180,6 +180,6 @@ Before creating a PR:
 ## Laravel Herd
 
 - Application is served by Laravel Herd
-- URL format: `https://atlas-v2.test` (kebab-case project directory)
+- URL format: `https://atlas.test` (kebab-case project directory)
 - No manual HTTP server setup needed
 - Use `php artisan route:list` to see all routes

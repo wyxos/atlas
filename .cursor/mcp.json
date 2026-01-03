@@ -13,7 +13,7 @@
                 "C:/Users/joeyj/.config/herd/bin/herd-mcp.phar"
             ],
             "env": {
-                "SITE_PATH": "D:\\code\\wyxos\\php\\atlas-v2"
+                "SITE_PATH": "${workspaceFolder}"
             }
         }
     }

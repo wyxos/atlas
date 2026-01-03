@@ -1,4 +1,4 @@
-# Atlas v2 - AI Agent Guidelines
+# Atlas - AI Agent Guidelines
 
 ## Project Overview
 Atlas is a Laravel 12 media server application with a Vue 3 SPA frontend. It aggregates media from external services (CivitAI, Wallhaven, etc.) through a pluggable service architecture, with sophisticated moderation, reaction tracking, and browsing capabilities.
@@ -35,7 +35,7 @@ Atlas is a Laravel 12 media server application with a Vue 3 SPA frontend. It agg
 - **Backend**: Laravel 12, PHP 8.4, Pest 4, Playwright browser tests
 - **Frontend**: Vue 3, TypeScript, Vite, Vitest, Tailwind CSS 4, Oruga UI, FontAwesome
 - **Database**: SQLite (via Laravel conventions)
-- **Dev Server**: Laravel Herd (auto-serves at `https://atlas-v2.test`)
+- **Dev Server**: Laravel Herd (auto-serves at `https://atlas.test`)
 - **Package**: `wyxos/harmonie` for listing utilities (`ListingBase`)
 
 ## Development Workflows
