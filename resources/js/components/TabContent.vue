@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue';
 import type { TabData, FeedItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem } from '@wyxos/vibe';
-import type { MasonryInstance } from '@wyxos/vibe';
+import type { MasonryInstance, MasonryRestoredPages, PageToken } from '@wyxos/vibe';
 import {
     ChevronDown,
     Copy,
@@ -89,8 +89,8 @@ const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
 
 const masonryRenderKey = ref(0);
-const startPageToken = ref<number | string>(1);
-const restoredPages = ref<number[] | null>(null);
+const startPageToken = ref<PageToken>(1);
+const restoredPages = ref<MasonryRestoredPages | null>(null);
 
 // Track which items have successfully preloaded so overlays can gate UI like the old implementation did.
 const preloadedItemIds = ref<Set<number>>(new Set());
@@ -594,35 +594,19 @@ onMounted(async () => {
             shouldShowForm.value = false;
             isTabRestored.value = hasRestoredItems;
 
-            const savedPage = params.page as string | number | null | undefined;
-            const savedNext = params.next as string | number | null | undefined;
-            const parsedPage = typeof savedPage === 'number' ? savedPage : Number(savedPage);
-            const lastLoadedPage = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.floor(parsedPage) : 1;
+            const savedPage = params.page as PageToken | null | undefined;
+            const savedNext = params.next as PageToken | null | undefined;
 
             items.value = itemsToRestore as FeedItem[];
             preloadedItemIds.value = new Set();
 
             if (hasRestoredItems) {
-                // Inform Vibe Masonry that items are restored, so it doesn't refetch on mount.
-                // If the backend didn't include per-item page values, fall back to the tab's last page.
-                const restored = Array.from(
-                    new Set<number>(
-                        (itemsToRestore as FeedItem[])
-                            .map((it) => Number((it as any).page))
-                            .filter((p) => Number.isFinite(p) && p > 0)
-                    )
-                );
-                restoredPages.value = restored.length ? restored : [lastLoadedPage];
+                restoredPages.value = [savedPage];
 
-                // Resume pagination using the saved next token when present; otherwise fall back to saved page.
-                // (In this UI we call these fields page/next; they may be numeric pages or string tokens.)
-                startPageToken.value = (savedNext ?? savedPage ?? lastLoadedPage) as string | number;
+                startPageToken.value = savedNext as PageToken;
             } else {
-                // No items to restore.
-                // If we have a saved next token, treat the first page as already loaded so Masonry doesn't refetch.
-                // Otherwise allow normal initial load/backfill.
-                restoredPages.value = savedNext != null ? [lastLoadedPage] : null;
-                startPageToken.value = (savedNext ?? savedPage ?? 1) as string | number;
+                restoredPages.value = savedNext;
+                startPageToken.value = savedPage;
             }
 
             // Ensure Masonry is remounted after restoring state.
@@ -805,7 +789,7 @@ defineExpose({
 
                 <Masonry v-else :key="`${tab.id}-${masonryRenderKey}`" ref="masonry" v-model:items="items"
                     class="min-h-0 flex-1"
-                    :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
+                    :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
                     :mode="form.data.feed === 'online' && !isTabRestored ? 'backfill' : 'default'"
