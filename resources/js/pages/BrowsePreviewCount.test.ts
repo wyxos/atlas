@@ -556,11 +556,15 @@ describe('Browse - Preview and Seen Count Tracking', () => {
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
 
         if (masonryContainer.exists()) {
-            const mockItem = document.createElement('div');
-            mockItem.className = 'masonry-item';
+            const mockItem = document.createElement('article');
+            mockItem.setAttribute('data-testid', 'item-card');
             const mockImg = document.createElement('img');
             mockImg.src = 'test1.jpg';
             mockItem.appendChild(mockImg);
+
+            const mockOverlay = document.createElement('div');
+            mockOverlay.setAttribute('data-file-id', '1');
+            mockItem.appendChild(mockOverlay);
             masonryContainer.element.appendChild(mockItem);
 
             mockItem.getBoundingClientRect = vi.fn(() => ({
@@ -576,7 +580,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
             }));
 
             const clickEvent = new MouseEvent('click', { bubbles: true });
-            Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+            Object.defineProperty(clickEvent, 'target', { value: mockOverlay, enumerable: true });
             masonryContainer.element.dispatchEvent(clickEvent);
 
             await wrapper.vm.$nextTick();

@@ -271,6 +271,31 @@ function onMasonryClick(e: MouseEvent): void {
     }
 }
 
+function handleMasonryItemClick(e: MouseEvent, item: FeedItem): void {
+    if (e.altKey) {
+        masonryInteractions.handleAltClickReaction(e, item);
+        return;
+    }
+
+    // Keep the click handling local to the item so it continues to work with Vibe 2.x
+    // (which no longer renders the legacy `.masonry-item` wrapper).
+    e.stopPropagation();
+    fileViewer.value?.openFromClick(e);
+}
+
+function handleMasonryItemContextMenu(e: MouseEvent, item: FeedItem): void {
+    if (e.altKey) {
+        masonryInteractions.handleAltClickReaction(e, item);
+    }
+}
+
+function handleMasonryItemMouseDown(e: MouseEvent, item: FeedItem): void {
+    if (e.altKey && e.button === 1) {
+        masonryInteractions.handleAltClickReaction(e, item);
+        return;
+    }
+}
+
 function onMasonryMouseDown(e: MouseEvent): void {
     // Prevent browser scroll for middle click (without ALT) - actual opening happens on auxclick
     if (!e.altKey && e.button === 1) {
@@ -789,10 +814,20 @@ defineExpose({
                             <div class="relative h-full w-full"
                                 @mouseenter="handleMasonryItemMouseEnter((item as FeedItem).id as number)"
                                 @mouseleave="handleMasonryItemMouseLeave"
-                                @click="(e: MouseEvent) => { if (e.altKey) masonryInteractions.handleAltClickReaction(e, item as FeedItem) }"
-                                @contextmenu="(e: MouseEvent) => { if (e.altKey) masonryInteractions.handleAltClickReaction(e, item as FeedItem) }"
-                                @mousedown="(e: MouseEvent) => { if (e.altKey && e.button === 1) masonryInteractions.handleAltClickReaction(e, item as FeedItem) }"
+                                :data-file-id="(item as FeedItem).id"
+                                :class="[
+                                    'overflow-hidden rounded-xl transition-colors transition-opacity duration-200',
+                                    containerBadges.getMasonryItemClasses.value(item as FeedItem),
+                                ]"
+                                @click="(e: MouseEvent) => handleMasonryItemClick(e, item as FeedItem)"
+                                @contextmenu="(e: MouseEvent) => handleMasonryItemContextMenu(e, item as FeedItem)"
+                                @mousedown="(e: MouseEvent) => handleMasonryItemMouseDown(e, item as FeedItem)"
                                 @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item as FeedItem)">
+                                <!-- When hovering a container pill, dim non-siblings to focus context -->
+                                <div
+                                    v-if="containerBadges.hoveredContainerId.value !== null && !containerBadges.isSiblingItem(item as FeedItem, containerBadges.hoveredContainerId.value)"
+                                    class="absolute inset-0 bg-black/50 pointer-events-none transition-opacity duration-200"
+                                />
                                 <!-- Container badges (shows on hover with type and count) -->
                                 <Transition name="fade">
                                     <div v-if="hoveredItemId === ((item as FeedItem).id as number) && isItemPreloaded((item as FeedItem).id as number) && containerBadges.getContainersForItem(item as FeedItem).length > 0"
@@ -912,6 +947,16 @@ defineExpose({
 </template>
 
 <style scoped>
+/* Vibe's default card border/background is tuned for a light theme.
+   Atlas uses a darker UI, so we neutralize the default ring and let the
+   container-hover border highlight (on the overlay wrapper) be the only border.
+*/
+:deep([data-testid="item-card"]),
+:deep([data-testid="item-card-leaving"]) {
+    border-color: transparent;
+    background-color: transparent;
+}
+
 /* Optimized transitions using only transform and opacity (compositor-friendly) */
 .ring-fade-enter-active {
     animation: ringAppear 0.6s ease-out;

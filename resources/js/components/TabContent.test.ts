@@ -267,15 +267,15 @@ vi.mock('@wyxos/vibe', () => {
                 const node = overlayNodes[0];
 
                 if (!node) {
-                    return h('div', { class: 'masonry-item', 'data-key': props.item?.key ?? '' });
+                    return h('article', { 'data-testid': 'item-card' });
                 }
 
                 return cloneVNode(node, {
                     class: [
                         (node.props as any)?.class,
-                        'masonry-item',
+                        'item-card',
                     ],
-                    'data-key': props.item?.key ?? '',
+                    'data-testid': 'item-card',
                 });
             };
         },
@@ -691,7 +691,7 @@ describe('TabContent - Container Badges', () => {
         await nextTick();
 
         // Find the first masonry item
-        const masonryItems = wrapper.findAll('.masonry-item');
+        const masonryItems = wrapper.findAll('[data-testid="item-card"]');
         expect(masonryItems.length).toBeGreaterThan(0);
 
         // Hover over the first item
@@ -741,7 +741,7 @@ describe('TabContent - Container Badges', () => {
         await nextTick();
 
         // Find masonry items
-        const masonryItems = wrapper.findAll('.masonry-item');
+        const masonryItems = wrapper.findAll('[data-testid="item-card"]');
         expect(masonryItems.length).toBeGreaterThan(0);
 
         // Hover over the first item (which has no containers)
@@ -938,7 +938,7 @@ describe('TabContent - Container Badges', () => {
         expect(badgeContainers.length).toBe(0);
 
         // Hover over item
-        const masonryItems = wrapper.findAll('.masonry-item');
+        const masonryItems = wrapper.findAll('[data-testid="item-card"]');
         if (masonryItems.length > 0) {
             await masonryItems[0].trigger('mouseenter');
             await nextTick();

@@ -276,7 +276,8 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
     }
 
     // Get classes for masonry item based on hover state (uses debounced value)
-    // Both opacity and border (ring) transitions are smooth for better UX
+    // Note: we avoid setting opacity here because the Masonry "overlay" wrapper is not
+    // the actual image/card; opacity here also inadvertently reduces any dimming overlay.
     const getMasonryItemClasses = computed(() => (item: FeedItem) => {
         const classes: string[] = [];
         const hoveredId = debouncedHoveredContainerId.value;
@@ -288,13 +289,6 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
             classes.push(`border-2 ${getBorderColorClassForVariant(variant)}`);
         } else {
             classes.push('border-2 border-transparent');
-        }
-
-        // Opacity changes with smooth transition (compositor-friendly)
-        if (hoveredId !== null && !isSiblingItem(item, hoveredId)) {
-            classes.push('opacity-50');
-        } else {
-            classes.push('opacity-100');
         }
 
         return classes.join(' ');

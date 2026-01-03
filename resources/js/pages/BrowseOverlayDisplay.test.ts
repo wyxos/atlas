@@ -199,14 +199,18 @@ describe('Browse - Overlay Display', () => {
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
         const masonryContainer = browseTabContentComponent.find('[ref="masonryContainer"]');
         if (masonryContainer.exists()) {
-            const mockItem = document.createElement('div');
-            mockItem.className = 'masonry-item';
+            const mockItem = document.createElement('article');
+            mockItem.setAttribute('data-testid', 'item-card');
             const mockImg = document.createElement('img');
             mockImg.src = 'test1.jpg';
             mockImg.setAttribute('srcset', 'test1.jpg 1x');
             mockImg.setAttribute('sizes', '(max-width: 300px) 300px');
             mockImg.setAttribute('alt', 'Test image');
             mockItem.appendChild(mockImg);
+
+            const mockOverlay = document.createElement('div');
+            mockOverlay.setAttribute('data-file-id', '1');
+            mockItem.appendChild(mockOverlay);
             masonryContainer.element.appendChild(mockItem);
 
             mockItem.getBoundingClientRect = vi.fn(() => ({
@@ -214,7 +218,7 @@ describe('Browse - Overlay Display', () => {
             }));
 
             const clickEvent = new MouseEvent('click', { bubbles: true });
-            Object.defineProperty(clickEvent, 'target', { value: mockImg, enumerable: true });
+            Object.defineProperty(clickEvent, 'target', { value: mockOverlay, enumerable: true });
             masonryContainer.element.dispatchEvent(clickEvent);
 
             await wrapper.vm.$nextTick();
