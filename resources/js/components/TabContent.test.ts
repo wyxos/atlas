@@ -27,11 +27,15 @@ vi.mock('@/composables/useContainerBadges', async () => {
     return {
         useContainerBadges: vi.fn((itemsRef: any) => {
             const hoveredContainerId = ref<number | null>(null);
+            // TabContent uses the debounced "active" hover id for visual effects.
+            // For unit tests we can mirror it to the immediate hovered state.
+            const activeHoveredContainerId = hoveredContainerId;
             const setHoveredContainerId = vi.fn((id: number | null) => {
                 hoveredContainerId.value = id;
             });
             return {
                 hoveredContainerId,
+                activeHoveredContainerId,
                 setHoveredContainerId,
                 getContainersForItem: (item: any) => {
                     const containers = (item as any).containers || [];

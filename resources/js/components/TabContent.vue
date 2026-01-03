@@ -825,8 +825,8 @@ defineExpose({
                                 @auxclick="(e: MouseEvent) => handleMasonryItemAuxClick(e, item as FeedItem)">
                                 <!-- When hovering a container pill, dim non-siblings to focus context -->
                                 <div
-                                    v-if="containerBadges.hoveredContainerId.value !== null && !containerBadges.isSiblingItem(item as FeedItem, containerBadges.hoveredContainerId.value)"
                                     class="absolute inset-0 bg-black/50 pointer-events-none transition-opacity duration-200"
+                                    :class="(containerBadges.activeHoveredContainerId.value !== null && !containerBadges.isSiblingItem(item as FeedItem, containerBadges.activeHoveredContainerId.value)) ? 'opacity-100' : 'opacity-0'"
                                 />
                                 <!-- Container badges (shows on hover with type and count) -->
                                 <Transition name="fade">

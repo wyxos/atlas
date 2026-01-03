@@ -90,7 +90,7 @@ describe('useContainerBadges', () => {
             await nextTick();
 
             setHoveredContainerId(10);
-            vi.advanceTimersByTime(100); // Wait for debounce
+            vi.advanceTimersByTime(150); // Wait for debounce
 
             expect(isSiblingItem(items.value[0], 10)).toBe(true);
             expect(isSiblingItem(items.value[1], 10)).toBe(false);
@@ -110,7 +110,7 @@ describe('useContainerBadges', () => {
             expect(classesBefore).not.toContain('border-smart-blue-500');
 
             // Advance timer past debounce delay
-            vi.advanceTimersByTime(60);
+            vi.advanceTimersByTime(150);
 
             // Now should be updated
             const classesAfter = getMasonryItemClasses.value(items.value[0] || { id: 1 } as FeedItem);
@@ -131,7 +131,7 @@ describe('useContainerBadges', () => {
 
             // Set hover
             setHoveredContainerId(10);
-            vi.advanceTimersByTime(60);
+            vi.advanceTimersByTime(150);
 
             // Clear hover - should update immediately
             setHoveredContainerId(null);
