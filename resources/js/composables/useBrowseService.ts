@@ -9,6 +9,39 @@ export type ServiceOption = {
     key: string;
     label: string;
     defaults?: Record<string, unknown>;
+    schema?: ServiceFilterSchema;
+};
+
+export type ServiceFilterFieldType =
+    | 'select'
+    | 'radio'
+    | 'checkbox'
+    | 'boolean'
+    | 'text'
+    | 'number'
+    | 'hidden';
+
+export type ServiceFilterOption = {
+    label: string;
+    value: string | number | boolean | null;
+};
+
+export type ServiceFilterField = {
+    uiKey: string;
+    serviceKey: string;
+    type: ServiceFilterFieldType;
+    label: string;
+    description?: string;
+    required?: boolean;
+    options?: ServiceFilterOption[];
+    min?: number;
+    max?: number;
+    step?: number;
+    placeholder?: string;
+};
+
+export type ServiceFilterSchema = {
+    fields: ServiceFilterField[];
 };
 
 export type UseBrowseServiceOptions = {

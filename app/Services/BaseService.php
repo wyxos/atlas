@@ -79,4 +79,18 @@ abstract class BaseService
     {
         return [];
     }
+
+    /**
+     * Describe the service's available UI filters.
+     *
+     * The frontend uses canonical UI keys (e.g. 'page', 'limit').
+     * Each field may specify a different 'serviceKey' used by the upstream API
+     * (e.g. UI 'page' -> service 'cursor', UI 'limit' -> service 'size').
+     */
+    public function filterSchema(): array
+    {
+        return [
+            'fields' => [],
+        ];
+    }
 }

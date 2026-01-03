@@ -45,6 +45,7 @@ class BrowseController extends Controller
                 'key' => $serviceInstance::key(),
                 'label' => $serviceInstance::label(),
                 'defaults' => $serviceInstance->defaultParams(),
+                'schema' => $serviceInstance->filterSchema(),
             ];
         }
 

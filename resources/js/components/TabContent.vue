@@ -37,6 +37,7 @@ import { useItemPreview } from '@/composables/useItemPreview';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
 import { useBrowseForm, type BrowseFormData } from '@/composables/useBrowseForm';
+import type { ServiceOption } from '@/composables/useBrowseService';
 import TabFilter from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
 import ContainerBlacklistManager from './container-blacklist/ContainerBlacklistManager.vue';
@@ -50,7 +51,7 @@ import type { ReactionType } from '@/types/reaction';
 
 interface Props {
     tabId: number | null;
-    availableServices: Array<{ key: string; label: string }>;
+    availableServices: ServiceOption[];
     onReaction: (fileId: number, type: ReactionType) => void;
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
@@ -221,20 +222,15 @@ const layout = {
     sizes: { base: 1, sm: 2, md: 3, lg: 4, '2xl': 10 },
 };
 
-async function getPage(page: number | string, context?: BrowseFormData) {
+async function getPage(page: PageToken, context?: BrowseFormData) {
     const formData = context || form.getData();
-    const params = { ...formData, page };
-
-    if (typeof page === 'string') {
-        params.next = page;
-    }
+    const params: Record<string, unknown> = { ...formData, ...(formData.serviceFilters || {}), page };
+    // Do not send the nested object itself.
+    delete params.serviceFilters;
 
     handleLoadingStart();
     try {
         const { data } = await window.axios.get(browseIndex.url({ query: params }));
-
-        // Keep the form pagination state in sync for persistence.
-        form.data.next = data.nextPage;
 
         return {
             items: data.items || [],
@@ -250,7 +246,6 @@ async function applyFilters() {
     // Best-effort cancel/reset: remount Masonry.
     shouldShowForm.value = false;
     form.data.page = 1;
-    form.data.next = null;
     items.value = [];
     preloadedItemIds.value = new Set();
     restoredPages.value = null;
@@ -262,7 +257,6 @@ async function applyFilters() {
 
 async function applyService() {
     shouldShowForm.value = false;
-    form.data.next = null;
     items.value = [];
     preloadedItemIds.value = new Set();
     restoredPages.value = null;
@@ -594,20 +588,15 @@ onMounted(async () => {
             shouldShowForm.value = false;
             isTabRestored.value = hasRestoredItems;
 
-            const savedPage = params.page as PageToken | null | undefined;
-            const savedNext = params.next as PageToken | null | undefined;
+            const savedNextToken = params.page as PageToken | null | undefined;
 
             items.value = itemsToRestore as FeedItem[];
             preloadedItemIds.value = new Set();
 
-            if (hasRestoredItems) {
-                restoredPages.value = [savedPage];
-
-                startPageToken.value = savedNext as PageToken;
-            } else {
-                restoredPages.value = savedNext;
-                startPageToken.value = savedPage;
-            }
+            // Vibe contract: `page` is the next token to load.
+            // `restoredPages` is optional history; Vibe can resume without it when items are preloaded.
+            restoredPages.value = null;
+            startPageToken.value = (savedNextToken ?? 1) as PageToken;
 
             // Ensure Masonry is remounted after restoring state.
             masonryRenderKey.value += 1;
@@ -790,7 +779,7 @@ defineExpose({
 
                 <Masonry v-else :key="`${tab.id}-${masonryRenderKey}`" ref="masonry" v-model:items="items"
                     class="min-h-0 flex-1 !mt-0 !py-0 !border-0"
-                    :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages"
+                    :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
                     :mode="form.data.feed === 'online' && !isTabRestored ? 'backfill' : 'default'"
