@@ -44,24 +44,3 @@ declare module '@/actions/App/Http/Controllers/ProfileController' {
     export const updatePassword: ActionHandler;
     export const deleteAccount: ActionHandler;
 }
-
-// Vibe now exports MasonryInstance type - this augmentation makes it available
-// Once Vibe is rebuilt and the type is properly exported, this can be removed
-declare module '@wyxos/vibe' {
-    export interface MasonryInstance {
-        remove: (itemsOrIds: any | any[]) => Promise<void> | void;
-        restore: (itemsOrIds: any | any[]) => Promise<void> | void;
-        undo: () => Promise<void> | void;
-        forget: (itemsOrIds: any | any[]) => void;
-
-        pagesLoaded: Array<number | string>;
-        nextPage: number | string | null;
-        loadNextPage: () => Promise<void>;
-        cancel: () => void;
-
-        backfillStats?: BackfillStats;
-
-        readonly isLoading: boolean;
-        readonly hasReachedEnd: boolean;
-    }
-}
