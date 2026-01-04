@@ -12,8 +12,38 @@ test('browse services endpoint returns civitai schema with expected field mappin
 
     $response->assertOk();
 
+    $response->assertJsonStructure([
+        'services',
+        'local' => [
+            'key',
+            'label',
+            'defaults',
+            'schema' => ['fields'],
+        ],
+    ]);
+
     $services = $response->json('services');
     expect($services)->toBeArray();
+
+    expect(collect($services)->contains(fn ($s) => ($s['key'] ?? null) === 'local'))->toBeFalse();
+
+    $local = $response->json('local');
+    expect($local)->toBeArray();
+    expect($local['key'])->toBe('local');
+    expect($local['defaults']['reaction'])->toBe(['love', 'like', 'dislike', 'funny']);
+    expect($local['defaults']['downloaded'])->toBe('any');
+    expect($local['defaults']['blacklisted'])->toBe('any');
+
+    $localFields = $local['schema']['fields'] ?? null;
+    expect($localFields)->toBeArray();
+    expect(array_column($localFields, 'uiKey'))->toBe([
+        'page',
+        'limit',
+        'source',
+        'reaction',
+        'downloaded',
+        'blacklisted',
+    ]);
 
     $civit = collect($services)->firstWhere('key', 'civit-ai-images');
     expect($civit)->not->toBeNull();

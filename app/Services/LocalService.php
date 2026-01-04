@@ -22,6 +22,9 @@ class LocalService extends BaseService
         $page = (int) ($params['page'] ?? 1);
         $limit = (int) ($params['limit'] ?? 20);
         $source = $params['source'] ?? null; // Filter by source if provided
+        $downloaded = $params['downloaded'] ?? 'any';
+        $blacklisted = $params['blacklisted'] ?? 'any';
+        $reaction = $params['reaction'] ?? null;
 
         // Build query
         $query = File::query();
@@ -29,6 +32,53 @@ class LocalService extends BaseService
         // Filter by source if provided and not 'all'
         if ($source && $source !== 'all') {
             $query->where('source', $source);
+        }
+
+        // Filter by downloaded tri-state
+        if ($downloaded === 'yes') {
+            $query->where('downloaded', true);
+        } elseif ($downloaded === 'no') {
+            $query->where(function ($q) {
+                $q->whereNull('downloaded')->orWhere('downloaded', false);
+            });
+        }
+
+        // Filter by blacklisted tri-state
+        if ($blacklisted === 'yes') {
+            $query->whereNotNull('blacklisted_at');
+        } elseif ($blacklisted === 'no') {
+            $query->whereNull('blacklisted_at');
+        }
+
+        // Filter by current user's reaction types (optional)
+        $allTypes = ['love', 'like', 'dislike', 'funny'];
+        $reactionTypes = null;
+        if (is_array($reaction)) {
+            $reactionTypes = array_values(array_unique(array_filter(array_map(fn ($v) => is_string($v) ? $v : (is_numeric($v) ? (string) $v : ''), $reaction))));
+        } elseif (is_string($reaction) && $reaction !== '') {
+            $reactionTypes = [$reaction];
+        }
+
+        if ($reactionTypes !== null) {
+            $reactionTypes = array_values(array_filter($reactionTypes, fn ($t) => in_array($t, $allTypes, true)));
+
+            // When all reaction types are selected (default), treat this as "no filter".
+            if (count($reactionTypes) === 0) {
+                $query->whereRaw('1 = 0');
+            } elseif (count($reactionTypes) < count($allTypes)) {
+                $userId = auth()->id();
+                if (! $userId) {
+                    $query->whereRaw('1 = 0');
+                } else {
+                    $query->whereExists(function ($q) use ($userId, $reactionTypes) {
+                        $q->selectRaw('1')
+                            ->from('reactions')
+                            ->whereColumn('reactions.file_id', 'files.id')
+                            ->where('reactions.user_id', $userId)
+                            ->whereIn('reactions.type', $reactionTypes);
+                    });
+                }
+            }
         }
 
         // Order by most recently downloaded/updated

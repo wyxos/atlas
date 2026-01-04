@@ -16,6 +16,7 @@ export type ServiceFilterFieldType =
     | 'select'
     | 'radio'
     | 'checkbox'
+    | 'checkbox-group'
     | 'boolean'
     | 'text'
     | 'number'
@@ -34,6 +35,7 @@ export type ServiceFilterField = {
     description?: string;
     required?: boolean;
     options?: ServiceFilterOption[];
+    default?: unknown;
     min?: number;
     max?: number;
     step?: number;
@@ -57,6 +59,7 @@ export type UseBrowseServiceOptions = {
 export function useBrowseService(_options?: UseBrowseServiceOptions) {
     const availableServices = ref<ServiceOption[]>([]);
     const availableSources = ref<string[]>([]);
+    const localService = ref<ServiceOption | null>(null);
 
     /**
      * Fetch available services from the services endpoint
@@ -65,9 +68,11 @@ export function useBrowseService(_options?: UseBrowseServiceOptions) {
         try {
             const { data } = await window.axios.get(browseServices.url());
             availableServices.value = data.services || [];
+            localService.value = data.local || null;
         } catch (error) {
             console.error('Failed to fetch services:', error);
             availableServices.value = [];
+            localService.value = null;
         }
     }
 
@@ -97,6 +102,7 @@ export function useBrowseService(_options?: UseBrowseServiceOptions) {
     return {
         availableServices,
         availableSources,
+        localService,
         fetchServices,
         fetchSources,
         getCurrentService,
