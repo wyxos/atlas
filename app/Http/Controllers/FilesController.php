@@ -284,10 +284,20 @@ class FilesController extends Controller
         $deletedCount = File::count();
         File::query()->delete();
 
-        // Empty atlas app storage
+        // Empty atlas app storage (including directory structure)
         $atlasDisk = Storage::disk('atlas-app');
-        $files = $atlasDisk->allFiles();
-        foreach ($files as $file) {
+
+        // Delete all top-level directories (downloads/, thumbnails/, and any future ones)
+        foreach ($atlasDisk->directories() as $directory) {
+            $atlasDisk->deleteDirectory($directory);
+        }
+
+        // Delete any remaining top-level files, but keep dotfiles like .gitignore
+        foreach ($atlasDisk->files() as $file) {
+            if (str_starts_with(basename($file), '.')) {
+                continue;
+            }
+
             $atlasDisk->delete($file);
         }
 
