@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use App\Support\ServiceFilterSchema;
 use App\Support\FileTypeDetector;
 use App\Support\HttpRateLimiter;
+use App\Support\ServiceFilterSchema;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
