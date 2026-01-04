@@ -144,7 +144,7 @@ const fileViewer = ref<InstanceType<typeof FileViewer> | null>(null);
 const itemPreview = useItemPreview(items, computed(() => tab.value));
 
 // Browse service composable - fetch services if not provided via prop
-const { availableServices: localServices, availableSources, fetchServices, fetchSources } = useBrowseService();
+const { availableServices: localServices, availableSources, localService, fetchServices, fetchSources } = useBrowseService();
 
 // Use prop services if available, otherwise use local services
 const availableServices = computed(() => {
@@ -727,7 +727,7 @@ defineExpose({
                     </Select>
                 </div>
                 <!-- Filters Button (Primary) -->
-                <TabFilter v-model:open="isFilterSheetOpen" :available-services="availableServices" :masonry="masonry"
+                <TabFilter v-model:open="isFilterSheetOpen" :available-services="availableServices" :local-def="localService" :masonry="masonry"
                     @reset="handleResetFilters" @apply="applyFilters" />
 
                 <!-- Moderation Rules Button (Info) -->

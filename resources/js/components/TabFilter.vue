@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
+import Checkbox from '@/components/ui/Checkbox.vue';
 import { SlidersHorizontal } from 'lucide-vue-next';
 import { useBrowseForm } from '@/composables/useBrowseForm';
 import { Masonry } from '@wyxos/vibe';
@@ -15,11 +16,13 @@ import { coerceBoolean } from '@/utils/coerceBoolean';
 interface Props {
     open: boolean;
     availableServices: ServiceOption[];
+    localDef?: ServiceOption | null;
     masonry?: InstanceType<typeof Masonry> | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     open: false,
+    localDef: null,
     masonry: null,
 });
 
@@ -39,14 +42,81 @@ const selectedServiceDef = computed(() => {
     return props.availableServices.find((s) => s.key === form.data.service) ?? null;
 });
 
+const selectedLocalDef = computed(() => props.localDef ?? null);
+
+const activeSchema = computed(() => {
+    if (form.data.feed === 'local') {
+        return selectedLocalDef.value?.schema ?? null;
+    }
+
+    return selectedServiceDef.value?.schema ?? null;
+});
+
+const localSourceField = computed(() => {
+    if (form.data.feed !== 'local') {
+        return null;
+    }
+
+    const schema = activeSchema.value;
+    if (!schema?.fields?.length) {
+        return null;
+    }
+
+    return schema.fields.find((f) => f.uiKey === 'source') ?? null;
+});
+
 const visibleServiceFields = computed(() => {
-    const schema = selectedServiceDef.value?.schema;
+    const schema = activeSchema.value;
     if (!schema?.fields?.length) {
         return [] as ServiceFilterField[];
     }
 
-    return schema.fields.filter((f) => f.type !== 'hidden' && f.uiKey !== 'page' && f.uiKey !== 'limit');
+    return schema.fields.filter((f) => {
+        if (f.type === 'hidden') {
+            return false;
+        }
+        if (f.uiKey === 'page' || f.uiKey === 'limit') {
+            return false;
+        }
+        if (form.data.feed === 'local' && f.uiKey === 'source') {
+            return false;
+        }
+        return true;
+    });
 });
+
+function valueOrDefault(field: ServiceFilterField): unknown {
+    const existing = form.data.serviceFilters[field.uiKey];
+    if (existing !== undefined && existing !== null && existing !== '') {
+        return existing;
+    }
+
+    return field.default;
+}
+
+function checkboxGroupSelection(field: ServiceFilterField): string[] {
+    const raw = valueOrDefault(field);
+    if (Array.isArray(raw)) {
+        return raw.map((v) => String(v));
+    }
+    return [];
+}
+
+function setCheckboxGroupValue(field: ServiceFilterField, value: string, checked: boolean): void {
+    const current = new Set(checkboxGroupSelection(field));
+
+    if (checked) {
+        current.add(value);
+    } else {
+        current.delete(value);
+    }
+
+    const ordered = (field.options || [])
+        .map((opt) => String(opt.value))
+        .filter((v) => current.has(v));
+
+    updateServiceFilterValue(field.uiKey, ordered);
+}
 
 function placeholderForField(field: ServiceFilterField): string | undefined {
     if (field.placeholder) {
@@ -113,8 +183,8 @@ function handleReset(): void {
                 <SheetTitle>Advanced Filters</SheetTitle>
             </SheetHeader>
             <div class="flex-1 p-6 overflow-y-auto space-y-6">
-                <!-- Service Filter -->
-                <div class="space-y-2">
+                <!-- Service Filter (online only) -->
+                <div v-if="form.data.feed === 'online'" class="space-y-2">
                     <label class="text-sm font-medium text-regal-navy-100 mb-2 block">Service</label>
                     <Select :model-value="form.data.service" @update:model-value="(v) => updateService(v as string)">
                         <SelectTrigger class="w-full">
@@ -127,6 +197,128 @@ function handleReset(): void {
                         </SelectContent>
                     </Select>
                 </div>
+
+                <!-- Local mode fields -->
+                <template v-if="form.data.feed === 'local' && activeSchema">
+                    <!-- Limit (global) -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">Limit</label>
+                        <Select v-model="form.data.limit">
+                            <SelectTrigger class="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="20">20</SelectItem>
+                                <SelectItem value="40">40</SelectItem>
+                                <SelectItem value="60">60</SelectItem>
+                                <SelectItem value="80">80</SelectItem>
+                                <SelectItem value="100">100</SelectItem>
+                                <SelectItem value="200">200</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <!-- Source (global) -->
+                    <div v-if="localSourceField" class="space-y-2">
+                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">
+                            {{ localSourceField.label }}
+                        </label>
+                        <Select :model-value="form.data.source" @update:model-value="(v) => (form.data.source = v as string)">
+                            <SelectTrigger class="w-full">
+                                <SelectValue :placeholder="localSourceField.placeholder || 'Select…'" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="opt in (localSourceField.options || [])"
+                                    :key="String(opt.value)"
+                                    :value="opt.value as any"
+                                >
+                                    {{ opt.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-if="shouldShowDescriptionBelow(localSourceField)" class="text-xs text-twilight-indigo-300">{{ localSourceField.description }}</p>
+                    </div>
+
+                    <div v-for="field in visibleServiceFields" :key="field.uiKey" class="space-y-2">
+                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">
+                            {{ field.label }}
+                        </label>
+
+                        <div v-if="field.type === 'checkbox-group'" class="space-y-2">
+                                <div class="flex flex-wrap gap-2">
+                                <Checkbox
+                                    v-for="opt in (field.options || [])"
+                                    :key="String(opt.value)"
+                                    :model-value="checkboxGroupSelection(field).includes(String(opt.value))"
+                                    @update:model-value="(checked: boolean) => setCheckboxGroupValue(field, String(opt.value), checked)"
+                                >
+                                    {{ opt.label }}
+                                </Checkbox>
+                            </div>
+                        </div>
+
+                        <div v-else-if="field.type === 'boolean'" class="flex items-center justify-between">
+                            <span class="text-sm text-twilight-indigo-200">{{ field.description || '' }}</span>
+                            <Switch
+                                :model-value="coerceBoolean(valueOrDefault(field))"
+                                @update:model-value="(v: boolean) => updateServiceFilterValue(field.uiKey, v)"
+                            />
+                        </div>
+
+                        <Select
+                            v-else-if="field.type === 'select'"
+                            :model-value="(valueOrDefault(field) ?? null) as any"
+                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue :placeholder="field.placeholder || 'Select…'" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="opt in (field.options || [])"
+                                    :key="String(opt.value)"
+                                    :value="opt.value as any"
+                                >
+                                    {{ opt.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Input
+                            v-else-if="field.type === 'number'"
+                            :model-value="(valueOrDefault(field) ?? '') as any"
+                            type="number"
+                            :placeholder="placeholderForField(field)"
+                            :min="field.min"
+                            :max="field.max"
+                            :step="field.step"
+                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
+                        />
+
+                        <RadioGroup
+                            v-else-if="field.type === 'radio'"
+                            :model-value="String(valueOrDefault(field) ?? '')"
+                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
+                            class="flex flex-wrap items-center gap-4"
+                        >
+                            <div v-for="opt in (field.options || [])" :key="String(opt.value)" class="flex items-center gap-2">
+                                <RadioGroupItem :value="String(opt.value)" />
+                                <span class="text-sm text-twilight-indigo-100">{{ opt.label }}</span>
+                            </div>
+                        </RadioGroup>
+
+                        <Input
+                            v-else
+                            :model-value="(valueOrDefault(field) ?? '') as any"
+                            type="text"
+                            :placeholder="placeholderForField(field)"
+                            @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
+                        />
+
+                        <p v-if="shouldShowDescriptionBelow(field)" class="text-xs text-twilight-indigo-300">{{ field.description }}</p>
+                    </div>
+                </template>
 
                 <!-- Service fields (online services only). If no service selected, show nothing. -->
                 <template v-if="form.data.feed === 'online' && selectedServiceDef">
