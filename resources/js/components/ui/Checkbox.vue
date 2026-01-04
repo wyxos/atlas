@@ -23,10 +23,10 @@ const emit = defineEmits<{
             type="checkbox"
             :checked="modelValue"
             :required="required"
-            class="w-4 h-4 rounded focus:ring-2 accent-smart-blue-500"
+            class="form-checkbox"
             @change="emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
         />
-        <span class="text-sm text-twilight-indigo-100">
+        <span class="form-option-label">
             <slot />
         </span>
     </label>

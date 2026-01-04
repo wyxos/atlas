@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue';
+import { computed, hasInjectionContext, inject, reactive, ref, type InjectionKey } from 'vue';
 import type { TabData } from './useTabs';
 
 export interface BrowseFormData {
@@ -12,6 +12,10 @@ export interface BrowseFormData {
     // These are persisted/restored per service key.
     serviceFilters: Record<string, unknown>;
 }
+
+export type BrowseFormInstance = ReturnType<typeof createFormInstance>;
+
+export const BrowseFormKey: InjectionKey<BrowseFormInstance> = Symbol('BrowseForm');
 
 // Singleton instance
 let formInstance: ReturnType<typeof createFormInstance> | null = null;
@@ -294,8 +298,25 @@ function createFormInstance() {
     };
 }
 
+/**
+ * Create a new, independent browse form instance.
+ * Use this for per-tab isolation.
+ */
+export function createBrowseForm(): BrowseFormInstance {
+    return createFormInstance();
+}
+
 export function useBrowseForm() {
-    // Return singleton instance
+    // Prefer a provided per-component instance (e.g., TabContent scope)
+    // Only attempt inject() when we're in a component setup/injection context.
+    if (hasInjectionContext()) {
+        const injected = inject(BrowseFormKey, null);
+        if (injected) {
+            return injected;
+        }
+    }
+
+    // Fallback to singleton instance (legacy/global usage)
     if (!formInstance) {
         formInstance = createFormInstance();
     }

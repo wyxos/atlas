@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { useBrowseForm } from './useBrowseForm';
+import { mount } from '@vue/test-utils';
+import { defineComponent, provide } from 'vue';
+import { BrowseFormKey, createBrowseForm, useBrowseForm } from './useBrowseForm';
 import type { TabData } from './useTabs';
 
 describe('useBrowseForm - defaults merging', () => {
@@ -79,5 +81,40 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.limit).toBe('20');
         expect(form.data.page).toBe(1);
         expect(form.data.serviceFilters).toEqual({});
+    });
+
+    it('uses provided instance when available (tab isolation)', () => {
+        const Parent = defineComponent({
+            name: 'Parent',
+            setup() {
+                const scoped = createBrowseForm();
+                scoped.data.service = 'wallhaven';
+                provide(BrowseFormKey, scoped);
+                return { scoped };
+            },
+            template: '<Child />',
+            components: {
+                Child: defineComponent({
+                    name: 'Child',
+                    setup() {
+                        const form = useBrowseForm();
+                        return { form };
+                    },
+                    template: '<div />',
+                }),
+            },
+        });
+
+        const wrapper = mount(Parent);
+        const childForm = (wrapper.findComponent({ name: 'Child' }).vm as any).form;
+        const parentScoped = (wrapper.vm as any).scoped;
+
+        expect(childForm).toBe(parentScoped);
+        expect(childForm.data.service).toBe('wallhaven');
+
+        // Outside of injection context, useBrowseForm() still returns the singleton fallback
+        // (and must not magically become the scoped instance).
+        const globalForm = useBrowseForm();
+        expect(globalForm).not.toBe(parentScoped);
     });
 });
