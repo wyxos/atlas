@@ -105,15 +105,21 @@ const backfillCooldownWidth = computed(() => {
             <span class="px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-3"
                 :class="backfillActive ? 'bg-prussian-blue-700 hover:bg-prussian-blue-600 text-warning-100' : 'bg-prussian-blue-700/30 text-twilight-indigo-400'">
                 <template v-if="backfillActive && backfillStats">
+                    <span>
+                        {{ backfillStats.progress.collected }} / {{ backfillStats.progress.target }}
+                    </span>
+
                     <template v-if="!backfillWaiting">
-                        <span>
-                            {{ backfillStats.progress.collected }} / {{ backfillStats.progress.target }}
+                        <span class="text-xs text-warning-100">
                             ({{ backfillStats.totals.pagesFetched }} page{{ backfillStats.totals.pagesFetched !== 1 ? 's' : '' }})
                         </span>
                     </template>
                     <template v-else>
                         <div class="h-2 w-20 overflow-hidden rounded bg-muted">
-                            <div class="h-full bg-warning-500 transition-[width] duration-100" :style="{ width: backfillCooldownWidth }" />
+                            <div
+                                class="h-full bg-warning-500 transition-[width] duration-100"
+                                :style="{ width: backfillCooldownWidth }"
+                            />
                         </div>
                         <span v-if="backfillStats.cooldownMsRemaining > 0" class="text-xs text-warning-100">
                             next in {{ (backfillStats.cooldownMsRemaining / 1000).toFixed(1) }}s

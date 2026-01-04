@@ -1,6 +1,5 @@
 - [ ] Browse feature improvements
     - [ ] Browse
-      - [ ] Stabilize Wallhaven
       - [ ] Evaluate other default feeds (Youtube, etc)
     - [ ] Video handling
       - [ ] Display video from CivitAI in masonry and fileviewer 
