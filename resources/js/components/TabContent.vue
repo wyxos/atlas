@@ -971,14 +971,24 @@ defineExpose({
 </template>
 
 <style scoped>
+@reference "../../css/app.css";
+
 /* Vibe's default card border/background is tuned for a light theme.
    Atlas uses a darker UI, so we neutralize the default ring and let the
    container-hover border highlight (on the overlay wrapper) be the only border.
 */
 :deep([data-testid="item-card"]),
 :deep([data-testid="item-card-leaving"]) {
-    border-color: transparent;
-    background-color: transparent;
+    @apply border-white/10 bg-white/5;
+}
+
+/* Vibe loader visuals: ensure placeholder + spinner are visible on dark theme. */
+:deep([data-testid="item-card"] .bg-slate-100) {
+    @apply bg-white/5;
+}
+
+:deep([data-testid="masonry-loader-spinner"] svg) {
+    @apply text-white/70;
 }
 
 /* Optimized transitions using only transform and opacity (compositor-friendly) */

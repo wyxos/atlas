@@ -128,6 +128,14 @@ function createFormInstance() {
     function reset(): void {
         Object.assign(data, defaultData);
         data.serviceFilters = {};
+
+        // This form instance is currently shared across tabs. Clear the per-service
+        // cache so a newly-created tab doesn't inherit limit/filter values from
+        // whatever tab was previously active.
+        for (const k of Object.keys(filtersByServiceKey)) {
+            delete filtersByServiceKey[k];
+        }
+
         clearErrors();
         wasSuccessful.value = false;
     }
