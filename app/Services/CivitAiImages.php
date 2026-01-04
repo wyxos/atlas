@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\ServiceFilterSchema;
 use App\Support\FileTypeDetector;
 use App\Support\HttpRateLimiter;
 use Carbon\Carbon;
@@ -91,7 +92,18 @@ class CivitAiImages extends BaseService
 
         $sort = $this->params['sort'] ?? 'Newest';
         $nsfw = $this->resolveNsfw($this->params['nsfw'] ?? null);
-        $type = $this->resolveType($this->params['type'] ?? null);
+
+        // Preserve UI selection for `type` (including 'all') for persistence/restores,
+        // but only send a `type` param upstream when it is a specific filter.
+        $rawType = $this->params['type'] ?? null;
+        $uiType = null;
+        if (is_string($rawType)) {
+            $uiType = strtolower(trim($rawType));
+            if ($uiType === '') {
+                $uiType = null;
+            }
+        }
+        $type = $this->resolveType($uiType);
 
         $postId = isset($this->params['postId']) ? (int) $this->params['postId'] : null;
         $modelId = isset($this->params['modelId']) ? (int) $this->params['modelId'] : null;
@@ -139,7 +151,7 @@ class CivitAiImages extends BaseService
             $query['period'] = $period;
         }
 
-        $this->params['type'] = $type;
+        $this->params['type'] = $uiType;
 
         return $query;
     }
@@ -149,6 +161,8 @@ class CivitAiImages extends BaseService
         return [
             'limit' => 20,
             'sort' => 'Newest',
+            'type' => 'all',
+            'period' => 'AllTime',
             // CivitAI supports `nsfw` as a boolean.
             // Default to safe mode (false) unless user opts in.
             'nsfw' => false,
@@ -158,109 +172,105 @@ class CivitAiImages extends BaseService
 
     public function filterSchema(): array
     {
-        return [
-            'fields' => [
-                // Global keys (canonical UI keys)
-                [
-                    'uiKey' => 'page',
-                    'serviceKey' => 'cursor',
-                    'type' => 'hidden',
-                    'label' => 'Page',
-                    'description' => 'Pagination cursor (managed automatically).',
-                ],
-                [
-                    'uiKey' => 'limit',
-                    'serviceKey' => 'limit',
-                    'type' => 'number',
-                    'label' => 'Limit',
-                    'description' => 'The number of results per page (0-200).',
-                    'min' => 0,
-                    'max' => 200,
-                    'step' => 1,
-                ],
+        $schema = ServiceFilterSchema::make()
+            ->keys($this->schemaKeyMap())
+            ->types($this->schemaTypeMap())
+            ->labels($this->schemaLabelMap());
 
-                // Service-specific keys
-                [
-                    'uiKey' => 'postId',
-                    'serviceKey' => 'postId',
-                    'type' => 'number',
-                    'label' => 'Post ID',
-                    'description' => 'The ID of a post to get images from.',
-                    'min' => 1,
-                    'step' => 1,
+        return $schema->fields([
+            // Global keys (canonical UI keys)
+            ...$schema->paginationFields(),
+
+            // Service-specific keys
+            $schema->field('postId', [
+                'placeholder' => 'The ID of a post to get images from.',
+                'min' => 1,
+                'step' => 1,
+            ]),
+            $schema->field('modelId', [
+                'placeholder' => 'The ID of a model to get images from.',
+                'min' => 1,
+                'step' => 1,
+            ]),
+            $schema->field('modelVersionId', [
+                'placeholder' => 'The ID of a model version to get images from.',
+                'min' => 1,
+                'step' => 1,
+            ]),
+            $schema->field('username', [
+                'placeholder' => 'Filter to images from a specific user (e.g. someUser).',
+            ]),
+            $schema->field('nsfw', [
+                'description' => 'Include NSFW results.',
+            ]),
+            $schema->field('type', [
+                'description' => 'Filter by media type.',
+                'options' => [
+                    ['label' => 'All', 'value' => 'all'],
+                    ['label' => 'Image', 'value' => 'image'],
+                    ['label' => 'Video', 'value' => 'video'],
                 ],
-                [
-                    'uiKey' => 'modelId',
-                    'serviceKey' => 'modelId',
-                    'type' => 'number',
-                    'label' => 'Model ID',
-                    'description' => 'The ID of a model to get images from.',
-                    'min' => 1,
-                    'step' => 1,
+            ]),
+            $schema->field('sort', [
+                'description' => 'Order of results.',
+                'options' => [
+                    ['label' => 'Newest', 'value' => 'Newest'],
+                    ['label' => 'Most Reactions', 'value' => 'Most Reactions'],
+                    ['label' => 'Most Comments', 'value' => 'Most Comments'],
                 ],
-                [
-                    'uiKey' => 'modelVersionId',
-                    'serviceKey' => 'modelVersionId',
-                    'type' => 'number',
-                    'label' => 'Model Version ID',
-                    'description' => 'The ID of a model version to get images from.',
-                    'min' => 1,
-                    'step' => 1,
+            ]),
+            $schema->field('period', [
+                'description' => 'Time window for sorting.',
+                'options' => [
+                    ['label' => 'All Time', 'value' => 'AllTime'],
+                    ['label' => 'Year', 'value' => 'Year'],
+                    ['label' => 'Month', 'value' => 'Month'],
+                    ['label' => 'Week', 'value' => 'Week'],
+                    ['label' => 'Day', 'value' => 'Day'],
                 ],
-                [
-                    'uiKey' => 'username',
-                    'serviceKey' => 'username',
-                    'type' => 'text',
-                    'label' => 'Username',
-                    'description' => 'Filter to images from a specific user.',
-                    'placeholder' => 'e.g. someUser',
-                ],
-                [
-                    'uiKey' => 'nsfw',
-                    'serviceKey' => 'nsfw',
-                    'type' => 'boolean',
-                    'label' => 'NSFW',
-                    'description' => 'Include NSFW results.',
-                ],
-                [
-                    'uiKey' => 'type',
-                    'serviceKey' => 'type',
-                    'type' => 'select',
-                    'label' => 'Type',
-                    'description' => 'Filter by media type.',
-                    'options' => [
-                        ['label' => 'All', 'value' => 'all'],
-                        ['label' => 'Image', 'value' => 'image'],
-                        ['label' => 'Video', 'value' => 'video'],
-                    ],
-                ],
-                [
-                    'uiKey' => 'sort',
-                    'serviceKey' => 'sort',
-                    'type' => 'select',
-                    'label' => 'Sort',
-                    'description' => 'Order of results.',
-                    'options' => [
-                        ['label' => 'Newest', 'value' => 'Newest'],
-                        ['label' => 'Most Reactions', 'value' => 'Most Reactions'],
-                        ['label' => 'Most Comments', 'value' => 'Most Comments'],
-                    ],
-                ],
-                [
-                    'uiKey' => 'period',
-                    'serviceKey' => 'period',
-                    'type' => 'select',
-                    'label' => 'Period',
-                    'description' => 'Time window for sorting.',
-                    'options' => [
-                        ['label' => 'All Time', 'value' => 'AllTime'],
-                        ['label' => 'Year', 'value' => 'Year'],
-                        ['label' => 'Month', 'value' => 'Month'],
-                        ['label' => 'Week', 'value' => 'Week'],
-                        ['label' => 'Day', 'value' => 'Day'],
-                    ],
-                ],
-            ],
+            ]),
+        ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function schemaKeyMap(): array
+    {
+        return [
+            'page' => 'cursor',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function schemaTypeMap(): array
+    {
+        return [
+            'page' => 'hidden',
+            'limit' => 'number',
+            'postId' => 'number',
+            'modelId' => 'number',
+            'modelVersionId' => 'number',
+            'username' => 'text',
+            'nsfw' => 'boolean',
+            'type' => 'radio',
+            'sort' => 'select',
+            'period' => 'select',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function schemaLabelMap(): array
+    {
+        return [
+            'postId' => 'Post ID',
+            'modelId' => 'Model ID',
+            'modelVersionId' => 'Model Version ID',
+            'nsfw' => 'NSFW',
         ];
     }
 

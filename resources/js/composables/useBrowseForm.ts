@@ -206,6 +206,24 @@ function createFormInstance() {
             }
 
             const { page: _p, limit: _l, ...rest } = cached;
+
+            // Merge defaults into cached values when cached is missing/null/empty.
+            // This fixes cases where a restored tab seeded nulls (e.g. `type: null`)
+            // but the UI expects a default selection (e.g. `type: 'all'`).
+            if (nextDefaults && typeof nextDefaults === 'object') {
+                const reserved = new Set(['service', 'feed', 'source', 'tab_id', 'limit', 'page']);
+                for (const [k, v] of Object.entries(nextDefaults)) {
+                    if (reserved.has(k)) {
+                        continue;
+                    }
+
+                    const current = (rest as Record<string, unknown>)[k];
+                    if (current === undefined || current === null || current === '') {
+                        (rest as Record<string, unknown>)[k] = v;
+                    }
+                }
+            }
+
             data.serviceFilters = { ...rest };
             return;
         }
