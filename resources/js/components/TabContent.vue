@@ -132,6 +132,11 @@ const availableServices = computed(() => {
     return props.availableServices.length > 0 ? props.availableServices : localServices.value;
 });
 
+function updateService(nextService: string): void {
+    const defaults = availableServices.value.find((s) => s.key === nextService)?.defaults;
+    form.setService(nextService, defaults);
+}
+
 // Accumulate moderation data from each page load
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
 
@@ -676,7 +681,7 @@ defineExpose({
                 </div>
                 <!-- Service Dropdown (only show when feed is 'online') -->
                 <div v-if="form.data.feed === 'online'" class="flex-1">
-                    <Select v-model="form.data.service" :disabled="masonry?.isLoading">
+                    <Select :model-value="form.data.service" @update:model-value="(v) => updateService(v as string)" :disabled="masonry?.isLoading">
                         <SelectTrigger class="w-[200px]" data-test="service-select-trigger">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
@@ -764,7 +769,7 @@ defineExpose({
                         <!-- Service Dropdown (only show when Online) -->
                         <div v-if="form.data.feed === 'online'" class="w-full">
                             <label class="block text-sm font-medium text-twilight-indigo-200 mb-2">Service</label>
-                            <Select v-model="form.data.service" :disabled="masonry?.isLoading">
+                            <Select :model-value="form.data.service" @update:model-value="(v) => updateService(v as string)" :disabled="masonry?.isLoading">
                                 <SelectTrigger class="w-full" data-test="service-select-trigger">
                                     <SelectValue placeholder="Select a service..." />
                                 </SelectTrigger>
