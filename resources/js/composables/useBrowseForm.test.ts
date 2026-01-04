@@ -59,4 +59,25 @@ describe('useBrowseForm - defaults merging', () => {
 
         expect(form.data.serviceFilters.type).toBe('video');
     });
+
+    it('clears per-service cached limit when reset (new tab should start from defaults)', () => {
+        const form = useBrowseForm();
+        form.reset();
+
+        // Simulate tab A: select service + change limit, then switch away so values get cached.
+        form.setService('civit-ai-images');
+        form.data.limit = '100';
+        form.data.page = 2;
+        form.data.serviceFilters = { type: 'video' };
+        form.setService('wallhaven');
+
+        // Simulate creating a brand new tab: TabContent calls reset() before syncing.
+        form.reset();
+
+        // Tab B: selecting the same service must NOT inherit limit=100 from tab A.
+        form.setService('civit-ai-images');
+        expect(form.data.limit).toBe('20');
+        expect(form.data.page).toBe(1);
+        expect(form.data.serviceFilters).toEqual({});
+    });
 });
