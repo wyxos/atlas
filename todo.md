@@ -1,8 +1,5 @@
 - [ ] Browse feature improvements
     - [ ] Browse
-      - [ ] Form building via class
-      - [ ] Local service to use scout
-      - [ ] Reaction filtering
       - [ ] Stabilize Wallhaven
       - [ ] Evaluate other default feeds (Youtube, etc)
     - [ ] Video handling
