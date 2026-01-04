@@ -42,6 +42,7 @@ npm run check:js
 - ✅ DO: Use Composition API with `<script setup>` syntax
 - ✅ DO: Colocate tests with components: `ComponentName.vue` + `ComponentName.test.ts`
 - ✅ DO: Extract reusable UI components to `resources/js/components/ui/`
+- ✅ DO: Follow the UI design system guidelines in `resources/js/components/ui/AGENTS.md`
 - ✅ DO: Use TypeScript for all components
 - ✅ Example: `resources/js/components/AppHeader.vue` - header component with test
 - ✅ Example: `resources/js/components/ui/Button/Button.vue` - reusable button component

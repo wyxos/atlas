@@ -88,4 +88,37 @@ test('browse services endpoint returns civitai schema with expected field mappin
         ['label' => 'Image', 'value' => 'image'],
         ['label' => 'Video', 'value' => 'video'],
     ]);
+
+    $wallhaven = collect($services)->firstWhere('key', 'wallhaven');
+    expect($wallhaven)->not->toBeNull();
+
+    $wallSchema = $wallhaven['schema'] ?? null;
+    expect($wallSchema)->toBeArray();
+
+    $wallFields = $wallSchema['fields'] ?? null;
+    expect($wallFields)->toBeArray();
+
+    // Stable ordering + presence
+    expect(array_column($wallFields, 'uiKey'))->toBe([
+        'page',
+        'limit',
+        'q',
+        'categories',
+        'nsfw',
+        'sort',
+        'order',
+        'topRange',
+        'atleast',
+        'resolutions',
+        'ratios',
+        'seed',
+    ]);
+
+    $wallSort = collect($wallFields)->firstWhere('uiKey', 'sort');
+    expect($wallSort['serviceKey'])->toBe('sorting');
+    expect($wallSort['type'])->toBe('select');
+
+    $wallNsfw = collect($wallFields)->firstWhere('uiKey', 'nsfw');
+    expect($wallNsfw['label'])->toBe('Purity');
+    expect($wallNsfw['type'])->toBe('radio');
 });
