@@ -177,7 +177,7 @@ class Wallhaven extends BaseService
         $id = $row['id'] ?? '';
         $path = $row['path'] ?? '';
         $thumbs = $row['thumbs'] ?? [];
-        $thumbnail = $thumbs['large'] ?? $thumbs['original'] ?? $path;
+        $thumbnail = $thumbs['original'] ?? $thumbs['large'] ?? $path;
 
         $referrer = $row['url'] ?? "https://wallhaven.cc/w/{$id}";
 
