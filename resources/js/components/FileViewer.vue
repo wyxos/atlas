@@ -40,6 +40,8 @@ const isRemovingItem = ref(false);
 // Overlay state
 const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
 const overlayImage = ref<{ src: string; srcset?: string; sizes?: string; alt?: string } | null>(null);
+const overlayMediaType = ref<'image' | 'video'>('image');
+const overlayVideoSrc = ref<string | null>(null);
 const overlayBorderRadius = ref<string | null>(null);
 const overlayKey = ref(0); // Key to force image element recreation on each click
 const overlayIsAnimating = ref(false); // Track if overlay is animating to center
@@ -200,6 +202,8 @@ function closeOverlay(): void {
             imageCenterPosition.value = null;
             overlayRect.value = null;
             overlayImage.value = null;
+            overlayMediaType.value = 'image';
+            overlayVideoSrc.value = null;
             overlayBorderRadius.value = null;
             overlayIsLoading.value = false;
             overlayFullSizeImage.value = null;
@@ -225,6 +229,8 @@ function closeOverlay(): void {
         imageCenterPosition.value = null;
         overlayRect.value = null;
         overlayImage.value = null;
+        overlayMediaType.value = 'image';
+        overlayVideoSrc.value = null;
         overlayBorderRadius.value = null;
         overlayIsLoading.value = false;
         overlayFullSizeImage.value = null;
@@ -475,6 +481,10 @@ async function openFromClick(e: MouseEvent): Promise<void> {
         return;
     }
 
+    const mediaType: 'image' | 'video' = masonryItem.type === 'video' ? 'video' : 'image';
+    overlayMediaType.value = mediaType;
+    overlayVideoSrc.value = null;
+
     // Compute position relative to the tab content container (not masonry container)
     const itemBox = itemEl.getBoundingClientRect();
     const tabContentBox = tabContent.getBoundingClientRect();
@@ -487,19 +497,20 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const width = itemBox.width + (overlayBorderWidth * 2);
     const height = itemBox.height + (overlayBorderWidth * 2);
 
-    // Try to find an <img> inside the clicked masonry item
+    // Prefer using the rendered <img> so the overlay matches the clicked preview exactly.
+    // For video cards there may be no <img>, so fall back to FeedItem preview URLs.
     const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
-    if (!imgEl) {
-        // No image found -> clear overlay (requirement is to show the same image)
-        closeOverlay();
-        return;
-    }
 
-    // Copy image attributes
-    const src = imgEl.currentSrc || imgEl.getAttribute('src') || '';
-    const srcset = imgEl.getAttribute('srcset') || undefined;
-    const sizes = imgEl.getAttribute('sizes') || undefined;
-    const alt = imgEl.getAttribute('alt') || '';
+    const src = imgEl?.currentSrc
+        || imgEl?.getAttribute('src')
+        || masonryItem.src
+        || masonryItem.thumbnail
+        || masonryItem.preview
+        || '';
+
+    const srcset = imgEl?.getAttribute('srcset') || undefined;
+    const sizes = imgEl?.getAttribute('sizes') || undefined;
+    const alt = imgEl?.getAttribute('alt') || String(masonryItem.id);
 
     // Compute the border radius from the masonry item so the overlay matches
     const computed = window.getComputedStyle(itemEl);
@@ -518,7 +529,7 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     overlayFillComplete.value = false;
     overlayIsClosing.value = false;
     overlayScale.value = 1; // Reset scale to normal
-    overlayIsLoading.value = true; // Show spinner
+    overlayIsLoading.value = mediaType === 'image'; // Spinner only for image preload
     overlayFullSizeImage.value = null; // Reset full-size image
 
     // Set initial position at clicked item location and show overlay with spinner
@@ -533,21 +544,33 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     // Wait for DOM update
     await nextTick();
 
-    // Preload the full-size image and get its dimensions
     try {
-        const imageDimensions = await preloadImage(fullSizeUrl);
-        // Store original dimensions for best-fit calculation
-        originalImageDimensions.value = imageDimensions;
-        // Once loaded, update to use full-size image
-        overlayFullSizeImage.value = fullSizeUrl;
-        overlayIsLoading.value = false;
+        if (mediaType === 'video') {
+            originalImageDimensions.value = {
+                width: masonryItem.width,
+                height: masonryItem.height,
+            };
+            overlayVideoSrc.value = fullSizeUrl || masonryItem.src || '';
+            overlayIsLoading.value = false;
 
-        // Increment seen count when file is fully loaded
-        await handleItemSeen(masonryItem.id);
+            // Count as seen when opening the viewer for the file.
+            await handleItemSeen(masonryItem.id);
+            await nextTick();
+        } else {
+            const imageDimensions = await preloadImage(fullSizeUrl);
+            // Store original dimensions for best-fit calculation
+            originalImageDimensions.value = imageDimensions;
+            // Once loaded, update to use full-size image
+            overlayFullSizeImage.value = fullSizeUrl;
+            overlayIsLoading.value = false;
 
-        // Wait for image to be displayed, then proceed with animations
-        await nextTick();
-        await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure image is rendered
+            // Increment seen count when file is fully loaded
+            await handleItemSeen(masonryItem.id);
+
+            // Wait for image to be displayed, then proceed with animations
+            await nextTick();
+            await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure image is rendered
+        }
     } catch (error) {
         // If preload fails, use the original image and continue
         console.warn('Failed to preload full-size image, using original:', error);
@@ -726,8 +749,11 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         return;
     }
 
+    const nextIsVideo = nextItem.type === 'video';
     const nextImageSrc = nextItem.src || nextItem.thumbnail || '';
-    const nextFullSizeUrl = nextItem.originalUrl || nextImageSrc;
+    const nextFullSizeUrl = nextIsVideo
+        ? (nextItem.originalUrl || nextItem.original || nextImageSrc)
+        : (nextItem.originalUrl || nextImageSrc);
 
     // Update overlay image to show spinner with preview
     overlayImage.value = {
@@ -736,7 +762,9 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         sizes: undefined,
         alt: nextItem.id.toString(),
     };
-    overlayIsLoading.value = true;
+    overlayMediaType.value = nextIsVideo ? 'video' : 'image';
+    overlayVideoSrc.value = nextIsVideo ? nextFullSizeUrl : null;
+    overlayIsLoading.value = !nextIsVideo;
     overlayFullSizeImage.value = null;
     overlayKey.value++; // Force image element recreation
 
@@ -768,10 +796,85 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     imageScale.value = 1; // Keep scale at 1 for slide animation
     await nextTick(); // Ensure DOM updates before continuing
 
-    // Step 3: Preload the full-size image
+    // Step 3: Preload the full-size image (or swap to video)
     // Check if navigation target has changed (user spammed navigation)
     const preloadTarget = index;
     try {
+        if (nextIsVideo) {
+            if (currentNavigationTarget.value !== preloadTarget) {
+                isNavigating.value = false;
+                overlayIsAnimating.value = false;
+                return;
+            }
+
+            originalImageDimensions.value = {
+                width: nextItem.width,
+                height: nextItem.height,
+            };
+            overlayVideoSrc.value = nextFullSizeUrl;
+
+            // Increment seen count when navigating to a new file
+            if (nextItem?.id) {
+                await handleItemSeen(nextItem.id);
+            }
+
+            // Calculate best-fit size for the video within the expanded container
+            const tabContentBox = tabContent.getBoundingClientRect();
+            const containerWidth = tabContentBox.width;
+            const containerHeight = tabContentBox.height;
+            const borderWidth = 4;
+            const panelHeight = isBottomPanelOpen.value ? 200 : 0;
+            const availableWidth = getAvailableWidth(containerWidth, borderWidth);
+            const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
+
+            const bestFitSize = calculateBestFitSize(
+                nextItem.width,
+                nextItem.height,
+                availableWidth,
+                availableHeight
+            );
+
+            overlayImageSize.value = bestFitSize;
+
+            const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
+            const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
+
+            imageCenterPosition.value = {
+                top: fullImageTop,
+                left: fullImageLeft,
+            };
+
+            // Switch out of loading state so the <video> renders
+            overlayIsLoading.value = false;
+
+            await nextTick();
+
+            // Ensure element is rendered before animating
+            await new Promise(resolve => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => resolve(void 0));
+                });
+            });
+
+            if (currentNavigationTarget.value !== preloadTarget) {
+                isNavigating.value = false;
+                overlayIsAnimating.value = false;
+                return;
+            }
+
+            imageTranslateX.value = 0;
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if (currentNavigationTarget.value !== preloadTarget) {
+                isNavigating.value = false;
+                overlayIsAnimating.value = false;
+                return;
+            }
+
+            isNavigating.value = false;
+            overlayIsAnimating.value = false;
+            return;
+        }
+
         const imageDimensions = await preloadImage(nextFullSizeUrl);
 
         // Cancel if navigation target changed during preload
@@ -1146,8 +1249,8 @@ defineExpose({
                     <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
                 </div>
 
-                <!-- Full-size image (shown after preload) -->
-                <img v-else :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt"
+                <!-- Full-size media (image or video) -->
+                <img v-if="!overlayIsLoading && overlayMediaType === 'image'" :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt"
                     :class="[
                         'absolute select-none',
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
@@ -1175,6 +1278,37 @@ defineExpose({
                     }" draggable="false" @click="handleOverlayImageClick"
                     @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick" />
+
+                <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayImage.src"
+                    :class="[
+                        'absolute',
+                        overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'pointer-events-auto' : 'pointer-events-none',
+                        overlayIsFilled ? 'object-contain' : 'object-cover',
+                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating || isBottomPanelOpen !== null) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                    ]" :style="{
+                        ...(overlayImageSize && imageCenterPosition ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                            top: imageCenterPosition.top + 'px',
+                            left: imageCenterPosition.left + 'px',
+                            transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        } : overlayImageSize ? {
+                            width: overlayImageSize.width + 'px',
+                            height: overlayImageSize.height + 'px',
+                            top: '50%',
+                            left: '50%',
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        } : {
+                            top: '50%',
+                            left: '50%',
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                        }),
+                        transformOrigin: 'center center',
+                    }" playsinline controls preload="metadata" @click="handleOverlayImageClick"
+                    @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
+                    @auxclick="handleOverlayImageAuxClick">
+                    <source :src="overlayVideoSrc || ''" type="video/mp4" />
+                </video>
 
                 <!-- Close button -->
                 <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
