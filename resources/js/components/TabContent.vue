@@ -89,6 +89,21 @@ const hoveredItemIndex = ref<number | null>(null);
 const hoveredItemId = ref<number | null>(null);
 const isFilterSheetOpen = ref(false);
 
+const itemIndexById = computed(() => {
+    const map = new Map<number, number>();
+    for (let i = 0; i < items.value.length; i += 1) {
+        const id = items.value[i]?.id;
+        if (typeof id === 'number') {
+            map.set(id, i);
+        }
+    }
+    return map;
+});
+
+function getItemIndex(itemId: number): number | undefined {
+    return itemIndexById.value.get(itemId);
+}
+
 const masonryRenderKey = ref(0);
 const startPageToken = ref<PageToken>(1);
 const restoredPages = ref<MasonryRestoredPages | null>(null);
@@ -108,6 +123,10 @@ function markItemsPreloaded(batch: FeedItem[]): void {
 
 function isItemPreloaded(itemId: number): boolean {
     return preloadedItemIds.value.has(itemId);
+}
+
+function hasActiveReaction(item: FeedItem): boolean {
+    return Boolean(item.reaction?.type);
 }
 
 // Internal tab data - loaded from API
@@ -869,12 +888,12 @@ defineExpose({
 
                                 <!-- Hover reactions overlay -->
                                 <Transition name="fade">
-                                    <div v-if="hoveredItemId === ((item as FeedItem).id as number) && isItemPreloaded((item as FeedItem).id as number)"
+                                    <div v-if="(hoveredItemId === ((item as FeedItem).id as number) || hasActiveReaction(item as FeedItem)) && isItemPreloaded((item as FeedItem).id as number)"
                                         class="absolute bottom-0 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-auto">
                                         <FileReactions :file-id="(item as FeedItem).id as number" :reaction="(item as FeedItem).reaction as ({ type: string } | null | undefined)"
                                             :previewed-count="(item as FeedItem).previewed_count"
                                             :viewed-count="(item as FeedItem).seen_count"
-                                            :current-index="hoveredItemIndex === null ? undefined : hoveredItemIndex"
+                                            :current-index="getItemIndex((item as FeedItem).id as number)"
                                             :total-items="items.length" variant="small" :remove-item="remove"
                                             @reaction="(type) => handleFileReaction((item as FeedItem).id as number, type, remove)" />
                                     </div>
