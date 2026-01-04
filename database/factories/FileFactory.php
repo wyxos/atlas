@@ -29,12 +29,16 @@ class FileFactory extends Factory
         $mimeType = fake()->randomElement($mimeTypes);
         $ext = fake()->randomElement($extensions);
 
+        $pathToken = fake()->optional()->uuid();
+        $thumbnailPathToken = fake()->optional()->uuid();
+
         return [
             'source' => fake()->randomElement($sources),
             'source_id' => fake()->optional()->uuid(),
             'url' => fake()->optional()->url(),
             'referrer_url' => fake()->optional()->url(),
-            'path' => fake()->optional()->filePath(),
+            // Avoid Faker's filePath() (tempnam) which can emit warnings that PHPUnit treats as exceptions.
+            'path' => $pathToken ? 'files/'.$pathToken.'.'.$ext : null,
             'filename' => fake()->word().'.'.$ext,
             'ext' => $ext,
             'size' => fake()->numberBetween(1024, 104857600), // 1KB to 100MB
@@ -43,7 +47,7 @@ class FileFactory extends Factory
             'title' => fake()->optional()->sentence(),
             'description' => fake()->optional()->paragraph(),
             'thumbnail_url' => fake()->optional()->imageUrl(),
-            'thumbnail_path' => fake()->optional()->filePath(),
+            'thumbnail_path' => $thumbnailPathToken ? 'thumbnails/'.$thumbnailPathToken.'.jpg' : null,
             'tags' => fake()->optional()->randomElements(['tag1', 'tag2', 'tag3', 'tag4'], 2),
             'parent_id' => null,
             'chapter' => null,
