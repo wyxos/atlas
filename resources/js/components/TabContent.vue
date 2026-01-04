@@ -876,6 +876,21 @@ defineExpose({
                     :mode="form.data.feed === 'online' && !isTabRestored ? 'backfill' : 'default'"
                     @preloaded="handleBatchPreloaded" @failures="handleBatchFailures" data-test="masonry-component">
                     <MasonryItem @preloaded="handleItemPreloaded">
+                        <template #loader>
+                            <div class="flex h-full w-full items-center justify-center text-twilight-indigo-200">
+                                <Loader2 :size="20" class="animate-spin" />
+                            </div>
+                        </template>
+
+                        <template #error="{ retry }">
+                            <div class="flex h-full w-full flex-col items-center justify-center gap-2 p-3">
+                                <p class="text-center text-xs font-medium text-danger-100">Failed to load</p>
+                                <Button variant="outline" color="danger" size="sm" class="h-7 px-2" @click="retry">
+                                    Retry
+                                </Button>
+                            </div>
+                        </template>
+
                         <template #overlay="{ item, remove }">
                             <div class="relative h-full w-full"
                                 @mouseenter="handleMasonryItemMouseEnter((item as FeedItem).id as number)"
