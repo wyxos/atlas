@@ -56,7 +56,7 @@ npm run test                # Run Vitest tests
 - **TypeScript/JavaScript**: ESLint + TypeScript strict mode → [see resources/js/AGENTS.md for JS/TS conventions](resources/js/AGENTS.md)
 - **Vue**: Composition API only, `<script setup>` syntax → [see resources/js/AGENTS.md for Vue conventions](resources/js/AGENTS.md)
 - **CSS**: Tailwind CSS v4 (CSS-first config, no `tailwind.config.js`) → [see resources/js/AGENTS.md for Tailwind conventions](resources/js/AGENTS.md)
-- **UI design system**: For component styling/layout/variants, follow [resources/js/components/ui/AGENTS.md](resources/js/components/ui/AGENTS.md)
+- **UI design system**: For component styling/layout/variants, follow [resources/js/components/ui/AGENTS.md](resources/js/components/ui/AGENTS.md) and prefer reusing primitives from `resources/js/components/ui/` before creating new UI components.
 
 ### Coding Style Principles
 

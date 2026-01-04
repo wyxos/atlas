@@ -375,6 +375,32 @@
     }
 }
 
+@layer components {
+    .form-field {
+        @apply space-y-2;
+    }
+
+    .form-label {
+        @apply block text-sm font-medium mb-2 text-smart-blue-100;
+    }
+
+    .form-help {
+        @apply text-xs text-twilight-indigo-300;
+    }
+
+    .form-inline-help {
+        @apply text-sm text-twilight-indigo-200;
+    }
+
+    .form-option-label {
+        @apply text-sm text-twilight-indigo-100;
+    }
+
+    .form-checkbox {
+        @apply size-4 rounded focus:ring-2 accent-smart-blue-500;
+    }
+}
+
 /* Remove default blue background from vue-toastification globally */
 .Vue-Toastification__toast {
     background: transparent !important;

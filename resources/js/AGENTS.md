@@ -45,7 +45,7 @@ npm run check:js
 - ✅ DO: Follow the UI design system guidelines in `resources/js/components/ui/AGENTS.md`
 - ✅ DO: Use TypeScript for all components
 - ✅ Example: `resources/js/components/AppHeader.vue` - header component with test
-- ✅ Example: `resources/js/components/ui/Button/Button.vue` - reusable button component
+- ✅ Example: `resources/js/components/ui/button/Button.vue` - reusable button component
 
 **Pages** (`resources/js/pages/`)
 - ✅ DO: Pages are route components, use Vue Router

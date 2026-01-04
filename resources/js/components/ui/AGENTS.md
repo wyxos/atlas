@@ -121,6 +121,12 @@ If spacing looks “odd”, first fix it by normalizing to the 4/8 grid before i
   - keep the API small (variants only when there are real use-cases)
   - follow the existing conventions: `cn()` helper, `data-slot`, and token-based classes
 
+### Existing Primitives (Start Here)
+
+Before creating a new component or adding one-off styling, check what already exists in `resources/js/components/ui/` and reuse it.
+
+Common starting points in this repo include `button/Button.vue`, `Heading.vue`, `Section.vue`, `PageHeader.vue`, `FormInput.vue`, `Pill.vue`, `Badge.vue`, `TabPanel.vue`, and the shadcn-vue folders like `dialog/`, `dropdown-menu/`, `select/`, `sheet/`, `sidebar/`, and `tooltip/`.
+
 ### Oruga
 
 - Oruga is used in parts of the app; overrides live in `resources/css/oruga/*`.

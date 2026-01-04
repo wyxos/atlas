@@ -17,7 +17,8 @@ class Browser
      * Resolve a source key and return the service transform result.
      *
      * Request inputs:
-     * - source: service key (default: 'civit-ai-images')
+        * - service: service key (default: 'civit-ai-images')
+        * - source: local-mode source filter (only when feed=local)
      * - page: page number for pagination
      * - any other inputs are forwarded to fetch()
      */
@@ -32,11 +33,27 @@ class Browser
     public function run(): array
     {
         $params = request()->all();
-        $requestedService = (string) ($params['service'] ?? '');
-        $serviceKey = $requestedService !== '' ? $requestedService : CivitAiImages::key();
+        // Check if this is a local tab
+        $tabId = request()->input('tab_id');
+        $feed = $params['feed'] ?? null;
+
+        $isLocalMode = $feed === 'local';
 
         // Get available services
         $services = $this->getAvailableServices();
+
+        // Prefer the canonical `service` query parameter.
+        // Back-compat: some frontends send the selected service as `source`.
+        // Only treat `source` as a service alias when NOT in local mode.
+        $requestedService = (string) ($params['service'] ?? '');
+        if ($requestedService === '' && ! $isLocalMode) {
+            $sourceCandidate = (string) ($params['source'] ?? '');
+            if ($sourceCandidate !== '' && array_key_exists($sourceCandidate, $services)) {
+                $requestedService = $sourceCandidate;
+            }
+        }
+
+        $serviceKey = $requestedService !== '' ? $requestedService : CivitAiImages::key();
         $servicesMeta = [];
         foreach ($services as $key => $serviceClass) {
             $serviceInstance = app($serviceClass);
@@ -47,11 +64,12 @@ class Browser
             ];
         }
 
-        // Check if this is a local tab
-        $tabId = request()->input('tab_id');
-        $feed = $params['feed'] ?? null;
-
-        $isLocalMode = $feed === 'local';
+        // Track whether the incoming `source` param was used as a service alias.
+        // If so, we must not persist it into the tab's local-mode `source` field.
+        $sourceWasServiceAlias = ! $isLocalMode
+            && $requestedService !== ''
+            && (string) ($params['service'] ?? '') === ''
+            && (string) ($params['source'] ?? '') === $requestedService;
 
         // If we're starting a new browse session (page=1), clear the tab's existing file attachments.
         // This keeps tab history consistent and prevents results from accumulating across new searches.
@@ -238,7 +256,9 @@ class Browser
                         'service' => $serviceKey,
                         'feed' => $isLocalMode ? 'local' : 'online',
                         // Keep local source around (used by local mode UI)
-                        'source' => $params['source'] ?? ($existingParams['source'] ?? 'all'),
+                        'source' => $isLocalMode
+                            ? ($params['source'] ?? ($existingParams['source'] ?? 'all'))
+                            : ($existingParams['source'] ?? 'all'),
 
                         ...$service->defaultParams(),
                         ...$flatFilter,

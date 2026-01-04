@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, shallowRef, triggerRef, watch } from 'vue';
 import type { TabData, FeedItem } from '@/composables/useTabs';
 import { Masonry, MasonryItem } from '@wyxos/vibe';
 import type { MasonryInstance, MasonryRestoredPages, PageToken } from '@wyxos/vibe';
@@ -36,7 +36,7 @@ import { createMasonryInteractions } from '@/utils/masonryInteractions';
 import { useItemPreview } from '@/composables/useItemPreview';
 import { useMasonryReactionHandler } from '@/composables/useMasonryReactionHandler';
 import { useAutoDislikeQueue } from '@/composables/useAutoDislikeQueue';
-import { useBrowseForm, type BrowseFormData } from '@/composables/useBrowseForm';
+import { BrowseFormKey, createBrowseForm, type BrowseFormData } from '@/composables/useBrowseForm';
 import type { ServiceOption } from '@/composables/useBrowseService';
 import TabFilter from './TabFilter.vue';
 import ModerationRulesManager from './moderation/ModerationRulesManager.vue';
@@ -132,8 +132,9 @@ function hasActiveReaction(item: FeedItem): boolean {
 // Internal tab data - loaded from API
 const tab = ref<TabData | null>(null);
 
-// Initialize browse form - will be initialized when tab loads
-const form = useBrowseForm();
+// Per-tab browse form (provided so all descendant composables/components share the same instance)
+const form = createBrowseForm();
+provide(BrowseFormKey, form);
 
 // Container refs for FileViewer
 const masonryContainer = ref<HTMLElement | null>(null);
@@ -248,9 +249,32 @@ const layout = {
 
 async function getPage(page: PageToken, context?: BrowseFormData) {
     const formData = context || form.getData();
-    const params: Record<string, unknown> = { ...formData, ...(formData.serviceFilters || {}), page };
-    // Do not send the nested object itself.
-    delete params.serviceFilters;
+    // Canonical query contract:
+    // - Online browsing: `service=<serviceKey>`
+    // - Local browsing: `source=<sourceName>` (filters local files by source column)
+    // Never send `source` in online mode.
+    const params: Record<string, unknown> = {
+        feed: formData.feed,
+        tab_id: formData.tab_id,
+        page,
+        limit: formData.limit,
+    };
+
+    if (formData.feed === 'online') {
+        params.service = formData.service;
+    } else {
+        params.source = formData.source;
+    }
+
+    // Flatten service-specific filters into the query params, but don't let them override
+    // the envelope keys above.
+    const reserved = new Set(['service', 'source', 'feed', 'tab_id', 'page', 'limit', 'serviceFilters']);
+    for (const [k, v] of Object.entries(formData.serviceFilters || {})) {
+        if (reserved.has(k)) {
+            continue;
+        }
+        params[k] = v;
+    }
 
     handleLoadingStart();
     try {
@@ -656,6 +680,22 @@ onMounted(async () => {
     }
 
     await fetchServices();
+
+    // Legacy migration: older tabs stored the selected online service in `params.source`.
+    // If we restored an online tab with an empty `service`, upgrade it in-memory so the
+    // UI and requests consistently use `service`.
+    if (form.data.feed === 'online' && !form.data.service) {
+        const legacyCandidate = (tab.value?.params as any)?.source;
+        if (typeof legacyCandidate === 'string' && legacyCandidate.length > 0) {
+            const isKnownService = availableServices.value.some((s) => s.key === legacyCandidate);
+            if (isKnownService) {
+                updateService(legacyCandidate);
+                // Reset local-mode source to its default to avoid leaking it into UI.
+                form.data.source = 'all';
+            }
+        }
+    }
+
     await fetchSources();
 });
 
@@ -674,6 +714,8 @@ defineExpose({
     hasServiceSelected,
     loadAtPage,
     isTabRestored,
+    // Expose the per-tab form for tests/debugging
+    browseForm: form,
     masonry,
 });
 </script>

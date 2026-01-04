@@ -77,7 +77,7 @@ describe('TabContent - Service defaults', () => {
         selects[0].vm.$emit('update:modelValue', 'civit-ai-images');
         await nextTick();
 
-        const form = useBrowseForm();
+        const form = (wrapper.vm as any).browseForm;
         expect(form.data.service).toBe('civit-ai-images');
         expect(form.data.serviceFilters.sort).toBe('Newest');
         expect(form.data.serviceFilters.type).toBe('all');

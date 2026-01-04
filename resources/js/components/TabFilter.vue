@@ -39,6 +39,10 @@ const selectedServiceDef = computed(() => {
     if (!form.data.service) {
         return null;
     }
+    // In online mode, `local` is not a valid service selection.
+    if (form.data.feed === 'online' && form.data.service === 'local') {
+        return null;
+    }
     return props.availableServices.find((s) => s.key === form.data.service) ?? null;
 });
 
@@ -150,6 +154,10 @@ function shouldShowDescriptionBelow(field: ServiceFilterField): boolean {
 }
 
 function updateService(nextService: string): void {
+    // Online-mode service selector must not allow switching to the local pseudo-service.
+    if (nextService === 'local') {
+        return;
+    }
     const defaults = props.availableServices.find((s) => s.key === nextService)?.defaults;
     form.setService(nextService, defaults);
 }
@@ -184,14 +192,14 @@ function handleReset(): void {
             </SheetHeader>
             <div class="flex-1 p-6 overflow-y-auto space-y-6">
                 <!-- Service Filter (online only) -->
-                <div v-if="form.data.feed === 'online'" class="space-y-2">
-                    <label class="text-sm font-medium text-regal-navy-100 mb-2 block">Service</label>
+                <div v-if="form.data.feed === 'online'" class="form-field">
+                    <label class="form-label">Service</label>
                     <Select :model-value="form.data.service" @update:model-value="(v) => updateService(v as string)">
                         <SelectTrigger class="w-full">
                             <SelectValue placeholder="Select a service..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem v-for="service in availableServices" :key="service.key" :value="service.key">
+                            <SelectItem v-for="service in availableServices.filter((s) => s.key !== 'local')" :key="service.key" :value="service.key">
                                 {{ service.label }}
                             </SelectItem>
                         </SelectContent>
@@ -201,8 +209,8 @@ function handleReset(): void {
                 <!-- Local mode fields -->
                 <template v-if="form.data.feed === 'local' && activeSchema">
                     <!-- Limit (global) -->
-                    <div class="space-y-2">
-                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">Limit</label>
+                    <div class="form-field">
+                        <label class="form-label">Limit</label>
                         <Select v-model="form.data.limit">
                             <SelectTrigger class="w-full">
                                 <SelectValue />
@@ -219,8 +227,8 @@ function handleReset(): void {
                     </div>
 
                     <!-- Source (global) -->
-                    <div v-if="localSourceField" class="space-y-2">
-                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">
+                    <div v-if="localSourceField" class="form-field">
+                        <label class="form-label">
                             {{ localSourceField.label }}
                         </label>
                         <Select :model-value="form.data.source" @update:model-value="(v) => (form.data.source = v as string)">
@@ -237,11 +245,11 @@ function handleReset(): void {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
-                        <p v-if="shouldShowDescriptionBelow(localSourceField)" class="text-xs text-twilight-indigo-300">{{ localSourceField.description }}</p>
+                        <p v-if="shouldShowDescriptionBelow(localSourceField)" class="form-help">{{ localSourceField.description }}</p>
                     </div>
 
-                    <div v-for="field in visibleServiceFields" :key="field.uiKey" class="space-y-2">
-                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">
+                    <div v-for="field in visibleServiceFields" :key="field.uiKey" class="form-field">
+                        <label class="form-label">
                             {{ field.label }}
                         </label>
 
@@ -259,7 +267,7 @@ function handleReset(): void {
                         </div>
 
                         <div v-else-if="field.type === 'boolean'" class="flex items-center justify-between">
-                            <span class="text-sm text-twilight-indigo-200">{{ field.description || '' }}</span>
+                            <span class="form-inline-help">{{ field.description || '' }}</span>
                             <Switch
                                 :model-value="coerceBoolean(valueOrDefault(field))"
                                 @update:model-value="(v: boolean) => updateServiceFilterValue(field.uiKey, v)"
@@ -304,7 +312,7 @@ function handleReset(): void {
                         >
                             <div v-for="opt in (field.options || [])" :key="String(opt.value)" class="flex items-center gap-2">
                                 <RadioGroupItem :value="String(opt.value)" />
-                                <span class="text-sm text-twilight-indigo-100">{{ opt.label }}</span>
+                                <span class="form-option-label">{{ opt.label }}</span>
                             </div>
                         </RadioGroup>
 
@@ -316,15 +324,15 @@ function handleReset(): void {
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                         />
 
-                        <p v-if="shouldShowDescriptionBelow(field)" class="text-xs text-twilight-indigo-300">{{ field.description }}</p>
+                        <p v-if="shouldShowDescriptionBelow(field)" class="form-help">{{ field.description }}</p>
                     </div>
                 </template>
 
                 <!-- Service fields (online services only). If no service selected, show nothing. -->
                 <template v-if="form.data.feed === 'online' && selectedServiceDef">
                     <!-- Limit (global across all services) -->
-                    <div class="space-y-2">
-                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">Limit</label>
+                    <div class="form-field">
+                        <label class="form-label">Limit</label>
                         <Select v-model="form.data.limit">
                             <SelectTrigger class="w-full">
                                 <SelectValue />
@@ -340,22 +348,22 @@ function handleReset(): void {
                         </Select>
                     </div>
 
-                    <div v-for="field in visibleServiceFields" :key="field.uiKey" class="space-y-2">
-                        <label class="text-sm font-medium text-regal-navy-100 mb-2 block">
+                    <div v-for="field in visibleServiceFields" :key="field.uiKey" class="form-field">
+                        <label class="form-label">
                             {{ field.label }}
                         </label>
 
                         <div v-if="field.type === 'boolean'" class="flex items-center justify-between">
-                            <span class="text-sm text-twilight-indigo-200">{{ field.description || '' }}</span>
+                            <span class="form-inline-help">{{ field.description || '' }}</span>
                             <Switch
-                                :model-value="coerceBoolean(form.data.serviceFilters[field.uiKey])"
+                                :model-value="coerceBoolean(valueOrDefault(field))"
                                 @update:model-value="(v: boolean) => updateServiceFilterValue(field.uiKey, v)"
                             />
                         </div>
 
                         <Select
                             v-else-if="field.type === 'select'"
-                            :model-value="(form.data.serviceFilters[field.uiKey] ?? null) as any"
+                            :model-value="(valueOrDefault(field) ?? null) as any"
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                         >
                             <SelectTrigger class="w-full">
@@ -374,7 +382,7 @@ function handleReset(): void {
 
                         <Input
                             v-else-if="field.type === 'number'"
-                            :model-value="(form.data.serviceFilters[field.uiKey] ?? '') as any"
+                            :model-value="(valueOrDefault(field) ?? '') as any"
                             type="number"
                             :placeholder="placeholderForField(field)"
                             :min="field.min"
@@ -385,25 +393,25 @@ function handleReset(): void {
 
                         <RadioGroup
                             v-else-if="field.type === 'radio'"
-                            :model-value="String(form.data.serviceFilters[field.uiKey] ?? '')"
+                            :model-value="String(valueOrDefault(field) ?? '')"
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                             class="flex flex-wrap items-center gap-4"
                         >
                             <div v-for="opt in (field.options || [])" :key="String(opt.value)" class="flex items-center gap-2">
                                 <RadioGroupItem :value="String(opt.value)" />
-                                <span class="text-sm text-twilight-indigo-100">{{ opt.label }}</span>
+                                <span class="form-option-label">{{ opt.label }}</span>
                             </div>
                         </RadioGroup>
 
                         <Input
                             v-else
-                            :model-value="(form.data.serviceFilters[field.uiKey] ?? '') as any"
+                            :model-value="(valueOrDefault(field) ?? '') as any"
                             type="text"
                             :placeholder="placeholderForField(field)"
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                         />
 
-                        <p v-if="shouldShowDescriptionBelow(field)" class="text-xs text-twilight-indigo-300">{{ field.description }}</p>
+                        <p v-if="shouldShowDescriptionBelow(field)" class="form-help">{{ field.description }}</p>
                     </div>
                 </template>
             </div>
