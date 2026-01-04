@@ -446,11 +446,35 @@ async function loadNextPage(): Promise<void> {
 // Auto-dislike queue composable
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
 
+function findNearestVideoElement(from: EventTarget | null): HTMLVideoElement | null {
+    let el = from as HTMLElement | null;
+    for (let i = 0; i < 8 && el; i += 1) {
+        const video = el.querySelector('video');
+        if (video instanceof HTMLVideoElement) {
+            return video;
+        }
+        el = el.parentElement;
+    }
+    return null;
+}
+
 // Event handlers for masonry items
-function handleMasonryItemMouseEnter(itemId: number): void {
+function handleMasonryItemMouseEnter(e: MouseEvent, item: FeedItem): void {
+    const itemId = item.id;
     const index = items.value.findIndex((i) => i.id === itemId);
     hoveredItemIndex.value = index === -1 ? null : index;
     hoveredItemId.value = itemId;
+
+    if (item.type === 'video') {
+        const video = findNearestVideoElement(e.currentTarget);
+        if (video) {
+            // Avoid autoplay policy issues; Atlas doesn't expose volume controls on hover previews.
+            video.muted = true;
+            void video.play().catch(() => {
+                // Ignore playback failures (browser policy, etc.)
+            });
+        }
+    }
 
     // Freeze auto-dislike queue only if hovering over an item with an active countdown
     if (autoDislikeQueue.hasActiveCountdown(itemId)) {
@@ -458,7 +482,7 @@ function handleMasonryItemMouseEnter(itemId: number): void {
     }
 }
 
-function handleMasonryItemMouseLeave(): void {
+function handleMasonryItemMouseLeave(e: MouseEvent, item: FeedItem): void {
     const itemId = hoveredItemId.value;
     const wasHoveringItemWithCountdown = itemId !== null && autoDislikeQueue.hasActiveCountdown(itemId);
 
@@ -470,6 +494,13 @@ function handleMasonryItemMouseLeave(): void {
     // (The queue will be frozen again if mouse enters another item with countdown)
     if (wasHoveringItemWithCountdown) {
         autoDislikeQueue.unfreezeAll();
+    }
+
+    if (item.type === 'video') {
+        const video = findNearestVideoElement(e.currentTarget);
+        if (video && !video.paused) {
+            video.pause();
+        }
     }
 }
 
@@ -893,8 +924,8 @@ defineExpose({
 
                         <template #overlay="{ item, remove }">
                             <div class="relative h-full w-full"
-                                @mouseenter="handleMasonryItemMouseEnter((item as FeedItem).id as number)"
-                                @mouseleave="handleMasonryItemMouseLeave"
+                                @mouseenter="(e: MouseEvent) => handleMasonryItemMouseEnter(e, item as FeedItem)"
+                                @mouseleave="(e: MouseEvent) => handleMasonryItemMouseLeave(e, item as FeedItem)"
                                 :data-file-id="(item as FeedItem).id"
                                 :class="[
                                     'overflow-hidden rounded-xl transition-colors transition-opacity duration-200',
