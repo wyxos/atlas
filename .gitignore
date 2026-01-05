@@ -29,3 +29,4 @@ Thumbs.db
 /resources/js/wayfinder
 /resources/js/actions
 /resources/js/routes
+package-lock.json
