@@ -416,3 +416,34 @@
     background: transparent !important;
     border: none !important;
 }
+
+/* File viewer video controls */
+.file-viewer-video-slider {
+    appearance: none;
+    height: 4px;
+    border-radius: 9999px;
+    background-color: var(--color-twilight-indigo-600);
+}
+
+.file-viewer-video-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    background-color: var(--color-smart-blue-400);
+    border: 2px solid var(--color-prussian-blue-900);
+}
+
+.file-viewer-video-slider::-moz-range-track {
+    height: 4px;
+    border-radius: 9999px;
+    background-color: var(--color-twilight-indigo-600);
+}
+
+.file-viewer-video-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    background-color: var(--color-smart-blue-400);
+    border: 2px solid var(--color-prussian-blue-900);
+}
