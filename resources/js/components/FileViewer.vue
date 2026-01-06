@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, nextTick, onUnmounted, watch, type Ref } from 'vue';
-import { X, Loader2, Menu } from 'lucide-vue-next';
+import { computed, ref, nextTick, onUnmounted, watch, type Ref } from 'vue';
+import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
 import ImageCarousel from './ImageCarousel.vue';
 import FileReactions from './FileReactions.vue';
 import type { FeedItem } from '@/composables/useTabs';
@@ -42,6 +42,13 @@ const overlayRect = ref<{ top: number; left: number; width: number; height: numb
 const overlayImage = ref<{ src: string; srcset?: string; sizes?: string; alt?: string } | null>(null);
 const overlayMediaType = ref<'image' | 'video'>('image');
 const overlayVideoSrc = ref<string | null>(null);
+const overlayVideoRef = ref<HTMLVideoElement | null>(null);
+const videoCurrentTime = ref(0);
+const videoDuration = ref(0);
+const isVideoPlaying = ref(false);
+const isVideoSeeking = ref(false);
+const isVideoFullscreen = ref(false);
+const videoVolume = ref(1);
 const overlayBorderRadius = ref<string | null>(null);
 const overlayKey = ref(0); // Key to force image element recreation on each click
 const overlayIsAnimating = ref(false); // Track if overlay is animating to center
@@ -73,6 +80,28 @@ watch(() => props.items, (newItems) => {
     }
 }, { deep: true });
 
+watch(
+    () => [overlayMediaType.value, overlayIsLoading.value, overlayVideoSrc.value],
+    async ([mediaType, isLoading, src]) => {
+        if (mediaType !== 'video' || isLoading || !src) {
+            return;
+        }
+        await nextTick();
+        playOverlayVideo();
+    }
+);
+
+watch(() => overlayMediaType.value, (mediaType) => {
+    if (mediaType !== 'video') {
+        videoCurrentTime.value = 0;
+        videoDuration.value = 0;
+        isVideoPlaying.value = false;
+        isVideoSeeking.value = false;
+        isVideoFullscreen.value = false;
+        videoVolume.value = 1;
+    }
+});
+
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -80,6 +109,130 @@ function preloadImage(url: string): Promise<{ width: number; height: number }> {
         img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
         img.src = url;
     });
+}
+
+function playOverlayVideo(): void {
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    video.muted = false;
+    video.volume = 1;
+    videoVolume.value = video.volume;
+    void video.play().catch(() => {});
+}
+
+const videoProgressPercent = computed(() => {
+    if (!videoDuration.value) {
+        return 0;
+    }
+    return Math.min(100, (videoCurrentTime.value / videoDuration.value) * 100);
+});
+
+const videoVolumePercent = computed(() => Math.round(videoVolume.value * 100));
+
+function handleVideoLoadedMetadata(): void {
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    videoDuration.value = Number.isFinite(video.duration) ? video.duration : 0;
+    videoCurrentTime.value = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+    isVideoPlaying.value = !video.paused && !video.ended;
+    videoVolume.value = video.volume;
+}
+
+function handleVideoTimeUpdate(): void {
+    if (isVideoSeeking.value) {
+        return;
+    }
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    videoCurrentTime.value = video.currentTime;
+}
+
+function handleVideoPlay(): void {
+    isVideoPlaying.value = true;
+}
+
+function handleVideoPause(): void {
+    isVideoPlaying.value = false;
+}
+
+function handleVideoEnded(): void {
+    isVideoPlaying.value = false;
+}
+
+function handleVideoVolumeChange(): void {
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    videoVolume.value = video.volume;
+}
+
+function toggleVideoPlayback(): void {
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    if (video.paused || video.ended) {
+        void video.play().catch(() => {});
+    } else {
+        video.pause();
+    }
+}
+
+function handleVideoSeek(event: Event): void {
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    const value = Number((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(value)) {
+        return;
+    }
+    video.currentTime = value;
+    videoCurrentTime.value = value;
+}
+
+function handleVideoVolumeInput(event: Event): void {
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    const value = Number((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(value)) {
+        return;
+    }
+    video.volume = value;
+    video.muted = value === 0;
+    videoVolume.value = value;
+}
+
+function handleFullscreenChange(): void {
+    isVideoFullscreen.value = document.fullscreenElement === overlayVideoRef.value;
+}
+
+function toggleVideoFullscreen(): void {
+    const video = overlayVideoRef.value;
+    if (!video) {
+        return;
+    }
+    if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+        return;
+    }
+    void video.requestFullscreen().catch(() => {});
+}
+function handleVideoSeekStart(): void {
+    isVideoSeeking.value = true;
+}
+
+function handleVideoSeekEnd(): void {
+    isVideoSeeking.value = false;
 }
 
 // Increment seen count when file is loaded in FileViewer
@@ -1160,6 +1313,7 @@ watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible)
         document.addEventListener('auxclick', handleMouseButton, true);
         // Handle popstate to prevent browser navigation
         window.addEventListener('popstate', handlePopState);
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
     } else {
         overlayStatePushed = false;
         window.removeEventListener('keydown', handleKeyDown);
@@ -1167,6 +1321,7 @@ watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible)
         document.removeEventListener('mouseup', handleMouseButton, true);
         document.removeEventListener('auxclick', handleMouseButton, true);
         window.removeEventListener('popstate', handlePopState);
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }
 }, { immediate: true });
 
@@ -1177,6 +1332,7 @@ onUnmounted(() => {
     document.removeEventListener('mouseup', handleMouseButton, true);
     document.removeEventListener('auxclick', handleMouseButton, true);
     window.removeEventListener('popstate', handlePopState);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
 });
 
 // Expose methods for parent component
@@ -1279,7 +1435,7 @@ defineExpose({
                     @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick" />
 
-                <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayImage.src"
+                <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayImage.src" ref="overlayVideoRef"
                     :class="[
                         'absolute',
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'pointer-events-auto' : 'pointer-events-none',
@@ -1304,11 +1460,45 @@ defineExpose({
                             transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
                         }),
                         transformOrigin: 'center center',
-                    }" playsinline controls preload="metadata" @click="handleOverlayImageClick"
+                    }" playsinline autoplay disablepictureinpicture preload="metadata"
+                    @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
+                    @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
+                    @volumechange="handleVideoVolumeChange" @click="handleOverlayImageClick"
                     @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick">
                     <source :src="overlayVideoSrc || ''" type="video/mp4" />
                 </video>
+
+                <div v-if="!overlayIsLoading && overlayMediaType === 'video' && overlayFillComplete && !overlayIsClosing"
+                    class="absolute bottom-4 left-0 right-0 z-50 pointer-events-auto px-4">
+                    <div class="flex w-full items-center gap-3 rounded border border-twilight-indigo-500/80 bg-prussian-blue-800/80 px-3 py-2 backdrop-blur">
+                        <button type="button" class="rounded-full p-2 text-smart-blue-100 hover:text-white"
+                            :aria-label="isVideoPlaying ? 'Pause video' : 'Play video'" @click.stop="toggleVideoPlayback">
+                            <Pause v-if="isVideoPlaying" :size="16" />
+                            <Play v-else :size="16" />
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <input class="file-viewer-video-slider w-full" type="range" min="0"
+                                :max="videoDuration || 0" step="0.1" :value="videoCurrentTime"
+                                :style="{
+                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${videoProgressPercent}%, var(--color-twilight-indigo-600) ${videoProgressPercent}%)`
+                                }" @input="handleVideoSeek" @pointerdown="handleVideoSeekStart"
+                                @pointerup="handleVideoSeekEnd" />
+                        </div>
+                        <div class="w-24 shrink-0">
+                            <input class="file-viewer-video-slider w-full" type="range" min="0" max="1" step="0.01"
+                                :value="videoVolume" :style="{
+                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${videoVolumePercent}%, var(--color-twilight-indigo-600) ${videoVolumePercent}%)`
+                                }" @input="handleVideoVolumeInput" />
+                        </div>
+                        <button type="button" class="rounded-full p-2 text-smart-blue-100 hover:text-white"
+                            :aria-label="isVideoFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+                            @click.stop="toggleVideoFullscreen">
+                            <Minimize2 v-if="isVideoFullscreen" :size="16" />
+                            <Maximize2 v-else :size="16" />
+                        </button>
+                    </div>
+                </div>
 
                 <!-- Close button -->
                 <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
@@ -1319,7 +1509,7 @@ defineExpose({
 
                 <!-- File Reactions (centered under image) -->
                 <div v-if="overlayFillComplete && !overlayIsClosing"
-                    class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+                    class="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
                     <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
                         :reaction="items[currentItemIndex]?.reaction"
                         :previewed-count="(items[currentItemIndex]?.previewed_count as number) ?? 0"
