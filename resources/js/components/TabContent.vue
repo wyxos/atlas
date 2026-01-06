@@ -913,13 +913,11 @@ defineExpose({
                             </div>
                         </template>
 
-                        <template #error="{ retry }">
-                            <div class="flex h-full w-full flex-col items-center justify-center gap-2 p-3">
-                                <p class="text-center text-xs font-medium text-danger-100">Failed to load</p>
-                                <Button type="button" variant="outline" color="danger" size="sm" @click="retry()" data-test="masonry-item-retry">
-                                    Retry
-                                </Button>
-                            </div>
+                        <template #error="{ retry, error }">
+                            <p class="text-center text-xs font-medium text-danger-100">Failed to load {{ error }}</p>
+                            <Button type="button" variant="outline" color="danger" size="sm" @click="retry()" data-test="masonry-item-retry">
+                                Retry
+                            </Button>
                         </template>
 
                         <template #overlay="{ item, remove }">
