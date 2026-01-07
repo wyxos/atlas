@@ -604,6 +604,7 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
     }
 }
 
+
 async function openFromClick(e: MouseEvent): Promise<void> {
     const container = props.masonryContainerRef;
     const tabContent = props.containerRef;

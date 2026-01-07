@@ -89,6 +89,7 @@ Artisan::command('app:setup', function () {
             if (! hash_equals($password, $confirm)) {
                 $this->error('Passwords do not match.');
                 $password = (string) $this->secret('Password');
+
                 continue;
             }
 

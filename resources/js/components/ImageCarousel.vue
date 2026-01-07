@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-vue-next';
-import type { FeedItem } from '../composables/useTabs';
+import type { FeedItem } from '@/composables/useTabs';
 
 interface Props {
     items: FeedItem[];
@@ -127,6 +127,20 @@ watch(() => props.items.length, (newLength) => {
     previousItemsLength.value = newLength;
 }, { immediate: true });
 
+function handleCarouselVideoLoadedMetadata(event: Event): void {
+    const video = event.target as HTMLVideoElement | null;
+    if (!video) {
+        return;
+    }
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    const previewTime = duration > 0 ? Math.min(0.1, duration / 2) : 0;
+    try {
+        video.currentTime = previewTime;
+    } catch {
+        // ignore failed seeks on metadata-only loads
+    }
+}
+
 function handlePrevious(): void {
     emit('previous');
 }
@@ -209,7 +223,11 @@ function isCurrentItem(item: FeedItem): boolean {
                         height: `${ITEM_SIZE}px`,
                         '--stagger-delay': `${Math.max(0, index - previousItemsLength) * STAGGER_DELAY}ms`,
                     }" :data-test="`carousel-item-${index}`" @click="handleItemClick(item)">
-                        <img :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`"
+                        <video v-if="item.type === 'video'" :src="item.originalUrl || item.original || item.src || ''"
+                            class="w-full h-full object-cover pointer-events-none" muted playsinline preload="metadata"
+                            :data-test="`carousel-preview-${index}`"
+                            @loadedmetadata="handleCarouselVideoLoadedMetadata" />
+                        <img v-else :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`"
                             class="w-full h-full object-cover" :data-test="`carousel-preview-${index}`" />
                     </div>
                 </TransitionGroup>
