@@ -18,6 +18,7 @@ export type FeedItem = {
     src: string; // Preview/thumbnail URL for masonry grid
     preview?: string; // Vibe loader preview URL
     original?: string; // Vibe loader original URL
+    timeoutSeconds?: number; // Vibe loader timeout override (seconds)
     originalUrl?: string; // Original full-size URL
     thumbnail?: string; // Thumbnail URL (may be same as src)
     type?: 'image' | 'video';
@@ -257,4 +258,3 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         setActiveTab,
     };
 }
-

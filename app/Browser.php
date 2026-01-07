@@ -17,8 +17,8 @@ class Browser
      * Resolve a source key and return the service transform result.
      *
      * Request inputs:
-        * - service: service key (default: 'civit-ai-images')
-        * - source: local-mode source filter (only when feed=local)
+     * - service: service key (default: 'civit-ai-images')
+     * - source: local-mode source filter (only when feed=local)
      * - page: page number for pagination
      * - any other inputs are forwarded to fetch()
      */
