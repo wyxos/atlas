@@ -190,7 +190,7 @@ vi.mock('@wyxos/vibe', () => ({
                     :videoError="false"
                     :isLoading="false"
                     :showMedia="true"
-                    :imageSrc="item?.src || item?.thumbnail || ''"
+                    :imageSrc="item?.preview"
                     :videoSrc="null"
                 ></slot>
             </div>
@@ -280,6 +280,8 @@ export function createMockBrowseResponse(
             width: 300 + (i % 100),
             height: 200 + (i % 100),
             src: `https://picsum.photos/id/${i}/300/200`,
+            preview: `https://picsum.photos/id/${i}/300/200`,
+            original: `https://picsum.photos/id/${i}/1200/800`,
             type: i % 10 === 0 ? 'video' : 'image',
             page: pageNum,
             key: `${pageNum}-${itemId}`,

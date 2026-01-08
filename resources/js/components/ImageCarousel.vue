@@ -223,11 +223,11 @@ function isCurrentItem(item: FeedItem): boolean {
                         height: `${ITEM_SIZE}px`,
                         '--stagger-delay': `${Math.max(0, index - previousItemsLength) * STAGGER_DELAY}ms`,
                     }" :data-test="`carousel-item-${index}`" @click="handleItemClick(item)">
-                        <video v-if="item.type === 'video'" :src="item.originalUrl || item.original || item.src || ''"
+                        <video v-if="item.type === 'video' && item.preview" :src="item.preview"
                             class="w-full h-full object-cover pointer-events-none" muted playsinline preload="metadata"
                             :data-test="`carousel-preview-${index}`"
                             @loadedmetadata="handleCarouselVideoLoadedMetadata" />
-                        <img v-else :src="item.src || item.thumbnail || ''" :alt="`Preview ${item.id}`"
+                        <img v-else-if="item.preview" :src="item.preview" :alt="`Preview ${item.id}`"
                             class="w-full h-full object-cover" :data-test="`carousel-preview-${index}`" />
                     </div>
                 </TransitionGroup>

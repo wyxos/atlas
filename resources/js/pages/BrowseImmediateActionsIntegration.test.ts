@@ -165,7 +165,7 @@ vi.mock('@wyxos/vibe', () => ({
                     :videoError="false"
                     :isLoading="false"
                     :showMedia="true"
-                    :imageSrc="item?.src || item?.thumbnail || ''"
+                    :imageSrc="item?.preview"
                     :videoSrc="null"
                 ></slot>
             </div>

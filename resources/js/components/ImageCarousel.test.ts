@@ -19,9 +19,9 @@ describe('ImageCarousel', () => {
             page: 1,
             key: `1-${i + 1}`,
             index: i,
-            src: `https://example.com/image${i + 1}.jpg`,
-            thumbnail: `https://example.com/thumb${i + 1}.jpg`,
-            originalUrl: `https://example.com/original${i + 1}.jpg`,
+            preview: `https://example.com/preview${i + 1}.jpg`,
+            original: `https://example.com/original${i + 1}.jpg`,
+            src: `https://example.com/preview${i + 1}.jpg`,
         }));
     };
 

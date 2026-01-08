@@ -130,6 +130,16 @@ const videoProgressPercent = computed(() => {
 });
 
 const videoVolumePercent = computed(() => Math.round(videoVolume.value * 100));
+const overlayVideoPoster = computed(() => {
+    const src = overlayImage.value?.src;
+    if (!src) {
+        return undefined;
+    }
+    if (/\.(mp4|webm)(\?|#|$)/i.test(src)) {
+        return undefined;
+    }
+    return src;
+});
 
 function handleVideoLoadedMetadata(): void {
     const video = overlayVideoRef.value;
@@ -592,7 +602,7 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
 
         const currentItem = items.value[currentItemIndex.value];
         if (currentItem) {
-            const url = currentItem.originalUrl || currentItem.src;
+            const url = currentItem.original || currentItem.preview;
             if (url) {
                 try {
                     window.open(url, '_blank', 'noopener,noreferrer');
@@ -655,12 +665,10 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     // For video cards there may be no <img>, so fall back to FeedItem preview URLs.
     const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
 
-    const src = imgEl?.currentSrc
+    const src = (imgEl?.currentSrc
         || imgEl?.getAttribute('src')
-        || masonryItem.src
-        || masonryItem.thumbnail
         || masonryItem.preview
-        || '';
+        || masonryItem.original) as string;
 
     const srcset = imgEl?.getAttribute('srcset') || undefined;
     const sizes = imgEl?.getAttribute('sizes') || undefined;
@@ -670,7 +678,7 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const computed = window.getComputedStyle(itemEl);
     const radius = computed.borderRadius || '';
 
-    const fullSizeUrl = masonryItem.originalUrl || masonryItem.original || masonryItem.src;
+    const fullSizeUrl = masonryItem.original || src;
     currentItemIndex.value = items.value.findIndex((it) => it.id === masonryItem.id);
 
     // Increment key to force image element recreation (prevents showing previous image)
@@ -704,7 +712,7 @@ async function openFromClick(e: MouseEvent): Promise<void> {
                 width: masonryItem.width,
                 height: masonryItem.height,
             };
-            overlayVideoSrc.value = fullSizeUrl || masonryItem.src || '';
+            overlayVideoSrc.value = fullSizeUrl;
             overlayIsLoading.value = false;
 
             // Count as seen when opening the viewer for the file.
@@ -904,10 +912,8 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     }
 
     const nextIsVideo = nextItem.type === 'video';
-    const nextImageSrc = nextItem.src || nextItem.thumbnail || '';
-    const nextFullSizeUrl = nextIsVideo
-        ? (nextItem.originalUrl || nextItem.original || nextImageSrc)
-        : (nextItem.originalUrl || nextImageSrc);
+    const nextImageSrc = (nextItem.preview || nextItem.original) as string;
+    const nextFullSizeUrl = nextItem.original || nextImageSrc;
 
     // Update overlay image to show spinner with preview
     overlayImage.value = {
@@ -1436,7 +1442,7 @@ defineExpose({
                     @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick" />
 
-                <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayImage.src" ref="overlayVideoRef"
+                <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayVideoPoster" ref="overlayVideoRef"
                     :class="[
                         'absolute',
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'pointer-events-auto' : 'pointer-events-none',
@@ -1467,7 +1473,7 @@ defineExpose({
                     @volumechange="handleVideoVolumeChange" @click="handleOverlayImageClick"
                     @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick">
-                    <source :src="overlayVideoSrc || ''" type="video/mp4" />
+                    <source v-if="overlayVideoSrc" :src="overlayVideoSrc" type="video/mp4" />
                 </video>
 
                 <div v-if="!overlayIsLoading && overlayMediaType === 'video' && overlayFillComplete && !overlayIsClosing"

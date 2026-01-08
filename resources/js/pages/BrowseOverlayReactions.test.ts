@@ -142,7 +142,7 @@ vi.mock('@wyxos/vibe', () => ({
     },
     MasonryItem: {
         name: 'MasonryItem',
-        template: '<div @mouseenter="$emit(\'mouseenter\', $event)" @mouseleave="$emit(\'mouseleave\', $event)"><slot :item="item" :remove="remove" :imageLoaded="true" :imageError="false" :videoLoaded="false" :videoError="false" :isLoading="false" :showMedia="true" :imageSrc="item?.src || item?.thumbnail || \'\'" :videoSrc="null"></slot></div>',
+        template: '<div @mouseenter="$emit(\'mouseenter\', $event)" @mouseleave="$emit(\'mouseleave\', $event)"><slot :item="item" :remove="remove" :imageLoaded="true" :imageError="false" :videoLoaded="false" :videoError="false" :isLoading="false" :showMedia="true" :imageSrc="item?.preview" :videoSrc="null"></slot></div>',
         props: ['item', 'remove'],
         emits: ['mouseenter', 'mouseleave', 'preload:success'],
     },
