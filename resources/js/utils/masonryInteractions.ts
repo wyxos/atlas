@@ -43,7 +43,7 @@ export function createMasonryInteractions(
             e.preventDefault();
             e.stopPropagation();
 
-            const url = item.originalUrl || item.src;
+            const url = item.original || item.preview;
             if (!url) {
                 return;
             }
@@ -57,7 +57,7 @@ export function createMasonryInteractions(
     }
 
     function openOriginalUrl(item: FeedItem): void {
-        const url = item.originalUrl || item.src;
+        const url = item.original || item.preview;
         if (!url) {
             return;
         }

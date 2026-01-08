@@ -180,7 +180,7 @@ vi.mock('@wyxos/vibe', () => ({
                     :videoError="false"
                     :isLoading="false"
                     :showMedia="true"
-                    :imageSrc="item?.src || item?.thumbnail || ''"
+                    :imageSrc="item?.preview"
                     :videoSrc="null"
                 ></slot>
             </div>
@@ -209,7 +209,7 @@ describe('Browse - Middle Click Shortcuts', () => {
 
         const browseResponse = {
             items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
             ],
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
@@ -231,7 +231,7 @@ describe('Browse - Middle Click Shortcuts', () => {
             return;
         }
 
-        tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+        tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });
@@ -267,7 +267,7 @@ describe('Browse - Middle Click Shortcuts', () => {
 
         const browseResponse = {
             items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
             ],
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
@@ -289,7 +289,7 @@ describe('Browse - Middle Click Shortcuts', () => {
             return;
         }
 
-        tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', originalUrl: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
+        tabContentVm.items = [{ id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }];
         await wrapper.vm.$nextTick();
 
         const browseTabContentComponent = wrapper.findComponent({ name: 'TabContent' });

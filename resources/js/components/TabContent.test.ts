@@ -593,9 +593,9 @@ describe('TabContent - Resume Session', () => {
                             page: 5,
                             key: '5-1',
                             index: 0,
-                            src: 'https://example.com/image1.jpg',
-                            originalUrl: 'https://example.com/original1.jpg',
-                            thumbnail: 'https://example.com/thumb1.jpg',
+                            src: 'https://example.com/preview1.jpg',
+                            preview: 'https://example.com/preview1.jpg',
+                            original: 'https://example.com/original1.jpg',
                             type: 'image',
                             notFound: false,
                         },
@@ -644,9 +644,9 @@ describe('TabContent - Container Badges', () => {
         page: 1,
         key: `1-${id}`,
         index: id - 1,
-        src: `https://example.com/image${id}.jpg`,
-        originalUrl: `https://example.com/original${id}.jpg`,
-        thumbnail: `https://example.com/thumb${id}.jpg`,
+        src: `https://example.com/preview${id}.jpg`,
+        preview: `https://example.com/preview${id}.jpg`,
+        original: `https://example.com/original${id}.jpg`,
         type: 'image',
         notFound: false,
         previewed_count: 0,
@@ -1024,7 +1024,7 @@ describe('TabContent - Container Badges', () => {
             // The img should have a src attribute
             expect(img.attributes('src')).toBeTruthy();
             // Verify it's using the imageSrc from Vibe's slot prop
-            expect(img.attributes('src')).toBe(item1.src || item1.thumbnail);
+            expect(img.attributes('src')).toBe(item1.preview);
         }
     });
 
