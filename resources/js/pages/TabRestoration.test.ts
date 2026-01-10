@@ -411,7 +411,6 @@ describe('Browse - Tab Restoration', () => {
 
     it('preserves cursor values on page reload instead of resetting to page 1', async () => {
         const tabId = 1;
-        const cursorX = 'cursor-x';
         const cursorY = 'cursor-y';
         const mockItems = Array.from({ length: 139 }, (_, i) => ({
             id: i + 1,
@@ -451,7 +450,6 @@ describe('Browse - Tab Restoration', () => {
 
     it('continues saved cursor after creating a new tab and switching back', async () => {
         const tabId = 1;
-        const cursorX = 'cursor-x';
         const cursorY = 'cursor-y';
         const mockItems = [
             { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },

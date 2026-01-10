@@ -1,12 +1,6 @@
 import { ref } from 'vue';
-import TabController from '@/actions/App/Http/Controllers/TabController';
+import { index as tabsIndex, store as tabsStore, update as tabsUpdate, destroy as tabsDestroy, show as tabsShow, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
 
-const tabsIndex = TabController.index;
-const tabsStore = TabController.store;
-const tabsUpdate = TabController.update;
-const tabsDestroy = TabController.destroy;
-const tabsShow = TabController.show;
-const tabsSetActive = TabController.setActive;
 
 export type FeedItem = {
     id: number; // Database file ID
@@ -258,3 +252,5 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         setActiveTab,
     };
 }
+
+

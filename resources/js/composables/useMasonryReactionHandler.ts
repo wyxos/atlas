@@ -20,15 +20,11 @@ export function useMasonryReactionHandler(
      * Handle reaction - conditionally removes item from masonry based on feed mode and queues reaction.
      * In local mode: items are NOT removed (visual treatment only).
      * In online mode: items are removed immediately.
-     * 
-     * @param item - The exact item object reference that Vibe is tracking (required for proper animations)
-     * @param type - The reaction type
-     * @param index - Optional index of the item in the items array (avoids findIndex lookup)
      */
     async function handleMasonryReaction(
         item: FeedItem,
         type: ReactionType,
-        index?: number
+        _index?: number
     ): Promise<void> {
         const fileId = item.id;
         const tabId = tab.value?.id;

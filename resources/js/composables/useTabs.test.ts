@@ -368,8 +368,6 @@ describe('useTabs', () => {
         // loadTabItems now returns items from API response
         expect(result).toEqual(mockItems);
 
-        const tab = tabs.value.find(t => t.id === 1);
-        // items are managed in component state, not in tab object
     });
 
     it('handles load tab items error gracefully', async () => {
@@ -391,8 +389,6 @@ describe('useTabs', () => {
 
         await expect(loadTabItems(1)).rejects.toThrow('Network error');
 
-        // Tab should remain unchanged on error
-        const tab = tabs.value.find(t => t.id === 1);
     });
 
     it('handles load tabs error gracefully', async () => {

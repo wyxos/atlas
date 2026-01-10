@@ -121,6 +121,8 @@ function createFormInstance() {
                 }
 
                 const { page: _p, limit: _l, ...rest } = cached;
+                void _p;
+                void _l;
                 data.serviceFilters = { ...rest };
             }
         }
@@ -218,6 +220,8 @@ function createFormInstance() {
             }
 
             const { page: _p, limit: _l, ...rest } = cached;
+            void _p;
+            void _l;
 
             // Merge defaults into cached values when cached is missing/null/empty.
             // This fixes cases where a restored tab seeded nulls (e.g. `type: null`)
@@ -323,4 +327,3 @@ export function useBrowseForm() {
 
     return formInstance;
 }
-

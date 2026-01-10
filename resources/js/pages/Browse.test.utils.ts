@@ -94,8 +94,8 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(props: { items: any[] }, { emit }: { emit: (event: string, value: any) => void }) {
             const removeFn = (item: any) => {
                 mockRemove(item);
@@ -241,8 +241,7 @@ export async function createTestRouter(initialPath = '/browse') {
         history: createMemoryHistory(),
         routes: [
             { path: '/browse', component: Browse },
-            { path: '/dashboard', component: { template: '<div>Dashboard</div>' } },
-        ],
+            { path: '/dashboard', component: { template: '<div>Dashboard</div>' } }],
     });
     await router.push(initialPath);
     await router.isReady();
@@ -432,3 +431,7 @@ export async function setupOverlayTest() {
     await waitForStable(wrapper);
     return { wrapper, router };
 }
+
+
+
+

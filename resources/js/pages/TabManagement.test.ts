@@ -95,8 +95,8 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
@@ -260,8 +260,7 @@ describe('Browse - Tab Management', () => {
                             items: [],
                             position: 1,
                             is_active: false,
-                        },
-                    ],
+                        }],
                 });
             }
             if (url.includes(browseIndexUrl)) {
@@ -344,8 +343,7 @@ describe('Browse - Tab Management', () => {
                             items: [],
                             position: 0,
                             is_active: true,
-                        },
-                    ],
+                        }],
                 });
             }
             if (url.includes(browseIndexUrl)) {
@@ -419,8 +417,7 @@ describe('Browse - Tab Management', () => {
                             items: [],
                             position: 1,
                             is_active: false,
-                        },
-                    ],
+                        }],
                 });
             }
             if (url.includes(browseIndexUrl)) {
@@ -529,3 +526,7 @@ describe('Browse - Tab Management', () => {
         expect(wrapper.find('[data-test="play-button"]').exists()).toBe(true);
     });
 });
+
+
+
+

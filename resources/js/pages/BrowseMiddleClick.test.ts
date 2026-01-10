@@ -87,8 +87,8 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
@@ -209,8 +209,7 @@ describe('Browse - Middle Click Shortcuts', () => {
 
         const browseResponse = {
             items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
-            ],
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }],
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
         };
@@ -267,8 +266,7 @@ describe('Browse - Middle Click Shortcuts', () => {
 
         const browseResponse = {
             items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false },
-            ],
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', preview: 'test1.jpg', original: 'https://example.com/original.jpg', type: 'image', page: 1, index: 0, notFound: false }],
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
         };
@@ -323,3 +321,7 @@ describe('Browse - Middle Click Shortcuts', () => {
         window.open = originalOpen;
     });
 });
+
+
+
+

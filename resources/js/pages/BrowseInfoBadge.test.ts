@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import Browse from './Browse.vue';
-import { show as filesShow } from '@/actions/App/Http/Controllers/FilesController';
 import {
     setupBrowseTestMocks,
     createTestRouter,
@@ -87,8 +86,8 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
@@ -205,8 +204,7 @@ describe('Browse - Info Badge and Prompt Tooltip', () => {
     it('shows info badge when hovering on masonry item with prompt data', async () => {
         const browseResponse = {
             items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, metadata: { prompt: 'test prompt' } },
-            ],
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, metadata: { prompt: 'test prompt' } }],
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
         };
@@ -251,3 +249,7 @@ describe('Browse - Info Badge and Prompt Tooltip', () => {
     // If prompt data is not in metadata, loadPromptData will fetch it from the API, but that's an edge case
     // that's already covered by the usePromptData composable tests.
 });
+
+
+
+
