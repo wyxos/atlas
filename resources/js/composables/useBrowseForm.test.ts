@@ -85,7 +85,7 @@ describe('useBrowseForm - defaults merging', () => {
 
     it('uses provided instance when available (tab isolation)', () => {
         const Parent = defineComponent({
-            name: 'Parent',
+            name: 'ParentWrapper',
             setup() {
                 const scoped = createBrowseForm();
                 scoped.data.service = 'wallhaven';
@@ -95,7 +95,7 @@ describe('useBrowseForm - defaults merging', () => {
             template: '<Child />',
             components: {
                 Child: defineComponent({
-                    name: 'Child',
+                    name: 'ChildWrapper',
                     setup() {
                         const form = useBrowseForm();
                         return { form };
@@ -106,7 +106,7 @@ describe('useBrowseForm - defaults merging', () => {
         });
 
         const wrapper = mount(Parent);
-        const childForm = (wrapper.findComponent({ name: 'Child' }).vm as any).form;
+        const childForm = (wrapper.findComponent({ name: 'ChildWrapper' }).vm as any).form;
         const parentScoped = (wrapper.vm as any).scoped;
 
         expect(childForm).toBe(parentScoped);

@@ -52,8 +52,8 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                     ></slot>
                 </div>
             `,
-            props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-            emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+            props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+            emits: ['update:items', 'preloaded', 'failures'],
             setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
                 let currentPage: number | string | null = null;
                 let nextPage: number | string | null = null;
@@ -294,8 +294,7 @@ export async function createTestRouter(initialPath = '/browse') {
         history: createMemoryHistory(),
         routes: [
             { path: '/browse', component: Browse },
-            { path: '/dashboard', component: { template: '<div>Dashboard</div>' } },
-        ],
+            { path: '/dashboard', component: { template: '<div>Dashboard</div>' } }],
     });
     await router.push(initialPath);
     await router.isReady();
@@ -543,3 +542,7 @@ export function setupBoundingClientRectMock(): void {
         toJSON: vi.fn(),
     }));
 }
+
+
+
+

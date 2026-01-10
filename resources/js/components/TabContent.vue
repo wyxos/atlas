@@ -191,7 +191,6 @@ function showModerationToast(moderatedFiles: Array<{ id: number; action_type: st
         },
         {
             id: toastId,
-            timeout: false, // Don't auto-dismiss
             closeButton: false,
             closeOnClick: false,
             toastClassName: 'moderation-toast-wrapper',
@@ -716,7 +715,7 @@ onMounted(async () => {
     // If we restored an online tab with an empty `service`, upgrade it in-memory so the
     // UI and requests consistently use `service`.
     if (form.data.feed === 'online' && !form.data.service) {
-        const legacyCandidate = (tab.value?.params as any)?.source;
+        const legacyCandidate = tab.value?.params?.source;
         if (typeof legacyCandidate === 'string' && legacyCandidate.length > 0) {
             const isKnownService = availableServices.value.some((s) => s.key === legacyCandidate);
             if (isKnownService) {
@@ -904,7 +903,6 @@ defineExpose({
                     :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
-                    :mode="form.data.feed === 'online' && !isTabRestored ? 'backfill' : 'default'"
                     @preloaded="handleBatchPreloaded" @failures="handleBatchFailures" data-test="masonry-component">
                     <MasonryItem @preloaded="handleItemPreloaded">
                         <template #loader>
@@ -913,11 +911,8 @@ defineExpose({
                             </div>
                         </template>
 
-                        <template #error="{ retry, error }">
+                        <template #error="{ error }">
                             <p class="text-center text-xs font-medium text-danger-100">Failed to load {{ error }}</p>
-                            <Button type="button" variant="outline" color="danger" size="sm" @click="retry()" data-test="masonry-item-retry">
-                                Retry
-                            </Button>
                         </template>
 
                         <template #overlay="{ item, remove }">
@@ -1120,3 +1115,4 @@ defineExpose({
     opacity: 0;
 }
 </style>
+

@@ -132,25 +132,9 @@ const mockInitialize = vi.fn();
 
 vi.mock('@wyxos/vibe', () => {
     const Masonry = defineComponent({
-        name: 'Masonry',
-        props: [
-            'items',
-            'getContent',
-            'getPage',
-            'page',
-            'layout',
-            'layoutMode',
-            'mobileBreakpoint',
-            'init',
-            'mode',
-            'backfillDelayMs',
-            'backfillMaxCalls',
-            'restoredPages',
-            'pageSize',
-            'gapX',
-            'gapY',
-        ],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items', 'preloaded', 'failures'],
+        name: 'MasonryGrid',
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(props: any, { expose, emit, slots }: any) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
@@ -159,17 +143,16 @@ vi.mock('@wyxos/vibe', () => {
 
             const remove = (itemToRemove: any) => {
                 mockRemove(itemToRemove);
-                const idx = (props.items ?? []).findIndex((i: any) => i?.id === itemToRemove?.id);
-                if (idx !== -1) {
-                    props.items.splice(idx, 1);
-                    emit('update:items', props.items);
+                const currentItems = props.items ?? [];
+                const nextItems = currentItems.filter((item: any) => item?.id !== itemToRemove?.id);
+                if (nextItems.length !== currentItems.length) {
+                    emit('update:items', nextItems);
                 }
             };
 
             const initialize = (itemsToRestore: any[], page: number | string, next: number | string | null) => {
                 mockInitialize(itemsToRestore, page, next);
                 const nextItems = [...itemsToRestore];
-                props.items.splice(0, props.items.length, ...nextItems);
                 emit('update:items', nextItems);
                 currentPage = page;
                 nextPage = next ?? null;
@@ -179,7 +162,6 @@ vi.mock('@wyxos/vibe', () => {
 
             const reset = () => {
                 mockReset();
-                props.items.splice(0, props.items.length);
                 emit('update:items', []);
                 currentPage = null;
                 nextPage = null;
@@ -197,9 +179,8 @@ vi.mock('@wyxos/vibe', () => {
                 currentPage = pageToLoad;
                 const result = await getContent(pageToLoad);
                 const newItems = result?.items ?? [];
-                const nextItems = [...props.items, ...newItems];
-                props.items.splice(0, props.items.length, ...nextItems);
-                emit('update:items', [...nextItems]);
+                const nextItems = [...(props.items ?? []), ...newItems];
+                emit('update:items', nextItems);
                 nextPage = result?.nextPage ?? null;
                 paginationHistory = nextPage === null ? [] : [nextPage];
                 hasReachedEnd = nextPage === null;
@@ -349,7 +330,7 @@ vi.mock('./BrowseStatusBar.vue', () => ({
     default: {
         name: 'BrowseStatusBar',
         template: '<div class="browse-status-bar-mock"></div>',
-        props: ['items', 'masonry', 'tab', 'nextCursor', 'isLoading', 'backfill', 'visible'],
+        props: ['items', 'masonry', 'tab', 'nextCursor', 'isLoading', 'visible'],
     },
 }));
 
@@ -618,12 +599,12 @@ describe('TabContent - Resume Session', () => {
         await flushPromises();
         await nextTick();
 
-        const masonry = wrapper.findComponent({ name: 'Masonry' });
+        const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
         expect(masonry.exists()).toBe(true);
         expect(masonry.props('restoredPages')).toBeUndefined();
         expect(masonry.props('page')).toBe('CURSOR_NEXT');
-        // Restored sessions should not run backfill (which can auto-fetch on mount).
-        expect(masonry.props('mode')).toBe('default');
+        // Restored sessions should not set a Masonry mode override.
+        expect(masonry.props('mode')).toBeUndefined();
     });
 });
 
@@ -1208,3 +1189,5 @@ describe('TabContent - Container Badges', () => {
         });
     });
 });
+
+

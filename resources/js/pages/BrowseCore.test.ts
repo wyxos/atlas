@@ -275,7 +275,7 @@ describe('Browse - Core', () => {
         expect(masonry.props('pageSize')).toBe(20);
         expect(masonry.props('gapX')).toBe(12);
         expect(masonry.props('gapY')).toBe(12);
-        expect(masonry.props('mode')).toBe('backfill');
+        expect(masonry.props('mode')).toBeUndefined();
     });
 
     it('provides getPage function that fetches from API', async () => {
@@ -630,7 +630,7 @@ describe('Browse - Core', () => {
         const vm = wrapper.vm as any;
         expect(vm.activeTabId).toBe(tabId);
 
-        const tabContentVm = await waitForTabContent(wrapper);
+        await waitForTabContent(wrapper);
         const masonry = wrapper.findComponent({ name: 'Masonry' });
         expect(masonry.exists()).toBe(true);
         // New contract: `page` is the next token to load.

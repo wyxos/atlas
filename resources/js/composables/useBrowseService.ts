@@ -1,9 +1,7 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
 import type { FeedItem, TabData } from './useTabs';
-import BrowseController from '@/actions/App/Http/Controllers/BrowseController';
+import { services as browseServices, sources as browseSources } from '@/actions/App/Http/Controllers/BrowseController';
 
-const browseServices = BrowseController.services;
-const browseSources = BrowseController.sources;
 
 export type ServiceOption = {
     key: string;
@@ -108,3 +106,5 @@ export function useBrowseService(_options?: UseBrowseServiceOptions) {
         getCurrentService,
     };
 }
+
+

@@ -76,8 +76,8 @@ Object.defineProperty(window, 'axios', {
 vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['preloaded', 'failures', 'update:items'],
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(
             props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> },
             {
@@ -88,8 +88,7 @@ vi.mock('@wyxos/vibe', () => ({
                 emit: (event: string, value: any) => void;
                 expose: (exposed: any) => void;
                 slots: { default?: () => any[] };
-            },
-        ) {
+            }) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
             let hasReachedEnd = false;
@@ -181,9 +180,7 @@ vi.mock('@wyxos/vibe', () => ({
                                   remove: () => {},
                                   index,
                               })
-                            : null,
-                    ),
-                );
+                            : null));
             };
         },
     },
@@ -240,8 +237,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
     it('increments preview count when item is fully in view', async () => {
         const browseResponse = {
             items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 0 },
-            ],
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, previewed_count: 0 }],
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
         };
@@ -524,8 +520,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
     it('increments seen count when file is loaded in FileViewer', async () => {
         const browseResponse = {
             items: [
-                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, seen_count: 0 },
-            ],
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false, seen_count: 0 }],
             nextPage: null,
             services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
         };
@@ -597,3 +592,7 @@ describe('Browse - Preview and Seen Count Tracking', () => {
     });
 
 });
+
+
+
+

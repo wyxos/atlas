@@ -61,8 +61,8 @@ vi.mock('@wyxos/vibe', () => ({
     Masonry: {
         name: 'Masonry',
         template: '<div class="masonry-mock"><slot v-for="(item, index) in items" :key="item.id || index" :item="item" :remove="() => {}" :index="index"></slot></div>',
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
@@ -211,8 +211,7 @@ describe('Browse - Overlay Navigation', () => {
 
         tabContentVm.items = [
             { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
-        ];
+            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false }];
         await wrapper.vm.$nextTick();
 
         const fileViewer = getFileViewer(wrapper);
@@ -254,8 +253,7 @@ describe('Browse - Overlay Navigation', () => {
 
         tabContentVm.items = [
             { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
-        ];
+            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false }];
         await wrapper.vm.$nextTick();
 
         const fileViewer = getFileViewer(wrapper);
@@ -297,8 +295,7 @@ describe('Browse - Overlay Navigation', () => {
 
         tabContentVm.items = [
             { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
-        ];
+            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false }];
         await wrapper.vm.$nextTick();
 
         const fileViewer = getFileViewer(wrapper);
@@ -337,8 +334,7 @@ describe('Browse - Overlay Navigation', () => {
 
         tabContentVm.items = [
             { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
-        ];
+            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false }];
         await wrapper.vm.$nextTick();
 
         const fileViewer = getFileViewer(wrapper);
@@ -375,3 +371,7 @@ describe('Browse - Overlay Navigation', () => {
         // The actual functionality is tested in the browser
     });
 });
+
+
+
+

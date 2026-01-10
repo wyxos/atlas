@@ -89,8 +89,8 @@ vi.mock('@wyxos/vibe', () => ({
                 ></slot>
             </div>
         `,
-        props: ['items', 'getPage', 'layout', 'layoutMode', 'mobileBreakpoint', 'init', 'mode', 'backfillDelayMs', 'backfillMaxCalls'],
-        emits: ['backfill:start', 'backfill:tick', 'backfill:stop', 'backfill:retry-start', 'backfill:retry-tick', 'backfill:retry-stop', 'update:items'],
+        props: ['items', 'getContent', 'getPage', 'page', 'layout', 'layoutMode', 'init', 'mode', 'restoredPages', 'pageSize', 'gapX', 'gapY'],
+        emits: ['update:items', 'preloaded', 'failures'],
         setup(props: { items: any[]; getPage?: (page: number | string) => Promise<{ items?: any[]; nextPage?: number | string | null }> }, { emit }: { emit: (event: string, value: any) => void }) {
             let currentPage: number | string | null = null;
             let nextPage: number | string | null = null;
@@ -230,8 +230,7 @@ describe('Browse - Service Selection', () => {
                         nextPage: null,
                         services: [
                             { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            { key: 'wallhaven', label: 'Wallhaven' },
-                        ],
+                            { key: 'wallhaven', label: 'Wallhaven' }],
                     },
                 });
             }
@@ -316,13 +315,11 @@ describe('Browse - Service Selection', () => {
                 return Promise.resolve({
                     data: {
                         items: [
-                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-                        ],
+                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         nextPage: 'cursor-2',
                         services: [
                             { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            { key: 'wallhaven', label: 'Wallhaven' },
-                        ],
+                            { key: 'wallhaven', label: 'Wallhaven' }],
                     },
                 });
             }
@@ -417,8 +414,7 @@ describe('Browse - Service Selection', () => {
                             params: { service: 'wallhaven', page: 1 },
                             position: 1,
                             is_active: false,
-                        },
-                    ],
+                        }],
                 });
             }
             if (url.includes(browseIndexUrl)) {
@@ -428,8 +424,7 @@ describe('Browse - Service Selection', () => {
                         nextPage: null,
                         services: [
                             { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            { key: 'wallhaven', label: 'Wallhaven' },
-                        ],
+                            { key: 'wallhaven', label: 'Wallhaven' }],
                     },
                 });
             }
@@ -496,13 +491,11 @@ describe('Browse - Service Selection', () => {
                 return Promise.resolve({
                     data: {
                         items: [
-                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
-                        ],
+                            { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false }],
                         nextPage: 'cursor-2',
                         services: [
                             { key: 'civit-ai-images', label: 'CivitAI Images' },
-                            { key: 'wallhaven', label: 'Wallhaven' },
-                        ],
+                            { key: 'wallhaven', label: 'Wallhaven' }],
                     },
                 });
             }
@@ -533,65 +526,8 @@ describe('Browse - Service Selection', () => {
         expect(lastCall).toContain('service=wallhaven');
     });
 
-    it('registers backfill event handlers on masonry component', async () => {
-        mocks.mockAxios.get.mockImplementation((url: string) => {
-            const tabShowMatch = url.match(/\/api\/tabs\/(\d+)(?:\?|$)/);
-            if (tabShowMatch) {
-                const id = Number(tabShowMatch[1]);
-                return Promise.resolve({
-                    data: {
-                        tab: {
-                            id,
-                            label: 'Test Tab',
-                            params: { service: 'civit-ai-images', page: 1 },
-                            feed: 'online',
-                        },
-                    },
-                });
-            }
-            if (url.includes(tabIndexUrl)) {
-                return Promise.resolve({
-                    data: [{
-                        id: 1,
-                        label: 'Test Tab',
-                        params: { service: 'civit-ai-images', page: 1 },
-                        position: 0,
-                    }],
-                });
-            }
-            if (url.includes(browseIndexUrl)) {
-                return Promise.resolve({
-                    data: {
-                        items: [],
-                        nextPage: null,
-                        services: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
-                    },
-                });
-            }
-            return Promise.resolve({ data: { items: [], nextPage: null } });
-        });
-
-        const router = await createTestRouter('/browse');
-        const wrapper = mount(Browse, { global: { plugins: [router] } });
-
-        await waitForStable(wrapper);
-        await waitForStable(wrapper);
-
-        const tabContentVm = getTabContent(wrapper);
-        if (!tabContentVm) {
-            return;
-        }
-
-        expect(typeof tabContentVm.onBackfillStart).toBe('function');
-        expect(typeof tabContentVm.onBackfillTick).toBe('function');
-        expect(typeof tabContentVm.onBackfillStop).toBe('function');
-        expect(typeof tabContentVm.onBackfillRetryStart).toBe('function');
-        expect(typeof tabContentVm.onBackfillRetryTick).toBe('function');
-        expect(typeof tabContentVm.onBackfillRetryStop).toBe('function');
-
-        expect(tabContentVm.backfill).toBeDefined();
-        expect(tabContentVm.backfill.active).toBe(false);
-        expect(tabContentVm.backfill.fetched).toBe(0);
-        expect(tabContentVm.backfill.target).toBe(0);
-    });
 });
+
+
+
+

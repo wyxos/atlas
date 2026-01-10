@@ -18,11 +18,13 @@ declare module '@/actions/App/Http/Controllers/FilesController' {
 declare module '@/actions/App/Http/Controllers/BrowseController' {
     export const index: ActionHandler;
     export const services: ActionHandler;
+    export const sources: ActionHandler;
 }
 
 declare module '@/actions/App/Http/Controllers/TabController' {
     export const index: ActionHandler;
     export const items: ActionHandler;
+    export const show: ActionHandler;
     export const store: ActionHandler;
     export const update: ActionHandler;
     export const destroy: ActionHandler;
