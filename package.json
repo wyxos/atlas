@@ -6,10 +6,16 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "test": "vitest run",
+        "check": "npm run lint && npm run typecheck && npm run test && npm run backend:lint && npm run backend:test",
+        "lint": "eslint . --max-warnings 0",
+        "lint:fix": "eslint . --fix",
+        "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
+        "test": "vitest run --reporter=dot",
         "test:watch": "vitest",
         "test:ui": "vitest --ui",
         "test:coverage": "vitest run --coverage",
+        "backend:lint": "php vendor/bin/pint --dirty",
+        "backend:test": "php artisan test --compact",
         "generate-favicons": "tsx scripts/generate-favicons.ts",
         "build:vibe": "cd ../../vue/vibe && npm run build:lib",
         "release:vibe": "cd ../../vue/vibe && npm run release"

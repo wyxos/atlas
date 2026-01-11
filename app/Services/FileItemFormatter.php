@@ -75,18 +75,25 @@ class FileItemFormatter
                 }
             }
 
+            $originalUrl = $file->url;
+            if (! $originalUrl && $file->path) {
+                $originalUrl = route('api.files.serve', ['file' => $file->id]);
+            }
+
+            $thumbnailUrl = $file->thumbnail_url ?? $originalUrl;
+
             $item = [
                 'id' => $file->id,
                 'width' => $width,
                 'height' => $height,
-                'src' => $file->thumbnail_url ?? $file->url,
+                'src' => $thumbnailUrl,
                 // Vibe (new) expects preview/original for the internal MasonryLoader.
                 // Keep existing src/originalUrl for backward compatibility in the Atlas UI.
-                'preview' => $file->thumbnail_url ?? $file->url,
-                'original' => $file->url,
+                'preview' => $thumbnailUrl,
+                'original' => $originalUrl,
                 'timeoutSeconds' => 30,
-                'originalUrl' => $file->url, // Needed for FileViewer to show original images
-                'thumbnail' => $file->thumbnail_url,
+                'originalUrl' => $originalUrl, // Needed for FileViewer to show original images
+                'thumbnail' => $thumbnailUrl,
                 'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
                 'page' => $page,
                 'key' => "{$page}-{$file->id}",
