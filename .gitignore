@@ -30,3 +30,4 @@ Thumbs.db
 /resources/js/actions
 /resources/js/routes
 package-lock.json
+.zephyr/
