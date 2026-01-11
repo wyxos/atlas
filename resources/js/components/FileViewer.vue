@@ -86,6 +86,18 @@ watch(
         if (mediaType !== 'video' || isLoading || !src) {
             return;
         }
+        // Intentionally do not autoplay when the source is set.
+        // We only start playback after the overlay transition completes (overlayFillComplete).
+    }
+);
+
+watch(
+    () => [overlayMediaType.value, overlayFillComplete.value, overlayIsClosing.value, overlayVideoSrc.value],
+    async ([mediaType, fillComplete, isClosing, src]) => {
+        if (mediaType !== 'video' || !fillComplete || isClosing || !src) {
+            return;
+        }
+
         await nextTick();
         playOverlayVideo();
     }
@@ -1467,7 +1479,7 @@ defineExpose({
                             transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
                         }),
                         transformOrigin: 'center center',
-                    }" playsinline autoplay disablepictureinpicture preload="metadata"
+                    }" playsinline disablepictureinpicture preload="metadata"
                     @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
                     @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
                     @volumechange="handleVideoVolumeChange" @click="handleOverlayImageClick"

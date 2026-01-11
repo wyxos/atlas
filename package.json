@@ -7,13 +7,9 @@
         "build": "vite build",
         "dev": "vite",
         "test": "vitest run",
-        "test:run": "vitest run",
         "test:watch": "vitest",
         "test:ui": "vitest --ui",
         "test:coverage": "vitest run --coverage",
-        "check": "tsx scripts/check.ts",
-        "check:js": "tsx scripts/check-js.ts",
-        "check:php": "tsx scripts/check-php.ts",
         "generate-favicons": "tsx scripts/generate-favicons.ts",
         "build:vibe": "cd ../../vue/vibe && npm run build:lib",
         "release:vibe": "cd ../../vue/vibe && npm run release"
