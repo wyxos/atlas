@@ -4,8 +4,13 @@ use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Bus::fake();
+});
 
 test('removes auto_disliked flag when user reacts with like', function () {
     $admin = User::factory()->admin()->create();

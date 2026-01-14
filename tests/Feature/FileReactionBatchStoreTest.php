@@ -1,13 +1,17 @@
 <?php
 
+use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake(DownloadFile::class);
+
     $this->user = User::factory()->admin()->create();
     $this->actingAs($this->user);
 });
@@ -98,6 +102,8 @@ test('batch store toggles reaction off if same type is sent again', function () 
 });
 
 test('batch store removes auto_disliked flag for positive reactions', function () {
+    Bus::fake();
+
     $file = File::factory()->create(['auto_disliked' => true]);
 
     $response = $this->postJson('/api/files/reactions/batch/store', [
