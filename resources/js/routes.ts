@@ -54,6 +54,12 @@ const routes: RouteRecordRaw[] = [
         meta: { layout: 'DashboardLayout' },
     },
     {
+        path: '/downloads',
+        name: 'downloads',
+        component: () => import('./pages/DownloadsQueue.vue'),
+        meta: { layout: 'DashboardLayout' },
+    },
+    {
         path: '/settings',
         name: 'settings',
         component: () => import('./pages/Settings.vue'),

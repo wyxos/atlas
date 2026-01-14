@@ -1,9 +1,12 @@
 <?php
 
 use App\Jobs\DownloadFile;
+use App\Jobs\Downloads\PumpDomainDownloads;
+use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
@@ -12,13 +15,8 @@ beforeEach(function () {
     Storage::fake('atlas-app');
 });
 
-test('downloads file from URL and stores in atlas disk', function () {
-    $fileContent = 'fake image content';
-
-    // Fake HTTP response first - before creating file
-    Http::fake([
-        '*' => Http::response($fileContent, 200, ['Content-Type' => 'image/jpeg']),
-    ]);
+test('queues a download transfer for the file URL (DownloadFile is an orchestrator)', function () {
+    Bus::fake();
 
     $file = File::factory()->create([
         'url' => 'https://example.com/test-image.jpg',
@@ -33,23 +31,19 @@ test('downloads file from URL and stores in atlas disk', function () {
 
     $file->refresh();
 
-    // Verify HTTP request was made
-    Http::assertSent(function ($request) use ($file) {
-        return $request->url() === $file->url;
-    });
+    expect($file->downloaded)->toBeFalse();
+    expect($file->path)->toBeNull();
 
-    expect($file->downloaded)->toBeTrue();
-    expect($file->path)->toStartWith('downloads/');
-    // Path should be segmented: downloads/{hash[0:2]}/{hash[2:4]}/filename
-    expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\/test-image\.jpg$/');
-    expect($file->filename)->toBe('test-image.jpg');
+    $transfer = DownloadTransfer::query()->where('file_id', $file->id)->first();
+    expect($transfer)->not->toBeNull();
+    expect($transfer->domain)->toBe('example.com');
 
-    // Verify file exists in storage
-    Storage::disk('atlas-app')->assertExists($file->path);
-    expect(Storage::disk('atlas-app')->get($file->path))->toBe($fileContent);
+    Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'example.com');
 });
 
 test('skips download if file is already downloaded', function () {
+    Bus::fake();
+
     $file = File::factory()->create([
         'url' => 'https://example.com/test-image.jpg',
         'downloaded' => true,
@@ -59,11 +53,13 @@ test('skips download if file is already downloaded', function () {
     $job = new DownloadFile($file->id);
     $job->handle();
 
-    // Verify no new files were created
-    Storage::disk('atlas-app')->assertMissing('downloads/new-file.jpg');
+    expect(DownloadTransfer::query()->where('file_id', $file->id)->exists())->toBeFalse();
+    Bus::assertNotDispatched(PumpDomainDownloads::class);
 });
 
 test('skips download if file has no URL', function () {
+    Bus::fake();
+
     $file = File::factory()->create([
         'url' => null,
         'downloaded' => false,
@@ -74,35 +70,28 @@ test('skips download if file has no URL', function () {
 
     $file->refresh();
     expect($file->downloaded)->toBeFalse();
+    expect(DownloadTransfer::query()->where('file_id', $file->id)->exists())->toBeFalse();
+    Bus::assertNotDispatched(PumpDomainDownloads::class);
 });
 
-test('handles download failure gracefully', function () {
+test('creates a transfer even if the URL may not be reachable (download happens asynchronously)', function () {
+    Bus::fake();
+
     $file = File::factory()->create([
         'url' => 'https://example.com/nonexistent.jpg',
         'downloaded' => false,
     ]);
 
-    // Fake HTTP error response
-    Http::fake([
-        $file->url => Http::response('Not Found', 404),
-    ]);
-
     $job = new DownloadFile($file->id);
     $job->handle();
 
-    // File should not be marked as downloaded
     $file->refresh();
     expect($file->downloaded)->toBeFalse();
+    expect(DownloadTransfer::query()->where('file_id', $file->id)->exists())->toBeTrue();
+    Bus::assertDispatched(PumpDomainDownloads::class);
 });
 
-test('clears blacklist flags when downloading a blacklisted file', function () {
-    $fileContent = 'fake image content';
-
-    // Fake HTTP response
-    Http::fake([
-        '*' => Http::response($fileContent, 200, ['Content-Type' => 'image/jpeg']),
-    ]);
-
+test('clears blacklist flags when finalizing a downloaded file', function () {
     $file = File::factory()->create([
         'url' => 'https://example.com/test-image.jpg',
         'filename' => 'test-image.jpg',
@@ -113,8 +102,10 @@ test('clears blacklist flags when downloading a blacklisted file', function () {
         'blacklist_reason' => 'Race condition test',
     ]);
 
-    $job = new DownloadFile($file->id);
-    $job->handle();
+    $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
+    Storage::disk('atlas-app')->put($tmpPath, 'fake image content');
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
     $file->refresh();
 
@@ -126,13 +117,9 @@ test('clears blacklist flags when downloading a blacklisted file', function () {
     expect($file->blacklist_reason)->toBeNull();
 });
 
-test('determines extension from MIME type when URL has no extension', function () {
+test('determines extension from MIME type when URL has no extension (finalizer)', function () {
     // Create actual JPEG file content (JPEG magic bytes: FF D8 FF)
     $jpegContent = hex2bin('FFD8FFE000104A46494600010100000100010000FFDB004300');
-
-    Http::fake([
-        '*' => Http::response($jpegContent, 200, ['Content-Type' => 'image/jpeg']),
-    ]);
 
     $file = File::factory()->create([
         'url' => 'https://example.com/image?id=12345', // No extension in URL
@@ -142,8 +129,10 @@ test('determines extension from MIME type when URL has no extension', function (
         'path' => null,
     ]);
 
-    $job = new DownloadFile($file->id);
-    $job->handle();
+    $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
+    Storage::disk('atlas-app')->put($tmpPath, $jpegContent);
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
     $file->refresh();
 
@@ -155,13 +144,9 @@ test('determines extension from MIME type when URL has no extension', function (
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
 });
 
-test('determines extension from file content when Content-Type header is missing', function () {
+test('determines extension from file content when Content-Type header is missing (finalizer)', function () {
     // Create actual PNG file content (PNG magic bytes: 89 50 4E 47)
     $pngContent = hex2bin('89504E470D0A1A0A0000000D49484452');
-
-    Http::fake([
-        '*' => Http::response($pngContent, 200), // No Content-Type header
-    ]);
 
     $file = File::factory()->create([
         'url' => 'https://example.com/file', // No extension
@@ -171,8 +156,10 @@ test('determines extension from file content when Content-Type header is missing
         'path' => null,
     ]);
 
-    $job = new DownloadFile($file->id);
-    $job->handle();
+    $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
+    Storage::disk('atlas-app')->put($tmpPath, $pngContent);
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath);
 
     $file->refresh();
 
@@ -183,7 +170,7 @@ test('determines extension from file content when Content-Type header is missing
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
 });
 
-test('generates thumbnail for image files', function () {
+test('generates thumbnail for image files (finalizer)', function () {
     // Create a simple 1x1 pixel JPEG image for testing
     // This is a minimal but valid JPEG that GD can process
     $image = imagecreatetruecolor(1, 1);
@@ -195,10 +182,6 @@ test('generates thumbnail for image files', function () {
     $jpegContent = ob_get_clean();
     imagedestroy($image);
 
-    Http::fake([
-        '*' => Http::response($jpegContent, 200, ['Content-Type' => 'image/jpeg']),
-    ]);
-
     $file = File::factory()->create([
         'url' => 'https://example.com/test-image.jpg',
         'filename' => 'test-image.jpg',
@@ -207,8 +190,10 @@ test('generates thumbnail for image files', function () {
         'path' => null,
     ]);
 
-    $job = new DownloadFile($file->id);
-    $job->handle();
+    $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
+    Storage::disk('atlas-app')->put($tmpPath, $jpegContent);
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
 
     $file->refresh();
 

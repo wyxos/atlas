@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/api/tabs/{tab}/active', [\App\Http\Controllers\TabController::class, 'setActive'])->name('api.tabs.active');
     Route::delete('/api/tabs', [\App\Http\Controllers\TabController::class, 'deleteAll'])->name('api.tabs.delete-all');
     Route::delete('/api/files', [\App\Http\Controllers\FilesController::class, 'deleteAll'])->name('api.files.delete-all');
+    Route::get('/api/download-transfers', [\App\Http\Controllers\DownloadTransfersController::class, 'index'])->name('api.download-transfers.index');
 
     // Moderation Rules
     Route::get('/api/moderation-rules', [\App\Http\Controllers\ModerationRuleController::class, 'index'])->name('api.moderation-rules.index');
