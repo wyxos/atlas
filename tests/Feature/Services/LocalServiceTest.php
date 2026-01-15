@@ -31,6 +31,8 @@ test('fetch returns paginated local files', function () {
         'downloaded_at' => now()->subHours(6),
     ]);
 
+    File::makeAllSearchable();
+
     $result = $this->service->fetch(['page' => 1, 'limit' => 20]);
 
     expect($result)->toHaveKey('files');
@@ -50,6 +52,8 @@ test('fetch filters by source when provided', function () {
         'source' => 'Wallhaven',
     ]);
 
+    File::makeAllSearchable();
+
     $result = $this->service->fetch(['page' => 1, 'limit' => 20, 'source' => 'CivitAI']);
 
     expect($result['files'])->toHaveCount(1);
@@ -64,6 +68,8 @@ test('fetch returns all sources when source is all', function () {
         'source' => 'Wallhaven',
     ]);
 
+    File::makeAllSearchable();
+
     $result = $this->service->fetch(['page' => 1, 'limit' => 20, 'source' => 'all']);
 
     expect($result['files'])->toHaveCount(2);
@@ -71,6 +77,8 @@ test('fetch returns all sources when source is all', function () {
 
 test('fetch handles pagination correctly', function () {
     File::factory()->count(25)->create();
+
+    File::makeAllSearchable();
 
     $page1 = $this->service->fetch(['page' => 1, 'limit' => 10]);
     $page2 = $this->service->fetch(['page' => 2, 'limit' => 10]);
@@ -90,6 +98,8 @@ test('transform returns file models directly', function () {
         'thumbnail_url' => 'https://example.com/thumb.jpg',
         'source' => 'CivitAI',
     ]);
+
+    File::makeAllSearchable();
 
     $fetchResult = $this->service->fetch(['page' => 1, 'limit' => 20]);
     $transformResult = $this->service->transform($fetchResult);
