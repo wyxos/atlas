@@ -13,7 +13,10 @@ class LocalService extends BaseService
     public const string LABEL = 'Local Files';
 
     /**
-     * Fetch local files from database (will use Scout when installed).
+     * Fetch local files from search index.
+     *
+     * Do not use Eloquent queries here. The database has over 1 million file records,
+     * and direct queries are too slow for browse operations.
      */
     public function fetch(array $params = []): array
     {
@@ -26,30 +29,6 @@ class LocalService extends BaseService
         $blacklisted = $params['blacklisted'] ?? 'any';
         $reaction = $params['reaction'] ?? null;
 
-        // Build query
-        $query = File::query();
-
-        // Filter by source if provided and not 'all'
-        if ($source && $source !== 'all') {
-            $query->where('source', $source);
-        }
-
-        // Filter by downloaded tri-state
-        if ($downloaded === 'yes') {
-            $query->where('downloaded', true);
-        } elseif ($downloaded === 'no') {
-            $query->where(function ($q) {
-                $q->whereNull('downloaded')->orWhere('downloaded', false);
-            });
-        }
-
-        // Filter by blacklisted tri-state
-        if ($blacklisted === 'yes') {
-            $query->whereNotNull('blacklisted_at');
-        } elseif ($blacklisted === 'no') {
-            $query->whereNull('blacklisted_at');
-        }
-
         // Filter by current user's reaction types (optional)
         $allTypes = ['love', 'like', 'dislike', 'funny'];
         $reactionTypes = null;
@@ -59,44 +38,129 @@ class LocalService extends BaseService
             $reactionTypes = [$reaction];
         }
 
+        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted) {
+            $search = $params['search'] ?? '';
+            if ($search === '') {
+                $search = config('scout.driver') === 'typesense' ? '*' : '';
+            }
+            $builder = File::search($search);
+
+            // Filter by source if provided and not 'all'
+            if ($source && $source !== 'all') {
+                $builder->where('source', $source);
+            }
+
+            // Filter by downloaded tri-state
+            if ($downloaded === 'yes') {
+                $builder->where('downloaded', true);
+            } elseif ($downloaded === 'no') {
+                $builder->where('downloaded', false);
+            }
+
+            // Filter by blacklisted tri-state
+            if ($blacklisted === 'yes') {
+                $builder->where('blacklisted', true);
+            } elseif ($blacklisted === 'no') {
+                $builder->where('blacklisted', false);
+            }
+
+            // Order by most recently downloaded/updated
+            $builder->orderBy('downloaded_at', 'desc')
+                ->orderBy('updated_at', 'desc');
+
+            // Paginate with eager loaded metadata (needed for moderation)
+            $builder->query(fn ($query) => $query->with('metadata'));
+
+            return $builder;
+        };
+
         if ($reactionTypes !== null) {
             $reactionTypes = array_values(array_filter($reactionTypes, fn ($t) => in_array($t, $allTypes, true)));
 
             // When all reaction types are selected (default), treat this as "no filter".
             if (count($reactionTypes) === 0) {
-                $query->whereRaw('1 = 0');
-            } elseif (count($reactionTypes) < count($allTypes)) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                    ],
+                ];
+            }
+
+            if (count($reactionTypes) < count($allTypes)) {
                 $userId = auth()->id();
                 if (! $userId) {
-                    $query->whereRaw('1 = 0');
-                } else {
-                    $query->whereExists(function ($q) use ($userId, $reactionTypes) {
-                        $q->selectRaw('1')
-                            ->from('reactions')
-                            ->whereColumn('reactions.file_id', 'files.id')
-                            ->where('reactions.user_id', $userId)
-                            ->whereIn('reactions.type', $reactionTypes);
-                    });
+                    return [
+                        'files' => [],
+                        'metadata' => [
+                            'nextCursor' => null,
+                        ],
+                    ];
                 }
+
+                if (count($reactionTypes) === 1) {
+                    $reactionField = "{$reactionTypes[0]}_user_ids";
+                    $pagination = $buildSearch()
+                        ->where($reactionField, (string) $userId)
+                        ->paginate($limit, 'page', $page);
+
+                    $files = collect($pagination->items());
+                    $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
+
+                    return [
+                        'files' => $files->all(),
+                        'metadata' => [
+                            'nextCursor' => $nextCursor,
+                        ],
+                    ];
+                }
+
+                $targetLimit = $page * $limit;
+                $results = collect();
+                $total = 0;
+
+                foreach ($reactionTypes as $type) {
+                    $reactionField = "{$type}_user_ids";
+                    $pagination = $buildSearch()
+                        ->where($reactionField, (string) $userId)
+                        ->paginate($targetLimit, 'page', 1);
+
+                    $results = $results->merge($pagination->items());
+                    $total += $pagination->total();
+                }
+
+                $files = $results
+                    ->unique('id')
+                    ->sort(function (File $a, File $b) {
+                        $aDownloaded = $a->downloaded_at?->timestamp ?? 0;
+                        $bDownloaded = $b->downloaded_at?->timestamp ?? 0;
+                        if ($aDownloaded !== $bDownloaded) {
+                            return $bDownloaded <=> $aDownloaded;
+                        }
+
+                        $aUpdated = $a->updated_at?->timestamp ?? 0;
+                        $bUpdated = $b->updated_at?->timestamp ?? 0;
+
+                        return $bUpdated <=> $aUpdated;
+                    })
+                    ->values();
+
+                $totalPages = (int) ceil($total / $limit);
+                $filesPage = $files->slice(($page - 1) * $limit, $limit)->values();
+                $nextCursor = $page < $totalPages ? $page + 1 : null;
+
+                return [
+                    'files' => $filesPage->all(),
+                    'metadata' => [
+                        'nextCursor' => $nextCursor,
+                    ],
+                ];
             }
         }
 
-        // Order by most recently downloaded/updated
-        $query->orderBy('downloaded_at', 'desc')
-            ->orderBy('updated_at', 'desc');
-
-        // Get total count for pagination
-        $total = $query->count();
-        $totalPages = (int) ceil($total / $limit);
-
-        // Paginate with eager loaded metadata (needed for moderation)
-        $files = $query->with('metadata')
-            ->skip(($page - 1) * $limit)
-            ->take($limit)
-            ->get();
-
-        // Determine next cursor (page number)
-        $nextCursor = $page < $totalPages ? $page + 1 : null;
+        $pagination = $buildSearch()->paginate($limit, 'page', $page);
+        $files = collect($pagination->items());
+        $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
 
         // Return files directly - Browser.php will use FileItemFormatter
         return [
@@ -134,7 +198,13 @@ class LocalService extends BaseService
     protected function transformItemToFileFormat(array $item): File
     {
         $fileId = $item['id'] ?? null;
-        $file = $fileId ? File::with('metadata')->find($fileId) : null;
+        $file = $fileId
+            ? File::search('*')
+                ->where('id', (string) $fileId)
+                ->query(fn ($query) => $query->with('metadata'))
+                ->get()
+                ->first()
+            : null;
 
         if (! $file) {
             throw new \RuntimeException("File with ID {$fileId} not found");
