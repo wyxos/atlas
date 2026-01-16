@@ -21,10 +21,10 @@ class FileDownloadFinalizer
             ?? $this->getExtensionFromUrl((string) $file->url)
             ?? 'bin';
 
-        $filename = $this->normalizeFilename($file, $extension);
-        $hashForSegmentation = $file->hash ?? hash('sha256', $filename);
+        $storedFilename = $this->generateStoredFilename($extension);
+        $hashForSegmentation = $file->hash ?? hash('sha256', $storedFilename);
 
-        $finalPath = $this->generateSegmentedPath('downloads', $filename, $hashForSegmentation);
+        $finalPath = $this->generateSegmentedPath('downloads', $storedFilename, $hashForSegmentation);
 
         if ($downloadedPath !== $finalPath) {
             $directory = dirname($finalPath);
@@ -38,14 +38,13 @@ class FileDownloadFinalizer
 
         $updates = [
             'path' => $finalPath,
-            'filename' => $filename,
             'downloaded' => true,
             'downloaded_at' => now(),
         ];
 
         $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
         if ($this->isImageMimeType($mimeType)) {
-            $thumbnailPath = $this->generateThumbnailFromFile($disk, $absolutePath, $filename, $hashForSegmentation);
+            $thumbnailPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
             if ($thumbnailPath) {
                 $updates['thumbnail_path'] = $thumbnailPath;
             }
@@ -59,20 +58,9 @@ class FileDownloadFinalizer
         $file->update($updates);
     }
 
-    private function normalizeFilename(File $file, string $extension): string
+    private function generateStoredFilename(string $extension): string
     {
-        if (empty($file->filename)) {
-            return Str::random(40).'.'.$extension;
-        }
-
-        $currentExt = pathinfo($file->filename, PATHINFO_EXTENSION);
-        if (empty($currentExt) || strtolower($currentExt) !== strtolower($extension)) {
-            $baseName = pathinfo($file->filename, PATHINFO_FILENAME);
-
-            return $baseName.'.'.$extension;
-        }
-
-        return $file->filename;
+        return Str::random(40).'.'.$extension;
     }
 
     private function getExtensionFromUrl(string $url): ?string

@@ -110,6 +110,7 @@ test('clears blacklist flags when finalizing a downloaded file', function () {
     $file->refresh();
 
     expect($file->downloaded)->toBeTrue();
+    expect($file->filename)->toBe('test-image.jpg');
     expect($file->path)->toStartWith('downloads/');
     // Path should be segmented
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
@@ -138,7 +139,7 @@ test('determines extension from MIME type when URL has no extension (finalizer)'
 
     expect($file->downloaded)->toBeTrue();
     // league/mime-type-detection returns 'jpeg' for 'image/jpeg', not 'jpg'
-    expect($file->filename)->toMatch('/\.(jpg|jpeg)$/');
+    expect($file->filename)->toBe('temp-file');
     expect($file->path)->toMatch('/\.(jpg|jpeg)$/');
     // Path should be segmented
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
@@ -164,7 +165,7 @@ test('determines extension from file content when Content-Type header is missing
     $file->refresh();
 
     expect($file->downloaded)->toBeTrue();
-    expect($file->filename)->toEndWith('.png');
+    expect($file->filename)->toBe('temp-file');
     expect($file->path)->toEndWith('.png');
     // Path should be segmented
     expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
@@ -198,6 +199,7 @@ test('generates thumbnail for image files (finalizer)', function () {
     $file->refresh();
 
     expect($file->downloaded)->toBeTrue();
+    expect($file->filename)->toBe('test-image.jpg');
     // Thumbnail should be generated for valid images
     // Verify the path structure and that it exists in fake storage
     if ($file->thumbnail_path) {
