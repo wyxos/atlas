@@ -145,13 +145,22 @@ class BrowseController extends Controller
      */
     private function sourcesWithAll(): array
     {
-        $sources = \App\Models\File::query()
-            ->distinct()
-            ->whereNotNull('source')
-            ->where('source', '!=', '')
-            ->orderBy('source')
-            ->pluck('source')
-            ->toArray();
+        $browser = new \App\Browser;
+        $reflection = new \ReflectionClass($browser);
+        $method = $reflection->getMethod('getAvailableServices');
+        $method->setAccessible(true);
+        $services = $method->invoke($browser);
+
+        $sources = [];
+        foreach ($services as $serviceClass) {
+            $source = $serviceClass::source();
+            if ($source !== '') {
+                $sources[] = $source;
+            }
+        }
+
+        $sources = array_values(array_unique($sources));
+        sort($sources);
 
         return array_merge(['all'], $sources);
     }
