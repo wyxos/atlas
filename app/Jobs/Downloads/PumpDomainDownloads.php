@@ -3,6 +3,7 @@
 namespace App\Jobs\Downloads;
 
 use App\Enums\DownloadTransferStatus;
+use App\Events\DownloadTransferQueued;
 use App\Models\DownloadTransfer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -89,6 +90,7 @@ class PumpDomainDownloads implements ShouldQueue
 
         foreach ($transferIds as $transferId) {
             QueueDownloadTransfer::dispatch($transferId);
+            event(new DownloadTransferQueued($transferId));
         }
     }
 }
