@@ -85,6 +85,7 @@ class DownloadTransfer extends Model
         return in_array($this->status, [
             DownloadTransferStatus::COMPLETED,
             DownloadTransferStatus::FAILED,
+            DownloadTransferStatus::CANCELED,
         ], true);
     }
 }

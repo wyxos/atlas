@@ -38,8 +38,12 @@ class DownloadTransferListing extends ListingBase
         if ($status !== '' && $status !== 'all') {
             if ($status === 'active') {
                 $base->whereIn('status', [
+                    DownloadTransferStatus::PENDING,
                     DownloadTransferStatus::QUEUED,
+                    DownloadTransferStatus::PREPARING,
                     DownloadTransferStatus::DOWNLOADING,
+                    DownloadTransferStatus::ASSEMBLING,
+                    DownloadTransferStatus::PAUSED,
                     DownloadTransferStatus::FAILED,
                 ]);
             } elseif (in_array($status, [
@@ -48,8 +52,10 @@ class DownloadTransferListing extends ListingBase
                 DownloadTransferStatus::PREPARING,
                 DownloadTransferStatus::DOWNLOADING,
                 DownloadTransferStatus::ASSEMBLING,
+                DownloadTransferStatus::PAUSED,
                 DownloadTransferStatus::COMPLETED,
                 DownloadTransferStatus::FAILED,
+                DownloadTransferStatus::CANCELED,
             ], true)) {
                 $base->where('status', $status);
             }
@@ -77,9 +83,12 @@ class DownloadTransferListing extends ListingBase
             'status' => [
                 'active' => 'Active',
                 'queued' => 'Queued',
+                'paused' => 'Paused',
                 'downloading' => 'Downloading',
+                'assembling' => 'Assembling',
                 'failed' => 'Failed',
                 'completed' => 'Completed',
+                'canceled' => 'Canceled',
                 'all' => 'All',
             ],
         ];

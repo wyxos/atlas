@@ -2,6 +2,7 @@
 
 namespace App\Services\Downloads;
 
+use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
 use App\Models\File;
@@ -12,6 +13,10 @@ class DownloadTransferProgressBroadcaster
     {
         $transfer = DownloadTransfer::query()->find($transferId);
         if (! $transfer || ! $transfer->bytes_total) {
+            return;
+        }
+
+        if (in_array($transfer->status, [DownloadTransferStatus::PAUSED, DownloadTransferStatus::CANCELED], true)) {
             return;
         }
 
@@ -40,12 +45,16 @@ class DownloadTransferProgressBroadcaster
             'updated_at' => now(),
         ]);
 
-        event(new DownloadTransferProgressUpdated(
-            downloadTransferId: $transfer->id,
-            fileId: $transfer->file_id,
-            domain: $transfer->domain,
-            status: $transfer->status,
-            percent: $boundary
-        ));
+        try {
+            event(new DownloadTransferProgressUpdated(
+                downloadTransferId: $transfer->id,
+                fileId: $transfer->file_id,
+                domain: $transfer->domain,
+                status: $transfer->status,
+                percent: $boundary
+            ));
+        } catch (\Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
     }
 }

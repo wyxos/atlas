@@ -38,6 +38,7 @@ class DownloadFile implements ShouldQueue
             DownloadTransferStatus::PREPARING,
             DownloadTransferStatus::DOWNLOADING,
             DownloadTransferStatus::ASSEMBLING,
+            DownloadTransferStatus::PAUSED,
         ];
 
         $existing = DownloadTransfer::query()

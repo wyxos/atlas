@@ -16,7 +16,11 @@ final class DownloadTransferStatus
 
     public const ASSEMBLING = 'assembling';
 
+    public const PAUSED = 'paused';
+
     public const COMPLETED = 'completed';
 
     public const FAILED = 'failed';
+
+    public const CANCELED = 'canceled';
 }

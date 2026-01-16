@@ -90,7 +90,11 @@ class PumpDomainDownloads implements ShouldQueue
 
         foreach ($transferIds as $transferId) {
             QueueDownloadTransfer::dispatch($transferId);
-            event(new DownloadTransferQueued($transferId));
+            try {
+                event(new DownloadTransferQueued($transferId));
+            } catch (\Throwable) {
+                // Ignore broadcast failures for queueing updates.
+            }
         }
     }
 }
