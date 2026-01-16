@@ -9,7 +9,6 @@ use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate;
 
 class FileReactionController extends Controller
 {
@@ -19,8 +18,6 @@ class FileReactionController extends Controller
      */
     public function store(Request $request, File $file): JsonResponse
     {
-        Gate::authorize('view', $file);
-
         $validated = $request->validate([
             'type' => ['required', 'string', 'in:love,like,dislike,funny'],
         ]);
@@ -91,8 +88,6 @@ class FileReactionController extends Controller
      */
     public function show(File $file): JsonResponse
     {
-        Gate::authorize('view', $file);
-
         $user = Auth::user();
 
         $reaction = Reaction::where('user_id', $user->id)
@@ -118,12 +113,6 @@ class FileReactionController extends Controller
 
         $fileIds = $request->input('file_ids');
         $user = Auth::user();
-
-        // Load files and authorize
-        $files = File::whereIn('id', $fileIds)->get();
-        foreach ($files as $file) {
-            Gate::authorize('view', $file);
-        }
 
         // Fetch all reactions for these files and this user
         $reactions = Reaction::where('user_id', $user->id)
@@ -164,7 +153,6 @@ class FileReactionController extends Controller
 
         foreach ($validated['reactions'] as $reactionData) {
             $file = File::findOrFail($reactionData['file_id']);
-            Gate::authorize('view', $file);
 
             // Find existing reaction for this user and file
             $existingReaction = Reaction::where('user_id', $user->id)

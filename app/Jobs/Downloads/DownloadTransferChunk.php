@@ -116,6 +116,9 @@ class DownloadTransferChunk implements ShouldQueue
 
             if ($bytesSinceBroadcastCheck >= (2 * 1024 * 1024)) {
                 $bytesSinceBroadcastCheck = 0;
+                if ($this->shouldStop($transfer->id, $chunk, $fh)) {
+                    return;
+                }
                 $broadcaster->maybeBroadcast($transfer->id);
             }
         }
@@ -134,6 +137,27 @@ class DownloadTransferChunk implements ShouldQueue
         ]);
 
         $broadcaster->maybeBroadcast($transfer->id);
+    }
+
+    private function shouldStop(int $transferId, DownloadChunk $chunk, $fh): bool
+    {
+        $status = DownloadTransfer::query()->whereKey($transferId)->value('status');
+        if ($status === DownloadTransferStatus::DOWNLOADING) {
+            return false;
+        }
+
+        if (is_resource($fh)) {
+            fclose($fh);
+        }
+
+        $chunk->update([
+            'status' => $status === DownloadTransferStatus::PAUSED
+                ? DownloadChunkStatus::PAUSED
+                : DownloadChunkStatus::CANCELED,
+            'finished_at' => now(),
+        ]);
+
+        return true;
     }
 
     private function isValidRangeResponse(Response $response): bool

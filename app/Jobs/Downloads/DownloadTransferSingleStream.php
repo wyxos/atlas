@@ -130,6 +130,9 @@ class DownloadTransferSingleStream implements ShouldQueue
 
             if ($bytesSinceBroadcastCheck >= (2 * 1024 * 1024)) {
                 $bytesSinceBroadcastCheck = 0;
+                if ($this->shouldStop($transfer->id, $fh)) {
+                    return;
+                }
                 $broadcaster->maybeBroadcast($transfer->id);
             }
         }
@@ -170,6 +173,20 @@ class DownloadTransferSingleStream implements ShouldQueue
         }
 
         PumpDomainDownloads::dispatch($transfer->domain);
+    }
+
+    private function shouldStop(int $transferId, $fh): bool
+    {
+        $status = DownloadTransfer::query()->whereKey($transferId)->value('status');
+        if ($status === DownloadTransferStatus::DOWNLOADING) {
+            return false;
+        }
+
+        if (is_resource($fh)) {
+            fclose($fh);
+        }
+
+        return true;
     }
 
     private function isValidResponse(Response $response): bool

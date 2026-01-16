@@ -8,7 +8,6 @@ use App\Models\Reaction;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 
 class FilesController extends Controller
@@ -18,8 +17,6 @@ class FilesController extends Controller
      */
     public function index(FileListing $listing): JsonResponse
     {
-        Gate::authorize('viewAny', File::class);
-
         return response()->json($listing->handle());
     }
 
@@ -28,8 +25,6 @@ class FilesController extends Controller
      */
     public function show(File $file): JsonResponse
     {
-        Gate::authorize('view', $file);
-
         // Load metadata relationship for prompt data
         $file->load('metadata');
 
@@ -43,8 +38,6 @@ class FilesController extends Controller
      */
     public function serve(File $file)
     {
-        Gate::authorize('view', $file);
-
         if (! $file->path) {
             abort(404, 'File not found');
         }
@@ -145,8 +138,6 @@ class FilesController extends Controller
      */
     public function destroy(File $file): JsonResponse
     {
-        Gate::authorize('delete', $file);
-
         $file->delete();
 
         return response()->json([
@@ -159,8 +150,6 @@ class FilesController extends Controller
      */
     public function incrementPreview(File $file): JsonResponse
     {
-        Gate::authorize('view', $file);
-
         $file->increment('previewed_count');
         $file->touch('previewed_at');
         $file->refresh();
@@ -203,9 +192,6 @@ class FilesController extends Controller
 
         // Load files and authorize
         $files = File::whereIn('id', $fileIds)->get();
-        foreach ($files as $file) {
-            Gate::authorize('view', $file);
-        }
 
         // Batch increment preview counts
         File::whereIn('id', $fileIds)->increment('previewed_count');
@@ -265,9 +251,6 @@ class FilesController extends Controller
 
         // Load files and authorize
         $files = File::whereIn('id', $fileIds)->get();
-        foreach ($files as $file) {
-            Gate::authorize('view', $file);
-        }
 
         // Filter files that still meet conditions
         // Files can be auto-disliked via:
@@ -339,8 +322,6 @@ class FilesController extends Controller
      */
     public function incrementSeen(File $file): JsonResponse
     {
-        Gate::authorize('view', $file);
-
         $file->increment('seen_count');
         $file->touch('seen_at');
 
@@ -357,10 +338,6 @@ class FilesController extends Controller
     {
         $user = Auth::user();
 
-        // Authorize that user can view any files (admin only)
-        Gate::authorize('viewAny', File::class);
-
-        // Delete all files in the database
         $deletedCount = File::count();
         File::query()->delete();
 
