@@ -2,19 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\DownloadTransferResource;
-use App\Models\DownloadTransfer;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use App\Listings\DownloadTransferListing;
+use Illuminate\Http\JsonResponse;
 
 class DownloadTransfersController extends Controller
 {
-    public function index(): AnonymousResourceCollection
+    public function index(DownloadTransferListing $listing): JsonResponse
     {
-        $transfers = DownloadTransfer::query()
-            ->with('file')
-            ->latest('id')
-            ->paginate(50);
-
-        return DownloadTransferResource::collection($transfers);
+        return response()->json($listing->handle());
     }
 }

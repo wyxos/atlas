@@ -3,6 +3,7 @@
 use App\Enums\DownloadChunkStatus;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
+use App\Events\DownloadTransferQueued;
 use App\Jobs\Downloads\AssembleDownloadTransfer;
 use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Jobs\Downloads\QueueDownloadTransfer;
@@ -20,6 +21,7 @@ uses(RefreshDatabase::class);
 
 test('pumps at most 20 transfers per domain (queued includes waiting+active)', function () {
     Bus::fake();
+    Event::fake([DownloadTransferQueued::class]);
 
     $file = File::factory()->create([
         'url' => 'https://example.com/test.bin',
@@ -46,6 +48,7 @@ test('pumps at most 20 transfers per domain (queued includes waiting+active)', f
     expect(DownloadTransfer::query()->where('domain', 'example.com')->where('status', DownloadTransferStatus::PENDING)->count())->toBe(1);
 
     Bus::assertDispatched(QueueDownloadTransfer::class, 20);
+    Event::assertDispatchedTimes(DownloadTransferQueued::class, 20);
 });
 
 test('pumps respects global transfer cap across domains', function () {
