@@ -3,18 +3,26 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatFileSize } from '../utils/file';
+import type { DownloadTransfer } from '../types/downloadTransfer';
 
-const STATUSES = ['queued', 'processing', 'done', 'failed'] as const;
+const STATUSES = [
+    'pending',
+    'queued',
+    'preparing',
+    'downloading',
+    'assembling',
+    'paused',
+    'completed',
+    'failed',
+    'canceled',
+] as const;
 type Status = typeof STATUSES[number];
 const FILTERS = ['all', ...STATUSES] as const;
 type FilterStatus = typeof FILTERS[number];
-type DownloadItem = {
-    id: number;
-    status: Status;
-    queuedAt: string;
-    startedAt: string | null;
-    completedAt: string | null;
-};
+type DownloadItem = Pick<
+    DownloadTransfer,
+    'id' | 'status' | 'queued_at' | 'started_at' | 'finished_at' | 'percent'
+>;
 
 type SortKey = 'queuedAt' | 'startedAt' | 'completedAt' | 'progress';
 type SortDirection = 'asc' | 'desc';
@@ -23,34 +31,6 @@ const DEFAULT_SORT: { key: SortKey; direction: SortDirection } = {
     key: 'queuedAt',
     direction: 'desc',
 };
-
-const INITIAL_LOAD_DELAY_MS = 900;
-
-function createInitialDownloads(count: number): DownloadItem[] {
-    const now = Date.now();
-    return Array.from({ length: count }, (_, index) => {
-        const id = index + 1;
-        const status = STATUSES[index % STATUSES.length];
-        const queuedAt = new Date(now - (count - index) * 60_000).toISOString();
-        let startedAt: string | null = null;
-        let completedAt: string | null = null;
-
-        if (status !== 'queued') {
-            startedAt = new Date(Date.parse(queuedAt) + 4 * 60_000).toISOString();
-        }
-        if (status === 'done') {
-            completedAt = new Date(Date.parse(startedAt ?? queuedAt) + 8 * 60_000).toISOString();
-        }
-
-        return {
-            id,
-            status,
-            queuedAt,
-            startedAt,
-            completedAt,
-        };
-    });
-}
 
 const downloads = ref<DownloadItem[]>([]);
 const nextId = ref(1);
@@ -76,13 +56,11 @@ type DownloadDetails = {
 };
 
 const detailsById = ref<Record<number, DownloadDetails>>({});
-const progressOverrides = ref<Record<number, number>>({});
 
 let activeRequestToken = 0;
 let activeFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 let idleTimeout: ReturnType<typeof setTimeout> | null = null;
 let socketInterval: ReturnType<typeof setInterval> | null = null;
-let initialLoadTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const sortKey = ref<SortKey | null>(null);
 const sortDirection = ref<SortDirection>('asc');
@@ -95,14 +73,14 @@ const baseFilteredIds = computed(() =>
 
 function sortMetric(item: DownloadItem, key: SortKey): number | null {
     if (key === 'progress') {
-        return currentProgress(item.id);
+        return item.percent ?? 0;
     }
 
     const value = key === 'queuedAt'
-        ? item.queuedAt
+        ? item.queued_at
         : key === 'startedAt'
-            ? item.startedAt
-            : item.completedAt;
+            ? item.started_at
+            : item.finished_at;
 
     return value ? Date.parse(value) : null;
 }
@@ -139,19 +117,37 @@ const visibleIds = computed(() => sortedIds.value.slice(startIndex.value, endInd
 const offsetY = computed(() => startIndex.value * ITEM_HEIGHT);
 
 const STATUS_STYLES: Record<Status, string> = {
+    pending: 'bg-warning-600 border border-warning-500 text-warning-100',
     queued: 'bg-twilight-indigo-500 border border-blue-slate-500 text-twilight-indigo-100',
-    processing: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
-    done: 'bg-success-600 border border-success-500 text-white',
+    preparing: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
+    downloading: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
+    assembling: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
+    paused: 'bg-warning-600 border border-warning-500 text-warning-100',
+    completed: 'bg-success-600 border border-success-500 text-white',
     failed: 'bg-danger-600 border border-danger-500 text-white',
+    canceled: 'bg-prussian-blue-600 border border-blue-slate-500 text-blue-slate-200',
 };
 
-function statusClass(status: Status) {
-    return STATUS_STYLES[status];
+function statusClass(status: string) {
+    return STATUS_STYLES[status as Status] ?? 'bg-prussian-blue-600 border border-blue-slate-500 text-blue-slate-200';
 }
 
 function filterLabel(status: FilterStatus) {
     if (status === 'all') return 'All';
-    return status.charAt(0).toUpperCase() + status.slice(1);
+
+    const labels: Record<Status, string> = {
+        pending: 'Pending',
+        queued: 'Queued',
+        preparing: 'Preparing',
+        downloading: 'Downloading',
+        assembling: 'Assembling',
+        paused: 'Paused',
+        completed: 'Completed',
+        failed: 'Failed',
+        canceled: 'Canceled',
+    };
+
+    return labels[status];
 }
 
 function pad2(value: number) {
@@ -211,13 +207,20 @@ function normalizeProgress(value: number) {
     return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function findDownload(id: number) {
+    return downloads.value.find((item) => item.id === id) ?? null;
+}
+
 function currentProgress(id: number) {
-    return progressOverrides.value[id] ?? detailsById.value[id]?.progress ?? 0;
+    return findDownload(id)?.percent ?? 0;
 }
 
 function setProgress(id: number, value: number) {
     const progress = normalizeProgress(value);
-    progressOverrides.value = { ...progressOverrides.value, [id]: progress };
+    updateDownload(id, (current) => ({
+        ...current,
+        percent: progress,
+    }));
     if (detailsById.value[id]) {
         detailsById.value = {
             ...detailsById.value,
@@ -234,10 +237,10 @@ function updateDownload(id: number, updater: (item: DownloadItem) => DownloadIte
     downloads.value = next;
 }
 
-function buildDetails(id: number): DownloadDetails {
-    const progress = progressOverrides.value[id] ?? ((id * 17) % 101);
-    const size = 512_000 + ((id * 104_729) % 48_000_000);
-    const color = ((id * 57) % 360).toString();
+function buildDetails(item: DownloadItem): DownloadDetails {
+    const progress = item.percent ?? ((item.id * 17) % 101);
+    const size = 512_000 + ((item.id * 104_729) % 48_000_000);
+    const color = ((item.id * 57) % 360).toString();
     const thumbnailUrl = `data:image/svg+xml;utf8,${encodeURIComponent(
         `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
             <defs>
@@ -247,13 +250,13 @@ function buildDetails(id: number): DownloadDetails {
                 </linearGradient>
             </defs>
             <rect width="64" height="64" rx="12" fill="url(#g)" />
-            <text x="50%" y="52%" font-size="18" font-family="Arial, sans-serif" fill="white" text-anchor="middle">${id}</text>
+            <text x="50%" y="52%" font-size="18" font-family="Arial, sans-serif" fill="white" text-anchor="middle">${item.id}</text>
         </svg>`,
     )}`;
 
     return {
-        path: `/downloads/${id}.bin`,
-        url: `https://example.test/downloads/${id}`,
+        path: `/downloads/${item.id}.bin`,
+        url: `https://example.test/downloads/${item.id}`,
         thumbnailUrl,
         progress,
         size,
@@ -269,40 +272,25 @@ function addDownload(status: Status, initialProgress?: number) {
         {
             id,
             status,
-            queuedAt: now,
-            startedAt: status === 'processing' ? now : null,
-            completedAt: null,
+            queued_at: now,
+            started_at: status === 'downloading' ? now : null,
+            finished_at: null,
+            percent: status === 'downloading' ? (initialProgress ?? Math.floor(Math.random() * 12)) : 0,
         },
     ];
 
-    if (status === 'processing') {
-        setProgress(id, initialProgress ?? Math.floor(Math.random() * 12));
-    } else {
-        setProgress(id, 0);
-    }
-
     detailsById.value = {
         ...detailsById.value,
-        [id]: buildDetails(id),
+        [id]: buildDetails({
+            id,
+            status,
+            queued_at: now,
+            started_at: status === 'downloading' ? now : null,
+            finished_at: null,
+            percent: status === 'downloading' ? (initialProgress ?? Math.floor(Math.random() * 12)) : 0,
+        }),
     };
 
-    queueFetchAfterIdle();
-}
-
-function seedInitialDownloads() {
-    const seeded = createInitialDownloads(100);
-    downloads.value = seeded;
-    nextId.value = seeded.length + 1;
-    progressOverrides.value = seeded.reduce((acc, item) => {
-        if (item.status === 'processing') {
-            acc[item.id] = 5 + (item.id % 15);
-        }
-        if (item.status === 'done') {
-            acc[item.id] = 100;
-        }
-        return acc;
-    }, {} as Record<number, number>);
-    isInitialLoading.value = false;
     queueFetchAfterIdle();
 }
 
@@ -312,12 +300,16 @@ function pickRandomId(items: DownloadItem[]) {
 }
 
 function pickProcessingId(preferVisible = false) {
-    const processing = downloads.value.filter((item) => item.status === 'processing');
+    const processing = downloads.value.filter((item) =>
+        ['preparing', 'downloading', 'assembling'].includes(item.status),
+    );
     if (!processing.length) return null;
 
     if (preferVisible) {
         const visibleProcessingIds = new Set(
-            visibleIds.value.filter((item) => item.status === 'processing').map((item) => item.id),
+            visibleIds.value
+                .filter((item) => ['preparing', 'downloading', 'assembling'].includes(item.status))
+                .map((item) => item.id),
         );
         const visibleProcessing = processing.filter((item) => visibleProcessingIds.has(item.id));
         const visiblePick = pickRandomId(visibleProcessing);
@@ -328,12 +320,14 @@ function pickProcessingId(preferVisible = false) {
 }
 
 function pickQueuedId(preferVisible = false) {
-    const queued = downloads.value.filter((item) => item.status === 'queued');
+    const queued = downloads.value.filter((item) => ['pending', 'queued'].includes(item.status));
     if (!queued.length) return null;
 
     if (preferVisible) {
         const visibleQueuedIds = new Set(
-            visibleIds.value.filter((item) => item.status === 'queued').map((item) => item.id),
+            visibleIds.value
+                .filter((item) => ['pending', 'queued'].includes(item.status))
+                .map((item) => item.id),
         );
         const visibleQueued = queued.filter((item) => visibleQueuedIds.has(item.id));
         const visiblePick = pickRandomId(visibleQueued);
@@ -349,8 +343,8 @@ function progressQueuedItem() {
     const now = new Date().toISOString();
     updateDownload(id, (current) => ({
         ...current,
-        status: 'processing',
-        startedAt: current.startedAt ?? now,
+        status: 'downloading',
+        started_at: current.started_at ?? now,
     }));
     setProgress(id, Math.floor(Math.random() * 10));
     queueFetchAfterIdle();
@@ -367,15 +361,16 @@ function progressActiveItem() {
     if (progress >= 100) {
         updateDownload(id, (current) => ({
             ...current,
-            status: 'done',
-            startedAt: current.startedAt ?? now,
-            completedAt: now,
+            status: 'completed',
+            started_at: current.started_at ?? now,
+            finished_at: now,
         }));
         setProgress(id, 100);
     } else {
         updateDownload(id, (current) => ({
             ...current,
-            startedAt: current.startedAt ?? now,
+            status: current.status === 'preparing' ? 'downloading' : current.status,
+            started_at: current.started_at ?? now,
         }));
     }
     queueFetchAfterIdle();
@@ -389,8 +384,8 @@ function failActiveItem() {
     updateDownload(id, (current) => ({
         ...current,
         status: 'failed',
-        startedAt: current.startedAt ?? now,
-        completedAt: null,
+        started_at: current.started_at ?? now,
+        finished_at: null,
     }));
     setProgress(id, currentProgress(id));
     queueFetchAfterIdle();
@@ -420,7 +415,7 @@ function simulateSocketEvent() {
         return;
     }
 
-    addDownload('processing', Math.floor(Math.random() * 14));
+    addDownload('downloading', Math.floor(Math.random() * 14));
 }
 
 function startSocketSimulation() {
@@ -453,11 +448,9 @@ function queueFetchAfterIdle() {
 }
 
 function fetchVisibleDetails() {
-    const idsToFetch = visibleIds.value
-        .map((item) => item.id)
-        .filter((id) => !detailsById.value[id]);
+    const itemsToFetch = visibleIds.value.filter((item) => !detailsById.value[item.id]);
 
-    if (!idsToFetch.length) return;
+    if (!itemsToFetch.length) return;
 
     cancelActiveRequest();
     const requestToken = activeRequestToken;
@@ -466,8 +459,8 @@ function fetchVisibleDetails() {
         if (requestToken !== activeRequestToken) return;
 
         const nextDetails = { ...detailsById.value };
-        for (const id of idsToFetch) {
-            nextDetails[id] = buildDetails(id);
+        for (const item of itemsToFetch) {
+            nextDetails[item.id] = buildDetails(item);
         }
         detailsById.value = nextDetails;
         activeFetchTimeout = null;
@@ -488,13 +481,24 @@ function updateContainerHeight() {
     queueFetchAfterIdle();
 }
 
-onMounted(() => {
+async function loadDownloads() {
+    isInitialLoading.value = true;
+    try {
+        const { data } = await window.axios.get<{ items: DownloadItem[] }>('/api/download-transfers');
+        downloads.value = data.items;
+        detailsById.value = {};
+        const maxId = data.items.reduce((max, item) => Math.max(max, item.id), 0);
+        nextId.value = maxId + 1;
+    } finally {
+        isInitialLoading.value = false;
+        queueFetchAfterIdle();
+    }
+}
+
+onMounted(async () => {
     updateContainerHeight();
     window.addEventListener('resize', updateContainerHeight);
-    isInitialLoading.value = true;
-    initialLoadTimeout = setTimeout(() => {
-        seedInitialDownloads();
-    }, INITIAL_LOAD_DELAY_MS);
+    await loadDownloads();
     startSocketSimulation();
 });
 
@@ -502,9 +506,6 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', updateContainerHeight);
     if (idleTimeout) {
         clearTimeout(idleTimeout);
-    }
-    if (initialLoadTimeout) {
-        clearTimeout(initialLoadTimeout);
     }
     cancelActiveRequest();
     stopSocketSimulation();
@@ -661,15 +662,15 @@ watch(selectedStatus, () => {
                                             </span>
                                         </div>
                                         <div class="w-28">
-                                            <div v-if="detailsById[item.id]" class="h-1.5 w-full rounded bg-prussian-blue-600">
+                                            <div v-if="item.percent !== null" class="h-1.5 w-full rounded bg-prussian-blue-600">
                                                 <div
                                                     class="h-full rounded bg-smart-blue-500 transition-all"
-                                                    :style="{ width: `${detailsById[item.id]?.progress ?? 0}%` }"
+                                                    :style="{ width: `${item.percent}%` }"
                                                 ></div>
                                             </div>
                                             <Skeleton v-else class="h-2 w-full bg-prussian-blue-500/60" />
-                                            <div v-if="detailsById[item.id]" class="mt-1 text-right text-[11px] text-blue-slate-300">
-                                                {{ `${detailsById[item.id].progress}%` }}
+                                            <div v-if="item.percent !== null" class="mt-1 text-right text-[11px] text-blue-slate-300">
+                                                {{ `${item.percent}%` }}
                                             </div>
                                             <div v-else class="mt-1 flex justify-end">
                                                 <Skeleton class="h-3 w-10 bg-prussian-blue-500/60" />
@@ -682,13 +683,13 @@ watch(selectedStatus, () => {
                                             <Skeleton v-else class="ml-auto h-3 w-12 bg-prussian-blue-500/60" />
                                         </div>
                                         <div class="w-28 text-right text-xs text-blue-slate-300">
-                                            {{ formatTimestamp(item.queuedAt) }}
+                                            {{ formatTimestamp(item.queued_at) }}
                                         </div>
                                         <div class="w-28 text-right text-xs text-blue-slate-300">
-                                            {{ formatTimestamp(item.startedAt) }}
+                                            {{ formatTimestamp(item.started_at) }}
                                         </div>
                                         <div class="w-28 text-right text-xs text-blue-slate-300">
-                                            {{ formatTimestamp(item.completedAt) }}
+                                            {{ formatTimestamp(item.finished_at) }}
                                         </div>
                                     </div>
                                 </div>
