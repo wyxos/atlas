@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, ArrowUpDown, Pause, Play, RotateCcw, Trash2, X } from 'lucide-vue-next';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatFileSize } from '../utils/file';
-import type { DownloadTransfer } from '../types/downloadTransfer';
+import { formatFileSize } from '@/utils/file';
+import type { DownloadTransfer } from '@/types/downloadTransfer';
+import downloadTransfers from '@/routes/api/download-transfers';
 
 const STATUSES = [
     'pending',
@@ -45,6 +47,7 @@ const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
 const containerHeight = ref(0);
 const selectedStatus = ref<FilterStatus>('all');
+const actionBusy = ref<Record<number, boolean>>({});
 const isScrolling = ref(false);
 
 type DownloadDetails = {
@@ -231,6 +234,109 @@ function normalizeProgress(value: number) {
     return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function setActionBusy(id: number, value: boolean) {
+    actionBusy.value = { ...actionBusy.value, [id]: value };
+}
+
+function isActionBusy(id: number) {
+    return actionBusy.value[id] ?? false;
+}
+
+function canPause(item: DownloadItem) {
+    return [
+        'pending',
+        'queued',
+        'preparing',
+        'downloading',
+        'assembling',
+    ].includes(item.status);
+}
+
+function canResume(item: DownloadItem) {
+    return item.status === 'paused';
+}
+
+function canCancel(item: DownloadItem) {
+    return !['completed', 'failed', 'canceled'].includes(item.status);
+}
+
+function canRestart(item: DownloadItem) {
+    return ['failed', 'canceled'].includes(item.status);
+}
+
+async function pauseDownload(item: DownloadItem) {
+    if (!canPause(item) || isActionBusy(item.id)) return;
+    setActionBusy(item.id, true);
+    try {
+        await window.axios.post(downloadTransfers.pause.url(item.id));
+        updateDownload(item.id, (current) => ({ ...current, status: 'paused' }));
+    } finally {
+        setActionBusy(item.id, false);
+    }
+}
+
+async function resumeDownload(item: DownloadItem) {
+    if (!canResume(item) || isActionBusy(item.id)) return;
+    setActionBusy(item.id, true);
+    try {
+        await window.axios.post(downloadTransfers.resume.url(item.id));
+        updateDownload(item.id, (current) => ({
+            ...current,
+            status: 'pending',
+            percent: 0,
+            queued_at: null,
+            started_at: null,
+            finished_at: null,
+            failed_at: null,
+        }));
+    } finally {
+        setActionBusy(item.id, false);
+    }
+}
+
+async function cancelDownload(item: DownloadItem) {
+    if (!canCancel(item) || isActionBusy(item.id)) return;
+    setActionBusy(item.id, true);
+    try {
+        await window.axios.post(downloadTransfers.cancel.url(item.id));
+        updateDownload(item.id, (current) => ({ ...current, status: 'canceled' }));
+    } finally {
+        setActionBusy(item.id, false);
+    }
+}
+
+async function restartDownload(item: DownloadItem) {
+    if (!canRestart(item) || isActionBusy(item.id)) return;
+    setActionBusy(item.id, true);
+    try {
+        await window.axios.post(downloadTransfers.restart.url(item.id));
+        updateDownload(item.id, (current) => ({
+            ...current,
+            status: 'pending',
+            percent: 0,
+            queued_at: null,
+            started_at: null,
+            finished_at: null,
+            failed_at: null,
+        }));
+    } finally {
+        setActionBusy(item.id, false);
+    }
+}
+
+async function deleteDownload(item: DownloadItem) {
+    if (isActionBusy(item.id)) return;
+    setActionBusy(item.id, true);
+    try {
+        await window.axios.delete(downloadTransfers.destroy.url(item.id));
+        downloads.value = downloads.value.filter((row) => row.id !== item.id);
+        const { [item.id]: _removed, ...rest } = detailsById.value;
+        detailsById.value = rest;
+    } finally {
+        setActionBusy(item.id, false);
+    }
+}
+
 function updateDownload(id: number, updater: (item: DownloadItem) => DownloadItem) {
     const index = downloads.value.findIndex((item) => item.id === id);
     if (index === -1) return;
@@ -360,7 +466,7 @@ async function fetchVisibleDetails() {
     try {
         const { data } = await window.axios.post<{
             items: Array<DownloadDetails & { id: number }>;
-        }>('/api/download-transfers/details', {
+        }>(downloadTransfers.details.url(), {
             ids: itemsToFetch.map((item) => item.id),
         }, {
             signal: controller.signal,
@@ -404,7 +510,7 @@ function updateContainerHeight() {
 async function loadDownloads() {
     isInitialLoading.value = true;
     try {
-        const { data } = await window.axios.get<{ items: DownloadItem[] }>('/api/download-transfers');
+        const { data } = await window.axios.get<{ items: DownloadItem[] }>(downloadTransfers.index.url());
         downloads.value = data.items;
         detailsById.value = {};
     } finally {
@@ -483,7 +589,7 @@ watch(selectedStatus, () => {
 
             <div class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 overflow-hidden">
                 <div
-                    class="flex min-w-[1080px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300"
+                    class="flex min-w-[1180px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300"
                 >
                     <span>Download</span>
                     <div class="flex items-center gap-4">
@@ -533,6 +639,7 @@ watch(selectedStatus, () => {
                             <ArrowDown v-else-if="sortState('completedAt') === 'desc'" :size="12" class="text-blue-slate-400" />
                             <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
+                        <span class="w-80 text-right">Actions</span>
                     </div>
                 </div>
                 <div
@@ -549,7 +656,7 @@ watch(selectedStatus, () => {
                                 <div
                                     v-for="item in visibleIds"
                                     :key="item.id"
-                                    class="flex h-16 min-w-[1080px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
+                                    class="flex h-16 min-w-[1180px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
                                 >
                                     <div class="flex min-w-0 items-center gap-3">
                                         <div
@@ -620,6 +727,55 @@ watch(selectedStatus, () => {
                                         </div>
                                         <div class="w-28 text-right text-xs text-blue-slate-300">
                                             {{ formatTimestamp(item.finished_at ?? item.failed_at) }}
+                                        </div>
+                                        <div class="flex w-80 items-center justify-end gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                :disabled="isActionBusy(item.id) || !canPause(item)"
+                                                aria-label="Pause download"
+                                                @click="pauseDownload(item)"
+                                            >
+                                                <Pause :size="14" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                :disabled="isActionBusy(item.id) || !canResume(item)"
+                                                aria-label="Resume download"
+                                                @click="resumeDownload(item)"
+                                            >
+                                                <Play :size="14" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                color="danger"
+                                                size="icon-sm"
+                                                :disabled="isActionBusy(item.id) || !canCancel(item)"
+                                                aria-label="Cancel download"
+                                                @click="cancelDownload(item)"
+                                            >
+                                                <X :size="14" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                :disabled="isActionBusy(item.id) || !canRestart(item)"
+                                                aria-label="Restart download"
+                                                @click="restartDownload(item)"
+                                            >
+                                                <RotateCcw :size="14" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                color="danger"
+                                                size="icon-sm"
+                                                :disabled="isActionBusy(item.id)"
+                                                aria-label="Delete download"
+                                                @click="deleteDownload(item)"
+                                            >
+                                                <Trash2 :size="14" />
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
