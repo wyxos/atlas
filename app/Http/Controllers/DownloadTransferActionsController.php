@@ -84,6 +84,7 @@ class DownloadTransferActionsController extends Controller
         if (! in_array($downloadTransfer->status, [
             DownloadTransferStatus::FAILED,
             DownloadTransferStatus::CANCELED,
+            DownloadTransferStatus::COMPLETED,
         ], true)) {
             return response()->json([
                 'message' => 'Download is not restartable.',
