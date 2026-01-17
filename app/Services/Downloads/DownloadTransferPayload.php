@@ -55,6 +55,7 @@ final class DownloadTransferPayload
             'downloadTransferId' => $transfer->id,
             'status' => $transfer->status,
             'percent' => $percent,
+            'created_at' => $transfer->created_at?->toISOString(),
             'started_at' => $transfer->started_at?->toISOString(),
             'finished_at' => $transfer->finished_at?->toISOString(),
             'failed_at' => $transfer->failed_at?->toISOString(),
