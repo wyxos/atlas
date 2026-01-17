@@ -34,13 +34,12 @@ const DEFAULT_SORT: { key: SortKey; direction: SortDirection } = {
 };
 
 const downloads = ref<DownloadItem[]>([]);
-const nextId = ref(1);
 const isInitialLoading = ref(true);
 
 const ITEM_HEIGHT = 64;
 const OVERSCAN = 12;
 const SCROLL_IDLE_MS = 180;
-const SOCKET_TICK_MS = 900;
+const SOCKET_CHANNEL = 'downloads';
 
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
@@ -57,10 +56,19 @@ type DownloadDetails = {
 
 const detailsById = ref<Record<number, DownloadDetails>>({});
 
+type DownloadQueuedPayload = DownloadItem & DownloadDetails & {
+    downloadTransferId?: number;
+};
+type DownloadProgressPayload = {
+    downloadTransferId: number;
+    status: string;
+    percent: number;
+};
+
 let activeRequestToken = 0;
 let idleTimeout: ReturnType<typeof setTimeout> | null = null;
-let socketInterval: ReturnType<typeof setInterval> | null = null;
 let detailsAbortController: AbortController | null = null;
+let echoChannel: { listen: (event: string, callback: (payload: unknown) => void) => void } | null = null;
 
 const sortKey = ref<SortKey | null>(null);
 const sortDirection = ref<SortDirection>('asc');
@@ -214,28 +222,6 @@ function normalizeProgress(value: number) {
     return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function findDownload(id: number) {
-    return downloads.value.find((item) => item.id === id) ?? null;
-}
-
-function currentProgress(id: number) {
-    return findDownload(id)?.percent ?? 0;
-}
-
-function setProgress(id: number, value: number) {
-    const progress = normalizeProgress(value);
-    updateDownload(id, (current) => ({
-        ...current,
-        percent: progress,
-    }));
-    if (detailsById.value[id]) {
-        detailsById.value = {
-            ...detailsById.value,
-            [id]: { ...detailsById.value[id], progress },
-        };
-    }
-}
-
 function updateDownload(id: number, updater: (item: DownloadItem) => DownloadItem) {
     const index = downloads.value.findIndex((item) => item.id === id);
     if (index === -1) return;
@@ -244,195 +230,72 @@ function updateDownload(id: number, updater: (item: DownloadItem) => DownloadIte
     downloads.value = next;
 }
 
-function buildDetails(item: DownloadItem): DownloadDetails {
-    const size = 512_000 + ((item.id * 104_729) % 48_000_000);
-    const color = ((item.id * 57) % 360).toString();
-    const thumbnailUrl = `data:image/svg+xml;utf8,${encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-            <defs>
-                <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stop-color="hsl(${color} 70% 45%)" />
-                    <stop offset="1" stop-color="hsl(${(parseInt(color, 10) + 40) % 360} 70% 35%)" />
-                </linearGradient>
-            </defs>
-            <rect width="64" height="64" rx="12" fill="url(#g)" />
-            <text x="50%" y="52%" font-size="18" font-family="Arial, sans-serif" fill="white" text-anchor="middle">${item.id}</text>
-        </svg>`,
-    )}`;
-
-    return {
-        path: `/downloads/${item.id}.bin`,
-        original: `https://example.test/downloads/${item.id}`,
-        preview: thumbnailUrl,
-        size,
-        filename: `download-${item.id}.bin`,
-    };
+function upsertDownload(item: DownloadItem) {
+    const index = downloads.value.findIndex((row) => row.id === item.id);
+    if (index === -1) {
+        downloads.value = [item, ...downloads.value];
+        return;
+    }
+    const next = downloads.value.slice();
+    next[index] = { ...next[index], ...item };
+    downloads.value = next;
 }
 
-function addDownload(status: Status, initialProgress?: number) {
-    const now = new Date().toISOString();
-    const id = nextId.value;
-    nextId.value += 1;
-    downloads.value = [
-        ...downloads.value,
-        {
-            id,
-            status,
-            queued_at: now,
-            started_at: status === 'downloading' ? now : null,
-            finished_at: null,
-            percent: status === 'downloading' ? (initialProgress ?? Math.floor(Math.random() * 12)) : 0,
-        },
-    ];
+function applyQueuedPayload(payload: DownloadQueuedPayload) {
+    const id = payload.id ?? payload.downloadTransferId;
+    if (!id) return;
+
+    const item: DownloadItem = {
+        id,
+        status: payload.status,
+        queued_at: payload.queued_at ?? null,
+        started_at: payload.started_at ?? null,
+        finished_at: payload.finished_at ?? null,
+        percent: payload.percent ?? 0,
+    };
+
+    upsertDownload(item);
 
     detailsById.value = {
         ...detailsById.value,
-        [id]: buildDetails({
-            id,
-            status,
-            queued_at: now,
-            started_at: status === 'downloading' ? now : null,
-            finished_at: null,
-            percent: status === 'downloading' ? (initialProgress ?? Math.floor(Math.random() * 12)) : 0,
-        }),
+        [id]: {
+            path: payload.path ?? null,
+            original: payload.original ?? null,
+            preview: payload.preview ?? null,
+            size: payload.size ?? null,
+            filename: payload.filename ?? null,
+        },
     };
 
     queueFetchAfterIdle();
 }
 
-function pickRandomId(items: DownloadItem[]) {
-    if (!items.length) return null;
-    return items[Math.floor(Math.random() * items.length)]?.id ?? null;
-}
-
-function pickProcessingId(preferVisible = false) {
-    const processing = downloads.value.filter((item) =>
-        ['preparing', 'downloading', 'assembling'].includes(item.status),
-    );
-    if (!processing.length) return null;
-
-    if (preferVisible) {
-        const visibleProcessingIds = new Set(
-            visibleIds.value
-                .filter((item) => ['preparing', 'downloading', 'assembling'].includes(item.status))
-                .map((item) => item.id),
-        );
-        const visibleProcessing = processing.filter((item) => visibleProcessingIds.has(item.id));
-        const visiblePick = pickRandomId(visibleProcessing);
-        if (visiblePick !== null) return visiblePick;
-    }
-
-    return pickRandomId(processing);
-}
-
-function pickQueuedId(preferVisible = false) {
-    const queued = downloads.value.filter((item) => ['pending', 'queued'].includes(item.status));
-    if (!queued.length) return null;
-
-    if (preferVisible) {
-        const visibleQueuedIds = new Set(
-            visibleIds.value
-                .filter((item) => ['pending', 'queued'].includes(item.status))
-                .map((item) => item.id),
-        );
-        const visibleQueued = queued.filter((item) => visibleQueuedIds.has(item.id));
-        const visiblePick = pickRandomId(visibleQueued);
-        if (visiblePick !== null) return visiblePick;
-    }
-
-    return pickRandomId(queued);
-}
-
-function progressQueuedItem() {
-    const id = pickQueuedId(true);
-    if (id === null) return false;
-    const now = new Date().toISOString();
+function applyProgressPayload(payload: DownloadProgressPayload) {
+    const id = payload.downloadTransferId;
     updateDownload(id, (current) => ({
         ...current,
-        status: 'downloading',
-        started_at: current.started_at ?? now,
+        status: payload.status,
+        percent: normalizeProgress(payload.percent),
     }));
-    setProgress(id, Math.floor(Math.random() * 10));
-    queueFetchAfterIdle();
-    return true;
 }
 
-function progressActiveItem() {
-    const id = pickProcessingId(true);
-    if (id === null) return false;
-    const now = new Date().toISOString();
-    const next = currentProgress(id) + 5 + Math.floor(Math.random() * 18);
-    const progress = normalizeProgress(next);
-    setProgress(id, progress);
-    if (progress >= 100) {
-        updateDownload(id, (current) => ({
-            ...current,
-            status: 'completed',
-            started_at: current.started_at ?? now,
-            finished_at: now,
-        }));
-        setProgress(id, 100);
-    } else {
-        updateDownload(id, (current) => ({
-            ...current,
-            status: current.status === 'preparing' ? 'downloading' : current.status,
-            started_at: current.started_at ?? now,
-        }));
-    }
-    queueFetchAfterIdle();
-    return true;
+function startEchoListeners() {
+    const echo = window.Echo as undefined | { private: (channel: string) => { listen: (event: string, cb: (payload: unknown) => void) => void } };
+    if (!echo) return;
+    echoChannel = echo.private(SOCKET_CHANNEL);
+    echoChannel.listen('.DownloadTransferQueued', (payload: unknown) => {
+        applyQueuedPayload(payload as DownloadQueuedPayload);
+    });
+    echoChannel.listen('.DownloadTransferProgressUpdated', (payload: unknown) => {
+        applyProgressPayload(payload as DownloadProgressPayload);
+    });
 }
 
-function failActiveItem() {
-    const id = pickProcessingId(true);
-    if (id === null) return false;
-    const now = new Date().toISOString();
-    updateDownload(id, (current) => ({
-        ...current,
-        status: 'failed',
-        started_at: current.started_at ?? now,
-        finished_at: null,
-    }));
-    setProgress(id, currentProgress(id));
-    queueFetchAfterIdle();
-    return true;
-}
-
-function simulateSocketEvent() {
-    const roll = Math.random();
-    if (roll < 0.35) {
-        if (Math.random() < 0.5) {
-            if (!progressQueuedItem()) {
-                progressActiveItem();
-            }
-        } else if (!progressActiveItem()) {
-            progressQueuedItem();
-        }
-        return;
-    }
-
-    if (roll < 0.5) {
-        failActiveItem();
-        return;
-    }
-
-    if (roll < 0.75) {
-        addDownload('queued');
-        return;
-    }
-
-    addDownload('downloading', Math.floor(Math.random() * 14));
-}
-
-function startSocketSimulation() {
-    if (socketInterval) return;
-    socketInterval = setInterval(simulateSocketEvent, SOCKET_TICK_MS);
-}
-
-function stopSocketSimulation() {
-    if (!socketInterval) return;
-    clearInterval(socketInterval);
-    socketInterval = null;
+function stopEchoListeners() {
+    const echo = window.Echo as undefined | { leave: (channel: string) => void };
+    if (!echo) return;
+    echo.leave(SOCKET_CHANNEL);
+    echoChannel = null;
 }
 
 function cancelActiveRequest() {
@@ -514,8 +377,6 @@ async function loadDownloads() {
         downloads.value = data.items;
         detailsById.value = {};
 
-        const maxId = data.items.reduce((max, item) => Math.max(max, item.id), 0);
-        nextId.value = maxId + 1;
     } finally {
         isInitialLoading.value = false;
         queueFetchAfterIdle();
@@ -526,7 +387,7 @@ onMounted(async () => {
     updateContainerHeight();
     window.addEventListener('resize', updateContainerHeight);
     await loadDownloads();
-    startSocketSimulation();
+    startEchoListeners();
 });
 
 onBeforeUnmount(() => {
@@ -535,7 +396,7 @@ onBeforeUnmount(() => {
         clearTimeout(idleTimeout);
     }
     cancelActiveRequest();
-    stopSocketSimulation();
+    stopEchoListeners();
 });
 
 watch(selectedStatus, () => {
