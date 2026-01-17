@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-vue-next';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatFileSize } from '../utils/file';
 import type { DownloadTransfer } from '../types/downloadTransfer';
@@ -68,6 +69,13 @@ const baseFilteredIds = computed(() =>
     selectedStatus.value === 'all'
         ? downloads.value
         : downloads.value.filter((item) => item.status === selectedStatus.value),
+);
+
+const statusCounts = computed(() =>
+    downloads.value.reduce((acc, item) => {
+        acc[item.status] = (acc[item.status] ?? 0) + 1;
+        return acc;
+    }, {} as Record<string, number>),
 );
 
 function sortMetric(item: DownloadItem, key: SortKey): number | null {
@@ -560,13 +568,21 @@ watch(selectedStatus, () => {
                         v-for="status in FILTERS"
                         :key="status"
                         type="button"
-                        class="inline-flex items-center rounded border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                        class="inline-flex items-center gap-2 rounded border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                         :class="selectedStatus === status
                             ? 'border-smart-blue-500 bg-smart-blue-600 text-white'
                             : 'border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100 hover:bg-prussian-blue-500'"
                         @click="selectedStatus = status"
                     >
-                        {{ filterLabel(status) }}
+                        <span>{{ filterLabel(status) }}</span>
+                        <span
+                            class="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                            :class="selectedStatus === status
+                                ? 'bg-white/15 text-white'
+                                : 'bg-prussian-blue-500 text-blue-slate-200'"
+                        >
+                            {{ status === 'all' ? downloads.length : (statusCounts[status] ?? 0) }}
+                        </span>
                     </button>
                 </div>
                 <div class="text-xs text-blue-slate-300">
@@ -585,42 +601,46 @@ watch(selectedStatus, () => {
                             type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
                             @click="toggleSort('progress')"
+                            aria-label="Sort by progress"
                         >
                             <span>Progress</span>
-                            <span v-if="sortState('progress')" class="text-[10px] text-blue-slate-400">
-                                {{ sortState('progress')?.toUpperCase() }}
-                            </span>
+                            <ArrowUp v-if="sortState('progress') === 'asc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('progress') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
                         <span class="w-20 text-right">Size</span>
                         <button
                             type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
                             @click="toggleSort('queuedAt')"
+                            aria-label="Sort by queued time"
                         >
                             <span>Queued</span>
-                            <span v-if="sortState('queuedAt')" class="text-[10px] text-blue-slate-400">
-                                {{ sortState('queuedAt')?.toUpperCase() }}
-                            </span>
+                            <ArrowUp v-if="sortState('queuedAt') === 'asc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('queuedAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
                         <button
                             type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
                             @click="toggleSort('startedAt')"
+                            aria-label="Sort by started time"
                         >
                             <span>Started</span>
-                            <span v-if="sortState('startedAt')" class="text-[10px] text-blue-slate-400">
-                                {{ sortState('startedAt')?.toUpperCase() }}
-                            </span>
+                            <ArrowUp v-if="sortState('startedAt') === 'asc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('startedAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
                         <button
                             type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
                             @click="toggleSort('completedAt')"
+                            aria-label="Sort by completed time"
                         >
                             <span>Completed</span>
-                            <span v-if="sortState('completedAt')" class="text-[10px] text-blue-slate-400">
-                                {{ sortState('completedAt')?.toUpperCase() }}
-                            </span>
+                            <ArrowUp v-if="sortState('completedAt') === 'asc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('completedAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
                     </div>
                 </div>
