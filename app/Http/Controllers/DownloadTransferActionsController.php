@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DownloadTransferStatus;
+use App\Events\DownloadTransferProgressUpdated;
 use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
@@ -27,6 +29,8 @@ class DownloadTransferActionsController extends Controller
             'status' => DownloadTransferStatus::PAUSED,
         ]);
 
+        $this->broadcastState($downloadTransfer);
+
         return response()->json([
             'message' => 'Download paused.',
         ]);
@@ -42,6 +46,8 @@ class DownloadTransferActionsController extends Controller
 
         $this->cleanupTransferParts($downloadTransfer);
         $this->resetTransferProgress($downloadTransfer);
+
+        $this->broadcastState($downloadTransfer);
 
         PumpDomainDownloads::dispatch($downloadTransfer->domain);
 
@@ -66,6 +72,7 @@ class DownloadTransferActionsController extends Controller
         ]);
 
         $this->resetFileProgress($downloadTransfer);
+        $this->broadcastState($downloadTransfer);
 
         return response()->json([
             'message' => 'Download canceled.',
@@ -86,6 +93,8 @@ class DownloadTransferActionsController extends Controller
         $this->cancelBatch($downloadTransfer);
         $this->cleanupTransferParts($downloadTransfer);
         $this->resetTransferProgress($downloadTransfer);
+
+        $this->broadcastState($downloadTransfer);
 
         PumpDomainDownloads::dispatch($downloadTransfer->domain);
 
@@ -215,5 +224,18 @@ class DownloadTransferActionsController extends Controller
             'download_progress' => 0,
             'updated_at' => now(),
         ]);
+    }
+
+    private function broadcastState(DownloadTransfer $downloadTransfer): void
+    {
+        $downloadTransfer->refresh();
+
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($downloadTransfer, (int) ($downloadTransfer->last_broadcast_percent ?? 0))
+            ));
+        } catch (\Throwable) {
+            // Broadcast errors shouldn't fail download actions.
+        }
     }
 }
