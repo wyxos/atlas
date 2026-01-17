@@ -284,7 +284,15 @@ function addDownload(status: Status, initialProgress?: number) {
 
     if (status === 'processing') {
         setProgress(id, initialProgress ?? Math.floor(Math.random() * 12));
+    } else {
+        setProgress(id, 0);
     }
+
+    detailsById.value = {
+        ...detailsById.value,
+        [id]: buildDetails(id),
+    };
+
     queueFetchAfterIdle();
 }
 
@@ -587,83 +595,85 @@ watch(selectedStatus, () => {
                 >
                     <div class="relative w-full" :style="{ height: `${totalHeight}px` }">
                         <div class="absolute left-0 right-0" :style="{ transform: `translateY(${offsetY}px)` }">
-                            <div
-                                v-for="item in visibleIds"
-                                :key="item.id"
-                                class="flex h-16 min-w-[1080px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
-                            >
-                                <div class="flex min-w-0 items-center gap-3">
-                                    <div
-                                        class="h-10 w-10 overflow-hidden rounded border border-twilight-indigo-500/40 bg-prussian-blue-600"
-                                    >
-                                        <img
-                                            v-if="detailsById[item.id]?.thumbnailUrl"
-                                            :src="detailsById[item.id]?.thumbnailUrl"
-                                            alt=""
-                                            class="h-full w-full object-cover"
-                                        />
-                                        <Skeleton v-else class="h-full w-full rounded-none bg-prussian-blue-500/60" />
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-mono text-sm text-twilight-indigo-100">
-                                                ID {{ item.id }}
-                                            </span>
-                                            <span
-                                                v-if="detailsById[item.id]"
-                                                class="truncate text-xs text-blue-slate-300"
-                                            >
-                                                {{ detailsById[item.id]?.path }}
-                                            </span>
-                                            <Skeleton v-else class="h-3 w-36 bg-prussian-blue-500/60" />
-                                        </div>
-                                        <div v-if="detailsById[item.id]" class="truncate text-xs text-smart-blue-400">
-                                            {{ detailsById[item.id]?.url }}
-                                        </div>
-                                        <Skeleton v-else class="mt-1 h-3 w-48 bg-prussian-blue-500/60" />
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-4">
-                                    <div class="flex w-24 items-center justify-end gap-2">
-                                        <span
-                                            class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium"
-                                            :class="statusClass(item.status)"
+                            <TransitionGroup name="queue" tag="div">
+                                <div
+                                    v-for="item in visibleIds"
+                                    :key="item.id"
+                                    class="flex h-16 min-w-[1080px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
+                                >
+                                    <div class="flex min-w-0 items-center gap-3">
+                                        <div
+                                            class="h-10 w-10 overflow-hidden rounded border border-twilight-indigo-500/40 bg-prussian-blue-600"
                                         >
-                                            {{ item.status }}
-                                        </span>
-                                    </div>
-                                    <div class="w-28">
-                                        <div v-if="detailsById[item.id]" class="h-1.5 w-full rounded bg-prussian-blue-600">
-                                            <div
-                                                class="h-full rounded bg-smart-blue-500 transition-all"
-                                                :style="{ width: `${detailsById[item.id]?.progress ?? 0}%` }"
-                                            ></div>
+                                            <img
+                                                v-if="detailsById[item.id]?.thumbnailUrl"
+                                                :src="detailsById[item.id]?.thumbnailUrl"
+                                                alt=""
+                                                class="h-full w-full object-cover"
+                                            />
+                                            <Skeleton v-else class="h-full w-full rounded-none bg-prussian-blue-500/60" />
                                         </div>
-                                        <Skeleton v-else class="h-2 w-full bg-prussian-blue-500/60" />
-                                        <div v-if="detailsById[item.id]" class="mt-1 text-right text-[11px] text-blue-slate-300">
-                                            {{ `${detailsById[item.id].progress}%` }}
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-mono text-sm text-twilight-indigo-100">
+                                                    ID {{ item.id }}
+                                                </span>
+                                                <span
+                                                    v-if="detailsById[item.id]"
+                                                    class="truncate text-xs text-blue-slate-300"
+                                                >
+                                                    {{ detailsById[item.id]?.path }}
+                                                </span>
+                                                <Skeleton v-else class="h-3 w-36 bg-prussian-blue-500/60" />
+                                            </div>
+                                            <div v-if="detailsById[item.id]" class="truncate text-xs text-smart-blue-400">
+                                                {{ detailsById[item.id]?.url }}
+                                            </div>
+                                            <Skeleton v-else class="mt-1 h-3 w-48 bg-prussian-blue-500/60" />
                                         </div>
-                                        <div v-else class="mt-1 flex justify-end">
-                                            <Skeleton class="h-3 w-10 bg-prussian-blue-500/60" />
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <div class="flex w-24 items-center justify-end gap-2">
+                                            <span
+                                                class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium"
+                                                :class="statusClass(item.status)"
+                                            >
+                                                {{ item.status }}
+                                            </span>
                                         </div>
-                                    </div>
-                                    <div class="w-20 text-right text-xs text-blue-slate-300">
-                                        <span v-if="detailsById[item.id]">
-                                            {{ formatFileSize(detailsById[item.id].size) }}
-                                        </span>
-                                        <Skeleton v-else class="ml-auto h-3 w-12 bg-prussian-blue-500/60" />
-                                    </div>
-                                    <div class="w-28 text-right text-xs text-blue-slate-300">
-                                        {{ formatTimestamp(item.queuedAt) }}
-                                    </div>
-                                    <div class="w-28 text-right text-xs text-blue-slate-300">
-                                        {{ formatTimestamp(item.startedAt) }}
-                                    </div>
-                                    <div class="w-28 text-right text-xs text-blue-slate-300">
-                                        {{ formatTimestamp(item.completedAt) }}
+                                        <div class="w-28">
+                                            <div v-if="detailsById[item.id]" class="h-1.5 w-full rounded bg-prussian-blue-600">
+                                                <div
+                                                    class="h-full rounded bg-smart-blue-500 transition-all"
+                                                    :style="{ width: `${detailsById[item.id]?.progress ?? 0}%` }"
+                                                ></div>
+                                            </div>
+                                            <Skeleton v-else class="h-2 w-full bg-prussian-blue-500/60" />
+                                            <div v-if="detailsById[item.id]" class="mt-1 text-right text-[11px] text-blue-slate-300">
+                                                {{ `${detailsById[item.id].progress}%` }}
+                                            </div>
+                                            <div v-else class="mt-1 flex justify-end">
+                                                <Skeleton class="h-3 w-10 bg-prussian-blue-500/60" />
+                                            </div>
+                                        </div>
+                                        <div class="w-20 text-right text-xs text-blue-slate-300">
+                                            <span v-if="detailsById[item.id]">
+                                                {{ formatFileSize(detailsById[item.id].size) }}
+                                            </span>
+                                            <Skeleton v-else class="ml-auto h-3 w-12 bg-prussian-blue-500/60" />
+                                        </div>
+                                        <div class="w-28 text-right text-xs text-blue-slate-300">
+                                            {{ formatTimestamp(item.queuedAt) }}
+                                        </div>
+                                        <div class="w-28 text-right text-xs text-blue-slate-300">
+                                            {{ formatTimestamp(item.startedAt) }}
+                                        </div>
+                                        <div class="w-28 text-right text-xs text-blue-slate-300">
+                                            {{ formatTimestamp(item.completedAt) }}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </TransitionGroup>
                         </div>
                     </div>
                 </div>
@@ -671,3 +681,22 @@ watch(selectedStatus, () => {
         </div>
     </PageLayout>
 </template>
+
+<style scoped>
+.queue-move,
+.queue-enter-active,
+.queue-leave-active {
+    transition: all 0.4s ease;
+}
+
+.queue-enter-from,
+.queue-leave-to {
+    opacity: 0;
+    transform: translateY(14px);
+}
+
+.queue-leave-active {
+    position: absolute;
+    width: 100%;
+}
+</style>
