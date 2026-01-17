@@ -24,6 +24,8 @@ const DEFAULT_SORT: { key: SortKey; direction: SortDirection } = {
     direction: 'desc',
 };
 
+const INITIAL_LOAD_DELAY_MS = 900;
+
 function createInitialDownloads(count: number): DownloadItem[] {
     const now = Date.now();
     return Array.from({ length: count }, (_, index) => {
@@ -50,9 +52,9 @@ function createInitialDownloads(count: number): DownloadItem[] {
     });
 }
 
-const initialDownloads = createInitialDownloads(100);
-const downloads = ref<DownloadItem[]>(initialDownloads);
-const nextId = ref(initialDownloads.length + 1);
+const downloads = ref<DownloadItem[]>([]);
+const nextId = ref(1);
+const isInitialLoading = ref(true);
 
 const ITEM_HEIGHT = 64;
 const OVERSCAN = 12;
@@ -74,22 +76,13 @@ type DownloadDetails = {
 };
 
 const detailsById = ref<Record<number, DownloadDetails>>({});
-const progressOverrides = ref<Record<number, number>>(
-    initialDownloads.reduce((acc, item) => {
-        if (item.status === 'processing') {
-            acc[item.id] = 5 + (item.id % 15);
-        }
-        if (item.status === 'done') {
-            acc[item.id] = 100;
-        }
-        return acc;
-    }, {} as Record<number, number>),
-);
+const progressOverrides = ref<Record<number, number>>({});
 
 let activeRequestToken = 0;
 let activeFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 let idleTimeout: ReturnType<typeof setTimeout> | null = null;
 let socketInterval: ReturnType<typeof setInterval> | null = null;
+let initialLoadTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const sortKey = ref<SortKey | null>(null);
 const sortDirection = ref<SortDirection>('asc');
@@ -296,6 +289,23 @@ function addDownload(status: Status, initialProgress?: number) {
     queueFetchAfterIdle();
 }
 
+function seedInitialDownloads() {
+    const seeded = createInitialDownloads(100);
+    downloads.value = seeded;
+    nextId.value = seeded.length + 1;
+    progressOverrides.value = seeded.reduce((acc, item) => {
+        if (item.status === 'processing') {
+            acc[item.id] = 5 + (item.id % 15);
+        }
+        if (item.status === 'done') {
+            acc[item.id] = 100;
+        }
+        return acc;
+    }, {} as Record<number, number>);
+    isInitialLoading.value = false;
+    queueFetchAfterIdle();
+}
+
 function pickRandomId(items: DownloadItem[]) {
     if (!items.length) return null;
     return items[Math.floor(Math.random() * items.length)]?.id ?? null;
@@ -481,7 +491,10 @@ function updateContainerHeight() {
 onMounted(() => {
     updateContainerHeight();
     window.addEventListener('resize', updateContainerHeight);
-    queueFetchAfterIdle();
+    isInitialLoading.value = true;
+    initialLoadTimeout = setTimeout(() => {
+        seedInitialDownloads();
+    }, INITIAL_LOAD_DELAY_MS);
     startSocketSimulation();
 });
 
@@ -489,6 +502,9 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', updateContainerHeight);
     if (idleTimeout) {
         clearTimeout(idleTimeout);
+    }
+    if (initialLoadTimeout) {
+        clearTimeout(initialLoadTimeout);
     }
     cancelActiveRequest();
     stopSocketSimulation();
@@ -534,7 +550,7 @@ watch(selectedStatus, () => {
                     </button>
                 </div>
                 <div class="text-xs text-blue-slate-300">
-                    Showing {{ baseFilteredIds.length }} of {{ downloads.length }}
+                    Total files: {{ downloads.length }} · Filtered files: {{ baseFilteredIds.length }}
                 </div>
             </div>
 
@@ -593,7 +609,10 @@ watch(selectedStatus, () => {
                     class="min-h-[60vh] max-h-[70vh] overflow-auto"
                     @scroll="onScroll"
                 >
-                    <div class="relative w-full" :style="{ height: `${totalHeight}px` }">
+                    <div v-if="isInitialLoading" class="px-4 py-12 text-center text-sm text-blue-slate-300">
+                        Loading downloads...
+                    </div>
+                    <div v-else class="relative w-full" :style="{ height: `${totalHeight}px` }">
                         <div class="absolute left-0 right-0" :style="{ transform: `translateY(${offsetY}px)` }">
                             <TransitionGroup name="queue" tag="div">
                                 <div
