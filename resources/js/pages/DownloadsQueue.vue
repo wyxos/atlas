@@ -66,6 +66,11 @@ type DownloadProgressPayload = {
     started_at?: string | null;
     finished_at?: string | null;
     failed_at?: string | null;
+    path?: string | null;
+    original?: string | null;
+    preview?: string | null;
+    size?: number | null;
+    filename?: string | null;
 };
 
 let activeRequestToken = 0;
@@ -270,8 +275,6 @@ function applyQueuedPayload(payload: DownloadQueuedPayload) {
             filename: payload.filename ?? null,
         },
     };
-
-    queueFetchAfterIdle();
 }
 
 function applyProgressPayload(payload: DownloadProgressPayload) {
@@ -284,6 +287,24 @@ function applyProgressPayload(payload: DownloadProgressPayload) {
         finished_at: payload.finished_at ?? null,
         failed_at: payload.failed_at ?? null,
     }));
+    if (
+        payload.path !== undefined
+        || payload.original !== undefined
+        || payload.preview !== undefined
+        || payload.size !== undefined
+        || payload.filename !== undefined
+    ) {
+        detailsById.value = {
+            ...detailsById.value,
+            [id]: {
+                path: payload.path ?? detailsById.value[id]?.path ?? null,
+                original: payload.original ?? detailsById.value[id]?.original ?? null,
+                preview: payload.preview ?? detailsById.value[id]?.preview ?? null,
+                size: payload.size ?? detailsById.value[id]?.size ?? null,
+                filename: payload.filename ?? detailsById.value[id]?.filename ?? null,
+            },
+        };
+    }
 }
 
 function startEchoListeners() {
@@ -324,7 +345,7 @@ function queueFetchAfterIdle() {
 }
 
 async function fetchVisibleDetails() {
-    const itemsToFetch = visibleIds.value.filter((item) => !detailsById.value[item.id]);
+    const itemsToFetch = visibleIds.value;
 
     if (!itemsToFetch.length) return;
 
@@ -383,7 +404,6 @@ async function loadDownloads() {
         const { data } = await window.axios.get<{ items: DownloadItem[] }>('/api/download-transfers');
         downloads.value = data.items;
         detailsById.value = {};
-
     } finally {
         isInitialLoading.value = false;
         queueFetchAfterIdle();
