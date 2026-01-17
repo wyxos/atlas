@@ -131,13 +131,17 @@ class AssembleDownloadTransfer implements ShouldQueue
             'updated_at' => now(),
         ]);
 
-        event(new DownloadTransferProgressUpdated(
-            downloadTransferId: $transfer->id,
-            fileId: $transfer->file_id,
-            domain: $transfer->domain,
-            status: DownloadTransferStatus::COMPLETED,
-            percent: 100
-        ));
+        try {
+            event(new DownloadTransferProgressUpdated(
+                downloadTransferId: $transfer->id,
+                fileId: $transfer->file_id,
+                domain: $transfer->domain,
+                status: DownloadTransferStatus::COMPLETED,
+                percent: 100
+            ));
+        } catch (\Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
 
         foreach ($chunks as $chunk) {
             if ($chunk->part_path) {

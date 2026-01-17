@@ -209,3 +209,28 @@ test('assemble job concatenates chunk parts, finalizes file, and marks transfer 
 
     Event::assertDispatched(DownloadTransferProgressUpdated::class, fn (DownloadTransferProgressUpdated $event) => $event->downloadTransferId === $transfer->id && $event->percent === 100);
 });
+
+test('finalizer falls back when hash contains invalid path characters', function () {
+    Storage::fake('atlas-app');
+    config()->set('downloads.disk', 'atlas-app');
+
+    $file = File::factory()->create([
+        'url' => 'https://example.com/test.jpg',
+        'filename' => 'test.jpg',
+        'ext' => 'jpg',
+        'hash' => 'UP/L:',
+        'downloaded' => false,
+        'path' => null,
+    ]);
+
+    $tmpPath = 'downloads/.tmp/transfer-1/single.tmp';
+    Storage::disk('atlas-app')->put($tmpPath, 'abc');
+
+    app(FileDownloadFinalizer::class)->finalize($file, $tmpPath, 'image/jpeg');
+
+    $file->refresh();
+
+    expect($file->path)->toMatch('/^downloads\/[a-f0-9]{2}\/[a-f0-9]{2}\/.+\.jpg$/');
+    expect($file->path)->not()->toContain(':');
+    Storage::disk('atlas-app')->assertExists($file->path);
+});
