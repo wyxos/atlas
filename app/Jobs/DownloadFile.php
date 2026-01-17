@@ -3,9 +3,11 @@
 namespace App\Jobs;
 
 use App\Enums\DownloadTransferStatus;
+use App\Events\DownloadTransferCreated;
 use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -48,7 +50,7 @@ class DownloadFile implements ShouldQueue
             ->first();
 
         if (! $existing) {
-            DownloadTransfer::query()->create([
+            $transfer = DownloadTransfer::query()->create([
                 'file_id' => $file->id,
                 'url' => (string) $file->url,
                 'domain' => $domain,
@@ -57,6 +59,13 @@ class DownloadFile implements ShouldQueue
                 'bytes_downloaded' => 0,
                 'last_broadcast_percent' => 0,
             ]);
+
+            $transfer->setRelation('file', $file);
+            try {
+                event(new DownloadTransferCreated(DownloadTransferPayload::forQueued($transfer)));
+            } catch (\Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
         }
 
         PumpDomainDownloads::dispatch($domain);
