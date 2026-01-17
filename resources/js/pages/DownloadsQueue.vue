@@ -67,6 +67,7 @@ type DownloadProgressPayload = {
     downloadTransferId: number;
     status: string;
     percent: number;
+    created_at?: string | null;
     started_at?: string | null;
     finished_at?: string | null;
     failed_at?: string | null;
@@ -341,11 +342,12 @@ function upsertDownload(item: DownloadItem) {
 function applyQueuedPayload(payload: DownloadQueuedPayload) {
     const id = payload.id ?? payload.downloadTransferId;
     if (!id) return;
+    const existing = downloads.value.find((item) => item.id === id);
 
     const item: DownloadItem = {
         id,
         status: payload.status,
-        created_at: payload.created_at ?? null,
+        created_at: payload.created_at ?? existing?.created_at ?? null,
         queued_at: payload.queued_at ?? null,
         started_at: payload.started_at ?? null,
         finished_at: payload.finished_at ?? null,
@@ -373,6 +375,7 @@ function applyProgressPayload(payload: DownloadProgressPayload) {
         ...current,
         status: payload.status,
         percent: normalizeProgress(payload.percent),
+        created_at: payload.created_at ?? current.created_at ?? null,
         started_at: payload.started_at ?? null,
         finished_at: payload.finished_at ?? null,
         failed_at: payload.failed_at ?? null,
