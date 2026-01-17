@@ -48,11 +48,11 @@ const containerHeight = ref(0);
 const selectedStatus = ref<FilterStatus>('all');
 
 type DownloadDetails = {
-    path: string;
-    url: string;
-    thumbnailUrl: string;
-    progress: number;
-    size: number;
+    path: string | null;
+    original: string | null;
+    preview: string | null;
+    size: number | null;
+    filename: string | null;
 };
 
 const detailsById = ref<Record<number, DownloadDetails>>({});
@@ -238,7 +238,6 @@ function updateDownload(id: number, updater: (item: DownloadItem) => DownloadIte
 }
 
 function buildDetails(item: DownloadItem): DownloadDetails {
-    const progress = item.percent ?? ((item.id * 17) % 101);
     const size = 512_000 + ((item.id * 104_729) % 48_000_000);
     const color = ((item.id * 57) % 360).toString();
     const thumbnailUrl = `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -256,10 +255,10 @@ function buildDetails(item: DownloadItem): DownloadDetails {
 
     return {
         path: `/downloads/${item.id}.bin`,
-        url: `https://example.test/downloads/${item.id}`,
-        thumbnailUrl,
-        progress,
+        original: `https://example.test/downloads/${item.id}`,
+        preview: thumbnailUrl,
         size,
+        filename: `download-${item.id}.bin`,
     };
 }
 
@@ -484,9 +483,30 @@ function updateContainerHeight() {
 async function loadDownloads() {
     isInitialLoading.value = true;
     try {
-        const { data } = await window.axios.get<{ items: DownloadItem[] }>('/api/download-transfers');
-        downloads.value = data.items;
-        detailsById.value = {};
+        const { data } = await window.axios.get<{
+            items: Array<DownloadItem & DownloadDetails>;
+        }>('/api/download-transfers');
+
+        downloads.value = data.items.map(({ id, status, queued_at, started_at, finished_at, percent }) => ({
+            id,
+            status,
+            queued_at,
+            started_at,
+            finished_at,
+            percent,
+        }));
+
+        detailsById.value = data.items.reduce((acc, item) => {
+            acc[item.id] = {
+                path: item.path,
+                original: item.original,
+                preview: item.preview,
+                size: item.size,
+                filename: item.filename,
+            };
+            return acc;
+        }, {} as Record<number, DownloadDetails>);
+
         const maxId = data.items.reduce((max, item) => Math.max(max, item.id), 0);
         nextId.value = maxId + 1;
     } finally {
@@ -625,12 +645,12 @@ watch(selectedStatus, () => {
                                         <div
                                             class="h-10 w-10 overflow-hidden rounded border border-twilight-indigo-500/40 bg-prussian-blue-600"
                                         >
-                                            <img
-                                                v-if="detailsById[item.id]?.thumbnailUrl"
-                                                :src="detailsById[item.id]?.thumbnailUrl"
-                                                alt=""
-                                                class="h-full w-full object-cover"
-                                            />
+                                        <img
+                                            v-if="detailsById[item.id]?.preview"
+                                            :src="detailsById[item.id]?.preview"
+                                            alt=""
+                                            class="h-full w-full object-cover"
+                                        />
                                             <Skeleton v-else class="h-full w-full rounded-none bg-prussian-blue-500/60" />
                                         </div>
                                         <div class="min-w-0">
@@ -646,9 +666,9 @@ watch(selectedStatus, () => {
                                                 </span>
                                                 <Skeleton v-else class="h-3 w-36 bg-prussian-blue-500/60" />
                                             </div>
-                                            <div v-if="detailsById[item.id]" class="truncate text-xs text-smart-blue-400">
-                                                {{ detailsById[item.id]?.url }}
-                                            </div>
+                                        <div v-if="detailsById[item.id]" class="truncate text-xs text-smart-blue-400">
+                                            {{ detailsById[item.id]?.original }}
+                                        </div>
                                             <Skeleton v-else class="mt-1 h-3 w-48 bg-prussian-blue-500/60" />
                                         </div>
                                     </div>
