@@ -68,6 +68,15 @@ class AssembleDownloadTransfer implements ShouldQueue
                 'error' => 'Unable to open assembled output file.',
             ]);
 
+            $transfer->refresh();
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                ));
+            } catch (\Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+
             PumpDomainDownloads::dispatch($transfer->domain);
 
             return;
@@ -88,6 +97,15 @@ class AssembleDownloadTransfer implements ShouldQueue
                     'error' => 'Missing chunk part file during assembly.',
                 ]);
 
+                $transfer->refresh();
+                try {
+                    event(new DownloadTransferProgressUpdated(
+                        DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                    ));
+                } catch (\Throwable) {
+                    // Broadcast errors shouldn't fail downloads.
+                }
+
                 PumpDomainDownloads::dispatch($transfer->domain);
 
                 return;
@@ -103,6 +121,15 @@ class AssembleDownloadTransfer implements ShouldQueue
                     'failed_at' => now(),
                     'error' => 'Unable to open chunk part file during assembly.',
                 ]);
+
+                $transfer->refresh();
+                try {
+                    event(new DownloadTransferProgressUpdated(
+                        DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                    ));
+                } catch (\Throwable) {
+                    // Broadcast errors shouldn't fail downloads.
+                }
 
                 PumpDomainDownloads::dispatch($transfer->domain);
 

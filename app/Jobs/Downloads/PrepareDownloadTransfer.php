@@ -4,8 +4,10 @@ namespace App\Jobs\Downloads;
 
 use App\Enums\DownloadChunkStatus;
 use App\Enums\DownloadTransferStatus;
+use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -71,6 +73,15 @@ class PrepareDownloadTransfer implements ShouldQueue
                 'error' => 'Unable to determine Content-Length for download.',
             ]);
 
+            $transfer->refresh();
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                ));
+            } catch (Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+
             PumpDomainDownloads::dispatch($transfer->domain);
 
             return;
@@ -133,6 +144,17 @@ class PrepareDownloadTransfer implements ShouldQueue
                     'failed_at' => now(),
                     'error' => $e->getMessage(),
                 ]);
+
+                $updated = DownloadTransfer::query()->find($transfer->id);
+                if ($updated) {
+                    try {
+                        event(new DownloadTransferProgressUpdated(
+                            DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
+                        ));
+                    } catch (Throwable) {
+                        // Broadcast errors shouldn't fail downloads.
+                    }
+                }
 
                 PumpDomainDownloads::dispatch($transfer->domain);
             })

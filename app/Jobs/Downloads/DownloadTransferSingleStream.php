@@ -52,6 +52,15 @@ class DownloadTransferSingleStream implements ShouldQueue
                 'error' => 'bytes_total missing for single-stream download.',
             ]);
 
+            $transfer->refresh();
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                ));
+            } catch (\Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+
             PumpDomainDownloads::dispatch($transfer->domain);
 
             return;
@@ -69,6 +78,15 @@ class DownloadTransferSingleStream implements ShouldQueue
                 'failed_at' => now(),
                 'error' => "Invalid download response (status {$response->status()}).",
             ]);
+
+            $transfer->refresh();
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                ));
+            } catch (\Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
 
             PumpDomainDownloads::dispatch($transfer->domain);
 
@@ -92,6 +110,15 @@ class DownloadTransferSingleStream implements ShouldQueue
                 'failed_at' => now(),
                 'error' => 'Unable to open temp file for writing.',
             ]);
+
+            $transfer->refresh();
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                ));
+            } catch (\Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
 
             PumpDomainDownloads::dispatch($transfer->domain);
 
@@ -118,6 +145,15 @@ class DownloadTransferSingleStream implements ShouldQueue
                     'failed_at' => now(),
                     'error' => 'Failed writing download to disk.',
                 ]);
+
+                $transfer->refresh();
+                try {
+                    event(new DownloadTransferProgressUpdated(
+                        DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                    ));
+                } catch (\Throwable) {
+                    // Broadcast errors shouldn't fail downloads.
+                }
 
                 PumpDomainDownloads::dispatch($transfer->domain);
 
