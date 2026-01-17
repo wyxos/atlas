@@ -22,7 +22,7 @@ const FILTERS = ['all', ...STATUSES] as const;
 type FilterStatus = typeof FILTERS[number];
 type DownloadItem = Pick<
     DownloadTransfer,
-    'id' | 'status' | 'queued_at' | 'started_at' | 'finished_at' | 'percent'
+    'id' | 'status' | 'queued_at' | 'started_at' | 'finished_at' | 'failed_at' | 'percent'
 >;
 
 type SortKey = 'queuedAt' | 'startedAt' | 'completedAt' | 'progress';
@@ -63,6 +63,9 @@ type DownloadProgressPayload = {
     downloadTransferId: number;
     status: string;
     percent: number;
+    started_at?: string | null;
+    finished_at?: string | null;
+    failed_at?: string | null;
 };
 
 let activeRequestToken = 0;
@@ -95,7 +98,7 @@ function sortMetric(item: DownloadItem, key: SortKey): number | null {
         ? item.queued_at
         : key === 'startedAt'
             ? item.started_at
-            : item.finished_at;
+            : item.finished_at ?? item.failed_at;
 
     return value ? Date.parse(value) : null;
 }
@@ -251,6 +254,7 @@ function applyQueuedPayload(payload: DownloadQueuedPayload) {
         queued_at: payload.queued_at ?? null,
         started_at: payload.started_at ?? null,
         finished_at: payload.finished_at ?? null,
+        failed_at: payload.failed_at ?? null,
         percent: payload.percent ?? 0,
     };
 
@@ -276,6 +280,9 @@ function applyProgressPayload(payload: DownloadProgressPayload) {
         ...current,
         status: payload.status,
         percent: normalizeProgress(payload.percent),
+        started_at: payload.started_at ?? null,
+        finished_at: payload.finished_at ?? null,
+        failed_at: payload.failed_at ?? null,
     }));
 }
 
@@ -589,7 +596,7 @@ watch(selectedStatus, () => {
                                             {{ formatTimestamp(item.started_at) }}
                                         </div>
                                         <div class="w-28 text-right text-xs text-blue-slate-300">
-                                            {{ formatTimestamp(item.finished_at) }}
+                                            {{ formatTimestamp(item.finished_at ?? item.failed_at) }}
                                         </div>
                                     </div>
                                 </div>

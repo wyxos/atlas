@@ -6,6 +6,7 @@ use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferPayload;
 
 class DownloadTransferProgressBroadcaster
 {
@@ -47,11 +48,7 @@ class DownloadTransferProgressBroadcaster
 
         try {
             event(new DownloadTransferProgressUpdated(
-                downloadTransferId: $transfer->id,
-                fileId: $transfer->file_id,
-                domain: $transfer->domain,
-                status: $transfer->status,
-                percent: $boundary
+                DownloadTransferPayload::forProgress($transfer, $boundary)
             ));
         } catch (\Throwable) {
             // Broadcast errors shouldn't fail downloads.
