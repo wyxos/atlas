@@ -39,7 +39,6 @@ const isInitialLoading = ref(true);
 const ITEM_HEIGHT = 64;
 const OVERSCAN = 12;
 const SCROLL_IDLE_MS = 180;
-const FETCH_DELAY_MS = 650;
 const SOCKET_TICK_MS = 900;
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -58,9 +57,9 @@ type DownloadDetails = {
 const detailsById = ref<Record<number, DownloadDetails>>({});
 
 let activeRequestToken = 0;
-let activeFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 let idleTimeout: ReturnType<typeof setTimeout> | null = null;
 let socketInterval: ReturnType<typeof setInterval> | null = null;
+let detailsAbortController: AbortController | null = null;
 
 const sortKey = ref<SortKey | null>(null);
 const sortDirection = ref<SortDirection>('asc');
@@ -429,9 +428,9 @@ function stopSocketSimulation() {
 }
 
 function cancelActiveRequest() {
-    if (activeFetchTimeout) {
-        clearTimeout(activeFetchTimeout);
-        activeFetchTimeout = null;
+    if (detailsAbortController) {
+        detailsAbortController.abort();
+        detailsAbortController = null;
     }
     activeRequestToken += 1;
 }
@@ -446,24 +445,44 @@ function queueFetchAfterIdle() {
     }, SCROLL_IDLE_MS);
 }
 
-function fetchVisibleDetails() {
+async function fetchVisibleDetails() {
     const itemsToFetch = visibleIds.value.filter((item) => !detailsById.value[item.id]);
 
     if (!itemsToFetch.length) return;
 
     cancelActiveRequest();
     const requestToken = activeRequestToken;
+    const controller = new AbortController();
+    detailsAbortController = controller;
 
-    activeFetchTimeout = setTimeout(() => {
+    try {
+        const { data } = await window.axios.post<{
+            items: Array<DownloadDetails & { id: number }>;
+        }>('/api/download-transfers/details', {
+            ids: itemsToFetch.map((item) => item.id),
+        }, {
+            signal: controller.signal,
+        });
+
         if (requestToken !== activeRequestToken) return;
 
-        const nextDetails = { ...detailsById.value };
-        for (const item of itemsToFetch) {
-            nextDetails[item.id] = buildDetails(item);
+        detailsById.value = data.items.reduce((acc, item) => {
+            acc[item.id] = {
+                path: item.path,
+                original: item.original,
+                preview: item.preview,
+                size: item.size,
+                filename: item.filename,
+            };
+            return acc;
+        }, { ...detailsById.value } as Record<number, DownloadDetails>);
+    } catch (error) {
+        if (controller.signal.aborted) return;
+    } finally {
+        if (detailsAbortController === controller) {
+            detailsAbortController = null;
         }
-        detailsById.value = nextDetails;
-        activeFetchTimeout = null;
-    }, FETCH_DELAY_MS);
+    }
 }
 
 function onScroll(event: Event) {
@@ -483,29 +502,9 @@ function updateContainerHeight() {
 async function loadDownloads() {
     isInitialLoading.value = true;
     try {
-        const { data } = await window.axios.get<{
-            items: Array<DownloadItem & DownloadDetails>;
-        }>('/api/download-transfers');
-
-        downloads.value = data.items.map(({ id, status, queued_at, started_at, finished_at, percent }) => ({
-            id,
-            status,
-            queued_at,
-            started_at,
-            finished_at,
-            percent,
-        }));
-
-        detailsById.value = data.items.reduce((acc, item) => {
-            acc[item.id] = {
-                path: item.path,
-                original: item.original,
-                preview: item.preview,
-                size: item.size,
-                filename: item.filename,
-            };
-            return acc;
-        }, {} as Record<number, DownloadDetails>);
+        const { data } = await window.axios.get<{ items: DownloadItem[] }>('/api/download-transfers');
+        downloads.value = data.items;
+        detailsById.value = {};
 
         const maxId = data.items.reduce((max, item) => Math.max(max, item.id), 0);
         nextId.value = maxId + 1;
