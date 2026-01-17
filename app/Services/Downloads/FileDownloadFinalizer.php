@@ -21,7 +21,7 @@ class FileDownloadFinalizer
             ?? $this->getExtensionFromUrl((string) $file->url)
             ?? 'bin';
 
-        $storedFilename = $this->generateStoredFilename($extension);
+        $storedFilename = $this->resolveStoredFilename($file, $extension);
         $hashForSegmentation = $this->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
 
         $finalPath = $this->generateSegmentedPath('downloads', $storedFilename, $hashForSegmentation);
@@ -61,6 +61,21 @@ class FileDownloadFinalizer
     private function generateStoredFilename(string $extension): string
     {
         return Str::random(40).'.'.$extension;
+    }
+
+    private function resolveStoredFilename(File $file, string $extension): string
+    {
+        $baseFilename = $file->filename;
+        if (! $baseFilename) {
+            return $this->generateStoredFilename($extension);
+        }
+
+        $suffix = '.'.strtolower($extension);
+        if ($suffix !== '.' && str_ends_with(strtolower($baseFilename), $suffix)) {
+            return $baseFilename;
+        }
+
+        return $baseFilename.$suffix;
     }
 
     private function normalizeHash(?string $hash): ?string

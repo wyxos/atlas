@@ -60,7 +60,7 @@ final class DownloadTransferPayload
         ];
 
         if ($transfer->isTerminal()) {
-            $file = $transfer->relationLoaded('file') ? $transfer->file : $transfer->file()->first();
+            $file = $transfer->file()->first();
             if ($file || $transfer->url) {
                 $payload = [
                     ...$payload,
@@ -86,13 +86,69 @@ final class DownloadTransferPayload
         }
 
         $preview = $file?->thumbnail_url ?? $original;
+        $plannedPath = self::plannedPath($file, $sourceUrl);
 
         return [
-            'path' => $file?->path,
+            'path' => $file?->path ?? $plannedPath,
             'original' => $original,
             'preview' => $preview,
             'size' => $file?->size,
             'filename' => $file?->filename,
         ];
+    }
+
+    private static function plannedPath(?File $file, ?string $sourceUrl): ?string
+    {
+        if (! $file || $file->path || ! $file->filename) {
+            return null;
+        }
+
+        $extension = $file->ext ?? self::extensionFromUrl($sourceUrl) ?? 'bin';
+        $storedFilename = self::storedFilename($file->filename, $extension);
+        $hash = self::normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
+        $subfolder1 = substr($hash, 0, 2);
+        $subfolder2 = substr($hash, 2, 2);
+
+        return "downloads/{$subfolder1}/{$subfolder2}/{$storedFilename}";
+    }
+
+    private static function storedFilename(string $baseFilename, string $extension): string
+    {
+        $suffix = '.'.strtolower($extension);
+        if ($suffix !== '.' && str_ends_with(strtolower($baseFilename), $suffix)) {
+            return $baseFilename;
+        }
+
+        return $baseFilename.$suffix;
+    }
+
+    private static function normalizeHash(?string $hash): ?string
+    {
+        if (! $hash) {
+            return null;
+        }
+
+        $hash = strtolower(trim($hash));
+        if ($hash === '') {
+            return null;
+        }
+
+        return preg_match('/^[a-f0-9]{4,}$/', $hash) === 1 ? $hash : null;
+    }
+
+    private static function extensionFromUrl(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! $path) {
+            return null;
+        }
+
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+
+        return $extension !== '' ? strtolower($extension) : null;
     }
 }
