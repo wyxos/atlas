@@ -8,15 +8,57 @@ const STATUSES = ['queued', 'processing', 'done', 'failed'] as const;
 type Status = typeof STATUSES[number];
 const FILTERS = ['all', ...STATUSES] as const;
 type FilterStatus = typeof FILTERS[number];
-const IDS = Array.from({ length: 100 }, (_, index) => ({
-    id: index + 1,
-    status: STATUSES[index % STATUSES.length],
-}));
+type DownloadItem = {
+    id: number;
+    status: Status;
+    queuedAt: string;
+    startedAt: string | null;
+    completedAt: string | null;
+};
+
+type SortKey = 'queuedAt' | 'startedAt' | 'completedAt' | 'progress';
+type SortDirection = 'asc' | 'desc';
+
+const DEFAULT_SORT: { key: SortKey; direction: SortDirection } = {
+    key: 'queuedAt',
+    direction: 'desc',
+};
+
+function createInitialDownloads(count: number): DownloadItem[] {
+    const now = Date.now();
+    return Array.from({ length: count }, (_, index) => {
+        const id = index + 1;
+        const status = STATUSES[index % STATUSES.length];
+        const queuedAt = new Date(now - (count - index) * 60_000).toISOString();
+        let startedAt: string | null = null;
+        let completedAt: string | null = null;
+
+        if (status !== 'queued') {
+            startedAt = new Date(Date.parse(queuedAt) + 4 * 60_000).toISOString();
+        }
+        if (status === 'done') {
+            completedAt = new Date(Date.parse(startedAt ?? queuedAt) + 8 * 60_000).toISOString();
+        }
+
+        return {
+            id,
+            status,
+            queuedAt,
+            startedAt,
+            completedAt,
+        };
+    });
+}
+
+const initialDownloads = createInitialDownloads(100);
+const downloads = ref<DownloadItem[]>(initialDownloads);
+const nextId = ref(initialDownloads.length + 1);
 
 const ITEM_HEIGHT = 64;
 const OVERSCAN = 12;
 const SCROLL_IDLE_MS = 180;
 const FETCH_DELAY_MS = 650;
+const SOCKET_TICK_MS = 900;
 
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
@@ -32,27 +74,75 @@ type DownloadDetails = {
 };
 
 const detailsById = ref<Record<number, DownloadDetails>>({});
+const progressOverrides = ref<Record<number, number>>(
+    initialDownloads.reduce((acc, item) => {
+        if (item.status === 'processing') {
+            acc[item.id] = 5 + (item.id % 15);
+        }
+        if (item.status === 'done') {
+            acc[item.id] = 100;
+        }
+        return acc;
+    }, {} as Record<number, number>),
+);
 
 let activeRequestToken = 0;
 let activeFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+let socketInterval: ReturnType<typeof setInterval> | null = null;
 
-const filteredIds = computed(() =>
+const sortKey = ref<SortKey | null>(null);
+const sortDirection = ref<SortDirection>('asc');
+
+const baseFilteredIds = computed(() =>
     selectedStatus.value === 'all'
-        ? IDS
-        : IDS.filter((item) => item.status === selectedStatus.value),
+        ? downloads.value
+        : downloads.value.filter((item) => item.status === selectedStatus.value),
 );
-const totalHeight = computed(() => filteredIds.value.length * ITEM_HEIGHT);
+
+function sortMetric(item: DownloadItem, key: SortKey): number | null {
+    if (key === 'progress') {
+        return currentProgress(item.id);
+    }
+
+    const value = key === 'queuedAt'
+        ? item.queuedAt
+        : key === 'startedAt'
+            ? item.startedAt
+            : item.completedAt;
+
+    return value ? Date.parse(value) : null;
+}
+
+function compareItems(a: DownloadItem, b: DownloadItem, key: SortKey, direction: SortDirection) {
+    const aValue = sortMetric(a, key);
+    const bValue = sortMetric(b, key);
+
+    if (aValue === null && bValue === null) return a.id - b.id;
+    if (aValue === null) return 1;
+    if (bValue === null) return -1;
+
+    if (aValue === bValue) return a.id - b.id;
+    return direction === 'asc' ? aValue - bValue : bValue - aValue;
+}
+
+const sortedIds = computed(() => {
+    const key = sortKey.value ?? DEFAULT_SORT.key;
+    const direction = sortKey.value ? sortDirection.value : DEFAULT_SORT.direction;
+    return baseFilteredIds.value.slice().sort((a, b) => compareItems(a, b, key, direction));
+});
+
+const totalHeight = computed(() => sortedIds.value.length * ITEM_HEIGHT);
 const startIndex = computed(() =>
     Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT) - OVERSCAN),
 );
 const endIndex = computed(() =>
     Math.min(
-        filteredIds.value.length,
+        sortedIds.value.length,
         Math.ceil((scrollTop.value + containerHeight.value) / ITEM_HEIGHT) + OVERSCAN,
     ),
 );
-const visibleIds = computed(() => filteredIds.value.slice(startIndex.value, endIndex.value));
+const visibleIds = computed(() => sortedIds.value.slice(startIndex.value, endIndex.value));
 const offsetY = computed(() => startIndex.value * ITEM_HEIGHT);
 
 const STATUS_STYLES: Record<Status, string> = {
@@ -71,8 +161,88 @@ function filterLabel(status: FilterStatus) {
     return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function pad2(value: number) {
+    return value.toString().padStart(2, '0');
+}
+
+function formatTimestamp(value: string | null) {
+    if (!value) return '--';
+    const date = new Date(value);
+    const now = new Date();
+
+    const isToday =
+        date.getFullYear() === now.getFullYear()
+        && date.getMonth() === now.getMonth()
+        && date.getDate() === now.getDate();
+
+    const time = `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+
+    if (isToday) {
+        return time;
+    }
+
+    const day = pad2(date.getDate());
+    const month = pad2(date.getMonth() + 1);
+
+    if (date.getFullYear() === now.getFullYear()) {
+        return `${day}.${month} ${time}`;
+    }
+
+    return `${day}:${month}:${date.getFullYear()} ${time}`;
+}
+
+function sortState(key: SortKey) {
+    if (sortKey.value === null) {
+        return key === DEFAULT_SORT.key ? DEFAULT_SORT.direction : null;
+    }
+    return sortKey.value === key ? sortDirection.value : null;
+}
+
+function toggleSort(key: SortKey) {
+    if (sortKey.value !== key) {
+        sortKey.value = key;
+        sortDirection.value = 'asc';
+        return;
+    }
+
+    if (sortDirection.value === 'asc') {
+        sortDirection.value = 'desc';
+        return;
+    }
+
+    sortKey.value = null;
+    sortDirection.value = DEFAULT_SORT.direction;
+}
+
+function normalizeProgress(value: number) {
+    return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function currentProgress(id: number) {
+    return progressOverrides.value[id] ?? detailsById.value[id]?.progress ?? 0;
+}
+
+function setProgress(id: number, value: number) {
+    const progress = normalizeProgress(value);
+    progressOverrides.value = { ...progressOverrides.value, [id]: progress };
+    if (detailsById.value[id]) {
+        detailsById.value = {
+            ...detailsById.value,
+            [id]: { ...detailsById.value[id], progress },
+        };
+    }
+}
+
+function updateDownload(id: number, updater: (item: DownloadItem) => DownloadItem) {
+    const index = downloads.value.findIndex((item) => item.id === id);
+    if (index === -1) return;
+    const next = downloads.value.slice();
+    next[index] = updater(next[index]);
+    downloads.value = next;
+}
+
 function buildDetails(id: number): DownloadDetails {
-    const progress = (id * 17) % 101;
+    const progress = progressOverrides.value[id] ?? ((id * 17) % 101);
     const size = 512_000 + ((id * 104_729) % 48_000_000);
     const color = ((id * 57) % 360).toString();
     const thumbnailUrl = `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -95,6 +265,155 @@ function buildDetails(id: number): DownloadDetails {
         progress,
         size,
     };
+}
+
+function addDownload(status: Status, initialProgress?: number) {
+    const now = new Date().toISOString();
+    const id = nextId.value;
+    nextId.value += 1;
+    downloads.value = [
+        ...downloads.value,
+        {
+            id,
+            status,
+            queuedAt: now,
+            startedAt: status === 'processing' ? now : null,
+            completedAt: null,
+        },
+    ];
+
+    if (status === 'processing') {
+        setProgress(id, initialProgress ?? Math.floor(Math.random() * 12));
+    }
+    queueFetchAfterIdle();
+}
+
+function pickRandomId(items: DownloadItem[]) {
+    if (!items.length) return null;
+    return items[Math.floor(Math.random() * items.length)]?.id ?? null;
+}
+
+function pickProcessingId(preferVisible = false) {
+    const processing = downloads.value.filter((item) => item.status === 'processing');
+    if (!processing.length) return null;
+
+    if (preferVisible) {
+        const visibleProcessingIds = new Set(
+            visibleIds.value.filter((item) => item.status === 'processing').map((item) => item.id),
+        );
+        const visibleProcessing = processing.filter((item) => visibleProcessingIds.has(item.id));
+        const visiblePick = pickRandomId(visibleProcessing);
+        if (visiblePick !== null) return visiblePick;
+    }
+
+    return pickRandomId(processing);
+}
+
+function pickQueuedId(preferVisible = false) {
+    const queued = downloads.value.filter((item) => item.status === 'queued');
+    if (!queued.length) return null;
+
+    if (preferVisible) {
+        const visibleQueuedIds = new Set(
+            visibleIds.value.filter((item) => item.status === 'queued').map((item) => item.id),
+        );
+        const visibleQueued = queued.filter((item) => visibleQueuedIds.has(item.id));
+        const visiblePick = pickRandomId(visibleQueued);
+        if (visiblePick !== null) return visiblePick;
+    }
+
+    return pickRandomId(queued);
+}
+
+function progressQueuedItem() {
+    const id = pickQueuedId(true);
+    if (id === null) return false;
+    const now = new Date().toISOString();
+    updateDownload(id, (current) => ({
+        ...current,
+        status: 'processing',
+        startedAt: current.startedAt ?? now,
+    }));
+    setProgress(id, Math.floor(Math.random() * 10));
+    queueFetchAfterIdle();
+    return true;
+}
+
+function progressActiveItem() {
+    const id = pickProcessingId(true);
+    if (id === null) return false;
+    const now = new Date().toISOString();
+    const next = currentProgress(id) + 5 + Math.floor(Math.random() * 18);
+    const progress = normalizeProgress(next);
+    setProgress(id, progress);
+    if (progress >= 100) {
+        updateDownload(id, (current) => ({
+            ...current,
+            status: 'done',
+            startedAt: current.startedAt ?? now,
+            completedAt: now,
+        }));
+        setProgress(id, 100);
+    } else {
+        updateDownload(id, (current) => ({
+            ...current,
+            startedAt: current.startedAt ?? now,
+        }));
+    }
+    queueFetchAfterIdle();
+    return true;
+}
+
+function failActiveItem() {
+    const id = pickProcessingId(true);
+    if (id === null) return false;
+    const now = new Date().toISOString();
+    updateDownload(id, (current) => ({
+        ...current,
+        status: 'failed',
+        startedAt: current.startedAt ?? now,
+        completedAt: null,
+    }));
+    setProgress(id, currentProgress(id));
+    queueFetchAfterIdle();
+    return true;
+}
+
+function simulateSocketEvent() {
+    const roll = Math.random();
+    if (roll < 0.35) {
+        if (Math.random() < 0.5) {
+            if (!progressQueuedItem()) {
+                progressActiveItem();
+            }
+        } else if (!progressActiveItem()) {
+            progressQueuedItem();
+        }
+        return;
+    }
+
+    if (roll < 0.5) {
+        failActiveItem();
+        return;
+    }
+
+    if (roll < 0.75) {
+        addDownload('queued');
+        return;
+    }
+
+    addDownload('processing', Math.floor(Math.random() * 14));
+}
+
+function startSocketSimulation() {
+    if (socketInterval) return;
+    socketInterval = setInterval(simulateSocketEvent, SOCKET_TICK_MS);
+}
+
+function stopSocketSimulation() {
+    if (!socketInterval) return;
+    clearInterval(socketInterval);
+    socketInterval = null;
 }
 
 function cancelActiveRequest() {
@@ -155,6 +474,7 @@ onMounted(() => {
     updateContainerHeight();
     window.addEventListener('resize', updateContainerHeight);
     queueFetchAfterIdle();
+    startSocketSimulation();
 });
 
 onBeforeUnmount(() => {
@@ -163,6 +483,7 @@ onBeforeUnmount(() => {
         clearTimeout(idleTimeout);
     }
     cancelActiveRequest();
+    stopSocketSimulation();
 });
 
 watch(selectedStatus, () => {
@@ -189,30 +510,74 @@ watch(selectedStatus, () => {
                 </div>
             </div>
 
-            <div class="mb-4 flex flex-wrap items-center gap-2">
-                <button
-                    v-for="status in FILTERS"
-                    :key="status"
-                    type="button"
-                    class="inline-flex items-center rounded border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
-                    :class="selectedStatus === status
-                        ? 'border-smart-blue-500 bg-smart-blue-600 text-white'
-                        : 'border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100 hover:bg-prussian-blue-500'"
-                    @click="selectedStatus = status"
-                >
-                    {{ filterLabel(status) }}
-                </button>
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button
+                        v-for="status in FILTERS"
+                        :key="status"
+                        type="button"
+                        class="inline-flex items-center rounded border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
+                        :class="selectedStatus === status
+                            ? 'border-smart-blue-500 bg-smart-blue-600 text-white'
+                            : 'border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100 hover:bg-prussian-blue-500'"
+                        @click="selectedStatus = status"
+                    >
+                        {{ filterLabel(status) }}
+                    </button>
+                </div>
+                <div class="text-xs text-blue-slate-300">
+                    Showing {{ baseFilteredIds.length }} of {{ downloads.length }}
+                </div>
             </div>
 
             <div class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 overflow-hidden">
                 <div
-                    class="flex items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300"
+                    class="flex min-w-[1080px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300"
                 >
                     <span>Download</span>
                     <div class="flex items-center gap-4">
                         <span class="w-24 text-right">Status</span>
-                        <span class="w-28 text-right">Progress</span>
+                        <button
+                            type="button"
+                            class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
+                            @click="toggleSort('progress')"
+                        >
+                            <span>Progress</span>
+                            <span v-if="sortState('progress')" class="text-[10px] text-blue-slate-400">
+                                {{ sortState('progress')?.toUpperCase() }}
+                            </span>
+                        </button>
                         <span class="w-20 text-right">Size</span>
+                        <button
+                            type="button"
+                            class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
+                            @click="toggleSort('queuedAt')"
+                        >
+                            <span>Queued</span>
+                            <span v-if="sortState('queuedAt')" class="text-[10px] text-blue-slate-400">
+                                {{ sortState('queuedAt')?.toUpperCase() }}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
+                            @click="toggleSort('startedAt')"
+                        >
+                            <span>Started</span>
+                            <span v-if="sortState('startedAt')" class="text-[10px] text-blue-slate-400">
+                                {{ sortState('startedAt')?.toUpperCase() }}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
+                            @click="toggleSort('completedAt')"
+                        >
+                            <span>Completed</span>
+                            <span v-if="sortState('completedAt')" class="text-[10px] text-blue-slate-400">
+                                {{ sortState('completedAt')?.toUpperCase() }}
+                            </span>
+                        </button>
                     </div>
                 </div>
                 <div
@@ -225,7 +590,7 @@ watch(selectedStatus, () => {
                             <div
                                 v-for="item in visibleIds"
                                 :key="item.id"
-                                class="flex h-16 items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
+                                class="flex h-16 min-w-[1080px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
                             >
                                 <div class="flex min-w-0 items-center gap-3">
                                     <div
@@ -287,6 +652,15 @@ watch(selectedStatus, () => {
                                             {{ formatFileSize(detailsById[item.id].size) }}
                                         </span>
                                         <Skeleton v-else class="ml-auto h-3 w-12 bg-prussian-blue-500/60" />
+                                    </div>
+                                    <div class="w-28 text-right text-xs text-blue-slate-300">
+                                        {{ formatTimestamp(item.queuedAt) }}
+                                    </div>
+                                    <div class="w-28 text-right text-xs text-blue-slate-300">
+                                        {{ formatTimestamp(item.startedAt) }}
+                                    </div>
+                                    <div class="w-28 text-right text-xs text-blue-slate-300">
+                                        {{ formatTimestamp(item.completedAt) }}
                                     </div>
                                 </div>
                             </div>
