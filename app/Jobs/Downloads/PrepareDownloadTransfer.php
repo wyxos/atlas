@@ -5,8 +5,10 @@ namespace App\Jobs\Downloads;
 use App\Enums\DownloadChunkStatus;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
+use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -45,6 +47,15 @@ class PrepareDownloadTransfer implements ShouldQueue
         $transfer->update([
             'status' => DownloadTransferStatus::PREPARING,
         ]);
+
+        $transfer->refresh();
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+            ));
+        } catch (Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
 
         $url = $transfer->url;
         $timeout = (int) config('downloads.http_timeout_seconds');
@@ -94,6 +105,15 @@ class PrepareDownloadTransfer implements ShouldQueue
             'status' => DownloadTransferStatus::DOWNLOADING,
             'started_at' => $transfer->started_at ?? now(),
         ]);
+
+        $transfer->refresh();
+        try {
+            event(new DownloadTransferProgressUpdated(
+                DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+            ));
+        } catch (Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
 
         if (! $rangesSupported || $totalBytes < (int) config('downloads.min_bytes_for_chunking')) {
             DownloadTransferSingleStream::dispatch($transfer->id, $contentType);

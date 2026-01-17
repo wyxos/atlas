@@ -417,6 +417,9 @@ function startEchoListeners() {
     const echo = window.Echo as undefined | { private: (channel: string) => { listen: (event: string, cb: (payload: unknown) => void) => void } };
     if (!echo) return;
     echoChannel = echo.private(SOCKET_CHANNEL);
+    echoChannel.listen('.DownloadTransferCreated', (payload: unknown) => {
+        applyQueuedPayload(payload as DownloadQueuedPayload);
+    });
     echoChannel.listen('.DownloadTransferQueued', (payload: unknown) => {
         applyQueuedPayload(payload as DownloadQueuedPayload);
     });
