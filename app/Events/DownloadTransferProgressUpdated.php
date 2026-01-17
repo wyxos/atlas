@@ -12,13 +12,10 @@ class DownloadTransferProgressUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(
-        public int $downloadTransferId,
-        public int $fileId,
-        public string $domain,
-        public string $status,
-        public int $percent
-    ) {}
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function __construct(public array $payload) {}
 
     /**
      * Get the channels the event should broadcast on.
@@ -42,12 +39,6 @@ class DownloadTransferProgressUpdated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        return [
-            'downloadTransferId' => $this->downloadTransferId,
-            'fileId' => $this->fileId,
-            'domain' => $this->domain,
-            'status' => $this->status,
-            'percent' => $this->percent,
-        ];
+        return $this->payload;
     }
 }

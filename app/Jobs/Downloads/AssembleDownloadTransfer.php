@@ -4,6 +4,7 @@ namespace App\Jobs\Downloads;
 
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
+use App\Services\Downloads\DownloadTransferPayload;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
@@ -131,13 +132,11 @@ class AssembleDownloadTransfer implements ShouldQueue
             'updated_at' => now(),
         ]);
 
+        $transfer->refresh();
+
         try {
             event(new DownloadTransferProgressUpdated(
-                downloadTransferId: $transfer->id,
-                fileId: $transfer->file_id,
-                domain: $transfer->domain,
-                status: DownloadTransferStatus::COMPLETED,
-                percent: 100
+                DownloadTransferPayload::forProgress($transfer, 100)
             ));
         } catch (\Throwable) {
             // Broadcast errors shouldn't fail downloads.

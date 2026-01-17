@@ -3,6 +3,8 @@
 use App\Events\DownloadTransferProgressUpdated;
 use App\Events\DownloadTransferQueued;
 use App\Http\Controllers\Auth\LoginController;
+use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -79,14 +81,38 @@ Route::middleware('auth')->group(function () {
         $status = $request->string('status', 'processing')->toString();
         $percent = $request->integer('percent', random_int(1, 100));
 
-        event(new DownloadTransferQueued($downloadTransferId));
-        event(new DownloadTransferProgressUpdated(
-            downloadTransferId: $downloadTransferId,
-            fileId: $request->integer('fileId', random_int(10000, 99999)),
-            domain: $request->string('domain', 'reverb-test')->toString(),
-            status: $status,
-            percent: $percent
-        ));
+        $transfer = DownloadTransfer::query()
+            ->with(['file:id,filename,path,url,thumbnail_url,size'])
+            ->find($downloadTransferId);
+
+        if ($transfer) {
+            event(new DownloadTransferQueued(DownloadTransferPayload::forQueued($transfer)));
+            event(new DownloadTransferProgressUpdated(DownloadTransferPayload::forProgress($transfer, $percent)));
+        } else {
+            $now = now()->toISOString();
+            event(new DownloadTransferQueued([
+                'id' => $downloadTransferId,
+                'status' => $status,
+                'queued_at' => $now,
+                'started_at' => null,
+                'finished_at' => null,
+                'failed_at' => null,
+                'percent' => $percent,
+                'path' => null,
+                'original' => null,
+                'preview' => null,
+                'size' => null,
+                'filename' => null,
+            ]));
+            event(new DownloadTransferProgressUpdated([
+                'downloadTransferId' => $downloadTransferId,
+                'status' => $status,
+                'percent' => $percent,
+                'started_at' => null,
+                'finished_at' => null,
+                'failed_at' => null,
+            ]));
+        }
 
         return response()->noContent();
     })->name('reverb.test.trigger');

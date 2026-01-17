@@ -5,6 +5,7 @@ namespace App\Jobs\Downloads;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferQueued;
 use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -88,10 +89,19 @@ class PumpDomainDownloads implements ShouldQueue
             return $ids;
         });
 
+        $transfers = DownloadTransfer::query()
+            ->with(['file:id,filename,path,url,thumbnail_url,size'])
+            ->whereIn('id', $transferIds)
+            ->get()
+            ->keyBy('id');
+
         foreach ($transferIds as $transferId) {
             QueueDownloadTransfer::dispatch($transferId);
             try {
-                event(new DownloadTransferQueued($transferId));
+                $transfer = $transfers->get($transferId);
+                if ($transfer) {
+                    event(new DownloadTransferQueued(DownloadTransferPayload::forQueued($transfer)));
+                }
             } catch (\Throwable) {
                 // Ignore broadcast failures for queueing updates.
             }
