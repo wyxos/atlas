@@ -4,8 +4,10 @@ namespace App\Jobs\Downloads;
 
 use App\Enums\DownloadChunkStatus;
 use App\Enums\DownloadTransferStatus;
+use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
+use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -182,6 +184,17 @@ class DownloadTransferChunk implements ShouldQueue
             'failed_at' => now(),
             'error' => $message,
         ]);
+
+        $updated = DownloadTransfer::query()->find($transfer->id);
+        if ($updated) {
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
+                ));
+            } catch (\Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+        }
 
         PumpDomainDownloads::dispatch($transfer->domain);
     }
