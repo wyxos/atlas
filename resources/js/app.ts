@@ -10,11 +10,24 @@ import App from './App.vue';
 import routes from './routes';
 import './bootstrap';
 import './icons';
-import { configureEcho } from '@laravel/echo-vue';
+import { configureEcho, echo } from '@laravel/echo-vue';
+import type Echo from 'laravel-echo';
+
+declare global {
+    interface Window {
+        Echo?: Echo;
+    }
+}
 
 configureEcho({
     broadcaster: 'reverb',
 });
+
+try {
+    window.Echo = echo();
+} catch {
+    window.Echo = undefined;
+}
 
 // Add all solid icons to the library
 library.add(fas);

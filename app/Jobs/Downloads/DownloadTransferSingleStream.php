@@ -156,13 +156,17 @@ class DownloadTransferSingleStream implements ShouldQueue
             'updated_at' => now(),
         ]);
 
-        event(new DownloadTransferProgressUpdated(
-            downloadTransferId: $transfer->id,
-            fileId: $transfer->file_id,
-            domain: $transfer->domain,
-            status: DownloadTransferStatus::COMPLETED,
-            percent: 100
-        ));
+        try {
+            event(new DownloadTransferProgressUpdated(
+                downloadTransferId: $transfer->id,
+                fileId: $transfer->file_id,
+                domain: $transfer->domain,
+                status: DownloadTransferStatus::COMPLETED,
+                percent: 100
+            ));
+        } catch (\Throwable) {
+            // Broadcast errors shouldn't fail downloads.
+        }
 
         if ($disk->exists($tmpPath)) {
             $disk->delete($tmpPath);

@@ -60,7 +60,7 @@ class File extends Model
     public static function generateStoragePath(string $type, string $filename, ?string $hash = null): string
     {
         // Use provided hash or generate one from filename
-        $hashValue = $hash ?? hash('sha256', $filename);
+        $hashValue = self::normalizeHash($hash) ?? hash('sha256', $filename);
 
         // Take first 4 characters for 2-level subfolder structure (256^2 = 65,536 possible folders)
         // This distributes files evenly and keeps folder sizes manageable
@@ -68,6 +68,20 @@ class File extends Model
         $subfolder2 = substr($hashValue, 2, 2);
 
         return "private/{$type}/{$subfolder1}/{$subfolder2}/{$filename}";
+    }
+
+    private static function normalizeHash(?string $hash): ?string
+    {
+        if (! $hash) {
+            return null;
+        }
+
+        $hash = strtolower(trim($hash));
+        if ($hash === '') {
+            return null;
+        }
+
+        return preg_match('/^[a-f0-9]{4,}$/', $hash) === 1 ? $hash : null;
     }
 
     /**

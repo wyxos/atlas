@@ -1,6 +1,9 @@
 <?php
 
+use App\Events\DownloadTransferProgressUpdated;
+use App\Events\DownloadTransferQueued;
 use App\Http\Controllers\Auth\LoginController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -65,6 +68,27 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/container-blacklists', [\App\Http\Controllers\ContainerBlacklistController::class, 'store'])->name('api.container-blacklists.store');
     Route::get('/api/container-blacklists/{container}/check', [\App\Http\Controllers\ContainerBlacklistController::class, 'check'])->name('api.container-blacklists.check');
     Route::delete('/api/container-blacklists/{container}', [\App\Http\Controllers\ContainerBlacklistController::class, 'destroy'])->name('api.container-blacklists.destroy');
+
+    Route::get('/reverb-test', function () {
+        return view('reverb-test');
+    })->name('reverb.test');
+
+    Route::post('/reverb-test/trigger', function (Request $request) {
+        $downloadTransferId = $request->integer('downloadTransferId', random_int(1000, 9999));
+        $status = $request->string('status', 'processing')->toString();
+        $percent = $request->integer('percent', random_int(1, 100));
+
+        event(new DownloadTransferQueued($downloadTransferId));
+        event(new DownloadTransferProgressUpdated(
+            downloadTransferId: $downloadTransferId,
+            fileId: $request->integer('fileId', random_int(10000, 99999)),
+            domain: $request->string('domain', 'reverb-test')->toString(),
+            status: $status,
+            percent: $percent
+        ));
+
+        return response()->noContent();
+    })->name('reverb.test.trigger');
 
     // SPA catch-all - serves the dashboard view for all GET requests
     // Vue Router handles client-side routing, but Laravel needs to serve the view
