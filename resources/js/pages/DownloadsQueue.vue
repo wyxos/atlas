@@ -45,6 +45,7 @@ const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
 const containerHeight = ref(0);
 const selectedStatus = ref<FilterStatus>('all');
+const isScrolling = ref(false);
 
 type DownloadDetails = {
     path: string | null;
@@ -338,8 +339,10 @@ function queueFetchAfterIdle() {
     if (idleTimeout) {
         clearTimeout(idleTimeout);
     }
+    isScrolling.value = true;
     idleTimeout = setTimeout(() => {
         idleTimeout = null;
+        isScrolling.value = false;
         fetchVisibleDetails();
     }, SCROLL_IDLE_MS);
 }
@@ -542,7 +545,7 @@ watch(selectedStatus, () => {
                     </div>
                     <div v-else class="relative w-full" :style="{ height: `${totalHeight}px` }">
                         <div class="absolute left-0 right-0" :style="{ transform: `translateY(${offsetY}px)` }">
-                            <TransitionGroup name="queue" tag="div">
+                            <TransitionGroup :name="isScrolling ? '' : 'queue'" tag="div">
                                 <div
                                     v-for="item in visibleIds"
                                     :key="item.id"
