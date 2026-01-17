@@ -24,14 +24,14 @@ const FILTERS = ['all', ...STATUSES] as const;
 type FilterStatus = typeof FILTERS[number];
 type DownloadItem = Pick<
     DownloadTransfer,
-    'id' | 'status' | 'queued_at' | 'started_at' | 'finished_at' | 'failed_at' | 'percent'
+    'id' | 'status' | 'created_at' | 'queued_at' | 'started_at' | 'finished_at' | 'failed_at' | 'percent'
 >;
 
-type SortKey = 'queuedAt' | 'startedAt' | 'completedAt' | 'progress';
+type SortKey = 'createdAt' | 'queuedAt' | 'startedAt' | 'completedAt' | 'progress';
 type SortDirection = 'asc' | 'desc';
 
 const DEFAULT_SORT: { key: SortKey; direction: SortDirection } = {
-    key: 'queuedAt',
+    key: 'createdAt',
     direction: 'desc',
 };
 
@@ -103,11 +103,13 @@ function sortMetric(item: DownloadItem, key: SortKey): number | null {
         return item.percent ?? 0;
     }
 
-    const value = key === 'queuedAt'
-        ? item.queued_at
-        : key === 'startedAt'
-            ? item.started_at
-            : item.finished_at ?? item.failed_at;
+    const value = key === 'createdAt'
+        ? item.created_at
+        : key === 'queuedAt'
+            ? item.queued_at
+            : key === 'startedAt'
+                ? item.started_at
+                : item.finished_at ?? item.failed_at;
 
     return value ? Date.parse(value) : null;
 }
@@ -269,7 +271,6 @@ async function pauseDownload(item: DownloadItem) {
     setActionBusy(item.id, true);
     try {
         await window.axios.post(downloadTransfers.pause.url(item.id));
-        updateDownload(item.id, (current) => ({ ...current, status: 'paused' }));
     } finally {
         setActionBusy(item.id, false);
     }
@@ -280,14 +281,6 @@ async function resumeDownload(item: DownloadItem) {
     setActionBusy(item.id, true);
     try {
         await window.axios.post(downloadTransfers.resume.url(item.id));
-        updateDownload(item.id, (current) => ({
-            ...current,
-            status: 'pending',
-            percent: 0,
-            started_at: null,
-            finished_at: null,
-            failed_at: null,
-        }));
     } finally {
         setActionBusy(item.id, false);
     }
@@ -298,7 +291,6 @@ async function cancelDownload(item: DownloadItem) {
     setActionBusy(item.id, true);
     try {
         await window.axios.post(downloadTransfers.cancel.url(item.id));
-        updateDownload(item.id, (current) => ({ ...current, status: 'canceled' }));
     } finally {
         setActionBusy(item.id, false);
     }
@@ -309,15 +301,6 @@ async function restartDownload(item: DownloadItem) {
     setActionBusy(item.id, true);
     try {
         await window.axios.post(downloadTransfers.restart.url(item.id));
-        updateDownload(item.id, (current) => ({
-            ...current,
-            status: 'pending',
-            percent: 0,
-            queued_at: null,
-            started_at: null,
-            finished_at: null,
-            failed_at: null,
-        }));
     } finally {
         setActionBusy(item.id, false);
     }
@@ -362,6 +345,7 @@ function applyQueuedPayload(payload: DownloadQueuedPayload) {
     const item: DownloadItem = {
         id,
         status: payload.status,
+        created_at: payload.created_at ?? null,
         queued_at: payload.queued_at ?? null,
         started_at: payload.started_at ?? null,
         finished_at: payload.finished_at ?? null,
@@ -591,7 +575,7 @@ watch(selectedStatus, () => {
 
             <div class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 overflow-hidden">
                 <div
-                    class="flex min-w-[1180px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300"
+                    class="flex min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300"
                 >
                     <span>Download</span>
                     <div class="flex items-center gap-4">
@@ -608,6 +592,17 @@ watch(selectedStatus, () => {
                             <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
                         <span class="w-20 text-right">Size</span>
+                        <button
+                            type="button"
+                            class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
+                            @click="toggleSort('createdAt')"
+                            aria-label="Sort by added time"
+                        >
+                            <span>Added</span>
+                            <ArrowUp v-if="sortState('createdAt') === 'asc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('createdAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
+                        </button>
                         <button
                             type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
@@ -658,7 +653,7 @@ watch(selectedStatus, () => {
                                 <div
                                     v-for="item in visibleIds"
                                     :key="item.id"
-                                    class="flex h-16 min-w-[1180px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
+                                    class="flex h-16 min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
                                 >
                                     <div class="flex min-w-0 items-center gap-3">
                                         <div
@@ -720,6 +715,9 @@ watch(selectedStatus, () => {
                                                 {{ formatFileSize(detailsById[item.id].size) }}
                                             </span>
                                             <Skeleton v-else class="ml-auto h-3 w-12 bg-prussian-blue-500/60" />
+                                        </div>
+                                        <div class="w-28 text-right text-xs text-blue-slate-300">
+                                            {{ formatTimestamp(item.created_at) }}
                                         </div>
                                         <div class="w-28 text-right text-xs text-blue-slate-300">
                                             {{ formatTimestamp(item.queued_at) }}

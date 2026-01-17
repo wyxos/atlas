@@ -15,6 +15,7 @@ final class DownloadTransferPayload
         return [
             'id' => $transfer->id,
             'status' => $transfer->status,
+            'created_at' => $transfer->created_at?->toISOString(),
             'queued_at' => $transfer->queued_at?->toISOString(),
             'started_at' => $transfer->started_at?->toISOString(),
             'finished_at' => $transfer->finished_at?->toISOString(),

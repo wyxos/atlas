@@ -12,6 +12,7 @@ export interface DownloadTransfer {
     percent: number;
     bytes_total: number | null;
     bytes_downloaded: number;
+    created_at: string | null;
     queued_at: string | null;
     started_at: string | null;
     finished_at: string | null;
@@ -19,4 +20,3 @@ export interface DownloadTransfer {
     error: string | null;
     file: DownloadTransferFileSummary | null;
 }
-

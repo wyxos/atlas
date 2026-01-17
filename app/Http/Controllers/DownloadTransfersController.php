@@ -15,6 +15,7 @@ class DownloadTransfersController extends Controller
             ->select([
                 'id',
                 'status',
+                'created_at',
                 'queued_at',
                 'started_at',
                 'finished_at',
