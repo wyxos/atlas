@@ -261,7 +261,7 @@ function canCancel(item: DownloadItem) {
 }
 
 function canRestart(item: DownloadItem) {
-    return ['failed', 'canceled'].includes(item.status);
+    return ['failed', 'canceled', 'completed'].includes(item.status);
 }
 
 async function pauseDownload(item: DownloadItem) {
@@ -284,7 +284,6 @@ async function resumeDownload(item: DownloadItem) {
             ...current,
             status: 'pending',
             percent: 0,
-            queued_at: null,
             started_at: null,
             finished_at: null,
             failed_at: null,
