@@ -5,13 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class DownloadTransfersController extends Controller
 {
     public function index(): JsonResponse
     {
         $items = DownloadTransfer::query()
-            ->with(['file:id,filename,path,url,thumbnail_url,size'])
+            ->select([
+                'id',
+                'status',
+                'queued_at',
+                'started_at',
+                'finished_at',
+                'last_broadcast_percent',
+            ])
             ->orderByDesc('id')
             ->get()
             ->map(fn (DownloadTransfer $transfer) => [
@@ -21,6 +29,26 @@ class DownloadTransfersController extends Controller
                 'started_at' => $transfer->started_at?->toISOString(),
                 'finished_at' => $transfer->finished_at?->toISOString(),
                 'percent' => (int) ($transfer->last_broadcast_percent ?? 0),
+            ]);
+
+        return response()->json(['items' => $items]);
+    }
+
+    public function details(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'required|integer|exists:download_transfers,id',
+        ]);
+
+        $ids = $validated['ids'];
+
+        $items = DownloadTransfer::query()
+            ->with(['file:id,filename,path,url,thumbnail_url,size'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->map(fn (DownloadTransfer $transfer) => [
+                'id' => $transfer->id,
                 ...$this->filePayload($transfer->file, $transfer->url),
             ]);
 

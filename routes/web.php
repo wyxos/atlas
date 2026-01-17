@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/api/tabs', [\App\Http\Controllers\TabController::class, 'deleteAll'])->name('api.tabs.delete-all');
     Route::delete('/api/files', [\App\Http\Controllers\FilesController::class, 'deleteAll'])->name('api.files.delete-all');
     Route::get('/api/download-transfers', [\App\Http\Controllers\DownloadTransfersController::class, 'index'])->name('api.download-transfers.index');
+    Route::post('/api/download-transfers/details', [\App\Http\Controllers\DownloadTransfersController::class, 'details'])->name('api.download-transfers.details');
     Route::post('/api/download-transfers/{downloadTransfer}/pause', [\App\Http\Controllers\DownloadTransferActionsController::class, 'pause'])->name('api.download-transfers.pause');
     Route::post('/api/download-transfers/{downloadTransfer}/resume', [\App\Http\Controllers\DownloadTransferActionsController::class, 'resume'])->name('api.download-transfers.resume');
     Route::post('/api/download-transfers/{downloadTransfer}/cancel', [\App\Http\Controllers\DownloadTransferActionsController::class, 'cancel'])->name('api.download-transfers.cancel');
