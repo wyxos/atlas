@@ -38,7 +38,7 @@ class DownloadTransferChunk implements ShouldQueue
      */
     public function handle(DownloadTransferProgressBroadcaster $broadcaster): void
     {
-        $transfer = DownloadTransfer::query()->find($this->downloadTransferId);
+        $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || $transfer->status !== DownloadTransferStatus::DOWNLOADING) {
             return;
         }
@@ -60,11 +60,16 @@ class DownloadTransferChunk implements ShouldQueue
             'started_at' => $chunk->started_at ?? now(),
         ]);
 
+        $headers = [];
+        if ($transfer->file?->referrer_url) {
+            $headers['Referer'] = $transfer->file->referrer_url;
+        }
+
         $timeout = (int) config('downloads.http_timeout_seconds');
         $rangeHeader = "bytes={$chunk->range_start}-{$chunk->range_end}";
 
         $response = Http::timeout($timeout)
-            ->withHeaders(['Range' => $rangeHeader])
+            ->withHeaders(array_merge($headers, ['Range' => $rangeHeader]))
             ->withOptions(['stream' => true])
             ->get($transfer->url);
 
@@ -200,3 +205,5 @@ class DownloadTransferChunk implements ShouldQueue
         PumpDomainDownloads::dispatch($transfer->domain);
     }
 }
+
+

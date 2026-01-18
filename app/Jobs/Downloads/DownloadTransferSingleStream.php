@@ -46,9 +46,14 @@ class DownloadTransferSingleStream implements ShouldQueue
         }
 
 
+        $headers = [];
+        if ($transfer->file?->referrer_url) {
+            $headers['Referer'] = $transfer->file->referrer_url;
+        }
+
         $timeout = (int) config('downloads.http_timeout_seconds');
 
-        $response = Http::timeout($timeout)
+        $response = Http::timeout($timeout)->withHeaders($headers)
             ->withOptions(['stream' => true])
             ->get($transfer->url);
 
@@ -228,5 +233,6 @@ class DownloadTransferSingleStream implements ShouldQueue
 
     // Progress broadcasting is handled by DownloadTransferProgressBroadcaster.
 }
+
 
 
