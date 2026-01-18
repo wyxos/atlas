@@ -726,8 +726,7 @@ watch(downloads, () => {
 
 <template>
     <PageLayout>
-        <div class="w-full">
-            <DemoList />
+        <div class="flex h-full w-full min-h-0 flex-col">
             <div class="mb-8 flex items-center justify-between">
                 <div>
                     <h4 class="text-2xl font-semibold mb-2 text-regal-navy-100">
@@ -781,7 +780,7 @@ watch(downloads, () => {
                 </div>
             </div>
 
-            <div class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 overflow-hidden">
+            <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700">
                 <div
                     class="flex min-w-[1320px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300">
                     <div class="flex items-center gap-3">
@@ -848,7 +847,7 @@ watch(downloads, () => {
                 </div>
                 <div
                     ref="containerRef"
-                    class="min-h-[60vh] max-h-[70vh] overflow-auto"
+                    class="flex-1 overflow-auto"
                     @scroll="onScroll"
                 >
                     <div v-if="isInitialLoading" class="px-4 py-12 text-center text-sm text-blue-slate-300">
