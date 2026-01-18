@@ -174,7 +174,9 @@ class DownloadTransferActionsController extends Controller
 
     private function resetTransferProgress(DownloadTransfer $downloadTransfer): void
     {
-        $downloadTransfer->update([
+        $downloadTransfer->loadMissing('file');
+
+        $updates = [
             'status' => DownloadTransferStatus::PENDING,
             'bytes_total' => null,
             'bytes_downloaded' => 0,
@@ -185,7 +187,19 @@ class DownloadTransferActionsController extends Controller
             'failed_at' => null,
             'batch_id' => null,
             'error' => null,
-        ]);
+        ];
+
+        if ($downloadTransfer->file?->url) {
+            $freshUrl = (string) $downloadTransfer->file->url;
+            $updates['url'] = $freshUrl;
+
+            $host = parse_url($freshUrl, PHP_URL_HOST);
+            if ($host) {
+                $updates['domain'] = strtolower($host);
+            }
+        }
+
+        $downloadTransfer->update($updates);
 
         $this->resetFileProgress($downloadTransfer);
     }
