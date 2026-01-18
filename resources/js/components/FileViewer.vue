@@ -70,12 +70,27 @@ const currentNavigationTarget = ref<number | null>(null); // Track current navig
 const isSheetOpen = ref(false); // Track if the sheet is open
 const fileData = ref<import('@/types/file').File | null>(null); // Store file data from API
 const isLoadingFileData = ref(false); // Track if file data is loading
+const isLoadingMore = ref(false);
 const swipeStart = ref<{ x: number; y: number } | null>(null);
 const lastWheelAt = ref(0);
 const lastSwipeAt = ref(0);
 const SWIPE_THRESHOLD = 60;
 const WHEEL_THRESHOLD = 40;
 const NAV_THROTTLE_MS = 400;
+
+async function ensureMoreItems(): Promise<boolean> {
+    if (!props.hasMore || !props.onLoadMore || isLoadingMore.value || props.isLoading) {
+        return false;
+    }
+    isLoadingMore.value = true;
+    try {
+        await props.onLoadMore();
+        await nextTick();
+    } finally {
+        isLoadingMore.value = false;
+    }
+    return true;
+}
 
 // Watch props.items and sync to reactive items (only when props change externally)
 // Use a flag to prevent syncing when we're removing items internally
@@ -876,7 +891,15 @@ async function openFromClick(e: MouseEvent): Promise<void> {
 // Navigate to next image
 async function navigateToNext(): Promise<void> {
     if (!overlayRect.value || !overlayFillComplete.value || currentItemIndex.value === null) return;
-    if (currentItemIndex.value >= items.value.length - 1) return; // Already at last item
+    if (currentItemIndex.value >= items.value.length - 1) {
+        await ensureMoreItems();
+        if (currentItemIndex.value < items.value.length - 1) {
+            const nextIndex = currentItemIndex.value + 1;
+            currentItemIndex.value = nextIndex;
+            navigateToIndex(nextIndex, 'down');
+        }
+        return;
+    } // Already at last item
 
     const nextIndex = currentItemIndex.value + 1;
     // Update index immediately - both carousel and fileviewer animate together
@@ -1281,6 +1304,13 @@ watch(() => currentItemIndex.value, async (newIndex) => {
     }
 });
 
+watch(() => [currentItemIndex.value, overlayFillComplete.value], ([newIndex, isFilled]) => {
+    if (newIndex === null || !isFilled) return;
+    if (items.value.length - 1 - newIndex <= 1) {
+        void ensureMoreItems();
+    }
+});
+
 // Watch sheet open to fetch file data
 watch(() => isSheetOpen.value, async (isOpen) => {
     if (isOpen && currentItemIndex.value !== null && overlayFillComplete.value) {
@@ -1528,12 +1558,22 @@ defineExpose({
                     </div>
                 </div>
 
-                <!-- Close button -->
-                <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
-                    class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
-                    aria-label="Close overlay" data-test="close-overlay-button">
-                    <X :size="20" />
-                </button>
+            <!-- Close button -->
+            <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
+                class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+                aria-label="Close overlay" data-test="close-overlay-button">
+                <X :size="20" />
+            </button>
+
+            <div
+                v-if="overlayFillComplete && !overlayIsClosing && isLoadingMore"
+                class="absolute top-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-smart-blue-500/80 bg-prussian-blue-800/90 px-4 py-2 text-xs font-medium text-smart-blue-100 backdrop-blur"
+            >
+                <span class="inline-flex items-center gap-2">
+                    <Loader2 :size="14" class="animate-spin" />
+                    Loading more items…
+                </span>
+            </div>
 
                 <!-- File Reactions (centered under image) -->
                 <div v-if="overlayFillComplete && !overlayIsClosing"
