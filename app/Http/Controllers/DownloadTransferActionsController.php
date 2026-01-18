@@ -106,12 +106,7 @@ class DownloadTransferActionsController extends Controller
 
     public function destroy(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        if (! $downloadTransfer->isTerminal() && $downloadTransfer->status !== DownloadTransferStatus::CANCELED) {
-            $this->cancelBatch($downloadTransfer);
-            $this->cleanupTransferParts($downloadTransfer);
-            $this->resetFileProgress($downloadTransfer);
-        }
-
+        $this->prepareForRemoval($downloadTransfer);
         $downloadTransfer->delete();
 
         return response()->json([
@@ -121,17 +116,35 @@ class DownloadTransferActionsController extends Controller
 
     public function destroyWithDisk(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        if (! $downloadTransfer->isTerminal() && $downloadTransfer->status !== DownloadTransferStatus::CANCELED) {
-            $this->cancelBatch($downloadTransfer);
-            $this->cleanupTransferParts($downloadTransfer);
-            $this->resetFileProgress($downloadTransfer);
-        }
-
+        $this->prepareForRemoval($downloadTransfer);
         $this->deleteFileFromDisk($downloadTransfer);
         $downloadTransfer->delete();
 
         return response()->json([
             'message' => 'Download removed and file deleted from disk.',
+        ]);
+    }
+
+    public function destroyBatch(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'required|integer|exists:download_transfers,id',
+        ]);
+
+        $ids = $validated['ids'];
+        $transfers = DownloadTransfer::query()->whereIn('id', $ids)->get();
+
+        $removedIds = [];
+        foreach ($transfers as $transfer) {
+            $this->prepareForRemoval($transfer);
+            $transfer->delete();
+            $removedIds[] = $transfer->id;
+        }
+
+        return response()->json([
+            'message' => 'Downloads removed.',
+            'ids' => $removedIds,
         ]);
     }
 
@@ -156,6 +169,17 @@ class DownloadTransferActionsController extends Controller
         if ($batch) {
             $batch->cancel();
         }
+    }
+
+    private function prepareForRemoval(DownloadTransfer $downloadTransfer): void
+    {
+        if ($downloadTransfer->isTerminal() || $downloadTransfer->status === DownloadTransferStatus::CANCELED) {
+            return;
+        }
+
+        $this->cancelBatch($downloadTransfer);
+        $this->cleanupTransferParts($downloadTransfer);
+        $this->resetFileProgress($downloadTransfer);
     }
 
     private function cleanupTransferParts(DownloadTransfer $downloadTransfer): void
