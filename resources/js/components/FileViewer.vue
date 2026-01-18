@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, nextTick, onUnmounted, watch, type Ref } from 'vue';
 import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
-import ImageCarousel from './ImageCarousel.vue';
 import FileViewerSheet from './FileViewerSheet.vue';
 import FileReactions from './FileReactions.vue';
 import type { FeedItem } from '@/composables/useTabs';
@@ -65,13 +64,18 @@ const originalImageDimensions = ref<{ width: number; height: number } | null>(nu
 const currentItemIndex = ref<number | null>(null); // Track current item index in items array
 const imageScale = ref(1); // Scale factor for individual image (for scale-from-zero animation)
 const isNavigating = ref(false); // Track if we're navigating between images
-const isBottomPanelOpen = ref(false); // Track if bottom panel is open
-const imageTranslateX = ref(0); // Translate X for slide animation
-const navigationDirection = ref<'left' | 'right' | null>(null); // Track navigation direction
+const imageTranslateY = ref(0); // Translate Y for slide animation
+const navigationDirection = ref<'up' | 'down' | null>(null); // Track navigation direction
 const currentNavigationTarget = ref<number | null>(null); // Track current navigation target to cancel stale preloads
 const isSheetOpen = ref(false); // Track if the sheet is open
 const fileData = ref<import('@/types/file').File | null>(null); // Store file data from API
 const isLoadingFileData = ref(false); // Track if file data is loading
+const swipeStart = ref<{ x: number; y: number } | null>(null);
+const lastWheelAt = ref(0);
+const lastSwipeAt = ref(0);
+const SWIPE_THRESHOLD = 60;
+const WHEEL_THRESHOLD = 40;
+const NAV_THROTTLE_MS = 400;
 
 // Watch props.items and sync to reactive items (only when props change externally)
 // Use a flag to prevent syncing when we're removing items internally
@@ -239,6 +243,70 @@ function handleFullscreenChange(): void {
     isVideoFullscreen.value = document.fullscreenElement === overlayVideoRef.value;
 }
 
+function shouldIgnoreGesture(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el) {
+        return false;
+    }
+    return Boolean(el.closest('button, input, textarea, select, a, .file-viewer-video-slider'));
+}
+
+function handleWheel(e: WheelEvent): void {
+    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
+    if (shouldIgnoreGesture(e.target)) return;
+
+    const now = Date.now();
+    if (now - lastWheelAt.value < NAV_THROTTLE_MS) return;
+
+    const deltaY = e.deltaY;
+    if (Math.abs(deltaY) < WHEEL_THRESHOLD) return;
+
+    e.preventDefault();
+    lastWheelAt.value = now;
+
+    if (deltaY > 0) {
+        navigateToNext();
+    } else {
+        navigateToPrevious();
+    }
+}
+
+function handleTouchStart(e: TouchEvent): void {
+    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
+    if (shouldIgnoreGesture(e.target)) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+    swipeStart.value = { x: touch.clientX, y: touch.clientY };
+}
+
+function handleTouchEnd(e: TouchEvent): void {
+    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
+    if (shouldIgnoreGesture(e.target)) return;
+
+    const start = swipeStart.value;
+    swipeStart.value = null;
+    if (!start) return;
+
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaY) < SWIPE_THRESHOLD) return;
+    if (Math.abs(deltaY) < Math.abs(deltaX)) return;
+
+    const now = Date.now();
+    if (now - lastSwipeAt.value < NAV_THROTTLE_MS) return;
+    lastSwipeAt.value = now;
+
+    if (deltaY < 0) {
+        navigateToNext();
+    } else {
+        navigateToPrevious();
+    }
+}
+
 function toggleVideoFullscreen(): void {
     const video = overlayVideoRef.value;
     if (!video) {
@@ -386,10 +454,9 @@ function closeOverlay(): void {
             originalImageDimensions.value = null;
             currentItemIndex.value = null;
             imageScale.value = 1;
-            imageTranslateX.value = 0;
+            imageTranslateY.value = 0;
             navigationDirection.value = null;
             isNavigating.value = false;
-            isBottomPanelOpen.value = false;
             isSheetOpen.value = false;
             emit('close');
         }, 500); // Match transition duration
@@ -410,13 +477,11 @@ function closeOverlay(): void {
         overlayBorderRadius.value = null;
         overlayIsLoading.value = false;
         overlayFullSizeImage.value = null;
-        isBottomPanelOpen.value = false;
         currentItemIndex.value = null;
         imageScale.value = 1;
-        imageTranslateX.value = 0;
+        imageTranslateY.value = 0;
         navigationDirection.value = null;
         isNavigating.value = false;
-        isBottomPanelOpen.value = false;
         isSheetOpen.value = false;
         emit('close');
     }
@@ -434,17 +499,17 @@ async function handleReaction(type: ReactionType): Promise<void> {
 
     // Determine next item to navigate to before removing
     let nextIndex: number | null = null;
-    let nextDirection: 'left' | 'right' | null = null;
+    let nextDirection: 'up' | 'down' | null = null;
 
     if (items.value.length > 1) {
         // If we're not at the last item, navigate to next
         if (itemIndex < items.value.length - 1) {
             nextIndex = itemIndex; // After removal, this will be the next item
-            nextDirection = 'right';
+            nextDirection = 'down';
         } else if (itemIndex > 0) {
             // If we're at the end, go to previous
             nextIndex = itemIndex - 1;
-            nextDirection = 'left';
+            nextDirection = 'up';
         }
     }
 
@@ -493,62 +558,9 @@ async function handleReaction(type: ReactionType): Promise<void> {
         if (itemIndex >= items.value.length) {
             currentItemIndex.value = items.value.length - 1;
             if (currentItemIndex.value >= 0) {
-                await navigateToIndex(currentItemIndex.value, 'left');
+                await navigateToIndex(currentItemIndex.value, 'up');
             }
         }
-    }
-}
-
-// Handle carousel item click
-function handleCarouselItemClick(item: FeedItem): void {
-    const itemIndex = items.value.findIndex(i => i.id === item.id);
-    if (itemIndex >= 0 && currentItemIndex.value !== null) {
-        // Determine direction based on index comparison BEFORE updating
-        const direction = itemIndex > currentItemIndex.value ? 'right' : 'left';
-
-        // Update currentItemIndex immediately so carousel stays in sync
-        currentItemIndex.value = itemIndex;
-
-        navigateToIndex(itemIndex, direction);
-    }
-}
-
-function toggleBottomPanel(): void {
-    if (!overlayFillComplete.value || overlayIsClosing.value) return;
-    isBottomPanelOpen.value = !isBottomPanelOpen.value;
-
-    // Recalculate image size and position when panel opens/closes
-    if (overlayRect.value && overlayImageSize.value && originalImageDimensions.value && props.containerRef) {
-        const tabContent = props.containerRef;
-        const tabContentBox = tabContent.getBoundingClientRect();
-        const containerWidth = tabContentBox.width;
-        const containerHeight = tabContentBox.height;
-        const borderWidth = 4;
-
-        // Reduce available height by 200px when panel is open
-        const panelHeight = isBottomPanelOpen.value ? 200 : 0;
-        const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-        const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
-
-        // Recalculate best-fit size for the image
-        const bestFitSize = calculateBestFitSize(
-            originalImageDimensions.value.width,
-            originalImageDimensions.value.height,
-            availableWidth,
-            availableHeight
-        );
-
-        // Update image size
-        overlayImageSize.value = bestFitSize;
-
-        // Recalculate center position
-        const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
-        const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
-
-        imageCenterPosition.value = {
-            top: fullImageTop,
-            left: fullImageLeft,
-        };
     }
 }
 
@@ -578,10 +590,7 @@ function handleOverlayImageClick(e: MouseEvent): void {
         return;
     }
 
-    // Normal click behavior - toggle bottom panel (only for left click without ALT)
-    if (!e.altKey && (e.button === 0 || (e.type === 'click' && e.button === 0))) {
-        toggleBottomPanel();
-    }
+    // Normal click behavior - no-op for now (carousel disabled).
 }
 
 // Handle ALT + Middle Click (mousedown event needed for middle button)
@@ -873,7 +882,7 @@ async function navigateToNext(): Promise<void> {
     // Update index immediately - both carousel and fileviewer animate together
     currentItemIndex.value = nextIndex;
     // Don't await - allow rapid navigation
-    navigateToIndex(nextIndex, 'right');
+    navigateToIndex(nextIndex, 'down');
 }
 
 // Navigate to previous image
@@ -885,11 +894,11 @@ async function navigateToPrevious(): Promise<void> {
     // Update index immediately - both carousel and fileviewer animate together
     currentItemIndex.value = prevIndex;
     // Don't await - allow rapid navigation
-    navigateToIndex(prevIndex, 'left');
+    navigateToIndex(prevIndex, 'up');
 }
 
 // Navigate to a specific index
-async function navigateToIndex(index: number, direction?: 'left' | 'right'): Promise<void> {
+async function navigateToIndex(index: number, direction?: 'up' | 'down'): Promise<void> {
     if (!overlayRect.value || !overlayFillComplete.value) return;
     if (index < 0 || index >= items.value.length) return;
 
@@ -898,9 +907,9 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
 
     // Determine direction if not provided
     if (!direction && currentItemIndex.value !== null) {
-        direction = index > currentItemIndex.value ? 'right' : 'left';
+        direction = index > currentItemIndex.value ? 'down' : 'up';
     }
-    navigationDirection.value = direction || 'right';
+    navigationDirection.value = direction || 'down';
 
     // Set current navigation target - this will cancel any stale preloads
     currentNavigationTarget.value = index;
@@ -910,8 +919,8 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     // before this function is called, so carousel reacts immediately
 
     // Step 1: Slide current image out
-    const slideOutDistance = tabContent.getBoundingClientRect().width;
-    imageTranslateX.value = direction === 'right' ? -slideOutDistance : slideOutDistance;
+    const slideOutDistance = tabContent.getBoundingClientRect().height;
+    imageTranslateY.value = direction === 'down' ? -slideOutDistance : slideOutDistance;
     overlayIsAnimating.value = true;
 
     // Wait for slide out animation to complete
@@ -964,8 +973,8 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
     };
 
     // Start new image off-screen in the opposite direction
-    const slideInDistance = tabContent.getBoundingClientRect().width;
-    imageTranslateX.value = direction === 'right' ? slideInDistance : -slideInDistance;
+    const slideInDistance = tabContent.getBoundingClientRect().height;
+    imageTranslateY.value = direction === 'down' ? slideInDistance : -slideInDistance;
     imageScale.value = 1; // Keep scale at 1 for slide animation
     await nextTick(); // Ensure DOM updates before continuing
 
@@ -996,9 +1005,8 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
             const containerWidth = tabContentBox.width;
             const containerHeight = tabContentBox.height;
             const borderWidth = 4;
-            const panelHeight = isBottomPanelOpen.value ? 200 : 0;
             const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-            const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
+            const availableHeight = containerHeight - (borderWidth * 2);
 
             const bestFitSize = calculateBestFitSize(
                 nextItem.width,
@@ -1035,7 +1043,7 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
                 return;
             }
 
-            imageTranslateX.value = 0;
+            imageTranslateY.value = 0;
             await new Promise(resolve => setTimeout(resolve, 500));
             if (currentNavigationTarget.value !== preloadTarget) {
                 isNavigating.value = false;
@@ -1079,9 +1087,8 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         const borderWidth = 4;
 
         // Reduce available height by 200px when drawer is open
-        const panelHeight = isBottomPanelOpen.value ? 200 : 0;
         const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-        const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
+        const availableHeight = containerHeight - (borderWidth * 2);
 
         const bestFitSize = calculateBestFitSize(
             imageDimensions.width,
@@ -1100,7 +1107,7 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
             left: fullImageLeft,
         };
 
-        // Ensure imageTranslateX is set for slide-in animation
+        // Ensure imageTranslateY is set for slide-in animation
         // (already set above, but keep scale at 1)
         imageScale.value = 1;
 
@@ -1158,7 +1165,7 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
         }
 
         // Now slide image in from the side
-        imageTranslateX.value = 0;
+        imageTranslateY.value = 0;
 
         // Wait for scale animation to complete
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -1180,7 +1187,7 @@ async function navigateToIndex(index: number, direction?: 'left' | 'right'): Pro
             };
         }
         imageScale.value = 1;
-        imageTranslateX.value = 0;
+        imageTranslateY.value = 0;
         await nextTick();
     }
 
@@ -1194,10 +1201,10 @@ function handleKeyDown(e: KeyboardEvent): void {
 
     if (e.key === 'Escape') {
         closeOverlay();
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault();
         navigateToNext();
-    } else if (e.key === 'ArrowLeft') {
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
         navigateToPrevious();
     }
@@ -1294,9 +1301,8 @@ watch(() => isSheetOpen.value, () => {
         const containerWidth = tabContentBox.width;
         const containerHeight = tabContentBox.height;
         const borderWidth = 4;
-        const panelHeight = isBottomPanelOpen.value ? 200 : 0;
         const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-        const availableHeight = containerHeight - (borderWidth * 2) - panelHeight;
+        const availableHeight = containerHeight - (borderWidth * 2);
 
         const bestFitSize = calculateBestFitSize(
             originalImageDimensions.value.width,
@@ -1326,6 +1332,7 @@ watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible)
             overlayStatePushed = true;
         }
         window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('wheel', handleWheel, { passive: false });
         // Listen to mousedown, mouseup, and auxclick to catch mouse button 4/5 events
         // Use capture phase and handle on document for better interception
         document.addEventListener('mousedown', handleMouseButton, true);
@@ -1337,6 +1344,7 @@ watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible)
     } else {
         overlayStatePushed = false;
         window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('wheel', handleWheel);
         document.removeEventListener('mousedown', handleMouseButton, true);
         document.removeEventListener('mouseup', handleMouseButton, true);
         document.removeEventListener('auxclick', handleMouseButton, true);
@@ -1348,6 +1356,7 @@ watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible)
 // Cleanup on unmount
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('wheel', handleWheel);
     document.removeEventListener('mousedown', handleMouseButton, true);
     document.removeEventListener('mouseup', handleMouseButton, true);
     document.removeEventListener('auxclick', handleMouseButton, true);
@@ -1363,7 +1372,6 @@ defineExpose({
     navigateBackward: navigateToPrevious,
     currentItemIndex,
     items,
-    isBottomPanelOpen,
 });
 </script>
 
@@ -1382,7 +1390,7 @@ defineExpose({
         borderRadius: overlayIsFilled ? undefined : (overlayBorderRadius || undefined),
         transform: `scale(${overlayScale})`,
         transformOrigin: 'center center',
-    }">
+    }" @touchstart.passive="handleTouchStart" @touchend.passive="handleTouchEnd">
         <!-- Main content area -->
         <div :class="[
             'relative overflow-hidden transition-all duration-500 ease-in-out',
@@ -1405,17 +1413,17 @@ defineExpose({
                             height: overlayImageSize.height + 'px',
                             top: imageCenterPosition.top + 'px',
                             left: imageCenterPosition.left + 'px',
-                            transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         } : overlayImageSize ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
                             top: '50%',
                             left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         } : {
                             top: '50%',
                             left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         }),
                         transformOrigin: 'center center',
                     }" draggable="false" />
@@ -1431,24 +1439,24 @@ defineExpose({
                         'absolute select-none',
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
                         overlayIsFilled ? '' : 'object-cover',
-                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating || isBottomPanelOpen !== null) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
                     ]" :style="{
                         ...(overlayImageSize && imageCenterPosition ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
                             top: imageCenterPosition.top + 'px',
                             left: imageCenterPosition.left + 'px',
-                            transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         } : overlayImageSize ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
                             top: '50%',
                             left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         } : {
                             top: '50%',
                             left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         }),
                         transformOrigin: 'center center',
                     }" draggable="false" @click="handleOverlayImageClick"
@@ -1460,24 +1468,24 @@ defineExpose({
                         'absolute',
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'pointer-events-auto' : 'pointer-events-none',
                         overlayIsFilled ? 'object-contain' : 'object-cover',
-                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating || isBottomPanelOpen !== null) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
                     ]" :style="{
                         ...(overlayImageSize && imageCenterPosition ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
                             top: imageCenterPosition.top + 'px',
                             left: imageCenterPosition.left + 'px',
-                            transform: `scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         } : overlayImageSize ? {
                             width: overlayImageSize.width + 'px',
                             height: overlayImageSize.height + 'px',
                             top: '50%',
                             left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         } : {
                             top: '50%',
                             left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateX(${imageTranslateX}px)`,
+                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         }),
                         transformOrigin: 'center center',
                     }" playsinline disablepictureinpicture preload="metadata"
@@ -1539,13 +1547,7 @@ defineExpose({
                 </div>
             </div>
 
-            <!-- Image Carousel -->
-            <div class="shrink-0 min-w-0 overflow-hidden">
-                <ImageCarousel v-if="overlayFillComplete && !overlayIsClosing" :items="items"
-                    :current-item-index="currentItemIndex" :visible="isBottomPanelOpen" :has-more="hasMore"
-                    :is-loading="isLoading" :on-load-more="onLoadMore" :sheet-open="isSheetOpen" @next="navigateToNext"
-                    @previous="navigateToPrevious" @item-click="handleCarouselItemClick" />
-            </div>
+            <!-- Carousel disabled (vertical navigation only for now). -->
         </div>
 
         <!-- Vertical Taskbar (only shown when filled) -->
