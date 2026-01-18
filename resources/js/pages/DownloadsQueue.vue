@@ -17,6 +17,7 @@ import { formatFileSize } from '@/utils/file';
 import type { DownloadTransfer } from '@/types/downloadTransfer';
 import downloadTransfers from '@/routes/api/download-transfers';
 import { RecycleScroller } from 'vue-virtual-scroller';
+import DemoList from '@/components/DemoList.vue';
 
 const STATUSES = [
     'pending',
@@ -713,6 +714,7 @@ watch(downloads, () => {
 <template>
     <PageLayout>
         <div class="w-full">
+            <DemoList />
             <div class="mb-8 flex items-center justify-between">
                 <div>
                     <h4 class="text-2xl font-semibold mb-2 text-regal-navy-100">
