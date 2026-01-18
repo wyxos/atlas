@@ -744,29 +744,54 @@ watch([sortKey, sortDirection], () => {
                                             {{ formatTimestamp(item.finished_at ?? item.failed_at) }}
                                         </div>
                                         <div class="flex w-80 items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon-sm"
+                                            <Button
+                                                variant="outline"
+                                                size="icon-sm"
+                                                class="border-warning-500/50 text-warning-200 hover:bg-warning-600/15 hover:text-warning-100"
                                                 :disabled="isActionBusy(item.id) || !canPause(item)"
-                                                aria-label="Pause download" @click="pauseDownload(item)">
+                                                aria-label="Pause download"
+                                                @click="pauseDownload(item)"
+                                            >
                                                 <Pause :size="14" />
                                             </Button>
-                                            <Button variant="ghost" size="icon-sm"
+                                            <Button
+                                                variant="outline"
+                                                size="icon-sm"
+                                                class="border-success-500/50 text-success-200 hover:bg-success-600/15 hover:text-success-100"
                                                 :disabled="isActionBusy(item.id) || !canResume(item)"
-                                                aria-label="Resume download" @click="resumeDownload(item)">
+                                                aria-label="Resume download"
+                                                @click="resumeDownload(item)"
+                                            >
                                                 <Play :size="14" />
                                             </Button>
-                                            <Button variant="ghost" color="danger" size="icon-sm"
+                                            <Button
+                                                variant="outline"
+                                                size="icon-sm"
+                                                class="border-danger-500/50 text-danger-200 hover:bg-danger-600/15 hover:text-danger-100"
                                                 :disabled="isActionBusy(item.id) || !canCancel(item)"
-                                                aria-label="Cancel download" @click="cancelDownload(item)">
+                                                aria-label="Cancel download"
+                                                @click="cancelDownload(item)"
+                                            >
                                                 <X :size="14" />
                                             </Button>
-                                            <Button variant="ghost" size="icon-sm"
+                                            <Button
+                                                variant="outline"
+                                                size="icon-sm"
+                                                class="border-sapphire-500/50 text-sapphire-200 hover:bg-sapphire-600/15 hover:text-sapphire-100"
                                                 :disabled="isActionBusy(item.id) || !canRestart(item)"
-                                                aria-label="Restart download" @click="restartDownload(item)">
+                                                aria-label="Restart download"
+                                                @click="restartDownload(item)"
+                                            >
                                                 <RotateCcw :size="14" />
                                             </Button>
-                                            <Button variant="ghost" color="danger" size="icon-sm"
-                                                :disabled="isActionBusy(item.id)" aria-label="Delete download"
-                                                @click="deleteDownload(item)">
+                                            <Button
+                                                variant="outline"
+                                                size="icon-sm"
+                                                class="border-danger-500/50 text-danger-200 hover:bg-danger-600/15 hover:text-danger-100"
+                                                :disabled="isActionBusy(item.id)"
+                                                aria-label="Delete download"
+                                                @click="deleteDownload(item)"
+                                            >
                                                 <Trash2 :size="14" />
                                             </Button>
                                         </div>
