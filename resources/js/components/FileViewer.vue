@@ -71,6 +71,8 @@ const isSheetOpen = ref(false); // Track if the sheet is open
 const fileData = ref<import('@/types/file').File | null>(null); // Store file data from API
 const isLoadingFileData = ref(false); // Track if file data is loading
 const isLoadingMore = ref(false);
+const containerOverflow = ref<string | null>(null);
+const containerOverscroll = ref<string | null>(null);
 const swipeStart = ref<{ x: number; y: number } | null>(null);
 const lastWheelAt = ref(0);
 const lastSwipeAt = ref(0);
@@ -424,12 +426,27 @@ function getClickedItemId(target: HTMLElement): number | null {
 function closeOverlay(): void {
     if (!overlayRect.value) return;
 
+    const tabContent = props.containerRef;
+    if (tabContent) {
+        if (containerOverflow.value !== null) {
+            tabContent.style.overflow = containerOverflow.value;
+        } else {
+            tabContent.style.removeProperty('overflow');
+        }
+        if (containerOverscroll.value !== null) {
+            tabContent.style.overscrollBehavior = containerOverscroll.value;
+        } else {
+            tabContent.style.removeProperty('overscroll-behavior');
+        }
+        containerOverflow.value = null;
+        containerOverscroll.value = null;
+    }
+
     // Start closing animation - shrink towards center using CSS scale
     overlayIsClosing.value = true;
     overlayIsAnimating.value = true;
 
     // Calculate center position of the container
-    const tabContent = props.containerRef;
     if (tabContent && overlayRect.value) {
         const tabContentBox = tabContent.getBoundingClientRect();
         const containerWidth = tabContentBox.width;
@@ -656,6 +673,13 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const container = props.masonryContainerRef;
     const tabContent = props.containerRef;
     if (!container || !tabContent) return;
+
+    if (containerOverflow.value === null) {
+        containerOverflow.value = tabContent.style.overflow || '';
+        containerOverscroll.value = tabContent.style.overscrollBehavior || '';
+        tabContent.style.overflow = 'hidden';
+        tabContent.style.overscrollBehavior = 'contain';
+    }
 
     const target = e.target as HTMLElement | null;
     if (!target) return;
@@ -1392,6 +1416,18 @@ onUnmounted(() => {
     document.removeEventListener('auxclick', handleMouseButton, true);
     window.removeEventListener('popstate', handlePopState);
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
+
+    const tabContent = props.containerRef;
+    if (tabContent && containerOverflow.value !== null) {
+        tabContent.style.overflow = containerOverflow.value;
+        if (containerOverscroll.value !== null) {
+            tabContent.style.overscrollBehavior = containerOverscroll.value;
+        } else {
+            tabContent.style.removeProperty('overscroll-behavior');
+        }
+        containerOverflow.value = null;
+        containerOverscroll.value = null;
+    }
 });
 
 // Expose methods for parent component
