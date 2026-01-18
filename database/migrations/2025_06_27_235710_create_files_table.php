@@ -25,8 +25,9 @@ return new class extends Migration
             $table->string('hash')->nullable(); // Full file hash (e.g., SHA256, up to 64 chars)
             $table->text('title')->nullable(); // Title (from source or filename)
             $table->text('description')->nullable(); // Description (from source or optional)
-            $table->text('thumbnail_url')->nullable(); // URL for thumbnail/preview
-            $table->string('thumbnail_path')->nullable(); // Local path for thumbnail
+            $table->text('preview_url')->nullable(); // URL for preview (remote)
+            $table->text('preview_path')->nullable(); // Local path for preview (image or video)
+            $table->text('poster_path')->nullable(); // Local path for video poster
             $table->json('tags')->nullable(); // Tags (array from source, or user)
             $table->unsignedBigInteger('parent_id')->nullable(); // Parent file (for chapters, albums, etc.)
             $table->string('chapter')->nullable(); // Chapter/episode/etc. (if applicable)

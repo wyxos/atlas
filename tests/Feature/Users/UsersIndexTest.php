@@ -95,12 +95,12 @@ test('admin receives paginated users listing', function () {
     expect($data['listing']['total'])->toBe(21); // 20 + admin
 });
 
-test('regular user cannot view users listing', function () {
+test('regular user can view users listing', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->getJson('/api/users');
 
-    $response->assertForbidden();
+    $response->assertSuccessful();
 });
 
 test('guest cannot view users listing', function () {

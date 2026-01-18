@@ -14,4 +14,12 @@ return [
     'http_timeout_seconds' => (int) env('DOWNLOADS_HTTP_TIMEOUT_SECONDS', 30),
 
     'tmp_dir' => env('DOWNLOADS_TMP_DIR', 'downloads/.tmp'),
+
+    'ffmpeg_path' => env('DOWNLOADS_FFMPEG_PATH', 'ffmpeg'),
+
+    'ffmpeg_timeout_seconds' => (int) env('DOWNLOADS_FFMPEG_TIMEOUT_SECONDS', 120),
+
+    'video_preview_width' => (int) env('DOWNLOADS_VIDEO_PREVIEW_WIDTH', 450),
+
+    'video_poster_second' => (float) env('DOWNLOADS_VIDEO_POSTER_SECOND', 1),
 ];

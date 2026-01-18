@@ -40,6 +40,8 @@ class FileResource extends JsonResource
         if ($this->downloaded && $this->path) {
             $diskUrl = route('api.files.downloaded', ['file' => $this->id]);
         }
+        $previewFileUrl = $this->preview_path ? route('api.files.preview', ['file' => $this->id]) : null;
+        $posterUrl = $this->poster_path ? route('api.files.poster', ['file' => $this->id]) : null;
 
         return [
             'id' => $this->id,
@@ -57,9 +59,12 @@ class FileResource extends JsonResource
             'referrer_url' => $this->referrer_url,
             'path' => $this->path,
             'absolute_path' => $absolutePath,
-            'thumbnail_url' => $this->thumbnail_url,
-            'thumbnail_path' => $this->thumbnail_path,
+            'preview_url' => $this->preview_url,
             'disk_url' => $diskUrl,
+            'preview_file_url' => $previewFileUrl,
+            'poster_url' => $posterUrl,
+            'preview_path' => $this->preview_path,
+            'poster_path' => $this->poster_path,
             'tags' => $this->tags,
             'parent_id' => $this->parent_id,
             'chapter' => $this->chapter,

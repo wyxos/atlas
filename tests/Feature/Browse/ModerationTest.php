@@ -222,7 +222,7 @@ test('moderation result includes correct structure', function () {
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
         'auto_disliked' => false,
-        'thumbnail_url' => 'https://example.com/thumb.jpg',
+        'preview_url' => 'https://example.com/thumb.jpg',
         'filename' => 'test.jpg',
         'path' => 'test/path.jpg',
     ]);

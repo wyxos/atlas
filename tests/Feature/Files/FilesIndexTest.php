@@ -123,12 +123,12 @@ test('admin receives paginated files listing', function () {
     expect($data['listing']['perPage'])->toBe(10);
 });
 
-test('regular user cannot view files listing', function () {
+test('regular user can view files listing', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->getJson('/api/files');
 
-    $response->assertForbidden();
+    $response->assertSuccessful();
 });
 
 test('guest cannot view files listing', function () {

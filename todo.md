@@ -1,9 +1,9 @@
 - [ ] Browse feature improvements
     - [ ] Browse
       - [ ] Evaluate other default feeds (Youtube, etc)
+      - [ ] container click open a new tab browsing that container by re-using the service API
     - [ ] Video handling
-      - [ ] Display video from CivitAI in masonry and fileviewer 
-      - [ ] Implement video playback and controls in browse interface
+      - [ ] Download preview version if available, else generate one
     - [ ] FileViewer enhancements
         - [ ] Preload next items in FileViewer for smoother navigation
     - [ ] Dynamic filtering

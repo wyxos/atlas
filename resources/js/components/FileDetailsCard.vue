@@ -203,22 +203,22 @@ defineProps<Props>();
                 </div>
 
                 <div>
-                    <label class="text-xs font-semibold text-smart-blue-300 uppercase tracking-wide mb-2 block">Thumbnail/Preview URL</label>
-                    <div v-if="file.thumbnail_url" class="space-y-2">
+                    <label class="text-xs font-semibold text-smart-blue-300 uppercase tracking-wide mb-2 block">Preview URL</label>
+                    <div v-if="file.preview_url" class="space-y-2">
                         <div class="flex items-center gap-2">
                             <a
-                                :href="file.thumbnail_url"
+                                :href="file.preview_url"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="text-smart-blue-400 hover:text-smart-blue-400 hover:underline truncate flex-1"
-                                :title="file.thumbnail_url"
+                                :title="file.preview_url"
                             >
-                                {{ file.thumbnail_url }}
+                                {{ file.preview_url }}
                             </a>
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                @click="() => copyToClipboard(file.thumbnail_url!, 'Thumbnail URL')"
+                                @click="() => copyToClipboard(file.preview_url!, 'Preview URL')"
                                 class="p-1 h-auto"
                             >
                                 <Copy :size="12" class="text-smart-blue-400" />
@@ -226,7 +226,7 @@ defineProps<Props>();
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                @click="() => openUrl(file.thumbnail_url!)"
+                                @click="() => openUrl(file.preview_url!)"
                                 class="p-1 h-auto"
                             >
                                 <ExternalLink :size="12" class="text-smart-blue-400" />
@@ -234,10 +234,18 @@ defineProps<Props>();
                         </div>
                         <div class="mt-2">
                             <img
-                                :src="file.thumbnail_url"
-                                :alt="`Thumbnail for ${file.filename}`"
+                                v-if="file.mime_type?.startsWith('image/')"
+                                :src="file.preview_url"
+                                :alt="`Preview for ${file.filename}`"
                                 class="max-w-xs max-h-48 rounded border border-twilight-indigo-500"
                                 @error="(e) => { (e.target as HTMLImageElement).style.display = 'none' }"
+                            />
+                            <video
+                                v-else-if="file.mime_type?.startsWith('video/')"
+                                :src="file.preview_url"
+                                class="max-w-xs max-h-48 rounded border border-twilight-indigo-500"
+                                muted
+                                playsinline
                             />
                         </div>
                     </div>
@@ -267,16 +275,32 @@ defineProps<Props>();
                     </div>
                 </div>
 
-                <div v-if="file.thumbnail_path">
-                    <label class="text-xs font-semibold text-smart-blue-300 uppercase tracking-wide mb-2 block">Thumbnail Path</label>
+                <div v-if="file.preview_path">
+                    <label class="text-xs font-semibold text-smart-blue-300 uppercase tracking-wide mb-2 block">Preview Path</label>
                     <div class="flex items-center gap-2">
-                        <span class="font-mono text-xs text-regal-navy-100 break-all" :title="file.thumbnail_path">
-                            {{ file.thumbnail_path }}
+                        <span class="font-mono text-xs text-regal-navy-100 break-all" :title="file.preview_path">
+                            {{ file.preview_path }}
                         </span>
                         <Button
                             variant="ghost"
                             size="sm"
-                            @click="() => copyToClipboard(file.thumbnail_path!, 'Thumbnail Path')"
+                            @click="() => copyToClipboard(file.preview_path!, 'Preview Path')"
+                            class="p-1 h-auto shrink-0"
+                        >
+                            <Copy :size="12" class="text-smart-blue-400" />
+                        </Button>
+                    </div>
+                </div>
+                <div v-if="file.poster_path">
+                    <label class="text-xs font-semibold text-smart-blue-300 uppercase tracking-wide mb-2 block">Poster Path</label>
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-xs text-regal-navy-100 break-all" :title="file.poster_path">
+                            {{ file.poster_path }}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            @click="() => copyToClipboard(file.poster_path!, 'Poster Path')"
                             class="p-1 h-auto shrink-0"
                         >
                             <Copy :size="12" class="text-smart-blue-400" />
@@ -407,4 +431,3 @@ defineProps<Props>();
         </div>
     </div>
 </template>
-

@@ -119,7 +119,7 @@ class TabController extends Controller
             ->select([
                 'files.id',
                 'files.url',
-                'files.thumbnail_url',
+                'files.preview_url',
                 'files.mime_type',
                 'files.listing_metadata',
                 'files.previewed_count',

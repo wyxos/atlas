@@ -95,7 +95,7 @@ test('fetch handles pagination correctly', function () {
 test('transform returns file models directly', function () {
     $file = File::factory()->create([
         'url' => 'https://example.com/image.jpg',
-        'thumbnail_url' => 'https://example.com/thumb.jpg',
+        'preview_url' => 'https://example.com/thumb.jpg',
         'source' => 'CivitAI',
     ]);
 

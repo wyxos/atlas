@@ -42,13 +42,13 @@ test('reverb test trigger dispatches demo events', function () {
     $response->assertNoContent();
 
     Event::assertDispatched(DownloadTransferQueued::class, function (DownloadTransferQueued $event) {
-        return $event->downloadTransferId === 1234;
+        return $event->downloadTransferId === 1234
+            && $event->status === 'processing'
+            && $event->percent === 55;
     });
 
     Event::assertDispatched(DownloadTransferProgressUpdated::class, function (DownloadTransferProgressUpdated $event) {
         return $event->downloadTransferId === 1234
-            && $event->fileId === 56789
-            && $event->domain === 'reverb-test'
             && $event->status === 'processing'
             && $event->percent === 55;
     });

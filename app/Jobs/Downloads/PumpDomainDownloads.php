@@ -90,7 +90,7 @@ class PumpDomainDownloads implements ShouldQueue
         });
 
         $transfers = DownloadTransfer::query()
-            ->with(['file:id,filename,path,url,thumbnail_url,size,referrer_url'])
+            ->with(['file:id,filename,path,url,preview_url,size,referrer_url'])
             ->whereIn('id', $transferIds)
             ->get()
             ->keyBy('id');

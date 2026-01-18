@@ -30,7 +30,8 @@ class FileFactory extends Factory
         $ext = fake()->randomElement($extensions);
 
         $pathToken = fake()->optional()->uuid();
-        $thumbnailPathToken = fake()->optional()->uuid();
+        $previewPathToken = fake()->optional()->uuid();
+        $posterPathToken = fake()->optional()->uuid();
 
         return [
             'source' => fake()->randomElement($sources),
@@ -46,8 +47,9 @@ class FileFactory extends Factory
             'hash' => fake()->optional()->sha256(),
             'title' => fake()->optional()->sentence(),
             'description' => fake()->optional()->paragraph(),
-            'thumbnail_url' => fake()->optional()->imageUrl(),
-            'thumbnail_path' => $thumbnailPathToken ? 'thumbnails/'.$thumbnailPathToken.'.jpg' : null,
+            'preview_url' => fake()->optional()->imageUrl(),
+            'preview_path' => $previewPathToken ? 'thumbnails/'.$previewPathToken.'.jpg' : null,
+            'poster_path' => $posterPathToken ? 'thumbnails/'.$posterPathToken.'_poster.jpg' : null,
             'tags' => fake()->optional()->randomElements(['tag1', 'tag2', 'tag3', 'tag4'], 2),
             'parent_id' => null,
             'chapter' => null,

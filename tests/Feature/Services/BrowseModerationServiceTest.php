@@ -119,7 +119,7 @@ test('formats immediate actions correctly', function () {
     $file = File::factory()->create([
         'auto_disliked' => false,
         'blacklisted_at' => null,
-        'thumbnail_url' => 'https://example.com/thumb.jpg',
+        'preview_url' => 'https://example.com/thumb.jpg',
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file->id,
@@ -201,7 +201,7 @@ test('merges immediate actions from file and container moderation', function () 
     $file1 = File::factory()->create([
         'auto_disliked' => false,
         'blacklisted_at' => null,
-        'thumbnail_url' => 'https://example.com/thumb1.jpg',
+        'preview_url' => 'https://example.com/thumb1.jpg',
     ]);
     FileMetadata::factory()->create([
         'file_id' => $file1->id,
@@ -212,7 +212,7 @@ test('merges immediate actions from file and container moderation', function () 
     $file2 = File::factory()->create([
         'auto_disliked' => false,
         'blacklisted_at' => null,
-        'thumbnail_url' => 'https://example.com/thumb2.jpg',
+        'preview_url' => 'https://example.com/thumb2.jpg',
     ]);
 
     // Create blacklisted container and attach to file2

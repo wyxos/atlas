@@ -22,11 +22,13 @@ class File extends Model
         'auto_disliked',
         'path',
         'filename',
+        'preview_url',
         'downloaded',
         'downloaded_at',
         'blacklisted_at',
         'blacklist_reason',
-        'thumbnail_path',
+        'preview_path',
+        'poster_path',
     ];
 
     /**
@@ -147,8 +149,9 @@ class File extends Model
             'hash' => $this->hash,
             'title' => $this->title,
             'description' => $this->description,
-            'thumbnail_url' => $this->thumbnail_url,
-            'thumbnail_path' => $this->thumbnail_path,
+            'preview_url' => $this->preview_url,
+            'preview_path' => $this->preview_path,
+            'poster_path' => $this->poster_path,
             'parent_id' => $this->parent_id,
             'chapter' => $this->chapter,
             'blacklisted' => $this->blacklisted_at !== null,

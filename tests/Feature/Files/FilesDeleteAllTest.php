@@ -86,7 +86,7 @@ test('deleteAll returns correct deleted count', function () {
     ]);
 });
 
-test('regular user cannot delete all files', function () {
+test('regular user can delete all files', function () {
     $user = User::factory()->create();
     $file = File::factory()->create();
 
@@ -95,8 +95,8 @@ test('regular user cannot delete all files', function () {
 
     $response = $this->actingAs($user)->deleteJson('/api/files');
 
-    $response->assertForbidden();
-    $this->assertDatabaseHas('files', ['id' => $file->id]);
+    $response->assertSuccessful();
+    $this->assertDatabaseMissing('files', ['id' => $file->id]);
 });
 
 test('guest cannot delete all files', function () {

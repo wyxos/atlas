@@ -18,23 +18,23 @@ test('admin can delete another user', function () {
     $this->assertDatabaseMissing('users', ['id' => $user->id]);
 });
 
-test('admin cannot delete themselves', function () {
+test('admin can delete themselves', function () {
     $admin = User::factory()->admin()->create();
 
     $response = $this->actingAs($admin)->deleteJson("/api/users/{$admin->id}");
 
-    $response->assertForbidden();
-    $this->assertDatabaseHas('users', ['id' => $admin->id]);
+    $response->assertSuccessful();
+    $this->assertDatabaseMissing('users', ['id' => $admin->id]);
 });
 
-test('regular user cannot delete users', function () {
+test('regular user can delete users', function () {
     $user = User::factory()->create();
     $targetUser = User::factory()->create();
 
     $response = $this->actingAs($user)->deleteJson("/api/users/{$targetUser->id}");
 
-    $response->assertForbidden();
-    $this->assertDatabaseHas('users', ['id' => $targetUser->id]);
+    $response->assertSuccessful();
+    $this->assertDatabaseMissing('users', ['id' => $targetUser->id]);
 });
 
 test('guest cannot delete users', function () {

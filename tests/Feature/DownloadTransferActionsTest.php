@@ -159,11 +159,11 @@ it('removes a transfer and deletes the file from disk', function () {
         'filename' => 'test.jpg',
         'downloaded' => true,
         'path' => 'downloads/aa/bb/test.jpg',
-        'thumbnail_path' => 'thumbnails/aa/bb/test_thumb.jpg',
+        'preview_path' => 'thumbnails/aa/bb/test_thumb.jpg',
     ]);
     File::query()->whereKey($file->id)->update(['download_progress' => 100]);
     Storage::disk('atlas-app')->put($file->path, 'file');
-    Storage::disk('atlas-app')->put($file->thumbnail_path, 'thumb');
+    Storage::disk('atlas-app')->put($file->preview_path, 'thumb');
 
     $transfer = DownloadTransfer::query()->create([
         'file_id' => $file->id,
@@ -183,7 +183,7 @@ it('removes a transfer and deletes the file from disk', function () {
 
     $file->refresh();
     expect($file->path)->toBeNull();
-    expect($file->thumbnail_path)->toBeNull();
+    expect($file->preview_path)->toBeNull();
     expect($file->downloaded)->toBeFalse();
     expect($file->download_progress)->toBe(0);
 

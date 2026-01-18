@@ -7,6 +7,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use League\MimeTypeDetection\FinfoMimeTypeDetector;
+use Symfony\Component\Process\Process;
 
 class FileDownloadFinalizer
 {
@@ -48,9 +49,19 @@ class FileDownloadFinalizer
 
         $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
         if ($this->isImageMimeType($mimeType)) {
-            $thumbnailPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
-            if ($thumbnailPath) {
-                $updates['thumbnail_path'] = $thumbnailPath;
+            $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
+            if ($previewPath) {
+                $updates['preview_path'] = $previewPath;
+            }
+        }
+        if ($this->isVideoMimeType($mimeType)) {
+            [$previewPath, $posterPath] = $this->generateVideoPreview($disk, $absolutePath, $finalPath);
+
+            if ($previewPath) {
+                $updates['preview_path'] = $previewPath;
+            }
+            if ($posterPath) {
+                $updates['poster_path'] = $posterPath;
             }
         }
 
@@ -192,6 +203,116 @@ class FileDownloadFinalizer
 
         return str_starts_with($mimeType, 'image/')
             && ! in_array($mimeType, ['image/svg+xml', 'image/x-icon'], true);
+    }
+
+    private function isVideoMimeType(?string $mimeType): bool
+    {
+        if (! $mimeType) {
+            return false;
+        }
+
+        return str_starts_with(strtolower($mimeType), 'video/');
+    }
+
+    /**
+     * @return array{0: string|null, 1: string|null}
+     */
+    private function generateVideoPreview(Filesystem $disk, string $absolutePath, string $finalPath): array
+    {
+        $ffmpegPath = (string) config('downloads.ffmpeg_path');
+        $ffmpegPath = $this->resolveFfmpegPath($ffmpegPath);
+        if (! $ffmpegPath) {
+            return [null, null];
+        }
+
+        $previewWidth = (int) config('downloads.video_preview_width', 450);
+        $posterSecond = (float) config('downloads.video_poster_second', 1);
+        $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
+
+        $directory = pathinfo($finalPath, PATHINFO_DIRNAME);
+        $filename = pathinfo($finalPath, PATHINFO_FILENAME);
+        $previewPath = $directory.'/'.$filename.'.preview.mp4';
+        $posterPath = $directory.'/'.$filename.'.poster.jpg';
+
+        if (! $disk->exists($directory)) {
+            $disk->makeDirectory($directory, 0755, true);
+        }
+
+        $previewAbsolutePath = $disk->path($previewPath);
+        $posterAbsolutePath = $disk->path($posterPath);
+
+        $previewProcess = new Process([
+            $ffmpegPath,
+            '-y',
+            '-i',
+            $absolutePath,
+            '-vf',
+            "scale={$previewWidth}:-2",
+            '-c:v',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '28',
+            '-an',
+            $previewAbsolutePath,
+        ]);
+        $previewProcess->setTimeout($timeout);
+
+        try {
+            $previewProcess->run();
+        } catch (\Throwable) {
+            // Ignore preview generation failures.
+        }
+
+        if (! $previewProcess->isSuccessful() || ! $disk->exists($previewPath)) {
+            $previewPath = null;
+        }
+
+        $posterProcess = new Process([
+            $ffmpegPath,
+            '-y',
+            '-ss',
+            (string) $posterSecond,
+            '-i',
+            $absolutePath,
+            '-frames:v',
+            '1',
+            '-vf',
+            "scale={$previewWidth}:-2",
+            $posterAbsolutePath,
+        ]);
+        $posterProcess->setTimeout($timeout);
+
+        try {
+            $posterProcess->run();
+        } catch (\Throwable) {
+            // Ignore poster generation failures.
+        }
+
+        if (! $posterProcess->isSuccessful() || ! $disk->exists($posterPath)) {
+            $posterPath = null;
+        }
+
+        return [$previewPath, $posterPath];
+    }
+
+    private function resolveFfmpegPath(string $ffmpegPath): ?string
+    {
+        if ($ffmpegPath === '') {
+            return null;
+        }
+
+        if (is_dir($ffmpegPath)) {
+            $binary = DIRECTORY_SEPARATOR.(PHP_OS_FAMILY === 'Windows' ? 'ffmpeg.exe' : 'ffmpeg');
+            $ffmpegPath = rtrim($ffmpegPath, '\\/').$binary;
+        }
+
+        if (is_file($ffmpegPath)) {
+            return $ffmpegPath;
+        }
+
+        return $ffmpegPath !== '' ? $ffmpegPath : null;
     }
 
     private function generateThumbnailFromFile(Filesystem $disk, string $absolutePath, string $filename, string $hash): ?string
