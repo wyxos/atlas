@@ -36,6 +36,11 @@ class FileResource extends JsonResource
             $fileUrl = route('api.files.serve', ['file' => $this->id]);
         }
 
+        $diskUrl = null;
+        if ($this->downloaded && $this->path) {
+            $diskUrl = route('api.files.downloaded', ['file' => $this->id]);
+        }
+
         return [
             'id' => $this->id,
             'source' => $this->source,
@@ -54,6 +59,7 @@ class FileResource extends JsonResource
             'absolute_path' => $absolutePath,
             'thumbnail_url' => $this->thumbnail_url,
             'thumbnail_path' => $this->thumbnail_path,
+            'disk_url' => $diskUrl,
             'tags' => $this->tags,
             'parent_id' => $this->parent_id,
             'chapter' => $this->chapter,

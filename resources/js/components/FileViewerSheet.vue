@@ -16,19 +16,26 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div v-if="isOpen"
-        class="flex flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden w-80 max-w-80">
+    <div
+        class="flex flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden"
+        :class="isOpen ? 'w-80 max-w-80' : 'w-0 max-w-0'"
+    >
         <div
-            class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap">
+            class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap"
+            :class="isOpen ? '' : 'opacity-0 pointer-events-none'"
+        >
             <h2 class="text-lg font-semibold text-white">
                 # {{ fileId || '' }}
             </h2>
-            <button @click="emit('close')"
-                class="p-2 rounded-lg hover:bg-prussian-blue-700 text-white transition-colors" aria-label="Close sheet">
+            <button
+                @click="emit('close')"
+                class="p-2 rounded-lg hover:bg-prussian-blue-700 text-white transition-colors"
+                aria-label="Close sheet"
+            >
                 <X :size="20" />
             </button>
         </div>
-        <div class="flex-1 overflow-y-auto p-4 min-w-0">
+        <div class="flex-1 overflow-y-auto p-4 min-w-0" :class="isOpen ? '' : 'opacity-0 pointer-events-none'">
             <div v-if="isLoading" class="flex items-center justify-center py-8">
                 <Loader2 :size="24" class="animate-spin text-smart-blue-500" />
             </div>
@@ -49,6 +56,18 @@ const emit = defineEmits<{
                     <div class="font-semibold text-white mb-1">Size</div>
                     <div>{{ (fileData.size / 1024 / 1024).toFixed(2) }} MB</div>
                 </div>
+                <div v-if="fileData.downloaded !== undefined">
+                    <div class="font-semibold text-white mb-1">Downloaded</div>
+                    <div>{{ fileData.downloaded ? 'Yes' : 'No' }}</div>
+                </div>
+                <div v-if="fileData.downloaded_at">
+                    <div class="font-semibold text-white mb-1">Downloaded At</div>
+                    <div>{{ new Date(fileData.downloaded_at).toLocaleString() }}</div>
+                </div>
+                <div v-if="fileData.source_id">
+                    <div class="font-semibold text-white mb-1">Source ID</div>
+                    <div class="wrap-break-word">{{ fileData.source_id }}</div>
+                </div>
                 <div v-if="fileData.title">
                     <div class="font-semibold text-white mb-1">Title</div>
                     <div class="wrap-break-word">{{ fileData.title }}</div>
@@ -62,6 +81,13 @@ const emit = defineEmits<{
                     <a :href="fileData.url" target="_blank" rel="noopener noreferrer"
                         class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
                         {{ fileData.url }}
+                    </a>
+                </div>
+                <div v-if="fileData.disk_url">
+                    <div class="font-semibold text-white mb-1">Disk URL</div>
+                    <a :href="fileData.disk_url" target="_blank" rel="noopener noreferrer"
+                        class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
+                        {{ fileData.disk_url }}
                     </a>
                 </div>
                 <div v-if="fileData.referrer_url">
@@ -97,17 +123,6 @@ const emit = defineEmits<{
                 No file data available
             </div>
         </div>
-    </div>
-    <div v-else
-        class="flex flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden w-0 max-w-0">
-        <div
-            class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap opacity-0 pointer-events-none">
-            <h2 class="text-lg font-semibold text-white">#</h2>
-            <button class="p-2 rounded-lg hover:bg-prussian-blue-700 text-white transition-colors">
-                <X :size="20" />
-            </button>
-        </div>
-        <div class="flex-1 overflow-y-auto p-4 min-w-0 opacity-0 pointer-events-none"></div>
     </div>
 </template>
 
