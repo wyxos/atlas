@@ -1,8 +1,25 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
+import { beforeEach, expect, it, vi } from 'vitest';
 import DownloadsQueue from './DownloadsQueue.vue';
 
-it('renders the downloads queue placeholder', () => {
+beforeEach(() => {
+    window.axios = {
+        get: vi.fn().mockResolvedValue({ data: { items: [] } }),
+        post: vi.fn().mockResolvedValue({ data: { items: [] } }),
+        delete: vi.fn(),
+    } as typeof window.axios;
+
+    window.Echo = {
+        private: () => ({ listen: () => {} }),
+        leave: () => {},
+    } as typeof window.Echo;
+});
+
+it('renders the downloads queue', async () => {
     const wrapper = mount(DownloadsQueue);
 
-    expect(wrapper.text()).toContain('Downloads queue placeholder.');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Downloads Queue');
+    expect(wrapper.text()).toContain('Manage queued downloads.');
 });
