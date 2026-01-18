@@ -416,7 +416,11 @@ async function confirmRemove(): Promise<void> {
     const ids = removeTargetIds.value;
 
     try {
-        await Promise.all(ids.map((id) => window.axios.delete(downloadTransfers.destroy.url(id))));
+        if (ids.length === 1) {
+            await window.axios.delete(downloadTransfers.destroy.url(ids[0]));
+        } else {
+            await window.axios.post(downloadTransfers.destroyBatch.url(), { ids });
+        }
         downloads.value = downloads.value.filter((item) => !ids.includes(item.id));
         detailsById.value = Object.fromEntries(
             Object.entries(detailsById.value).filter(([key]) => !ids.includes(Number(key))),

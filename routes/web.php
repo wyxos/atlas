@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/download-transfers/{downloadTransfer}/resume', [\App\Http\Controllers\DownloadTransferActionsController::class, 'resume'])->name('api.download-transfers.resume');
     Route::post('/api/download-transfers/{downloadTransfer}/cancel', [\App\Http\Controllers\DownloadTransferActionsController::class, 'cancel'])->name('api.download-transfers.cancel');
     Route::post('/api/download-transfers/{downloadTransfer}/restart', [\App\Http\Controllers\DownloadTransferActionsController::class, 'restart'])->name('api.download-transfers.restart');
+    Route::post('/api/download-transfers/bulk-delete', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyBatch'])->name('api.download-transfers.destroy-batch');
     Route::delete('/api/download-transfers/{downloadTransfer}/disk', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyWithDisk'])->name('api.download-transfers.destroy-disk');
     Route::delete('/api/download-transfers/{downloadTransfer}', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroy'])->name('api.download-transfers.destroy');
 
