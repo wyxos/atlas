@@ -324,6 +324,14 @@
         @apply bg-background text-foreground;
     }
 
+    button {
+        @apply cursor-pointer;
+    }
+
+    button:disabled {
+        @apply cursor-not-allowed;
+    }
+
     /* Global smooth color transitions for interactive elements */
     a,
     button,
@@ -447,3 +455,4 @@
     background-color: var(--color-smart-blue-400);
     border: 2px solid var(--color-prussian-blue-900);
 }
+
