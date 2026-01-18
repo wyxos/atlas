@@ -63,7 +63,7 @@ class PrepareDownloadTransfer implements ShouldQueue
         $contentLength = $head->header('Content-Length');
         $acceptRanges = $head->header('Accept-Ranges');
 
-        $totalBytes = is_numeric($contentLength) ? (int) $contentLength : null;
+        $totalBytes = is_numeric($contentLength) && (int) $contentLength > 0 ? (int) $contentLength : null;
         $rangesSupported = is_string($acceptRanges) && str_contains(strtolower($acceptRanges), 'bytes');
 
         if (! $rangesSupported || $totalBytes === null) {
@@ -77,9 +77,11 @@ class PrepareDownloadTransfer implements ShouldQueue
 
         if ($totalBytes === null) {
             $transfer->update([
-                'status' => DownloadTransferStatus::FAILED,
-                'failed_at' => now(),
-                'error' => 'Unable to determine Content-Length for download.',
+                'bytes_total' => null,
+                'bytes_downloaded' => 0,
+                'last_broadcast_percent' => 0,
+                'status' => DownloadTransferStatus::DOWNLOADING,
+                'started_at' => $transfer->started_at ?? now(),
             ]);
 
             $transfer->refresh();
@@ -91,11 +93,10 @@ class PrepareDownloadTransfer implements ShouldQueue
                 // Broadcast errors shouldn't fail downloads.
             }
 
-            PumpDomainDownloads::dispatch($transfer->domain);
+            DownloadTransferSingleStream::dispatch($transfer->id, $contentType);
 
             return;
         }
-
         $transfer->update([
             'bytes_total' => $totalBytes,
             'bytes_downloaded' => 0,
@@ -200,3 +201,4 @@ class PrepareDownloadTransfer implements ShouldQueue
         return is_numeric($total) ? (int) $total : null;
     }
 }
+

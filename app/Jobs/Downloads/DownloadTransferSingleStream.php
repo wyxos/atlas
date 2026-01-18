@@ -45,26 +45,6 @@ class DownloadTransferSingleStream implements ShouldQueue
             return;
         }
 
-        if (! $transfer->bytes_total) {
-            $transfer->update([
-                'status' => DownloadTransferStatus::FAILED,
-                'failed_at' => now(),
-                'error' => 'bytes_total missing for single-stream download.',
-            ]);
-
-            $transfer->refresh();
-            try {
-                event(new DownloadTransferProgressUpdated(
-                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                ));
-            } catch (\Throwable) {
-                // Broadcast errors shouldn't fail downloads.
-            }
-
-            PumpDomainDownloads::dispatch($transfer->domain);
-
-            return;
-        }
 
         $timeout = (int) config('downloads.http_timeout_seconds');
 
@@ -93,6 +73,19 @@ class DownloadTransferSingleStream implements ShouldQueue
             return;
         }
 
+        if (! $transfer->bytes_total) {
+            $contentLength = $response->header('Content-Length');
+            $totalBytes = is_numeric($contentLength) && (int) $contentLength > 0 ? (int) $contentLength : null;
+            if ($totalBytes) {
+                $transfer->update([
+                    'bytes_total' => $totalBytes,
+                    'bytes_downloaded' => 0,
+                    'last_broadcast_percent' => 0,
+                    'updated_at' => now(),
+                ]);
+                $transfer->refresh();
+            }
+        }
         $disk = Storage::disk(config('downloads.disk'));
 
         $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
@@ -235,3 +228,5 @@ class DownloadTransferSingleStream implements ShouldQueue
 
     // Progress broadcasting is handled by DownloadTransferProgressBroadcaster.
 }
+
+

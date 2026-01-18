@@ -514,16 +514,17 @@ function applyQueuedPayload(payload: DownloadQueuedPayload) {
 
     upsertDownload(item);
 
+    const existingDetails = detailsById.value[id] ?? {};
     detailsById.value = {
         ...detailsById.value,
         [id]: {
-            path: payload.path ?? null,
-            absolute_path: payload.absolute_path ?? null,
-            original: payload.original ?? null,
-            referrer_url: payload.referrer_url ?? null,
-            preview: payload.preview ?? null,
-            size: payload.size ?? null,
-            filename: payload.filename ?? null,
+            path: payload.path ?? existingDetails.path ?? null,
+            absolute_path: payload.absolute_path ?? existingDetails.absolute_path ?? null,
+            original: payload.original ?? existingDetails.original ?? null,
+            referrer_url: payload.referrer_url ?? existingDetails.referrer_url ?? null,
+            preview: payload.preview ?? existingDetails.preview ?? null,
+            size: payload.size ?? existingDetails.size ?? null,
+            filename: payload.filename ?? existingDetails.filename ?? null,
         },
     };
 }
@@ -1040,3 +1041,6 @@ watch(downloads, () => {
     width: 100%;
 }
 </style>
+
+
+
