@@ -3,6 +3,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
 import { ArrowDown, ArrowUp, ArrowUpDown, Pause, Play, RotateCcw, Trash2, X } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatFileSize } from '@/utils/file';
 import type { DownloadTransfer } from '@/types/downloadTransfer';
@@ -49,6 +58,23 @@ const containerHeight = ref(0);
 const selectedStatus = ref<FilterStatus>('all');
 const actionBusy = ref<Record<number, boolean>>({});
 const isScrolling = ref(false);
+const selectedIds = ref<Set<number>>(new Set());
+const lastSelectedIndex = ref<number | null>(null);
+const selectAllRef = ref<HTMLInputElement | null>(null);
+const removeDialogOpen = ref(false);
+const removeTargetIds = ref<number[]>([]);
+const removeIsDeleting = ref(false);
+const removeMode = ref<'single' | 'selection' | 'all' | null>(null);
+const removeCount = computed(() => removeTargetIds.value.length);
+const removeTitle = computed(() => (removeMode.value === 'single' ? 'Remove download' : 'Remove downloads'));
+const removeLabel = computed(() => {
+    if (removeMode.value === 'single') return 'this download';
+    if (removeCount.value === 1) return '1 download';
+    return `${removeCount.value} downloads`;
+});
+const removeDescription = computed(
+    () => `Are you sure you want to remove ${removeLabel.value}? This action cannot be undone.`,
+);
 
 type DownloadDetails = {
     path: string | null;
@@ -102,6 +128,19 @@ const statusCounts = computed(() =>
         acc[item.status] = (acc[item.status] ?? 0) + 1;
         return acc;
     }, {} as Record<string, number>),
+);
+
+const filteredIds = computed(() => baseFilteredIds.value.map((item) => item.id));
+const selectedCount = computed(() => selectedIds.value.size);
+const selectedInFilterCount = computed(() =>
+    filteredIds.value.filter((id) => selectedIds.value.has(id)).length,
+);
+const selectedIdsList = computed(() => Array.from(selectedIds.value));
+const allFilteredSelected = computed(() =>
+    filteredIds.value.length > 0 && selectedInFilterCount.value === filteredIds.value.length,
+);
+const someFilteredSelected = computed(() =>
+    selectedInFilterCount.value > 0 && !allFilteredSelected.value,
 );
 
 function sortMetric(item: DownloadItem, key: SortKey): number | null {
@@ -284,6 +323,116 @@ async function copyPath(path: string | null, absolutePath: string | null) {
     }
 }
 
+function setSelection(next: Set<number>) {
+    selectedIds.value = next;
+}
+
+function isSelected(id: number) {
+    return selectedIds.value.has(id);
+}
+
+function selectRange(rangeIds: number[], additive: boolean) {
+    const next = additive ? new Set(selectedIds.value) : new Set<number>();
+    rangeIds.forEach((id) => next.add(id));
+    setSelection(next);
+}
+
+function selectSingle(id: number, additive: boolean) {
+    const next = additive ? new Set(selectedIds.value) : new Set<number>();
+    if (additive && next.has(id)) {
+        next.delete(id);
+    } else {
+        next.add(id);
+    }
+    setSelection(next);
+}
+
+function handleSelection(id: number, event?: MouseEvent) {
+    const allIds = sortedIds.value.map((item) => item.id);
+    const index = allIds.indexOf(id);
+    if (index === -1) return;
+
+    const isCtrl = !!event && (event.ctrlKey || event.metaKey);
+    const isShift = !!event && event.shiftKey;
+
+    if (isShift && lastSelectedIndex.value !== null) {
+        const start = Math.min(lastSelectedIndex.value, index);
+        const end = Math.max(lastSelectedIndex.value, index);
+        selectRange(allIds.slice(start, end + 1), isCtrl);
+    } else {
+        selectSingle(id, isCtrl);
+    }
+
+    lastSelectedIndex.value = index;
+}
+
+function handleCheckboxClick(id: number, event: MouseEvent) {
+    const next = new Set(selectedIds.value);
+    if (next.has(id)) {
+        next.delete(id);
+    } else {
+        next.add(id);
+    }
+    setSelection(next);
+    event.stopPropagation();
+    lastSelectedIndex.value = sortedIds.value.findIndex((item) => item.id === id);
+}
+
+function handleRowClick(item: DownloadItem, event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button, a, input')) return;
+    handleSelection(item.id, event);
+}
+
+function toggleSelectAll(checked: boolean) {
+    const next = new Set(selectedIds.value);
+    if (checked) {
+        filteredIds.value.forEach((id) => next.add(id));
+    } else {
+        filteredIds.value.forEach((id) => next.delete(id));
+    }
+    setSelection(next);
+}
+
+function clearSelection() {
+    const filtered = new Set(filteredIds.value);
+    const next = new Set([...selectedIds.value].filter((id) => !filtered.has(id)));
+    setSelection(next);
+}
+
+function clearAllSelection() {
+    setSelection(new Set());
+}
+
+function openRemoveDialog(mode: 'single' | 'selection' | 'all', ids: number[]) {
+    if (ids.length === 0) return;
+    removeMode.value = mode;
+    removeTargetIds.value = ids;
+    removeDialogOpen.value = true;
+}
+
+async function confirmRemove(): Promise<void> {
+    if (removeIsDeleting.value) return;
+    removeIsDeleting.value = true;
+    const ids = removeTargetIds.value;
+
+    try {
+        await Promise.all(ids.map((id) => window.axios.delete(downloadTransfers.destroy.url(id))));
+        downloads.value = downloads.value.filter((item) => !ids.includes(item.id));
+        detailsById.value = Object.fromEntries(
+            Object.entries(detailsById.value).filter(([key]) => !ids.includes(Number(key))),
+        );
+        const nextSelection = new Set(selectedIds.value);
+        ids.forEach((id) => nextSelection.delete(id));
+        setSelection(nextSelection);
+    } finally {
+        removeIsDeleting.value = false;
+        removeDialogOpen.value = false;
+        removeTargetIds.value = [];
+        removeMode.value = null;
+    }
+}
+
 async function pauseDownload(item: DownloadItem) {
     if (!canPause(item) || isActionBusy(item.id)) return;
     setActionBusy(item.id, true);
@@ -324,17 +473,8 @@ async function restartDownload(item: DownloadItem) {
     }
 }
 
-async function deleteDownload(item: DownloadItem) {
-    if (isActionBusy(item.id)) return;
-    setActionBusy(item.id, true);
-    try {
-        await window.axios.delete(downloadTransfers.destroy.url(item.id));
-        downloads.value = downloads.value.filter((row) => row.id !== item.id);
-        const { [item.id]: _removed, ...rest } = detailsById.value;
-        detailsById.value = rest;
-    } finally {
-        setActionBusy(item.id, false);
-    }
+function deleteDownload(item: DownloadItem) {
+    openRemoveDialog('single', [item.id]);
 }
 
 function updateDownload(id: number, updater: (item: DownloadItem) => DownloadItem) {
@@ -571,6 +711,19 @@ watch([sortKey, sortDirection], () => {
     cancelActiveRequest();
     queueFetchAfterIdle();
 });
+
+watch([someFilteredSelected, allFilteredSelected], ([hasSome, hasAll]) => {
+    if (!selectAllRef.value) return;
+    selectAllRef.value.indeterminate = hasSome && !hasAll;
+});
+
+watch(downloads, () => {
+    const validIds = new Set(downloads.value.map((item) => item.id));
+    const next = new Set([...selectedIds.value].filter((id) => validIds.has(id)));
+    if (next.size !== selectedIds.value.size) {
+        setSelection(next);
+    }
+});
 </script>
 
 <template>
@@ -603,15 +756,46 @@ watch([sortKey, sortDirection], () => {
                         </span>
                     </button>
                 </div>
-                <div class="text-xs text-blue-slate-300">
-                    Total files: {{ downloads.length }} · Filtered files: {{ baseFilteredIds.length }}
+                <div class="flex flex-wrap items-center gap-3 text-xs text-blue-slate-300">
+                    <span>Total files: {{ downloads.length }} | Filtered files: {{ baseFilteredIds.length }}</span>
+                    <span v-if="selectedCount">
+                        Selected: {{ selectedCount }} | In filter: {{ selectedInFilterCount }}
+                    </span>
+                    <div v-if="selectedCount || filteredIds.length" class="flex items-center gap-2">
+                        <Button
+                            v-if="selectedCount"
+                            variant="outline"
+                            size="sm"
+                            :disabled="removeIsDeleting"
+                            @click="openRemoveDialog('selection', selectedIdsList)">
+                            Remove selection
+                        </Button>
+                        <Button
+                            v-if="filteredIds.length"
+                            variant="outline"
+                            size="sm"
+                            :disabled="removeIsDeleting"
+                            @click="openRemoveDialog('all', filteredIds)">
+                            Remove all
+                        </Button>
+                    </div>
                 </div>
             </div>
 
             <div class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 overflow-hidden">
                 <div
-                    class="flex min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300">
-                    <span>Download</span>
+                    class="flex min-w-[1320px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300">
+                    <div class="flex items-center gap-3">
+                        <input
+                            ref="selectAllRef"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border border-twilight-indigo-500 bg-prussian-blue-700 text-smart-blue-400"
+                            :checked="allFilteredSelected"
+                            aria-label="Select all downloads"
+                            @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                        />
+                        <span>Download</span>
+                    </div>
                     <div class="flex items-center gap-4">
                         <span class="w-24 text-right">Status</span>
                         <button type="button"
@@ -671,8 +855,16 @@ watch([sortKey, sortDirection], () => {
                         <div class="absolute left-0 right-0" :style="{ transform: `translateY(${offsetY}px)` }">
                             <TransitionGroup :name="isScrolling ? '' : 'queue'" tag="div">
                                 <div v-for="item in visibleIds" :key="item.id"
-                                    class="flex h-16 min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60">
+                                    class="flex h-16 min-w-[1320px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60 cursor-pointer"
+                                    @click="handleRowClick(item, $event)">
                                     <div class="flex min-w-0 items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            class="h-4 w-4 rounded border border-twilight-indigo-500 bg-prussian-blue-700 text-smart-blue-400"
+                                            :checked="isSelected(item.id)"
+                                            aria-label="Select download"
+                                            @click.stop="handleCheckboxClick(item.id, $event)"
+                                        />
                                         <div
                                             class="h-10 w-10 overflow-hidden rounded border border-twilight-indigo-500/40 bg-prussian-blue-600">
                                             <img v-if="detailsById[item.id]?.preview"
@@ -689,7 +881,7 @@ watch([sortKey, sortDirection], () => {
                                                 <button v-if="detailsById[item.id]" type="button"
                                                     class="truncate text-xs text-blue-slate-300 hover:text-white"
                                                     title="Copy full path"
-                                                    @click="copyPath(detailsById[item.id]?.path ?? null, detailsById[item.id]?.absolute_path ?? null)">
+                                                    @click.stop="copyPath(detailsById[item.id]?.path ?? null, detailsById[item.id]?.absolute_path ?? null)">
                                                     {{ detailsById[item.id]?.path }}
                                                 </button>
                                                 <Skeleton v-else class="h-3 w-36 bg-prussian-blue-500/60" />
@@ -803,6 +995,30 @@ watch([sortKey, sortDirection], () => {
                 </div>
             </div>
         </div>
+        <Dialog v-model="removeDialogOpen">
+            <DialogContent class="sm:max-w-[425px] bg-prussian-blue-600 border-danger-500/30">
+                <DialogHeader>
+                    <DialogTitle class="text-danger-400">{{ removeTitle }}</DialogTitle>
+                    <DialogDescription class="text-base mt-2 text-twilight-indigo-100">
+                        {{ removeDescription }}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <DialogClose as-child>
+                        <Button variant="outline" :disabled="removeIsDeleting">
+                            Cancel
+                        </Button>
+                    </DialogClose>
+                    <Button
+                        variant="destructive"
+                        :loading="removeIsDeleting"
+                        :disabled="removeIsDeleting"
+                        @click="confirmRemove">
+                        {{ removeIsDeleting ? 'Removing...' : 'Remove' }}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </PageLayout>
 </template>
 
