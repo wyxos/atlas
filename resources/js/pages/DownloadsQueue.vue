@@ -48,7 +48,7 @@ const downloads = ref<DownloadItem[]>([]);
 const isInitialLoading = ref(true);
 
 const ITEM_HEIGHT = 64;
-const OVERSCAN = 12;
+const OVERSCAN = 2;
 const SCROLL_IDLE_MS = 180;
 const SOCKET_CHANNEL = 'downloads';
 
@@ -1041,6 +1041,5 @@ watch(downloads, () => {
     width: 100%;
 }
 </style>
-
 
 
