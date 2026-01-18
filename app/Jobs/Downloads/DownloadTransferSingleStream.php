@@ -88,6 +88,12 @@ class DownloadTransferSingleStream implements ShouldQueue
                     'last_broadcast_percent' => 0,
                     'updated_at' => now(),
                 ]);
+                if ($transfer->file && (! $transfer->file->size || $transfer->file->size <= 0)) {
+                    $transfer->file->update([
+                        'size' => $totalBytes,
+                        'updated_at' => now(),
+                    ]);
+                }
                 $transfer->refresh();
             }
         }

@@ -547,6 +547,9 @@ class Wallhaven extends BaseService
             'ext' => FileTypeDetector::extensionFromUrl($path),
             'mime_type' => FileTypeDetector::mimeFromUrl($path),
             'hash' => null,
+            'size' => isset($row['file_size']) && is_numeric($row['file_size']) && (int) $row['file_size'] > 0
+                ? (int) $row['file_size']
+                : null,
             'title' => null,
             'description' => null,
             'thumbnail_url' => $thumbnail,
