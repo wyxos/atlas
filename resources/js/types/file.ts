@@ -16,6 +16,7 @@ export interface File {
     absolute_path: string | null;
     thumbnail_url: string | null;
     thumbnail_path: string | null;
+    disk_url: string | null;
     tags: string[] | null;
     parent_id: number | null;
     chapter: string | null;
@@ -34,4 +35,3 @@ export interface File {
     created_at: string;
     updated_at: string;
 }
-
