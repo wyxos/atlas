@@ -4,6 +4,7 @@ namespace App\Services\Downloads;
 
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use Illuminate\Support\Facades\Storage;
 
 final class DownloadTransferPayload
 {
@@ -89,10 +90,16 @@ final class DownloadTransferPayload
 
         $preview = $file?->thumbnail_url ?? $original;
         $plannedPath = self::plannedPath($file, $sourceUrl);
+        $path = $file?->path ?? $plannedPath;
+        $absolutePath = $path
+            ? Storage::disk(config('downloads.disk'))->path($path)
+            : null;
 
         return [
-            'path' => $file?->path ?? $plannedPath,
+            'path' => $path,
+            'absolute_path' => $absolutePath,
             'original' => $original,
+            'referrer_url' => $file?->referrer_url,
             'preview' => $preview,
             'size' => $file?->size,
             'filename' => $file?->filename,

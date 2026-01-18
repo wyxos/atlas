@@ -52,7 +52,9 @@ const isScrolling = ref(false);
 
 type DownloadDetails = {
     path: string | null;
+    absolute_path: string | null;
     original: string | null;
+    referrer_url: string | null;
     preview: string | null;
     size: number | null;
     filename: string | null;
@@ -72,7 +74,9 @@ type DownloadProgressPayload = {
     finished_at?: string | null;
     failed_at?: string | null;
     path?: string | null;
+    absolute_path?: string | null;
     original?: string | null;
+    referrer_url?: string | null;
     preview?: string | null;
     size?: number | null;
     filename?: string | null;
@@ -85,6 +89,7 @@ let echoChannel: { listen: (event: string, callback: (payload: unknown) => void)
 
 const sortKey = ref<SortKey | null>(null);
 const sortDirection = ref<SortDirection>('asc');
+const lastNonCompletedSort = ref<{ key: SortKey | null; direction: SortDirection } | null>(null);
 
 const baseFilteredIds = computed(() =>
     selectedStatus.value === 'all'
@@ -267,6 +272,18 @@ function canRestart(item: DownloadItem) {
     return ['failed', 'canceled', 'completed'].includes(item.status);
 }
 
+async function copyPath(path: string | null, absolutePath: string | null) {
+    const value = absolutePath || path;
+    if (!value) return;
+    const isWindows = navigator.userAgent.toLowerCase().includes('windows');
+    const normalized = isWindows ? value.replace(/\//g, '\\') : value.replace(/\\/g, '/');
+    try {
+        await navigator.clipboard.writeText(normalized);
+    } catch {
+        // Ignore clipboard errors.
+    }
+}
+
 async function pauseDownload(item: DownloadItem) {
     if (!canPause(item) || isActionBusy(item.id)) return;
     setActionBusy(item.id, true);
@@ -361,7 +378,9 @@ function applyQueuedPayload(payload: DownloadQueuedPayload) {
         ...detailsById.value,
         [id]: {
             path: payload.path ?? null,
+            absolute_path: payload.absolute_path ?? null,
             original: payload.original ?? null,
+            referrer_url: payload.referrer_url ?? null,
             preview: payload.preview ?? null,
             size: payload.size ?? null,
             filename: payload.filename ?? null,
@@ -382,7 +401,9 @@ function applyProgressPayload(payload: DownloadProgressPayload) {
     }));
     if (
         payload.path !== undefined
+        || payload.absolute_path !== undefined
         || payload.original !== undefined
+        || payload.referrer_url !== undefined
         || payload.preview !== undefined
         || payload.size !== undefined
         || payload.filename !== undefined
@@ -391,7 +412,9 @@ function applyProgressPayload(payload: DownloadProgressPayload) {
             ...detailsById.value,
             [id]: {
                 path: payload.path ?? detailsById.value[id]?.path ?? null,
+                absolute_path: payload.absolute_path ?? detailsById.value[id]?.absolute_path ?? null,
                 original: payload.original ?? detailsById.value[id]?.original ?? null,
+                referrer_url: payload.referrer_url ?? detailsById.value[id]?.referrer_url ?? null,
                 preview: payload.preview ?? detailsById.value[id]?.preview ?? null,
                 size: payload.size ?? detailsById.value[id]?.size ?? null,
                 filename: payload.filename ?? detailsById.value[id]?.filename ?? null,
@@ -466,7 +489,9 @@ async function fetchVisibleDetails() {
         detailsById.value = data.items.reduce((acc, item) => {
             acc[item.id] = {
                 path: item.path,
+                absolute_path: item.absolute_path,
                 original: item.original,
+                referrer_url: item.referrer_url,
                 preview: item.preview,
                 size: item.size,
                 filename: item.filename,
@@ -524,11 +549,25 @@ onBeforeUnmount(() => {
     stopEchoListeners();
 });
 
-watch(selectedStatus, () => {
+watch(selectedStatus, (next, prev) => {
     scrollTop.value = 0;
     if (containerRef.value) {
         containerRef.value.scrollTop = 0;
     }
+    if (next === 'completed') {
+        lastNonCompletedSort.value = { key: sortKey.value, direction: sortDirection.value };
+        sortKey.value = 'completedAt';
+        sortDirection.value = 'desc';
+    } else if (prev === 'completed' && lastNonCompletedSort.value) {
+        sortKey.value = lastNonCompletedSort.value.key;
+        sortDirection.value = lastNonCompletedSort.value.direction;
+        lastNonCompletedSort.value = null;
+    }
+    cancelActiveRequest();
+    queueFetchAfterIdle();
+});
+
+watch([sortKey, sortDirection], () => {
     cancelActiveRequest();
     queueFetchAfterIdle();
 });
@@ -550,23 +589,16 @@ watch(selectedStatus, () => {
 
             <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-2">
-                    <button
-                        v-for="status in FILTERS"
-                        :key="status"
-                        type="button"
+                    <button v-for="status in FILTERS" :key="status" type="button"
                         class="inline-flex items-center gap-2 rounded border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors"
                         :class="selectedStatus === status
                             ? 'border-smart-blue-500 bg-smart-blue-600 text-white'
                             : 'border-twilight-indigo-500 bg-prussian-blue-600 text-twilight-indigo-100 hover:bg-prussian-blue-500'"
-                        @click="selectedStatus = status"
-                    >
+                        @click="selectedStatus = status">
                         <span>{{ filterLabel(status) }}</span>
-                        <span
-                            class="rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                            :class="selectedStatus === status
-                                ? 'bg-white/15 text-white'
-                                : 'bg-prussian-blue-500 text-blue-slate-200'"
-                        >
+                        <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold" :class="selectedStatus === status
+                            ? 'bg-white/15 text-white'
+                            : 'bg-prussian-blue-500 text-blue-slate-200'">
                             {{ status === 'all' ? downloads.length : (statusCounts[status] ?? 0) }}
                         </span>
                     </button>
@@ -578,114 +610,95 @@ watch(selectedStatus, () => {
 
             <div class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700 overflow-hidden">
                 <div
-                    class="flex min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300"
-                >
+                    class="flex min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/40 px-4 py-2 text-xs uppercase tracking-wide text-blue-slate-300">
                     <span>Download</span>
                     <div class="flex items-center gap-4">
                         <span class="w-24 text-right">Status</span>
-                        <button
-                            type="button"
+                        <button type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
-                            @click="toggleSort('progress')"
-                            aria-label="Sort by progress"
-                        >
+                            @click="toggleSort('progress')" aria-label="Sort by progress">
                             <span>Progress</span>
                             <ArrowUp v-if="sortState('progress') === 'asc'" :size="12" class="text-blue-slate-400" />
-                            <ArrowDown v-else-if="sortState('progress') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('progress') === 'desc'" :size="12"
+                                class="text-blue-slate-400" />
                             <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
                         <span class="w-20 text-right">Size</span>
-                        <button
-                            type="button"
+                        <button type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
-                            @click="toggleSort('createdAt')"
-                            aria-label="Sort by added time"
-                        >
+                            @click="toggleSort('createdAt')" aria-label="Sort by added time">
                             <span>Added</span>
                             <ArrowUp v-if="sortState('createdAt') === 'asc'" :size="12" class="text-blue-slate-400" />
-                            <ArrowDown v-else-if="sortState('createdAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('createdAt') === 'desc'" :size="12"
+                                class="text-blue-slate-400" />
                             <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
-                        <button
-                            type="button"
+                        <button type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
-                            @click="toggleSort('queuedAt')"
-                            aria-label="Sort by queued time"
-                        >
+                            @click="toggleSort('queuedAt')" aria-label="Sort by queued time">
                             <span>Queued</span>
                             <ArrowUp v-if="sortState('queuedAt') === 'asc'" :size="12" class="text-blue-slate-400" />
-                            <ArrowDown v-else-if="sortState('queuedAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('queuedAt') === 'desc'" :size="12"
+                                class="text-blue-slate-400" />
                             <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
-                        <button
-                            type="button"
+                        <button type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
-                            @click="toggleSort('startedAt')"
-                            aria-label="Sort by started time"
-                        >
+                            @click="toggleSort('startedAt')" aria-label="Sort by started time">
                             <span>Started</span>
                             <ArrowUp v-if="sortState('startedAt') === 'asc'" :size="12" class="text-blue-slate-400" />
-                            <ArrowDown v-else-if="sortState('startedAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('startedAt') === 'desc'" :size="12"
+                                class="text-blue-slate-400" />
                             <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
-                        <button
-                            type="button"
+                        <button type="button"
                             class="inline-flex w-28 items-center justify-end gap-1 text-blue-slate-300 hover:text-white"
-                            @click="toggleSort('completedAt')"
-                            aria-label="Sort by completed time"
-                        >
+                            @click="toggleSort('completedAt')" aria-label="Sort by completed time">
                             <span>Completed</span>
                             <ArrowUp v-if="sortState('completedAt') === 'asc'" :size="12" class="text-blue-slate-400" />
-                            <ArrowDown v-else-if="sortState('completedAt') === 'desc'" :size="12" class="text-blue-slate-400" />
+                            <ArrowDown v-else-if="sortState('completedAt') === 'desc'" :size="12"
+                                class="text-blue-slate-400" />
                             <ArrowUpDown v-else :size="12" class="text-blue-slate-500" />
                         </button>
                         <span class="w-80 text-right">Actions</span>
                     </div>
                 </div>
-                <div
-                    ref="containerRef"
-                    class="min-h-[60vh] max-h-[70vh] overflow-auto"
-                    @scroll="onScroll"
-                >
+                <div ref="containerRef" class="min-h-[60vh] max-h-[70vh] overflow-auto" @scroll="onScroll">
                     <div v-if="isInitialLoading" class="px-4 py-12 text-center text-sm text-blue-slate-300">
                         Loading downloads...
                     </div>
                     <div v-else class="relative w-full" :style="{ height: `${totalHeight}px` }">
                         <div class="absolute left-0 right-0" :style="{ transform: `translateY(${offsetY}px)` }">
                             <TransitionGroup :name="isScrolling ? '' : 'queue'" tag="div">
-                                <div
-                                    v-for="item in visibleIds"
-                                    :key="item.id"
-                                    class="flex h-16 min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60"
-                                >
+                                <div v-for="item in visibleIds" :key="item.id"
+                                    class="flex h-16 min-w-[1280px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60">
                                     <div class="flex min-w-0 items-center gap-3">
                                         <div
-                                            class="h-10 w-10 overflow-hidden rounded border border-twilight-indigo-500/40 bg-prussian-blue-600"
-                                        >
-                                        <img
-                                            v-if="detailsById[item.id]?.preview"
-                                            :src="detailsById[item.id]?.preview"
-                                            alt=""
-                                            class="h-full w-full object-cover"
-                                        />
-                                            <Skeleton v-else class="h-full w-full rounded-none bg-prussian-blue-500/60" />
+                                            class="h-10 w-10 overflow-hidden rounded border border-twilight-indigo-500/40 bg-prussian-blue-600">
+                                            <img v-if="detailsById[item.id]?.preview"
+                                                :src="detailsById[item.id]?.preview" alt=""
+                                                class="h-full w-full object-cover" />
+                                            <Skeleton v-else
+                                                class="h-full w-full rounded-none bg-prussian-blue-500/60" />
                                         </div>
                                         <div class="min-w-0">
                                             <div class="flex items-center gap-2">
                                                 <span class="font-mono text-sm text-twilight-indigo-100">
                                                     ID {{ item.id }}
                                                 </span>
-                                                <span
-                                                    v-if="detailsById[item.id]"
-                                                    class="truncate text-xs text-blue-slate-300"
-                                                >
+                                                <button v-if="detailsById[item.id]" type="button"
+                                                    class="truncate text-xs text-blue-slate-300 hover:text-white"
+                                                    title="Copy full path"
+                                                    @click="copyPath(detailsById[item.id]?.path ?? null, detailsById[item.id]?.absolute_path ?? null)">
                                                     {{ detailsById[item.id]?.path }}
-                                                </span>
+                                                </button>
                                                 <Skeleton v-else class="h-3 w-36 bg-prussian-blue-500/60" />
                                             </div>
-                                        <div v-if="detailsById[item.id]" class="truncate text-xs text-smart-blue-400">
-                                            {{ detailsById[item.id]?.original }}
-                                        </div>
+                                            <div v-if="detailsById[item.id]"
+                                                class="truncate text-xs text-smart-blue-400 hover:text-white">
+                                                <a :href="detailsById[item.id]?.referrer_url" target="_blank">{{
+                                                    detailsById[item.id]?.referrer_url }}</a>
+                                            </div>
                                             <Skeleton v-else class="mt-1 h-3 w-48 bg-prussian-blue-500/60" />
                                         </div>
                                     </div>
@@ -693,20 +706,19 @@ watch(selectedStatus, () => {
                                         <div class="flex w-24 items-center justify-end gap-2">
                                             <span
                                                 class="inline-flex items-center rounded px-2.5 py-0.5 text-xs font-medium"
-                                                :class="statusClass(item.status)"
-                                            >
+                                                :class="statusClass(item.status)">
                                                 {{ item.status }}
                                             </span>
                                         </div>
                                         <div class="w-28">
-                                            <div v-if="item.percent !== null" class="h-1.5 w-full rounded bg-prussian-blue-600">
-                                                <div
-                                                    class="h-full rounded bg-smart-blue-500 transition-all"
-                                                    :style="{ width: `${item.percent}%` }"
-                                                ></div>
+                                            <div v-if="item.percent !== null"
+                                                class="h-1.5 w-full rounded bg-prussian-blue-600">
+                                                <div class="h-full rounded bg-smart-blue-500 transition-all"
+                                                    :style="{ width: `${item.percent}%` }"></div>
                                             </div>
                                             <Skeleton v-else class="h-2 w-full bg-prussian-blue-500/60" />
-                                            <div v-if="item.percent !== null" class="mt-1 text-right text-[11px] text-blue-slate-300">
+                                            <div v-if="item.percent !== null"
+                                                class="mt-1 text-right text-[11px] text-blue-slate-300">
                                                 {{ `${item.percent}%` }}
                                             </div>
                                             <div v-else class="mt-1 flex justify-end">
@@ -732,51 +744,29 @@ watch(selectedStatus, () => {
                                             {{ formatTimestamp(item.finished_at ?? item.failed_at) }}
                                         </div>
                                         <div class="flex w-80 items-center justify-end gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-sm"
+                                            <Button variant="ghost" size="icon-sm"
                                                 :disabled="isActionBusy(item.id) || !canPause(item)"
-                                                aria-label="Pause download"
-                                                @click="pauseDownload(item)"
-                                            >
+                                                aria-label="Pause download" @click="pauseDownload(item)">
                                                 <Pause :size="14" />
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-sm"
+                                            <Button variant="ghost" size="icon-sm"
                                                 :disabled="isActionBusy(item.id) || !canResume(item)"
-                                                aria-label="Resume download"
-                                                @click="resumeDownload(item)"
-                                            >
+                                                aria-label="Resume download" @click="resumeDownload(item)">
                                                 <Play :size="14" />
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                color="danger"
-                                                size="icon-sm"
+                                            <Button variant="ghost" color="danger" size="icon-sm"
                                                 :disabled="isActionBusy(item.id) || !canCancel(item)"
-                                                aria-label="Cancel download"
-                                                @click="cancelDownload(item)"
-                                            >
+                                                aria-label="Cancel download" @click="cancelDownload(item)">
                                                 <X :size="14" />
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-sm"
+                                            <Button variant="ghost" size="icon-sm"
                                                 :disabled="isActionBusy(item.id) || !canRestart(item)"
-                                                aria-label="Restart download"
-                                                @click="restartDownload(item)"
-                                            >
+                                                aria-label="Restart download" @click="restartDownload(item)">
                                                 <RotateCcw :size="14" />
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                color="danger"
-                                                size="icon-sm"
-                                                :disabled="isActionBusy(item.id)"
-                                                aria-label="Delete download"
-                                                @click="deleteDownload(item)"
-                                            >
+                                            <Button variant="ghost" color="danger" size="icon-sm"
+                                                :disabled="isActionBusy(item.id)" aria-label="Delete download"
+                                                @click="deleteDownload(item)">
                                                 <Trash2 :size="14" />
                                             </Button>
                                         </div>

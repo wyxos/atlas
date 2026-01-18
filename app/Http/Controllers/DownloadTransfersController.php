@@ -39,7 +39,7 @@ class DownloadTransfersController extends Controller
         $ids = $validated['ids'];
 
         $items = DownloadTransfer::query()
-            ->with(['file:id,filename,path,url,thumbnail_url,size'])
+            ->with(['file:id,filename,path,url,thumbnail_url,size,referrer_url'])
             ->whereIn('id', $ids)
             ->get()
             ->map(fn (DownloadTransfer $transfer) => DownloadTransferPayload::forDetails($transfer));
