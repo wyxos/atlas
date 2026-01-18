@@ -86,6 +86,9 @@ npm run test                # Run Vitest tests
 - If the backend returns `params`, use `params`. Don't map it to `queryParams` unless absolutely necessary.
 - Align the backend to return what's needed instead of transforming in the frontend.
 
+### Test Alignment & Auth Policy
+- **See `tests/AGENTS.md`** for test alignment rules, auth expectations, and Vitest mocking guidance.
+
 ### Commit Format
 - Use clear, descriptive commit messages
 - No enforced conventional commits format, but clarity is expected

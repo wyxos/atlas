@@ -183,6 +183,15 @@ $response = $this->actingAs($user)
     ->getJson('/api/files');
 ```
 
+---
+
+## Test Alignment & Auth Policy
+
+- **Tests must reflect current behavior** unless the user explicitly asks to restore or change behavior.
+- **Do not reintroduce removed behavior** just to satisfy a test. If a feature was intentionally removed (auth, columns, endpoints, UI copy), align or delete the test instead.
+- **Use history to decide**: check recent commits/PR intent before changing code vs. updating tests. If intent is unclear, ask.
+- **UI tests should mock external globals** (e.g., `window.axios`, `window.Echo`) to avoid unhandled errors in Vitest.
+
 ### API Testing
 
 **✅ DO: Use `getJson()`, `postJson()`, etc. for API tests**
@@ -340,6 +349,4 @@ it('can browse files in browser', function () {
 - Use `RefreshDatabase` for clean state
 - Test user interactions (click, type, scroll)
 - Assert no JavaScript errors: `assertNoJavascriptErrors()`
-
-
 
