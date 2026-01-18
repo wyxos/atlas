@@ -76,11 +76,19 @@ class FileItemFormatter
             }
 
             $originalUrl = $file->url;
-            if (! $originalUrl && $file->path) {
-                $originalUrl = route('api.files.serve', ['file' => $file->id]);
-            }
+            $thumbnailUrl = $file->thumbnail_url;
 
-            $thumbnailUrl = $file->thumbnail_url ?? $originalUrl;
+            if ($file->downloaded && $file->path) {
+                $originalUrl = route('api.files.downloaded', ['file' => $file->id]);
+                $thumbnailUrl = $file->thumbnail_path
+                    ? route('api.files.thumbnail', ['file' => $file->id])
+                    : $originalUrl;
+            } else {
+                if (! $originalUrl && $file->path) {
+                    $originalUrl = route('api.files.serve', ['file' => $file->id]);
+                }
+                $thumbnailUrl = $thumbnailUrl ?? $originalUrl;
+            }
 
             $item = [
                 'id' => $file->id,

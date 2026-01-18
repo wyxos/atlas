@@ -28,6 +28,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/files', [\App\Http\Controllers\FilesController::class, 'index'])->name('api.files.index');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
+    Route::get('/api/files/{file}/downloaded', [\App\Http\Controllers\FilesController::class, 'serveDownloaded'])->name('api.files.downloaded');
+    Route::get('/api/files/{file}/thumbnail', [\App\Http\Controllers\FilesController::class, 'serveThumbnail'])->name('api.files.thumbnail');
     Route::delete('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'destroy'])->name('api.files.destroy');
     Route::get('/api/files/{file}/reaction', [\App\Http\Controllers\FileReactionController::class, 'show'])->name('api.files.reaction.show');
     Route::post('/api/files/reactions/batch', [\App\Http\Controllers\FileReactionController::class, 'batchShow'])->name('api.files.reactions.batch');

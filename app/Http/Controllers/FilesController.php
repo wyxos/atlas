@@ -134,6 +134,23 @@ class FilesController extends Controller
     }
 
     /**
+     * Serve the downloaded file from the private downloads disk.
+     */
+    public function serveDownloaded(File $file)
+    {
+        return $this->serveDiskPath($file->path, $file->mime_type);
+    }
+
+    /**
+     * Serve the downloaded thumbnail from the private downloads disk.
+     */
+    public function serveThumbnail(File $file)
+    {
+        $mimeType = $file->thumbnail_path ? ($file->mime_type ?? 'application/octet-stream') : null;
+        return $this->serveDiskPath($file->thumbnail_path, $mimeType);
+    }
+
+    /**
      * Remove the specified file from storage.
      */
     public function destroy(File $file): JsonResponse
@@ -142,6 +159,102 @@ class FilesController extends Controller
 
         return response()->json([
             'message' => 'File deleted successfully.',
+        ]);
+    }
+
+    private function serveDiskPath(?string $path, ?string $mimeType)
+    {
+        if (! $path) {
+            abort(404, 'File not found');
+        }
+
+        $disk = Storage::disk(config('downloads.disk'));
+        if (! $disk->exists($path)) {
+            abort(404, 'File not found');
+        }
+
+        $fullPath = $disk->path($path);
+        $size = $disk->size($path);
+        $mimeType = $mimeType ?? 'application/octet-stream';
+
+        $baseHeaders = [
+            'Content-Type' => $mimeType,
+            'Accept-Ranges' => 'bytes',
+        ];
+
+        $range = request()->header('Range');
+        if (is_string($range) && preg_match('/bytes=(\d*)-(\d*)/i', $range, $matches)) {
+            $startRaw = $matches[1] ?? '';
+            $endRaw = $matches[2] ?? '';
+
+            $start = $startRaw !== '' ? (int) $startRaw : null;
+            $end = $endRaw !== '' ? (int) $endRaw : null;
+
+            if ($start === null && $end !== null) {
+                $suffixLength = max(0, $end);
+                if ($suffixLength === 0) {
+                    return response('', 416, [
+                        ...$baseHeaders,
+                        'Content-Range' => "bytes */{$size}",
+                    ]);
+                }
+
+                $suffixLength = min($suffixLength, $size);
+                $start = $size - $suffixLength;
+                $end = $size - 1;
+            }
+
+            if ($start !== null) {
+                $end = $end ?? ($size - 1);
+
+                if ($start >= $size || $start < 0 || $end < $start) {
+                    return response('', 416, [
+                        ...$baseHeaders,
+                        'Content-Range' => "bytes */{$size}",
+                    ]);
+                }
+
+                $end = min($end, $size - 1);
+                $length = $end - $start + 1;
+
+                return response()->stream(function () use ($fullPath, $start, $length) {
+                    $handle = fopen($fullPath, 'rb');
+                    if ($handle === false) {
+                        return;
+                    }
+
+                    fseek($handle, $start);
+
+                    $remaining = $length;
+                    $chunkSize = 1024 * 64;
+
+                    while ($remaining > 0 && ! feof($handle)) {
+                        $readLength = min($chunkSize, $remaining);
+                        $chunk = fread($handle, $readLength);
+                        if ($chunk === false || $chunk === '') {
+                            break;
+                        }
+
+                        echo $chunk;
+                        $remaining -= strlen($chunk);
+
+                        if (connection_aborted()) {
+                            break;
+                        }
+                    }
+
+                    fclose($handle);
+                }, 206, [
+                    ...$baseHeaders,
+                    'Content-Length' => (string) $length,
+                    'Content-Range' => "bytes {$start}-{$end}/{$size}",
+                ]);
+            }
+        }
+
+        return response()->file($fullPath, [
+            ...$baseHeaders,
+            'Content-Length' => (string) $size,
         ]);
     }
 
