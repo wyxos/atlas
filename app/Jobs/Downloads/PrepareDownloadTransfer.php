@@ -56,9 +56,13 @@ class PrepareDownloadTransfer implements ShouldQueue
         }
 
         $url = $transfer->url;
+        $headers = [];
+        if ($transfer->file?->referrer_url) {
+            $headers['Referer'] = $transfer->file->referrer_url;
+        }
         $timeout = (int) config('downloads.http_timeout_seconds');
 
-        $head = Http::timeout($timeout)->head($url);
+        $head = Http::timeout($timeout)->withHeaders($headers)->head($url);
         $contentType = $head->header('Content-Type');
         $contentLength = $head->header('Content-Length');
         $acceptRanges = $head->header('Accept-Ranges');
@@ -67,7 +71,7 @@ class PrepareDownloadTransfer implements ShouldQueue
         $rangesSupported = is_string($acceptRanges) && str_contains(strtolower($acceptRanges), 'bytes');
 
         if (! $rangesSupported || $totalBytes === null) {
-            $rangeProbe = Http::timeout($timeout)->withHeaders(['Range' => 'bytes=0-0'])->get($url);
+            $rangeProbe = Http::timeout($timeout)->withHeaders(array_merge($headers, ['Range' => 'bytes=0-0']))->get($url);
             if ($rangeProbe->status() === 206) {
                 $rangesSupported = true;
                 $contentType = $contentType ?? $rangeProbe->header('Content-Type');
@@ -201,4 +205,5 @@ class PrepareDownloadTransfer implements ShouldQueue
         return is_numeric($total) ? (int) $total : null;
     }
 }
+
 
