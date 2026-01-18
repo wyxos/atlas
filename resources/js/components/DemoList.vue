@@ -10,7 +10,6 @@ const items = Array.from({ length: 1000 }, (_, index) => ({
 }));
 
 const ROW_HEIGHT = 28;
-const OVERSCAN = 6;
 const SCROLL_IDLE_MS = 150;
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
@@ -20,12 +19,12 @@ const visibleRangeLabel = ref('Visible indices: --');
 
 const totalHeight = computed(() => items.length * ROW_HEIGHT);
 const startIndex = computed(() =>
-    Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - OVERSCAN),
+    Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT)),
 );
 const endIndex = computed(() =>
     Math.min(
         items.length,
-        Math.ceil((scrollTop.value + containerHeight.value) / ROW_HEIGHT) + OVERSCAN,
+        Math.ceil((scrollTop.value + containerHeight.value) / ROW_HEIGHT),
     ),
 );
 const visibleItems = computed(() => items.slice(startIndex.value, endIndex.value));

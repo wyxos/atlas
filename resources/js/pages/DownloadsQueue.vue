@@ -49,7 +49,6 @@ const downloads = ref<DownloadItem[]>([]);
 const isInitialLoading = ref(true);
 
 const ITEM_HEIGHT = 64;
-const OVERSCAN = 2;
 const SCROLL_IDLE_MS = 180;
 const SOCKET_CHANNEL = 'downloads';
 
@@ -58,7 +57,6 @@ const scrollTop = ref(0);
 const containerHeight = ref(0);
 const selectedStatus = ref<FilterStatus>('all');
 const actionBusy = ref<Record<number, boolean>>({});
-const isScrolling = ref(false);
 const selectedIds = ref<Set<number>>(new Set());
 const lastSelectedIndex = ref<number | null>(null);
 const selectAllRef = ref<HTMLInputElement | null>(null);
@@ -180,12 +178,12 @@ const sortedIds = computed(() => {
 
 const totalHeight = computed(() => sortedIds.value.length * ITEM_HEIGHT);
 const startIndex = computed(() =>
-    Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT) - OVERSCAN),
+    Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT)),
 );
 const endIndex = computed(() =>
     Math.min(
         sortedIds.value.length,
-        Math.ceil((scrollTop.value + containerHeight.value) / ITEM_HEIGHT) + OVERSCAN,
+        Math.ceil((scrollTop.value + containerHeight.value) / ITEM_HEIGHT),
     ),
 );
 const visibleIds = computed(() => sortedIds.value.slice(startIndex.value, endIndex.value));
@@ -599,10 +597,8 @@ function queueFetchAfterIdle() {
     if (idleTimeout) {
         clearTimeout(idleTimeout);
     }
-    isScrolling.value = true;
     idleTimeout = setTimeout(() => {
         idleTimeout = null;
-        isScrolling.value = false;
         fetchVisibleDetails();
     }, SCROLL_IDLE_MS);
 }
