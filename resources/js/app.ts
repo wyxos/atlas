@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Oruga from '@oruga-ui/oruga-next';
 import Toast, { POSITION } from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { fas } from '@fortawesome/free-solid-svg-icons';
@@ -74,4 +75,3 @@ if (appElement && appElement.children.length === 0 && !appElement.nextElementSib
 
     app.mount('#app');
 }
-
