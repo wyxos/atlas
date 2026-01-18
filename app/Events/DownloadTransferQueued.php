@@ -13,9 +13,26 @@ class DownloadTransferQueued implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
-    public function __construct(public array $payload) {}
+    public function __construct(public array $payload)
+    {
+        $this->downloadTransferId = $payload['downloadTransferId'] ?? $payload['id'] ?? null;
+        $this->fileId = $payload['fileId'] ?? $payload['file_id'] ?? null;
+        $this->domain = $payload['domain'] ?? null;
+        $this->status = $payload['status'] ?? null;
+        $this->percent = $payload['percent'] ?? null;
+    }
+
+    public ?int $downloadTransferId = null;
+
+    public ?int $fileId = null;
+
+    public ?string $domain = null;
+
+    public ?string $status = null;
+
+    public ?int $percent = null;
 
     public function broadcastOn(): array
     {

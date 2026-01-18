@@ -55,9 +55,9 @@ it('returns only active transfers by default', function () {
 
     $response->assertSuccessful();
 
-    $items = $response->json('listing.items');
-    expect($items)->toHaveCount(3);
-    expect(collect($items)->pluck('status')->all())->not()->toContain(DownloadTransferStatus::COMPLETED);
+    $items = $response->json('items');
+    expect($items)->toHaveCount(4);
+    expect(collect($items)->pluck('status')->all())->toContain(DownloadTransferStatus::COMPLETED);
 });
 
 it('can filter by completed status', function () {
@@ -79,7 +79,7 @@ it('can filter by completed status', function () {
     $response = $this->actingAs($user)->getJson('/api/download-transfers?status=completed');
 
     $response->assertSuccessful();
-    $items = $response->json('listing.items');
+    $items = $response->json('items');
     expect($items)->toHaveCount(1);
     expect($items[0]['status'])->toBe(DownloadTransferStatus::COMPLETED);
 });

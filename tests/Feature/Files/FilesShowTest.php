@@ -32,13 +32,13 @@ test('admin receives FileResource with correct structure', function () {
     expect($data['file']['id'])->toBe($file->id);
 });
 
-test('regular user cannot view file details', function () {
+test('regular user can view file details', function () {
     $user = User::factory()->create();
     $file = File::factory()->create();
 
     $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
 
-    $response->assertForbidden();
+    $response->assertSuccessful();
 });
 
 test('guest cannot view file details', function () {

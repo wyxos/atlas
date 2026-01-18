@@ -14,9 +14,12 @@ export interface File {
     referrer_url: string | null;
     path: string | null;
     absolute_path: string | null;
-    thumbnail_url: string | null;
-    thumbnail_path: string | null;
+    preview_url: string | null;
     disk_url: string | null;
+    preview_file_url: string | null;
+    poster_url: string | null;
+    preview_path: string | null;
+    poster_path: string | null;
     tags: string[] | null;
     parent_id: number | null;
     chapter: string | null;

@@ -16,7 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatFileSize } from '@/utils/file';
 import type { DownloadTransfer } from '@/types/downloadTransfer';
 import downloadTransfers from '@/routes/api/download-transfers';
-import DemoList from '@/components/DemoList.vue';
 
 const STATUSES = [
     'pending',
@@ -400,16 +399,6 @@ function toggleSelectAll(checked: boolean) {
     setSelection(next);
 }
 
-function clearSelection() {
-    const filtered = new Set(filteredIds.value);
-    const next = new Set([...selectedIds.value].filter((id) => !filtered.has(id)));
-    setSelection(next);
-}
-
-function clearAllSelection() {
-    setSelection(new Set());
-}
-
 function openRemoveDialog(mode: 'single' | 'selection' | 'all', ids: number[]) {
     if (ids.length === 0) return;
     removeMode.value = mode;
@@ -671,7 +660,7 @@ async function fetchVisibleDetails() {
             };
             return acc;
         }, { ...detailsById.value } as Record<number, DownloadDetails>);
-    } catch (error) {
+    } catch {
         if (controller.signal.aborted) return;
     } finally {
         if (detailsAbortController === controller) {

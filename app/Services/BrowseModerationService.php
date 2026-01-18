@@ -74,7 +74,7 @@ class BrowseModerationService
                 ->map(fn ($file) => [
                     'id' => $file->id,
                     'action_type' => $actionTypeMap[$file->id] ?? 'dislike',
-                    'thumbnail' => $file->thumbnail_url ?? $file->url,
+                    'thumbnail' => $file->preview_url ?? $file->url,
                 ])
                 ->values()
                 ->all();

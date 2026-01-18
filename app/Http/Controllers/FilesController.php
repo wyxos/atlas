@@ -142,12 +142,21 @@ class FilesController extends Controller
     }
 
     /**
-     * Serve the downloaded thumbnail from the private downloads disk.
+     * Serve the generated preview from the private downloads disk.
      */
-    public function serveThumbnail(File $file)
+    public function servePreview(File $file)
     {
-        $mimeType = $file->thumbnail_path ? ($file->mime_type ?? 'application/octet-stream') : null;
-        return $this->serveDiskPath($file->thumbnail_path, $mimeType);
+        $mimeType = $file->mime_type ?? 'application/octet-stream';
+
+        return $this->serveDiskPath($file->preview_path, $mimeType);
+    }
+
+    /**
+     * Serve the generated video poster from the private downloads disk.
+     */
+    public function serveVideoPoster(File $file)
+    {
+        return $this->serveDiskPath($file->poster_path, 'image/jpeg');
     }
 
     /**

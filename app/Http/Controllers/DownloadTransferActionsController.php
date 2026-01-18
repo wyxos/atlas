@@ -97,6 +97,7 @@ class DownloadTransferActionsController extends Controller
         foreach ($transfers as $transfer) {
             if (! $this->canPause($transfer)) {
                 $skippedIds[] = $transfer->id;
+
                 continue;
             }
 
@@ -132,6 +133,7 @@ class DownloadTransferActionsController extends Controller
         foreach ($transfers as $transfer) {
             if (! $this->canCancel($transfer)) {
                 $skippedIds[] = $transfer->id;
+
                 continue;
             }
 
@@ -330,13 +332,17 @@ class DownloadTransferActionsController extends Controller
             $disk->delete($file->path);
         }
 
-        if ($file->thumbnail_path && $disk->exists($file->thumbnail_path)) {
-            $disk->delete($file->thumbnail_path);
+        if ($file->preview_path && $disk->exists($file->preview_path)) {
+            $disk->delete($file->preview_path);
+        }
+        if ($file->poster_path && $disk->exists($file->poster_path)) {
+            $disk->delete($file->poster_path);
         }
 
         File::query()->whereKey($file->id)->update([
             'path' => null,
-            'thumbnail_path' => null,
+            'preview_path' => null,
+            'poster_path' => null,
             'downloaded' => false,
             'downloaded_at' => null,
             'download_progress' => 0,

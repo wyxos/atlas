@@ -552,7 +552,7 @@ class Wallhaven extends BaseService
                 : null,
             'title' => null,
             'description' => null,
-            'thumbnail_url' => $thumbnail,
+            'preview_url' => $thumbnail,
             'listing_metadata' => json_encode($row),
             'created_at' => $now,
             'updated_at' => $now,

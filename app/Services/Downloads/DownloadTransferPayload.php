@@ -88,7 +88,7 @@ final class DownloadTransferPayload
             $original = route('api.files.serve', ['file' => $file->id]);
         }
 
-        $preview = $file?->thumbnail_url ?? $original;
+        $preview = $file?->preview_url ?? $original;
         $plannedPath = self::plannedPath($file, $sourceUrl);
         $path = $file?->path ?? $plannedPath;
         $absolutePath = $path

@@ -200,13 +200,13 @@ test('generates thumbnail for image files (finalizer)', function () {
 
     expect($file->downloaded)->toBeTrue();
     expect($file->filename)->toBe('test-image.jpg');
-    // Thumbnail should be generated for valid images
+    // Preview should be generated for valid images
     // Verify the path structure and that it exists in fake storage
-    if ($file->thumbnail_path) {
-        expect($file->thumbnail_path)->toStartWith('thumbnails/');
-        expect($file->thumbnail_path)->toMatch('/^thumbnails\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
-        expect($file->thumbnail_path)->toContain('_thumb.');
+    if ($file->preview_path) {
+        expect($file->preview_path)->toStartWith('thumbnails/');
+        expect($file->preview_path)->toMatch('/^thumbnails\/[a-f0-9]{2}\/[a-f0-9]{2}\//');
+        expect($file->preview_path)->toContain('_thumb.');
         // Verify thumbnail exists in fake storage
-        Storage::disk('atlas-app')->assertExists($file->thumbnail_path);
+        Storage::disk('atlas-app')->assertExists($file->preview_path);
     }
 });

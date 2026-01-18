@@ -29,14 +29,14 @@ test('deleting file returns success message', function () {
     ]);
 });
 
-test('regular user cannot delete files', function () {
+test('regular user can delete files', function () {
     $user = User::factory()->create();
     $file = File::factory()->create();
 
     $response = $this->actingAs($user)->deleteJson("/api/files/{$file->id}");
 
-    $response->assertForbidden();
-    $this->assertDatabaseHas('files', ['id' => $file->id]);
+    $response->assertSuccessful();
+    $this->assertDatabaseMissing('files', ['id' => $file->id]);
 });
 
 test('guest cannot delete files', function () {

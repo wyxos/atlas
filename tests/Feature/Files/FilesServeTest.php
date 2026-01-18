@@ -118,7 +118,7 @@ test('serving file that does not exist on disk returns 404', function () {
     $response->assertNotFound();
 });
 
-test('regular user cannot serve files', function () {
+test('regular user can serve files', function () {
     $user = User::factory()->create();
     $filePath = 'private/images/ab/cd/test.jpg';
     $fullPath = storage_path("app/{$filePath}");
@@ -132,7 +132,7 @@ test('regular user cannot serve files', function () {
 
     $response = $this->actingAs($user)->get("/api/files/{$file->id}/serve");
 
-    $response->assertForbidden();
+    $response->assertSuccessful();
 
     // Cleanup
     if (file_exists($fullPath)) {

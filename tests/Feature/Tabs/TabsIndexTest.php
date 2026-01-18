@@ -57,7 +57,7 @@ test('tabs do not include file-related data in index response', function () {
     $file = File::factory()->create([
         'referrer_url' => 'https://example.com/file.jpg',
         'url' => 'https://example.com/original.jpg',
-        'thumbnail_url' => 'https://example.com/thumb.jpg',
+        'preview_url' => 'https://example.com/thumb.jpg',
     ]);
 
     $tab = Tab::factory()->for($user)->withFiles([$file->id])->create();
