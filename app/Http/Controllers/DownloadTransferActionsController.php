@@ -10,6 +10,7 @@ use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
 
@@ -58,7 +59,7 @@ class DownloadTransferActionsController extends Controller
 
     public function cancel(DownloadTransfer $downloadTransfer): JsonResponse
     {
-        if ($downloadTransfer->isTerminal() || $downloadTransfer->status === DownloadTransferStatus::CANCELED) {
+        if (! $this->canCancel($downloadTransfer)) {
             return response()->json([
                 'message' => 'Download is already finished.',
             ], 409);
@@ -76,6 +77,78 @@ class DownloadTransferActionsController extends Controller
 
         return response()->json([
             'message' => 'Download canceled.',
+        ]);
+    }
+
+    public function pauseBatchTransfers(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'required|integer|exists:download_transfers,id',
+        ]);
+
+        $transfers = DownloadTransfer::query()
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        $pausedIds = [];
+        $skippedIds = [];
+
+        foreach ($transfers as $transfer) {
+            if (! $this->canPause($transfer)) {
+                $skippedIds[] = $transfer->id;
+                continue;
+            }
+
+            $this->cancelBatch($transfer);
+            $transfer->update([
+                'status' => DownloadTransferStatus::PAUSED,
+            ]);
+            $this->broadcastState($transfer);
+            $pausedIds[] = $transfer->id;
+        }
+
+        return response()->json([
+            'message' => 'Downloads paused.',
+            'ids' => $pausedIds,
+            'skipped_ids' => $skippedIds,
+        ]);
+    }
+
+    public function cancelBatchTransfers(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'required|integer|exists:download_transfers,id',
+        ]);
+
+        $transfers = DownloadTransfer::query()
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        $canceledIds = [];
+        $skippedIds = [];
+
+        foreach ($transfers as $transfer) {
+            if (! $this->canCancel($transfer)) {
+                $skippedIds[] = $transfer->id;
+                continue;
+            }
+
+            $this->cancelBatch($transfer);
+            $this->cleanupTransferParts($transfer);
+            $transfer->update([
+                'status' => DownloadTransferStatus::CANCELED,
+            ]);
+            $this->resetFileProgress($transfer);
+            $this->broadcastState($transfer);
+            $canceledIds[] = $transfer->id;
+        }
+
+        return response()->json([
+            'message' => 'Downloads canceled.',
+            'ids' => $canceledIds,
+            'skipped_ids' => $skippedIds,
         ]);
     }
 
@@ -157,6 +230,12 @@ class DownloadTransferActionsController extends Controller
             DownloadTransferStatus::DOWNLOADING,
             DownloadTransferStatus::ASSEMBLING,
         ], true);
+    }
+
+    private function canCancel(DownloadTransfer $downloadTransfer): bool
+    {
+        return ! $downloadTransfer->isTerminal()
+            && $downloadTransfer->status !== DownloadTransferStatus::CANCELED;
     }
 
     private function cancelBatch(DownloadTransfer $downloadTransfer): void

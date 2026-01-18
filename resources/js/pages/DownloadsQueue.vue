@@ -64,6 +64,8 @@ const removeDialogOpen = ref(false);
 const removeTargetIds = ref<number[]>([]);
 const removeIsDeleting = ref(false);
 const removeMode = ref<'single' | 'selection' | 'all' | null>(null);
+const batchIsPausing = ref(false);
+const batchIsCanceling = ref(false);
 const removeCount = computed(() => removeTargetIds.value.length);
 const removeTitle = computed(() => (removeMode.value === 'single' ? 'Remove download' : 'Remove downloads'));
 const removeLabel = computed(() => {
@@ -377,6 +379,11 @@ function handleCheckboxClick(id: number, event: MouseEvent) {
     lastSelectedIndex.value = sortedIds.value.findIndex((item) => item.id === id);
 }
 
+function isLastSelected(id: number) {
+    if (lastSelectedIndex.value === null) return false;
+    return sortedIds.value[lastSelectedIndex.value]?.id === id;
+}
+
 function handleRowClick(item: DownloadItem, event: MouseEvent) {
     const target = event.target as HTMLElement | null;
     if (target?.closest('button, a, input')) return;
@@ -433,6 +440,30 @@ async function confirmRemove(): Promise<void> {
         removeDialogOpen.value = false;
         removeTargetIds.value = [];
         removeMode.value = null;
+    }
+}
+
+async function pauseSelection(): Promise<void> {
+    if (batchIsPausing.value) return;
+    const ids = selectedIdsList.value;
+    if (!ids.length) return;
+    batchIsPausing.value = true;
+    try {
+        await window.axios.post(downloadTransfers.pauseBatch.url(), { ids });
+    } finally {
+        batchIsPausing.value = false;
+    }
+}
+
+async function cancelSelection(): Promise<void> {
+    if (batchIsCanceling.value) return;
+    const ids = selectedIdsList.value;
+    if (!ids.length) return;
+    batchIsCanceling.value = true;
+    try {
+        await window.axios.post(downloadTransfers.cancelBatch.url(), { ids });
+    } finally {
+        batchIsCanceling.value = false;
     }
 }
 
@@ -768,6 +799,22 @@ watch(downloads, () => {
                             v-if="selectedCount"
                             variant="outline"
                             size="sm"
+                            :disabled="batchIsPausing"
+                            @click="pauseSelection">
+                            {{ batchIsPausing ? 'Pausing...' : 'Pause selection' }}
+                        </Button>
+                        <Button
+                            v-if="selectedCount"
+                            variant="outline"
+                            size="sm"
+                            :disabled="batchIsCanceling"
+                            @click="cancelSelection">
+                            {{ batchIsCanceling ? 'Canceling...' : 'Cancel selection' }}
+                        </Button>
+                        <Button
+                            v-if="selectedCount"
+                            variant="outline"
+                            size="sm"
                             :disabled="removeIsDeleting"
                             @click="openRemoveDialog('selection', selectedIdsList)">
                             Remove selection
@@ -863,6 +910,11 @@ watch(downloads, () => {
                                 v-for="item in visibleIds"
                                 :key="item.id"
                                 class="flex h-16 min-w-[1320px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60 cursor-pointer"
+                                :class="isSelected(item.id)
+                                    ? (isLastSelected(item.id)
+                                        ? 'bg-smart-blue-600/20 ring-1 ring-inset ring-smart-blue-400/70'
+                                        : 'bg-prussian-blue-500/70 ring-1 ring-inset ring-smart-blue-500/40')
+                                    : ''"
                                 @click="handleRowClick(item, $event)">
                                     <div class="flex min-w-0 items-center gap-3">
                                         <input
