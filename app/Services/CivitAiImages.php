@@ -341,7 +341,6 @@ class CivitAiImages extends BaseService
         ];
 
         $meta = $row['meta'] ?? [];
-
         $metadata = [
             'file_referrer_url' => $referrer,
             'payload' => json_encode(array_merge($meta, [

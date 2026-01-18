@@ -101,6 +101,13 @@ class PrepareDownloadTransfer implements ShouldQueue
 
             return;
         }
+
+        if ($transfer->file && (! $transfer->file->size || $transfer->file->size <= 0)) {
+            $transfer->file->update([
+                'size' => $totalBytes,
+                'updated_at' => now(),
+            ]);
+        }
         $transfer->update([
             'bytes_total' => $totalBytes,
             'bytes_downloaded' => 0,

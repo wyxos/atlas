@@ -36,11 +36,15 @@ class FileDownloadFinalizer
             $absolutePath = $disk->path($finalPath);
         }
 
+        $size = $disk->exists($finalPath) ? $disk->size($finalPath) : null;
         $updates = [
             'path' => $finalPath,
             'downloaded' => true,
             'downloaded_at' => now(),
         ];
+        if (is_int($size) && $size > 0 && (! $file->size || $file->size <= 0)) {
+            $updates['size'] = $size;
+        }
 
         $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
         if ($this->isImageMimeType($mimeType)) {

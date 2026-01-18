@@ -27,7 +27,7 @@ class BrowsePersister
         File::upsert(
             $fileRows,
             ['referrer_url'],
-            ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'listing_metadata', 'updated_at']
+            ['url', 'filename', 'ext', 'mime_type', 'description', 'thumbnail_url', 'size', 'listing_metadata', 'updated_at']
         );
 
         $referrers = collect($normalized)->map(fn ($i) => $i['file']['referrer_url'])->filter()->values()->all();
