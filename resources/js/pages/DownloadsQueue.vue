@@ -16,7 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatFileSize } from '@/utils/file';
 import type { DownloadTransfer } from '@/types/downloadTransfer';
 import downloadTransfers from '@/routes/api/download-transfers';
-import { RecycleScroller } from 'vue-virtual-scroller';
 import DemoList from '@/components/DemoList.vue';
 
 const STATUSES = [
@@ -54,7 +53,9 @@ const OVERSCAN = 2;
 const SCROLL_IDLE_MS = 180;
 const SOCKET_CHANNEL = 'downloads';
 
-const scrollerRef = ref<{ scrollToItem: (index: number) => void } | null>(null);
+const containerRef = ref<HTMLElement | null>(null);
+const scrollTop = ref(0);
+const containerHeight = ref(0);
 const selectedStatus = ref<FilterStatus>('all');
 const actionBusy = ref<Record<number, boolean>>({});
 const isScrolling = ref(false);
@@ -87,7 +88,6 @@ type DownloadDetails = {
 };
 
 const detailsById = ref<Record<number, DownloadDetails>>({});
-const visibleItems = ref<DownloadItem[]>([]);
 
 type DownloadQueuedPayload = DownloadItem & DownloadDetails & {
     downloadTransferId?: number;
@@ -178,7 +178,18 @@ const sortedIds = computed(() => {
     return baseFilteredIds.value.slice().sort((a, b) => compareItems(a, b, key, direction));
 });
 
-const scrollerBuffer = ITEM_HEIGHT * OVERSCAN;
+const totalHeight = computed(() => sortedIds.value.length * ITEM_HEIGHT);
+const startIndex = computed(() =>
+    Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT) - OVERSCAN),
+);
+const endIndex = computed(() =>
+    Math.min(
+        sortedIds.value.length,
+        Math.ceil((scrollTop.value + containerHeight.value) / ITEM_HEIGHT) + OVERSCAN,
+    ),
+);
+const visibleIds = computed(() => sortedIds.value.slice(startIndex.value, endIndex.value));
+const offsetY = computed(() => startIndex.value * ITEM_HEIGHT);
 
 const STATUS_STYLES: Record<Status, string> = {
     pending: 'bg-warning-600 border border-warning-500 text-warning-100',
@@ -597,7 +608,7 @@ function queueFetchAfterIdle() {
 }
 
 async function fetchVisibleDetails() {
-    const itemsToFetch = visibleItems.value;
+    const itemsToFetch = visibleIds.value;
 
     if (!itemsToFetch.length) return;
 
@@ -638,17 +649,17 @@ async function fetchVisibleDetails() {
     }
 }
 
-function handleScrollerUpdate(
-    _startIndex: number,
-    _endIndex: number,
-    visibleStartIndex: number,
-    visibleEndIndex: number,
-) {
-    visibleItems.value = sortedIds.value.slice(
-        Math.max(0, visibleStartIndex),
-        Math.min(sortedIds.value.length, visibleEndIndex),
-    );
+function onScroll(event: Event) {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    scrollTop.value = target.scrollTop;
     cancelActiveRequest();
+    queueFetchAfterIdle();
+}
+
+function updateContainerHeight() {
+    if (!containerRef.value) return;
+    containerHeight.value = containerRef.value.clientHeight;
     queueFetchAfterIdle();
 }
 
@@ -665,11 +676,14 @@ async function loadDownloads() {
 }
 
 onMounted(async () => {
+    updateContainerHeight();
+    window.addEventListener('resize', updateContainerHeight);
     await loadDownloads();
     startEchoListeners();
 });
 
 onBeforeUnmount(() => {
+    window.removeEventListener('resize', updateContainerHeight);
     if (idleTimeout) {
         clearTimeout(idleTimeout);
     }
@@ -678,7 +692,10 @@ onBeforeUnmount(() => {
 });
 
 watch(selectedStatus, (next, prev) => {
-    scrollerRef.value?.scrollToItem(0);
+    scrollTop.value = 0;
+    if (containerRef.value) {
+        containerRef.value.scrollTop = 0;
+    }
     if (next === 'completed') {
         lastNonCompletedSort.value = { key: sortKey.value, direction: sortDirection.value };
         sortKey.value = 'completedAt';
@@ -833,23 +850,19 @@ watch(downloads, () => {
                         <span class="w-80 text-right">Actions</span>
                     </div>
                 </div>
-                <div>
+                <div
+                    ref="containerRef"
+                    class="min-h-[60vh] max-h-[70vh] overflow-auto"
+                    @scroll="onScroll"
+                >
                     <div v-if="isInitialLoading" class="px-4 py-12 text-center text-sm text-blue-slate-300">
                         Loading downloads...
                     </div>
-                    <RecycleScroller
-                        v-else
-                        ref="scrollerRef"
-                        class="min-h-[60vh] max-h-[70vh] overflow-auto"
-                        :items="sortedIds"
-                        :item-size="ITEM_HEIGHT"
-                        :buffer="scrollerBuffer"
-                        key-field="id"
-                        :emit-update="true"
-                        @update="handleScrollerUpdate"
-                    >
-                        <template #default="{ item }">
+                    <div v-else class="relative w-full" :style="{ height: `${totalHeight}px` }">
+                        <div class="absolute left-0 right-0" :style="{ transform: `translateY(${offsetY}px)` }">
                             <div
+                                v-for="item in visibleIds"
+                                :key="item.id"
                                 class="flex h-16 min-w-[1320px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60 cursor-pointer"
                                 @click="handleRowClick(item, $event)">
                                     <div class="flex min-w-0 items-center gap-3">
@@ -984,13 +997,11 @@ watch(downloads, () => {
                                         </div>
                                     </div>
                             </div>
-                        </template>
-                        <template v-if="!sortedIds.length" #empty>
-                            <div class="px-4 py-12 text-center text-sm text-blue-slate-300">
-                                No downloads found.
-                            </div>
-                        </template>
-                    </RecycleScroller>
+                        </div>
+                    </div>
+                    <div v-if="!sortedIds.length && !isInitialLoading" class="px-4 py-12 text-center text-sm text-blue-slate-300">
+                        No downloads found.
+                    </div>
                 </div>
             </div>
         </div>
