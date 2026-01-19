@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, nextTick, onUnmounted, watch, type Ref } from 'vue';
+import { computed, ref, nextTick, onUnmounted, watch } from 'vue';
 import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
 import type { FeedItem } from '@/composables/useTabs';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
+import type { Masonry } from '@wyxos/vibe';
+import { useOverlayVideoControls } from '@/composables/useOverlayVideoControls';
+import { useFileViewerNavigation } from '@/composables/useFileViewerNavigation';
+import { useFileViewerSizing } from '@/composables/useFileViewerSizing';
+import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlayState';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -29,12 +34,6 @@ const overlayImage = ref<{ src: string; srcset?: string; sizes?: string; alt?: s
 const overlayMediaType = ref<'image' | 'video'>('image');
 const overlayVideoSrc = ref<string | null>(null);
 const overlayVideoRef = ref<HTMLVideoElement | null>(null);
-const videoCurrentTime = ref(0);
-const videoDuration = ref(0);
-const isVideoPlaying = ref(false);
-const isVideoSeeking = ref(false);
-const isVideoFullscreen = ref(false);
-const videoVolume = ref(1);
 const overlayBorderRadius = ref<string | null>(null);
 const overlayKey = ref(0); // Key to force image element recreation on each click
 const overlayIsAnimating = ref(false); // Track if overlay is animating to center
@@ -59,12 +58,84 @@ const isLoadingFileData = ref(false); // Track if file data is loading
 const isLoadingMore = ref(false);
 const containerOverflow = ref<string | null>(null);
 const containerOverscroll = ref<string | null>(null);
-const swipeStart = ref<{ x: number; y: number } | null>(null);
-const lastWheelAt = ref(0);
-const lastSwipeAt = ref(0);
-const SWIPE_THRESHOLD = 60;
-const WHEEL_THRESHOLD = 40;
-const NAV_THROTTLE_MS = 400;
+
+const {
+    videoCurrentTime,
+    videoDuration,
+    isVideoPlaying,
+    isVideoSeeking,
+    isVideoFullscreen,
+    videoVolume,
+    videoProgressPercent,
+    videoVolumePercent,
+    overlayVideoPoster,
+    handleVideoLoadedMetadata,
+    handleVideoTimeUpdate,
+    handleVideoPlay,
+    handleVideoPause,
+    handleVideoEnded,
+    handleVideoVolumeChange,
+    toggleVideoPlayback,
+    handleVideoSeek,
+    handleVideoSeekStart,
+    handleVideoSeekEnd,
+    handleVideoVolumeInput,
+    toggleVideoFullscreen,
+    handleFullscreenChange,
+} = useOverlayVideoControls({
+    overlayVideoRef,
+    overlayMediaType,
+    overlayFillComplete,
+    overlayIsClosing,
+    overlayVideoSrc,
+    overlayImageSrc: computed(() => overlayImage.value?.src ?? null),
+});
+
+const { getAvailableWidth, calculateBestFitSize, getCenteredPosition } = useFileViewerSizing({
+    overlayIsFilled,
+    overlayFillComplete,
+    overlayIsClosing,
+    isSheetOpen,
+});
+
+const { closeOverlay } = useFileViewerOverlayState({
+    containerRef: computed(() => props.containerRef),
+    containerOverflow,
+    containerOverscroll,
+    overlayRect,
+    overlayKey,
+    overlayIsAnimating,
+    overlayIsClosing,
+    overlayIsFilled,
+    overlayFillComplete,
+    overlayScale,
+    overlayImageSize,
+    imageCenterPosition,
+    overlayImage,
+    overlayMediaType,
+    overlayVideoSrc,
+    overlayBorderRadius,
+    overlayIsLoading,
+    overlayFullSizeImage,
+    originalImageDimensions,
+    currentItemIndex,
+    imageScale,
+    imageTranslateY,
+    navigationDirection,
+    isNavigating,
+    isSheetOpen,
+    emitClose: () => emit('close'),
+});
+
+const { handleTouchStart, handleTouchEnd } = useFileViewerNavigation({
+    overlayRect,
+    overlayFillComplete,
+    overlayIsClosing,
+    onClose: closeOverlay,
+    onNext: navigateToNext,
+    onPrevious: navigateToPrevious,
+    onFullscreenChange: handleFullscreenChange,
+});
 
 async function ensureMoreItems(): Promise<boolean> {
     if (!hasMore.value || isLoadingMore.value || isLoading.value) {
@@ -80,41 +151,6 @@ async function ensureMoreItems(): Promise<boolean> {
     return true;
 }
 
-
-watch(
-    () => [overlayMediaType.value, overlayIsLoading.value, overlayVideoSrc.value],
-    async ([mediaType, isLoading, src]) => {
-        if (mediaType !== 'video' || isLoading || !src) {
-            return;
-        }
-        // Intentionally do not autoplay when the source is set.
-        // We only start playback after the overlay transition completes (overlayFillComplete).
-    }
-);
-
-watch(
-    () => [overlayMediaType.value, overlayFillComplete.value, overlayIsClosing.value, overlayVideoSrc.value],
-    async ([mediaType, fillComplete, isClosing, src]) => {
-        if (mediaType !== 'video' || !fillComplete || isClosing || !src) {
-            return;
-        }
-
-        await nextTick();
-        playOverlayVideo();
-    }
-);
-
-watch(() => overlayMediaType.value, (mediaType) => {
-    if (mediaType !== 'video') {
-        videoCurrentTime.value = 0;
-        videoDuration.value = 0;
-        isVideoPlaying.value = false;
-        isVideoSeeking.value = false;
-        isVideoFullscreen.value = false;
-        videoVolume.value = 1;
-    }
-});
-
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -122,204 +158,6 @@ function preloadImage(url: string): Promise<{ width: number; height: number }> {
         img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
         img.src = url;
     });
-}
-
-function playOverlayVideo(): void {
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    video.muted = false;
-    video.volume = 1;
-    videoVolume.value = video.volume;
-    void video.play().catch(() => {});
-}
-
-const videoProgressPercent = computed(() => {
-    if (!videoDuration.value) {
-        return 0;
-    }
-    return Math.min(100, (videoCurrentTime.value / videoDuration.value) * 100);
-});
-
-const videoVolumePercent = computed(() => Math.round(videoVolume.value * 100));
-const overlayVideoPoster = computed(() => {
-    const src = overlayImage.value?.src;
-    if (!src) {
-        return undefined;
-    }
-    if (/\.(mp4|webm)(\?|#|$)/i.test(src)) {
-        return undefined;
-    }
-    return src;
-});
-
-function handleVideoLoadedMetadata(): void {
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    videoDuration.value = Number.isFinite(video.duration) ? video.duration : 0;
-    videoCurrentTime.value = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-    isVideoPlaying.value = !video.paused && !video.ended;
-    videoVolume.value = video.volume;
-}
-
-function handleVideoTimeUpdate(): void {
-    if (isVideoSeeking.value) {
-        return;
-    }
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    videoCurrentTime.value = video.currentTime;
-}
-
-function handleVideoPlay(): void {
-    isVideoPlaying.value = true;
-}
-
-function handleVideoPause(): void {
-    isVideoPlaying.value = false;
-}
-
-function handleVideoEnded(): void {
-    isVideoPlaying.value = false;
-}
-
-function handleVideoVolumeChange(): void {
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    videoVolume.value = video.volume;
-}
-
-function toggleVideoPlayback(): void {
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    if (video.paused || video.ended) {
-        void video.play().catch(() => {});
-    } else {
-        video.pause();
-    }
-}
-
-function handleVideoSeek(event: Event): void {
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    const value = Number((event.target as HTMLInputElement).value);
-    if (!Number.isFinite(value)) {
-        return;
-    }
-    video.currentTime = value;
-    videoCurrentTime.value = value;
-}
-
-function handleVideoVolumeInput(event: Event): void {
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    const value = Number((event.target as HTMLInputElement).value);
-    if (!Number.isFinite(value)) {
-        return;
-    }
-    video.volume = value;
-    video.muted = value === 0;
-    videoVolume.value = value;
-}
-
-function handleFullscreenChange(): void {
-    isVideoFullscreen.value = document.fullscreenElement === overlayVideoRef.value;
-}
-
-function shouldIgnoreGesture(target: EventTarget | null): boolean {
-    const el = target as HTMLElement | null;
-    if (!el) {
-        return false;
-    }
-    return Boolean(el.closest('button, input, textarea, select, a, .file-viewer-video-slider'));
-}
-
-function handleWheel(e: WheelEvent): void {
-    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
-    if (shouldIgnoreGesture(e.target)) return;
-
-    const now = Date.now();
-    if (now - lastWheelAt.value < NAV_THROTTLE_MS) return;
-
-    const deltaY = e.deltaY;
-    if (Math.abs(deltaY) < WHEEL_THRESHOLD) return;
-
-    e.preventDefault();
-    lastWheelAt.value = now;
-
-    if (deltaY > 0) {
-        navigateToNext();
-    } else {
-        navigateToPrevious();
-    }
-}
-
-function handleTouchStart(e: TouchEvent): void {
-    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
-    if (shouldIgnoreGesture(e.target)) return;
-
-    const touch = e.touches[0];
-    if (!touch) return;
-    swipeStart.value = { x: touch.clientX, y: touch.clientY };
-}
-
-function handleTouchEnd(e: TouchEvent): void {
-    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
-    if (shouldIgnoreGesture(e.target)) return;
-
-    const start = swipeStart.value;
-    swipeStart.value = null;
-    if (!start) return;
-
-    const touch = e.changedTouches[0];
-    if (!touch) return;
-
-    const deltaX = touch.clientX - start.x;
-    const deltaY = touch.clientY - start.y;
-    if (Math.abs(deltaY) < SWIPE_THRESHOLD) return;
-    if (Math.abs(deltaY) < Math.abs(deltaX)) return;
-
-    const now = Date.now();
-    if (now - lastSwipeAt.value < NAV_THROTTLE_MS) return;
-    lastSwipeAt.value = now;
-
-    if (deltaY < 0) {
-        navigateToNext();
-    } else {
-        navigateToPrevious();
-    }
-}
-
-function toggleVideoFullscreen(): void {
-    const video = overlayVideoRef.value;
-    if (!video) {
-        return;
-    }
-    if (document.fullscreenElement) {
-        void document.exitFullscreen().catch(() => {});
-        return;
-    }
-    void video.requestFullscreen().catch(() => {});
-}
-function handleVideoSeekStart(): void {
-    isVideoSeeking.value = true;
-}
-
-function handleVideoSeekEnd(): void {
-    isVideoSeeking.value = false;
 }
 
 // Increment seen count when file is loaded in FileViewer
@@ -339,54 +177,6 @@ async function handleItemSeen(fileId: number): Promise<void> {
     }
 }
 
-// Calculate available width accounting for taskbar and sheet
-function getAvailableWidth(containerWidth: number, borderWidth: number): number {
-    const taskbarWidth = overlayIsFilled.value && overlayFillComplete.value && !overlayIsClosing.value && !isSheetOpen.value ? 64 : 0; // w-16 = 64px
-    const sheetWidth = overlayIsFilled.value && overlayFillComplete.value && !overlayIsClosing.value && isSheetOpen.value ? 320 : 0; // w-80 = 320px
-    return containerWidth - (borderWidth * 2) - taskbarWidth - sheetWidth;
-}
-
-function calculateBestFitSize(
-    originalWidth: number,
-    originalHeight: number,
-    containerWidth: number,
-    containerHeight: number
-): { width: number; height: number } {
-    // If image is smaller than container in both dimensions, use original size (will be centered)
-    if (originalWidth <= containerWidth && originalHeight <= containerHeight) {
-        return {
-            width: originalWidth,
-            height: originalHeight,
-        };
-    }
-
-    // Image is larger than container - scale down to fit while maintaining aspect ratio
-    const aspectRatio = originalWidth / originalHeight;
-    const containerAspectRatio = containerWidth / containerHeight;
-
-    let fitWidth: number;
-    let fitHeight: number;
-
-    if (aspectRatio > containerAspectRatio) {
-        // Image is wider - fit to width
-        fitWidth = containerWidth;
-        fitHeight = containerWidth / aspectRatio;
-    } else {
-        // Image is taller - fit to height
-        fitHeight = containerHeight;
-        fitWidth = containerHeight * aspectRatio;
-    }
-
-    // Ensure dimensions don't exceed container bounds (account for rounding errors)
-    fitWidth = Math.min(fitWidth, containerWidth);
-    fitHeight = Math.min(fitHeight, containerHeight);
-
-    return {
-        width: Math.floor(fitWidth), // Use floor to ensure we don't exceed bounds
-        height: Math.floor(fitHeight),
-    };
-}
-
 function getClickedItemId(target: HTMLElement): number | null {
     const el = target.closest('[data-file-id]') as HTMLElement | null;
     if (!el) {
@@ -400,107 +190,6 @@ function getClickedItemId(target: HTMLElement): number | null {
 
     const id = Number(raw);
     return Number.isFinite(id) ? id : null;
-}
-
-function closeOverlay(): void {
-    if (!overlayRect.value) return;
-
-    const tabContent = props.containerRef;
-    if (tabContent) {
-        if (containerOverflow.value !== null) {
-            tabContent.style.overflow = containerOverflow.value;
-        } else {
-            tabContent.style.removeProperty('overflow');
-        }
-        if (containerOverscroll.value !== null) {
-            tabContent.style.overscrollBehavior = containerOverscroll.value;
-        } else {
-            tabContent.style.removeProperty('overscroll-behavior');
-        }
-        containerOverflow.value = null;
-        containerOverscroll.value = null;
-    }
-
-    // Start closing animation - shrink towards center using CSS scale
-    overlayIsClosing.value = true;
-    overlayIsAnimating.value = true;
-
-    // Calculate center position of the container
-    if (tabContent && overlayRect.value) {
-        const tabContentBox = tabContent.getBoundingClientRect();
-        const containerWidth = tabContentBox.width;
-        const containerHeight = tabContentBox.height;
-
-        // Calculate center position - move container to center
-        const centerLeft = Math.round((containerWidth - overlayRect.value.width) / 2);
-        const centerTop = Math.round((containerHeight - overlayRect.value.height) / 2);
-
-        // Move container to center
-        overlayRect.value = {
-            ...overlayRect.value,
-            top: centerTop,
-            left: centerLeft,
-        };
-
-        // Scale down to 0 - CSS will shrink everything inside proportionally
-        overlayScale.value = 0;
-
-        // After animation completes, clear everything
-        setTimeout(() => {
-            overlayKey.value++;
-            overlayIsAnimating.value = false;
-            overlayIsClosing.value = false;
-            overlayIsFilled.value = false;
-            overlayFillComplete.value = false;
-            overlayScale.value = 1; // Reset scale
-            overlayImageSize.value = null;
-            imageCenterPosition.value = null;
-            overlayRect.value = null;
-            overlayImage.value = null;
-            overlayMediaType.value = 'image';
-            overlayVideoSrc.value = null;
-            overlayBorderRadius.value = null;
-            overlayIsLoading.value = false;
-            overlayFullSizeImage.value = null;
-            originalImageDimensions.value = null;
-            currentItemIndex.value = null;
-            imageScale.value = 1;
-            imageTranslateY.value = 0;
-            navigationDirection.value = null;
-            isNavigating.value = false;
-            isSheetOpen.value = false;
-            emit('close');
-        }, 500); // Match transition duration
-    } else {
-        // Fallback: immediate close if container not available
-        overlayKey.value++;
-        overlayIsAnimating.value = false;
-        overlayIsClosing.value = false;
-        overlayIsFilled.value = false;
-        overlayFillComplete.value = false;
-        overlayScale.value = 1;
-        overlayImageSize.value = null;
-        imageCenterPosition.value = null;
-        overlayRect.value = null;
-        overlayImage.value = null;
-        overlayMediaType.value = 'image';
-        overlayVideoSrc.value = null;
-        overlayBorderRadius.value = null;
-        overlayIsLoading.value = false;
-        overlayFullSizeImage.value = null;
-        currentItemIndex.value = null;
-        imageScale.value = 1;
-        imageTranslateY.value = 0;
-        navigationDirection.value = null;
-        isNavigating.value = false;
-        isSheetOpen.value = false;
-        emit('close');
-    }
-}
-
-// Handle ALT + mouse button combinations on overlay image
-function handleOverlayImageClick(e: MouseEvent): void {
-    // Normal click behavior - no-op for now.
 }
 
 // Handle ALT + Middle Click (mousedown event needed for middle button)
@@ -685,13 +374,12 @@ async function openFromClick(e: MouseEvent): Promise<void> {
     const initialContentWidth = width - (borderWidth * 2);
     const initialContentHeight = height - (borderWidth * 2);
     // Initially image size equals container size (overlayImageSize is set to { width, height })
-    const initialImageLeft = Math.round((initialContentWidth - overlayImageSize.value.width) / 2);
-    const initialImageTop = Math.round((initialContentHeight - overlayImageSize.value.height) / 2);
-
-    imageCenterPosition.value = {
-        top: initialImageTop,
-        left: initialImageLeft,
-    };
+    imageCenterPosition.value = getCenteredPosition(
+        initialContentWidth,
+        initialContentHeight,
+        overlayImageSize.value.width,
+        overlayImageSize.value.height
+    );
 
     // Wait for image to be displayed, then proceed with animations
     await nextTick();
@@ -717,13 +405,12 @@ async function openFromClick(e: MouseEvent): Promise<void> {
             const borderWidth = 4; // border-4 = 4px
             const contentWidth = width - (borderWidth * 2);
             const contentHeight = height - (borderWidth * 2);
-            const centeredImageLeft = Math.round((contentWidth - overlayImageSize.value.width) / 2);
-            const centeredImageTop = Math.round((contentHeight - overlayImageSize.value.height) / 2);
-
-            imageCenterPosition.value = {
-                top: centeredImageTop,
-                left: centeredImageLeft,
-            };
+            imageCenterPosition.value = getCenteredPosition(
+                contentWidth,
+                contentHeight,
+                overlayImageSize.value.width,
+                overlayImageSize.value.height
+            );
 
             // Mark as animating and update to center position
             overlayIsAnimating.value = true;
@@ -754,13 +441,12 @@ async function openFromClick(e: MouseEvent): Promise<void> {
 
                 // Precalculate center position for full container with best-fit image
                 // Image container is inside border, so position relative to container (not border)
-                const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
-                const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
-
-                imageCenterPosition.value = {
-                    top: fullImageTop,
-                    left: fullImageLeft,
-                };
+                imageCenterPosition.value = getCenteredPosition(
+                    availableWidth,
+                    availableHeight,
+                    bestFitSize.width,
+                    bestFitSize.height
+                );
 
                 // Mark as filled and update to fill entire tab content container
                 overlayIsFilled.value = true;
@@ -878,13 +564,12 @@ async function navigateToIndex(index: number, direction?: 'up' | 'down'): Promis
         height: availableHeight,
     };
 
-    const previewImageLeft = Math.floor((availableWidth - availableWidth) / 2) + borderWidth;
-    const previewImageTop = Math.floor((availableHeight - availableHeight) / 2) + borderWidth;
-
-    imageCenterPosition.value = {
-        top: previewImageTop,
-        left: previewImageLeft,
-    };
+    imageCenterPosition.value = getCenteredPosition(
+        availableWidth,
+        availableHeight,
+        availableWidth,
+        availableHeight
+    );
 
     // Start new image off-screen in the opposite direction
     const slideInDistance = tabContent.getBoundingClientRect().height;
@@ -931,13 +616,12 @@ async function navigateToIndex(index: number, direction?: 'up' | 'down'): Promis
 
             overlayImageSize.value = bestFitSize;
 
-            const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
-            const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
-
-            imageCenterPosition.value = {
-                top: fullImageTop,
-                left: fullImageLeft,
-            };
+            imageCenterPosition.value = getCenteredPosition(
+                availableWidth,
+                availableHeight,
+                bestFitSize.width,
+                bestFitSize.height
+            );
 
             // Switch out of loading state so the <video> renders
             overlayIsLoading.value = false;
@@ -1013,13 +697,12 @@ async function navigateToIndex(index: number, direction?: 'up' | 'down'): Promis
 
         overlayImageSize.value = bestFitSize;
 
-        const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
-        const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
-
-        imageCenterPosition.value = {
-            top: fullImageTop,
-            left: fullImageLeft,
-        };
+        imageCenterPosition.value = getCenteredPosition(
+            availableWidth,
+            availableHeight,
+            bestFitSize.width,
+            bestFitSize.height
+        );
 
         // Ensure imageTranslateY is set for slide-in animation
         // (already set above, but keep scale at 1)
@@ -1109,66 +792,6 @@ async function navigateToIndex(index: number, direction?: 'up' | 'down'): Promis
     overlayIsAnimating.value = false;
 }
 
-// Keyboard event handler for Escape key and arrow keys
-function handleKeyDown(e: KeyboardEvent): void {
-    if (!overlayRect.value || overlayIsClosing.value) return;
-
-    if (e.key === 'Escape') {
-        closeOverlay();
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        navigateToNext();
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        navigateToPrevious();
-    }
-}
-
-// Track if we're handling mouse navigation to prevent browser navigation
-let isHandlingMouseNavigation = false;
-let overlayStatePushed = false;
-
-// Mouse button handler for MX Master 3s navigation buttons (button 4 = back, button 5 = forward)
-// Handle mousedown, mouseup, and auxclick events to prevent browser navigation
-function handleMouseButton(e: MouseEvent): void {
-    // Only handle when overlay is open and filled
-    if (!overlayRect.value || !overlayFillComplete.value || overlayIsClosing.value) return;
-
-    // Button 4 = browser back (navigate to previous image)
-    if (e.button === 3) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        isHandlingMouseNavigation = true;
-        navigateToPrevious();
-        // Reset flag after a short delay
-        setTimeout(() => {
-            isHandlingMouseNavigation = false;
-        }, 100);
-    }
-    // Button 5 = browser forward (navigate to next image)
-    else if (e.button === 4) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        isHandlingMouseNavigation = true;
-        navigateToNext();
-        // Reset flag after a short delay
-        setTimeout(() => {
-            isHandlingMouseNavigation = false;
-        }, 100);
-    }
-}
-
-// Handle popstate event to prevent browser navigation when we're handling mouse navigation
-function handlePopState(): void {
-    // If we're handling mouse navigation or overlay is open, prevent browser navigation
-    if (isHandlingMouseNavigation || (overlayRect.value && overlayFillComplete.value && !overlayIsClosing.value)) {
-        // Push current state back to prevent navigation
-        history.pushState({ preventBack: true }, '', window.location.href);
-    }
-}
-
 // Fetch file data when sheet opens or current item changes
 async function fetchFileData(fileId: number): Promise<void> {
     if (!fileId) return;
@@ -1234,56 +857,17 @@ watch(() => isSheetOpen.value, () => {
 
         overlayImageSize.value = bestFitSize;
 
-        const fullImageLeft = Math.round((availableWidth - bestFitSize.width) / 2);
-        const fullImageTop = Math.round((availableHeight - bestFitSize.height) / 2);
-
-        imageCenterPosition.value = {
-            top: fullImageTop,
-            left: fullImageLeft,
-        };
+        imageCenterPosition.value = getCenteredPosition(
+            availableWidth,
+            availableHeight,
+            bestFitSize.width,
+            bestFitSize.height
+        );
     }
 });
 
-// Watch overlay visibility and add/remove keyboard and mouse button listeners
-watch(() => overlayRect.value !== null && overlayFillComplete.value, (isVisible) => {
-    if (isVisible) {
-        // Push a state entry when overlay opens to intercept back button
-        if (!overlayStatePushed) {
-            history.pushState({ fileViewerOpen: true }, '', window.location.href);
-            overlayStatePushed = true;
-        }
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('wheel', handleWheel, { passive: false });
-        // Listen to mousedown, mouseup, and auxclick to catch mouse button 4/5 events
-        // Use capture phase and handle on document for better interception
-        document.addEventListener('mousedown', handleMouseButton, true);
-        document.addEventListener('mouseup', handleMouseButton, true);
-        document.addEventListener('auxclick', handleMouseButton, true);
-        // Handle popstate to prevent browser navigation
-        window.addEventListener('popstate', handlePopState);
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-    } else {
-        overlayStatePushed = false;
-        window.removeEventListener('keydown', handleKeyDown);
-        window.removeEventListener('wheel', handleWheel);
-        document.removeEventListener('mousedown', handleMouseButton, true);
-        document.removeEventListener('mouseup', handleMouseButton, true);
-        document.removeEventListener('auxclick', handleMouseButton, true);
-        window.removeEventListener('popstate', handlePopState);
-        document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    }
-}, { immediate: true });
-
 // Cleanup on unmount
 onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyDown);
-    window.removeEventListener('wheel', handleWheel);
-    document.removeEventListener('mousedown', handleMouseButton, true);
-    document.removeEventListener('mouseup', handleMouseButton, true);
-    document.removeEventListener('auxclick', handleMouseButton, true);
-    window.removeEventListener('popstate', handlePopState);
-    document.removeEventListener('fullscreenchange', handleFullscreenChange);
-
     const tabContent = props.containerRef;
     if (tabContent && containerOverflow.value !== null) {
         tabContent.style.overflow = containerOverflow.value;
@@ -1392,8 +976,7 @@ defineExpose({
                             transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
                         }),
                         transformOrigin: 'center center',
-                    }" draggable="false" @click="handleOverlayImageClick"
-                    @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
+                    }" draggable="false" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick" />
 
                 <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayVideoPoster" ref="overlayVideoRef"
@@ -1424,8 +1007,7 @@ defineExpose({
                     }" playsinline disablepictureinpicture preload="metadata"
                     @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
                     @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
-                    @volumechange="handleVideoVolumeChange" @click="handleOverlayImageClick"
-                    @contextmenu.prevent="handleOverlayImageClick" @mousedown="handleOverlayImageMouseDown"
+                    @volumechange="handleVideoVolumeChange" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick">
                     <source v-if="overlayVideoSrc" :src="overlayVideoSrc" type="video/mp4" />
                 </video>
