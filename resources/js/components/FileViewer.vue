@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick, onUnmounted, watch } from 'vue';
+import { computed, ref, nextTick, onUnmounted, watch, toRef } from 'vue';
 import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
 import type { FeedItem } from '@/composables/useTabs';
@@ -27,7 +27,7 @@ const emit = defineEmits<{
     open: [];
 }>();
 
-const items = computed(() => props.items);
+const items = toRef(props, 'items');
 const hasMore = computed(() => !props.masonry?.hasReachedEnd);
 const isLoading = computed(() => props.masonry?.isLoading ?? false);
 
@@ -243,6 +243,37 @@ const { handleTouchStart, handleTouchEnd } = useFileViewerNavigation({
     onFullscreenChange: handleFullscreenChange,
 });
 
+const overlayMediaStyle = computed(() => {
+    const scale = `scale(${imageScale.value}) translateY(${imageTranslateY.value}px)`;
+    if (overlayImageSize.value && imageCenterPosition.value) {
+        return {
+            width: overlayImageSize.value.width + 'px',
+            height: overlayImageSize.value.height + 'px',
+            top: imageCenterPosition.value.top + 'px',
+            left: imageCenterPosition.value.left + 'px',
+            transform: scale,
+            transformOrigin: 'center center',
+        };
+    }
+
+    if (overlayImageSize.value) {
+        return {
+            width: overlayImageSize.value.width + 'px',
+            height: overlayImageSize.value.height + 'px',
+            top: '50%',
+            left: '50%',
+            transform: `translate(-50%, -50%) ${scale}`,
+            transformOrigin: 'center center',
+        };
+    }
+
+    return {
+        top: '50%',
+        left: '50%',
+        transform: `translate(-50%, -50%) ${scale}`,
+        transformOrigin: 'center center',
+    };
+});
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
     // Middle click without ALT - open original URL (prevent default to avoid browser scroll)
@@ -341,26 +372,7 @@ defineExpose({
                     :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
                         'absolute select-none pointer-events-none object-cover',
                         (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-                    ]" :style="{
-                        ...(overlayImageSize && imageCenterPosition ? {
-                            width: overlayImageSize.width + 'px',
-                            height: overlayImageSize.height + 'px',
-                            top: imageCenterPosition.top + 'px',
-                            left: imageCenterPosition.left + 'px',
-                            transform: `scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        } : overlayImageSize ? {
-                            width: overlayImageSize.width + 'px',
-                            height: overlayImageSize.height + 'px',
-                            top: '50%',
-                            left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        } : {
-                            top: '50%',
-                            left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        }),
-                        transformOrigin: 'center center',
-                    }" draggable="false" />
+                    ]" :style="overlayMediaStyle" draggable="false" />
 
                 <!-- Spinner while loading full-size image -->
                 <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
@@ -374,26 +386,7 @@ defineExpose({
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
                         overlayIsFilled ? '' : 'object-cover',
                         (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-                    ]" :style="{
-                        ...(overlayImageSize && imageCenterPosition ? {
-                            width: overlayImageSize.width + 'px',
-                            height: overlayImageSize.height + 'px',
-                            top: imageCenterPosition.top + 'px',
-                            left: imageCenterPosition.left + 'px',
-                            transform: `scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        } : overlayImageSize ? {
-                            width: overlayImageSize.width + 'px',
-                            height: overlayImageSize.height + 'px',
-                            top: '50%',
-                            left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        } : {
-                            top: '50%',
-                            left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        }),
-                        transformOrigin: 'center center',
-                    }" draggable="false" @mousedown="handleOverlayImageMouseDown"
+                    ]" :style="overlayMediaStyle" draggable="false" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick" />
 
                 <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayVideoPoster" ref="overlayVideoRef"
@@ -402,26 +395,7 @@ defineExpose({
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'pointer-events-auto' : 'pointer-events-none',
                         overlayIsFilled ? 'object-contain' : 'object-cover',
                         (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
-                    ]" :style="{
-                        ...(overlayImageSize && imageCenterPosition ? {
-                            width: overlayImageSize.width + 'px',
-                            height: overlayImageSize.height + 'px',
-                            top: imageCenterPosition.top + 'px',
-                            left: imageCenterPosition.left + 'px',
-                            transform: `scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        } : overlayImageSize ? {
-                            width: overlayImageSize.width + 'px',
-                            height: overlayImageSize.height + 'px',
-                            top: '50%',
-                            left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        } : {
-                            top: '50%',
-                            left: '50%',
-                            transform: `translate(-50%, -50%) scale(${imageScale}) translateY(${imageTranslateY}px)`,
-                        }),
-                        transformOrigin: 'center center',
-                    }" playsinline disablepictureinpicture preload="metadata"
+                    ]" :style="overlayMediaStyle" playsinline disablepictureinpicture preload="metadata"
                     @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
                     @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
                     @volumechange="handleVideoVolumeChange" @mousedown="handleOverlayImageMouseDown"
