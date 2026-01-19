@@ -9,7 +9,7 @@ interface Props {
     containerRef: HTMLElement | null;
     masonryContainerRef: HTMLElement | null;
     items: FeedItem[];
-    masonry?: Ref<InstanceType<typeof Masonry> | null>;
+    masonry?: InstanceType<typeof Masonry> | null;
 }
 
 const props = defineProps<Props>();
@@ -20,9 +20,8 @@ const emit = defineEmits<{
 }>();
 
 const items = computed(() => props.items);
-const masonry = computed(() => props.masonry?.value ?? null);
-const hasMore = computed(() => !masonry.value?.hasReachedEnd);
-const isLoading = computed(() => masonry.value?.isLoading ?? false);
+const hasMore = computed(() => !props.masonry?.hasReachedEnd);
+const isLoading = computed(() => props.masonry?.isLoading ?? false);
 
 // Overlay state
 const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -73,7 +72,7 @@ async function ensureMoreItems(): Promise<boolean> {
     }
     isLoadingMore.value = true;
     try {
-        await masonry.value?.loadNextPage?.();
+        await props.masonry?.loadNextPage?.();
         await nextTick();
     } finally {
         isLoadingMore.value = false;
