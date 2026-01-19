@@ -11,6 +11,7 @@ import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlaySta
 import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
 import { useFileViewerPaging } from '@/composables/useFileViewerPaging';
 import { useFileViewerData } from '@/composables/useFileViewerData';
+import { useFileViewerSheetSizing } from '@/composables/useFileViewerSheetSizing';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -157,6 +158,19 @@ const { fileData, isLoadingFileData, handleItemSeen } = useFileViewerData({
     isSheetOpen,
 });
 
+useFileViewerSheetSizing({
+    isSheetOpen,
+    overlayRect,
+    overlayImageSize,
+    originalImageDimensions,
+    containerRef: computed(() => props.containerRef),
+    overlayFillComplete,
+    getAvailableWidth,
+    calculateBestFitSize,
+    getCenteredPosition,
+    imageCenterPosition,
+});
+
 const { openFromClick } = useFileViewerOpen({
     containerRef: computed(() => props.containerRef),
     masonryContainerRef: computed(() => props.masonryContainerRef),
@@ -266,35 +280,6 @@ watch(() => [currentItemIndex.value, overlayFillComplete.value], ([newIndex, isF
     if (newIndex === null || !isFilled) return;
     if (items.value.length - 1 - newIndex <= 1) {
         void ensureMoreItems();
-    }
-});
-
-// Watch sheet open/close to recalculate image size immediately
-watch(() => isSheetOpen.value, () => {
-    if (overlayRect.value && overlayImageSize.value && originalImageDimensions.value && props.containerRef && overlayFillComplete.value) {
-        const tabContent = props.containerRef;
-        const tabContentBox = tabContent.getBoundingClientRect();
-        const containerWidth = tabContentBox.width;
-        const containerHeight = tabContentBox.height;
-        const borderWidth = 4;
-        const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-        const availableHeight = containerHeight - (borderWidth * 2);
-
-        const bestFitSize = calculateBestFitSize(
-            originalImageDimensions.value.width,
-            originalImageDimensions.value.height,
-            availableWidth,
-            availableHeight
-        );
-
-        overlayImageSize.value = bestFitSize;
-
-        imageCenterPosition.value = getCenteredPosition(
-            availableWidth,
-            availableHeight,
-            bestFitSize.width,
-            bestFitSize.height
-        );
     }
 });
 
