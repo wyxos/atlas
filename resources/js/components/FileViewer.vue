@@ -9,6 +9,7 @@ import { useOverlayVideoControls } from '@/composables/useOverlayVideoControls';
 import { useFileViewerNavigation } from '@/composables/useFileViewerNavigation';
 import { useFileViewerSizing } from '@/composables/useFileViewerSizing';
 import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlayState';
+import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -177,20 +178,38 @@ async function handleItemSeen(fileId: number): Promise<void> {
     }
 }
 
-function getClickedItemId(target: HTMLElement): number | null {
-    const el = target.closest('[data-file-id]') as HTMLElement | null;
-    if (!el) {
-        return null;
-    }
-
-    const raw = el.getAttribute('data-file-id');
-    if (!raw) {
-        return null;
-    }
-
-    const id = Number(raw);
-    return Number.isFinite(id) ? id : null;
-}
+const { openFromClick } = useFileViewerOpen({
+    containerRef: computed(() => props.containerRef),
+    masonryContainerRef: computed(() => props.masonryContainerRef),
+    items,
+    containerOverflow,
+    containerOverscroll,
+    overlayRect,
+    overlayImage,
+    overlayMediaType,
+    overlayVideoSrc,
+    overlayBorderRadius,
+    overlayKey,
+    overlayIsAnimating,
+    overlayImageSize,
+    overlayIsFilled,
+    overlayFillComplete,
+    overlayIsClosing,
+    overlayScale,
+    overlayIsLoading,
+    overlayFullSizeImage,
+    originalImageDimensions,
+    currentItemIndex,
+    imageScale,
+    imageCenterPosition,
+    getAvailableWidth,
+    calculateBestFitSize,
+    getCenteredPosition,
+    preloadImage,
+    handleItemSeen,
+    closeOverlay,
+    emitOpen: () => emit('open'),
+});
 
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
@@ -223,247 +242,6 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
             }
         }
     }
-}
-
-
-async function openFromClick(e: MouseEvent): Promise<void> {
-    const container = props.masonryContainerRef;
-    const tabContent = props.containerRef;
-    if (!container || !tabContent) return;
-
-    if (containerOverflow.value === null) {
-        containerOverflow.value = tabContent.style.overflow || '';
-        containerOverscroll.value = tabContent.style.overscrollBehavior || '';
-        tabContent.style.overflow = 'hidden';
-        tabContent.style.overscrollBehavior = 'contain';
-    }
-
-    const target = e.target as HTMLElement | null;
-    if (!target) return;
-
-    // Vibe 2.x renders each masonry card as an <article data-testid="item-card">.
-    const itemEl = target.closest('[data-testid="item-card"]') as HTMLElement | null;
-
-    if (!itemEl || !container.contains(itemEl)) {
-        // Clicked outside an item → clear overlay
-        closeOverlay();
-        return;
-    }
-
-    const clickedItemId = getClickedItemId(target);
-    if (clickedItemId === null) {
-        // The click did not originate from an item overlay we control.
-        closeOverlay();
-        return;
-    }
-
-    const masonryItem = items.value.find((i) => i.id === clickedItemId) ?? null;
-    if (!masonryItem) {
-        closeOverlay();
-        return;
-    }
-
-    const mediaType: 'image' | 'video' = masonryItem.type === 'video' ? 'video' : 'image';
-    overlayMediaType.value = mediaType;
-    overlayVideoSrc.value = null;
-
-    // Compute position relative to the tab content container (not masonry container)
-    const itemBox = itemEl.getBoundingClientRect();
-    const tabContentBox = tabContent.getBoundingClientRect();
-
-    // Account for border-4 (4px border on all sides = 8px total width/height added)
-    // Adjust position and size so the image inside aligns perfectly with the clicked image
-    const overlayBorderWidth = 4;
-    const top = itemBox.top - tabContentBox.top - overlayBorderWidth;
-    const left = itemBox.left - tabContentBox.left - overlayBorderWidth;
-    const width = itemBox.width + (overlayBorderWidth * 2);
-    const height = itemBox.height + (overlayBorderWidth * 2);
-
-    // Prefer using the rendered <img> so the overlay matches the clicked preview exactly.
-    // For video cards there may be no <img>, so fall back to FeedItem preview URLs.
-    const imgEl = itemEl.querySelector('img') as HTMLImageElement | null;
-
-    const src = (imgEl?.currentSrc
-        || imgEl?.getAttribute('src')
-        || masonryItem.preview
-        || masonryItem.original) as string;
-
-    const srcset = imgEl?.getAttribute('srcset') || undefined;
-    const sizes = imgEl?.getAttribute('sizes') || undefined;
-    const alt = imgEl?.getAttribute('alt') || String(masonryItem.id);
-
-    // Compute the border radius from the masonry item so the overlay matches
-    const computed = window.getComputedStyle(itemEl);
-    const radius = computed.borderRadius || '';
-
-    const fullSizeUrl = masonryItem.original || src;
-    currentItemIndex.value = items.value.findIndex((it) => it.id === masonryItem.id);
-
-    // Increment key to force image element recreation (prevents showing previous image)
-    overlayKey.value++;
-    imageScale.value = 1; // Reset image scale
-
-    // Store original image size to maintain it when container expands
-    overlayImageSize.value = { width, height };
-    overlayIsFilled.value = false;
-    overlayFillComplete.value = false;
-    overlayIsClosing.value = false;
-    overlayScale.value = 1; // Reset scale to normal
-    overlayIsLoading.value = mediaType === 'image'; // Spinner only for image preload
-    overlayFullSizeImage.value = null; // Reset full-size image
-
-    // Set initial position at clicked item location and show overlay with spinner
-    overlayRect.value = { top, left, width, height };
-    overlayImage.value = { src, srcset, sizes, alt };
-    overlayBorderRadius.value = radius || null;
-    overlayIsAnimating.value = false;
-
-    // Emit open event when FileViewer opens
-    emit('open');
-
-    // Wait for DOM update
-    await nextTick();
-
-    try {
-        if (mediaType === 'video') {
-            originalImageDimensions.value = {
-                width: masonryItem.width,
-                height: masonryItem.height,
-            };
-            overlayVideoSrc.value = fullSizeUrl;
-            overlayIsLoading.value = false;
-
-            // Count as seen when opening the viewer for the file.
-            await handleItemSeen(masonryItem.id);
-            await nextTick();
-        } else {
-            const imageDimensions = await preloadImage(fullSizeUrl);
-            // Store original dimensions for best-fit calculation
-            originalImageDimensions.value = imageDimensions;
-            // Once loaded, update to use full-size image
-            overlayFullSizeImage.value = fullSizeUrl;
-            overlayIsLoading.value = false;
-
-            // Increment seen count when file is fully loaded
-            await handleItemSeen(masonryItem.id);
-
-            // Wait for image to be displayed, then proceed with animations
-            await nextTick();
-            await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure image is rendered
-        }
-    } catch (error) {
-        // If preload fails, use the original image and continue
-        console.warn('Failed to preload full-size image, using original:', error);
-        overlayFullSizeImage.value = src;
-        overlayIsLoading.value = false;
-        // Use masonry item dimensions as fallback
-        if (masonryItem) {
-            originalImageDimensions.value = {
-                width: masonryItem.width,
-                height: masonryItem.height,
-            };
-        } else {
-            originalImageDimensions.value = { width, height };
-        }
-        await nextTick();
-    }
-
-    // Precalculate flexbox center position for initial (small) container
-    // Image container is inside border, so position relative to container (not border)
-    const borderWidth = 4; // border-4 = 4px
-    const initialContentWidth = width - (borderWidth * 2);
-    const initialContentHeight = height - (borderWidth * 2);
-    // Initially image size equals container size (overlayImageSize is set to { width, height })
-    imageCenterPosition.value = getCenteredPosition(
-        initialContentWidth,
-        initialContentHeight,
-        overlayImageSize.value.width,
-        overlayImageSize.value.height
-    );
-
-    // Wait for image to be displayed, then proceed with animations
-    await nextTick();
-    await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to ensure image is rendered
-
-    // Use requestAnimationFrame to ensure initial render is complete before starting animations
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            const tabContent = props.containerRef;
-            if (!tabContent || !overlayRect.value || !overlayImageSize.value) return;
-
-            const tabContentBox = tabContent.getBoundingClientRect();
-            const containerWidth = tabContentBox.width;
-            const containerHeight = tabContentBox.height;
-
-            // Calculate center position (centered both horizontally and vertically)
-            // Round to avoid subpixel rendering issues
-            const centerLeft = Math.round((containerWidth - width) / 2);
-            const centerTop = Math.round((containerHeight - height) / 2);
-
-            // Precalculate center position for centered (small) container
-            // Image container is inside border, so position relative to container (not border)
-            const borderWidth = 4; // border-4 = 4px
-            const contentWidth = width - (borderWidth * 2);
-            const contentHeight = height - (borderWidth * 2);
-            imageCenterPosition.value = getCenteredPosition(
-                contentWidth,
-                contentHeight,
-                overlayImageSize.value.width,
-                overlayImageSize.value.height
-            );
-
-            // Mark as animating and update to center position
-            overlayIsAnimating.value = true;
-            overlayRect.value = {
-                top: centerTop,
-                left: centerLeft,
-                width,
-                height,
-            };
-
-            // After center animation completes (500ms), animate to fill container
-            setTimeout(() => {
-                if (!tabContent || !overlayRect.value || !overlayImageSize.value || !originalImageDimensions.value) return;
-
-                // Calculate best-fit size for the image within the expanded container
-                const borderWidth = 4; // border-4 = 4px
-                const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-                const availableHeight = containerHeight - (borderWidth * 2);
-                const bestFitSize = calculateBestFitSize(
-                    originalImageDimensions.value.width,
-                    originalImageDimensions.value.height,
-                    availableWidth,
-                    availableHeight
-                );
-
-                // Update image size to best-fit dimensions
-                overlayImageSize.value = bestFitSize;
-
-                // Precalculate center position for full container with best-fit image
-                // Image container is inside border, so position relative to container (not border)
-                imageCenterPosition.value = getCenteredPosition(
-                    availableWidth,
-                    availableHeight,
-                    bestFitSize.width,
-                    bestFitSize.height
-                );
-
-                // Mark as filled and update to fill entire tab content container
-                overlayIsFilled.value = true;
-                overlayRect.value = {
-                    top: 0,
-                    left: 0,
-                    width: containerWidth,
-                    height: containerHeight,
-                };
-
-                // After fill animation completes (another 500ms), show close button
-                setTimeout(() => {
-                    overlayFillComplete.value = true;
-                }, 500); // Match the transition duration
-            }, 500); // Match the transition duration
-        });
-    });
 }
 
 // Navigate to next image
