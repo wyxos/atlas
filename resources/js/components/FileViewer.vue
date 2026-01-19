@@ -2,28 +2,17 @@
 import { computed, ref, nextTick, onUnmounted, watch, type Ref } from 'vue';
 import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
-import FileReactions from './FileReactions.vue';
 import type { FeedItem } from '@/composables/useTabs';
-import { createReactionCallback } from '@/utils/reactions';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
-import type { ReactionType } from '@/types/reaction';
-import type { Masonry } from '@wyxos/vibe';
-import { useBrowseForm } from '@/composables/useBrowseForm';
 
 interface Props {
     containerRef: HTMLElement | null;
     masonryContainerRef: HTMLElement | null;
     items: FeedItem[];
-    hasMore?: boolean;
-    isLoading?: boolean;
-    onLoadMore?: () => Promise<void>;
-    onReaction?: (fileId: number, type: ReactionType) => void;
     masonry?: Ref<InstanceType<typeof Masonry> | null>;
-    tabId?: number;
 }
 
 const props = defineProps<Props>();
-const { isLocal } = useBrowseForm();
 
 const emit = defineEmits<{
     close: [];
@@ -31,6 +20,9 @@ const emit = defineEmits<{
 }>();
 
 const items = computed(() => props.items);
+const masonry = computed(() => props.masonry?.value ?? null);
+const hasMore = computed(() => !masonry.value?.hasReachedEnd);
+const isLoading = computed(() => masonry.value?.isLoading ?? false);
 
 // Overlay state
 const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -76,12 +68,12 @@ const WHEEL_THRESHOLD = 40;
 const NAV_THROTTLE_MS = 400;
 
 async function ensureMoreItems(): Promise<boolean> {
-    if (!props.hasMore || !props.onLoadMore || isLoadingMore.value || props.isLoading) {
+    if (!hasMore.value || isLoadingMore.value || isLoading.value) {
         return false;
     }
     isLoadingMore.value = true;
     try {
-        await props.onLoadMore();
+        await masonry.value?.loadNextPage?.();
         await nextTick();
     } finally {
         isLoadingMore.value = false;
@@ -507,96 +499,8 @@ function closeOverlay(): void {
     }
 }
 
-// Handle reaction in FileViewer and auto-navigate
-async function handleReaction(type: ReactionType): Promise<void> {
-    if (currentItemIndex.value === null) return;
-
-    const currentItem = items.value[currentItemIndex.value];
-    if (!currentItem) return;
-
-    const fileId = currentItem.id;
-    const itemIndex = currentItemIndex.value;
-
-    // Determine next item to navigate to before removing
-    let nextIndex: number | null = null;
-    let nextDirection: 'up' | 'down' | null = null;
-
-    if (items.value.length > 1) {
-        // If we're not at the last item, navigate to next
-        if (itemIndex < items.value.length - 1) {
-            nextIndex = itemIndex; // After removal, this will be the next item
-            nextDirection = 'down';
-        } else if (itemIndex > 0) {
-            // If we're at the end, go to previous
-            nextIndex = itemIndex - 1;
-            nextDirection = 'up';
-        }
-    }
-
-    // IMPORTANT: Remove from masonry first so the grid updates immediately.
-    // This ensures masonry can find and properly remove the item
-    // Only remove in online mode (not in local mode)
-    // Pass the item directly to ensure correct reference
-    if (!isLocal.value) {
-        props.masonry?.value?.remove(currentItem);
-    }
-
-    // Call reaction callback directly
-    await createReactionCallback()(fileId, type);
-
-    // Emit to parent
-    if (props.onReaction) {
-        props.onReaction(fileId, type);
-    }
-
-    // Update currentItemIndex
-    if (items.value.length === 0) {
-        // No items left, close overlay
-        closeOverlay();
-        return;
-    }
-
-    // Auto-navigate to next if available
-    if (nextIndex !== null && nextDirection !== null) {
-        currentItemIndex.value = nextIndex;
-        await navigateToIndex(nextIndex, nextDirection);
-    } else {
-        // Adjust index if we removed the last item
-        if (itemIndex >= items.value.length) {
-            currentItemIndex.value = items.value.length - 1;
-            if (currentItemIndex.value >= 0) {
-                await navigateToIndex(currentItemIndex.value, 'up');
-            }
-        }
-    }
-}
-
 // Handle ALT + mouse button combinations on overlay image
 function handleOverlayImageClick(e: MouseEvent): void {
-    if (e.altKey && currentItemIndex.value !== null) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const currentItem = items.value[currentItemIndex.value];
-        if (!currentItem) return;
-
-        let reactionType: ReactionType | null = null;
-
-        // ALT + Left Click = Like
-        if (e.button === 0 || (e.type === 'click' && e.button === 0)) {
-            reactionType = 'like';
-        }
-        // ALT + Right Click = Dislike (handled via contextmenu event)
-        else if (e.button === 2 || e.type === 'contextmenu') {
-            reactionType = 'dislike';
-        }
-
-        if (reactionType) {
-            handleReaction(reactionType);
-        }
-        return;
-    }
-
     // Normal click behavior - no-op for now.
 }
 
@@ -610,16 +514,6 @@ function handleOverlayImageMouseDown(e: MouseEvent): void {
         return;
     }
 
-    // ALT + Middle Click = Favorite
-    if (e.altKey && e.button === 1 && currentItemIndex.value !== null) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const currentItem = items.value[currentItemIndex.value];
-        if (currentItem) {
-            handleReaction('love');
-        }
-    }
 }
 
 // Handle middle click (auxclick) to open original URL
@@ -1585,16 +1479,7 @@ defineExpose({
                 </span>
             </div>
 
-                <!-- File Reactions (centered under image) -->
-                <div v-if="overlayFillComplete && !overlayIsClosing"
-                    class="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
-                    <FileReactions v-if="currentItemIndex !== null" :file-id="items[currentItemIndex]?.id"
-                        :reaction="items[currentItemIndex]?.reaction"
-                        :previewed-count="(items[currentItemIndex]?.previewed_count as number) ?? 0"
-                        :viewed-count="(items[currentItemIndex]?.seen_count as number) ?? 0"
-                        :current-index="currentItemIndex ?? undefined" :total-items="items.length"
-                        @reaction="handleReaction" />
-                </div>
+                <!-- Reactions disabled -->
             </div>
 
             <!-- Carousel disabled (vertical navigation only for now). -->

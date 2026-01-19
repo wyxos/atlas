@@ -996,8 +996,7 @@ defineExpose({
 
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
-            :items="items" :has-more="!masonry?.hasReachedEnd" :is-loading="masonry?.isLoading"
-            :on-load-more="loadNextPage" :on-reaction="props.onReaction" :masonry="masonry" :tab-id="tab.id"
+            :items="items" :masonry="masonry"
             @open="handleFileViewerOpen" @close="handleFileViewerClose" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
@@ -1115,4 +1114,3 @@ defineExpose({
     opacity: 0;
 }
 </style>
-
