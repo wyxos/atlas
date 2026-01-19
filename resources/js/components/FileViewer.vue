@@ -10,6 +10,7 @@ import { useFileViewerNavigation } from '@/composables/useFileViewerNavigation';
 import { useFileViewerSizing } from '@/composables/useFileViewerSizing';
 import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlayState';
 import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
+import { useFileViewerPaging } from '@/composables/useFileViewerPaging';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -128,16 +129,6 @@ const { closeOverlay } = useFileViewerOverlayState({
     emitClose: () => emit('close'),
 });
 
-const { handleTouchStart, handleTouchEnd } = useFileViewerNavigation({
-    overlayRect,
-    overlayFillComplete,
-    overlayIsClosing,
-    onClose: closeOverlay,
-    onNext: navigateToNext,
-    onPrevious: navigateToPrevious,
-    onFullscreenChange: handleFullscreenChange,
-});
-
 async function ensureMoreItems(): Promise<boolean> {
     if (!hasMore.value || isLoadingMore.value || isLoading.value) {
         return false;
@@ -211,6 +202,45 @@ const { openFromClick } = useFileViewerOpen({
     emitOpen: () => emit('open'),
 });
 
+const { navigateToNext, navigateToPrevious, navigateToIndex } = useFileViewerPaging({
+    containerRef: computed(() => props.containerRef),
+    items,
+    currentItemIndex,
+    currentNavigationTarget,
+    overlayRect,
+    overlayFillComplete,
+    overlayIsAnimating,
+    overlayMediaType,
+    overlayVideoSrc,
+    overlayIsLoading,
+    overlayFullSizeImage,
+    overlayImage,
+    overlayImageSize,
+    overlayKey,
+    originalImageDimensions,
+    imageTranslateY,
+    imageScale,
+    imageCenterPosition,
+    isNavigating,
+    navigationDirection,
+    getAvailableWidth,
+    calculateBestFitSize,
+    getCenteredPosition,
+    preloadImage,
+    handleItemSeen,
+    ensureMoreItems,
+});
+
+const { handleTouchStart, handleTouchEnd } = useFileViewerNavigation({
+    overlayRect,
+    overlayFillComplete,
+    overlayIsClosing,
+    onClose: closeOverlay,
+    onNext: navigateToNext,
+    onPrevious: navigateToPrevious,
+    onFullscreenChange: handleFullscreenChange,
+});
+
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
     // Middle click without ALT - open original URL (prevent default to avoid browser scroll)
@@ -242,332 +272,6 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
             }
         }
     }
-}
-
-// Navigate to next image
-async function navigateToNext(): Promise<void> {
-    if (!overlayRect.value || !overlayFillComplete.value || currentItemIndex.value === null) return;
-    if (currentItemIndex.value >= items.value.length - 1) {
-        await ensureMoreItems();
-        if (currentItemIndex.value < items.value.length - 1) {
-            const nextIndex = currentItemIndex.value + 1;
-            currentItemIndex.value = nextIndex;
-            navigateToIndex(nextIndex, 'down');
-        }
-        return;
-    } // Already at last item
-
-    const nextIndex = currentItemIndex.value + 1;
-    // Update index immediately to keep viewer navigation responsive
-    currentItemIndex.value = nextIndex;
-    // Don't await - allow rapid navigation
-    navigateToIndex(nextIndex, 'down');
-}
-
-// Navigate to previous image
-async function navigateToPrevious(): Promise<void> {
-    if (!overlayRect.value || !overlayFillComplete.value || currentItemIndex.value === null) return;
-    if (currentItemIndex.value <= 0) return; // Already at first item
-
-    const prevIndex = currentItemIndex.value - 1;
-    // Update index immediately to keep viewer navigation responsive
-    currentItemIndex.value = prevIndex;
-    // Don't await - allow rapid navigation
-    navigateToIndex(prevIndex, 'up');
-}
-
-// Navigate to a specific index
-async function navigateToIndex(index: number, direction?: 'up' | 'down'): Promise<void> {
-    if (!overlayRect.value || !overlayFillComplete.value) return;
-    if (index < 0 || index >= items.value.length) return;
-
-    const tabContent = props.containerRef;
-    if (!tabContent) return;
-
-    // Determine direction if not provided
-    if (!direction && currentItemIndex.value !== null) {
-        direction = index > currentItemIndex.value ? 'down' : 'up';
-    }
-    navigationDirection.value = direction || 'down';
-
-    // Set current navigation target - this will cancel any stale preloads
-    currentNavigationTarget.value = index;
-    isNavigating.value = true;
-
-    // Note: currentItemIndex is already updated in navigateToNext/navigateToPrevious
-
-    // Step 1: Slide current image out
-    const slideOutDistance = tabContent.getBoundingClientRect().height;
-    imageTranslateY.value = direction === 'down' ? -slideOutDistance : slideOutDistance;
-    overlayIsAnimating.value = true;
-
-    // Wait for slide out animation to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Step 2: Get next item and show spinner
-    const nextItem = items.value[index];
-    if (!nextItem) {
-        isNavigating.value = false;
-        return;
-    }
-
-    const nextIsVideo = nextItem.type === 'video';
-    const nextImageSrc = (nextItem.preview || nextItem.original) as string;
-    const nextFullSizeUrl = nextItem.original || nextImageSrc;
-
-    // Update overlay image to show spinner with preview
-    overlayImage.value = {
-        src: nextImageSrc,
-        srcset: undefined,
-        sizes: undefined,
-        alt: nextItem.id.toString(),
-    };
-    overlayMediaType.value = nextIsVideo ? 'video' : 'image';
-    overlayVideoSrc.value = nextIsVideo ? nextFullSizeUrl : null;
-    overlayIsLoading.value = !nextIsVideo;
-    overlayFullSizeImage.value = null;
-    overlayKey.value++; // Force image element recreation
-
-    // Calculate preview image size and position (use current container size)
-    const tabContentBox = tabContent.getBoundingClientRect();
-    const containerWidth = tabContentBox.width;
-    const containerHeight = tabContentBox.height;
-    const borderWidth = 4;
-    const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-    const availableHeight = containerHeight - (borderWidth * 2);
-
-    // For preview, use container size (object-cover will handle aspect ratio)
-    overlayImageSize.value = {
-        width: availableWidth,
-        height: availableHeight,
-    };
-
-    imageCenterPosition.value = getCenteredPosition(
-        availableWidth,
-        availableHeight,
-        availableWidth,
-        availableHeight
-    );
-
-    // Start new image off-screen in the opposite direction
-    const slideInDistance = tabContent.getBoundingClientRect().height;
-    imageTranslateY.value = direction === 'down' ? slideInDistance : -slideInDistance;
-    imageScale.value = 1; // Keep scale at 1 for slide animation
-    await nextTick(); // Ensure DOM updates before continuing
-
-    // Step 3: Preload the full-size image (or swap to video)
-    // Check if navigation target has changed (user spammed navigation)
-    const preloadTarget = index;
-    try {
-        if (nextIsVideo) {
-            if (currentNavigationTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                overlayIsAnimating.value = false;
-                return;
-            }
-
-            originalImageDimensions.value = {
-                width: nextItem.width,
-                height: nextItem.height,
-            };
-            overlayVideoSrc.value = nextFullSizeUrl;
-
-            // Increment seen count when navigating to a new file
-            if (nextItem?.id) {
-                await handleItemSeen(nextItem.id);
-            }
-
-            // Calculate best-fit size for the video within the expanded container
-            const tabContentBox = tabContent.getBoundingClientRect();
-            const containerWidth = tabContentBox.width;
-            const containerHeight = tabContentBox.height;
-            const borderWidth = 4;
-            const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-            const availableHeight = containerHeight - (borderWidth * 2);
-
-            const bestFitSize = calculateBestFitSize(
-                nextItem.width,
-                nextItem.height,
-                availableWidth,
-                availableHeight
-            );
-
-            overlayImageSize.value = bestFitSize;
-
-            imageCenterPosition.value = getCenteredPosition(
-                availableWidth,
-                availableHeight,
-                bestFitSize.width,
-                bestFitSize.height
-            );
-
-            // Switch out of loading state so the <video> renders
-            overlayIsLoading.value = false;
-
-            await nextTick();
-
-            // Ensure element is rendered before animating
-            await new Promise(resolve => {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => resolve(void 0));
-                });
-            });
-
-            if (currentNavigationTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                overlayIsAnimating.value = false;
-                return;
-            }
-
-            imageTranslateY.value = 0;
-            await new Promise(resolve => setTimeout(resolve, 500));
-            if (currentNavigationTarget.value !== preloadTarget) {
-                isNavigating.value = false;
-                overlayIsAnimating.value = false;
-                return;
-            }
-
-            isNavigating.value = false;
-            overlayIsAnimating.value = false;
-            return;
-        }
-
-        const imageDimensions = await preloadImage(nextFullSizeUrl);
-
-        // Cancel if navigation target changed during preload
-        if (currentNavigationTarget.value !== preloadTarget) {
-            isNavigating.value = false;
-            overlayIsAnimating.value = false;
-            return;
-        }
-
-        originalImageDimensions.value = imageDimensions;
-        overlayFullSizeImage.value = nextFullSizeUrl;
-
-        // Increment seen count when navigating to a new file
-        if (nextItem?.id) {
-            await handleItemSeen(nextItem.id);
-        }
-
-        // Step 4: Calculate best-fit size BEFORE switching to full-size image
-        // Check again if navigation target changed
-        if (currentNavigationTarget.value !== preloadTarget) {
-            isNavigating.value = false;
-            overlayIsAnimating.value = false;
-            return;
-        }
-
-        const tabContentBox = tabContent.getBoundingClientRect();
-        const containerWidth = tabContentBox.width;
-        const containerHeight = tabContentBox.height;
-        const borderWidth = 4;
-
-        // Reduce available height by 200px when drawer is open
-        const availableWidth = getAvailableWidth(containerWidth, borderWidth);
-        const availableHeight = containerHeight - (borderWidth * 2);
-
-        const bestFitSize = calculateBestFitSize(
-            imageDimensions.width,
-            imageDimensions.height,
-            availableWidth,
-            availableHeight
-        );
-
-        overlayImageSize.value = bestFitSize;
-
-        imageCenterPosition.value = getCenteredPosition(
-            availableWidth,
-            availableHeight,
-            bestFitSize.width,
-            bestFitSize.height
-        );
-
-        // Ensure imageTranslateY is set for slide-in animation
-        // (already set above, but keep scale at 1)
-        imageScale.value = 1;
-
-        // Wait for DOM to update with new image size/position
-        await nextTick();
-
-        // Check again before continuing with animation
-        if (currentNavigationTarget.value !== preloadTarget) {
-            isNavigating.value = false;
-            overlayIsAnimating.value = false;
-            return;
-        }
-
-        // Use requestAnimationFrame to ensure the new image element is rendered at scale 0
-        // before we start the scale-up animation
-        await new Promise(resolve => {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    resolve(void 0);
-                });
-            });
-        });
-
-        // Check again before switching to full-size image
-        if (currentNavigationTarget.value !== preloadTarget) {
-            isNavigating.value = false;
-            overlayIsAnimating.value = false;
-            return;
-        }
-
-        // Now switch to full-size image (still at scale 0)
-        overlayIsLoading.value = false;
-
-        // Wait for DOM to update with full-size image element
-        await nextTick();
-
-        // Use requestAnimationFrame again to ensure full-size image is rendered at scale 0
-        // and that Vue has applied the transition class
-        await new Promise(resolve => {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    // Small delay to ensure transition class is applied
-                    setTimeout(() => {
-                        resolve(void 0);
-                    }, 10);
-                });
-            });
-        });
-
-        // Final check before animating
-        if (currentNavigationTarget.value !== preloadTarget) {
-            isNavigating.value = false;
-            overlayIsAnimating.value = false;
-            return;
-        }
-
-        // Now slide image in from the side
-        imageTranslateY.value = 0;
-
-        // Wait for scale animation to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Final check before marking navigation complete
-        if (currentNavigationTarget.value !== preloadTarget) {
-            isNavigating.value = false;
-            overlayIsAnimating.value = false;
-            return;
-        }
-    } catch (error) {
-        console.warn('Failed to preload next image:', error);
-        overlayFullSizeImage.value = nextImageSrc;
-        overlayIsLoading.value = false;
-        if (nextItem) {
-            originalImageDimensions.value = {
-                width: nextItem.width,
-                height: nextItem.height,
-            };
-        }
-        imageScale.value = 1;
-        imageTranslateY.value = 0;
-        await nextTick();
-    }
-
-    isNavigating.value = false;
-    overlayIsAnimating.value = false;
 }
 
 // Fetch file data when sheet opens or current item changes
