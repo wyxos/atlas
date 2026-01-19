@@ -3,7 +3,6 @@ import { computed, ref, nextTick, onUnmounted, watch } from 'vue';
 import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
 import type { FeedItem } from '@/composables/useTabs';
-import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { Masonry } from '@wyxos/vibe';
 import { useOverlayVideoControls } from '@/composables/useOverlayVideoControls';
 import { useFileViewerNavigation } from '@/composables/useFileViewerNavigation';
@@ -11,6 +10,7 @@ import { useFileViewerSizing } from '@/composables/useFileViewerSizing';
 import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlayState';
 import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
 import { useFileViewerPaging } from '@/composables/useFileViewerPaging';
+import { useFileViewerData } from '@/composables/useFileViewerData';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -55,8 +55,6 @@ const imageTranslateY = ref(0); // Translate Y for slide animation
 const navigationDirection = ref<'up' | 'down' | null>(null); // Track navigation direction
 const currentNavigationTarget = ref<number | null>(null); // Track current navigation target to cancel stale preloads
 const isSheetOpen = ref(false); // Track if the sheet is open
-const fileData = ref<import('@/types/file').File | null>(null); // Store file data from API
-const isLoadingFileData = ref(false); // Track if file data is loading
 const isLoadingMore = ref(false);
 const containerOverflow = ref<string | null>(null);
 const containerOverscroll = ref<string | null>(null);
@@ -152,22 +150,12 @@ function preloadImage(url: string): Promise<{ width: number; height: number }> {
     });
 }
 
-// Increment seen count when file is loaded in FileViewer
-// This increments every time a file comes into view (including when navigating back to it)
-async function handleItemSeen(fileId: number): Promise<void> {
-    try {
-        const { data } = await window.axios.post<{ seen_count: number }>(incrementSeen.url(fileId));
-
-        // Update local item state
-        const item = items.value.find((i) => i.id === fileId);
-        if (item) {
-            item.seen_count = data.seen_count;
-        }
-    } catch (error) {
-        console.error('Failed to increment seen count:', error);
-        // Don't throw - seen count is not critical
-    }
-}
+const { fileData, isLoadingFileData, handleItemSeen } = useFileViewerData({
+    items,
+    currentItemIndex,
+    overlayFillComplete,
+    isSheetOpen,
+});
 
 const { openFromClick } = useFileViewerOpen({
     containerRef: computed(() => props.containerRef),
@@ -274,48 +262,10 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
     }
 }
 
-// Fetch file data when sheet opens or current item changes
-async function fetchFileData(fileId: number): Promise<void> {
-    if (!fileId) return;
-
-    isLoadingFileData.value = true;
-    try {
-        const { data } = await window.axios.get(getFile.url(fileId));
-        fileData.value = data.file;
-    } catch (error) {
-        console.error('Failed to fetch file data:', error);
-        fileData.value = null;
-    } finally {
-        isLoadingFileData.value = false;
-    }
-}
-
-// Watch current item index to fetch file data when it changes
-watch(() => currentItemIndex.value, async (newIndex) => {
-    if (newIndex !== null && isSheetOpen.value && overlayFillComplete.value) {
-        const currentItem = items.value[newIndex];
-        if (currentItem?.id) {
-            await fetchFileData(currentItem.id);
-        }
-    }
-});
-
 watch(() => [currentItemIndex.value, overlayFillComplete.value], ([newIndex, isFilled]) => {
     if (newIndex === null || !isFilled) return;
     if (items.value.length - 1 - newIndex <= 1) {
         void ensureMoreItems();
-    }
-});
-
-// Watch sheet open to fetch file data
-watch(() => isSheetOpen.value, async (isOpen) => {
-    if (isOpen && currentItemIndex.value !== null && overlayFillComplete.value) {
-        const currentItem = items.value[currentItemIndex.value];
-        if (currentItem?.id) {
-            await fetchFileData(currentItem.id);
-        }
-    } else if (!isOpen) {
-        fileData.value = null; // Clear data when sheet closes
     }
 });
 
