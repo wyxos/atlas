@@ -30,12 +30,7 @@ const emit = defineEmits<{
     open: [];
 }>();
 
-// Make items reactive for carousel removal
-const items = ref<FeedItem[]>(props.items);
-
-// Watch props.items and sync to reactive items (only when props change externally)
-// Use a flag to prevent syncing when we're removing items internally
-const isRemovingItem = ref(false);
+const items = computed(() => props.items);
 
 // Overlay state
 const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -94,13 +89,6 @@ async function ensureMoreItems(): Promise<boolean> {
     return true;
 }
 
-// Watch props.items and sync to reactive items (only when props change externally)
-// Use a flag to prevent syncing when we're removing items internally
-watch(() => props.items, (newItems) => {
-    if (!isRemovingItem.value) {
-        items.value = newItems;
-    }
-}, { deep: true });
 
 watch(
     () => [overlayMediaType.value, overlayIsLoading.value, overlayVideoSrc.value],
@@ -519,7 +507,7 @@ function closeOverlay(): void {
     }
 }
 
-// Handle reaction in FileViewer - removes from carousel and auto-navigates
+// Handle reaction in FileViewer and auto-navigate
 async function handleReaction(type: ReactionType): Promise<void> {
     if (currentItemIndex.value === null) return;
 
@@ -545,7 +533,7 @@ async function handleReaction(type: ReactionType): Promise<void> {
         }
     }
 
-    // IMPORTANT: Remove from masonry FIRST (before removing from carousel)
+    // IMPORTANT: Remove from masonry first so the grid updates immediately.
     // This ensures masonry can find and properly remove the item
     // Only remove in online mode (not in local mode)
     // Pass the item directly to ensure correct reference
@@ -560,19 +548,6 @@ async function handleReaction(type: ReactionType): Promise<void> {
     if (props.onReaction) {
         props.onReaction(fileId, type);
     }
-
-    // Remove from carousel (items array) AFTER masonry removal
-    // Note: masonry removal updates TabContent's items, which should sync to FileViewer's props.items
-    // via the watch. However, we need to remove from FileViewer's items directly for immediate carousel update.
-    // The watch is blocked by isRemovingItem flag to prevent double removal.
-    isRemovingItem.value = true;
-    // Check if item still exists before removing (it might have been removed by watch sync)
-    const itemStillExists = items.value.findIndex((i) => i.id === fileId) !== -1;
-    if (itemStillExists) {
-        items.value.splice(itemIndex, 1);
-    }
-    await nextTick();
-    isRemovingItem.value = false;
 
     // Update currentItemIndex
     if (items.value.length === 0) {
@@ -622,7 +597,7 @@ function handleOverlayImageClick(e: MouseEvent): void {
         return;
     }
 
-    // Normal click behavior - no-op for now (carousel disabled).
+    // Normal click behavior - no-op for now.
 }
 
 // Handle ALT + Middle Click (mousedown event needed for middle button)
@@ -926,7 +901,7 @@ async function navigateToNext(): Promise<void> {
     } // Already at last item
 
     const nextIndex = currentItemIndex.value + 1;
-    // Update index immediately - both carousel and fileviewer animate together
+    // Update index immediately to keep viewer navigation responsive
     currentItemIndex.value = nextIndex;
     // Don't await - allow rapid navigation
     navigateToIndex(nextIndex, 'down');
@@ -938,7 +913,7 @@ async function navigateToPrevious(): Promise<void> {
     if (currentItemIndex.value <= 0) return; // Already at first item
 
     const prevIndex = currentItemIndex.value - 1;
-    // Update index immediately - both carousel and fileviewer animate together
+    // Update index immediately to keep viewer navigation responsive
     currentItemIndex.value = prevIndex;
     // Don't await - allow rapid navigation
     navigateToIndex(prevIndex, 'up');
@@ -963,7 +938,6 @@ async function navigateToIndex(index: number, direction?: 'up' | 'down'): Promis
     isNavigating.value = true;
 
     // Note: currentItemIndex is already updated in navigateToNext/navigateToPrevious
-    // before this function is called, so carousel reacts immediately
 
     // Step 1: Slide current image out
     const slideOutDistance = tabContent.getBoundingClientRect().height;
