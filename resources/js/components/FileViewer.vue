@@ -444,7 +444,7 @@ defineExpose({
             v-if="overlayIsFilled && overlayFillComplete && !overlayIsClosing"
             :is-open="isSheetOpen"
             :file-id="currentItemIndex !== null && items[currentItemIndex] ? items[currentItemIndex].id : null"
-            :file-data="fileData"
+            :file-data="fileData ?? null"
             :is-loading="isLoadingFileData"
             @close="isSheetOpen = false"
         />
