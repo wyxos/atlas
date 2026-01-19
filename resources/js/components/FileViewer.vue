@@ -12,6 +12,7 @@ import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
 import { useFileViewerPaging } from '@/composables/useFileViewerPaging';
 import { useFileViewerData } from '@/composables/useFileViewerData';
 import { useFileViewerSheetSizing } from '@/composables/useFileViewerSheetSizing';
+import { useFileViewerOverlayStyles } from '@/composables/useFileViewerOverlayStyles';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -243,36 +244,26 @@ const { handleTouchStart, handleTouchEnd } = useFileViewerNavigation({
     onFullscreenChange: handleFullscreenChange,
 });
 
-const overlayMediaStyle = computed(() => {
-    const scale = `scale(${imageScale.value}) translateY(${imageTranslateY.value}px)`;
-    if (overlayImageSize.value && imageCenterPosition.value) {
-        return {
-            width: overlayImageSize.value.width + 'px',
-            height: overlayImageSize.value.height + 'px',
-            top: imageCenterPosition.value.top + 'px',
-            left: imageCenterPosition.value.left + 'px',
-            transform: scale,
-            transformOrigin: 'center center',
-        };
-    }
-
-    if (overlayImageSize.value) {
-        return {
-            width: overlayImageSize.value.width + 'px',
-            height: overlayImageSize.value.height + 'px',
-            top: '50%',
-            left: '50%',
-            transform: `translate(-50%, -50%) ${scale}`,
-            transformOrigin: 'center center',
-        };
-    }
-
-    return {
-        top: '50%',
-        left: '50%',
-        transform: `translate(-50%, -50%) ${scale}`,
-        transformOrigin: 'center center',
-    };
+const {
+    overlayContainerClass,
+    overlayContainerStyle,
+    overlayContentClass,
+    overlayMediaWrapperStyle,
+    overlayMediaTransitionClass,
+    overlayMediaStyle,
+} = useFileViewerOverlayStyles({
+    overlayRect,
+    overlayIsFilled,
+    overlayIsClosing,
+    overlayIsAnimating,
+    overlayBorderRadius,
+    overlayScale,
+    overlayImageSize,
+    imageCenterPosition,
+    imageScale,
+    imageTranslateY,
+    overlayFillComplete,
+    isNavigating,
 });
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
@@ -342,36 +333,17 @@ defineExpose({
 
 <template>
     <!-- Click overlay -->
-    <div v-if="overlayRect && overlayImage" :class="[
-        'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900 overflow-hidden',
-        overlayIsFilled ? 'flex' : 'flex flex-col',
-        overlayIsFilled && !overlayIsClosing ? '' : 'pointer-events-none',
-        overlayIsAnimating || overlayIsClosing ? 'transition-all duration-500 ease-in-out' : ''
-    ]" :style="{
-        top: overlayRect.top + 'px',
-        left: overlayRect.left + 'px',
-        width: overlayRect.width + 'px',
-        height: overlayRect.height + 'px',
-        borderRadius: overlayIsFilled ? undefined : (overlayBorderRadius || undefined),
-        transform: `scale(${overlayScale})`,
-        transformOrigin: 'center center',
-    }" @touchstart.passive="handleTouchStart" @touchend.passive="handleTouchEnd">
+    <div v-if="overlayRect && overlayImage" :class="overlayContainerClass" :style="overlayContainerStyle"
+        @touchstart.passive="handleTouchStart" @touchend.passive="handleTouchEnd">
         <!-- Main content area -->
-        <div :class="[
-            'relative overflow-hidden transition-all duration-500 ease-in-out',
-            overlayIsFilled ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-1 min-h-0'
-        ]" :style="{
-            height: overlayIsFilled ? undefined : '100%',
-        }">
+        <div :class="overlayContentClass" :style="overlayMediaWrapperStyle">
             <!-- Image container -->
-            <div class="relative flex-1 min-h-0 overflow-hidden" :style="{
-                height: overlayIsFilled ? undefined : '100%',
-            }">
+            <div class="relative flex-1 min-h-0 overflow-hidden" :style="overlayMediaWrapperStyle">
                 <!-- Preview image (shown immediately, behind spinner) -->
                 <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
                     :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
                         'absolute select-none pointer-events-none object-cover',
-                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                        overlayMediaTransitionClass
                     ]" :style="overlayMediaStyle" draggable="false" />
 
                 <!-- Spinner while loading full-size image -->
@@ -385,7 +357,7 @@ defineExpose({
                         'absolute select-none',
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
                         overlayIsFilled ? '' : 'object-cover',
-                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                        overlayMediaTransitionClass
                     ]" :style="overlayMediaStyle" draggable="false" @mousedown="handleOverlayImageMouseDown"
                     @auxclick="handleOverlayImageAuxClick" />
 
@@ -394,7 +366,7 @@ defineExpose({
                         'absolute',
                         overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'pointer-events-auto' : 'pointer-events-none',
                         overlayIsFilled ? 'object-contain' : 'object-cover',
-                        (overlayIsAnimating || overlayIsClosing || overlayIsFilled || isNavigating) && imageCenterPosition ? 'transition-all duration-500 ease-in-out' : ''
+                        overlayMediaTransitionClass
                     ]" :style="overlayMediaStyle" playsinline disablepictureinpicture preload="metadata"
                     @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
                     @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
