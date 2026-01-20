@@ -1,56 +1,92 @@
-import type { Ref } from 'vue';
+import { toRefs, type Ref } from 'vue';
 
 export function useFileViewerOverlayState(params: {
     containerRef: Ref<HTMLElement | null>;
-    containerOverflow: Ref<string | null>;
-    containerOverscroll: Ref<string | null>;
-    overlayRect: Ref<{ top: number; left: number; width: number; height: number } | null>;
-    overlayKey: Ref<number>;
-    overlayIsAnimating: Ref<boolean>;
-    overlayIsClosing: Ref<boolean>;
-    overlayIsFilled: Ref<boolean>;
-    overlayFillComplete: Ref<boolean>;
-    overlayScale: Ref<number>;
-    overlayImageSize: Ref<{ width: number; height: number } | null>;
-    imageCenterPosition: Ref<{ top: number; left: number } | null>;
-    overlayImage: Ref<{ src: string; srcset?: string; sizes?: string; alt?: string } | null>;
-    overlayMediaType: Ref<'image' | 'video'>;
-    overlayVideoSrc: Ref<string | null>;
-    overlayBorderRadius: Ref<string | null>;
-    overlayIsLoading: Ref<boolean>;
-    overlayFullSizeImage: Ref<string | null>;
-    originalImageDimensions: Ref<{ width: number; height: number } | null>;
-    currentItemIndex: Ref<number | null>;
-    imageScale: Ref<number>;
-    imageTranslateY: Ref<number>;
-    navigationDirection: Ref<'up' | 'down' | null>;
-    isNavigating: Ref<boolean>;
-    isSheetOpen: Ref<boolean>;
+    container: {
+        overflow: string | null;
+        overscroll: string | null;
+    };
+    overlay: {
+        rect: { top: number; left: number; width: number; height: number } | null;
+        key: number;
+        isAnimating: boolean;
+        isClosing: boolean;
+        isFilled: boolean;
+        fillComplete: boolean;
+        scale: number;
+        imageSize: { width: number; height: number } | null;
+        centerPosition: { top: number; left: number } | null;
+        image: { src: string; srcset?: string; sizes?: string; alt?: string } | null;
+        mediaType: 'image' | 'video';
+        videoSrc: string | null;
+        borderRadius: string | null;
+        isLoading: boolean;
+        fullSizeImage: string | null;
+        originalDimensions: { width: number; height: number } | null;
+    };
+    navigation: {
+        currentItemIndex: number | null;
+        imageScale: number;
+        imageTranslateY: number;
+        direction: 'up' | 'down' | null;
+        isNavigating: boolean;
+    };
+    sheet: {
+        isOpen: boolean;
+    };
     emitClose: () => void;
 }) {
+    const { overflow, overscroll } = toRefs(params.container);
+    const {
+        rect,
+        key,
+        isAnimating,
+        isClosing,
+        isFilled,
+        fillComplete,
+        scale,
+        imageSize,
+        centerPosition,
+        image,
+        mediaType,
+        videoSrc,
+        borderRadius,
+        isLoading,
+        fullSizeImage,
+        originalDimensions,
+    } = toRefs(params.overlay);
+    const {
+        currentItemIndex,
+        imageScale,
+        imageTranslateY,
+        direction,
+        isNavigating,
+    } = toRefs(params.navigation);
+    const { isOpen } = toRefs(params.sheet);
+
     function resetOverlayState(): void {
-        params.overlayKey.value++;
-        params.overlayIsAnimating.value = false;
-        params.overlayIsClosing.value = false;
-        params.overlayIsFilled.value = false;
-        params.overlayFillComplete.value = false;
-        params.overlayScale.value = 1;
-        params.overlayImageSize.value = null;
-        params.imageCenterPosition.value = null;
-        params.overlayRect.value = null;
-        params.overlayImage.value = null;
-        params.overlayMediaType.value = 'image';
-        params.overlayVideoSrc.value = null;
-        params.overlayBorderRadius.value = null;
-        params.overlayIsLoading.value = false;
-        params.overlayFullSizeImage.value = null;
-        params.originalImageDimensions.value = null;
-        params.currentItemIndex.value = null;
-        params.imageScale.value = 1;
-        params.imageTranslateY.value = 0;
-        params.navigationDirection.value = null;
-        params.isNavigating.value = false;
-        params.isSheetOpen.value = false;
+        key.value++;
+        isAnimating.value = false;
+        isClosing.value = false;
+        isFilled.value = false;
+        fillComplete.value = false;
+        scale.value = 1;
+        imageSize.value = null;
+        centerPosition.value = null;
+        rect.value = null;
+        image.value = null;
+        mediaType.value = 'image';
+        videoSrc.value = null;
+        borderRadius.value = null;
+        isLoading.value = false;
+        fullSizeImage.value = null;
+        originalDimensions.value = null;
+        currentItemIndex.value = null;
+        imageScale.value = 1;
+        imageTranslateY.value = 0;
+        direction.value = null;
+        isNavigating.value = false;
+        isOpen.value = false;
         params.emitClose();
     }
 
@@ -59,50 +95,51 @@ export function useFileViewerOverlayState(params: {
         if (!tabContent) {
             return;
         }
-        if (params.containerOverflow.value !== null) {
-            tabContent.style.overflow = params.containerOverflow.value;
+        if (overflow.value !== null) {
+            tabContent.style.overflow = overflow.value;
         } else {
             tabContent.style.removeProperty('overflow');
         }
-        if (params.containerOverscroll.value !== null) {
-            tabContent.style.overscrollBehavior = params.containerOverscroll.value;
+        if (overscroll.value !== null) {
+            tabContent.style.overscrollBehavior = overscroll.value;
         } else {
             tabContent.style.removeProperty('overscroll-behavior');
         }
-        params.containerOverflow.value = null;
-        params.containerOverscroll.value = null;
+        overflow.value = null;
+        overscroll.value = null;
     }
 
     function closeOverlay(): void {
-        if (!params.overlayRect.value) return;
+        if (!rect.value) return;
 
         restoreContainerStyles();
 
-        params.overlayIsClosing.value = true;
-        params.overlayIsAnimating.value = true;
+        isClosing.value = true;
+        isAnimating.value = true;
+        scale.value = 0;
 
         const tabContent = params.containerRef.value;
-        if (tabContent && params.overlayRect.value) {
+        if (tabContent && rect.value) {
             const tabContentBox = tabContent.getBoundingClientRect();
             const containerWidth = tabContentBox.width;
             const containerHeight = tabContentBox.height;
 
-            const centerLeft = Math.round((containerWidth - params.overlayRect.value.width) / 2);
-            const centerTop = Math.round((containerHeight - params.overlayRect.value.height) / 2);
+            const centerLeft = Math.round((containerWidth - rect.value.width) / 2);
+            const centerTop = Math.round((containerHeight - rect.value.height) / 2);
 
-            params.overlayRect.value = {
-                ...params.overlayRect.value,
+            rect.value = {
+                ...rect.value,
                 top: centerTop,
                 left: centerLeft,
             };
-
-            params.overlayScale.value = 0;
 
             setTimeout(() => {
                 resetOverlayState();
             }, 500);
         } else {
-            resetOverlayState();
+            setTimeout(() => {
+                resetOverlayState();
+            }, 500);
         }
     }
 

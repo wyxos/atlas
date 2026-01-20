@@ -1,9 +1,11 @@
-import { onUnmounted, ref, watch, type Ref } from 'vue';
+import { onUnmounted, ref, watch, toRefs } from 'vue';
 
 export function useFileViewerNavigation(params: {
-    overlayRect: Ref<{ top: number; left: number; width: number; height: number } | null>;
-    overlayFillComplete: Ref<boolean>;
-    overlayIsClosing: Ref<boolean>;
+    overlay: {
+        rect: { top: number; left: number; width: number; height: number } | null;
+        fillComplete: boolean;
+        isClosing: boolean;
+    };
     onClose: () => void;
     onNext: () => void;
     onPrevious: () => void;
@@ -12,6 +14,7 @@ export function useFileViewerNavigation(params: {
     wheelThreshold?: number;
     navThrottleMs?: number;
 }) {
+    const { rect, fillComplete, isClosing } = toRefs(params.overlay);
     const swipeStart = ref<{ x: number; y: number } | null>(null);
     const lastWheelAt = ref(0);
     const lastSwipeAt = ref(0);
@@ -31,7 +34,7 @@ export function useFileViewerNavigation(params: {
     }
 
     function handleWheel(e: WheelEvent): void {
-        if (!params.overlayRect.value || !params.overlayFillComplete.value || params.overlayIsClosing.value) return;
+        if (!rect.value || !fillComplete.value || isClosing.value) return;
         if (shouldIgnoreGesture(e.target)) return;
 
         const now = Date.now();
@@ -51,7 +54,7 @@ export function useFileViewerNavigation(params: {
     }
 
     function handleTouchStart(e: TouchEvent): void {
-        if (!params.overlayRect.value || !params.overlayFillComplete.value || params.overlayIsClosing.value) return;
+        if (!rect.value || !fillComplete.value || isClosing.value) return;
         if (shouldIgnoreGesture(e.target)) return;
 
         const touch = e.touches[0];
@@ -60,7 +63,7 @@ export function useFileViewerNavigation(params: {
     }
 
     function handleTouchEnd(e: TouchEvent): void {
-        if (!params.overlayRect.value || !params.overlayFillComplete.value || params.overlayIsClosing.value) return;
+        if (!rect.value || !fillComplete.value || isClosing.value) return;
         if (shouldIgnoreGesture(e.target)) return;
 
         const start = swipeStart.value;
@@ -87,7 +90,7 @@ export function useFileViewerNavigation(params: {
     }
 
     function handleKeyDown(e: KeyboardEvent): void {
-        if (!params.overlayRect.value || params.overlayIsClosing.value) return;
+        if (!rect.value || isClosing.value) return;
 
         if (e.key === 'Escape') {
             params.onClose();
@@ -101,7 +104,7 @@ export function useFileViewerNavigation(params: {
     }
 
     function handleMouseButton(e: MouseEvent): void {
-        if (!params.overlayRect.value || !params.overlayFillComplete.value || params.overlayIsClosing.value) return;
+        if (!rect.value || !fillComplete.value || isClosing.value) return;
 
         if (e.button === 3) {
             e.preventDefault();
@@ -125,12 +128,12 @@ export function useFileViewerNavigation(params: {
     }
 
     function handlePopState(): void {
-        if (isHandlingMouseNavigation || (params.overlayRect.value && params.overlayFillComplete.value && !params.overlayIsClosing.value)) {
+        if (isHandlingMouseNavigation || (rect.value && fillComplete.value && !isClosing.value)) {
             history.pushState({ preventBack: true }, '', window.location.href);
         }
     }
 
-    watch(() => params.overlayRect.value !== null && params.overlayFillComplete.value, (isVisible) => {
+    watch(() => rect.value !== null && fillComplete.value, (isVisible) => {
         if (isVisible) {
             if (!overlayStatePushed) {
                 history.pushState({ fileViewerOpen: true }, '', window.location.href);
