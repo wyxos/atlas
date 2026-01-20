@@ -1,77 +1,93 @@
-import { computed, type Ref } from 'vue';
+import { computed, toRefs } from 'vue';
 
 export function useFileViewerOverlayStyles(params: {
-    overlayRect: Ref<{ top: number; left: number; width: number; height: number } | null>;
-    overlayIsFilled: Ref<boolean>;
-    overlayIsClosing: Ref<boolean>;
-    overlayIsAnimating: Ref<boolean>;
-    overlayBorderRadius: Ref<string | null>;
-    overlayScale: Ref<number>;
-    overlayImageSize: Ref<{ width: number; height: number } | null>;
-    imageCenterPosition: Ref<{ top: number; left: number } | null>;
-    imageScale: Ref<number>;
-    imageTranslateY: Ref<number>;
-    overlayFillComplete: Ref<boolean>;
-    isNavigating: Ref<boolean>;
+    overlay: {
+        rect: { top: number; left: number; width: number; height: number } | null;
+        isFilled: boolean;
+        isClosing: boolean;
+        isAnimating: boolean;
+        borderRadius: string | null;
+        scale: number;
+        imageSize: { width: number; height: number } | null;
+        centerPosition: { top: number; left: number } | null;
+        fillComplete: boolean;
+    };
+    navigation: {
+        imageScale: number;
+        imageTranslateY: number;
+        isNavigating: boolean;
+    };
 }) {
+    const {
+        rect,
+        isFilled,
+        isClosing,
+        isAnimating,
+        borderRadius,
+        scale,
+        imageSize,
+        centerPosition,
+    } = toRefs(params.overlay);
+    const { imageScale, imageTranslateY, isNavigating } = toRefs(params.navigation);
+
     const overlayContainerClass = computed(() => [
         'absolute z-50 border-4 border-smart-blue-500 bg-prussian-blue-900 overflow-hidden',
-        params.overlayIsFilled.value ? 'flex' : 'flex flex-col',
-        params.overlayIsFilled.value && !params.overlayIsClosing.value ? '' : 'pointer-events-none',
-        params.overlayIsAnimating.value || params.overlayIsClosing.value ? 'transition-all duration-500 ease-in-out' : '',
+        isFilled.value ? 'flex' : 'flex flex-col',
+        isFilled.value && !isClosing.value ? '' : 'pointer-events-none',
+        isAnimating.value || isClosing.value ? 'transition-all duration-500 ease-in-out' : '',
     ]);
 
     const overlayContainerStyle = computed(() => {
-        const rect = params.overlayRect.value;
-        if (!rect) {
+        const value = rect.value;
+        if (!value) {
             return {};
         }
         return {
-            top: rect.top + 'px',
-            left: rect.left + 'px',
-            width: rect.width + 'px',
-            height: rect.height + 'px',
-            borderRadius: params.overlayIsFilled.value ? undefined : (params.overlayBorderRadius.value || undefined),
-            transform: `scale(${params.overlayScale.value})`,
+            top: value.top + 'px',
+            left: value.left + 'px',
+            width: value.width + 'px',
+            height: value.height + 'px',
+            borderRadius: isFilled.value ? undefined : (borderRadius.value || undefined),
+            transform: `scale(${scale.value})`,
             transformOrigin: 'center center',
         };
     });
 
     const overlayContentClass = computed(() => [
         'relative overflow-hidden transition-all duration-500 ease-in-out',
-        params.overlayIsFilled.value ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-1 min-h-0',
+        isFilled.value ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-1 min-h-0',
     ]);
 
     const overlayMediaWrapperStyle = computed(() => ({
-        height: params.overlayIsFilled.value ? undefined : '100%',
+        height: isFilled.value ? undefined : '100%',
     }));
 
     const overlayMediaTransitionClass = computed(() => (
-        (params.overlayIsAnimating.value || params.overlayIsClosing.value || params.overlayIsFilled.value || params.isNavigating.value) && params.imageCenterPosition.value
+        (isAnimating.value || isClosing.value || isFilled.value || isNavigating.value) && centerPosition.value
             ? 'transition-all duration-500 ease-in-out'
             : ''
     ));
 
     const overlayMediaStyle = computed(() => {
-        const scale = `scale(${params.imageScale.value}) translateY(${params.imageTranslateY.value}px)`;
-        if (params.overlayImageSize.value && params.imageCenterPosition.value) {
+        const scaleValue = `scale(${imageScale.value}) translateY(${imageTranslateY.value}px)`;
+        if (imageSize.value && centerPosition.value) {
             return {
-                width: params.overlayImageSize.value.width + 'px',
-                height: params.overlayImageSize.value.height + 'px',
-                top: params.imageCenterPosition.value.top + 'px',
-                left: params.imageCenterPosition.value.left + 'px',
-                transform: scale,
+                width: imageSize.value.width + 'px',
+                height: imageSize.value.height + 'px',
+                top: centerPosition.value.top + 'px',
+                left: centerPosition.value.left + 'px',
+                transform: scaleValue,
                 transformOrigin: 'center center',
             };
         }
 
-        if (params.overlayImageSize.value) {
+        if (imageSize.value) {
             return {
-                width: params.overlayImageSize.value.width + 'px',
-                height: params.overlayImageSize.value.height + 'px',
+                width: imageSize.value.width + 'px',
+                height: imageSize.value.height + 'px',
                 top: '50%',
                 left: '50%',
-                transform: `translate(-50%, -50%) ${scale}`,
+                transform: `translate(-50%, -50%) ${scaleValue}`,
                 transformOrigin: 'center center',
             };
         }
@@ -79,7 +95,7 @@ export function useFileViewerOverlayStyles(params: {
         return {
             top: '50%',
             left: '50%',
-            transform: `translate(-50%, -50%) ${scale}`,
+            transform: `translate(-50%, -50%) ${scaleValue}`,
             transformOrigin: 'center center',
         };
     });

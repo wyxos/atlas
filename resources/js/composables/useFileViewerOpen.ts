@@ -1,30 +1,36 @@
-import { nextTick, type Ref } from 'vue';
+import { nextTick, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 
 export function useFileViewerOpen(params: {
     containerRef: Ref<HTMLElement | null>;
     masonryContainerRef: Ref<HTMLElement | null>;
     items: Ref<FeedItem[]>;
-    containerOverflow: Ref<string | null>;
-    containerOverscroll: Ref<string | null>;
-    overlayRect: Ref<{ top: number; left: number; width: number; height: number } | null>;
-    overlayImage: Ref<{ src: string; srcset?: string; sizes?: string; alt?: string } | null>;
-    overlayMediaType: Ref<'image' | 'video'>;
-    overlayVideoSrc: Ref<string | null>;
-    overlayBorderRadius: Ref<string | null>;
-    overlayKey: Ref<number>;
-    overlayIsAnimating: Ref<boolean>;
-    overlayImageSize: Ref<{ width: number; height: number } | null>;
-    overlayIsFilled: Ref<boolean>;
-    overlayFillComplete: Ref<boolean>;
-    overlayIsClosing: Ref<boolean>;
-    overlayScale: Ref<number>;
-    overlayIsLoading: Ref<boolean>;
-    overlayFullSizeImage: Ref<string | null>;
-    originalImageDimensions: Ref<{ width: number; height: number } | null>;
-    currentItemIndex: Ref<number | null>;
-    imageScale: Ref<number>;
-    imageCenterPosition: Ref<{ top: number; left: number } | null>;
+    container: {
+        overflow: string | null;
+        overscroll: string | null;
+    };
+    overlay: {
+        rect: { top: number; left: number; width: number; height: number } | null;
+        image: { src: string; srcset?: string; sizes?: string; alt?: string } | null;
+        mediaType: 'image' | 'video';
+        videoSrc: string | null;
+        borderRadius: string | null;
+        key: number;
+        isAnimating: boolean;
+        imageSize: { width: number; height: number } | null;
+        isFilled: boolean;
+        fillComplete: boolean;
+        isClosing: boolean;
+        scale: number;
+        isLoading: boolean;
+        fullSizeImage: string | null;
+        originalDimensions: { width: number; height: number } | null;
+        centerPosition: { top: number; left: number } | null;
+    };
+    navigation: {
+        currentItemIndex: number | null;
+        imageScale: number;
+    };
     getAvailableWidth: (containerWidth: number, borderWidth: number) => number;
     calculateBestFitSize: (
         originalWidth: number,
@@ -43,6 +49,27 @@ export function useFileViewerOpen(params: {
     closeOverlay: () => void;
     emitOpen: () => void;
 }) {
+    const { overflow, overscroll } = toRefs(params.container);
+    const {
+        rect,
+        image,
+        mediaType,
+        videoSrc,
+        borderRadius,
+        key,
+        isAnimating,
+        imageSize,
+        isFilled,
+        fillComplete,
+        isClosing,
+        scale,
+        isLoading,
+        fullSizeImage,
+        originalDimensions,
+        centerPosition,
+    } = toRefs(params.overlay);
+    const { currentItemIndex, imageScale } = toRefs(params.navigation);
+
     function getClickedItemId(target: HTMLElement): number | null {
         const el = target.closest('[data-file-id]') as HTMLElement | null;
         if (!el) {
@@ -63,9 +90,9 @@ export function useFileViewerOpen(params: {
         const tabContent = params.containerRef.value;
         if (!container || !tabContent) return;
 
-        if (params.containerOverflow.value === null) {
-            params.containerOverflow.value = tabContent.style.overflow || '';
-            params.containerOverscroll.value = tabContent.style.overscrollBehavior || '';
+        if (overflow.value === null) {
+            overflow.value = tabContent.style.overflow || '';
+            overscroll.value = tabContent.style.overscrollBehavior || '';
             tabContent.style.overflow = 'hidden';
             tabContent.style.overscrollBehavior = 'contain';
         }
@@ -92,9 +119,9 @@ export function useFileViewerOpen(params: {
             return;
         }
 
-        const mediaType: 'image' | 'video' = masonryItem.type === 'video' ? 'video' : 'image';
-        params.overlayMediaType.value = mediaType;
-        params.overlayVideoSrc.value = null;
+        const nextMediaType: 'image' | 'video' = masonryItem.type === 'video' ? 'video' : 'image';
+        mediaType.value = nextMediaType;
+        videoSrc.value = null;
 
         const itemBox = itemEl.getBoundingClientRect();
         const tabContentBox = tabContent.getBoundingClientRect();
@@ -120,44 +147,44 @@ export function useFileViewerOpen(params: {
         const radius = computedStyle.borderRadius || '';
 
         const fullSizeUrl = masonryItem.original || src;
-        params.currentItemIndex.value = params.items.value.findIndex((it) => it.id === masonryItem.id);
+        currentItemIndex.value = params.items.value.findIndex((it) => it.id === masonryItem.id);
 
-        params.overlayKey.value++;
-        params.imageScale.value = 1;
+        key.value++;
+        imageScale.value = 1;
 
-        params.overlayImageSize.value = { width, height };
-        params.overlayIsFilled.value = false;
-        params.overlayFillComplete.value = false;
-        params.overlayIsClosing.value = false;
-        params.overlayScale.value = 1;
-        params.overlayIsLoading.value = mediaType === 'image';
-        params.overlayFullSizeImage.value = null;
+        imageSize.value = { width, height };
+        isFilled.value = false;
+        fillComplete.value = false;
+        isClosing.value = false;
+        scale.value = 1;
+        isLoading.value = nextMediaType === 'image';
+        fullSizeImage.value = null;
 
-        params.overlayRect.value = { top, left, width, height };
-        params.overlayImage.value = { src, srcset, sizes, alt };
-        params.overlayBorderRadius.value = radius || null;
-        params.overlayIsAnimating.value = false;
+        rect.value = { top, left, width, height };
+        image.value = { src, srcset, sizes, alt };
+        borderRadius.value = radius || null;
+        isAnimating.value = false;
 
         params.emitOpen();
 
         await nextTick();
 
         try {
-            if (mediaType === 'video') {
-                params.originalImageDimensions.value = {
+            if (nextMediaType === 'video') {
+                originalDimensions.value = {
                     width: masonryItem.width,
                     height: masonryItem.height,
                 };
-                params.overlayVideoSrc.value = fullSizeUrl;
-                params.overlayIsLoading.value = false;
+                videoSrc.value = fullSizeUrl;
+                isLoading.value = false;
 
                 await params.handleItemSeen(masonryItem.id);
                 await nextTick();
             } else {
                 const imageDimensions = await params.preloadImage(fullSizeUrl);
-                params.originalImageDimensions.value = imageDimensions;
-                params.overlayFullSizeImage.value = fullSizeUrl;
-                params.overlayIsLoading.value = false;
+                originalDimensions.value = imageDimensions;
+                fullSizeImage.value = fullSizeUrl;
+                isLoading.value = false;
 
                 await params.handleItemSeen(masonryItem.id);
 
@@ -166,9 +193,9 @@ export function useFileViewerOpen(params: {
             }
         } catch (error) {
             console.warn('Failed to preload full-size image, using original:', error);
-            params.overlayFullSizeImage.value = src;
-            params.overlayIsLoading.value = false;
-            params.originalImageDimensions.value = {
+            fullSizeImage.value = src;
+            isLoading.value = false;
+            originalDimensions.value = {
                 width: masonryItem.width,
                 height: masonryItem.height,
             };
@@ -179,12 +206,12 @@ export function useFileViewerOpen(params: {
         const initialContentWidth = width - (borderWidth * 2);
         const initialContentHeight = height - (borderWidth * 2);
 
-        if (params.overlayImageSize.value) {
-            params.imageCenterPosition.value = params.getCenteredPosition(
+        if (imageSize.value) {
+            centerPosition.value = params.getCenteredPosition(
                 initialContentWidth,
                 initialContentHeight,
-                params.overlayImageSize.value.width,
-                params.overlayImageSize.value.height
+                imageSize.value.width,
+                imageSize.value.height
             );
         }
 
@@ -194,7 +221,7 @@ export function useFileViewerOpen(params: {
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 const container = params.containerRef.value;
-                if (!container || !params.overlayRect.value || !params.overlayImageSize.value) return;
+                if (!container || !rect.value || !imageSize.value) return;
 
                 const tabContentBox = container.getBoundingClientRect();
                 const containerWidth = tabContentBox.width;
@@ -206,15 +233,15 @@ export function useFileViewerOpen(params: {
                 const contentWidth = width - (borderWidth * 2);
                 const contentHeight = height - (borderWidth * 2);
 
-                params.imageCenterPosition.value = params.getCenteredPosition(
+                centerPosition.value = params.getCenteredPosition(
                     contentWidth,
                     contentHeight,
-                    params.overlayImageSize.value.width,
-                    params.overlayImageSize.value.height
+                    imageSize.value.width,
+                    imageSize.value.height
                 );
 
-                params.overlayIsAnimating.value = true;
-                params.overlayRect.value = {
+                isAnimating.value = true;
+                rect.value = {
                     top: centerTop,
                     left: centerLeft,
                     width,
@@ -222,27 +249,27 @@ export function useFileViewerOpen(params: {
                 };
 
                 setTimeout(() => {
-                    if (!container || !params.overlayRect.value || !params.overlayImageSize.value || !params.originalImageDimensions.value) return;
+                    if (!container || !rect.value || !imageSize.value || !originalDimensions.value) return;
 
                     const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
                     const availableHeight = containerHeight - (borderWidth * 2);
                     const bestFitSize = params.calculateBestFitSize(
-                        params.originalImageDimensions.value.width,
-                        params.originalImageDimensions.value.height,
+                        originalDimensions.value.width,
+                        originalDimensions.value.height,
                         availableWidth,
                         availableHeight
                     );
 
-                    params.overlayImageSize.value = bestFitSize;
-                    params.imageCenterPosition.value = params.getCenteredPosition(
+                    imageSize.value = bestFitSize;
+                    centerPosition.value = params.getCenteredPosition(
                         availableWidth,
                         availableHeight,
                         bestFitSize.width,
                         bestFitSize.height
                     );
 
-                    params.overlayIsFilled.value = true;
-                    params.overlayRect.value = {
+                    isFilled.value = true;
+                    rect.value = {
                         top: 0,
                         left: 0,
                         width: containerWidth,
@@ -250,7 +277,7 @@ export function useFileViewerOpen(params: {
                     };
 
                     setTimeout(() => {
-                        params.overlayFillComplete.value = true;
+                        fillComplete.value = true;
                     }, 500);
                 }, 500);
             });

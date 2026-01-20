@@ -1,14 +1,23 @@
-import { ref, type Ref, watch } from 'vue';
+import { ref, watch, toRefs, type Ref } from 'vue';
 import { incrementSeen, show as getFile } from '@/actions/App/Http/Controllers/FilesController';
 import type { FeedItem } from '@/composables/useTabs';
 import type { File } from '@/types/file';
 
 export function useFileViewerData(params: {
     items: Ref<FeedItem[]>;
-    currentItemIndex: Ref<number | null>;
-    overlayFillComplete: Ref<boolean>;
-    isSheetOpen: Ref<boolean>;
+    navigation: {
+        currentItemIndex: number | null;
+    };
+    overlay: {
+        fillComplete: boolean;
+    };
+    sheet: {
+        isOpen: boolean;
+    };
 }) {
+    const { currentItemIndex } = toRefs(params.navigation);
+    const { fillComplete } = toRefs(params.overlay);
+    const { isOpen } = toRefs(params.sheet);
     const fileData = ref<File | null>(null);
     const isLoadingFileData = ref(false);
 
@@ -40,8 +49,8 @@ export function useFileViewerData(params: {
         }
     }
 
-    watch(() => params.currentItemIndex.value, async (newIndex) => {
-        if (newIndex !== null && params.isSheetOpen.value && params.overlayFillComplete.value) {
+    watch(() => currentItemIndex.value, async (newIndex) => {
+        if (newIndex !== null && isOpen.value && fillComplete.value) {
             const currentItem = params.items.value[newIndex];
             if (currentItem?.id) {
                 await fetchFileData(currentItem.id);
@@ -49,13 +58,13 @@ export function useFileViewerData(params: {
         }
     });
 
-    watch(() => params.isSheetOpen.value, async (isOpen) => {
-        if (isOpen && params.currentItemIndex.value !== null && params.overlayFillComplete.value) {
-            const currentItem = params.items.value[params.currentItemIndex.value];
+    watch(() => isOpen.value, async (open) => {
+        if (open && currentItemIndex.value !== null && fillComplete.value) {
+            const currentItem = params.items.value[currentItemIndex.value];
             if (currentItem?.id) {
                 await fetchFileData(currentItem.id);
             }
-        } else if (!isOpen) {
+        } else if (!open) {
             fileData.value = null;
         }
     });

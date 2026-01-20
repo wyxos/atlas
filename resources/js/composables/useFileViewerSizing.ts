@@ -1,14 +1,21 @@
-import type { Ref } from 'vue';
+import { toRefs } from 'vue';
 
 export function useFileViewerSizing(params: {
-    overlayIsFilled: Ref<boolean>;
-    overlayFillComplete: Ref<boolean>;
-    overlayIsClosing: Ref<boolean>;
-    isSheetOpen: Ref<boolean>;
+    overlay: {
+        isFilled: boolean;
+        fillComplete: boolean;
+        isClosing: boolean;
+    };
+    sheet: {
+        isOpen: boolean;
+    };
 }) {
+    const { isFilled, fillComplete, isClosing } = toRefs(params.overlay);
+    const { isOpen } = toRefs(params.sheet);
+
     function getAvailableWidth(containerWidth: number, borderWidth: number): number {
-        const taskbarWidth = params.overlayIsFilled.value && params.overlayFillComplete.value && !params.overlayIsClosing.value && !params.isSheetOpen.value ? 64 : 0;
-        const sheetWidth = params.overlayIsFilled.value && params.overlayFillComplete.value && !params.overlayIsClosing.value && params.isSheetOpen.value ? 320 : 0;
+        const taskbarWidth = isFilled.value && fillComplete.value && !isClosing.value && !isOpen.value ? 64 : 0;
+        const sheetWidth = isFilled.value && fillComplete.value && !isClosing.value && isOpen.value ? 320 : 0;
         return containerWidth - (borderWidth * 2) - taskbarWidth - sheetWidth;
     }
 

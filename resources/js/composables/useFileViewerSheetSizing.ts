@@ -1,12 +1,17 @@
-import { watch, type Ref } from 'vue';
+import { watch, toRefs, type Ref } from 'vue';
 
 export function useFileViewerSheetSizing(params: {
-    isSheetOpen: Ref<boolean>;
-    overlayRect: Ref<{ top: number; left: number; width: number; height: number } | null>;
-    overlayImageSize: Ref<{ width: number; height: number } | null>;
-    originalImageDimensions: Ref<{ width: number; height: number } | null>;
+    sheet: {
+        isOpen: boolean;
+    };
+    overlay: {
+        rect: { top: number; left: number; width: number; height: number } | null;
+        imageSize: { width: number; height: number } | null;
+        originalDimensions: { width: number; height: number } | null;
+        fillComplete: boolean;
+        centerPosition: { top: number; left: number } | null;
+    };
     containerRef: Ref<HTMLElement | null>;
-    overlayFillComplete: Ref<boolean>;
     getAvailableWidth: (containerWidth: number, borderWidth: number) => number;
     calculateBestFitSize: (
         originalWidth: number,
@@ -20,10 +25,18 @@ export function useFileViewerSheetSizing(params: {
         imageWidth: number,
         imageHeight: number
     ) => { top: number; left: number };
-    imageCenterPosition: Ref<{ top: number; left: number } | null>;
 }) {
-    watch(() => params.isSheetOpen.value, () => {
-        if (params.overlayRect.value && params.overlayImageSize.value && params.originalImageDimensions.value && params.containerRef.value && params.overlayFillComplete.value) {
+    const { isOpen } = toRefs(params.sheet);
+    const {
+        rect,
+        imageSize,
+        originalDimensions,
+        fillComplete,
+        centerPosition,
+    } = toRefs(params.overlay);
+
+    watch(() => isOpen.value, () => {
+        if (rect.value && imageSize.value && originalDimensions.value && params.containerRef.value && fillComplete.value) {
             const tabContent = params.containerRef.value;
             const tabContentBox = tabContent.getBoundingClientRect();
             const containerWidth = tabContentBox.width;
@@ -33,14 +46,14 @@ export function useFileViewerSheetSizing(params: {
             const availableHeight = containerHeight - (borderWidth * 2);
 
             const bestFitSize = params.calculateBestFitSize(
-                params.originalImageDimensions.value.width,
-                params.originalImageDimensions.value.height,
+                originalDimensions.value.width,
+                originalDimensions.value.height,
                 availableWidth,
                 availableHeight
             );
 
-            params.overlayImageSize.value = bestFitSize;
-            params.imageCenterPosition.value = params.getCenteredPosition(
+            imageSize.value = bestFitSize;
+            centerPosition.value = params.getCenteredPosition(
                 availableWidth,
                 availableHeight,
                 bestFitSize.width,

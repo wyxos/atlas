@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, nextTick, onUnmounted, watch, toRef } from 'vue';
+import { computed, ref, reactive, nextTick, onUnmounted, watch, toRef, toRefs } from 'vue';
 import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
 import type { FeedItem } from '@/composables/useTabs';
@@ -33,33 +33,73 @@ const hasMore = computed(() => !props.masonry?.hasReachedEnd);
 const isLoading = computed(() => props.masonry?.isLoading ?? false);
 
 // Overlay state
-const overlayRect = ref<{ top: number; left: number; width: number; height: number } | null>(null);
-const overlayImage = ref<{ src: string; srcset?: string; sizes?: string; alt?: string } | null>(null);
-const overlayMediaType = ref<'image' | 'video'>('image');
-const overlayVideoSrc = ref<string | null>(null);
 const overlayVideoRef = ref<HTMLVideoElement | null>(null);
-const overlayBorderRadius = ref<string | null>(null);
-const overlayKey = ref(0); // Key to force image element recreation on each click
-const overlayIsAnimating = ref(false); // Track if overlay is animating to center
-const overlayImageSize = ref<{ width: number; height: number } | null>(null); // Store original image size
-const overlayIsFilled = ref(false); // Track if overlay has expanded to fill container
-const overlayFillComplete = ref(false); // Track if fill animation has completed (for close button visibility)
-const overlayIsClosing = ref(false); // Track if overlay is closing (shrinking animation)
-const overlayScale = ref(1); // Scale factor for closing animation (1 = normal, 0 = fully shrunk)
-const imageCenterPosition = ref<{ top: number; left: number } | null>(null); // Exact center position when filled
-const overlayIsLoading = ref(false); // Track if full-size image is loading
-const overlayFullSizeImage = ref<string | null>(null); // Full-size image URL once loaded
-const originalImageDimensions = ref<{ width: number; height: number } | null>(null); // Original full-size image dimensions
-const currentItemIndex = ref<number | null>(null); // Track current item index in items array
-const imageScale = ref(1); // Scale factor for individual image (for scale-from-zero animation)
-const isNavigating = ref(false); // Track if we're navigating between images
-const imageTranslateY = ref(0); // Translate Y for slide animation
-const navigationDirection = ref<'up' | 'down' | null>(null); // Track navigation direction
-const currentNavigationTarget = ref<number | null>(null); // Track current navigation target to cancel stale preloads
-const isSheetOpen = ref(false); // Track if the sheet is open
-const isLoadingMore = ref(false);
-const containerOverflow = ref<string | null>(null);
-const containerOverscroll = ref<string | null>(null);
+
+const overlayState = reactive({
+    rect: null as { top: number; left: number; width: number; height: number } | null,
+    image: null as { src: string; srcset?: string; sizes?: string; alt?: string } | null,
+    mediaType: 'image' as 'image' | 'video',
+    videoSrc: null as string | null,
+    borderRadius: null as string | null,
+    key: 0,
+    isAnimating: false,
+    imageSize: null as { width: number; height: number } | null,
+    isFilled: false,
+    fillComplete: false,
+    isClosing: false,
+    scale: 1,
+    centerPosition: null as { top: number; left: number } | null,
+    isLoading: false,
+    fullSizeImage: null as string | null,
+    originalDimensions: null as { width: number; height: number } | null,
+});
+
+const navigationState = reactive({
+    currentItemIndex: null as number | null,
+    imageScale: 1,
+    isNavigating: false,
+    imageTranslateY: 0,
+    direction: null as 'up' | 'down' | null,
+    currentTarget: null as number | null,
+});
+
+const sheetState = reactive({
+    isOpen: false,
+});
+
+const containerState = reactive({
+    isLoadingMore: false,
+    overflow: null as string | null,
+    overscroll: null as string | null,
+});
+
+const {
+    rect: overlayRect,
+    image: overlayImage,
+    mediaType: overlayMediaType,
+    videoSrc: overlayVideoSrc,
+    key: overlayKey,
+    isAnimating: overlayIsAnimating,
+    imageSize: overlayImageSize,
+    isFilled: overlayIsFilled,
+    fillComplete: overlayFillComplete,
+    isClosing: overlayIsClosing,
+    scale: overlayScale,
+    centerPosition: imageCenterPosition,
+    isLoading: overlayIsLoading,
+    fullSizeImage: overlayFullSizeImage,
+    originalDimensions: originalImageDimensions,
+} = toRefs(overlayState);
+
+const {
+    currentItemIndex,
+    imageScale,
+    isNavigating,
+    imageTranslateY,
+} = toRefs(navigationState);
+
+const { isOpen: isSheetOpen } = toRefs(sheetState);
+const { isLoadingMore, overflow: containerOverflow, overscroll: containerOverscroll } = toRefs(containerState);
 
 const {
     videoCurrentTime,
@@ -94,38 +134,16 @@ const {
 });
 
 const { getAvailableWidth, calculateBestFitSize, getCenteredPosition } = useFileViewerSizing({
-    overlayIsFilled,
-    overlayFillComplete,
-    overlayIsClosing,
-    isSheetOpen,
+    overlay: overlayState,
+    sheet: sheetState,
 });
 
 const { closeOverlay } = useFileViewerOverlayState({
     containerRef: computed(() => props.containerRef),
-    containerOverflow,
-    containerOverscroll,
-    overlayRect,
-    overlayKey,
-    overlayIsAnimating,
-    overlayIsClosing,
-    overlayIsFilled,
-    overlayFillComplete,
-    overlayScale,
-    overlayImageSize,
-    imageCenterPosition,
-    overlayImage,
-    overlayMediaType,
-    overlayVideoSrc,
-    overlayBorderRadius,
-    overlayIsLoading,
-    overlayFullSizeImage,
-    originalImageDimensions,
-    currentItemIndex,
-    imageScale,
-    imageTranslateY,
-    navigationDirection,
-    isNavigating,
-    isSheetOpen,
+    container: containerState,
+    overlay: overlayState,
+    navigation: navigationState,
+    sheet: sheetState,
     emitClose: () => emit('close'),
 });
 
@@ -154,48 +172,27 @@ function preloadImage(url: string): Promise<{ width: number; height: number }> {
 
 const { fileData, isLoadingFileData, handleItemSeen } = useFileViewerData({
     items,
-    currentItemIndex,
-    overlayFillComplete,
-    isSheetOpen,
+    navigation: navigationState,
+    overlay: overlayState,
+    sheet: sheetState,
 });
 
 useFileViewerSheetSizing({
-    isSheetOpen,
-    overlayRect,
-    overlayImageSize,
-    originalImageDimensions,
+    sheet: sheetState,
+    overlay: overlayState,
     containerRef: computed(() => props.containerRef),
-    overlayFillComplete,
     getAvailableWidth,
     calculateBestFitSize,
     getCenteredPosition,
-    imageCenterPosition,
 });
 
 const { openFromClick } = useFileViewerOpen({
     containerRef: computed(() => props.containerRef),
     masonryContainerRef: computed(() => props.masonryContainerRef),
     items,
-    containerOverflow,
-    containerOverscroll,
-    overlayRect,
-    overlayImage,
-    overlayMediaType,
-    overlayVideoSrc,
-    overlayBorderRadius,
-    overlayKey,
-    overlayIsAnimating,
-    overlayImageSize,
-    overlayIsFilled,
-    overlayFillComplete,
-    overlayIsClosing,
-    overlayScale,
-    overlayIsLoading,
-    overlayFullSizeImage,
-    originalImageDimensions,
-    currentItemIndex,
-    imageScale,
-    imageCenterPosition,
+    container: containerState,
+    overlay: overlayState,
+    navigation: navigationState,
     getAvailableWidth,
     calculateBestFitSize,
     getCenteredPosition,
@@ -208,24 +205,8 @@ const { openFromClick } = useFileViewerOpen({
 const { navigateToNext, navigateToPrevious, navigateToIndex } = useFileViewerPaging({
     containerRef: computed(() => props.containerRef),
     items,
-    currentItemIndex,
-    currentNavigationTarget,
-    overlayRect,
-    overlayFillComplete,
-    overlayIsAnimating,
-    overlayMediaType,
-    overlayVideoSrc,
-    overlayIsLoading,
-    overlayFullSizeImage,
-    overlayImage,
-    overlayImageSize,
-    overlayKey,
-    originalImageDimensions,
-    imageTranslateY,
-    imageScale,
-    imageCenterPosition,
-    isNavigating,
-    navigationDirection,
+    overlay: overlayState,
+    navigation: navigationState,
     getAvailableWidth,
     calculateBestFitSize,
     getCenteredPosition,
@@ -235,9 +216,7 @@ const { navigateToNext, navigateToPrevious, navigateToIndex } = useFileViewerPag
 });
 
 const { handleTouchStart, handleTouchEnd } = useFileViewerNavigation({
-    overlayRect,
-    overlayFillComplete,
-    overlayIsClosing,
+    overlay: overlayState,
     onClose: closeOverlay,
     onNext: navigateToNext,
     onPrevious: navigateToPrevious,
@@ -252,18 +231,8 @@ const {
     overlayMediaTransitionClass,
     overlayMediaStyle,
 } = useFileViewerOverlayStyles({
-    overlayRect,
-    overlayIsFilled,
-    overlayIsClosing,
-    overlayIsAnimating,
-    overlayBorderRadius,
-    overlayScale,
-    overlayImageSize,
-    imageCenterPosition,
-    imageScale,
-    imageTranslateY,
-    overlayFillComplete,
-    isNavigating,
+    overlay: overlayState,
+    navigation: navigationState,
 });
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
