@@ -192,13 +192,13 @@ describe('Browse - Overlay Drawer', () => {
 
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
-        fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
+        fileViewerVm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        fileViewerVm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
         fileViewerVm.currentItemIndex = 0;
-        fileViewerVm.overlayFullSizeImage = 'test1-full.jpg';
-        fileViewerVm.overlayIsLoading = false;
+        fileViewerVm.overlayState.fullSizeImage = 'test1-full.jpg';
+        fileViewerVm.overlayState.isLoading = false;
         await wrapper.vm.$nextTick();
 
         const openSheetButton = fileViewer.find('button[aria-label="Open sheet"]');
@@ -207,7 +207,7 @@ describe('Browse - Overlay Drawer', () => {
         await openSheetButton.trigger('click');
         await wrapper.vm.$nextTick();
 
-        expect(fileViewerVm.isSheetOpen).toBe(true);
+        expect(fileViewerVm.sheetState.isOpen).toBe(true);
     });
 
     it('closes sheet when clicking the close button', async () => {
@@ -236,14 +236,14 @@ describe('Browse - Overlay Drawer', () => {
 
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
-        fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
+        fileViewerVm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        fileViewerVm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
         fileViewerVm.currentItemIndex = 0;
-        fileViewerVm.overlayFullSizeImage = 'test1-full.jpg';
-        fileViewerVm.overlayIsLoading = false;
-        fileViewerVm.isSheetOpen = true;
+        fileViewerVm.overlayState.fullSizeImage = 'test1-full.jpg';
+        fileViewerVm.overlayState.isLoading = false;
+        fileViewerVm.sheetState.isOpen = true;
         await wrapper.vm.$nextTick();
 
         const closeButton = fileViewer.find('button[aria-label="Close sheet"]');
@@ -252,7 +252,7 @@ describe('Browse - Overlay Drawer', () => {
         await closeButton.trigger('click');
         await wrapper.vm.$nextTick();
 
-        expect(fileViewerVm.isSheetOpen).toBe(false);
+        expect(fileViewerVm.sheetState.isOpen).toBe(false);
     });
 });
 
