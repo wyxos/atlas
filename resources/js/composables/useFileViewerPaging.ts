@@ -65,6 +65,7 @@ export function useFileViewerPaging(params: {
         isNavigating,
         direction,
     } = toRefs(params.navigation);
+    const waitForLayout = () => new Promise(resolve => setTimeout(resolve, 0));
 
     async function navigateToNext(): Promise<void> {
         if (!rect.value || !fillComplete.value || currentItemIndex.value === null) return;
@@ -211,11 +212,8 @@ export function useFileViewerPaging(params: {
 
                 await nextTick();
 
-                await new Promise(resolve => {
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => resolve(void 0));
-                    });
-                });
+                await waitForLayout();
+                await waitForLayout();
 
                 if (currentTarget.value !== preloadTarget) {
                     isNavigating.value = false;
@@ -290,13 +288,8 @@ export function useFileViewerPaging(params: {
                 return;
             }
 
-            await new Promise(resolve => {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        resolve(void 0);
-                    });
-                });
-            });
+            await waitForLayout();
+            await waitForLayout();
 
             if (currentTarget.value !== preloadTarget) {
                 isNavigating.value = false;
@@ -307,15 +300,9 @@ export function useFileViewerPaging(params: {
             isLoading.value = false;
             await nextTick();
 
-            await new Promise(resolve => {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        setTimeout(() => {
-                            resolve(void 0);
-                        }, 10);
-                    });
-                });
-            });
+            await waitForLayout();
+            await waitForLayout();
+            await new Promise(resolve => setTimeout(resolve, 10));
 
             if (currentTarget.value !== preloadTarget) {
                 isNavigating.value = false;
