@@ -260,8 +260,11 @@ async function handleViewerReaction(type: ReactionType): Promise<void> {
     await nextTick();
 
     if (items.value.length === 0) {
-        closeOverlay();
-        return;
+        await ensureMoreItems();
+        if (items.value.length === 0) {
+            closeOverlay();
+            return;
+        }
     }
 
     const previousIndex = navigationState.currentItemIndex;
@@ -280,7 +283,12 @@ async function handleViewerReaction(type: ReactionType): Promise<void> {
     }
 
     if (targetIndex === null) {
-        return;
+        await ensureMoreItems();
+        if (items.value.length === 0) {
+            closeOverlay();
+            return;
+        }
+        targetIndex = Math.min(previousIndex ?? 0, items.value.length - 1);
     }
 
     navigationState.currentItemIndex = targetIndex;
