@@ -195,10 +195,15 @@ export function useFileViewerOpen(params: {
             console.warn('Failed to preload full-size image, using original:', error);
             fullSizeImage.value = src;
             isLoading.value = false;
-            originalDimensions.value = {
-                width: masonryItem.width,
-                height: masonryItem.height,
-            };
+            try {
+                const fallbackDimensions = await params.preloadImage(src);
+                originalDimensions.value = fallbackDimensions;
+            } catch {
+                originalDimensions.value = {
+                    width: masonryItem.width,
+                    height: masonryItem.height,
+                };
+            }
             await nextTick();
         }
 

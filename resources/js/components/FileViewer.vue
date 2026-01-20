@@ -41,6 +41,7 @@ const currentItem = computed(() => {
     }
     return items.value[index] ?? null;
 });
+const currentItemId = ref<number | null>(null);
 
 // Overlay state
 const overlayVideoRef = ref<HTMLVideoElement | null>(null);
@@ -220,6 +221,12 @@ const {
 
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
+    if (e.altKey && e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleViewerReaction('love');
+        return;
+    }
     // Middle click without ALT - open original URL (prevent default to avoid browser scroll)
     if (!e.altKey && e.button === 1) {
         e.preventDefault();
@@ -228,6 +235,27 @@ function handleOverlayImageMouseDown(e: MouseEvent): void {
         return;
     }
 
+}
+
+function handleOverlayMediaClick(e: MouseEvent): void {
+    if (!e.altKey) {
+        return;
+    }
+    if (e.button !== 0 && e.type !== 'click') {
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    void handleViewerReaction('like');
+}
+
+function handleOverlayMediaContextMenu(e: MouseEvent): void {
+    if (!e.altKey) {
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    void handleViewerReaction('dislike');
 }
 
 // Handle middle click (auxclick) to open original URL
@@ -292,6 +320,7 @@ async function handleViewerReaction(type: ReactionType): Promise<void> {
     }
 
     navigationState.currentItemIndex = targetIndex;
+    currentItemId.value = items.value[targetIndex]?.id ?? null;
     void navigateToIndex(targetIndex, 'down');
 }
 
@@ -299,6 +328,28 @@ watch(() => [navigationState.currentItemIndex, overlayState.fillComplete], ([new
     if (newIndex === null || !isFilled) return;
     if (items.value.length - 1 - newIndex <= 1) {
         void ensureMoreItems();
+    }
+});
+
+watch(() => navigationState.currentItemIndex, (index) => {
+    if (index === null || index < 0 || index >= items.value.length) {
+        currentItemId.value = null;
+        return;
+    }
+    currentItemId.value = items.value[index]?.id ?? null;
+});
+
+watch(() => items.value.map((item) => item.id), () => {
+    if (currentItemId.value === null) {
+        const index = navigationState.currentItemIndex;
+        if (index !== null && index >= 0 && index < items.value.length) {
+            currentItemId.value = items.value[index]?.id ?? null;
+        }
+        return;
+    }
+    const nextIndex = items.value.findIndex((item) => item.id === currentItemId.value);
+    if (nextIndex !== -1 && nextIndex !== navigationState.currentItemIndex) {
+        navigationState.currentItemIndex = nextIndex;
     }
 });
 
@@ -359,7 +410,10 @@ defineExpose({
                         overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
                         overlayState.isFilled ? '' : 'object-cover',
                         overlayMediaTransitionClass
-                    ]" :style="overlayMediaStyle" draggable="false" @mousedown="handleOverlayImageMouseDown"
+                    ]" :style="overlayMediaStyle" draggable="false"
+                     @click="handleOverlayMediaClick"
+                     @contextmenu="handleOverlayMediaContextMenu"
+                     @mousedown="handleOverlayImageMouseDown"
                      @auxclick="handleOverlayImageAuxClick"/>
 
                 <video v-else-if="!overlayState.isLoading && overlayState.mediaType === 'video'" :key="overlayState.key"
@@ -370,6 +424,8 @@ defineExpose({
                         overlayState.isFilled ? 'object-contain' : 'object-cover',
                         overlayMediaTransitionClass
                     ]" :style="overlayMediaStyle" playsinline disablepictureinpicture preload="metadata"
+                       @click="handleOverlayMediaClick"
+                       @contextmenu="handleOverlayMediaContextMenu"
                        @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
                        @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
                        @volumechange="handleVideoVolumeChange" @mousedown="handleOverlayImageMouseDown"
