@@ -185,7 +185,7 @@ const {openFromClick} = useFileViewerOpen({
     emitOpen: () => emit('open'),
 });
 
-const { navigateToNext, navigateToPrevious } = useFileViewerPaging({
+const { navigateToNext, navigateToPrevious, navigateToIndex } = useFileViewerPaging({
     containerRef: computed(() => props.containerRef),
     items,
     overlay: overlayState,
@@ -251,13 +251,40 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
     }
 }
 
-function handleViewerReaction(type: ReactionType): void {
+async function handleViewerReaction(type: ReactionType): Promise<void> {
     const item = currentItem.value;
     if (!item) {
         return;
     }
-    navigateToNext();
     emit('reaction', item.id, type);
+    await nextTick();
+
+    if (items.value.length === 0) {
+        closeOverlay();
+        return;
+    }
+
+    const previousIndex = navigationState.currentItemIndex;
+    const currentIndexInList = items.value.findIndex((candidate) => candidate.id === item.id);
+    let targetIndex: number | null = null;
+
+    if (currentIndexInList === -1) {
+        if (previousIndex !== null) {
+            targetIndex = Math.min(previousIndex, items.value.length - 1);
+        }
+    } else {
+        const nextIndex = currentIndexInList + 1;
+        if (nextIndex < items.value.length) {
+            targetIndex = nextIndex;
+        }
+    }
+
+    if (targetIndex === null) {
+        return;
+    }
+
+    navigationState.currentItemIndex = targetIndex;
+    void navigateToIndex(targetIndex, 'down');
 }
 
 watch(() => [navigationState.currentItemIndex, overlayState.fillComplete], ([newIndex, isFilled]) => {
@@ -387,7 +414,7 @@ defineExpose({
                         :viewed-count="currentItem.seen_count ?? 0"
                         :current-index="navigationState.currentItemIndex ?? 0"
                         :total-items="items.length"
-                        variant="small"
+                        variant="default"
                         @reaction="handleViewerReaction"
                     />
                 </div>
