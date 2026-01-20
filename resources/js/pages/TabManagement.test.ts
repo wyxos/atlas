@@ -444,12 +444,12 @@ describe('Browse - Tab Management', () => {
         const fileViewer = wrapper.findComponent(FileViewer);
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-        fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
+        fileViewerVm.overlayState.rect = { top: 100, left: 200, width: 300, height: 400 };
+        fileViewerVm.overlayState.image = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
 
-        expect(fileViewerVm.overlayRect).not.toBeNull();
+        expect(fileViewerVm.overlayState.rect).not.toBeNull();
 
         await vm.switchTab(tab2Id);
         await waitForStable(wrapper);
@@ -459,7 +459,7 @@ describe('Browse - Tab Management', () => {
         const newFileViewer = wrapper.findComponent(FileViewer);
         if (newFileViewer.exists()) {
             const newFileViewerVm = newFileViewer.vm as any;
-            expect(newFileViewerVm.overlayRect).toBeNull();
+            expect(newFileViewerVm.overlayState.rect).toBeNull();
         }
     });
 

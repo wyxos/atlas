@@ -179,13 +179,13 @@ describe('Browse - Overlay Navigation', () => {
         const fileViewer = wrapper.findComponent(FileViewer);
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 100, left: 200, width: 300, height: 400 };
-        fileViewerVm.overlayImage = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
+        fileViewerVm.overlayState.rect = { top: 100, left: 200, width: 300, height: 400 };
+        fileViewerVm.overlayState.image = { src: 'test.jpg', srcset: 'test.jpg 1x', sizes: '300px', alt: 'Test' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
         await wrapper.vm.$nextTick();
 
-        expect(fileViewerVm.overlayRect).not.toBeNull();
+        expect(fileViewerVm.overlayState.rect).not.toBeNull();
 
         const escapeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
         window.dispatchEvent(escapeEvent);
@@ -193,8 +193,8 @@ describe('Browse - Overlay Navigation', () => {
         await wrapper.vm.$nextTick();
         await waitForOverlayClose(fileViewerVm);
 
-        expect(fileViewerVm.overlayRect).toBeNull();
-        expect(fileViewerVm.overlayImage).toBeNull();
+        expect(fileViewerVm.overlayState.rect).toBeNull();
+        expect(fileViewerVm.overlayState.image).toBeNull();
     });
 
     it('navigates to next image when pressing ArrowRight key', async () => {
@@ -220,15 +220,15 @@ describe('Browse - Overlay Navigation', () => {
 
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
-        fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
-        fileViewerVm.currentItemIndex = 0;
+        fileViewerVm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        fileViewerVm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
+        fileViewerVm.navigationState.currentItemIndex = 0;
         fileViewerVm.items = tabContentVm.items;
         await wrapper.vm.$nextTick();
 
-        expect(fileViewerVm.currentItemIndex).toBe(0);
+        expect(fileViewerVm.navigationState.currentItemIndex).toBe(0);
 
         const arrowRightEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
         window.dispatchEvent(arrowRightEvent);
@@ -236,7 +236,7 @@ describe('Browse - Overlay Navigation', () => {
         await wrapper.vm.$nextTick();
         await waitForNavigation(fileViewerVm);
 
-        expect(fileViewerVm.currentItemIndex).toBe(1);
+        expect(fileViewerVm.navigationState.currentItemIndex).toBe(1);
     });
 
     it('navigates to previous image when pressing ArrowLeft key', async () => {
@@ -262,15 +262,15 @@ describe('Browse - Overlay Navigation', () => {
 
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
-        fileViewerVm.overlayImage = { src: 'test2.jpg', alt: 'Test 2' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
-        fileViewerVm.currentItemIndex = 1;
+        fileViewerVm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        fileViewerVm.overlayState.image = { src: 'test2.jpg', alt: 'Test 2' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
+        fileViewerVm.navigationState.currentItemIndex = 1;
         fileViewerVm.items = tabContentVm.items;
         await wrapper.vm.$nextTick();
 
-        expect(fileViewerVm.currentItemIndex).toBe(1);
+        expect(fileViewerVm.navigationState.currentItemIndex).toBe(1);
 
         const arrowLeftEvent = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true });
         window.dispatchEvent(arrowLeftEvent);
@@ -278,7 +278,7 @@ describe('Browse - Overlay Navigation', () => {
         await wrapper.vm.$nextTick();
         await waitForNavigation(fileViewerVm);
 
-        expect(fileViewerVm.currentItemIndex).toBe(0);
+        expect(fileViewerVm.navigationState.currentItemIndex).toBe(0);
     });
 
     it('does not navigate when at first item and pressing ArrowLeft', async () => {
@@ -304,11 +304,11 @@ describe('Browse - Overlay Navigation', () => {
 
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
-        fileViewerVm.overlayImage = { src: 'test1.jpg', alt: 'Test 1' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
-        fileViewerVm.currentItemIndex = 0;
+        fileViewerVm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        fileViewerVm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
+        fileViewerVm.navigationState.currentItemIndex = 0;
         fileViewerVm.items = tabContentVm.items;
         await wrapper.vm.$nextTick();
 
@@ -317,7 +317,7 @@ describe('Browse - Overlay Navigation', () => {
 
         await wrapper.vm.$nextTick();
 
-        expect(fileViewerVm.currentItemIndex).toBe(0);
+        expect(fileViewerVm.navigationState.currentItemIndex).toBe(0);
     });
 
     it('does not navigate when at last item and pressing ArrowRight', async () => {
@@ -343,22 +343,22 @@ describe('Browse - Overlay Navigation', () => {
 
         const fileViewerVm = fileViewer.vm as any;
 
-        fileViewerVm.overlayRect = { top: 0, left: 0, width: 800, height: 600 };
-        fileViewerVm.overlayImage = { src: 'test2.jpg', alt: 'Test 2' };
-        fileViewerVm.overlayIsFilled = true;
-        fileViewerVm.overlayFillComplete = true;
-        fileViewerVm.currentItemIndex = 1;
+        fileViewerVm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        fileViewerVm.overlayState.image = { src: 'test2.jpg', alt: 'Test 2' };
+        fileViewerVm.overlayState.isFilled = true;
+        fileViewerVm.overlayState.fillComplete = true;
+        fileViewerVm.navigationState.currentItemIndex = 1;
         fileViewerVm.items = tabContentVm.items;
         await wrapper.vm.$nextTick();
 
-        const initialIndex = fileViewerVm.currentItemIndex;
+        const initialIndex = fileViewerVm.navigationState.currentItemIndex;
         const arrowRightEvent = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
         window.dispatchEvent(arrowRightEvent);
 
         await wrapper.vm.$nextTick();
 
         // At last item, should not change (or at most stay at last)
-        expect(fileViewerVm.currentItemIndex).toBeGreaterThanOrEqual(initialIndex);
+        expect(fileViewerVm.navigationState.currentItemIndex).toBeGreaterThanOrEqual(initialIndex);
     });
 
     it.skip('prevents browser navigation when pressing mouse button 4 (back)', async () => {
