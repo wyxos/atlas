@@ -86,6 +86,11 @@ npm run test                # Run Vitest tests
 - If the backend returns `params`, use `params`. Don't map it to `queryParams` unless absolutely necessary.
 - Align the backend to return what's needed instead of transforming in the frontend.
 
+### Rework Expectations (Implicit)
+- If a feature or section is messy, fragile, or behaviorally wrong, treat any request to extend or fix it as implicit permission to refactor or rebuild it cleanly.
+- Prefer deleting the problematic path and replacing it with a minimal, direct implementation that matches the requested behavior.
+- Do not keep legacy logic just because it exists; keep only what is necessary and correct.
+
 ### Test Alignment & Auth Policy
 - **See `tests/AGENTS.md`** for test alignment rules, auth expectations, and Vitest mocking guidance.
 
