@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, reactive, nextTick, onUnmounted, watch, toRef, toRefs } from 'vue';
-import { X, Loader2, Menu, Pause, Play, Maximize2, Minimize2 } from 'lucide-vue-next';
+import {computed, ref, reactive, nextTick, onUnmounted, watch, toRef} from 'vue';
+import {X, Loader2, Menu, Pause, Play, Maximize2, Minimize2} from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
-import type { FeedItem } from '@/composables/useTabs';
-import type { Masonry } from '@wyxos/vibe';
-import { useOverlayVideoControls } from '@/composables/useOverlayVideoControls';
-import { useFileViewerNavigation } from '@/composables/useFileViewerNavigation';
-import { useFileViewerSizing } from '@/composables/useFileViewerSizing';
-import { useFileViewerOverlayState } from '@/composables/useFileViewerOverlayState';
-import { useFileViewerOpen } from '@/composables/useFileViewerOpen';
-import { useFileViewerPaging } from '@/composables/useFileViewerPaging';
-import { useFileViewerData } from '@/composables/useFileViewerData';
-import { useFileViewerSheetSizing } from '@/composables/useFileViewerSheetSizing';
-import { useFileViewerOverlayStyles } from '@/composables/useFileViewerOverlayStyles';
+import type {FeedItem} from '@/composables/useTabs';
+import type {Masonry} from '@wyxos/vibe';
+import {useOverlayVideoControls} from '@/composables/useOverlayVideoControls';
+import {useFileViewerNavigation} from '@/composables/useFileViewerNavigation';
+import {useFileViewerSizing} from '@/composables/useFileViewerSizing';
+import {useFileViewerOverlayState} from '@/composables/useFileViewerOverlayState';
+import {useFileViewerOpen} from '@/composables/useFileViewerOpen';
+import {useFileViewerPaging} from '@/composables/useFileViewerPaging';
+import {useFileViewerData} from '@/composables/useFileViewerData';
+import {useFileViewerSheetSizing} from '@/composables/useFileViewerSheetSizing';
+import {useFileViewerOverlayStyles} from '@/composables/useFileViewerOverlayStyles';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -73,39 +73,11 @@ const containerState = reactive({
     overscroll: null as string | null,
 });
 
-const {
-    rect: overlayRect,
-    image: overlayImage,
-    mediaType: overlayMediaType,
-    videoSrc: overlayVideoSrc,
-    key: overlayKey,
-    isAnimating: overlayIsAnimating,
-    imageSize: overlayImageSize,
-    isFilled: overlayIsFilled,
-    fillComplete: overlayFillComplete,
-    isClosing: overlayIsClosing,
-    scale: overlayScale,
-    centerPosition: imageCenterPosition,
-    isLoading: overlayIsLoading,
-    fullSizeImage: overlayFullSizeImage,
-    originalDimensions: originalImageDimensions,
-} = toRefs(overlayState);
-
-const {
-    currentItemIndex,
-    imageScale,
-    isNavigating,
-    imageTranslateY,
-} = toRefs(navigationState);
-
-const { isOpen: isSheetOpen } = toRefs(sheetState);
-const { isLoadingMore, overflow: containerOverflow, overscroll: containerOverscroll } = toRefs(containerState);
 
 const {
     videoCurrentTime,
     videoDuration,
     isVideoPlaying,
-    isVideoSeeking,
     isVideoFullscreen,
     videoVolume,
     videoProgressPercent,
@@ -126,19 +98,19 @@ const {
     handleFullscreenChange,
 } = useOverlayVideoControls({
     overlayVideoRef,
-    overlayMediaType,
-    overlayFillComplete,
-    overlayIsClosing,
-    overlayVideoSrc,
-    overlayImageSrc: computed(() => overlayImage.value?.src ?? null),
+    overlayMediaType: toRef(overlayState, 'mediaType'),
+    overlayFillComplete: toRef(overlayState, 'fillComplete'),
+    overlayIsClosing: toRef(overlayState, 'isClosing'),
+    overlayVideoSrc: toRef(overlayState, 'videoSrc'),
+    overlayImageSrc: computed(() => overlayState.image?.src ?? null),
 });
 
-const { getAvailableWidth, calculateBestFitSize, getCenteredPosition } = useFileViewerSizing({
+const {getAvailableWidth, calculateBestFitSize, getCenteredPosition} = useFileViewerSizing({
     overlay: overlayState,
     sheet: sheetState,
 });
 
-const { closeOverlay } = useFileViewerOverlayState({
+const {closeOverlay} = useFileViewerOverlayState({
     containerRef: computed(() => props.containerRef),
     container: containerState,
     overlay: overlayState,
@@ -148,15 +120,15 @@ const { closeOverlay } = useFileViewerOverlayState({
 });
 
 async function ensureMoreItems(): Promise<boolean> {
-    if (!hasMore.value || isLoadingMore.value || isLoading.value) {
+    if (!hasMore.value || containerState.isLoadingMore || isLoading.value) {
         return false;
     }
-    isLoadingMore.value = true;
+    containerState.isLoadingMore = true;
     try {
         await props.masonry?.loadNextPage?.();
         await nextTick();
     } finally {
-        isLoadingMore.value = false;
+        containerState.isLoadingMore = false;
     }
     return true;
 }
@@ -164,13 +136,13 @@ async function ensureMoreItems(): Promise<boolean> {
 function preloadImage(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onload = () => resolve({width: img.naturalWidth, height: img.naturalHeight});
         img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
         img.src = url;
     });
 }
 
-const { fileData, isLoadingFileData, handleItemSeen } = useFileViewerData({
+const {fileData, isLoadingFileData, handleItemSeen} = useFileViewerData({
     items,
     navigation: navigationState,
     overlay: overlayState,
@@ -186,7 +158,7 @@ useFileViewerSheetSizing({
     getCenteredPosition,
 });
 
-const { openFromClick } = useFileViewerOpen({
+const {openFromClick} = useFileViewerOpen({
     containerRef: computed(() => props.containerRef),
     masonryContainerRef: computed(() => props.masonryContainerRef),
     items,
@@ -202,7 +174,7 @@ const { openFromClick } = useFileViewerOpen({
     emitOpen: () => emit('open'),
 });
 
-const { navigateToNext, navigateToPrevious, navigateToIndex } = useFileViewerPaging({
+const { navigateToNext, navigateToPrevious } = useFileViewerPaging({
     containerRef: computed(() => props.containerRef),
     items,
     overlay: overlayState,
@@ -215,7 +187,7 @@ const { navigateToNext, navigateToPrevious, navigateToIndex } = useFileViewerPag
     ensureMoreItems,
 });
 
-const { handleTouchStart, handleTouchEnd } = useFileViewerNavigation({
+const {handleTouchStart, handleTouchEnd} = useFileViewerNavigation({
     overlay: overlayState,
     onClose: closeOverlay,
     onNext: navigateToNext,
@@ -234,6 +206,7 @@ const {
     overlay: overlayState,
     navigation: navigationState,
 });
+
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
     // Middle click without ALT - open original URL (prevent default to avoid browser scroll)
@@ -249,11 +222,11 @@ function handleOverlayImageMouseDown(e: MouseEvent): void {
 // Handle middle click (auxclick) to open original URL
 function handleOverlayImageAuxClick(e: MouseEvent): void {
     // Middle click without ALT - open original URL
-    if (!e.altKey && e.button === 1 && currentItemIndex.value !== null) {
+    if (!e.altKey && e.button === 1 && navigationState.currentItemIndex !== null) {
         e.preventDefault();
         e.stopPropagation();
 
-        const currentItem = items.value[currentItemIndex.value];
+        const currentItem = items.value[navigationState.currentItemIndex];
         if (currentItem) {
             const url = currentItem.original || currentItem.preview;
             if (url) {
@@ -267,7 +240,7 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
     }
 }
 
-watch(() => [currentItemIndex.value, overlayFillComplete.value], ([newIndex, isFilled]) => {
+watch(() => [navigationState.currentItemIndex, overlayState.fillComplete], ([newIndex, isFilled]) => {
     if (newIndex === null || !isFilled) return;
     if (items.value.length - 1 - newIndex <= 1) {
         void ensureMoreItems();
@@ -277,15 +250,15 @@ watch(() => [currentItemIndex.value, overlayFillComplete.value], ([newIndex, isF
 // Cleanup on unmount
 onUnmounted(() => {
     const tabContent = props.containerRef;
-    if (tabContent && containerOverflow.value !== null) {
-        tabContent.style.overflow = containerOverflow.value;
-        if (containerOverscroll.value !== null) {
-            tabContent.style.overscrollBehavior = containerOverscroll.value;
+    if (tabContent && containerState.overflow !== null) {
+        tabContent.style.overflow = containerState.overflow;
+        if (containerState.overscroll !== null) {
+            tabContent.style.overscrollBehavior = containerState.overscroll;
         } else {
             tabContent.style.removeProperty('overscroll-behavior');
         }
-        containerOverflow.value = null;
-        containerOverscroll.value = null;
+        containerState.overflow = null;
+        containerState.overscroll = null;
     }
 });
 
@@ -295,127 +268,128 @@ defineExpose({
     close: closeOverlay,
     navigateForward: navigateToNext,
     navigateBackward: navigateToPrevious,
-    currentItemIndex,
+    currentItemIndex: toRef(navigationState, 'currentItemIndex'),
     items,
 });
 </script>
 
 <template>
     <!-- Click overlay -->
-    <div v-if="overlayRect && overlayImage" :class="overlayContainerClass" :style="overlayContainerStyle"
-        @touchstart.passive="handleTouchStart" @touchend.passive="handleTouchEnd">
+    <div v-if="overlayState.rect && overlayState.image" :class="overlayContainerClass" :style="overlayContainerStyle"
+         @touchstart.passive="handleTouchStart" @touchend.passive="handleTouchEnd">
         <!-- Main content area -->
         <div :class="overlayContentClass" :style="overlayMediaWrapperStyle">
             <!-- Image container -->
             <div class="relative flex-1 min-h-0 overflow-hidden" :style="overlayMediaWrapperStyle">
                 <!-- Preview image (shown immediately, behind spinner) -->
-                <img v-if="overlayIsLoading" :key="overlayKey + '-preview'" :src="overlayImage.src"
-                    :srcset="overlayImage.srcset" :sizes="overlayImage.sizes" :alt="overlayImage.alt" :class="[
+                <img v-if="overlayState.isLoading" :key="overlayState.key + '-preview'" :src="overlayState.image.src"
+                     :srcset="overlayState.image.srcset" :sizes="overlayState.image.sizes" :alt="overlayState.image.alt" :class="[
                         'absolute select-none pointer-events-none object-cover',
                         overlayMediaTransitionClass
-                    ]" :style="overlayMediaStyle" draggable="false" />
+                    ]" :style="overlayMediaStyle" draggable="false"/>
 
                 <!-- Spinner while loading full-size image -->
-                <div v-if="overlayIsLoading" class="absolute inset-0 flex items-center justify-center z-10">
-                    <Loader2 :size="32" class="animate-spin text-smart-blue-500" />
+                <div v-if="overlayState.isLoading" class="absolute inset-0 flex items-center justify-center z-10">
+                    <Loader2 :size="32" class="animate-spin text-smart-blue-500"/>
                 </div>
 
                 <!-- Full-size media (image or video) -->
-                <img v-if="!overlayIsLoading && overlayMediaType === 'image'" :key="overlayKey" :src="overlayFullSizeImage || overlayImage.src" :alt="overlayImage.alt"
-                    :class="[
+                <img v-if="!overlayState.isLoading && overlayState.mediaType === 'image'" :key="overlayState.key"
+                     :src="overlayState.fullSizeImage || overlayState.image.src" :alt="overlayState.image.alt"
+                     :class="[
                         'absolute select-none',
-                        overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
-                        overlayIsFilled ? '' : 'object-cover',
+                        overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none',
+                        overlayState.isFilled ? '' : 'object-cover',
                         overlayMediaTransitionClass
                     ]" :style="overlayMediaStyle" draggable="false" @mousedown="handleOverlayImageMouseDown"
-                    @auxclick="handleOverlayImageAuxClick" />
+                     @auxclick="handleOverlayImageAuxClick"/>
 
-                <video v-else-if="!overlayIsLoading && overlayMediaType === 'video'" :key="overlayKey" :poster="overlayVideoPoster" ref="overlayVideoRef"
-                    :class="[
+                <video v-else-if="!overlayState.isLoading && overlayState.mediaType === 'video'" :key="overlayState.key"
+                       :poster="overlayVideoPoster" ref="overlayVideoRef"
+                       :class="[
                         'absolute',
-                        overlayIsFilled && overlayFillComplete && !overlayIsClosing ? 'pointer-events-auto' : 'pointer-events-none',
-                        overlayIsFilled ? 'object-contain' : 'object-cover',
+                        overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing ? 'pointer-events-auto' : 'pointer-events-none',
+                        overlayState.isFilled ? 'object-contain' : 'object-cover',
                         overlayMediaTransitionClass
                     ]" :style="overlayMediaStyle" playsinline disablepictureinpicture preload="metadata"
-                    @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
-                    @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
-                    @volumechange="handleVideoVolumeChange" @mousedown="handleOverlayImageMouseDown"
-                    @auxclick="handleOverlayImageAuxClick">
-                    <source v-if="overlayVideoSrc" :src="overlayVideoSrc" type="video/mp4" />
+                       @loadedmetadata="handleVideoLoadedMetadata" @timeupdate="handleVideoTimeUpdate"
+                       @play="handleVideoPlay" @pause="handleVideoPause" @ended="handleVideoEnded"
+                       @volumechange="handleVideoVolumeChange" @mousedown="handleOverlayImageMouseDown"
+                       @auxclick="handleOverlayImageAuxClick">
+                    <source v-if="overlayState.videoSrc" :src="overlayState.videoSrc" type="video/mp4"/>
                 </video>
 
-                <div v-if="!overlayIsLoading && overlayMediaType === 'video' && overlayFillComplete && !overlayIsClosing"
+                <div
+                    v-if="!overlayState.isLoading && overlayState.mediaType === 'video' && overlayState.fillComplete && !overlayState.isClosing"
                     class="absolute bottom-4 left-0 right-0 z-50 pointer-events-auto px-4">
-                    <div class="flex w-full items-center gap-3 rounded border border-twilight-indigo-500/80 bg-prussian-blue-800/80 px-3 py-2 backdrop-blur">
+                    <div
+                        class="flex w-full items-center gap-3 rounded border border-twilight-indigo-500/80 bg-prussian-blue-800/80 px-3 py-2 backdrop-blur">
                         <button type="button" class="rounded-full p-2 text-smart-blue-100 hover:text-white"
-                            :aria-label="isVideoPlaying ? 'Pause video' : 'Play video'" @click.stop="toggleVideoPlayback">
-                            <Pause v-if="isVideoPlaying" :size="16" />
-                            <Play v-else :size="16" />
+                                :aria-label="isVideoPlaying ? 'Pause video' : 'Play video'"
+                                @click.stop="toggleVideoPlayback">
+                            <Pause v-if="isVideoPlaying" :size="16"/>
+                            <Play v-else :size="16"/>
                         </button>
                         <div class="flex-1 min-w-0">
                             <input class="file-viewer-video-slider w-full" type="range" min="0"
-                                :max="videoDuration || 0" step="0.1" :value="videoCurrentTime"
-                                :style="{
+                                   :max="videoDuration || 0" step="0.1" :value="videoCurrentTime"
+                                   :style="{
                                     backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${videoProgressPercent}%, var(--color-twilight-indigo-600) ${videoProgressPercent}%)`
                                 }" @input="handleVideoSeek" @pointerdown="handleVideoSeekStart"
-                                @pointerup="handleVideoSeekEnd" />
+                                   @pointerup="handleVideoSeekEnd"/>
                         </div>
                         <div class="w-24 shrink-0">
                             <input class="file-viewer-video-slider w-full" type="range" min="0" max="1" step="0.01"
-                                :value="videoVolume" :style="{
+                                   :value="videoVolume" :style="{
                                     backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${videoVolumePercent}%, var(--color-twilight-indigo-600) ${videoVolumePercent}%)`
-                                }" @input="handleVideoVolumeInput" />
+                                }" @input="handleVideoVolumeInput"/>
                         </div>
                         <button type="button" class="rounded-full p-2 text-smart-blue-100 hover:text-white"
-                            :aria-label="isVideoFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
-                            @click.stop="toggleVideoFullscreen">
-                            <Minimize2 v-if="isVideoFullscreen" :size="16" />
-                            <Maximize2 v-else :size="16" />
+                                :aria-label="isVideoFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'"
+                                @click.stop="toggleVideoFullscreen">
+                            <Minimize2 v-if="isVideoFullscreen" :size="16"/>
+                            <Maximize2 v-else :size="16"/>
                         </button>
                     </div>
                 </div>
 
-            <!-- Close button -->
-            <button v-if="overlayFillComplete && !overlayIsClosing" @click="closeOverlay"
-                class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
-                aria-label="Close overlay" data-test="close-overlay-button">
-                <X :size="20" />
-            </button>
+                <!-- Close button -->
+                <button v-if="overlayState.fillComplete && !overlayState.isClosing" @click="closeOverlay"
+                        class="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors pointer-events-auto"
+                        aria-label="Close overlay" data-test="close-overlay-button">
+                    <X :size="20"/>
+                </button>
 
-            <div
-                v-if="overlayFillComplete && !overlayIsClosing && isLoadingMore"
-                class="absolute top-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-smart-blue-500/80 bg-prussian-blue-800/90 px-4 py-2 text-xs font-medium text-smart-blue-100 backdrop-blur"
-            >
+                <div
+                    v-if="overlayState.fillComplete && !overlayState.isClosing && containerState.isLoadingMore"
+                    class="absolute top-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-smart-blue-500/80 bg-prussian-blue-800/90 px-4 py-2 text-xs font-medium text-smart-blue-100 backdrop-blur"
+                >
                 <span class="inline-flex items-center gap-2">
-                    <Loader2 :size="14" class="animate-spin" />
+                    <Loader2 :size="14" class="animate-spin"/>
                     Loading more items…
                 </span>
+                </div>
             </div>
-
-                <!-- Reactions disabled -->
-            </div>
-
-            <!-- Carousel disabled (vertical navigation only for now). -->
         </div>
 
         <!-- Vertical Taskbar (only shown when filled) -->
-        <div v-if="overlayIsFilled && overlayFillComplete && !overlayIsClosing && !isSheetOpen"
-            class="flex flex-col items-center justify-center gap-4 p-4 bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out w-16">
+        <div v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing && !sheetState.isOpen"
+             class="flex flex-col items-center justify-center gap-4 p-4 bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out w-16">
             <!-- CTA Button to open sheet -->
-            <button @click="isSheetOpen = true"
-                class="p-3 rounded-lg bg-smart-blue-500 hover:bg-smart-blue-600 text-white transition-colors"
-                aria-label="Open sheet">
-                <Menu :size="20" />
+            <button @click="sheetState.isOpen = true"
+                    class="p-3 rounded-lg bg-smart-blue-500 hover:bg-smart-blue-600 text-white transition-colors"
+                    aria-label="Open sheet">
+                <Menu :size="20"/>
             </button>
         </div>
 
         <FileViewerSheet
-            v-if="overlayIsFilled && overlayFillComplete && !overlayIsClosing"
-            :is-open="isSheetOpen"
-            :file-id="currentItemIndex !== null && items[currentItemIndex] ? items[currentItemIndex].id : null"
+            v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing"
+            :is-open="sheetState.isOpen"
+            :file-id="navigationState.currentItemIndex !== null && items[navigationState.currentItemIndex] ? items[navigationState.currentItemIndex].id : null"
             :file-data="fileData ?? null"
             :is-loading="isLoadingFileData"
-            @close="isSheetOpen = false"
+            @close="sheetState.isOpen = false"
         />
     </div>
 </template>
