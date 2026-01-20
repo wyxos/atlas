@@ -142,16 +142,23 @@ export function useFileViewerPaging(params: {
         const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
         const availableHeight = containerHeight - (borderWidth * 2);
 
-        imageSize.value = {
-            width: availableWidth,
-            height: availableHeight,
+        const previewDimensions = {
+            width: nextItem.width,
+            height: nextItem.height,
         };
+        const initialBestFit = params.calculateBestFitSize(
+            previewDimensions.width,
+            previewDimensions.height,
+            availableWidth,
+            availableHeight
+        );
 
+        imageSize.value = initialBestFit;
         centerPosition.value = params.getCenteredPosition(
             availableWidth,
             availableHeight,
-            availableWidth,
-            availableHeight
+            initialBestFit.width,
+            initialBestFit.height
         );
 
         const slideInDistance = tabContent.getBoundingClientRect().height;
@@ -328,12 +335,41 @@ export function useFileViewerPaging(params: {
             console.warn('Failed to preload next image:', error);
             fullSizeImage.value = nextImageSrc;
             isLoading.value = false;
-            if (nextItem) {
-                originalDimensions.value = {
-                    width: nextItem.width,
-                    height: nextItem.height,
-                };
+
+            try {
+                const fallbackDimensions = await params.preloadImage(nextImageSrc);
+                originalDimensions.value = fallbackDimensions;
+
+                const tabContentBox = tabContent.getBoundingClientRect();
+                const containerWidth = tabContentBox.width;
+                const containerHeight = tabContentBox.height;
+                const borderWidth = 4;
+                const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+                const availableHeight = containerHeight - (borderWidth * 2);
+
+                const bestFitSize = params.calculateBestFitSize(
+                    fallbackDimensions.width,
+                    fallbackDimensions.height,
+                    availableWidth,
+                    availableHeight
+                );
+
+                imageSize.value = bestFitSize;
+                centerPosition.value = params.getCenteredPosition(
+                    availableWidth,
+                    availableHeight,
+                    bestFitSize.width,
+                    bestFitSize.height
+                );
+            } catch {
+                if (nextItem) {
+                    originalDimensions.value = {
+                        width: nextItem.width,
+                        height: nextItem.height,
+                    };
+                }
             }
+
             imageScale.value = 1;
             imageTranslateY.value = 0;
             await nextTick();

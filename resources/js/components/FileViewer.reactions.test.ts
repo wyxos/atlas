@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { nextTick } from 'vue';
+import { nextTick, reactive } from 'vue';
 import FileViewer from './FileViewer.vue';
 
 const containerRef = document.createElement('div');
@@ -32,10 +32,10 @@ beforeEach(() => {
 
 describe('FileViewer reactions', () => {
     it('navigates to the next item after reacting when the current item is removed', async () => {
-        const items = [
+        const items = reactive([
             { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },
             { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'video', page: 1, index: 1, notFound: false },
-        ];
+        ]);
 
         const wrapper = mount(FileViewer, {
             props: {
@@ -68,5 +68,114 @@ describe('FileViewer reactions', () => {
 
         expect(vm.navigationState.currentItemIndex).toBe(0);
         expect(items[vm.navigationState.currentItemIndex]?.id).toBe(2);
+    });
+
+    it('triggers like reaction on alt+click and moves to next item', async () => {
+        const items = reactive([
+            { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },
+            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'video', page: 1, index: 1, notFound: false },
+        ]);
+
+        const wrapper = mount(FileViewer, {
+            props: {
+                containerRef,
+                masonryContainerRef: containerRef,
+                items,
+                masonry: null,
+            },
+        });
+
+        const vm = wrapper.vm as any;
+        vm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        vm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+        vm.overlayState.isFilled = true;
+        vm.overlayState.fillComplete = true;
+        vm.navigationState.currentItemIndex = 0;
+        await nextTick();
+
+        const image = wrapper.find('img[alt="Test 1"]');
+        expect(image.exists()).toBe(true);
+
+        await image.trigger('click', { altKey: true, button: 0 });
+        await nextTick();
+
+        expect(wrapper.emitted('reaction')?.[0]).toEqual([1, 'like']);
+        expect(vm.navigationState.currentItemIndex).toBe(1);
+    });
+
+    it('keeps current item in sync when items restore before the current item', async () => {
+        const items = reactive([
+            { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },
+            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'video', page: 1, index: 1, notFound: false },
+        ]);
+
+        const wrapper = mount(FileViewer, {
+            props: {
+                containerRef,
+                masonryContainerRef: containerRef,
+                items,
+                masonry: null,
+            },
+        });
+
+        const vm = wrapper.vm as any;
+        vm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        vm.overlayState.image = { src: 'test2.jpg', alt: 'Test 2' };
+        vm.overlayState.isFilled = true;
+        vm.overlayState.fillComplete = true;
+        vm.navigationState.currentItemIndex = 1;
+        await nextTick();
+
+        items.unshift({ id: 99, width: 300, height: 400, src: 'test99.jpg', type: 'video', page: 1, index: 0, notFound: false });
+        await nextTick();
+
+        expect(vm.navigationState.currentItemIndex).toBe(2);
+    });
+
+    it('updates index after undo restores an item before the current one', async () => {
+        const items = reactive([
+            { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },
+            { id: 2, width: 300, height: 400, src: 'test2.jpg', type: 'video', page: 1, index: 1, notFound: false },
+            { id: 3, width: 300, height: 400, src: 'test3.jpg', type: 'video', page: 1, index: 2, notFound: false },
+            { id: 4, width: 300, height: 400, src: 'test4.jpg', type: 'video', page: 1, index: 3, notFound: false },
+        ]);
+
+        const wrapper = mount(FileViewer, {
+            props: {
+                containerRef,
+                masonryContainerRef: containerRef,
+                items,
+                masonry: null,
+            },
+        });
+
+        const vm = wrapper.vm as any;
+        vm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        vm.overlayState.image = { src: 'test3.jpg', alt: 'Test 3' };
+        vm.overlayState.isFilled = true;
+        vm.overlayState.fillComplete = true;
+        vm.navigationState.currentItemIndex = 2;
+        await nextTick();
+
+        const likeButton = wrapper.find('button[aria-label="Like"]');
+        await likeButton.trigger('click');
+        await nextTick();
+
+        expect(vm.navigationState.currentItemIndex).toBe(3);
+        expect(items[vm.navigationState.currentItemIndex]?.id).toBe(4);
+
+        items.splice(2, 1);
+        await nextTick();
+        await nextTick();
+
+        expect(vm.navigationState.currentItemIndex).toBe(2);
+        expect(items[vm.navigationState.currentItemIndex]?.id).toBe(4);
+
+        items.splice(2, 0, { id: 3, width: 300, height: 400, src: 'test3.jpg', type: 'video', page: 1, index: 2, notFound: false });
+        await nextTick();
+        await nextTick();
+
+        expect(vm.navigationState.currentItemIndex).toBe(3);
+        expect(items[vm.navigationState.currentItemIndex]?.id).toBe(4);
     });
 });
