@@ -20,7 +20,6 @@ const isFrozen = ref(false);
 const isModalOpen = ref(false);
 // Reactive trigger to force Vue reactivity on timer updates
 const updateTrigger = ref(0);
-let animationFrameId: number | null = null;
 let lastUpdateTime: number | null = null;
 let updateIntervalId: ReturnType<typeof setInterval> | null = null;
 // Throttle UI updates to reduce reactivity overhead (update every 100ms for display)
@@ -42,7 +41,6 @@ export function useQueue() {
         }
 
         const itemsToRemove: string[] = [];
-        const currentTime = performance.now();
 
         queue.value.forEach((item, id) => {
             // Skip items that haven't started yet
@@ -85,80 +83,47 @@ export function useQueue() {
             updateTrigger.value++;
         }
 
-        // Throttle UI update trigger to reduce reactivity overhead
-        // Update every 100ms instead of every frame (~60fps) for better performance
-        if (lastUIUpdateTime === null || currentTime - lastUIUpdateTime >= UI_UPDATE_INTERVAL_MS) {
-            lastUIUpdateTime = currentTime;
-            // Trigger reactivity for progress updates (components will re-render)
-            updateTrigger.value++;
-        }
     }
 
     /**
      * Start the timer loop if not already running.
-     * Uses requestAnimationFrame for smooth updates in browser.
      */
     function startTimerLoop(): void {
-        if (animationFrameId !== null || updateIntervalId !== null) {
+        if (updateIntervalId !== null) {
             return; // Already running
         }
 
         lastUpdateTime = performance.now();
-
-        function updateLoop(currentTime: number): void {
-            if (lastUpdateTime === null) {
+        const UPDATE_INTERVAL_MS = 16; // ~60fps
+        updateIntervalId = setInterval(() => {
+            const currentTime = performance.now();
+            if (lastUpdateTime !== null) {
+                const deltaTime = currentTime - lastUpdateTime;
                 lastUpdateTime = currentTime;
-                animationFrameId = requestAnimationFrame(updateLoop);
-                return;
-            }
-
-            const deltaTime = currentTime - lastUpdateTime;
-            lastUpdateTime = currentTime;
-
             updateQueueItems(deltaTime);
 
-            // Continue loop if there are items or if frozen (to resume when unfrozen)
-            if (queue.value.size > 0 || isFrozen.value) {
-                animationFrameId = requestAnimationFrame(updateLoop);
-            } else {
-                animationFrameId = null;
-                lastUpdateTime = null;
+            // Throttle UI update trigger to reduce reactivity overhead
+            // Update every 100ms instead of every frame (~60fps) for better performance
+            if (lastUIUpdateTime === null || currentTime - lastUIUpdateTime >= UI_UPDATE_INTERVAL_MS) {
+                lastUIUpdateTime = currentTime;
+                // Trigger reactivity for progress updates (components will re-render)
+                updateTrigger.value++;
             }
-        }
+            } else {
+                lastUpdateTime = currentTime;
+            }
 
-        // Try requestAnimationFrame first (browser environment)
-        if (typeof requestAnimationFrame !== 'undefined') {
-            animationFrameId = requestAnimationFrame(updateLoop);
-        } else {
-            // Fallback to setInterval (test environment)
-            const UPDATE_INTERVAL_MS = 16; // ~60fps
-            updateIntervalId = setInterval(() => {
-                const currentTime = performance.now();
-                if (lastUpdateTime !== null) {
-                    const deltaTime = currentTime - lastUpdateTime;
-                    lastUpdateTime = currentTime;
-                    updateQueueItems(deltaTime);
-                } else {
-                    lastUpdateTime = currentTime;
-                }
-
-                // Stop if no items and not frozen
-                if (queue.value.size === 0 && !isFrozen.value) {
-                    stopTimerLoop();
-                }
-            }, UPDATE_INTERVAL_MS) as unknown as ReturnType<typeof setInterval>;
-        }
+            // Stop if no items and not frozen
+            if (queue.value.size === 0 && !isFrozen.value) {
+                stopTimerLoop();
+            }
+        }, UPDATE_INTERVAL_MS) as unknown as ReturnType<typeof setInterval>;
     }
 
     /**
      * Stop the timer loop.
      */
     function stopTimerLoop(): void {
-        if (animationFrameId !== null) {
-            cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
-        }
-
         if (updateIntervalId !== null) {
             clearInterval(updateIntervalId);
             updateIntervalId = null;

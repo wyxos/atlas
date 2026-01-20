@@ -222,71 +222,67 @@ export function useFileViewerOpen(params: {
 
         await nextTick();
         await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 0));
 
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                const container = params.containerRef.value;
-                if (!container || !rect.value || !imageSize.value) return;
+        if (!tabContent || !rect.value || !imageSize.value) return;
 
-                const tabContentBox = container.getBoundingClientRect();
-                const containerWidth = tabContentBox.width;
-                const containerHeight = tabContentBox.height;
+        const tabContentBoxAfter = tabContent.getBoundingClientRect();
+        const containerWidth = tabContentBoxAfter.width;
+        const containerHeight = tabContentBoxAfter.height;
 
-                const centerLeft = Math.round((containerWidth - width) / 2);
-                const centerTop = Math.round((containerHeight - height) / 2);
+        const centerLeft = Math.round((containerWidth - width) / 2);
+        const centerTop = Math.round((containerHeight - height) / 2);
 
-                const contentWidth = width - (borderWidth * 2);
-                const contentHeight = height - (borderWidth * 2);
+        const contentWidth = width - (borderWidth * 2);
+        const contentHeight = height - (borderWidth * 2);
 
-                centerPosition.value = params.getCenteredPosition(
-                    contentWidth,
-                    contentHeight,
-                    imageSize.value.width,
-                    imageSize.value.height
-                );
+        centerPosition.value = params.getCenteredPosition(
+            contentWidth,
+            contentHeight,
+            imageSize.value.width,
+            imageSize.value.height
+        );
 
-                isAnimating.value = true;
-                rect.value = {
-                    top: centerTop,
-                    left: centerLeft,
-                    width,
-                    height,
-                };
+        isAnimating.value = true;
+        rect.value = {
+            top: centerTop,
+            left: centerLeft,
+            width,
+            height,
+        };
 
-                setTimeout(() => {
-                    if (!container || !rect.value || !imageSize.value || !originalDimensions.value) return;
+        setTimeout(() => {
+            if (!container || !rect.value || !imageSize.value || !originalDimensions.value) return;
 
-                    const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
-                    const availableHeight = containerHeight - (borderWidth * 2);
-                    const bestFitSize = params.calculateBestFitSize(
-                        originalDimensions.value.width,
-                        originalDimensions.value.height,
-                        availableWidth,
-                        availableHeight
-                    );
+            const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+            const availableHeight = containerHeight - (borderWidth * 2);
+            const bestFitSize = params.calculateBestFitSize(
+                originalDimensions.value.width,
+                originalDimensions.value.height,
+                availableWidth,
+                availableHeight
+            );
 
-                    imageSize.value = bestFitSize;
-                    centerPosition.value = params.getCenteredPosition(
-                        availableWidth,
-                        availableHeight,
-                        bestFitSize.width,
-                        bestFitSize.height
-                    );
+            imageSize.value = bestFitSize;
+            centerPosition.value = params.getCenteredPosition(
+                availableWidth,
+                availableHeight,
+                bestFitSize.width,
+                bestFitSize.height
+            );
 
-                    isFilled.value = true;
-                    rect.value = {
-                        top: 0,
-                        left: 0,
-                        width: containerWidth,
-                        height: containerHeight,
-                    };
+            isFilled.value = true;
+            rect.value = {
+                top: 0,
+                left: 0,
+                width: containerWidth,
+                height: containerHeight,
+            };
 
-                    setTimeout(() => {
-                        fillComplete.value = true;
-                    }, 500);
-                }, 500);
-            });
-        });
+            setTimeout(() => {
+                fillComplete.value = true;
+            }, 500);
+        }, 500);
     }
 
     return {

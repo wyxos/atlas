@@ -22,12 +22,6 @@ beforeEach(() => {
         get: vi.fn().mockResolvedValue({ data: { file: null } }),
     };
     Object.defineProperty(window, 'axios', { value: mockAxios, writable: true });
-    if (!window.requestAnimationFrame) {
-        Object.defineProperty(window, 'requestAnimationFrame', {
-            value: (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0),
-            writable: true,
-        });
-    }
 });
 
 describe('FileViewer reactions', () => {
