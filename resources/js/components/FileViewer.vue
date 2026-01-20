@@ -2,7 +2,9 @@
 import {computed, ref, reactive, nextTick, onUnmounted, watch, toRef} from 'vue';
 import {X, Loader2, Menu, Pause, Play, Maximize2, Minimize2} from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
+import FileReactions from './FileReactions.vue';
 import type {FeedItem} from '@/composables/useTabs';
+import type {ReactionType} from '@/types/reaction';
 import type {Masonry} from '@wyxos/vibe';
 import {useOverlayVideoControls} from '@/composables/useOverlayVideoControls';
 import {useFileViewerNavigation} from '@/composables/useFileViewerNavigation';
@@ -26,11 +28,19 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
     close: [];
     open: [];
+    reaction: [fileId: number, type: ReactionType];
 }>();
 
 const items = toRef(props, 'items');
 const hasMore = computed(() => !props.masonry?.hasReachedEnd);
 const isLoading = computed(() => props.masonry?.isLoading ?? false);
+const currentItem = computed(() => {
+    const index = navigationState.currentItemIndex;
+    if (index === null || index < 0 || index >= items.value.length) {
+        return null;
+    }
+    return items.value[index] ?? null;
+});
 
 // Overlay state
 const overlayVideoRef = ref<HTMLVideoElement | null>(null);
@@ -241,6 +251,15 @@ function handleOverlayImageAuxClick(e: MouseEvent): void {
     }
 }
 
+function handleViewerReaction(type: ReactionType): void {
+    const item = currentItem.value;
+    if (!item) {
+        return;
+    }
+    navigateToNext();
+    emit('reaction', item.id, type);
+}
+
 watch(() => [navigationState.currentItemIndex, overlayState.fillComplete], ([newIndex, isFilled]) => {
     if (newIndex === null || !isFilled) return;
     if (items.value.length - 1 - newIndex <= 1) {
@@ -355,6 +374,22 @@ defineExpose({
                             <Maximize2 v-else :size="16"/>
                         </button>
                     </div>
+                </div>
+
+                <div
+                    v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing && currentItem"
+                    class="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 pointer-events-auto"
+                >
+                    <FileReactions
+                        :file-id="currentItem.id"
+                        :reaction="currentItem.reaction as ({ type: string } | null | undefined)"
+                        :previewed-count="currentItem.previewed_count ?? 0"
+                        :viewed-count="currentItem.seen_count ?? 0"
+                        :current-index="navigationState.currentItemIndex ?? 0"
+                        :total-items="items.length"
+                        variant="small"
+                        @reaction="handleViewerReaction"
+                    />
                 </div>
 
                 <!-- Close button -->

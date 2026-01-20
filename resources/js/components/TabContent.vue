@@ -622,6 +622,10 @@ function handleFileReaction(itemId: number, type: ReactionType, remove: (() => v
     }
 }
 
+function handleFileViewerReaction(itemId: number, type: ReactionType): void {
+    handleFileReaction(itemId, type, () => {}, items.value.findIndex((i) => i.id === itemId));
+}
+
 function handleCopyPromptClick(): void {
     if (promptData.currentPromptData.value) {
         promptData.copyPromptToClipboard(promptData.currentPromptData.value);
@@ -997,7 +1001,8 @@ defineExpose({
         <!-- File Viewer -->
         <FileViewer ref="fileViewer" :container-ref="tabContentContainer" :masonry-container-ref="masonryContainer"
             :items="items" :masonry="masonry"
-            @open="handleFileViewerOpen" @close="handleFileViewerClose" />
+            @open="handleFileViewerOpen" @close="handleFileViewerClose"
+            @reaction="handleFileViewerReaction" />
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
