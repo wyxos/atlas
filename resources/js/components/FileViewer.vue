@@ -73,6 +73,7 @@ const containerState = reactive({
     overscroll: null as string | null,
 });
 
+const currentItemIndex = toRef(navigationState, 'currentItemIndex');
 
 const {
     videoCurrentTime,
@@ -268,7 +269,10 @@ defineExpose({
     close: closeOverlay,
     navigateForward: navigateToNext,
     navigateBackward: navigateToPrevious,
-    currentItemIndex: toRef(navigationState, 'currentItemIndex'),
+    currentItemIndex,
+    overlayState,
+    navigationState,
+    sheetState,
     items,
 });
 </script>
