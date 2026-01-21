@@ -166,6 +166,10 @@ class File extends Model
             'seen_count' => (int) ($this->seen_count ?? 0),
         ];
 
+        if ($this->blacklisted_at !== null) {
+            $array['blacklist_type'] = $this->blacklist_reason ? 'manual' : 'auto';
+        }
+
         // mime_group for easy filtering - always calculate from current mime_type
         $mime = $this->mime_type ? (string) $this->mime_type : '';
         if ($mime === '') {
@@ -256,6 +260,10 @@ class File extends Model
 
             // Add has_reactions boolean for efficient filtering
             $array['has_reactions'] = ! empty($reactedIds);
+            $array['has_love'] = ! empty($loveIds);
+            $array['has_like'] = ! empty($likeIds);
+            $array['has_dislike'] = ! empty($dislikeIds);
+            $array['has_funny'] = ! empty($funnyIds);
         } catch (\Throwable $e) {
             // If reactions table is not ready or any error occurs, skip embedding arrays
         }

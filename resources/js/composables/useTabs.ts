@@ -27,13 +27,19 @@ export type FeedItem = {
 export type TabData = {
     id: number;
     label: string;
-    params: Record<string, string | number | null>; // Contains 'page' and 'next' keys (service handles format)
+    params: Record<string, string | number | boolean | null | Array<unknown>>; // Contains 'page' and 'next' keys (service handles format)
     position: number;
     isActive: boolean;
     feed?: 'online' | 'local'; // Defaults to 'online' if not set
 };
 
 export type OnTabSwitchCallback = (tabId: number) => Promise<void> | void;
+
+type CreateTabOptions = {
+    label?: string;
+    params?: Record<string, string | number | boolean | null | Array<unknown>>;
+    activate?: boolean;
+};
 
 export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
     const tabs = ref<TabData[]>([]);
@@ -48,7 +54,7 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             tabs.value = data.map((tab: {
                 id: number;
                 label: string;
-                params?: Record<string, string | number | null>;
+                params?: Record<string, string | number | boolean | null | Array<unknown>>;
                 items?: FeedItem[]; // Not included in initial load, loaded lazily when restoring a tab
                 position?: number;
                 is_active?: boolean;
@@ -75,15 +81,22 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
     }
 
-    async function createTab(): Promise<TabData> {
+    async function createTab(options: CreateTabOptions = {}): Promise<TabData> {
+        const { label, params, activate = true } = options;
         const maxPosition = tabs.value.length > 0
             ? Math.max(...tabs.value.map(t => t.position))
             : -1;
 
+        const normalizedParams = params
+            ? Object.fromEntries(
+                Object.entries(params).filter(([, value]) => value !== undefined)
+            ) as Record<string, string | number | boolean | null | Array<unknown>>
+            : undefined;
+
         const newTab: TabData = {
             id: 0, // Temporary ID, will be set from response
-            label: `Browse ${tabs.value.length + 1}`,
-            params: {
+            label: label ?? `Browse ${tabs.value.length + 1}`,
+            params: normalizedParams ?? {
                 // Don't set page or service - user must select service first
             },
             position: maxPosition + 1,
@@ -103,14 +116,16 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
             newTab.params = params;
             newTab.feed = (params.feed === 'local' ? 'local' : 'online') as 'online' | 'local';
             tabs.value.push(newTab);
-            activeTabId.value = newTab.id;
+            if (activate) {
+                activeTabId.value = newTab.id;
 
-            // Set this tab as active
-            await setActiveTab(newTab.id);
+                // Set this tab as active
+                await setActiveTab(newTab.id);
 
-            // Call callback if provided to handle UI switching
-            if (onTabSwitch) {
-                await onTabSwitch(newTab.id);
+                // Call callback if provided to handle UI switching
+                if (onTabSwitch) {
+                    await onTabSwitch(newTab.id);
+                }
             }
 
             return newTab;
@@ -176,6 +191,20 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         }
         // Note: params are updated by the backend (Browser.php) when browse requests are made.
         saveTabDebounced(activeTab);
+    }
+
+    function updateTabLabel(tabId: number, label: string): void {
+        const tab = tabs.value.find(t => t.id === tabId);
+        if (!tab) {
+            return;
+        }
+
+        if (tab.label === label) {
+            return;
+        }
+
+        tab.label = label;
+        void saveTab(tab);
     }
 
     function saveTabDebounced(tab: TabData): void {
@@ -248,9 +277,8 @@ export function useTabs(onTabSwitch?: OnTabSwitchCallback) {
         closeTab,
         getActiveTab,
         updateActiveTab,
+        updateTabLabel,
         loadTabItems,
         setActiveTab,
     };
 }
-
-

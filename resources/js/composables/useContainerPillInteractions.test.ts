@@ -140,7 +140,7 @@ describe('useContainerPillInteractions', () => {
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 
-    it('handles middle click without alt to open URL', () => {
+    it('handles middle click without alt to open container tab', () => {
         const items = ref<FeedItem[]>([
             {
                 id: 1,
@@ -155,17 +155,14 @@ describe('useContainerPillInteractions', () => {
         ]);
 
         const masonry = ref({});
-
-        // Mock window.open
-        const mockOpen = vi.fn();
-        const originalOpen = window.open;
-        window.open = mockOpen;
+        const onOpenContainerTab = vi.fn();
 
         const { handlePillAuxClick } = useContainerPillInteractions(
             items,
             masonry,
             1,
-            mockOnReaction
+            mockOnReaction,
+            onOpenContainerTab
         );
 
         // Simulate middle click without alt
@@ -178,11 +175,9 @@ describe('useContainerPillInteractions', () => {
 
         handlePillAuxClick(1, mockEvent);
 
-        // Verify window.open was called (to open URL)
-        expect(mockOpen).toHaveBeenCalled();
-
-        // Restore window.open
-        window.open = originalOpen;
+        expect(onOpenContainerTab).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 1, type: 'gallery' })
+        );
     });
 
     it('handles alt + right click to dislike all siblings', async () => {

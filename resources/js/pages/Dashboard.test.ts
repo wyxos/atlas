@@ -28,7 +28,7 @@ describe('Dashboard', () => {
         expect(wrapper.text()).toContain('Dashboard');
     });
 
-    it('renders welcome message', async () => {
+    it('renders dashboard subtitle', async () => {
         const router = await createTestRouter();
         const wrapper = mount(Dashboard, {
             global: {
@@ -36,10 +36,10 @@ describe('Dashboard', () => {
             },
         });
 
-        expect(wrapper.text()).toContain('Welcome to your dashboard');
+        expect(wrapper.text()).toContain('File volume and moderation impact at a glance.');
     });
 
-    it('has a link to users page', async () => {
+    it('renders section headers', async () => {
         const router = await createTestRouter();
         const wrapper = mount(Dashboard, {
             global: {
@@ -47,9 +47,8 @@ describe('Dashboard', () => {
             },
         });
 
-        // router-link renders as an <a> tag with href="/users"
-        const usersLink = wrapper.find('a[href="/users"]');
-        expect(usersLink.exists()).toBe(true);
+        expect(wrapper.text()).toContain('Reactions');
+        expect(wrapper.text()).toContain('Blacklist breakdown');
     });
 });
 

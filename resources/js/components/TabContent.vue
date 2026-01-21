@@ -56,6 +56,8 @@ interface Props {
     onLoadingChange?: (isLoading: boolean) => void;
     onTabDataLoadingChange?: (isLoading: boolean) => void;
     updateActiveTab: (items: FeedItem[]) => void;
+    onOpenContainerTab?: (payload: { label: string; params: Record<string, unknown> }) => void;
+    onUpdateTabLabel?: (label: string) => void;
 }
 
 const props = defineProps<Props>();
@@ -275,6 +277,15 @@ async function getPage(page: PageToken, context?: BrowseFormData) {
         params[k] = v;
     }
 
+    if (props.onUpdateTabLabel) {
+        if (formData.feed === 'local' || (formData.feed === 'online' && formData.service)) {
+            const serviceLabel = formData.feed === 'local'
+                ? (localService.value?.label ?? 'Local')
+                : (availableServices.value.find((s) => s.key === formData.service)?.label ?? formData.service);
+            props.onUpdateTabLabel(`${serviceLabel} - ${String(page)}`);
+        }
+    }
+
     handleLoadingStart();
     try {
         const { data } = await window.axios.get(browseIndex.url({ query: params }));
@@ -398,6 +409,51 @@ const containerPillInteractions = useContainerPillInteractions(
     computed(() => tab.value.id),
     (fileId: number, type: 'love' | 'like' | 'dislike' | 'funny') => {
         props.onReaction(fileId, type);
+    },
+    (container) => {
+        if (!props.onOpenContainerTab || form.data.feed !== 'online' || !form.data.service) {
+            return;
+        }
+
+        const serviceKey = form.data.service;
+        const serviceLabel = availableServices.value.find((service) => service.key === serviceKey)?.label ?? serviceKey;
+        const containerValue = container.source_id ?? container.id;
+
+        const params: Record<string, unknown> = {
+            feed: 'online',
+            service: serviceKey,
+            page: 1,
+            limit: form.data.limit,
+        };
+
+        const reserved = new Set(['service', 'source', 'feed', 'tab_id', 'page', 'limit', 'serviceFilters']);
+        for (const [k, v] of Object.entries(form.data.serviceFilters || {})) {
+            if (reserved.has(k)) {
+                continue;
+            }
+            params[k] = v;
+        }
+
+        let hasContainerFilter = false;
+        if (serviceKey === 'civit-ai-images' && container.source === 'CivitAI') {
+            if (container.type === 'User' && container.source_id) {
+                params.username = container.source_id;
+                hasContainerFilter = true;
+            }
+            if (container.type === 'Post' && container.source_id) {
+                params.postId = container.source_id;
+                hasContainerFilter = true;
+            }
+        }
+
+        if (!hasContainerFilter) {
+            return;
+        }
+
+        props.onOpenContainerTab({
+            label: `${serviceLabel} - ${container.type}: ${containerValue}`,
+            params,
+        });
     }
 );
 
