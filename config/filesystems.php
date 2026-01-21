@@ -1,5 +1,8 @@
 <?php
 
+$atlasRoot = env('ATLAS_STORAGE');
+$atlasRoot = $atlasRoot ? rtrim($atlasRoot, '\\/') : storage_path('app/atlas');
+
 return [
 
     /*
@@ -62,7 +65,7 @@ return [
 
         'atlas' => [
             'driver' => 'local',
-            'root' => storage_path('app/atlas'),
+            'root' => $atlasRoot,
             'serve' => true,
             'throw' => false,
             'report' => false,
@@ -70,7 +73,7 @@ return [
 
         'atlas-app' => [
             'driver' => 'local',
-            'root' => storage_path('app/atlas/.app'),
+            'root' => $atlasRoot.DIRECTORY_SEPARATOR.'.app',
             'serve' => true,
             'throw' => false,
             'report' => false,

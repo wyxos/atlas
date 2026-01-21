@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\File;
 use App\Models\Reaction;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Typesense\Client;
 
 class DashboardMetricsController extends Controller
@@ -68,6 +69,7 @@ class DashboardMetricsController extends Controller
                 'not_found' => (int) ($fileCounts->not_found_total ?? 0),
                 'unreacted_not_blacklisted' => (int) $unreactedNotBlacklisted,
             ],
+            'containers' => $this->containerMetrics(),
         ];
     }
 
@@ -127,7 +129,79 @@ class DashboardMetricsController extends Controller
                 'not_found' => $notFound,
                 'unreacted_not_blacklisted' => $unreactedNotBlacklisted,
             ],
+            'containers' => $this->containerMetrics(),
         ];
+    }
+
+    private function containerMetrics(): array
+    {
+        $base = DB::table('containers')
+            ->where('type', '!=', 'Post');
+
+        $total = (clone $base)->count();
+        $blacklisted = (clone $base)->whereNotNull('blacklisted_at')->count();
+
+        $topDownloads = $this->topContainersByFiles(
+            fn ($query) => $query->where('files.downloaded', true)
+        );
+
+        $topFavorites = $this->topContainersByFiles(
+            fn ($query) => $query
+                ->join('reactions', function ($join) {
+                    $join->on('reactions.file_id', '=', 'files.id')
+                        ->where('reactions.type', '=', 'love');
+                })
+        );
+
+        $topBlacklisted = $this->topContainersByFiles(
+            fn ($query) => $query->whereNotNull('files.blacklisted_at')
+        );
+
+        return [
+            'total' => $total,
+            'blacklisted' => $blacklisted,
+            'top_downloads' => $topDownloads,
+            'top_favorites' => $topFavorites,
+            'top_blacklisted' => $topBlacklisted,
+        ];
+    }
+
+    /**
+     * @param  callable(\Illuminate\Database\Query\Builder): \Illuminate\Database\Query\Builder  $applyFilters
+     * @return array<int, array<string, mixed>>
+     */
+    private function topContainersByFiles(callable $applyFilters): array
+    {
+        $query = DB::table('containers')
+            ->join('container_file', 'containers.id', '=', 'container_file.container_id')
+            ->join('files', 'files.id', '=', 'container_file.file_id')
+            ->where('containers.type', '!=', 'Post');
+
+        $query = $applyFilters($query);
+
+        return $query
+            ->select([
+                'containers.id',
+                'containers.type',
+                'containers.source',
+                'containers.source_id',
+                'containers.referrer',
+                DB::raw('COUNT(DISTINCT files.id) as files_count'),
+            ])
+            ->groupBy('containers.id', 'containers.type', 'containers.source', 'containers.source_id', 'containers.referrer')
+            ->orderByDesc('files_count')
+            ->limit(20)
+            ->get()
+            ->map(fn ($row) => [
+                'id' => $row->id,
+                'type' => $row->type,
+                'source' => $row->source,
+                'source_id' => $row->source_id,
+                'referrer' => $row->referrer,
+                'files_count' => (int) $row->files_count,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

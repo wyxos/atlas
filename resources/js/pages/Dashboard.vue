@@ -33,6 +33,13 @@ type DashboardMetrics = {
         not_found: number;
         unreacted_not_blacklisted: number;
     };
+    containers: {
+        total: number;
+        blacklisted: number;
+        top_downloads: ContainerMetricItem[];
+        top_favorites: ContainerMetricItem[];
+        top_blacklisted: ContainerMetricItem[];
+    };
 };
 
 type ReactionChartDatum = {
@@ -61,6 +68,15 @@ type OverviewChartDatum = {
     downloaded: number;
     local: number;
     non_local: number;
+};
+
+type ContainerMetricItem = {
+    id: number;
+    type: string;
+    source: string;
+    source_id: string;
+    referrer: string | null;
+    files_count: number;
 };
 
 const metrics = ref<DashboardMetrics | null>(null);
@@ -255,6 +271,18 @@ const overviewSummary = computed(() => [
     { label: 'Local', value: metrics.value?.files.local ?? 0, color: overviewChartConfig.local.color },
     { label: 'Non-local', value: metrics.value?.files.non_local ?? 0, color: overviewChartConfig.non_local.color },
 ]);
+
+const containerTotals = computed(() => ({
+    total: metrics.value?.containers.total ?? 0,
+    blacklisted: metrics.value?.containers.blacklisted ?? 0,
+}));
+
+const topDownloadContainers = computed(() => metrics.value?.containers.top_downloads ?? []);
+const topFavoriteContainers = computed(() => metrics.value?.containers.top_favorites ?? []);
+const topBlacklistedContainers = computed(() => metrics.value?.containers.top_blacklisted ?? []);
+
+const formatContainerLabel = (item: ContainerMetricItem) =>
+    `${item.type} • ${item.source} • ${item.source_id}`;
 
 const formatCount = (value: number) => value.toLocaleString();
 const buildTickValues = (maxValue: number, steps = 5) => {
@@ -547,6 +575,82 @@ onMounted(fetchMetrics);
                         <div v-for="item in blacklistSummary" :key="item.label" class="flex gap-4">
                             <div class="text-twilight-indigo-200">{{ item.label }}</div>
                             <div class="font-semibold" :style="{ color: item.color }">{{ formatCount(item.value) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-twilight-indigo-500/40 bg-prussian-blue-600 p-6 space-y-6">
+                <div class="flex flex-col gap-2">
+                    <h2 class="text-lg font-semibold text-regal-navy-100">Containers</h2>
+                    <p class="text-sm text-twilight-indigo-200">
+                        Top containers by downloads, favorites, and blacklisted files.
+                    </p>
+                    <div class="flex gap-6 text-sm text-twilight-indigo-200">
+                        <div>
+                            Total containers:
+                            <span class="font-semibold text-regal-navy-100">{{ formatCount(containerTotals.total) }}</span>
+                        </div>
+                        <div>
+                            Blacklisted containers:
+                            <span class="font-semibold text-regal-navy-100">{{ formatCount(containerTotals.blacklisted) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="isLoading" class="space-y-4">
+                    <Skeleton class="h-40 w-full" />
+                </div>
+
+                <div v-else class="grid gap-6 lg:grid-cols-3">
+                    <div class="space-y-3">
+                        <div class="text-sm font-semibold text-regal-navy-100">Top downloads</div>
+                        <div class="space-y-2">
+                            <div
+                                v-for="item in topDownloadContainers"
+                                :key="`downloads-${item.id}`"
+                                class="flex items-center justify-between gap-3 text-xs text-twilight-indigo-200"
+                            >
+                                <span class="truncate" :title="formatContainerLabel(item)">{{ formatContainerLabel(item) }}</span>
+                                <span class="font-semibold text-regal-navy-100">{{ formatCount(item.files_count) }}</span>
+                            </div>
+                            <div v-if="topDownloadContainers.length === 0" class="text-xs text-twilight-indigo-300">
+                                No containers yet.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="text-sm font-semibold text-regal-navy-100">Top favorites</div>
+                        <div class="space-y-2">
+                            <div
+                                v-for="item in topFavoriteContainers"
+                                :key="`favorites-${item.id}`"
+                                class="flex items-center justify-between gap-3 text-xs text-twilight-indigo-200"
+                            >
+                                <span class="truncate" :title="formatContainerLabel(item)">{{ formatContainerLabel(item) }}</span>
+                                <span class="font-semibold text-regal-navy-100">{{ formatCount(item.files_count) }}</span>
+                            </div>
+                            <div v-if="topFavoriteContainers.length === 0" class="text-xs text-twilight-indigo-300">
+                                No containers yet.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="text-sm font-semibold text-regal-navy-100">Top blacklisted</div>
+                        <div class="space-y-2">
+                            <div
+                                v-for="item in topBlacklistedContainers"
+                                :key="`blacklisted-${item.id}`"
+                                class="flex items-center justify-between gap-3 text-xs text-twilight-indigo-200"
+                            >
+                                <span class="truncate" :title="formatContainerLabel(item)">{{ formatContainerLabel(item) }}</span>
+                                <span class="font-semibold text-regal-navy-100">{{ formatCount(item.files_count) }}</span>
+                            </div>
+                            <div v-if="topBlacklistedContainers.length === 0" class="text-xs text-twilight-indigo-300">
+                                No containers yet.
+                            </div>
                         </div>
                     </div>
                 </div>

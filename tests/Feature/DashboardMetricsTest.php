@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
@@ -41,6 +42,27 @@ test('dashboard metrics report file and reaction totals', function () {
         'downloaded' => false,
         'source' => 'YouTube',
     ]);
+
+    $containerUser = Container::factory()->create([
+        'type' => 'User',
+        'source' => 'CivitAI',
+        'source_id' => 'user-1',
+    ]);
+    $containerGallery = Container::factory()->create([
+        'type' => 'Gallery',
+        'source' => 'Booru',
+        'source_id' => 'gallery-1',
+        'blacklisted_at' => now(),
+    ]);
+    $containerPost = Container::factory()->create([
+        'type' => 'Post',
+        'source' => 'CivitAI',
+        'source_id' => 'post-1',
+    ]);
+
+    $containerUser->files()->attach([$manualBlacklisted->id, $unblacklisted->id]);
+    $containerGallery->files()->attach([$autoBlacklisted->id, $notFound->id]);
+    $containerPost->files()->attach([$unreacted->id]);
 
     Reaction::create([
         'file_id' => $manualBlacklisted->id,
@@ -94,6 +116,10 @@ test('dashboard metrics report file and reaction totals', function () {
             ],
             'not_found' => 1,
             'unreacted_not_blacklisted' => 2,
+        ],
+        'containers' => [
+            'total' => 2,
+            'blacklisted' => 1,
         ],
     ]);
 });

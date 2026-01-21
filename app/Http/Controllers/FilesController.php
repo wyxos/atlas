@@ -181,6 +181,7 @@ class FilesController extends Controller
         }
 
         $disk = Storage::disk(config('downloads.disk'));
+
         if (! $disk->exists($path)) {
             abort(404, 'File not found');
         }
