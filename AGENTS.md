@@ -185,6 +185,11 @@ Before creating a PR:
 - [ ] No redundant type checks or validation (trust TypeScript and libraries)
 - [ ] No dead code (empty functions, unused code)
 
+## AI Agent Requirement
+
+After any code changes, always run frontend linting and report the result:
+- `npm run lint` (minimum requirement; do not skip)
+
 ---
 
 ## Laravel Herd
