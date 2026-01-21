@@ -20,3 +20,12 @@ export interface DownloadTransfer {
     error: string | null;
     file: DownloadTransferFileSummary | null;
 }
+
+export interface DownloadTransferSummary {
+    id: number;
+    status: string;
+    percent: number;
+    queued_at: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+}

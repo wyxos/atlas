@@ -1,5 +1,11 @@
 import { beforeEach, vi } from 'vitest';
 
+declare global {
+    interface SVGElement {
+        getBBox: () => DOMRect;
+    }
+}
+
 // Mock window.matchMedia for Oruga components (must be set up before imports)
 if (typeof window !== 'undefined' && !window.matchMedia) {
     Object.defineProperty(window, 'matchMedia', {
@@ -39,6 +45,39 @@ if (typeof window !== 'undefined' && !window.IntersectionObserver) {
     });
 }
 
+// Mock ResizeObserver for Unovis charts and other components
+if (typeof window !== 'undefined' && !window.ResizeObserver) {
+    class MockResizeObserver {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    }
+
+    Object.defineProperty(window, 'ResizeObserver', {
+        writable: true,
+        value: MockResizeObserver,
+    });
+}
+
+vi.mock('@juggle/resize-observer', () => ({
+    ResizeObserver: class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    },
+}));
+
+// Mock SVG getBBox for chart libraries in JSDOM
+if (typeof SVGElement !== 'undefined' && !SVGElement.prototype.getBBox) {
+    SVGElement.prototype.getBBox = () =>
+        ({
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+        }) as DOMRect;
+}
+
 // Mock Element.scrollTo for @wyxos/vibe masonry component
 if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
     Element.prototype.scrollTo = vi.fn();
@@ -59,4 +98,3 @@ beforeEach(() => {
         originalWarn(message, ...args);
     });
 });
-

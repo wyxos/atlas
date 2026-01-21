@@ -45,6 +45,7 @@ const {
     closeTab,
     getActiveTab,
     updateActiveTab,
+    updateTabLabel,
     setActiveTab,
 } = useTabs(switchTab);
 
@@ -95,6 +96,27 @@ function handleTabDataLoadingChangeFromTab(isLoading: boolean): void {
     if (activeTabId.value !== null) {
         handleTabDataLoadingChange(activeTabId.value, isLoading);
     }
+}
+
+function handleUpdateTabLabel(label: string): void {
+    if (activeTabId.value === null) {
+        return;
+    }
+
+    updateTabLabel(activeTabId.value, label);
+}
+
+type ContainerTabPayload = {
+    label: string;
+    params: Record<string, unknown>;
+};
+
+async function handleOpenContainerTab(payload: ContainerTabPayload): Promise<void> {
+    await createTab({
+        label: payload.label,
+        params: payload.params,
+        activate: false,
+    });
 }
 
 
@@ -164,7 +186,9 @@ onMounted(async () => {
                     :available-services="[]" :update-active-tab="updateActiveTab"
                     :on-reaction="handleReaction"
                     :on-loading-change="handleMasonryLoadingChangeFromTab"
-                    :on-tab-data-loading-change="handleTabDataLoadingChangeFromTab" />
+                    :on-tab-data-loading-change="handleTabDataLoadingChangeFromTab"
+                    :on-update-tab-label="handleUpdateTabLabel"
+                    :on-open-container-tab="handleOpenContainerTab" />
                 <div v-else class="flex items-center justify-center h-full" data-test="no-tabs-message">
                     <p class="text-twilight-indigo-300 text-lg">Create a tab to start browsing</p>
                 </div>

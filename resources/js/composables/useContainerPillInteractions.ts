@@ -28,11 +28,14 @@ function isContainerEntry(container: ContainerEntry): container is Container {
 /**
  * Composable for handling container pill interactions (clicks, batch reactions, etc.).
  */
+type OpenContainerTabHandler = (container: Container) => void;
+
 export function useContainerPillInteractions(
     items: Ref<FeedItem[]>,
     masonry: Ref<InstanceType<typeof Masonry> | null>,
     tabId: number | undefined | ComputedRef<number | undefined>,
-    onReaction: (fileId: number, type: ReactionType) => void
+    onReaction: (fileId: number, type: ReactionType) => void,
+    onOpenContainerTab?: OpenContainerTabHandler
 ) {
     // Unwrap computed/ref to get the actual value
     const tabIdValue = computed(() => typeof tabId === 'object' && 'value' in tabId ? tabId.value : tabId);
@@ -67,6 +70,17 @@ export function useContainerPillInteractions(
             const container = containers.find((c) => c.id === containerId);
             if (container?.referrer) {
                 return container.referrer;
+            }
+        }
+        return null;
+    }
+
+    function getContainer(containerId: number): Container | null {
+        for (const item of items.value) {
+            const containers = getContainersForItem(item);
+            const container = containers.find((c) => c.id === containerId);
+            if (container) {
+                return container;
             }
         }
         return null;
@@ -124,6 +138,14 @@ export function useContainerPillInteractions(
     function handleMiddleClick(containerId: number, e: MouseEvent): void {
         e.preventDefault();
         e.stopPropagation();
+
+        if (onOpenContainerTab) {
+            const container = getContainer(containerId);
+            if (container) {
+                onOpenContainerTab(container);
+                return;
+            }
+        }
 
         const url = getContainerUrl(containerId);
         if (url) {

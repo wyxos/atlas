@@ -3,6 +3,7 @@
 use App\Events\DownloadTransferProgressUpdated;
 use App\Events\DownloadTransferQueued;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DashboardMetricsController;
 use App\Models\DownloadTransfer;
 use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile/account', [\App\Http\Controllers\ProfileController::class, 'deleteAccount'])->name('profile.account.delete');
     Route::get('/api/users', [\App\Http\Controllers\UsersController::class, 'index'])->name('api.users.index');
     Route::delete('/api/users/{user}', [\App\Http\Controllers\UsersController::class, 'destroy'])->name('api.users.destroy');
+    Route::get('/api/dashboard/metrics', DashboardMetricsController::class)->name('api.dashboard.metrics');
     Route::get('/api/files', [\App\Http\Controllers\FilesController::class, 'index'])->name('api.files.index');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
