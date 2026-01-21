@@ -14,6 +14,9 @@ class FilesController extends Controller
 {
     /**
      * Display a listing of the files.
+     *
+     * NOTE: Do NOT use Eloquent queries for any Files listing returned to the UI.
+     * The dataset is massive; always use Scout/Typesense-backed listings.
      */
     public function index(FileListing $listing): JsonResponse
     {

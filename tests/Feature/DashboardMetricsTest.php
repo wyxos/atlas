@@ -16,15 +16,31 @@ test('dashboard metrics report file and reaction totals', function () {
     $manualBlacklisted = File::factory()->create([
         'blacklisted_at' => now(),
         'blacklist_reason' => 'Manual review',
+        'downloaded' => true,
+        'source' => 'local',
     ]);
 
     $autoBlacklisted = File::factory()->create([
         'blacklisted_at' => now(),
         'blacklist_reason' => null,
+        'downloaded' => false,
+        'source' => 'NAS',
     ]);
 
-    $unblacklisted = File::factory()->create();
-    $unreacted = File::factory()->create();
+    $notFound = File::factory()->create([
+        'not_found' => true,
+        'downloaded' => false,
+        'source' => 'local',
+    ]);
+
+    $unblacklisted = File::factory()->create([
+        'downloaded' => true,
+        'source' => 'Booru',
+    ]);
+    $unreacted = File::factory()->create([
+        'downloaded' => false,
+        'source' => 'YouTube',
+    ]);
 
     Reaction::create([
         'file_id' => $manualBlacklisted->id,
@@ -61,19 +77,23 @@ test('dashboard metrics report file and reaction totals', function () {
     $response->assertSuccessful();
     $response->assertJson([
         'files' => [
-            'total' => 4,
+            'total' => 5,
             'reactions' => [
                 'love' => 1,
                 'like' => 1,
                 'dislike' => 1,
                 'funny' => 1,
             ],
+            'downloaded' => 2,
+            'local' => 2,
+            'non_local' => 3,
             'blacklisted' => [
                 'total' => 2,
                 'manual' => 1,
                 'auto' => 1,
             ],
-            'unreacted_not_blacklisted' => 1,
+            'not_found' => 1,
+            'unreacted_not_blacklisted' => 2,
         ],
     ]);
 });

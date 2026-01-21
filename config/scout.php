@@ -214,7 +214,7 @@ return [
                         ['name' => 'blacklisted', 'type' => 'bool', 'optional' => true, 'facet' => true],
                         ['name' => 'blacklist_reason', 'type' => 'string', 'optional' => true],
                         ['name' => 'blacklist_type', 'type' => 'string', 'optional' => true, 'facet' => true],
-                        ['name' => 'downloaded', 'type' => 'bool', 'optional' => true],
+                        ['name' => 'downloaded', 'type' => 'bool', 'optional' => true, 'facet' => true],
                         ['name' => 'download_progress', 'type' => 'int32', 'optional' => true],
                         ['name' => 'downloaded_at', 'type' => 'int64', 'optional' => true],
                         ['name' => 'not_found', 'type' => 'bool', 'optional' => true, 'facet' => true],
@@ -241,7 +241,7 @@ return [
                     'default_sorting_field' => 'created_at',
                 ],
                 'search-parameters' => [
-                    'query_by' => 'filename,title,description,tags,path,metadata_title,metadata_genre,metadata_comment',
+                    'query_by' => 'filename,title,description,source,tags,path,metadata_title,metadata_genre,metadata_comment',
                     'filter_by' => '',
                 ],
             ],
