@@ -81,6 +81,7 @@ class BrowsePersister
 
         $containerData = [];
         $fileContainerMap = []; // Maps file_id => [container_keys]
+        $serviceCache = [];
 
         foreach ($files as $file) {
             $listingMetadata = $file->listing_metadata;
@@ -93,40 +94,34 @@ class BrowsePersister
                 continue;
             }
 
-            $fileContainers = [];
-
-            // Process Post container
-            if (isset($listingMetadata['postId'])) {
-                $postId = (string) $listingMetadata['postId'];
-                $containerKey = "Post:{$source}:{$postId}";
-
-                if (! isset($containerData[$containerKey])) {
-                    $referrer = $source === 'CivitAI' ? "https://civitai.com/posts/{$postId}" : null;
-                    $containerData[$containerKey] = [
-                        'type' => 'Post',
-                        'source' => $source,
-                        'source_id' => $postId,
-                        'referrer' => $referrer,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-
-                $fileContainers[] = $containerKey;
+            if (! isset($serviceCache[$source])) {
+                $serviceCache[$source] = $this->resolveServiceForSource($source);
             }
 
-            // Process User container
-            if (isset($listingMetadata['username']) && is_string($listingMetadata['username'])) {
-                $username = $listingMetadata['username'];
-                $containerKey = "User:{$source}:{$username}";
+            $service = $serviceCache[$source];
+            $fileContainers = [];
+
+            $containers = $service->containers($listingMetadata, $file->detail_metadata ?? []);
+            if (empty($containers)) {
+                $containers = $this->fallbackContainers($listingMetadata);
+            }
+
+            foreach ($containers as $container) {
+                $type = $container['type'] ?? null;
+                $sourceId = $container['source_id'] ?? null;
+                if (! is_string($type) || $type === '' || $sourceId === null || $sourceId === '') {
+                    continue;
+                }
+
+                $sourceId = (string) $sourceId;
+                $containerKey = "{$type}:{$source}:{$sourceId}";
 
                 if (! isset($containerData[$containerKey])) {
-                    $referrer = $source === 'CivitAI' ? "https://civitai.com/user/{$username}" : null;
                     $containerData[$containerKey] = [
-                        'type' => 'User',
+                        'type' => $type,
                         'source' => $source,
-                        'source_id' => $username,
-                        'referrer' => $referrer,
+                        'source_id' => $sourceId,
+                        'referrer' => $container['referrer'] ?? null,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
@@ -205,5 +200,55 @@ class BrowsePersister
                 DB::table('container_file')->insertOrIgnore($chunk);
             }
         }
+    }
+
+    private function resolveServiceForSource(string $source): BaseService
+    {
+        $browser = new \App\Browser;
+        $reflection = new \ReflectionClass($browser);
+        $method = $reflection->getMethod('getAvailableServices');
+        $method->setAccessible(true);
+        $services = $method->invoke($browser);
+
+        foreach ($services as $key => $serviceClass) {
+            $serviceInstance = app($serviceClass);
+            if ($serviceInstance::source() === $source) {
+                return $serviceInstance;
+            }
+            if ($key === $source) {
+                return $serviceInstance;
+            }
+        }
+
+        return app(LocalService::class);
+    }
+
+    private function fallbackContainers(array $listingMetadata): array
+    {
+        $containers = [];
+
+        if (isset($listingMetadata['postId'])) {
+            $postId = (string) $listingMetadata['postId'];
+            if ($postId !== '') {
+                $containers[] = [
+                    'type' => 'Post',
+                    'source_id' => $postId,
+                    'referrer' => null,
+                ];
+            }
+        }
+
+        if (isset($listingMetadata['username']) && is_string($listingMetadata['username'])) {
+            $username = trim($listingMetadata['username']);
+            if ($username !== '') {
+                $containers[] = [
+                    'type' => 'User',
+                    'source_id' => $username,
+                    'referrer' => null,
+                ];
+            }
+        }
+
+        return $containers;
     }
 }

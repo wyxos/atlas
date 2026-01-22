@@ -373,7 +373,7 @@ const containerBlacklistManager = ref<InstanceType<typeof ContainerBlacklistMana
 // Check if a container type is blacklistable for the current service
 function isContainerBlacklistable(container: { type: string; source?: string }): boolean {
     // Hardcoded mapping for now - in the future, this could come from service metadata
-    // CivitAI: only 'User' type is blacklistable (case-sensitive match)
+    // CivitAI: 'User' type is blacklistable (case-sensitive match)
     if (container.source === 'CivitAI') {
         return container.type === 'User';
     }

@@ -83,6 +83,41 @@ it('creates containers for files with username in listing_metadata', function ()
     expect($file->containers()->where('containers.id', $container->id)->exists())->toBeTrue();
 });
 
+it('does not create containers for files with modelId in listing_metadata', function () {
+    $persister = new BrowsePersister;
+
+    $transformedItems = [
+        [
+            'file' => [
+                'referrer_url' => 'https://example.com/file-model.jpg',
+                'source' => 'CivitAI',
+                'url' => 'https://image.civitai.com/file-model.jpg',
+                'filename' => 'file-model.jpg',
+                'ext' => 'jpg',
+                'mime_type' => 'image/jpeg',
+                'listing_metadata' => json_encode([
+                    'modelId' => 24350,
+                    'model' => [
+                        'name' => 'PerfectDeliberate',
+                    ],
+                ]),
+            ],
+            'metadata' => [
+                'file_referrer_url' => 'https://example.com/file-model.jpg',
+                'payload' => json_encode(['test' => 'data']),
+            ],
+        ],
+    ];
+
+    $result = $persister->persist($transformedItems);
+
+    expect($result)->toHaveCount(1);
+    $this->assertDatabaseCount('containers', 0);
+
+    $file = File::where('referrer_url', 'https://example.com/file-model.jpg')->first();
+    expect($file->containers()->count())->toBe(0);
+});
+
 it('creates both post and user containers when both are present', function () {
     $persister = new BrowsePersister;
 
