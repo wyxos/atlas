@@ -77,6 +77,25 @@ class CivitAiImages extends BaseService
         return $json;
     }
 
+    public function containers(array $listingMetadata = [], array $detailMetadata = []): array
+    {
+        $containers = [];
+
+        $postId = isset($listingMetadata['postId']) ? (int) $listingMetadata['postId'] : null;
+        if ($postId && $postId > 0) {
+            $containers[] = $this->makeContainer('Post', (string) $postId, $listingMetadata);
+        }
+
+        $username = isset($listingMetadata['username']) && is_string($listingMetadata['username'])
+            ? trim($listingMetadata['username'])
+            : null;
+        if ($username !== null && $username !== '') {
+            $containers[] = $this->makeContainer('User', $username, $listingMetadata);
+        }
+
+        return $containers;
+    }
+
     public function formatParams(): array
     {
         $limit = isset($this->params['limit']) ? (int) $this->params['limit'] : 20;
@@ -403,5 +422,23 @@ class CivitAiImages extends BaseService
         return [
             'User',
         ];
+    }
+
+    private function makeContainer(string $type, string $sourceId, array $listingMetadata): array
+    {
+        return [
+            'type' => $type,
+            'source_id' => $sourceId,
+            'referrer' => $this->buildContainerReferrer($type, $sourceId, $listingMetadata),
+        ];
+    }
+
+    private function buildContainerReferrer(string $type, string $sourceId, array $listingMetadata): ?string
+    {
+        return match ($type) {
+            'Post' => "https://civitai.com/posts/{$sourceId}",
+            'User' => "https://civitai.com/user/{$sourceId}",
+            default => null,
+        };
     }
 }

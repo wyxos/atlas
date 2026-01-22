@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { VisAxis, VisStackedBar, VisXYContainer } from '@unovis/vue';
 import PageLayout from '../components/PageLayout.vue';
 import { Skeleton } from '@/components/ui/skeleton';
+import { store as tabsStore, setActive as tabsSetActive } from '@/actions/App/Http/Controllers/TabController';
 import {
     ChartContainer,
     ChartCrosshair,
@@ -82,6 +84,7 @@ type ContainerMetricItem = {
 const metrics = ref<DashboardMetrics | null>(null);
 const isLoading = ref(true);
 const loadError = ref<string | null>(null);
+const router = useRouter();
 
 const reactionChartConfig = {
     love: { label: 'Favorite', color: '#ef4444' },
@@ -283,6 +286,52 @@ const topBlacklistedContainers = computed(() => metrics.value?.containers.top_bl
 
 const formatContainerLabel = (item: ContainerMetricItem) =>
     `${item.type} • ${item.source} • ${item.source_id}`;
+
+const buildContainerTabPayload = (item: ContainerMetricItem) => {
+    if (item.source === 'CivitAI') {
+        const params: Record<string, unknown> = {
+            feed: 'online',
+            service: 'civit-ai-images',
+            page: 1,
+            limit: 20,
+        };
+
+        if (item.type === 'User') {
+            params.username = item.source_id;
+        } else if (item.type === 'Post') {
+            params.postId = item.source_id;
+        } else {
+            return null;
+        }
+
+        return {
+            label: `CivitAI Images - ${item.type}: ${item.source_id}`,
+            params,
+        };
+    }
+
+    return null;
+};
+
+const canOpenContainerInApp = (item: ContainerMetricItem) => buildContainerTabPayload(item) !== null;
+
+const openContainerInApp = async (item: ContainerMetricItem) => {
+    const payload = buildContainerTabPayload(item);
+    if (!payload) {
+        return;
+    }
+
+    const { data } = await window.axios.post(tabsStore.url(), {
+        label: payload.label,
+        params: payload.params,
+    });
+
+    if (data?.id) {
+        await window.axios.patch(tabsSetActive.url(data.id));
+    }
+
+    await router.push('/browse');
+};
 
 const formatCount = (value: number) => value.toLocaleString();
 const buildTickValues = (maxValue: number, steps = 5) => {
@@ -609,9 +658,35 @@ onMounted(fetchMetrics);
                             <div
                                 v-for="item in topDownloadContainers"
                                 :key="`downloads-${item.id}`"
-                                class="flex items-center justify-between gap-3 text-xs text-twilight-indigo-200"
+                                class="flex items-center justify-between gap-3 text-xs"
                             >
-                                <span class="truncate" :title="formatContainerLabel(item)">{{ formatContainerLabel(item) }}</span>
+                                <div class="min-w-0 flex-1">
+                                    <a
+                                        v-if="item.referrer"
+                                        class="block truncate text-twilight-indigo-100 hover:text-white transition-colors"
+                                        :href="item.referrer"
+                                        :title="formatContainerLabel(item)"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        {{ formatContainerLabel(item) }}
+                                    </a>
+                                    <span
+                                        v-else
+                                        class="block truncate text-twilight-indigo-200"
+                                        :title="formatContainerLabel(item)"
+                                    >
+                                        {{ formatContainerLabel(item) }}
+                                    </span>
+                                    <button
+                                        v-if="canOpenContainerInApp(item)"
+                                        type="button"
+                                        class="mt-1 inline-flex items-center text-[11px] font-semibold text-twilight-indigo-300 hover:text-twilight-indigo-100 transition-colors"
+                                        @click="openContainerInApp(item)"
+                                    >
+                                        Open in app
+                                    </button>
+                                </div>
                                 <span class="font-semibold text-regal-navy-100">{{ formatCount(item.files_count) }}</span>
                             </div>
                             <div v-if="topDownloadContainers.length === 0" class="text-xs text-twilight-indigo-300">
@@ -626,9 +701,35 @@ onMounted(fetchMetrics);
                             <div
                                 v-for="item in topFavoriteContainers"
                                 :key="`favorites-${item.id}`"
-                                class="flex items-center justify-between gap-3 text-xs text-twilight-indigo-200"
+                                class="flex items-center justify-between gap-3 text-xs"
                             >
-                                <span class="truncate" :title="formatContainerLabel(item)">{{ formatContainerLabel(item) }}</span>
+                                <div class="min-w-0 flex-1">
+                                    <a
+                                        v-if="item.referrer"
+                                        class="block truncate text-twilight-indigo-100 hover:text-white transition-colors"
+                                        :href="item.referrer"
+                                        :title="formatContainerLabel(item)"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        {{ formatContainerLabel(item) }}
+                                    </a>
+                                    <span
+                                        v-else
+                                        class="block truncate text-twilight-indigo-200"
+                                        :title="formatContainerLabel(item)"
+                                    >
+                                        {{ formatContainerLabel(item) }}
+                                    </span>
+                                    <button
+                                        v-if="canOpenContainerInApp(item)"
+                                        type="button"
+                                        class="mt-1 inline-flex items-center text-[11px] font-semibold text-twilight-indigo-300 hover:text-twilight-indigo-100 transition-colors"
+                                        @click="openContainerInApp(item)"
+                                    >
+                                        Open in app
+                                    </button>
+                                </div>
                                 <span class="font-semibold text-regal-navy-100">{{ formatCount(item.files_count) }}</span>
                             </div>
                             <div v-if="topFavoriteContainers.length === 0" class="text-xs text-twilight-indigo-300">
@@ -643,9 +744,35 @@ onMounted(fetchMetrics);
                             <div
                                 v-for="item in topBlacklistedContainers"
                                 :key="`blacklisted-${item.id}`"
-                                class="flex items-center justify-between gap-3 text-xs text-twilight-indigo-200"
+                                class="flex items-center justify-between gap-3 text-xs"
                             >
-                                <span class="truncate" :title="formatContainerLabel(item)">{{ formatContainerLabel(item) }}</span>
+                                <div class="min-w-0 flex-1">
+                                    <a
+                                        v-if="item.referrer"
+                                        class="block truncate text-twilight-indigo-100 hover:text-white transition-colors"
+                                        :href="item.referrer"
+                                        :title="formatContainerLabel(item)"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        {{ formatContainerLabel(item) }}
+                                    </a>
+                                    <span
+                                        v-else
+                                        class="block truncate text-twilight-indigo-200"
+                                        :title="formatContainerLabel(item)"
+                                    >
+                                        {{ formatContainerLabel(item) }}
+                                    </span>
+                                    <button
+                                        v-if="canOpenContainerInApp(item)"
+                                        type="button"
+                                        class="mt-1 inline-flex items-center text-[11px] font-semibold text-twilight-indigo-300 hover:text-twilight-indigo-100 transition-colors"
+                                        @click="openContainerInApp(item)"
+                                    >
+                                        Open in app
+                                    </button>
+                                </div>
                                 <span class="font-semibold text-regal-navy-100">{{ formatCount(item.files_count) }}</span>
                             </div>
                             <div v-if="topBlacklistedContainers.length === 0" class="text-xs text-twilight-indigo-300">
