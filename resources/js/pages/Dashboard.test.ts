@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import Dashboard from './Dashboard.vue';
 
@@ -89,6 +89,7 @@ const mockMetricsRequest = (metrics: DashboardMetrics) => {
     Object.defineProperty(window, 'axios', {
         value: mockAxios,
         writable: true,
+        configurable: true,
     });
     return mockAxios;
 };
@@ -108,6 +109,7 @@ async function createTestRouter(initialPath = '/dashboard') {
 
 describe('Dashboard', () => {
     beforeEach(() => {
+        vi.useRealTimers();
         mockMetricsRequest(createMetrics());
     });
 
@@ -176,11 +178,35 @@ describe('Dashboard', () => {
             },
         });
 
-        await flushPromises();
+        await Promise.resolve();
         await wrapper.vm.$nextTick();
 
         expect(wrapper.find('a[href="https://civitai.com/user/Desync"]').exists()).toBe(true);
         expect(wrapper.findAll('button').filter((button) => button.text() === 'Open in app')).toHaveLength(1);
+    });
+
+    it('renders container totals from metrics response', async () => {
+        const metrics = createMetrics();
+        metrics.containers.total = 987;
+        metrics.containers.blacklisted = 12;
+
+        mockMetricsRequest(metrics);
+
+        const router = await createTestRouter();
+        const wrapper = mount(Dashboard, {
+            global: {
+                plugins: [router],
+            },
+        });
+
+        await Promise.resolve();
+        await wrapper.vm.$nextTick();
+
+        const text = wrapper.text();
+        expect(text).toContain('Total containers:');
+        expect(text).toContain('987');
+        expect(text).toContain('Blacklisted containers:');
+        expect(text).toContain('12');
     });
 });
 

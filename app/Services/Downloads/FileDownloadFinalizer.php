@@ -3,6 +3,7 @@
 namespace App\Services\Downloads;
 
 use App\Models\File;
+use App\Services\MetricsService;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -13,6 +14,10 @@ class FileDownloadFinalizer
 {
     public function finalize(File $file, string $downloadedPath, ?string $contentTypeHeader = null): void
     {
+        $wasDownloaded = (bool) $file->downloaded;
+        $wasBlacklisted = $file->blacklisted_at !== null;
+        $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
+
         $disk = Storage::disk(config('downloads.disk'));
 
         $absolutePath = $disk->path($downloadedPath);
@@ -71,6 +76,12 @@ class FileDownloadFinalizer
         }
 
         $file->update($updates);
+
+        $metrics = app(MetricsService::class);
+        $metrics->applyDownload($file, $wasDownloaded);
+        if ($wasBlacklisted) {
+            $metrics->applyBlacklistClear($file, $wasManual);
+        }
     }
 
     private function generateStoredFilename(string $extension): string

@@ -9,6 +9,7 @@ use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
 use App\Services\Downloads\DownloadTransferPayload;
+use App\Services\MetricsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
@@ -326,6 +327,7 @@ class DownloadTransferActionsController extends Controller
         }
 
         $file = $downloadTransfer->file;
+        $wasDownloaded = (bool) $file->downloaded;
         $disk = Storage::disk(config('downloads.disk'));
 
         if ($file->path && $disk->exists($file->path)) {
@@ -348,6 +350,8 @@ class DownloadTransferActionsController extends Controller
             'download_progress' => 0,
             'updated_at' => now(),
         ]);
+
+        app(MetricsService::class)->applyDownloadClear($file, $wasDownloaded);
     }
 
     private function broadcastState(DownloadTransfer $downloadTransfer): void

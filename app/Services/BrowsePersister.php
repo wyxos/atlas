@@ -22,6 +22,15 @@ class BrowsePersister
             return isset($item['file']) && isset($item['metadata']);
         }));
 
+        $referrers = collect($normalized)->map(fn ($i) => $i['file']['referrer_url'])->filter()->values()->all();
+        $existingReferrers = ! empty($referrers)
+            ? File::whereIn('referrer_url', $referrers)->pluck('referrer_url')->all()
+            : [];
+        $newFileCount = 0;
+        if (! empty($referrers)) {
+            $newFileCount = count(array_diff($referrers, $existingReferrers));
+        }
+
         $fileRows = collect($normalized)->map(fn ($i) => $i['file'])->toArray();
 
         File::upsert(
@@ -30,7 +39,12 @@ class BrowsePersister
             ['url', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at']
         );
 
-        $referrers = collect($normalized)->map(fn ($i) => $i['file']['referrer_url'])->filter()->values()->all();
+        if ($newFileCount > 0) {
+            $metrics = app(MetricsService::class);
+            $metrics->incrementMetric(MetricsService::KEY_FILES_TOTAL, $newFileCount);
+            $metrics->incrementMetric(MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $newFileCount);
+        }
+
         $fileMap = File::whereIn('referrer_url', $referrers)->get()->keyBy('referrer_url');
 
         $metaRows = collect($normalized)
@@ -82,6 +96,7 @@ class BrowsePersister
         $containerData = [];
         $fileContainerMap = []; // Maps file_id => [container_keys]
         $serviceCache = [];
+        $metrics = app(MetricsService::class);
 
         foreach ($files as $file) {
             $listingMetadata = $file->listing_metadata;
@@ -139,6 +154,40 @@ class BrowsePersister
             return;
         }
 
+        $existingContainers = Container::query()
+            ->where(function ($query) use ($containerData) {
+                foreach ($containerData as $data) {
+                    $query->orWhere(function ($q) use ($data) {
+                        $q->where('type', $data['type'])
+                            ->where('source', $data['source'])
+                            ->where('source_id', $data['source_id']);
+                    });
+                }
+            })
+            ->get();
+
+        $existingKeys = $existingContainers
+            ->mapWithKeys(function ($container) {
+                $key = "{$container->type}:{$container->source}:{$container->source_id}";
+
+                return [$key => true];
+            })
+            ->all();
+
+        $newContainerCount = 0;
+        foreach ($containerData as $key => $data) {
+            if (isset($existingKeys[$key])) {
+                continue;
+            }
+            if (($data['type'] ?? null) === 'Post') {
+                continue;
+            }
+            $newContainerCount += 1;
+        }
+        if ($newContainerCount > 0) {
+            $metrics->incrementMetric(MetricsService::KEY_CONTAINERS_TOTAL, $newContainerCount);
+        }
+
         // Upsert containers in batch
         $containerRows = array_values($containerData);
         Container::upsert(
@@ -176,6 +225,37 @@ class BrowsePersister
         // Build pivot table inserts
         $pivotInserts = [];
         $now = now();
+        $fileIds = array_keys($fileContainerMap);
+        $containerIds = $containers->pluck('id')->all();
+        $existingPairs = [];
+
+        if (! empty($fileIds) && ! empty($containerIds)) {
+            $existingPairs = DB::table('container_file')
+                ->whereIn('file_id', $fileIds)
+                ->whereIn('container_id', $containerIds)
+                ->get(['file_id', 'container_id'])
+                ->map(fn ($row) => "{$row->file_id}:{$row->container_id}")
+                ->all();
+        }
+        $existingPairMap = array_flip($existingPairs);
+
+        $fileMap = $files->keyBy('id');
+        $favoritedFileIds = [];
+        if (! empty($fileIds)) {
+            $favoritedFileIds = \App\Models\Reaction::query()
+                ->whereIn('file_id', $fileIds)
+                ->where('type', 'love')
+                ->distinct()
+                ->pluck('file_id')
+                ->map(fn ($value) => (int) $value)
+                ->all();
+        }
+        $favoritedFileMap = array_flip($favoritedFileIds);
+
+        $totalCounts = [];
+        $downloadedCounts = [];
+        $blacklistedCounts = [];
+        $favoritedCounts = [];
 
         foreach ($fileContainerMap as $fileId => $containerKeys) {
             foreach ($containerKeys as $containerKey) {
@@ -184,21 +264,44 @@ class BrowsePersister
                 }
 
                 $containerId = $containers[$containerKey]->id;
+                $pairKey = "{$fileId}:{$containerId}";
+                if (isset($existingPairMap[$pairKey])) {
+                    continue;
+                }
+
                 $pivotInserts[] = [
                     'file_id' => $fileId,
                     'container_id' => $containerId,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
+
+                $totalCounts[$containerId] = ($totalCounts[$containerId] ?? 0) + 1;
+
+                $file = $fileMap->get($fileId);
+                if ($file && $file->downloaded) {
+                    $downloadedCounts[$containerId] = ($downloadedCounts[$containerId] ?? 0) + 1;
+                }
+                if ($file && $file->blacklisted_at !== null) {
+                    $blacklistedCounts[$containerId] = ($blacklistedCounts[$containerId] ?? 0) + 1;
+                }
+                if (isset($favoritedFileMap[$fileId])) {
+                    $favoritedCounts[$containerId] = ($favoritedCounts[$containerId] ?? 0) + 1;
+                }
             }
         }
 
-        // Batch insert pivot records (insertOrIgnore handles duplicates)
+        // Batch insert pivot records (duplicates already filtered)
         if (! empty($pivotInserts)) {
             // Use chunking to avoid query size limits
             foreach (array_chunk($pivotInserts, 500) as $chunk) {
-                DB::table('container_file')->insertOrIgnore($chunk);
+                DB::table('container_file')->insert($chunk);
             }
+
+            $metrics->incrementContainersByCounts('files_total', $totalCounts);
+            $metrics->incrementContainersByCounts('files_downloaded', $downloadedCounts);
+            $metrics->incrementContainersByCounts('files_blacklisted', $blacklistedCounts);
+            $metrics->incrementContainersByCounts('files_favorited', $favoritedCounts);
         }
     }
 
