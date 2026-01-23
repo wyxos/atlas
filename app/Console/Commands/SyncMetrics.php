@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\MetricsService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class SyncMetrics extends Command
 {
@@ -13,9 +14,14 @@ class SyncMetrics extends Command
 
     public function handle(): int
     {
+        $this->info('Syncing metrics...');
+        $start = microtime(true);
+
         app(MetricsService::class)->syncAll();
 
-        $this->info('Metrics synced.');
+        $elapsed = microtime(true) - $start;
+        $metricCount = DB::table('metrics')->count();
+        $this->info(sprintf('Metrics synced (%d keys) in %.2fs.', $metricCount, $elapsed));
 
         return self::SUCCESS;
     }
