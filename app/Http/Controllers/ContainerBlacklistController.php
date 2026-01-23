@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Container;
 use App\Services\BaseService;
+use App\Services\MetricsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -46,10 +47,16 @@ class ContainerBlacklistController extends Controller
             ], 422);
         }
 
+        $wasBlacklisted = $container->blacklisted_at !== null;
+
         $container->update([
             'action_type' => $validated['action_type'],
             'blacklisted_at' => now(),
         ]);
+
+        if (! $wasBlacklisted) {
+            app(MetricsService::class)->incrementMetric(MetricsService::KEY_CONTAINERS_BLACKLISTED, 1);
+        }
 
         return response()->json($container, 201);
     }
@@ -79,6 +86,8 @@ class ContainerBlacklistController extends Controller
             'blacklisted_at' => null,
             'action_type' => null,
         ]);
+
+        app(MetricsService::class)->incrementMetric(MetricsService::KEY_CONTAINERS_BLACKLISTED, -1);
 
         return response()->json(['message' => 'Container removed from blacklist successfully']);
     }

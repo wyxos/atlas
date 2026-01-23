@@ -165,6 +165,10 @@ abstract class BaseModerationService
                 });
 
                 if (! empty($newReactionsToInsert)) {
+                    app(MetricsService::class)->applyDislikeInsert(array_map(
+                        fn ($reaction) => (int) $reaction['file_id'],
+                        $newReactionsToInsert
+                    ));
                     Reaction::insert($newReactionsToInsert);
                 }
             }
@@ -172,6 +176,7 @@ abstract class BaseModerationService
 
         // Batch update blacklisted files
         if (! empty($this->blacklistFileIds)) {
+            app(MetricsService::class)->applyBlacklistAdd($this->blacklistFileIds, false);
             File::whereIn('id', $this->blacklistFileIds)->update(['blacklisted_at' => now()]);
         }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\MetricsService;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,9 +29,14 @@ class FileReactionController extends Controller
         $existingReaction = Reaction::where('user_id', $user->id)
             ->where('file_id', $file->id)
             ->first();
+        $metrics = app(MetricsService::class);
+        $oldType = $existingReaction?->type;
+        $wasBlacklisted = $file->blacklisted_at !== null;
+        $isBlacklisted = $wasBlacklisted;
 
         // If clicking the same reaction type, remove it (toggle off)
         if ($existingReaction && $existingReaction->type === $validated['type']) {
+            $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
             $existingReaction->delete();
 
             return response()->json([
@@ -47,12 +53,17 @@ class FileReactionController extends Controller
 
             // Clear blacklist if file was blacklisted
             if ($file->blacklisted_at !== null) {
+                $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
+                $metrics->applyBlacklistClear($file, $wasManual, false);
                 $updates['blacklisted_at'] = null;
                 $updates['blacklist_reason'] = null;
+                $isBlacklisted = false;
             }
 
             $file->update($updates);
         }
+
+        $metrics->applyReactionChange($file, $oldType, $validated['type'], $wasBlacklisted, $isBlacklisted);
 
         // Use updateOrCreate to atomically update or create the reaction
         // This prevents race conditions where concurrent requests could create duplicates
@@ -149,6 +160,7 @@ class FileReactionController extends Controller
         ]);
 
         $user = Auth::user();
+        $metrics = app(MetricsService::class);
         $results = [];
 
         foreach ($validated['reactions'] as $reactionData) {
@@ -158,9 +170,13 @@ class FileReactionController extends Controller
             $existingReaction = Reaction::where('user_id', $user->id)
                 ->where('file_id', $file->id)
                 ->first();
+            $oldType = $existingReaction?->type;
+            $wasBlacklisted = $file->blacklisted_at !== null;
+            $isBlacklisted = $wasBlacklisted;
 
             // If clicking the same reaction type, remove it (toggle off)
             if ($existingReaction && $existingReaction->type === $reactionData['type']) {
+                $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
                 $existingReaction->delete();
                 $results[] = [
                     'file_id' => $file->id,
@@ -177,12 +193,17 @@ class FileReactionController extends Controller
 
                 // Clear blacklist if file was blacklisted
                 if ($file->blacklisted_at !== null) {
+                    $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
+                    $metrics->applyBlacklistClear($file, $wasManual, false);
                     $updates['blacklisted_at'] = null;
                     $updates['blacklist_reason'] = null;
+                    $isBlacklisted = false;
                 }
 
                 $file->update($updates);
             }
+
+            $metrics->applyReactionChange($file, $oldType, $reactionData['type'], $wasBlacklisted, $isBlacklisted);
 
             // Use updateOrCreate to atomically update or create the reaction
             // This prevents race conditions where concurrent requests could create duplicates

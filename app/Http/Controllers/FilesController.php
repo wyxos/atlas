@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Listings\FileListing;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\MetricsService;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -430,6 +431,10 @@ class FilesController extends Controller
         });
 
         if (! empty($newReactionsToInsert)) {
+            app(MetricsService::class)->applyDislikeInsert(array_map(
+                fn ($reaction) => (int) $reaction['file_id'],
+                $newReactionsToInsert
+            ));
             Reaction::insert($newReactionsToInsert);
         }
 

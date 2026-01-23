@@ -4,6 +4,7 @@ use App\Models\Container;
 use App\Models\File;
 use App\Models\Reaction;
 use App\Models\User;
+use App\Services\MetricsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -93,6 +94,8 @@ test('dashboard metrics report file and reaction totals', function () {
         'user_id' => $otherUser->id,
         'type' => 'dislike',
     ]);
+
+    app(MetricsService::class)->syncAll();
 
     $response = $this->getJson('/api/dashboard/metrics');
 

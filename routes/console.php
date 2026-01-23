@@ -133,3 +133,4 @@ Artisan::command('app:setup', function () {
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
 Schedule::command('horizon:clear-metrics')->hourly();
 Schedule::command('horizon:clear')->daily();
+Schedule::command('metrics:sync')->hourly();
