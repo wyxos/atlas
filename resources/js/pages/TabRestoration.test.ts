@@ -226,13 +226,14 @@ describe('Browse - Tab Restoration', () => {
     it('restores tab query params after refresh', async () => {
         const tabId = 1;
         const currentToken = 'cursor-next-456';
+        const nextToken = 'cursor-next-789';
         const mockItems = [
             { id: 1, width: 100, height: 100, src: 'test1.jpg', type: 'image', page: 1, index: 0, notFound: false },
             { id: 2, width: 200, height: 200, src: 'test2.jpg', type: 'image', page: 1, index: 1, notFound: false },
         ];
 
         const tabConfig = createMockTabConfig(tabId, {
-            params: { service: 'civit-ai-images', page: currentToken },
+            params: { service: 'civit-ai-images', page: currentToken, next: nextToken },
             items: mockItems,
         });
 
@@ -253,6 +254,10 @@ describe('Browse - Tab Restoration', () => {
         // `page` holds the current token to load.
         expect(masonry.props('page')).toBe(currentToken);
         expect(masonry.props('restoredPages')).toBeUndefined();
+
+        const pills = wrapper.findAllComponents({ name: 'Pill' });
+        const nextPill = pills.find((pill) => pill.props('label') === 'Next');
+        expect(nextPill?.props('value')).toBe(nextToken);
     });
 
     it('loads tab items when items exist', async () => {
