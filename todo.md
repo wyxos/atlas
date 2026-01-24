@@ -1,7 +1,6 @@
 - [ ] Browse feature improvements
     - [ ] Browse
       - [ ] Evaluate other default feeds (Youtube, etc)
-      - [ ] container click open a new tab browsing that container by re-using the service API
     - [ ] Video handling
       - [ ] Download preview version if available, else generate one
     - [ ] FileViewer enhancements

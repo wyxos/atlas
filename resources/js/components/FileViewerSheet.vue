@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { X, Loader2 } from 'lucide-vue-next';
+import { copyToClipboard } from '@/utils/clipboard';
 
 interface Props {
     isOpen: boolean;
@@ -9,6 +10,27 @@ interface Props {
 }
 
 defineProps<Props>();
+
+function normalizePathForOs(path: string): string {
+    const platform = typeof navigator !== 'undefined' ? navigator.platform : '';
+    const isWindows = /win/i.test(platform);
+
+    return isWindows
+        ? path.replace(/\//g, '\\')
+        : path.replace(/\\/g, '/');
+}
+
+async function handleCopyPath(absolutePath: string | null): Promise<void> {
+    if (!absolutePath) {
+        return;
+    }
+
+    try {
+        await copyToClipboard(normalizePathForOs(absolutePath), 'Path', { showToast: false });
+    } catch {
+        // Ignore clipboard errors; there is no fallback UI in this sheet.
+    }
+}
 
 const emit = defineEmits<{
     close: [];
@@ -90,6 +112,32 @@ const emit = defineEmits<{
                             class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
                             {{ fileData.disk_url }}
                         </a>
+                    </div>
+                    <div v-if="fileData.path">
+                        <div class="font-semibold text-white mb-1">Path</div>
+                        <button
+                            type="button"
+                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all text-left w-full"
+                            title="Click to copy absolute path"
+                            data-test="file-path"
+                            :disabled="!fileData.absolute_path"
+                            @click="handleCopyPath(fileData.absolute_path)"
+                        >
+                            {{ fileData.path }}
+                        </button>
+                    </div>
+                    <div v-if="fileData.preview_path">
+                        <div class="font-semibold text-white mb-1">Preview Path</div>
+                        <button
+                            type="button"
+                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all text-left w-full"
+                            title="Click to copy absolute preview path"
+                            data-test="preview-path"
+                            :disabled="!fileData.absolute_preview_path"
+                            @click="handleCopyPath(fileData.absolute_preview_path)"
+                        >
+                            {{ fileData.preview_path }}
+                        </button>
                     </div>
                     <div v-if="fileData.referrer_url">
                         <div class="font-semibold text-white mb-1">Referrer</div>

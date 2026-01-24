@@ -14,6 +14,7 @@ export interface File {
     referrer_url: string | null;
     path: string | null;
     absolute_path: string | null;
+    absolute_preview_path: string | null;
     preview_url: string | null;
     disk_url: string | null;
     preview_file_url: string | null;

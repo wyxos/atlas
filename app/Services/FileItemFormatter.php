@@ -80,20 +80,11 @@ class FileItemFormatter
 
             if ($file->downloaded && $file->path) {
                 $originalUrl = route('api.files.downloaded', ['file' => $file->id]);
-                if (str_starts_with($file->mime_type ?? '', 'video/')) {
-                    $thumbnailUrl = $file->poster_path
-                        ? route('api.files.poster', ['file' => $file->id])
-                        : $originalUrl;
-                } else {
-                    $thumbnailUrl = $file->preview_path
-                        ? route('api.files.preview', ['file' => $file->id])
-                        : $originalUrl;
-                }
+                $thumbnailUrl = route('api.files.preview', ['file' => $file->id]);
             } else {
                 if (! $originalUrl && $file->path) {
                     $originalUrl = route('api.files.serve', ['file' => $file->id]);
                 }
-                $thumbnailUrl = $thumbnailUrl ?? $originalUrl;
             }
 
             $item = [
