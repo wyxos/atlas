@@ -336,3 +336,51 @@ test('browse does not detach tab files when page is not 1', function () {
     $tab->refresh();
     expect($tab->files()->count())->toBe(1);
 });
+
+test('browse persists current and next tokens for online tabs', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create();
+
+    Http::fake([
+        '*' => Http::response([
+            'items' => [],
+            'metadata' => [
+                'nextCursor' => 'cursor-next',
+            ],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&service=civit-ai-images&page=cursor-current");
+
+    $response->assertSuccessful();
+
+    $tab->refresh();
+    expect($tab->params['page'])->toBe('cursor-current');
+    expect($tab->params['next'])->toBe('cursor-next');
+    expect($tab->params['feed'])->toBe('online');
+});
+
+test('browse persists current page token for local tabs', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $file = \App\Models\File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDay(),
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'source' => 'CivitAI',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=1&page=2");
+
+    $response->assertSuccessful();
+
+    $tab->refresh();
+    expect((string) $tab->params['page'])->toBe('2');
+    expect($tab->params)->toHaveKey('next');
+    expect($tab->params['feed'])->toBe('local');
+    expect($file)->toBeInstanceOf(\App\Models\File::class);
+});
