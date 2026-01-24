@@ -211,9 +211,9 @@ class Browser
                     $existingServiceFilters = [];
                 }
 
-                // Vibe contract: `page` is the next token to load.
-                // Persist the *next* page token from the service response when available.
-                $pageToPersist = $filter['next'] ?? request()->input('page', 1);
+                // Persist the current page token; keep the next token separately.
+                $pageToPersist = request()->input('page', 1);
+                $nextToPersist = $filter['next'] ?? null;
 
                 // Canonical UI filter state for this service.
                 // Keep global keys (page/limit) and service-specific keys, but exclude non-filter envelope keys.
@@ -264,6 +264,7 @@ class Browser
                         ...$flatFilter,
                         // Persist the next token to load.
                         'page' => $pageToPersist,
+                        'next' => $nextToPersist,
                         // Per-service cache
                         'serviceFiltersByKey' => $existingServiceFilters,
                     ],
