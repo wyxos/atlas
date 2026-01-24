@@ -5,6 +5,7 @@ use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Events\DownloadTransferQueued;
 use App\Jobs\Downloads\AssembleDownloadTransfer;
+use App\Jobs\Downloads\GenerateTransferPreview;
 use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Jobs\Downloads\QueueDownloadTransfer;
 use App\Models\DownloadChunk;
@@ -197,6 +198,7 @@ test('assemble job concatenates chunk parts, finalizes file, and marks transfer 
     ]);
 
     (new AssembleDownloadTransfer($transfer->id))->handle(app(FileDownloadFinalizer::class));
+    (new GenerateTransferPreview($transfer->id))->handle(app(FileDownloadFinalizer::class));
 
     $transfer->refresh();
     $file->refresh();

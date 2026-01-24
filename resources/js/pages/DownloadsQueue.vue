@@ -23,6 +23,7 @@ const STATUSES = [
     'preparing',
     'downloading',
     'assembling',
+    'previewing',
     'paused',
     'completed',
     'failed',
@@ -196,6 +197,7 @@ const STATUS_STYLES: Record<Status, string> = {
     preparing: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
     downloading: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
     assembling: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
+    previewing: 'bg-smart-blue-600 border border-smart-blue-500 text-white',
     paused: 'bg-warning-600 border border-warning-500 text-warning-100',
     completed: 'bg-success-600 border border-success-500 text-white',
     failed: 'bg-danger-600 border border-danger-500 text-white',
@@ -215,6 +217,7 @@ function filterLabel(status: FilterStatus) {
         preparing: 'Preparing',
         downloading: 'Downloading',
         assembling: 'Assembling',
+        previewing: 'Previewing',
         paused: 'Paused',
         completed: 'Completed',
         failed: 'Failed',
@@ -290,6 +293,10 @@ function isActionBusy(id: number) {
 }
 
 function canPause(item: DownloadItem) {
+    if ((item.percent ?? 0) >= 100) {
+        return false;
+    }
+
     return [
         'pending',
         'queued',
@@ -304,7 +311,11 @@ function canResume(item: DownloadItem) {
 }
 
 function canCancel(item: DownloadItem) {
-    return !['completed', 'failed', 'canceled'].includes(item.status);
+    if ((item.percent ?? 0) >= 100) {
+        return false;
+    }
+
+    return !['completed', 'failed', 'canceled', 'previewing'].includes(item.status);
 }
 
 function canRestart(item: DownloadItem) {

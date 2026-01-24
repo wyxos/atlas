@@ -13,7 +13,7 @@ class DownloadTransferCreated implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function __construct(public array $payload) {}
 

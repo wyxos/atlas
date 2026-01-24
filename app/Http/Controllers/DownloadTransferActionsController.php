@@ -238,7 +238,8 @@ class DownloadTransferActionsController extends Controller
     private function canCancel(DownloadTransfer $downloadTransfer): bool
     {
         return ! $downloadTransfer->isTerminal()
-            && $downloadTransfer->status !== DownloadTransferStatus::CANCELED;
+            && $downloadTransfer->status !== DownloadTransferStatus::CANCELED
+            && $downloadTransfer->status !== DownloadTransferStatus::PREVIEWING;
     }
 
     private function cancelBatch(DownloadTransfer $downloadTransfer): void

@@ -212,5 +212,3 @@ class PrepareDownloadTransfer implements ShouldQueue
         return is_numeric($total) ? (int) $total : null;
     }
 }
-
-

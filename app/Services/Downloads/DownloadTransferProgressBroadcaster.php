@@ -6,7 +6,6 @@ use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
 use App\Models\File;
-use App\Services\Downloads\DownloadTransferPayload;
 
 class DownloadTransferProgressBroadcaster
 {

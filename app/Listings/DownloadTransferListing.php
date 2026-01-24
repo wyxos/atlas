@@ -43,6 +43,7 @@ class DownloadTransferListing extends ListingBase
                     DownloadTransferStatus::PREPARING,
                     DownloadTransferStatus::DOWNLOADING,
                     DownloadTransferStatus::ASSEMBLING,
+                    DownloadTransferStatus::PREVIEWING,
                     DownloadTransferStatus::PAUSED,
                     DownloadTransferStatus::FAILED,
                 ]);
@@ -52,6 +53,7 @@ class DownloadTransferListing extends ListingBase
                 DownloadTransferStatus::PREPARING,
                 DownloadTransferStatus::DOWNLOADING,
                 DownloadTransferStatus::ASSEMBLING,
+                DownloadTransferStatus::PREVIEWING,
                 DownloadTransferStatus::PAUSED,
                 DownloadTransferStatus::COMPLETED,
                 DownloadTransferStatus::FAILED,
@@ -86,6 +88,7 @@ class DownloadTransferListing extends ListingBase
                 'paused' => 'Paused',
                 'downloading' => 'Downloading',
                 'assembling' => 'Assembling',
+                'previewing' => 'Previewing',
                 'failed' => 'Failed',
                 'completed' => 'Completed',
                 'canceled' => 'Canceled',

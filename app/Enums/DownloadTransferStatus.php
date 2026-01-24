@@ -16,6 +16,8 @@ final class DownloadTransferStatus
 
     public const ASSEMBLING = 'assembling';
 
+    public const PREVIEWING = 'previewing';
+
     public const PAUSED = 'paused';
 
     public const COMPLETED = 'completed';

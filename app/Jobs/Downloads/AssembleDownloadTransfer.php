@@ -4,10 +4,10 @@ namespace App\Jobs\Downloads;
 
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
-use App\Services\Downloads\DownloadTransferPayload;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -142,11 +142,11 @@ class AssembleDownloadTransfer implements ShouldQueue
 
         fclose($out);
 
-        $finalizer->finalize($transfer->file, $assembledPath, $this->contentTypeHeader);
+        $finalizer->finalize($transfer->file, $assembledPath, $this->contentTypeHeader, false);
 
         $transfer->update([
-            'status' => DownloadTransferStatus::COMPLETED,
-            'finished_at' => now(),
+            'status' => DownloadTransferStatus::PREVIEWING,
+            'finished_at' => null,
         ]);
 
         File::query()->whereKey($transfer->file_id)->update([
@@ -168,6 +168,8 @@ class AssembleDownloadTransfer implements ShouldQueue
         } catch (\Throwable) {
             // Broadcast errors shouldn't fail downloads.
         }
+
+        GenerateTransferPreview::dispatch($transfer->id);
 
         foreach ($chunks as $chunk) {
             if ($chunk->part_path) {
