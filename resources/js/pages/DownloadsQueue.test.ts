@@ -23,3 +23,36 @@ it('renders the downloads queue', async () => {
     expect(wrapper.text()).toContain('Downloads Queue');
     expect(wrapper.text()).toContain('Manage queued downloads.');
 });
+
+it('disables pause and cancel when progress is complete', async () => {
+    window.axios.get = vi.fn().mockResolvedValue({
+        data: {
+            items: [
+                {
+                    id: 1,
+                    status: 'downloading',
+                    created_at: null,
+                    queued_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    failed_at: null,
+                    percent: 100,
+                },
+            ],
+        },
+    });
+
+    const wrapper = mount(DownloadsQueue);
+    await flushPromises();
+
+    const container = wrapper.find('.flex-1.overflow-auto');
+    Object.defineProperty(container.element, 'clientHeight', { value: 600, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    await wrapper.vm.$nextTick();
+
+    const pauseButton = wrapper.find('button[aria-label="Pause download"]');
+    const cancelButton = wrapper.find('button[aria-label="Cancel download"]');
+
+    expect(pauseButton.attributes('disabled')).toBeDefined();
+    expect(cancelButton.attributes('disabled')).toBeDefined();
+});

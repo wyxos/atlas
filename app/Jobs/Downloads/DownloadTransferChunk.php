@@ -205,5 +205,3 @@ class DownloadTransferChunk implements ShouldQueue
         PumpDomainDownloads::dispatch($transfer->domain);
     }
 }
-
-

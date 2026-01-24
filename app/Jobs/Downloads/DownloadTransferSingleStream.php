@@ -4,9 +4,9 @@ namespace App\Jobs\Downloads;
 
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
-use App\Services\Downloads\DownloadTransferPayload;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\DownloadTransferProgressBroadcaster;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Bus\Queueable;
@@ -44,7 +44,6 @@ class DownloadTransferSingleStream implements ShouldQueue
         if ($transfer->status !== DownloadTransferStatus::DOWNLOADING) {
             return;
         }
-
 
         $headers = [];
         if ($transfer->file?->referrer_url) {
@@ -180,11 +179,16 @@ class DownloadTransferSingleStream implements ShouldQueue
 
         fclose($fh);
 
-        $finalizer->finalize($transfer->file, $tmpPath, $this->contentTypeHeader ?? $response->header('Content-Type'));
+        $finalizer->finalize(
+            $transfer->file,
+            $tmpPath,
+            $this->contentTypeHeader ?? $response->header('Content-Type'),
+            false
+        );
 
         $transfer->update([
-            'status' => DownloadTransferStatus::COMPLETED,
-            'finished_at' => now(),
+            'status' => DownloadTransferStatus::PREVIEWING,
+            'finished_at' => null,
         ]);
 
         File::query()->whereKey($transfer->file_id)->update([
@@ -206,6 +210,8 @@ class DownloadTransferSingleStream implements ShouldQueue
         } catch (\Throwable) {
             // Broadcast errors shouldn't fail downloads.
         }
+
+        GenerateTransferPreview::dispatch($transfer->id);
 
         if ($disk->exists($tmpPath)) {
             $disk->delete($tmpPath);
@@ -239,6 +245,3 @@ class DownloadTransferSingleStream implements ShouldQueue
 
     // Progress broadcasting is handled by DownloadTransferProgressBroadcaster.
 }
-
-
-

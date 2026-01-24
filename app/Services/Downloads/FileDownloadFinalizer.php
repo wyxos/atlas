@@ -56,8 +56,12 @@ class FileDownloadFinalizer
         return $updates;
     }
 
-    public function finalize(File $file, string $downloadedPath, ?string $contentTypeHeader = null): void
-    {
+    public function finalize(
+        File $file,
+        string $downloadedPath,
+        ?string $contentTypeHeader = null,
+        bool $generatePreviews = true
+    ): void {
         $wasDownloaded = (bool) $file->downloaded;
         $wasBlacklisted = $file->blacklisted_at !== null;
         $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
@@ -96,21 +100,23 @@ class FileDownloadFinalizer
             $updates['size'] = $size;
         }
 
-        $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
-        if ($this->isImageMimeType($mimeType)) {
-            $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
-            if ($previewPath) {
-                $updates['preview_path'] = $previewPath;
+        if ($generatePreviews) {
+            $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
+            if ($this->isImageMimeType($mimeType)) {
+                $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
+                if ($previewPath) {
+                    $updates['preview_path'] = $previewPath;
+                }
             }
-        }
-        if ($this->isVideoMimeType($mimeType)) {
-            [$previewPath, $posterPath] = $this->generateVideoPreview($disk, $absolutePath, $finalPath);
+            if ($this->isVideoMimeType($mimeType)) {
+                [$previewPath, $posterPath] = $this->generateVideoPreview($disk, $absolutePath, $finalPath);
 
-            if ($previewPath) {
-                $updates['preview_path'] = $previewPath;
-            }
-            if ($posterPath) {
-                $updates['poster_path'] = $posterPath;
+                if ($previewPath) {
+                    $updates['preview_path'] = $previewPath;
+                }
+                if ($posterPath) {
+                    $updates['poster_path'] = $posterPath;
+                }
             }
         }
 
