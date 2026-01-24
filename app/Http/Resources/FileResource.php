@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class FileResource extends JsonResource
 {
@@ -12,21 +13,29 @@ class FileResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $absolutePath = null;
-        if ($this->path) {
-            $fullPath = storage_path('app/'.$this->path);
+        $downloadsDisk = Storage::disk(config('downloads.disk'));
+
+        $resolveAbsolutePath = function (?string $path) use ($downloadsDisk): ?string {
+            if (! $path) {
+                return null;
+            }
+
+            $fullPath = $downloadsDisk->path($path);
 
             // Normalize the path: use realpath() if file exists (returns canonical absolute path)
             // This handles symlinks, relative paths, and normalizes separators for the OS
             $normalized = realpath($fullPath);
             if ($normalized !== false) {
-                $absolutePath = $normalized;
-            } else {
-                // If file doesn't exist, use the constructed path with OS-native separators
-                // storage_path() already uses DIRECTORY_SEPARATOR, so it's OS-appropriate
-                $absolutePath = $fullPath;
+                return $normalized;
             }
-        }
+
+            // If file doesn't exist, use the constructed path with OS-native separators
+            // storage_path() already uses DIRECTORY_SEPARATOR, so it's OS-appropriate
+            return $fullPath;
+        };
+
+        $absolutePath = $resolveAbsolutePath($this->path);
+        $absolutePreviewPath = $resolveAbsolutePath($this->preview_path);
 
         $fileUrl = null;
         if ($this->url) {
@@ -59,6 +68,7 @@ class FileResource extends JsonResource
             'referrer_url' => $this->referrer_url,
             'path' => $this->path,
             'absolute_path' => $absolutePath,
+            'absolute_preview_path' => $absolutePreviewPath,
             'preview_url' => $this->preview_url,
             'disk_url' => $diskUrl,
             'preview_file_url' => $previewFileUrl,

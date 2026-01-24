@@ -12,6 +12,50 @@ use Symfony\Component\Process\Process;
 
 class FileDownloadFinalizer
 {
+    /**
+     * @return array{preview_path?: string, poster_path?: string}
+     */
+    public function generatePreviewAssets(File $file): array
+    {
+        if (! $file->path) {
+            return [];
+        }
+
+        $disk = Storage::disk(config('downloads.disk'));
+
+        if (! $disk->exists($file->path)) {
+            return [];
+        }
+
+        $absolutePath = $disk->path($file->path);
+        $mimeType = $file->mime_type ?? $this->getMimeTypeFromFile($absolutePath);
+
+        $updates = [];
+
+        if ($this->isImageMimeType($mimeType) && ! $file->preview_path) {
+            $storedFilename = basename($file->path);
+            $hashForSegmentation = $this->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
+
+            $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
+            if ($previewPath) {
+                $updates['preview_path'] = $previewPath;
+            }
+        }
+
+        if ($this->isVideoMimeType($mimeType) && (! $file->preview_path || ! $file->poster_path)) {
+            [$previewPath, $posterPath] = $this->generateVideoPreview($disk, $absolutePath, $file->path);
+
+            if ($previewPath && ! $file->preview_path) {
+                $updates['preview_path'] = $previewPath;
+            }
+            if ($posterPath && ! $file->poster_path) {
+                $updates['poster_path'] = $posterPath;
+            }
+        }
+
+        return $updates;
+    }
+
     public function finalize(File $file, string $downloadedPath, ?string $contentTypeHeader = null): void
     {
         $wasDownloaded = (bool) $file->downloaded;

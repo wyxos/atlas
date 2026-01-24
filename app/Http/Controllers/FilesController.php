@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Listings\FileListing;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\MetricsService;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class FilesController extends Controller
@@ -150,6 +152,13 @@ class FilesController extends Controller
      */
     public function servePreview(File $file)
     {
+        $disk = Storage::disk(config('downloads.disk'));
+
+        if (! $file->preview_path || ! $disk->exists($file->preview_path)) {
+            $this->dispatchPreviewGeneration($file, $disk);
+            abort(404, 'File not found');
+        }
+
         $mimeType = $file->mime_type ?? 'application/octet-stream';
 
         return $this->serveDiskPath($file->preview_path, $mimeType);
@@ -270,6 +279,40 @@ class FilesController extends Controller
             ...$baseHeaders,
             'Content-Length' => (string) $size,
         ]);
+    }
+
+    private function dispatchPreviewGeneration(File $file, \Illuminate\Contracts\Filesystem\Filesystem $disk): void
+    {
+        if (! $file->downloaded || ! $file->path) {
+            return;
+        }
+
+        if (! $disk->exists($file->path)) {
+            return;
+        }
+
+        $lockKey = "preview-generation:{$file->id}";
+        if (! Cache::add($lockKey, true, 300)) {
+            return;
+        }
+
+        $fileId = $file->id;
+
+        dispatch(function () use ($fileId) {
+            $fresh = File::query()->find($fileId);
+            if (! $fresh) {
+                return;
+            }
+
+            $finalizer = app(FileDownloadFinalizer::class);
+            $updates = $finalizer->generatePreviewAssets($fresh);
+
+            if ($updates === []) {
+                return;
+            }
+
+            $fresh->update($updates);
+        });
     }
 
     /**
