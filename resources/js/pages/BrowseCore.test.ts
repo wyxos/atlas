@@ -275,7 +275,7 @@ describe('Browse - Core', () => {
         expect(masonry.props('pageSize')).toBe(20);
         expect(masonry.props('gapX')).toBe(12);
         expect(masonry.props('gapY')).toBe(12);
-        expect(masonry.props('mode')).toBeUndefined();
+        expect(masonry.props('mode')).toBe('backfill');
     });
 
     it('provides getPage function that fetches from API', async () => {

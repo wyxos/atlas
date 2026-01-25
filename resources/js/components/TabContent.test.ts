@@ -603,8 +603,8 @@ describe('TabContent - Resume Session', () => {
         expect(masonry.exists()).toBe(true);
         expect(masonry.props('restoredPages')).toBeUndefined();
         expect(masonry.props('page')).toBe('CURSOR_NEXT');
-        // Restored sessions should not set a Masonry mode override.
-        expect(masonry.props('mode')).toBeUndefined();
+            // Restored sessions should keep backfill enabled for online browsing.
+            expect(masonry.props('mode')).toBe('backfill');
     });
 });
 
@@ -1189,5 +1189,4 @@ describe('TabContent - Container Badges', () => {
         });
     });
 });
-
 
