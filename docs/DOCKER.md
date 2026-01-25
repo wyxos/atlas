@@ -2,12 +2,47 @@
 
 This is the quickest way to get Atlas running on a local machine or a small server.
 
-## 1) Prepare your .env
+## 1) One-shot setup (recommended)
+
+If you want a single script that does everything (clone, env prompts, Docker, setup):
+
+```bash
+./scripts/setup.sh
+```
+
+On Windows (CMD):
+
+```bat
+scripts\setup.bat
+```
+
+## 2) Manual steps
+
+### 2.1) Clone the repo
+
+```bash
+git clone <your-repo-url> Atlas
+cd Atlas
+```
+
+### 2.2) Prepare your .env
+
+If you want prompts for the defaults:
+
+```bash
+./scripts/setup-env.sh
+```
+
+Or on Windows PowerShell:
+
+```powershell
+.\scripts\setup-env.ps1
+```
 
 Copy `.env.example` to `.env`, then set these values:
 
 - `APP_URL=http://localhost:8080`
-- `DB_CONNECTION=mysql`
+- `DB_CONNECTION=mariadb`
 - `DB_HOST=db`
 - `DB_PORT=3306`
 - `DB_DATABASE=atlas`
@@ -24,13 +59,13 @@ If you want to store files on a NAS, set:
 
 - `ATLAS_STORAGE=/data/atlas`
 
-## 2) Build and start
+### 2.3) Build and start
 
 ```bash
 docker compose up -d --build
 ```
 
-## 3) Initialize the app
+### 2.4) Initialize the app
 
 ```bash
 docker compose exec app php artisan key:generate
@@ -38,7 +73,7 @@ docker compose exec app php artisan migrate --force
 docker compose exec app php artisan app:setup
 ```
 
-## 4) Open the app
+### 2.5) Open the app
 
 Visit: `http://localhost:8080`
 
