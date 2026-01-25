@@ -8,7 +8,7 @@
 	<a href="https://youtu.be/g1Ogg5vivSM">Watch the demo video</a>
 </p>
 
-Setup guide: [docs/SETUP.md](docs/SETUP.md)
+Setup guide: [docs/SETUP.md](docs/SETUP.md) | Docker: [docs/DOCKER.md](docs/DOCKER.md)
 
 A self-hosted feed curating tool: scroll fast, react fast, block the junk, auto-save what is worth keeping.
 

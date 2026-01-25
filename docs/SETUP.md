@@ -2,6 +2,8 @@
 
 This guide mirrors a real-world install on a server.
 
+If you want the Docker option, use `docs/DOCKER.md` instead.
+
 ## What you need
 
 - A database (MariaDB/MySQL or Postgres)
