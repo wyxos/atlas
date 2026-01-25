@@ -18,9 +18,15 @@ const props = withDefaults(defineProps<Props>(), {
     visible: true,
 });
 
-// Display page value - Vibe exposes the loaded page tokens.
+const backfillStats = computed<BackfillStats | null>(() => props.masonry?.backfillStats ?? null);
+
+// Display page value - prefer live backfill stats while active, otherwise use Masonry's loaded pages.
 // Fallback to tab.params.page when masonry isn't initialized yet.
 const displayPage = computed(() => {
+    if (backfillStats.value?.isBackfillActive) {
+        return backfillStats.value.page ?? props.tab?.params?.page ?? 1;
+    }
+
     const pagesLoaded = props.masonry?.pagesLoaded;
     const lastLoaded = Array.isArray(pagesLoaded) && pagesLoaded.length > 0
         ? pagesLoaded[pagesLoaded.length - 1]
@@ -29,10 +35,14 @@ const displayPage = computed(() => {
     return lastLoaded ?? props.tab?.params?.page ?? 1;
 });
 
-// Next cursor/page token comes directly from Vibe.
-const nextCursor = computed(() => props.masonry?.nextPage ?? props.tab?.params?.next ?? null);
+// Next cursor/page token comes directly from Vibe (prefer backfill stats while active).
+const nextCursor = computed(() => {
+    if (backfillStats.value?.isBackfillActive) {
+        return backfillStats.value.next ?? 'Acquiring...';
+    }
 
-const backfillStats = computed<BackfillStats | null>(() => props.masonry?.backfillStats ?? null);
+    return props.masonry?.nextPage ?? props.tab?.params?.next ?? null;
+});
 
 const backfillActive = computed(() => backfillStats.value?.isBackfillActive ?? false);
 const backfillWaiting = computed(() => {
