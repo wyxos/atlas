@@ -8,6 +8,8 @@
 	<a href="https://youtu.be/g1Ogg5vivSM">Watch the demo video</a>
 </p>
 
+Setup guide: `docs/SETUP.md`
+
 A self-hosted feed curating tool: scroll fast, react fast, block the junk, auto-save what is worth keeping.
 
 It is also growing into a batch downloader and personal library with lightweight streaming.
