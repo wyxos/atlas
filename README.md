@@ -5,7 +5,7 @@
 <h1 align="center">Atlas</h1>
 
 <p align="center">
-	<video src="https://youtu.be/INrkDRw8ZFg" width="900" controls></video>
+	<a href="https://youtu.be/g1Ogg5vivSM">Watch the demo video</a>
 </p>
 
 Atlas is a self-hosted feed curating tool: scroll fast, react fast, block the junk, auto-save what is worth keeping.
