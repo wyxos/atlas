@@ -8,9 +8,9 @@
 	<a href="https://youtu.be/g1Ogg5vivSM">Watch the demo video</a>
 </p>
 
-Atlas is a self-hosted feed curating tool: scroll fast, react fast, block the junk, auto-save what is worth keeping.
+A self-hosted feed curating tool: scroll fast, react fast, block the junk, auto-save what is worth keeping.
 
-Atlas is also growing into a batch downloader and personal library with lightweight streaming.
+It is also growing into a batch downloader and personal library with lightweight streaming.
 
 The hard part is not finding content anymore. It is filtering it fast and keeping only what matters.
 
@@ -40,7 +40,7 @@ Atlas is not a traditional media library manager. It is for curation from chaoti
 - Repeats, spam, or low-signal items clogging your stream
 - A growing backlog without a clean way to save the best items
 
-Atlas is built to handle these.
+Built to handle these.
 
 **Current sources**
 
