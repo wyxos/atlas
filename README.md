@@ -4,7 +4,13 @@
 
 <h1 align="center">Atlas</h1>
 
+<p align="center">
+	<video src="docs/demo.mp4" width="900" controls></video>
+</p>
+
 Atlas is a self-hosted feed curating tool: scroll fast, react fast, block the junk, auto-save what is worth keeping.
+
+Atlas is also growing into a batch downloader and personal library with lightweight streaming.
 
 The hard part is not finding content anymore. It is filtering it fast and keeping only what matters.
 
