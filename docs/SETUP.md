@@ -14,6 +14,18 @@ If you want the Docker option, use `docs/DOCKER.md` instead.
 
 ## Steps
 
+If you want prompts for the defaults:
+
+```bash
+./scripts/setup-env.sh
+```
+
+Or on Windows PowerShell:
+
+```powershell
+.\scripts\setup-env.ps1
+```
+
 1) Clone the repo to a server with the basics installed (PHP, database, Redis, web server).
 
 2) Copy `.env.example` to `.env` and set:
