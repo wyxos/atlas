@@ -4,7 +4,7 @@
 
 <h1 align="center">Atlas</h1>
 
-Atlas is a self-hosted media curation app for high-volume feeds.
+Atlas is a self-hosted feed curating tool: scroll fast, react fast, block the junk, auto-save what is worth keeping.
 
 The hard part is not finding content anymore. It is filtering it fast and keeping only what matters.
 
