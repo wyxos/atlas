@@ -897,6 +897,7 @@ defineExpose({
             <!-- Masonry -->
             <div class="relative flex h-full min-h-0 flex-col overflow-hidden masonry-container" ref="masonryContainer" @click="onMasonryClick"
                 @contextmenu.prevent="onMasonryClick" @mousedown="onMasonryMouseDown">
+
                 <div v-if="shouldShowForm" class="flex items-center justify-center h-full" data-test="new-tab-form">
                     <div
                         class="flex flex-col items-center gap-4 p-8 bg-prussian-blue-700/50 rounded-lg border border-twilight-indigo-500/30 max-w-md w-full">
@@ -960,6 +961,7 @@ defineExpose({
 
                 <Masonry v-else :key="`${tab.id}-${masonryRenderKey}`" ref="masonry" v-model:items="items"
                     class="min-h-0 flex-1 !mt-0 !py-0 !border-0"
+                     :mode="form.isLocalMode.value ? 'default' : 'backfill'"
                     :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
