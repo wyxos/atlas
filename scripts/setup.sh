@@ -7,7 +7,7 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-./scripts/setup-env.sh
+bash ./scripts/setup-env.sh
 
 docker compose up -d --build
 
