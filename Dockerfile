@@ -11,6 +11,7 @@ RUN apt-get update \
         libpng-dev \
         libjpeg62-turbo-dev \
         libfreetype6-dev \
+        libsqlite3-dev \
         unzip \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
@@ -18,6 +19,7 @@ RUN apt-get update \
         intl \
         pcntl \
         pdo_mysql \
+        pdo_sqlite \
         zip \
         gd \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -36,11 +38,12 @@ COPY config ./config
 COPY routes ./routes
 COPY app ./app
 COPY database ./database
+COPY storage ./storage
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
 # Provide a minimal .env so artisan commands (used by Wayfinder during vite build) can run
 RUN set -eux; \
-  mkdir -p database; \
+  mkdir -p database storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache; \
   touch database/database.sqlite; \
   cat > .env <<"ENV"
 APP_NAME=Atlas
@@ -108,7 +111,7 @@ RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoload
 
 # Provide a minimal .env so artisan commands (used by Wayfinder during vite build) can run
 RUN set -eux; \
-  mkdir -p database; \
+  mkdir -p database storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache; \
   touch database/database.sqlite; \
   cat > .env <<"ENV"
 APP_NAME=Atlas
