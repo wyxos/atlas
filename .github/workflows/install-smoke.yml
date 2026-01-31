@@ -1,0 +1,69 @@
+name: install-smoke
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  docker-install-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show versions
+        run: |
+          docker --version
+          docker compose version
+          git --version
+
+      - name: Run installer (local repo URL)
+        env:
+          ATLAS_DIR: AtlasTest
+          ATLAS_REF: ${{ github.sha }}
+          ATLAS_REPO_URL: file://${{ github.workspace }}
+          ATLAS_SETUP_NAME: CI Admin
+          ATLAS_SETUP_EMAIL: ci@example.com
+          ATLAS_SETUP_PASSWORD: Password123!Password123!
+          ATLAS_ENV_AUTO: "1"
+        run: |
+          mkdir -p /tmp/atlas-install && cd /tmp/atlas-install
+          bash -c "$(cat ${{ github.workspace }}/install.sh)"
+
+
+      - name: Assert expected services are running
+        run: |
+          set -euo pipefail
+          cd /tmp/atlas-install/AtlasTest
+          docker compose ps
+          # Ensure all expected services exist
+          for svc in app web horizon scheduler reverb db redis typesense; do
+            docker compose ps $svc >/dev/null
+          done
+
+      - name: Smoke check HTTP
+        run: |
+          set -euo pipefail
+          # nginx is bound on localhost:8080 on the runner
+          for i in {1..60}; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080 || true)
+            if [ "$code" != "000" ]; then
+              echo "HTTP status: $code"
+              break
+            fi
+            sleep 2
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080)
+          # allow 200 OK or redirect-to-login
+          if [ "$code" != "200" ] && [ "$code" != "302" ]; then
+            echo "Unexpected HTTP status: $code"
+            exit 1
+          fi
+
+      - name: Dump docker compose status on failure
+        if: failure()
+        run: |
+          cd /tmp/atlas-install/AtlasTest || exit 0
+          docker compose ps || true
+          docker compose logs --no-color --tail=200 || true

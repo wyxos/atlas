@@ -2,9 +2,23 @@
 
 This is the quickest way to get Atlas running on a local machine or a small server.
 
-## 1) One-shot setup (recommended)
+## 1) One-shot install (recommended)
 
-If you want a single script that does everything (clone, env prompts, Docker, setup):
+### Linux/macOS/WSL
+
+Run directly from GitHub (clones the repo + prompts for env + starts Docker):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wyxos/atlas/main/install.sh | bash
+```
+
+### Windows (PowerShell)
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/wyxos/atlas/main/install.ps1 | iex
+```
+
+### If you already cloned the repo
 
 ```bash
 ./scripts/setup.sh

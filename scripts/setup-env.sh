@@ -7,11 +7,17 @@ if [[ ! -f "$env_file" ]]; then
   cp .env.example "$env_file"
 fi
 
+AUTO=${ATLAS_ENV_AUTO:-0}
+
 prompt() {
   local label="$1"
   local default="$2"
   local value
-  read -r -p "$label [$default]: " value
+  if [[ "$AUTO" == "1" ]] || [[ ! -t 0 ]]; then
+    value=""
+  else
+    read -r -p "$label [$default]: " value
+  fi
   if [[ -z "$value" ]]; then
     value="$default"
   fi
@@ -49,6 +55,9 @@ typesense_port=$(prompt "TYPESENSE_PORT" "8108")
 typesense_api_key=$(prompt "TYPESENSE_API_KEY" "typesense")
 ffmpeg_path=$(prompt "DOWNLOADS_FFMPEG_PATH" "ffmpeg")
 atlas_storage=$(prompt "ATLAS_STORAGE" "/data/atlas")
+reverb_host=$(prompt "REVERB_HOST" "localhost")
+reverb_port=$(prompt "REVERB_PORT" "8081")
+reverb_scheme=$(prompt "REVERB_SCHEME" "http")
 
 set_env "APP_URL" "$app_url"
 set_env "DB_CONNECTION" "$db_connection"
@@ -64,6 +73,9 @@ set_env "TYPESENSE_PORT" "$typesense_port"
 set_env "TYPESENSE_API_KEY" "$typesense_api_key"
 set_env "DOWNLOADS_FFMPEG_PATH" "$ffmpeg_path"
 set_env "ATLAS_STORAGE" "$atlas_storage"
+set_env "REVERB_HOST" "$reverb_host"
+set_env "REVERB_PORT" "$reverb_port"
+set_env "REVERB_SCHEME" "$reverb_scheme"
 set_env "QUEUE_CONNECTION" "redis"
 set_env "CACHE_STORE" "redis"
 

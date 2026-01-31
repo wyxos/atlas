@@ -7,6 +7,7 @@ function Prompt-Value {
         [string]$Label,
         [string]$Default
     )
+    if ($Auto) { return $Default }
     $value = Read-Host "$Label [$Default]"
     if ([string]::IsNullOrWhiteSpace($value)) {
         return $Default
@@ -55,6 +56,9 @@ $typesensePort = Prompt-Value "TYPESENSE_PORT" "8108"
 $typesenseApiKey = Prompt-Value "TYPESENSE_API_KEY" "typesense"
 $ffmpegPath = Prompt-Value "DOWNLOADS_FFMPEG_PATH" "ffmpeg"
 $atlasStorage = Prompt-Value "ATLAS_STORAGE" "/data/atlas"
+$reverbHost = Prompt-Value "REVERB_HOST" "localhost"
+$reverbPort = Prompt-Value "REVERB_PORT" "8081"
+$reverbScheme = Prompt-Value "REVERB_SCHEME" "http"
 
 Set-EnvValue "APP_URL" $appUrl $EnvFile
 Set-EnvValue "DB_CONNECTION" $dbConnection $EnvFile
@@ -70,6 +74,9 @@ Set-EnvValue "TYPESENSE_PORT" $typesensePort $EnvFile
 Set-EnvValue "TYPESENSE_API_KEY" $typesenseApiKey $EnvFile
 Set-EnvValue "DOWNLOADS_FFMPEG_PATH" $ffmpegPath $EnvFile
 Set-EnvValue "ATLAS_STORAGE" $atlasStorage $EnvFile
+Set-EnvValue "REVERB_HOST" $reverbHost $EnvFile
+Set-EnvValue "REVERB_PORT" $reverbPort $EnvFile
+Set-EnvValue "REVERB_SCHEME" $reverbScheme $EnvFile
 Set-EnvValue "QUEUE_CONNECTION" "redis" $EnvFile
 Set-EnvValue "CACHE_STORE" "redis" $EnvFile
 
