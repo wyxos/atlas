@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./.env:/var/www/html/.env:ro
+      - ./.env:/var/www/html/.env
       - atlas_storage:/data/atlas
     environment:
       ATLAS_STORAGE: /data/atlas
@@ -31,7 +31,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./.env:/var/www/html/.env:ro
+      - ./.env:/var/www/html/.env
       - atlas_storage:/data/atlas
     environment:
       ATLAS_STORAGE: /data/atlas
@@ -47,7 +47,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./.env:/var/www/html/.env:ro
+      - ./.env:/var/www/html/.env
       - atlas_storage:/data/atlas
     environment:
       ATLAS_STORAGE: /data/atlas
@@ -62,7 +62,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./.env:/var/www/html/.env:ro
+      - ./.env:/var/www/html/.env
       - atlas_storage:/data/atlas
     environment:
       ATLAS_STORAGE: /data/atlas
