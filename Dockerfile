@@ -39,7 +39,25 @@ COPY database ./database
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
 # Provide a minimal .env so artisan commands (used by Wayfinder during vite build) can run
-COPY .env.example ./.env
+RUN set -eux; \
+  mkdir -p database; \
+  touch database/database.sqlite; \
+  cat > .env <<"ENV"
+APP_NAME=Atlas
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=false
+APP_URL=http://localhost
+
+DB_CONNECTION=sqlite
+DB_DATABASE=/var/www/html/database/database.sqlite
+
+SESSION_DRIVER=file
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
+BROADCAST_CONNECTION=log
+ENV
+
 RUN php artisan key:generate --ansi
 
 
@@ -89,7 +107,25 @@ COPY database ./database
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
 # Provide a minimal .env so artisan commands (used by Wayfinder during vite build) can run
-COPY .env.example ./.env
+RUN set -eux; \
+  mkdir -p database; \
+  touch database/database.sqlite; \
+  cat > .env <<"ENV"
+APP_NAME=Atlas
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=false
+APP_URL=http://localhost
+
+DB_CONNECTION=sqlite
+DB_DATABASE=/var/www/html/database/database.sqlite
+
+SESSION_DRIVER=file
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
+BROADCAST_CONNECTION=log
+ENV
+
 RUN php artisan key:generate --ansi
 
 
