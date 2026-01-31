@@ -1,7 +1,30 @@
-FROM php:8.3-fpm-bullseye AS node-build
+FROM php:8.4-fpm-bullseye AS node-build
 WORKDIR /var/www/html
 
-RUN apt-get update     && apt-get install -y --no-install-recommends         ca-certificates         curl         gnupg         libicu-dev         libzip-dev         unzip     && docker-php-ext-install         bcmath         intl         pcntl         pdo_mysql         zip     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash -     && apt-get install -y --no-install-recommends nodejs     && npm install -g npm@9.9.2     && apt-get clean     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gnupg \
+        libicu-dev \
+        libzip-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+        unzip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
+        bcmath \
+        intl \
+        pcntl \
+        pdo_mysql \
+        zip \
+        gd \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g npm@9.9.2 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -23,10 +46,31 @@ COPY public ./public
 COPY vite.config.js tsconfig.json eslint.config.js ./
 RUN npm run build
 
-FROM php:8.3-fpm-bullseye
+FROM php:8.4-fpm-bullseye
 WORKDIR /var/www/html
 
-RUN apt-get update     && apt-get install -y --no-install-recommends         ffmpeg         git         libicu-dev         libzip-dev         unzip     && docker-php-ext-install         bcmath         intl         pcntl         pdo_mysql         zip     && pecl install redis     && docker-php-ext-enable redis     && apt-get clean     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        git \
+        libicu-dev \
+        libzip-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+        unzip \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
+        bcmath \
+        intl \
+        pcntl \
+        pdo_mysql \
+        zip \
+        gd \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
