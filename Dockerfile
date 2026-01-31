@@ -38,6 +38,11 @@ COPY app ./app
 COPY database ./database
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
+# Provide a minimal .env so artisan commands (used by Wayfinder during vite build) can run
+COPY .env.example ./.env
+RUN php artisan key:generate --ansi
+
+
 # Build frontend assets
 COPY package*.json ./
 RUN npm install --no-audit --no-fund
@@ -82,6 +87,11 @@ COPY routes ./routes
 COPY app ./app
 COPY database ./database
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+# Provide a minimal .env so artisan commands (used by Wayfinder during vite build) can run
+COPY .env.example ./.env
+RUN php artisan key:generate --ansi
+
 
 COPY . .
 COPY --from=node-build /var/www/html/public/build /var/www/html/public/build
