@@ -12,7 +12,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('app:setup', function () {
+Artisan::command('app:setup {--name=} {--email=} {--password=} {--generate-password : Generate a secure password (non-interactive)}', function () {
     $generatePassword = function (int $length = 20): string {
         $lower = 'abcdefghijklmnopqrstuvwxyz';
         $upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -39,7 +39,7 @@ Artisan::command('app:setup', function () {
         return implode('', $password);
     };
 
-    $name = (string) $this->ask('Name');
+    $name = (string) ($this->option('name') ?: $this->ask('Name'));
     while (true) {
         $validator = Validator::make(
             ['name' => $name],
@@ -51,10 +51,10 @@ Artisan::command('app:setup', function () {
         }
 
         $this->error($validator->errors()->first('name'));
-        $name = (string) $this->ask('Name');
+        $name = (string) ($this->option('name') ?: $this->ask('Name'));
     }
 
-    $email = (string) $this->ask('Email');
+    $email = (string) ($this->option('email') ?: $this->ask('Email'));
     while (true) {
         $validator = Validator::make(
             ['email' => $email],
@@ -67,7 +67,7 @@ Artisan::command('app:setup', function () {
         }
 
         $this->error($validator->errors()->first('email'));
-        $email = (string) $this->ask('Email');
+        $email = (string) ($this->option('email') ?: $this->ask('Email'));
     }
 
     $passwordRule = Password::min(12)
@@ -76,7 +76,15 @@ Artisan::command('app:setup', function () {
         ->numbers()
         ->symbols();
 
-    $password = (string) $this->secret('Password (leave blank to generate a secure one)');
+    $password = (string) ($this->option('password') ?? '');
+
+    if ($this->option('generate-password')) {
+        $password = '';
+    }
+
+    if ($password === '') {
+        $password = (string) $this->secret('Password (leave blank to generate a secure one)');
+    }
 
     if ($password === '') {
         $password = $generatePassword();

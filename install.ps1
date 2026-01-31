@@ -7,7 +7,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$RepoUrl = "https://github.com/wyxos/atlas.git"
+$RepoUrl = if ($env:ATLAS_REPO_URL) { $env:ATLAS_REPO_URL } else { "https://github.com/wyxos/atlas.git" }
 $AtlasDir = if ($env:ATLAS_DIR) { $env:ATLAS_DIR } else { "Atlas" }
 $AtlasRef = if ($env:ATLAS_REF) { $env:ATLAS_REF } else { "main" }
 

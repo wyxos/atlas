@@ -8,9 +8,15 @@ set -euo pipefail
 #   ATLAS_DIR=Atlas   (target directory)
 #   ATLAS_REF=main    (branch/tag/sha)
 
-REPO_URL="https://github.com/wyxos/atlas.git"
+REPO_URL="${ATLAS_REPO_URL:-https://github.com/wyxos/atlas.git}"
 ATLAS_DIR="${ATLAS_DIR:-Atlas}"
 ATLAS_REF="${ATLAS_REF:-main}"
+
+# Non-interactive setup (useful for CI)
+# If these are set, we will pass them to app:setup via options.
+ATLAS_SETUP_NAME="${ATLAS_SETUP_NAME:-}"
+ATLAS_SETUP_EMAIL="${ATLAS_SETUP_EMAIL:-}"
+ATLAS_SETUP_PASSWORD="${ATLAS_SETUP_PASSWORD:-}"
 
 need() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -35,7 +41,12 @@ fi
 
 if [[ ! -d "$ATLAS_DIR/.git" ]]; then
   echo "Cloning Atlas into: $ATLAS_DIR"
-  git clone --depth 1 --branch "$ATLAS_REF" "$REPO_URL" "$ATLAS_DIR"
+  if [[ "$REPO_URL" == file://* ]]; then
+    git clone "$REPO_URL" "$ATLAS_DIR"
+    (cd "$ATLAS_DIR" && git checkout -q "$ATLAS_REF")
+  else
+    git clone --depth 1 --branch "$ATLAS_REF" "$REPO_URL" "$ATLAS_DIR"
+  fi
 else
   echo "Using existing repo at: $ATLAS_DIR"
 fi
@@ -44,9 +55,15 @@ cd "$ATLAS_DIR"
 
 # If this installer script is being run from a different ref than the repo, keep it simple:
 # just run the repo's setup script.
-if [[ ! -x "./scripts/setup.sh" ]]; then
-  echo "Missing ./scripts/setup.sh in repo. Are you on the right branch/tag?" >&2
+if [[ ! -x "export ATLAS_SETUP_NAME ATLAS_SETUP_EMAIL ATLAS_SETUP_PASSWORD
+
+./scripts/setup.sh" ]]; then
+  echo "Missing export ATLAS_SETUP_NAME ATLAS_SETUP_EMAIL ATLAS_SETUP_PASSWORD
+
+./scripts/setup.sh in repo. Are you on the right branch/tag?" >&2
   exit 1
 fi
+
+export ATLAS_SETUP_NAME ATLAS_SETUP_EMAIL ATLAS_SETUP_PASSWORD
 
 ./scripts/setup.sh
