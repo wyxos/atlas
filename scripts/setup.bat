@@ -18,7 +18,7 @@ set /a attempts=0
 set /a attempts+=1
 docker compose exec app php -v >nul 2>&1
 if %errorlevel%==0 goto ready
-if %attempts% geq 30 goto ready
+if %attempts% geq 30 goto notready
 timeout /t 2 >nul
 goto wait
 
@@ -33,4 +33,4 @@ if defined ATLAS_SETUP_NAME if defined ATLAS_SETUP_EMAIL if defined ATLAS_SETUP_
 
 echo.
 echo Atlas is starting up.
-echo Open: http://localhost:8080
+echo Open: http://localhost:6363

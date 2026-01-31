@@ -42,7 +42,7 @@ if (-not (Test-Path $EnvFile)) {
 Write-Host "Atlas .env setup"
 Write-Host "Press Enter to accept defaults."
 
-$appUrl = Prompt-Value "APP_URL" "http://localhost:8080"
+$appUrl = Prompt-Value "APP_URL" "http://localhost:6363"
 $dbConnection = Prompt-Value "DB_CONNECTION" "mariadb"
 $dbHost = Prompt-Value "DB_HOST" "db"
 $dbPort = Prompt-Value "DB_PORT" "3306"
@@ -57,7 +57,7 @@ $typesenseApiKey = Prompt-Value "TYPESENSE_API_KEY" "typesense"
 $ffmpegPath = Prompt-Value "DOWNLOADS_FFMPEG_PATH" "ffmpeg"
 $atlasStorage = Prompt-Value "ATLAS_STORAGE" "/data/atlas"
 $reverbHost = Prompt-Value "REVERB_HOST" "localhost"
-$reverbPort = Prompt-Value "REVERB_PORT" "8081"
+$reverbPort = Prompt-Value "REVERB_PORT" "6364"
 $reverbScheme = Prompt-Value "REVERB_SCHEME" "http"
 
 Set-EnvValue "APP_URL" $appUrl $EnvFile
