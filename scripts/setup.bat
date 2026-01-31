@@ -23,9 +23,13 @@ timeout /t 2 >nul
 goto wait
 
 :ready
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate --force
-docker compose exec app php artisan app:setup
+docker compose exec -T app php artisan key:generate
+docker compose exec -T app php artisan migrate --force
+if defined ATLAS_SETUP_NAME if defined ATLAS_SETUP_EMAIL if defined ATLAS_SETUP_PASSWORD (
+  docker compose exec -T app php artisan app:setup --name="%ATLAS_SETUP_NAME%" --email="%ATLAS_SETUP_EMAIL%" --password="%ATLAS_SETUP_PASSWORD%"
+) else (
+  docker compose exec app php artisan app:setup
+)
 
 echo.
 echo Atlas is starting up.
