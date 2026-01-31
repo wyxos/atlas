@@ -26,9 +26,21 @@ jobs:
           ATLAS_SETUP_NAME: CI Admin
           ATLAS_SETUP_EMAIL: ci@example.com
           ATLAS_SETUP_PASSWORD: Password123!Password123!
+          ATLAS_ENV_AUTO: "1"
         run: |
           mkdir -p /tmp/atlas-install && cd /tmp/atlas-install
           bash -c "$(cat ${{ github.workspace }}/install.sh)"
+
+
+      - name: Assert expected services are running
+        run: |
+          set -euo pipefail
+          cd /tmp/atlas-install/AtlasTest
+          docker compose ps
+          # Ensure all expected services exist
+          for svc in app web horizon scheduler reverb db redis typesense; do
+            docker compose ps $svc >/dev/null
+          done
 
       - name: Smoke check HTTP
         run: |
