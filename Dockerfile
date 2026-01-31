@@ -135,4 +135,5 @@ RUN php artisan key:generate --ansi
 COPY . .
 COPY --from=node-build /var/www/html/public/build /var/www/html/public/build
 
-RUN chown -R www-data:www-data storage bootstrap/cache
+# Ensure runtime user can update env (CI runs `php artisan key:generate` inside the container)
+RUN chown -R www-data:www-data storage bootstrap/cache .env
