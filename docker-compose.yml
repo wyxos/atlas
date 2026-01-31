@@ -55,8 +55,31 @@ services:
     depends_on:
       - app
 
+  reverb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/var/www/html/.env:ro
+      - atlas_storage:/data/atlas
+    environment:
+      ATLAS_STORAGE: /data/atlas
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - "8081:8080"
+    depends_on:
+      - app
+
+
   db:
     image: mariadb:11.4
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -patlas > /dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     environment:
       MYSQL_DATABASE: atlas
       MYSQL_USER: atlas
@@ -69,6 +92,11 @@ services:
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     volumes:
       - redis_data:/data
     ports:
