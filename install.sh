@@ -55,18 +55,15 @@ cd "$ATLAS_DIR"
 
 # If this installer script is being run from a different ref than the repo, keep it simple:
 # just run the repo's setup script.
-if [[ ! -x "export ATLAS_ENV_AUTO=1
-export ATLAS_SETUP_NAME ATLAS_SETUP_EMAIL ATLAS_SETUP_PASSWORD
-
-./scripts/setup.sh" ]]; then
-  echo "Missing export ATLAS_ENV_AUTO=1
-export ATLAS_SETUP_NAME ATLAS_SETUP_EMAIL ATLAS_SETUP_PASSWORD
-
-./scripts/setup.sh in repo. Are you on the right branch/tag?" >&2
+#
+# Note: on Windows/WSL, executable bits may not be preserved, so we check for the file,
+# not +x, and run it explicitly with bash.
+if [[ ! -f "./scripts/setup.sh" ]]; then
+  echo "Missing ./scripts/setup.sh in repo. Are you on the right branch/tag?" >&2
   exit 1
 fi
 
 export ATLAS_ENV_AUTO=1
 export ATLAS_SETUP_NAME ATLAS_SETUP_EMAIL ATLAS_SETUP_PASSWORD
 
-./scripts/setup.sh
+bash ./scripts/setup.sh
