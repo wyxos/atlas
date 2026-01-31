@@ -41,7 +41,7 @@ echo "Atlas .env setup"
 echo "Press Enter to accept defaults."
 echo
 
-app_url=$(prompt "APP_URL" "http://localhost:8080")
+app_url=$(prompt "APP_URL" "http://localhost:6363")
 db_connection=$(prompt "DB_CONNECTION" "mariadb")
 db_host=$(prompt "DB_HOST" "db")
 db_port=$(prompt "DB_PORT" "3306")
@@ -56,7 +56,7 @@ typesense_api_key=$(prompt "TYPESENSE_API_KEY" "typesense")
 ffmpeg_path=$(prompt "DOWNLOADS_FFMPEG_PATH" "ffmpeg")
 atlas_storage=$(prompt "ATLAS_STORAGE" "/data/atlas")
 reverb_host=$(prompt "REVERB_HOST" "localhost")
-reverb_port=$(prompt "REVERB_PORT" "8081")
+reverb_port=$(prompt "REVERB_PORT" "6364")
 reverb_scheme=$(prompt "REVERB_SCHEME" "http")
 
 set_env "APP_URL" "$app_url"

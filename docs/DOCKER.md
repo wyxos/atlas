@@ -89,7 +89,7 @@ docker compose exec app php artisan app:setup
 
 ### 2.5) Open the app
 
-Visit: `http://localhost:8080`
+Visit: `http://localhost:6363`
 
 ## Storage notes
 
