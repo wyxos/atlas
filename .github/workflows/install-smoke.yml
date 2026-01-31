@@ -45,16 +45,16 @@ jobs:
       - name: Smoke check HTTP
         run: |
           set -euo pipefail
-          # nginx is bound on localhost:8080 on the runner
+          # nginx is bound on localhost:6363 on the runner
           for i in {1..60}; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080 || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:6363 || true)
             if [ "$code" != "000" ]; then
               echo "HTTP status: $code"
               break
             fi
             sleep 2
           done
-          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080)
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:6363)
           # allow 200 OK or redirect-to-login
           if [ "$code" != "200" ] && [ "$code" != "302" ]; then
             echo "Unexpected HTTP status: $code"
