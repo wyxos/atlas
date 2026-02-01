@@ -2,8 +2,6 @@
 
 This guide mirrors a real-world install on a server.
 
-If you want the Docker option, use `docs/DOCKER.md` instead.
-
 ## What you need
 
 - A database (MariaDB/MySQL or Postgres)
@@ -13,18 +11,6 @@ If you want the Docker option, use `docs/DOCKER.md` instead.
 - A storage path with enough space (local disk or mounted NAS)
 
 ## Steps
-
-If you want prompts for the defaults:
-
-```bash
-./scripts/setup-env.sh
-```
-
-Or on Windows PowerShell:
-
-```powershell
-.\scripts\setup-env.ps1
-```
 
 1) Clone the repo to a server with the basics installed (PHP, database, Redis, web server).
 
