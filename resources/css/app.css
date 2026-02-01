@@ -418,6 +418,16 @@
     }
 }
 
+@layer utilities {
+    .app-gradient {
+        background-color: var(--color-prussian-blue-900);
+        background-image:
+            radial-gradient(900px circle at 8% 8%, rgba(4, 102, 200, 0.25), transparent 60%),
+            radial-gradient(800px circle at 92% 0%, rgba(3, 83, 164, 0.25), transparent 60%),
+            linear-gradient(180deg, var(--color-prussian-blue-900) 0%, var(--color-prussian-blue-800) 45%, var(--color-prussian-blue-700) 100%);
+    }
+}
+
 /* Remove default blue background from vue-toastification globally */
 .Vue-Toastification__toast {
     background: transparent !important;
@@ -464,4 +474,3 @@
     background-color: var(--color-smart-blue-400);
     border: 2px solid var(--color-prussian-blue-900);
 }
-
