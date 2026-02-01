@@ -92,6 +92,29 @@
                     </div>
                 </div>
             </section>
+
+            <section class="rounded-lg border border-twilight-indigo-500/30 bg-prussian-blue-800/60 p-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="space-y-1">
+                        <h2 class="text-lg font-semibold text-regal-navy-100">Learn more</h2>
+                        <p class="text-sm text-blue-slate-200">Project details, demo walkthrough, and the main site.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 text-sm">
+                        <a href="https://github.com/wyxos/atlas" target="_blank" rel="noreferrer"
+                            class="text-smart-blue-200 underline underline-offset-4 hover:text-smart-blue-100">
+                            GitHub
+                        </a>
+                        <a href="https://www.youtube.com/watch?v=g1Ogg5vivSM" target="_blank" rel="noreferrer"
+                            class="text-smart-blue-200 underline underline-offset-4 hover:text-smart-blue-100">
+                            Demo video
+                        </a>
+                        <a href="https://wyxos.com" target="_blank" rel="noreferrer"
+                            class="text-smart-blue-200 underline underline-offset-4 hover:text-smart-blue-100">
+                            Wyxos.com
+                        </a>
+                    </div>
+                </div>
+            </section>
         </main>
     </body>
 </html>
