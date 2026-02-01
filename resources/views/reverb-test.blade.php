@@ -13,10 +13,10 @@
 
         @include('partials.favicons')
     </head>
-    <body class="bg-prussian-blue-700 text-twilight-indigo-900 min-h-screen">
+    <body class="app-gradient text-twilight-indigo-100 min-h-screen">
         <div id="app"></div>
         <main class="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 p-6">
-            <header class="rounded-lg border border-prussian-blue-500 bg-prussian-blue-600 p-6 text-smart-blue-900 shadow-lg">
+            <header class="rounded-lg border border-twilight-indigo-500/40 bg-prussian-blue-800/70 p-6 text-twilight-indigo-100 shadow-lg">
                 <h1 class="text-2xl font-semibold">Reverb Integration Test</h1>
                 <p class="mt-2 text-blue-slate-300">
                     This page listens to the <span class="font-semibold text-white">downloads</span> private channel and
@@ -24,7 +24,7 @@
                 </p>
             </header>
 
-            <section class="rounded-lg border border-prussian-blue-500 bg-prussian-blue-600 p-6 text-smart-blue-900 shadow-lg">
+            <section class="rounded-lg border border-twilight-indigo-500/40 bg-prussian-blue-800/70 p-6 text-twilight-indigo-100 shadow-lg">
                 <div class="flex flex-col gap-4 sm:flex-row">
                     <button id="send-progress" type="button"
                         class="inline-flex items-center justify-center rounded bg-smart-blue-500 px-4 py-2 text-white transition-colors hover:bg-smart-blue-600">
@@ -37,7 +37,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg border border-prussian-blue-500 bg-prussian-blue-600 p-6 text-smart-blue-900 shadow-lg">
+            <section class="rounded-lg border border-twilight-indigo-500/40 bg-prussian-blue-800/70 p-6 text-twilight-indigo-100 shadow-lg">
                 <h2 class="text-lg font-semibold">Live Events</h2>
                 <ul id="event-log" class="mt-4 flex flex-col gap-2 text-sm text-blue-slate-200"></ul>
                 <p id="echo-status" class="mt-4 text-sm text-blue-slate-300"></p>

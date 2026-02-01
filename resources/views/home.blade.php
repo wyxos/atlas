@@ -12,66 +12,86 @@
 
         @include('partials.favicons')
     </head>
-    <body class="bg-prussian-blue-700 text-twilight-indigo-900 min-h-screen">
+    <body class="app-gradient text-twilight-indigo-100 min-h-screen">
         <div id="app"></div>
-        <main class="flex min-h-screen items-center justify-center p-6">
-            <div class="w-full max-w-4xl">
-                <div class="bg-prussian-blue-700 rounded-lg shadow-2xl p-8 lg:p-12">
-                    <div class="text-center mb-8">
-                        <div class="flex justify-center mb-6">
-                            <x-atlas-icon class="w-32 h-32" />
+        <main class="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-6 py-12">
+            <header class="relative overflow-hidden rounded-2xl border border-twilight-indigo-500/40 bg-prussian-blue-800/70 p-8 shadow-2xl lg:p-12">
+                <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-smart-blue-500/20 blur-3xl"></div>
+                <div class="pointer-events-none absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-sapphire-500/20 blur-3xl"></div>
+
+                <div class="relative space-y-6">
+                    <div class="flex flex-col items-center gap-6 text-center">
+                        <x-atlas-icon class="h-28 w-28" />
+                        <div class="space-y-3">
+                            <div class="text-xs font-semibold uppercase tracking-[0.3em] text-smart-blue-200">Atlas</div>
+                            <h1 class="text-xl font-semibold text-regal-navy-100">
+                                Media operations, organized.
+                            </h1>
+                            <p class="text-sm text-blue-slate-200">
+                                Keep your library tidy, moderation consistent, and downloads moving in one console.
+                            </p>
                         </div>
-                        <h1 class="text-5xl font-bold text-smart-blue-900 mb-4">
-                            Welcome to {{ config('app.name', 'Atlas') }}
-                        </h1>
-                        <p class="text-lg text-blue-slate-700">
-                            Your media server solution
+                    </div>
+
+                    @if (Route::has('login'))
+                        <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+                            @auth
+                                <a href="{{ url('/dashboard') }}" class="inline-flex items-center justify-center rounded-lg bg-smart-blue-500 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-smart-blue-600">
+                                    Open Dashboard
+                                </a>
+                                <a href="{{ url('/browse') }}" class="inline-flex items-center justify-center rounded-lg border border-twilight-indigo-500/60 px-6 py-2 text-sm font-semibold text-twilight-indigo-100 transition-colors hover:border-smart-blue-400/60 hover:text-smart-blue-100">
+                                    Browse Library
+                                </a>
+                            @else
+                                <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-lg bg-smart-blue-500 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-smart-blue-600">
+                                    Log In
+                                </a>
+                                <span class="text-xs text-twilight-indigo-300">Private workspace access only.</span>
+                            @endauth
+                        </div>
+                    @endif
+                </div>
+            </header>
+
+            <section class="grid gap-4 md:grid-cols-3">
+                <div class="rounded-lg border border-twilight-indigo-500/30 bg-prussian-blue-800/60 p-6">
+                    <h2 class="text-lg font-semibold text-regal-navy-100">Library clarity</h2>
+                    <p class="mt-2 text-sm text-blue-slate-200">
+                        Track totals, availability, and source coverage without digging through raw lists.
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-twilight-indigo-500/30 bg-prussian-blue-800/60 p-6">
+                    <h2 class="text-lg font-semibold text-regal-navy-100">Moderation control</h2>
+                    <p class="mt-2 text-sm text-blue-slate-200">
+                        Keep reactions, rule blacklists, and manual actions aligned with your policy.
+                    </p>
+                </div>
+
+                <div class="rounded-lg border border-twilight-indigo-500/30 bg-prussian-blue-800/60 p-6">
+                    <h2 class="text-lg font-semibold text-regal-navy-100">Download flow</h2>
+                    <p class="mt-2 text-sm text-blue-slate-200">
+                        Monitor queues, troubleshoot failures, and keep fresh media moving.
+                    </p>
+                </div>
+            </section>
+
+            <section class="rounded-lg border border-twilight-indigo-500/30 bg-prussian-blue-800/60 p-6">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="space-y-2">
+                        <h2 class="text-lg font-semibold text-regal-navy-100">Workflow you can trust</h2>
+                        <p class="text-sm text-blue-slate-200">
+                            Atlas brings scanning, curation, and review into a single operational surface.
                         </p>
                     </div>
-
-                    <div class="grid md:grid-cols-2 gap-6 mb-8">
-                        <div class="bg-smart-blue-300 border-2 border-smart-blue-500 rounded-lg p-6">
-                            <h2 class="text-xl font-semibold text-smart-blue-900 mb-3 flex items-center">
-                                <svg class="w-6 h-6 mr-2 text-smart-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Features
-                            </h2>
-                            <p class="text-twilight-indigo-900">
-                                Manage your media library with ease. Organize, stream, and enjoy your content.
-                            </p>
-                        </div>
-
-                        <div class="bg-sapphire-300 border-2 border-sapphire-500 rounded-lg p-6">
-                            <h2 class="text-xl font-semibold text-sapphire-900 mb-3 flex items-center">
-                                <svg class="w-6 h-6 mr-2 text-sapphire-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                Performance
-                            </h2>
-                            <p class="text-twilight-indigo-900">
-                                Fast, reliable, and efficient. Built for modern media consumption.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="text-center">
-                        @if (Route::has('login'))
-                            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                                @auth
-                                    <a href="{{ url('/dashboard') }}" class="inline-block px-8 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg bg-smart-blue-500 hover:bg-smart-blue-600">
-                                        Go to Dashboard
-                                    </a>
-                                @else
-                                    <a href="{{ route('login') }}" class="inline-block px-8 py-3 text-white font-semibold rounded-lg transition-colors shadow-lg bg-smart-blue-500 hover:bg-smart-blue-600">
-                                        Log In
-                                    </a>
-                                @endauth
-                            </div>
-                        @endif
+                    <div class="flex flex-wrap gap-2">
+                        <span class="rounded-full border border-twilight-indigo-500/40 px-3 py-1 text-xs text-twilight-indigo-200">Realtime updates</span>
+                        <span class="rounded-full border border-twilight-indigo-500/40 px-3 py-1 text-xs text-twilight-indigo-200">Searchable sources</span>
+                        <span class="rounded-full border border-twilight-indigo-500/40 px-3 py-1 text-xs text-twilight-indigo-200">Moderation audits</span>
+                        <span class="rounded-full border border-twilight-indigo-500/40 px-3 py-1 text-xs text-twilight-indigo-200">Queue health</span>
                     </div>
                 </div>
-            </div>
+            </section>
         </main>
     </body>
 </html>

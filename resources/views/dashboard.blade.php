@@ -16,7 +16,7 @@
 
         @include('partials.favicons')
     </head>
-    <body class="bg-prussian-blue-600 text-twilight-indigo-900 min-h-screen">
+    <body class="app-gradient text-twilight-indigo-100 min-h-screen">
         <div id="app"></div>
     </body>
 </html>
