@@ -6,6 +6,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta name="user-id" content="{{ Auth::user()->id }}">
         <meta name="user-name" content="{{ Auth::user()->name }}">
+        <meta name="user-is-admin" content="{{ Auth::user()->is_admin ? '1' : '0' }}">
         <meta name="app-name" content="{{ config('app.name', 'Atlas') }}">
 
         <title>Dashboard - {{ config('app.name', 'Atlas') }}</title>
