@@ -17,6 +17,7 @@
         "laravel/tinker": "^2.10.1",
         "laravel/wayfinder": "^0.1.12",
         "pusher/pusher-php-server": "*",
+        "sentry/sentry-laravel": "^4.20",
         "typesense/typesense-php": "^5.2",
         "wyxos/harmonie": "1.6.13"
     },
