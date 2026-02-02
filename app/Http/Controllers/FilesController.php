@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\GenerateFilePreviewAssets;
 use App\Listings\FileListing;
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\Downloads\FileDownloadFinalizer;
 use App\Services\MetricsService;
 use App\Services\TabFileService;
 use Illuminate\Http\JsonResponse;
@@ -296,23 +296,7 @@ class FilesController extends Controller
             return;
         }
 
-        $fileId = $file->id;
-
-        dispatch(function () use ($fileId) {
-            $fresh = File::query()->find($fileId);
-            if (! $fresh) {
-                return;
-            }
-
-            $finalizer = app(FileDownloadFinalizer::class);
-            $updates = $finalizer->generatePreviewAssets($fresh);
-
-            if ($updates === []) {
-                return;
-            }
-
-            $fresh->update($updates);
-        });
+        GenerateFilePreviewAssets::dispatch($file->id);
     }
 
     /**
