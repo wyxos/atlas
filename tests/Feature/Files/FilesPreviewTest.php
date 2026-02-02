@@ -1,9 +1,9 @@
 <?php
 
+use App\Jobs\GenerateFilePreviewAssets;
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Jobs\GenerateFilePreviewAssets;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
