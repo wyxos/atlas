@@ -29,7 +29,9 @@ class DownloadTransferSingleStream implements ShouldQueue
     public function __construct(
         public int $downloadTransferId,
         public ?string $contentTypeHeader = null
-    ) {}
+    ) {
+        $this->onQueue('downloads');
+    }
 
     /**
      * Execute the job.
