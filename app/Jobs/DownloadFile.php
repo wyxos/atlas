@@ -18,7 +18,10 @@ class DownloadFile implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $fileId) {}
+    public function __construct(public int $fileId)
+    {
+        $this->onQueue('downloads');
+    }
 
     public function handle(): void
     {

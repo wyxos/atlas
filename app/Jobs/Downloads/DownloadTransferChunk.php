@@ -31,7 +31,9 @@ class DownloadTransferChunk implements ShouldQueue
         public int $downloadTransferId,
         public int $downloadChunkId,
         public ?string $contentTypeHeader = null
-    ) {}
+    ) {
+        $this->onQueue('downloads');
+    }
 
     /**
      * Execute the job.

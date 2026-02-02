@@ -26,7 +26,10 @@ class PrepareDownloadTransfer implements ShouldQueue
 
     public int $backoff = 30;
 
-    public function __construct(public int $downloadTransferId) {}
+    public function __construct(public int $downloadTransferId)
+    {
+        $this->onQueue('downloads');
+    }
 
     /**
      * Execute the job.

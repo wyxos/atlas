@@ -14,7 +14,10 @@ class QueueDownloadTransfer implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $downloadTransferId) {}
+    public function __construct(public int $downloadTransferId)
+    {
+        $this->onQueue('downloads');
+    }
 
     /**
      * Execute the job.

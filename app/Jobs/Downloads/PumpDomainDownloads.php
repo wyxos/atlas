@@ -20,7 +20,10 @@ class PumpDomainDownloads implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(public string $domain) {}
+    public function __construct(public string $domain)
+    {
+        $this->onQueue('downloads');
+    }
 
     /**
      * Execute the job.
