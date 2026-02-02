@@ -665,21 +665,19 @@ function handlePromptDialogClick(item: FeedItem): void {
     promptData.openPromptDialog(item);
 }
 
-function handleFileReaction(itemId: number, type: ReactionType, remove: (() => void) | ((item: FeedItem) => void), index?: number): void {
-    void remove;
+function handleFileReaction(item: FeedItem, type: ReactionType): void {
     // Cancel auto-dislike countdown if user reacts manually
-    autoDislikeQueue.cancelAutoDislikeCountdown(itemId);
-    // Note: remove parameter is kept for FileReactions component compatibility but not used here
-    // Find item and index if not provided
-    const itemIndex = index !== undefined ? index : items.value.findIndex((i) => i.id === itemId);
-    const item = itemIndex !== -1 ? items.value[itemIndex] : items.value.find((i) => i.id === itemId);
-    if (item) {
-        handleMasonryReaction(item, type, itemIndex !== -1 ? itemIndex : undefined);
-    }
+    autoDislikeQueue.cancelAutoDislikeCountdown(item.id);
+    // Pass item directly - FileReactions may have already called removeItem(),
+    // so we can't rely on finding the item in the items array by ID
+    handleMasonryReaction(item, type);
 }
 
 function handleFileViewerReaction(itemId: number, type: ReactionType): void {
-    handleFileReaction(itemId, type, () => {}, items.value.findIndex((i) => i.id === itemId));
+    const item = items.value.find((i) => i.id === itemId);
+    if (item) {
+        handleFileReaction(item, type);
+    }
 }
 
 function handleCopyPromptClick(): void {
@@ -1038,7 +1036,7 @@ defineExpose({
                                             :viewed-count="(item as FeedItem).seen_count"
                                             :current-index="getItemIndex((item as FeedItem).id as number)"
                                             :total-items="items.length" variant="small" :remove-item="remove"
-                                            @reaction="(type) => handleFileReaction((item as FeedItem).id as number, type, remove)" />
+                                            @reaction="(type) => handleFileReaction(item as FeedItem, type)" />
                                     </div>
                                 </Transition>
 
