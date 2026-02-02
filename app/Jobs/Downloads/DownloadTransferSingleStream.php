@@ -17,6 +17,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class DownloadTransferSingleStream implements ShouldQueue
 {
@@ -43,187 +44,154 @@ class DownloadTransferSingleStream implements ShouldQueue
             return;
         }
 
-        if ($transfer->status !== DownloadTransferStatus::DOWNLOADING) {
-            return;
-        }
+        $fh = null;
 
-        $headers = [];
-        if ($transfer->file?->referrer_url) {
-            $headers['Referer'] = $transfer->file->referrer_url;
-        }
-
-        $timeout = (int) config('downloads.http_timeout_seconds');
-
-        $response = Http::timeout($timeout)->withHeaders($headers)
-            ->withOptions(['stream' => true])
-            ->get($transfer->url);
-
-        if (! $this->isValidResponse($response)) {
-            $transfer->update([
-                'status' => DownloadTransferStatus::FAILED,
-                'failed_at' => now(),
-                'error' => "Invalid download response (status {$response->status()}).",
-            ]);
-
-            $transfer->refresh();
-            try {
-                event(new DownloadTransferProgressUpdated(
-                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                ));
-            } catch (\Throwable) {
-                // Broadcast errors shouldn't fail downloads.
+        try {
+            if ($transfer->status !== DownloadTransferStatus::DOWNLOADING) {
+                return;
             }
 
-            PumpDomainDownloads::dispatch($transfer->domain);
-
-            return;
-        }
-
-        if (! $transfer->bytes_total) {
-            $contentLength = $response->header('Content-Length');
-            $totalBytes = is_numeric($contentLength) && (int) $contentLength > 0 ? (int) $contentLength : null;
-            if ($totalBytes) {
-                $transfer->update([
-                    'bytes_total' => $totalBytes,
-                    'bytes_downloaded' => 0,
-                    'last_broadcast_percent' => 0,
-                    'updated_at' => now(),
-                ]);
-                if ($transfer->file && (! $transfer->file->size || $transfer->file->size <= 0)) {
-                    $transfer->file->update([
-                        'size' => $totalBytes,
-                        'updated_at' => now(),
-                    ]);
-                }
-                $transfer->refresh();
-            }
-        }
-        $disk = Storage::disk(config('downloads.disk'));
-
-        $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
-        $tmpPath = "{$tmpDir}/single.tmp";
-
-        if (! $disk->exists($tmpDir)) {
-            $disk->makeDirectory($tmpDir, 0755, true);
-        }
-
-        $absoluteTmpPath = $disk->path($tmpPath);
-        $fh = fopen($absoluteTmpPath, 'wb');
-        if (! $fh) {
-            $transfer->update([
-                'status' => DownloadTransferStatus::FAILED,
-                'failed_at' => now(),
-                'error' => 'Unable to open temp file for writing.',
-            ]);
-
-            $transfer->refresh();
-            try {
-                event(new DownloadTransferProgressUpdated(
-                    DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                ));
-            } catch (\Throwable) {
-                // Broadcast errors shouldn't fail downloads.
+            $headers = [];
+            if ($transfer->file?->referrer_url) {
+                $headers['Referer'] = $transfer->file->referrer_url;
             }
 
-            PumpDomainDownloads::dispatch($transfer->domain);
+            $timeout = (int) config('downloads.http_timeout_seconds');
 
-            return;
-        }
+            $response = Http::timeout($timeout)->withHeaders($headers)
+                ->withOptions(['stream' => true])
+                ->get($transfer->url);
 
-        $body = $response->toPsrResponse()->getBody();
-        $bufferSize = 1024 * 1024;
-
-        $bytesWritten = 0;
-        $bytesSinceBroadcastCheck = 0;
-
-        while (! $body->eof()) {
-            $buffer = $body->read($bufferSize);
-            if ($buffer === '') {
-                break;
-            }
-
-            $written = fwrite($fh, $buffer);
-            if ($written === false) {
-                fclose($fh);
-                $transfer->update([
-                    'status' => DownloadTransferStatus::FAILED,
-                    'failed_at' => now(),
-                    'error' => 'Failed writing download to disk.',
-                ]);
-
-                $transfer->refresh();
-                try {
-                    event(new DownloadTransferProgressUpdated(
-                        DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
-                    ));
-                } catch (\Throwable) {
-                    // Broadcast errors shouldn't fail downloads.
-                }
-
-                PumpDomainDownloads::dispatch($transfer->domain);
+            if (! $this->isValidResponse($response)) {
+                $this->failTransfer($transfer, "Invalid download response (status {$response->status()}).");
 
                 return;
             }
 
-            $bytesWritten += $written;
-            $bytesSinceBroadcastCheck += $written;
+            if (! $transfer->bytes_total) {
+                $contentLength = $response->header('Content-Length');
+                $totalBytes = is_numeric($contentLength) && (int) $contentLength > 0 ? (int) $contentLength : null;
+                if ($totalBytes) {
+                    $transfer->update([
+                        'bytes_total' => $totalBytes,
+                        'bytes_downloaded' => 0,
+                        'last_broadcast_percent' => 0,
+                        'updated_at' => now(),
+                    ]);
+                    if ($transfer->file && (! $transfer->file->size || $transfer->file->size <= 0)) {
+                        $transfer->file->update([
+                            'size' => $totalBytes,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                    $transfer->refresh();
+                }
+            }
+            $disk = Storage::disk(config('downloads.disk'));
 
-            DownloadTransfer::query()->whereKey($transfer->id)->increment('bytes_downloaded', $written);
+            $tmpDir = rtrim((string) config('downloads.tmp_dir'), '/').'/transfer-'.$transfer->id;
+            $tmpPath = "{$tmpDir}/single.tmp";
 
-            if ($bytesSinceBroadcastCheck >= (2 * 1024 * 1024)) {
-                $bytesSinceBroadcastCheck = 0;
-                if ($this->shouldStop($transfer->id, $fh)) {
+            if (! $disk->exists($tmpDir)) {
+                $disk->makeDirectory($tmpDir, 0755, true);
+            }
+
+            $absoluteTmpPath = $disk->path($tmpPath);
+            $fh = fopen($absoluteTmpPath, 'wb');
+            if (! $fh) {
+                $this->failTransfer($transfer, 'Unable to open temp file for writing.');
+
+                return;
+            }
+
+            $body = $response->toPsrResponse()->getBody();
+            $bufferSize = 1024 * 1024;
+
+            $bytesWritten = 0;
+            $bytesSinceBroadcastCheck = 0;
+
+            while (! $body->eof()) {
+                $buffer = $body->read($bufferSize);
+                if ($buffer === '') {
+                    break;
+                }
+
+                $written = fwrite($fh, $buffer);
+                if ($written === false) {
+                    fclose($fh);
+                    $fh = null;
+                    $this->failTransfer($transfer, 'Failed writing download to disk.');
+
                     return;
                 }
-                $broadcaster->maybeBroadcast($transfer->id);
+
+                $bytesWritten += $written;
+                $bytesSinceBroadcastCheck += $written;
+
+                DownloadTransfer::query()->whereKey($transfer->id)->increment('bytes_downloaded', $written);
+
+                if ($bytesSinceBroadcastCheck >= (2 * 1024 * 1024)) {
+                    $bytesSinceBroadcastCheck = 0;
+                    if ($this->shouldStop($transfer->id, $fh)) {
+                        return;
+                    }
+                    $broadcaster->maybeBroadcast($transfer->id);
+                }
             }
+
+            fclose($fh);
+            $fh = null;
+
+            $finalizer->finalize(
+                $transfer->file,
+                $tmpPath,
+                $this->contentTypeHeader ?? $response->header('Content-Type'),
+                false
+            );
+
+            $transfer->update([
+                'status' => DownloadTransferStatus::PREVIEWING,
+                'finished_at' => null,
+            ]);
+
+            File::query()->whereKey($transfer->file_id)->update([
+                'download_progress' => 100,
+                'updated_at' => now(),
+            ]);
+
+            DownloadTransfer::query()->whereKey($transfer->id)->update([
+                'last_broadcast_percent' => 100,
+                'updated_at' => now(),
+            ]);
+
+            $transfer->refresh();
+
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($transfer, 100)
+                ));
+            } catch (\Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+
+            GenerateTransferPreview::dispatch($transfer->id);
+
+            if ($disk->exists($tmpPath)) {
+                $disk->delete($tmpPath);
+            }
+
+            if ($disk->exists($tmpDir)) {
+                $disk->deleteDirectory($tmpDir);
+            }
+
+            PumpDomainDownloads::dispatch($transfer->domain);
+        } catch (Throwable $e) {
+            if (is_resource($fh)) {
+                fclose($fh);
+            }
+
+            $this->failTransfer($transfer, $e->getMessage());
         }
-
-        fclose($fh);
-
-        $finalizer->finalize(
-            $transfer->file,
-            $tmpPath,
-            $this->contentTypeHeader ?? $response->header('Content-Type'),
-            false
-        );
-
-        $transfer->update([
-            'status' => DownloadTransferStatus::PREVIEWING,
-            'finished_at' => null,
-        ]);
-
-        File::query()->whereKey($transfer->file_id)->update([
-            'download_progress' => 100,
-            'updated_at' => now(),
-        ]);
-
-        DownloadTransfer::query()->whereKey($transfer->id)->update([
-            'last_broadcast_percent' => 100,
-            'updated_at' => now(),
-        ]);
-
-        $transfer->refresh();
-
-        try {
-            event(new DownloadTransferProgressUpdated(
-                DownloadTransferPayload::forProgress($transfer, 100)
-            ));
-        } catch (\Throwable) {
-            // Broadcast errors shouldn't fail downloads.
-        }
-
-        GenerateTransferPreview::dispatch($transfer->id);
-
-        if ($disk->exists($tmpPath)) {
-            $disk->delete($tmpPath);
-        }
-
-        if ($disk->exists($tmpDir)) {
-            $disk->deleteDirectory($tmpDir);
-        }
-
-        PumpDomainDownloads::dispatch($transfer->domain);
     }
 
     private function shouldStop(int $transferId, $fh): bool
@@ -243,6 +211,28 @@ class DownloadTransferSingleStream implements ShouldQueue
     private function isValidResponse(Response $response): bool
     {
         return $response->successful();
+    }
+
+    private function failTransfer(DownloadTransfer $transfer, string $message): void
+    {
+        DownloadTransfer::query()->whereKey($transfer->id)->update([
+            'status' => DownloadTransferStatus::FAILED,
+            'failed_at' => now(),
+            'error' => $message,
+        ]);
+
+        $updated = DownloadTransfer::query()->find($transfer->id);
+        if ($updated) {
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
+                ));
+            } catch (Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+        }
+
+        PumpDomainDownloads::dispatch($transfer->domain);
     }
 
     // Progress broadcasting is handled by DownloadTransferProgressBroadcaster.

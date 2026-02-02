@@ -18,6 +18,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class DownloadTransferChunk implements ShouldQueue
 {
@@ -45,108 +46,122 @@ class DownloadTransferChunk implements ShouldQueue
             return;
         }
 
-        $chunk = DownloadChunk::query()
-            ->where('download_transfer_id', $transfer->id)
-            ->find($this->downloadChunkId);
+        $chunk = null;
+        $fh = null;
 
-        if (! $chunk || empty($chunk->part_path)) {
-            return;
-        }
+        try {
+            $chunk = DownloadChunk::query()
+                ->where('download_transfer_id', $transfer->id)
+                ->find($this->downloadChunkId);
 
-        if (! in_array($chunk->status, [DownloadChunkStatus::PENDING, DownloadChunkStatus::DOWNLOADING], true)) {
-            return;
-        }
-
-        $chunk->update([
-            'status' => DownloadChunkStatus::DOWNLOADING,
-            'started_at' => $chunk->started_at ?? now(),
-        ]);
-
-        $headers = [];
-        if ($transfer->file?->referrer_url) {
-            $headers['Referer'] = $transfer->file->referrer_url;
-        }
-
-        $timeout = (int) config('downloads.http_timeout_seconds');
-        $rangeHeader = "bytes={$chunk->range_start}-{$chunk->range_end}";
-
-        $response = Http::timeout($timeout)
-            ->withHeaders(array_merge($headers, ['Range' => $rangeHeader]))
-            ->withOptions(['stream' => true])
-            ->get($transfer->url);
-
-        if (! $this->isValidRangeResponse($response)) {
-            $this->failTransfer($transfer, $chunk, "Invalid range response for {$rangeHeader} (status {$response->status()}).");
-
-            return;
-        }
-
-        $disk = Storage::disk(config('downloads.disk'));
-
-        $directory = dirname($chunk->part_path);
-        if (! $disk->exists($directory)) {
-            $disk->makeDirectory($directory, 0755, true);
-        }
-
-        $absolutePartPath = $disk->path($chunk->part_path);
-        $fh = fopen($absolutePartPath, 'wb');
-        if (! $fh) {
-            $this->failTransfer($transfer, $chunk, 'Unable to open part file for writing.');
-
-            return;
-        }
-
-        $body = $response->toPsrResponse()->getBody();
-
-        $bufferSize = 1024 * 1024;
-        $expectedBytes = ($chunk->range_end - $chunk->range_start) + 1;
-
-        $bytesWritten = 0;
-        $bytesSinceBroadcastCheck = 0;
-
-        while (! $body->eof()) {
-            $buffer = $body->read($bufferSize);
-            if ($buffer === '') {
-                break;
+            if (! $chunk || empty($chunk->part_path)) {
+                return;
             }
 
-            $written = fwrite($fh, $buffer);
-            if ($written === false) {
-                fclose($fh);
-                $this->failTransfer($transfer, $chunk, 'Failed writing chunk to disk.');
+            if (! in_array($chunk->status, [DownloadChunkStatus::PENDING, DownloadChunkStatus::DOWNLOADING], true)) {
+                return;
+            }
+
+            $chunk->update([
+                'status' => DownloadChunkStatus::DOWNLOADING,
+                'started_at' => $chunk->started_at ?? now(),
+            ]);
+
+            $headers = [];
+            if ($transfer->file?->referrer_url) {
+                $headers['Referer'] = $transfer->file->referrer_url;
+            }
+
+            $timeout = (int) config('downloads.http_timeout_seconds');
+            $rangeHeader = "bytes={$chunk->range_start}-{$chunk->range_end}";
+
+            $response = Http::timeout($timeout)
+                ->withHeaders(array_merge($headers, ['Range' => $rangeHeader]))
+                ->withOptions(['stream' => true])
+                ->get($transfer->url);
+
+            if (! $this->isValidRangeResponse($response)) {
+                $this->failTransfer($transfer, $chunk, "Invalid range response for {$rangeHeader} (status {$response->status()}).");
 
                 return;
             }
 
-            $bytesWritten += $written;
-            $bytesSinceBroadcastCheck += $written;
+            $disk = Storage::disk(config('downloads.disk'));
 
-            DownloadTransfer::query()->whereKey($transfer->id)->increment('bytes_downloaded', $written);
-            DownloadChunk::query()->whereKey($chunk->id)->increment('bytes_downloaded', $written);
+            $directory = dirname($chunk->part_path);
+            if (! $disk->exists($directory)) {
+                $disk->makeDirectory($directory, 0755, true);
+            }
 
-            if ($bytesSinceBroadcastCheck >= (2 * 1024 * 1024)) {
-                $bytesSinceBroadcastCheck = 0;
-                if ($this->shouldStop($transfer->id, $chunk, $fh)) {
+            $absolutePartPath = $disk->path($chunk->part_path);
+            $fh = fopen($absolutePartPath, 'wb');
+            if (! $fh) {
+                $this->failTransfer($transfer, $chunk, 'Unable to open part file for writing.');
+
+                return;
+            }
+
+            $body = $response->toPsrResponse()->getBody();
+
+            $bufferSize = 1024 * 1024;
+            $expectedBytes = ($chunk->range_end - $chunk->range_start) + 1;
+
+            $bytesWritten = 0;
+            $bytesSinceBroadcastCheck = 0;
+
+            while (! $body->eof()) {
+                $buffer = $body->read($bufferSize);
+                if ($buffer === '') {
+                    break;
+                }
+
+                $written = fwrite($fh, $buffer);
+                if ($written === false) {
+                    fclose($fh);
+                    $this->failTransfer($transfer, $chunk, 'Failed writing chunk to disk.');
+
                     return;
                 }
-                $broadcaster->maybeBroadcast($transfer->id);
+
+                $bytesWritten += $written;
+                $bytesSinceBroadcastCheck += $written;
+
+                DownloadTransfer::query()->whereKey($transfer->id)->increment('bytes_downloaded', $written);
+                DownloadChunk::query()->whereKey($chunk->id)->increment('bytes_downloaded', $written);
+
+                if ($bytesSinceBroadcastCheck >= (2 * 1024 * 1024)) {
+                    $bytesSinceBroadcastCheck = 0;
+                    if ($this->shouldStop($transfer->id, $chunk, $fh)) {
+                        return;
+                    }
+                    $broadcaster->maybeBroadcast($transfer->id);
+                }
+            }
+
+            fclose($fh);
+            $fh = null;
+
+            if ($bytesWritten !== $expectedBytes) {
+                $this->failTransfer($transfer, $chunk, "Chunk incomplete: expected {$expectedBytes} bytes, wrote {$bytesWritten} bytes.");
+
+                return;
+            }
+
+            $chunk->update([
+                'status' => DownloadChunkStatus::COMPLETED,
+                'finished_at' => now(),
+            ]);
+
+            $broadcaster->maybeBroadcast($transfer->id);
+        } catch (Throwable $e) {
+            if (is_resource($fh)) {
+                fclose($fh);
+            }
+
+            if ($transfer) {
+                $this->failTransfer($transfer, $chunk, $e->getMessage());
             }
         }
-
-        fclose($fh);
-
-        if ($bytesWritten !== $expectedBytes) {
-            $this->failTransfer($transfer, $chunk, "Chunk incomplete: expected {$expectedBytes} bytes, wrote {$bytesWritten} bytes.");
-
-            return;
-        }
-
-        $chunk->update([
-            'status' => DownloadChunkStatus::COMPLETED,
-            'finished_at' => now(),
-        ]);
-
-        $broadcaster->maybeBroadcast($transfer->id);
     }
 
     private function shouldStop(int $transferId, DownloadChunk $chunk, $fh): bool
@@ -179,13 +194,15 @@ class DownloadTransferChunk implements ShouldQueue
         return false;
     }
 
-    private function failTransfer(DownloadTransfer $transfer, DownloadChunk $chunk, string $message): void
+    private function failTransfer(DownloadTransfer $transfer, ?DownloadChunk $chunk, string $message): void
     {
-        $chunk->update([
-            'status' => DownloadChunkStatus::FAILED,
-            'failed_at' => now(),
-            'error' => $message,
-        ]);
+        if ($chunk) {
+            $chunk->update([
+                'status' => DownloadChunkStatus::FAILED,
+                'failed_at' => now(),
+                'error' => $message,
+            ]);
+        }
 
         DownloadTransfer::query()->whereKey($transfer->id)->update([
             'status' => DownloadTransferStatus::FAILED,
