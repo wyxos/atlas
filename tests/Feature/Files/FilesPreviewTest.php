@@ -3,7 +3,7 @@
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Queue\CallQueuedClosure;
+use App\Jobs\GenerateFilePreviewAssets;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
@@ -29,5 +29,5 @@ test('preview request queues generation when preview is missing', function () {
     $response = $this->actingAs($admin)->get("/api/files/{$file->id}/preview");
 
     $response->assertNotFound();
-    Queue::assertPushed(CallQueuedClosure::class);
+    Queue::assertPushed(GenerateFilePreviewAssets::class);
 });

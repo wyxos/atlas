@@ -20,7 +20,10 @@ class GenerateTransferPreview implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 600;
 
-    public function __construct(public int $transferId) {}
+    public function __construct(public int $transferId)
+    {
+        $this->onQueue('processing');
+    }
 
     public function uniqueId(): string
     {
