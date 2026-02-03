@@ -15,6 +15,7 @@ import {useFileViewerPaging} from '@/composables/useFileViewerPaging';
 import {useFileViewerData} from '@/composables/useFileViewerData';
 import {useFileViewerSheetSizing} from '@/composables/useFileViewerSheetSizing';
 import {useFileViewerOverlayStyles} from '@/composables/useFileViewerOverlayStyles';
+import {useFileViewerPreload} from '@/composables/useFileViewerPreload';
 
 interface Props {
     containerRef: HTMLElement | null;
@@ -219,6 +220,13 @@ const {
     navigation: navigationState,
 });
 
+const { clearPreloadCache } = useFileViewerPreload({
+    items,
+    currentItemIndex: toRef(navigationState, 'currentItemIndex'),
+    fillComplete: toRef(overlayState, 'fillComplete'),
+    preloadCount: 2,
+});
+
 // Handle ALT + Middle Click (mousedown event needed for middle button)
 function handleOverlayImageMouseDown(e: MouseEvent): void {
     if (e.altKey && e.button === 1) {
@@ -366,6 +374,7 @@ onUnmounted(() => {
         containerState.overflow = null;
         containerState.overscroll = null;
     }
+    clearPreloadCache();
 });
 
 // Expose methods for parent component
