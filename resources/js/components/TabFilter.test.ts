@@ -98,5 +98,6 @@ describe('TabFilter', () => {
 
         const input = wrapper.find('input[placeholder="Filter to images from a specific user (e.g. someUser)."]');
         expect((input.element as HTMLInputElement).value).toBe('atlasUser');
+        expect(input.classes()).toContain('text-twilight-indigo-100');
     });
 });
