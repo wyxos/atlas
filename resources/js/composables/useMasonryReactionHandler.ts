@@ -28,11 +28,15 @@ export function useMasonryReactionHandler(
     ): Promise<void> {
         const fileId = item.id;
         const tabId = tab.value?.id;
+        const shouldLoadNext = !isLocal.value && items.value.length <= 1;
 
         // Only remove from masonry in online mode (not in local mode)
         // Pass item directly - Vibe tracks items by object reference, so we must use the exact reference
         if (!isLocal.value) {
-            masonry.value?.remove(item);
+            await masonry.value?.remove(item);
+            if (shouldLoadNext && !masonry.value?.isLoading) {
+                await masonry.value?.loadNextPage?.();
+            }
         }
 
         // Create restore callback for undo functionality (only in online mode where items are removed)
