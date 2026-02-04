@@ -47,6 +47,7 @@ const selectedServiceDef = computed(() => {
 });
 
 const selectedLocalDef = computed(() => props.localDef ?? null);
+const inputClass = 'text-twilight-indigo-100 placeholder:text-twilight-indigo-300';
 
 const activeSchema = computed(() => {
     if (form.data.feed === 'local') {
@@ -301,6 +302,7 @@ function handleReset(): void {
                             :min="field.min"
                             :max="field.max"
                             :step="field.step"
+                            :class="inputClass"
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                         />
 
@@ -321,6 +323,7 @@ function handleReset(): void {
                             :model-value="(valueOrDefault(field) ?? '') as any"
                             type="text"
                             :placeholder="placeholderForField(field)"
+                            :class="inputClass"
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                         />
 
@@ -388,6 +391,7 @@ function handleReset(): void {
                             :min="field.min"
                             :max="field.max"
                             :step="field.step"
+                            :class="inputClass"
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                         />
 
@@ -408,6 +412,7 @@ function handleReset(): void {
                             :model-value="(valueOrDefault(field) ?? '') as any"
                             type="text"
                             :placeholder="placeholderForField(field)"
+                            :class="inputClass"
                             @update:model-value="(v) => updateServiceFilterValue(field.uiKey, v)"
                         />
 
