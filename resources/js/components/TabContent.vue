@@ -793,6 +793,7 @@ onMounted(async () => {
 onUnmounted(() => {
     // cancel any in-flight masonry requests
     masonry.value?.cancel?.();
+    autoDislikeQueue.clearAutoDislikeCountdowns();
 });
 
 defineExpose({

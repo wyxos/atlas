@@ -225,6 +225,33 @@ export function useAutoDislikeQueue(
         }, 2000);
     }
 
+    /**
+     * Clear all auto-dislike countdowns and pending batch state.
+     * Used when switching tabs to avoid cross-tab timers.
+     */
+    function clearAutoDislikeCountdowns(): void {
+        const allItems = getAll();
+        allItems.forEach((item) => {
+            if (item.id.startsWith('auto-dislike-')) {
+                removeFromQueue(item.id);
+            }
+        });
+
+        pendingDislikes.value.clear();
+        frozenAutoDislikeItems.value.clear();
+        isFileViewerOpen.value = false;
+
+        if (debounceTimeout) {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = null;
+        }
+
+        if (fileViewerUnfreezeTimeout) {
+            clearTimeout(fileViewerUnfreezeTimeout);
+            fileViewerUnfreezeTimeout = null;
+        }
+    }
+
     return {
         startAutoDislikeCountdown,
         cancelAutoDislikeCountdown,
@@ -237,5 +264,6 @@ export function useAutoDislikeQueue(
         freezeAutoDislikeOnly, // For FileViewer (freezes only auto-dislike countdowns)
         unfreezeAutoDislikeOnly, // For FileViewer (unfreezes only auto-dislike countdowns)
         isFrozen, // Expose frozen state for UI indicators
+        clearAutoDislikeCountdowns,
     };
 }

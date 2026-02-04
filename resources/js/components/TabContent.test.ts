@@ -117,6 +117,27 @@ vi.mock('@/composables/useItemPreview', async () => {
     };
 });
 
+const mockClearAutoDislikeCountdowns = vi.fn();
+vi.mock('@/composables/useAutoDislikeQueue', async () => {
+    const { ref } = await import('vue');
+    return {
+        useAutoDislikeQueue: vi.fn(() => ({
+            startAutoDislikeCountdown: vi.fn(),
+            cancelAutoDislikeCountdown: vi.fn(),
+            getCountdownRemainingTime: vi.fn(() => 0),
+            getCountdownProgress: vi.fn(() => 0),
+            hasActiveCountdown: vi.fn(() => false),
+            formatCountdown: vi.fn(() => '00:00'),
+            freezeAll: vi.fn(),
+            unfreezeAll: vi.fn(),
+            freezeAutoDislikeOnly: vi.fn(),
+            unfreezeAutoDislikeOnly: vi.fn(),
+            isFrozen: ref(false),
+            clearAutoDislikeCountdowns: mockClearAutoDislikeCountdowns,
+        })),
+    };
+});
+
 // Mock @wyxos/vibe
 const mockIsLoading = ref(false);
 const mockCancelLoad = vi.fn();
@@ -535,6 +556,7 @@ vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mockClearAutoDislikeCountdowns.mockClear();
     mockIsLoading.value = false;
     mockCancelLoad.mockClear();
     mockDestroy.mockClear();
@@ -605,6 +627,41 @@ describe('TabContent - Resume Session', () => {
         expect(masonry.props('page')).toBe('CURSOR_NEXT');
             // Restored sessions should keep backfill enabled for online browsing.
             expect(masonry.props('mode')).toBe('backfill');
+    });
+});
+
+describe('TabContent - Auto-dislike cleanup', () => {
+    it('clears auto-dislike countdowns on unmount', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab: {
+                    id: 321,
+                    label: 'Browse 1',
+                    params: {
+                        page: 1,
+                        service: 'test-service',
+                    },
+                    items: [],
+                    position: 0,
+                    isActive: true,
+                },
+            },
+        });
+
+        const wrapper = mount(TabContent, {
+            props: {
+                tabId: 321,
+                availableServices: [{ key: 'test-service', label: 'Test Service' }],
+                onReaction: vi.fn(),
+                updateActiveTab: vi.fn(),
+            },
+        });
+
+        await flushPromises();
+
+        wrapper.unmount();
+
+        expect(mockClearAutoDislikeCountdowns).toHaveBeenCalled();
     });
 });
 
@@ -1189,4 +1246,3 @@ describe('TabContent - Container Badges', () => {
         });
     });
 });
-
