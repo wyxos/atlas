@@ -1,6 +1,6 @@
 import { useToast } from 'vue-toastification';
 import { useQueue } from '@/composables/useQueue';
-import { createReactionCallback } from './reactions';
+import { createReactionCallback, createBatchReactionCallback } from './reactions';
 import updateReactionState from '@/utils/reactionStateUpdater';
 import type { ReactionType } from '@/types/reaction';
 import type { Ref } from 'vue';
@@ -12,6 +12,7 @@ const toast = useToast();
 
 const queue = useQueue();
 const REACTION_COUNTDOWN_DURATION = 5000; // 5 seconds
+const BATCH_REACTION_THRESHOLD = 25;
 type ReactionQueueMetadata = {
     restoreCallback?: () => Promise<void> | void;
     items?: Ref<FeedItem[]>;
@@ -115,17 +116,24 @@ export function queueBatchReaction(
 
     const queueId = `batch-${reactionType}-${fileIds.join('-')}-${Date.now()}`;
 
-    // Create reaction callback
+    // Create reaction callbacks
     const reactionCallback = createReactionCallback();
+    const batchReactionCallback = createBatchReactionCallback();
 
     // Add to queue
     queue.add({
         id: queueId,
         duration: REACTION_COUNTDOWN_DURATION,
         onComplete: async () => {
+            // Dismiss the countdown toast as soon as the timer expires.
+            toast.dismiss(queueId);
             try {
                 // Execute all reactions in the batch
-                await Promise.all(fileIds.map((fileId) => reactionCallback(fileId, reactionType)));
+                if (fileIds.length >= BATCH_REACTION_THRESHOLD) {
+                    await batchReactionCallback(fileIds, reactionType);
+                } else {
+                    await Promise.all(fileIds.map((fileId) => reactionCallback(fileId, reactionType)));
+                }
                 
                 // Update reaction state in local mode for all files (if items provided)
                 if (items) {
@@ -133,17 +141,12 @@ export function queueBatchReaction(
                         updateReactionState(items, fileId, reactionType);
                     });
                 }
-                
-                // Dismiss toast on success
-                toast.dismiss(queueId);
             } catch (error) {
                 console.error('Failed to execute queued batch reaction:', error);
                 // Show error toast
                 toast.error('Failed to save batch reaction', {
                     id: `${queueId}-error`,
                 });
-                // Dismiss the countdown toast
-                toast.dismiss(queueId);
             }
         },
         metadata: {
@@ -223,6 +226,5 @@ export async function cancelBatchQueuedReaction(queueId: string): Promise<void> 
         }
     }
 }
-
 
 

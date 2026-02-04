@@ -4,7 +4,7 @@ import { useQueue } from '@/composables/useQueue';
 import type { ReactionType } from '@/types/reaction';
 
 // Hoist mocks to avoid initialization issues
-const { mockToast, mockReactionCallback } = vi.hoisted(() => {
+const { mockToast, mockReactionCallback, mockBatchReactionCallback } = vi.hoisted(() => {
     const toast = vi.fn();
     toast.dismiss = vi.fn();
     toast.error = vi.fn();
@@ -12,7 +12,8 @@ const { mockToast, mockReactionCallback } = vi.hoisted(() => {
     toast.info = vi.fn();
     toast.warning = vi.fn();
     const callback = vi.fn().mockResolvedValue(undefined);
-    return { mockToast: toast, mockReactionCallback: callback };
+    const batchCallback = vi.fn().mockResolvedValue(undefined);
+    return { mockToast: toast, mockReactionCallback: callback, mockBatchReactionCallback: batchCallback };
 });
 
 // Mock vue-toastification
@@ -24,6 +25,7 @@ vi.mock('vue-toastification', () => ({
 // Mock createReactionCallback
 vi.mock('./reactions', () => ({
     createReactionCallback: () => mockReactionCallback,
+    createBatchReactionCallback: () => mockBatchReactionCallback,
 }));
 
 // Mock axios
@@ -42,6 +44,8 @@ describe('reactionQueue', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.clearAllMocks();
+        mockReactionCallback.mockResolvedValue(undefined);
+        mockBatchReactionCallback.mockResolvedValue(undefined);
         queue = useQueue();
         queue.reset();
     });
@@ -259,6 +263,42 @@ describe('reactionQueue', () => {
             expect(mockReactionCallback).toHaveBeenCalledWith(789, 'like');
         });
 
+        it('uses batch callback for large reactions', async () => {
+            const fileIds = Array.from({ length: 30 }, (_, index) => index + 1);
+            queueBatchReaction(fileIds, 'dislike', []);
+
+            vi.advanceTimersByTime(5000);
+            await vi.runAllTimersAsync();
+
+            expect(mockBatchReactionCallback).toHaveBeenCalledWith(fileIds, 'dislike');
+            expect(mockReactionCallback).not.toHaveBeenCalled();
+        });
+
+        it('dismisses toast when countdown expires even if batch is still pending', async () => {
+            const fileIds = Array.from({ length: 30 }, (_, index) => index + 1);
+            let resolveBatch: (() => void) | null = null;
+            mockBatchReactionCallback.mockImplementationOnce(
+                () =>
+                    new Promise<void>((resolve) => {
+                        resolveBatch = resolve;
+                    })
+            );
+
+            queueBatchReaction(fileIds, 'dislike', []);
+
+            const items = queue.getAll();
+            const queueId = items[0]?.id;
+            expect(queueId).toBeDefined();
+
+            vi.advanceTimersByTime(5000);
+            await vi.runOnlyPendingTimersAsync();
+
+            expect(mockToast.dismiss).toHaveBeenCalledWith(queueId);
+
+            resolveBatch?.();
+            await vi.runAllTimersAsync();
+        });
+
         it('dismisses toast after successful batch execution', async () => {
             const fileIds = [123, 456];
             queueBatchReaction(fileIds, 'like', []);
@@ -390,4 +430,3 @@ describe('reactionQueue', () => {
         });
     });
 });
-
