@@ -84,12 +84,16 @@ function createFormInstance() {
         // Otherwise, fall back to storing unknown keys as serviceFilters for the current service.
         const serviceKey = data.service;
         const serviceFiltersByKey = params.serviceFiltersByKey;
+        let restoredFilters: Record<string, unknown> | null = null;
         if (serviceKey && typeof serviceFiltersByKey === 'object' && serviceFiltersByKey) {
             const raw = (serviceFiltersByKey as Record<string, unknown>)[serviceKey];
             if (raw && typeof raw === 'object') {
-                filtersByServiceKey[serviceKey] = { ...(raw as Record<string, unknown>) };
+                restoredFilters = { ...(raw as Record<string, unknown>) };
+                filtersByServiceKey[serviceKey] = restoredFilters;
             }
-        } else if (serviceKey) {
+        }
+
+        if (!restoredFilters && serviceKey) {
             const reserved = new Set(['service', 'feed', 'source', 'tab_id', 'page', 'limit']);
             const inferred: Record<string, unknown> = {};
             for (const [k, v] of Object.entries(params)) {

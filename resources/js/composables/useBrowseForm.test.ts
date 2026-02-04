@@ -83,6 +83,31 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.serviceFilters).toEqual({});
     });
 
+    it('infers filters from tab params when serviceFiltersByKey lacks the current service', () => {
+        const form = useBrowseForm();
+        form.reset();
+
+        const tab: TabData = {
+            id: 2,
+            label: 'Browse 2',
+            position: 0,
+            isActive: true,
+            params: {
+                service: 'civit-ai-images',
+                feed: 'online',
+                source: 'all',
+                postId: 123,
+                username: 'atlasUser',
+                serviceFiltersByKey: {},
+            } as any,
+        };
+
+        form.syncFromTab(tab);
+
+        expect(form.data.serviceFilters.postId).toBe(123);
+        expect(form.data.serviceFilters.username).toBe('atlasUser');
+    });
+
     it('uses provided instance when available (tab isolation)', () => {
         const Parent = defineComponent({
             name: 'ParentWrapper',
