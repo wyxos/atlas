@@ -305,7 +305,7 @@ const buildContainerTabPayload = (item: ContainerMetricItem) => {
         }
 
         return {
-            label: `CivitAI Images - ${item.type}: ${item.source_id}`,
+            label: `CivitAI Images: ${item.type} ${item.source_id} - 1`,
             params,
         };
     }

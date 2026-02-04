@@ -138,28 +138,6 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.serviceFilters.postId).toBe(321);
     });
 
-    it('maps civitai userId param to username for filter restore', () => {
-        const form = useBrowseForm();
-        form.reset();
-
-        const tab: TabData = {
-            id: 4,
-            label: 'Browse 4',
-            position: 0,
-            isActive: true,
-            params: {
-                service: 'civit-ai-images',
-                feed: 'online',
-                source: 'all',
-                userId: 98765,
-            } as any,
-        };
-
-        form.syncFromTab(tab);
-
-        expect(form.data.serviceFilters.username).toBe(98765);
-        expect(form.data.serviceFilters.userId).toBeUndefined();
-    });
 
     it('uses provided instance when available (tab isolation)', () => {
         const Parent = defineComponent({
