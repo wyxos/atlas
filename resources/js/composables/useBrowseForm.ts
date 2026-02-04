@@ -85,25 +85,42 @@ function createFormInstance() {
         const serviceKey = data.service;
         const serviceFiltersByKey = params.serviceFiltersByKey;
         let restoredFilters: Record<string, unknown> | null = null;
+        const reservedFilters = new Set([
+            'service',
+            'feed',
+            'source',
+            'tab_id',
+            'page',
+            'limit',
+            'serviceFilters',
+            'serviceFiltersByKey',
+        ]);
+        const inferredFilters: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(params)) {
+            if (reservedFilters.has(k)) {
+                continue;
+            }
+            inferredFilters[k] = v;
+        }
         if (serviceKey && typeof serviceFiltersByKey === 'object' && serviceFiltersByKey) {
             const raw = (serviceFiltersByKey as Record<string, unknown>)[serviceKey];
             if (raw && typeof raw === 'object') {
                 restoredFilters = { ...(raw as Record<string, unknown>) };
+                if (Object.keys(inferredFilters).length > 0) {
+                    for (const [k, v] of Object.entries(inferredFilters)) {
+                        const current = restoredFilters[k];
+                        if (current === undefined || current === null || current === '') {
+                            restoredFilters[k] = v;
+                        }
+                    }
+                }
                 filtersByServiceKey[serviceKey] = restoredFilters;
             }
         }
 
         if (!restoredFilters && serviceKey) {
-            const reserved = new Set(['service', 'feed', 'source', 'tab_id', 'page', 'limit']);
-            const inferred: Record<string, unknown> = {};
-            for (const [k, v] of Object.entries(params)) {
-                if (reserved.has(k)) {
-                    continue;
-                }
-                inferred[k] = v;
-            }
-            if (Object.keys(inferred).length > 0) {
-                filtersByServiceKey[serviceKey] = { ...inferred };
+            if (Object.keys(inferredFilters).length > 0) {
+                filtersByServiceKey[serviceKey] = { ...inferredFilters };
             }
         }
 
