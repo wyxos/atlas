@@ -38,7 +38,10 @@ const displayPage = computed(() => {
 // Next cursor/page token comes directly from Vibe (prefer backfill stats while active).
 const nextCursor = computed(() => {
     if (backfillStats.value?.isBackfillActive) {
-        return backfillStats.value.next ?? 'Acquiring...';
+        return backfillStats.value.next
+            ?? props.masonry?.nextPage
+            ?? props.tab?.params?.next
+            ?? 'Acquiring...';
     }
 
     return props.masonry?.nextPage ?? props.tab?.params?.next ?? null;
