@@ -103,28 +103,10 @@ function createFormInstance() {
             inferredFilters[k] = v;
         }
 
-        const normalizeCivitAiUserFilter = (filters: Record<string, unknown>): void => {
-            if (data.service !== 'civit-ai-images') {
-                return;
-            }
-
-            const username = filters.username;
-            const userId = filters.userId;
-            if ((username === undefined || username === null || username === '') && userId !== undefined && userId !== null && userId !== '') {
-                filters.username = userId;
-            }
-
-            if ('userId' in filters) {
-                delete filters.userId;
-            }
-        };
-
-        normalizeCivitAiUserFilter(inferredFilters);
         if (serviceKey && typeof serviceFiltersByKey === 'object' && serviceFiltersByKey) {
             const raw = (serviceFiltersByKey as Record<string, unknown>)[serviceKey];
             if (raw && typeof raw === 'object') {
                 restoredFilters = { ...(raw as Record<string, unknown>) };
-                normalizeCivitAiUserFilter(restoredFilters);
                 if (Object.keys(inferredFilters).length > 0) {
                     for (const [k, v] of Object.entries(inferredFilters)) {
                         const current = restoredFilters[k];

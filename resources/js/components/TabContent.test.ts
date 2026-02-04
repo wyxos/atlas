@@ -67,15 +67,21 @@ vi.mock('@/composables/useContainerBadges', async () => {
 });
 
 const mockBatchReactToSiblings = vi.fn();
+const mockHandlePillClick = vi.fn();
+const mockHandlePillAuxClick = vi.fn();
+let capturedOpenContainerTab: ((container: any) => void) | null = null;
 vi.mock('@/composables/useContainerPillInteractions', () => ({
-    useContainerPillInteractions: vi.fn(() => ({
+    useContainerPillInteractions: vi.fn((_items, _masonry, _tabId, _onReaction, onOpenContainerTab) => {
+        capturedOpenContainerTab = onOpenContainerTab ?? null;
+        return {
         getContainersForItem: vi.fn((item: any) => (item as any).containers || []),
         getSiblingItems: vi.fn((_containerId: number) => []),
         getContainerUrl: vi.fn((containerId: number) => `https://example.com/container/${containerId}`),
         batchReactToSiblings: mockBatchReactToSiblings,
-        handlePillClick: vi.fn(),
-        handlePillAuxClick: vi.fn(),
-    })),
+        handlePillClick: mockHandlePillClick,
+        handlePillAuxClick: mockHandlePillAuxClick,
+        };
+    }),
 }));
 
 vi.mock('@/composables/usePromptData', async () => {
@@ -556,6 +562,7 @@ vi.mock('@/actions/App/Http/Controllers/FilesController', () => ({
 
 beforeEach(() => {
     vi.clearAllMocks();
+    capturedOpenContainerTab = null;
     mockClearAutoDislikeCountdowns.mockClear();
     mockIsLoading.value = false;
     mockCancelLoad.mockClear();
@@ -1216,6 +1223,155 @@ describe('TabContent - Container Badges', () => {
                 // If pill container not found, skip test (might be due to mock setup)
                 expect(true).toBe(true);
             }
+        });
+
+        it('builds a CivitAI user container tab payload with username prefill', async () => {
+            const onOpenContainerTab = vi.fn();
+            const tab = createMockTab({
+                params: {
+                    service: 'civit-ai-images',
+                    feed: 'online',
+                    limit: 20,
+                    page: 1,
+                },
+            });
+
+            mockAxios.get.mockResolvedValueOnce({
+                data: {
+                    tab: {
+                        ...tab,
+                        items: [],
+                    },
+                },
+            });
+
+            mount(TabContent, {
+                props: {
+                    tabId: tab.id,
+                    availableServices: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    onOpenContainerTab,
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            expect(capturedOpenContainerTab).toBeTypeOf('function');
+
+            capturedOpenContainerTab?.({
+                id: 10,
+                type: 'User',
+                source: 'CivitAI',
+                source_id: 'atlasUser',
+            });
+
+            expect(onOpenContainerTab).toHaveBeenCalledWith({
+                label: 'CivitAI Images: User atlasUser - 1',
+                params: expect.objectContaining({
+                    feed: 'online',
+                    service: 'civit-ai-images',
+                    page: 1,
+                    limit: '20',
+                    username: 'atlasUser',
+                }),
+            });
+        });
+
+        it('builds a CivitAI post container tab payload with postId prefill', async () => {
+            const onOpenContainerTab = vi.fn();
+            const tab = createMockTab({
+                params: {
+                    service: 'civit-ai-images',
+                    feed: 'online',
+                    limit: 20,
+                    page: 1,
+                },
+            });
+
+            mockAxios.get.mockResolvedValueOnce({
+                data: {
+                    tab: {
+                        ...tab,
+                        items: [],
+                    },
+                },
+            });
+
+            mount(TabContent, {
+                props: {
+                    tabId: tab.id,
+                    availableServices: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    onOpenContainerTab,
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            expect(capturedOpenContainerTab).toBeTypeOf('function');
+
+            capturedOpenContainerTab?.({
+                id: 20,
+                type: 'Post',
+                source: 'CivitAI',
+                source_id: '12345',
+            });
+
+            expect(onOpenContainerTab).toHaveBeenCalledWith({
+                label: 'CivitAI Images: Post 12345 - 1',
+                params: expect.objectContaining({
+                    feed: 'online',
+                    service: 'civit-ai-images',
+                    page: 1,
+                    limit: '20',
+                    postId: '12345',
+                }),
+            });
+        });
+
+        it('keeps container label when updating tab label on page load', async () => {
+            const onUpdateTabLabel = vi.fn();
+            const tab = createMockTab({
+                params: {
+                    service: 'civit-ai-images',
+                    feed: 'online',
+                    limit: 20,
+                    page: 1,
+                    username: 'atlasUser',
+                },
+            });
+
+            mockAxios.get.mockResolvedValueOnce({
+                data: {
+                    tab: {
+                        ...tab,
+                        items: [],
+                    },
+                },
+            });
+
+            const wrapper = mount(TabContent, {
+                props: {
+                    tabId: tab.id,
+                    availableServices: [{ key: 'civit-ai-images', label: 'CivitAI Images' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                    onUpdateTabLabel,
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+
+            const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+            const getContent = masonry.props('getContent') as (page: string) => Promise<{ items: FeedItem[]; nextPage: string | null }>;
+            await getContent('CURSOR_1');
+
+            expect(onUpdateTabLabel).toHaveBeenCalledWith('CivitAI Images: User atlasUser - CURSOR_1');
         });
 
         it('passes masonry instance to container pill interactions composable', async () => {

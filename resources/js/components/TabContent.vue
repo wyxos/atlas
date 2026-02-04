@@ -159,6 +159,42 @@ function updateService(nextService: string): void {
     form.setService(nextService, defaults);
 }
 
+function normalizeContainerValue(value: unknown): string | null {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+    }
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? String(value) : null;
+    }
+    return null;
+}
+
+function getContainerLabelFromFilters(): string | null {
+    if (form.data.feed !== 'online') {
+        return null;
+    }
+
+    if (form.data.service === 'civit-ai-images') {
+        const username = normalizeContainerValue(form.data.serviceFilters?.username);
+        if (username) {
+            return `User ${username}`;
+        }
+
+        const postId = normalizeContainerValue(form.data.serviceFilters?.postId);
+        if (postId) {
+            return `Post ${postId}`;
+        }
+    }
+
+    return null;
+}
+
+function formatTabLabel(serviceLabel: string, pageToken: PageToken, containerLabel?: string | null): string {
+    const prefix = containerLabel ? `${serviceLabel}: ${containerLabel}` : serviceLabel;
+    return `${prefix} - ${String(pageToken)}`;
+}
+
 // Accumulate moderation data from each page load
 const accumulatedModeration = ref<Array<{ id: number; action_type: string; thumbnail?: string }>>([]);
 
@@ -279,10 +315,11 @@ async function getPage(page: PageToken, context?: BrowseFormData) {
 
     if (props.onUpdateTabLabel) {
         if (formData.feed === 'local' || (formData.feed === 'online' && formData.service)) {
-            const serviceLabel = formData.feed === 'local'
-                ? (localService.value?.label ?? 'Local')
-                : (availableServices.value.find((s) => s.key === formData.service)?.label ?? formData.service);
-            props.onUpdateTabLabel(`${serviceLabel} - ${String(page)}`);
+        const serviceLabel = formData.feed === 'local'
+            ? (localService.value?.label ?? 'Local')
+            : (availableServices.value.find((s) => s.key === formData.service)?.label ?? formData.service);
+            const containerLabel = getContainerLabelFromFilters();
+            props.onUpdateTabLabel(formatTabLabel(serviceLabel, page, containerLabel));
         }
     }
 
@@ -450,8 +487,9 @@ const containerPillInteractions = useContainerPillInteractions(
             return;
         }
 
+        const containerLabel = `${container.type} ${containerValue}`;
         props.onOpenContainerTab({
-            label: `${serviceLabel} - ${container.type}: ${containerValue}`,
+            label: formatTabLabel(serviceLabel, 1, containerLabel),
             params,
         });
     }
