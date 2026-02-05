@@ -1,0 +1,63 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Auth\Access\AuthorizationException;
+
+class StoreExternalFileRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        $expected = (string) config('downloads.extension_token');
+        if ($expected === '') {
+            return false;
+        }
+
+        $provided = $this->header('X-Atlas-Extension-Token') ?? $this->bearerToken();
+        if (! is_string($provided) || $provided === '') {
+            return false;
+        }
+
+        return hash_equals($expected, $provided);
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException('Invalid or missing extension token.');
+    }
+
+    public function rules(): array
+    {
+        return [
+            'url' => ['required', 'string', 'url', 'max:2048'],
+            'original_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'referrer_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'page_title' => ['nullable', 'string', 'max:500'],
+            'source' => ['nullable', 'string', 'max:100'],
+            'source_id' => ['nullable', 'string', 'max:255'],
+            'filename' => ['nullable', 'string', 'max:255'],
+            'preview_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'mime_type' => ['nullable', 'string', 'max:255'],
+            'size' => ['nullable', 'integer', 'min:0'],
+            'width' => ['nullable', 'integer', 'min:1'],
+            'height' => ['nullable', 'integer', 'min:1'],
+            'tag_name' => ['nullable', 'string', 'max:50'],
+            'alt' => ['nullable', 'string', 'max:500'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'url.required' => 'A media URL is required.',
+            'url.url' => 'The media URL must be a valid URL.',
+            'original_url.url' => 'The original URL must be a valid URL.',
+            'referrer_url.url' => 'The referrer URL must be a valid URL.',
+            'preview_url.url' => 'The preview URL must be a valid URL.',
+            'size.integer' => 'The size must be an integer.',
+            'width.integer' => 'The width must be an integer.',
+            'height.integer' => 'The height must be an integer.',
+        ];
+    }
+}

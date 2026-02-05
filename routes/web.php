@@ -18,6 +18,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
 });
 
+Route::post('/api/extension/files', [\App\Http\Controllers\ExternalFilesController::class, 'store'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->name('api.extension.files.store');
+
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
@@ -65,6 +69,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/download-transfers/bulk-delete', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyBatch'])->name('api.download-transfers.destroy-batch');
     Route::delete('/api/download-transfers/{downloadTransfer}/disk', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroyWithDisk'])->name('api.download-transfers.destroy-disk');
     Route::delete('/api/download-transfers/{downloadTransfer}', [\App\Http\Controllers\DownloadTransferActionsController::class, 'destroy'])->name('api.download-transfers.destroy');
+    Route::get('/downloads/atlas-extension.zip', [\App\Http\Controllers\ExtensionDownloadController::class, 'download'])
+        ->name('downloads.atlas-extension');
 
     // Moderation Rules
     Route::get('/api/moderation-rules', [\App\Http\Controllers\ModerationRuleController::class, 'index'])->name('api.moderation-rules.index');
