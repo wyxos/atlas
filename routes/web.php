@@ -21,6 +21,12 @@ Route::middleware('guest')->group(function () {
 Route::post('/api/extension/files', [\App\Http\Controllers\ExternalFilesController::class, 'store'])
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->name('api.extension.files.store');
+Route::options('/api/extension/files', function () {
+    return response()->noContent()
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');

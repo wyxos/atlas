@@ -154,16 +154,155 @@
   }
 
   function getMediaUrl(element) {
-    if (element.currentSrc) {
-      return element.currentSrc;
-    }
-
-    if (element.src) {
-      return element.src;
+    const direct =
+      safeUrl(element.currentSrc) ||
+      safeUrl(element.src) ||
+      safeUrl(element.getAttribute('src'));
+    if (direct) {
+      return direct;
     }
 
     const source = element.querySelector('source[src]');
-    return source ? source.src : '';
+    const sourceUrl = source ? safeUrl(source.src || source.getAttribute('src')) : '';
+    if (sourceUrl) {
+      return sourceUrl;
+    }
+
+    const dataStoreUrl = resolveDataStoreUrl(element);
+    if (dataStoreUrl) {
+      return dataStoreUrl;
+    }
+
+    return resolveMetaVideoUrl();
+  }
+
+  function safeUrl(value) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.startsWith('blob:')) {
+      return '';
+    }
+
+    return trimmed;
+  }
+
+  function resolveMetaVideoUrl() {
+    const selectors = [
+      'meta[property="og:video"]',
+      'meta[property="og:video:url"]',
+      'meta[property="og:video:secure_url"]',
+      'meta[name="twitter:player:stream"]',
+      'meta[name="twitter:player:stream:url"]',
+    ];
+
+    for (const selector of selectors) {
+      const tag = document.querySelector(selector);
+      const content = tag?.getAttribute('content');
+      if (content) {
+        return content;
+      }
+    }
+
+    return '';
+  }
+
+  function resolveDataStoreUrl(element) {
+    let node = element;
+    let depth = 0;
+
+    while (node && depth < 8) {
+      const dataStore = node.getAttribute('data-store');
+      if (dataStore) {
+        const parsed = parseMaybeJson(dataStore);
+        const url = findPlayableUrl(parsed, 0);
+        if (url) {
+          return url;
+        }
+      }
+
+      node = node.parentElement;
+      depth += 1;
+    }
+
+    return '';
+  }
+
+  function parseMaybeJson(value) {
+    if (!value) {
+      return null;
+    }
+
+    const decoded = decodeHtmlEntities(value);
+    try {
+      return JSON.parse(decoded);
+    } catch {
+      return null;
+    }
+  }
+
+  function decodeHtmlEntities(value) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+
+    return value
+      .replace(/&quot;/g, '"')
+      .replace(/&#34;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&#38;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+  }
+
+  function findPlayableUrl(value, depth) {
+    if (!value || depth > 4) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      return value.startsWith('http') ? value : '';
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const found = findPlayableUrl(entry, depth + 1);
+        if (found) {
+          return found;
+        }
+      }
+      return '';
+    }
+
+    if (typeof value !== 'object') {
+      return '';
+    }
+
+    const directKeys = [
+      'hd_src',
+      'sd_src',
+      'playable_url',
+      'playable_url_quality_hd',
+      'playable_url_quality_sd',
+    ];
+
+    for (const key of directKeys) {
+      const candidate = value[key];
+      if (typeof candidate === 'string' && candidate.startsWith('http')) {
+        return candidate;
+      }
+    }
+
+    for (const key of Object.keys(value)) {
+      const found = findPlayableUrl(value[key], depth + 1);
+      if (found) {
+        return found;
+      }
+    }
+
+    return '';
   }
 
   function getMediaWidth(element) {
