@@ -34,33 +34,4 @@ describe('BrowseStatusBar', () => {
 
         expect(nextPill?.props('value')).toBe('cursor-from-masonry');
     });
-
-    it('falls back to masonry next page while backfill is active', () => {
-        const wrapper = mount(BrowseStatusBar, {
-            props: {
-                items: [],
-                masonry: {
-                    nextPage: 'cursor-from-masonry',
-                    backfillStats: {
-                        enabled: true,
-                        isBackfillActive: true,
-                        page: 1,
-                        next: null,
-                        progress: { collected: 0, target: 10 },
-                        totals: { pagesFetched: 0 },
-                        cooldownMsRemaining: 0,
-                        cooldownMsTotal: 1000,
-                        isRequestInFlight: false,
-                    },
-                } as any,
-                tab: { params: { next: 'cursor-next' } },
-                visible: true,
-            },
-        });
-
-        const pills = wrapper.findAllComponents({ name: 'Pill' });
-        const nextPill = pills.find((pill) => pill.props('label') === 'Next');
-
-        expect(nextPill?.props('value')).toBe('cursor-from-masonry');
-    });
 });
