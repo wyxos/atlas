@@ -27,6 +27,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 // Get user data from meta tag or global variable
+const props = defineProps<{
+    appVersion?: string;
+}>();
+
 const userName = computed(() => {
     const metaTag = document.querySelector('meta[name="user-name"]');
     return metaTag?.getAttribute('content') || 'User';
@@ -36,6 +40,8 @@ const appName = computed(() => {
     const metaTag = document.querySelector('meta[name="app-name"]');
     return metaTag?.getAttribute('content') || 'Atlas';
 });
+
+const appVersion = computed(() => props.appVersion || 'dev');
 
 // On mobile/tablet, menu starts closed; on desktop, it starts open
 const isMenuOpen = ref(window.innerWidth >= 1024);
@@ -149,8 +155,9 @@ onUnmounted(() => {
             isMenuOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-16 lg:translate-x-0'
         ]">
             <!-- Atlas Icon / Logo -->
-            <div class="flex items-center justify-center h-16 px-4">
+            <div class="flex flex-col items-center justify-center h-16 px-4 gap-1">
                 <AtlasIcon @click="toggleMenu" class="w-10 h-10 cursor-pointer" />
+                <span class="text-[10px] font-medium text-twilight-indigo-300 tracking-wide">v{{ appVersion }}</span>
             </div>
 
             <!-- Menu Items -->

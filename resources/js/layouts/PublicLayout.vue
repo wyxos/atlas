@@ -1,5 +1,9 @@
 <script setup lang="ts">
-// Simple public layout
+const props = defineProps<{
+    appVersion?: string;
+}>();
+
+const appVersion = props.appVersion || 'dev';
 </script>
 
 <template>
@@ -10,7 +14,10 @@
                     <div class="w-8 h-8 rounded bg-smart-blue-500 flex items-center justify-center text-white font-bold">
                         A
                     </div>
-                    <span class="font-bold text-xl text-white">Atlas</span>
+                    <div class="flex items-baseline gap-2">
+                        <span class="font-bold text-xl text-white">Atlas</span>
+                        <span class="text-xs font-medium text-twilight-indigo-300">v{{ appVersion }}</span>
+                    </div>
                 </div>
                 
                 <a href="/" class="text-smart-blue-400 hover:text-smart-blue-300 transition-colors font-medium">
