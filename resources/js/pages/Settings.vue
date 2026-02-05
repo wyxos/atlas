@@ -23,6 +23,33 @@ const isResetting = ref(false);
 const extensionDialogOpen = ref(false);
 const extensionVersion = computed(() => extensionManifest.version ?? 'dev');
 const extensionDownloadUrl = '/downloads/atlas-extension.zip';
+const extensionCopyStatus = ref('');
+
+async function copyToClipboard(value: string, label: string): Promise<void> {
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(value);
+        } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = value;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            textarea.remove();
+        }
+
+        extensionCopyStatus.value = `${label} copied.`;
+    } catch (error) {
+        console.error('Failed to copy:', error);
+        extensionCopyStatus.value = `Unable to copy ${label.toLowerCase()}.`;
+    } finally {
+        window.setTimeout(() => {
+            extensionCopyStatus.value = '';
+        }, 2000);
+    }
+}
 
 async function handleResetApp(): Promise<void> {
     isResetting.value = true;
@@ -126,16 +153,23 @@ async function handleResetApp(): Promise<void> {
                         <li>Open the extension options and set your Atlas base URL and <span class="font-semibold">ATLAS_EXTENSION_TOKEN</span>.</li>
                     </ol>
                     <div class="flex flex-wrap gap-2">
-                        <Button as="a" href="chrome://extensions" target="_blank" rel="noopener noreferrer" variant="outline" size="sm">
-                            Open Chrome Extensions
-                        </Button>
-                        <Button as="a" href="brave://extensions" target="_blank" rel="noopener noreferrer" variant="outline" size="sm">
-                            Open Brave Extensions
-                        </Button>
                         <Button as="a" :href="extensionDownloadUrl" variant="secondary" size="sm">
                             Download Zip (v{{ extensionVersion }})
                         </Button>
+                        <Button variant="outline" size="sm" @click="copyToClipboard('chrome://extensions', 'Chrome extensions URL')">
+                            Copy chrome://extensions
+                        </Button>
+                        <Button variant="outline" size="sm" @click="copyToClipboard('brave://extensions', 'Brave extensions URL')">
+                            Copy brave://extensions
+                        </Button>
                     </div>
+                    <p v-if="extensionCopyStatus" class="text-xs text-smart-blue-200">
+                        {{ extensionCopyStatus }}
+                    </p>
+                    <p class="text-xs text-twilight-indigo-300">
+                        Browser pages like <span class="font-semibold">chrome://extensions</span> and
+                        <span class="font-semibold">brave://extensions</span> must be opened manually in the address bar.
+                    </p>
                 </div>
                 <DialogFooter>
                     <DialogClose as-child>
