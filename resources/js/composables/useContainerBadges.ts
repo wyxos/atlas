@@ -154,10 +154,10 @@ export function useContainerBadges(items: import('vue').Ref<FeedItem[]>) {
     );
 
     // Container type priority order (lower index = higher priority, appears first)
-    // This ensures consistent ordering: User always before Post, etc.
+    // This ensures consistent ordering: Post before User.
     const CONTAINER_TYPE_PRIORITY: Record<string, number> = {
-        'User': 0,
-        'Post': 1,
+        'Post': 0,
+        'User': 1,
         // Add other types as needed - they will sort alphabetically after priority types
     };
 

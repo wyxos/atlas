@@ -130,7 +130,7 @@ describe('useContainerPillInteractions', () => {
         handlePillAuxClick(1, mockEvent);
 
         // Wait for async batchReactToSiblings to complete
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await Promise.resolve();
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -141,6 +141,7 @@ describe('useContainerPillInteractions', () => {
     });
 
     it('handles middle click without alt to open container tab', () => {
+        vi.useFakeTimers();
         const items = ref<FeedItem[]>([
             {
                 id: 1,
@@ -174,10 +175,16 @@ describe('useContainerPillInteractions', () => {
         } as unknown as MouseEvent;
 
         handlePillAuxClick(1, mockEvent);
+        expect(onOpenContainerTab).not.toHaveBeenCalled();
+
+        vi.advanceTimersByTime(300);
+        vi.runOnlyPendingTimers();
 
         expect(onOpenContainerTab).toHaveBeenCalledWith(
             expect.objectContaining({ id: 1, type: 'gallery' })
         );
+
+        vi.useRealTimers();
     });
 
     it('handles alt + right click to dislike all siblings', async () => {
@@ -228,7 +235,7 @@ describe('useContainerPillInteractions', () => {
         handlePillClick(1, mockEvent);
 
         // Wait for async batchReactToSiblings to complete
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await Promise.resolve();
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -286,7 +293,7 @@ describe('useContainerPillInteractions', () => {
         handlePillClick(1, mockEvent, true); // isDoubleClick = true
 
         // Wait for async batchReactToSiblings to complete
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await Promise.resolve();
 
         // Verify preventDefault and stopPropagation were called
         expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -356,13 +363,14 @@ describe('useContainerPillInteractions', () => {
         handlePillClick(1, secondClick, true); // isDoubleClick = true
 
         // Wait for async batchReactToSiblings to complete
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await Promise.resolve();
 
         // Verify removeMany was called (indicating batchReactToSiblings was called with 'dislike')
         expect(mockRemoveMany).toHaveBeenCalled();
     });
 
     it('handles double middle click (without alt) to love all siblings', async () => {
+        vi.useFakeTimers();
         const items = ref<FeedItem[]>([
             {
                 id: 1,
@@ -391,32 +399,102 @@ describe('useContainerPillInteractions', () => {
             remove: mockRemoveMany,
         });
 
-        const { handlePillClick } = useContainerPillInteractions(
+        const { handlePillAuxClick } = useContainerPillInteractions(
             items,
             masonry,
             1,
             mockOnReaction
         );
 
-        // Simulate double middle click (without alt)
-        const mockEvent = {
+        const firstClick = {
             button: 1,
             altKey: false,
-            type: 'dblclick',
+            type: 'auxclick',
             preventDefault: vi.fn(),
             stopPropagation: vi.fn(),
         } as unknown as MouseEvent;
 
-        handlePillClick(1, mockEvent, true); // isDoubleClick = true
+        handlePillAuxClick(1, firstClick);
+
+        const secondClick = {
+            button: 1,
+            altKey: false,
+            type: 'auxclick',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        } as unknown as MouseEvent;
+
+        handlePillAuxClick(1, secondClick);
 
         // Wait for async batchReactToSiblings to complete
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await Promise.resolve();
 
-        // Verify preventDefault and stopPropagation were called
-        expect(mockEvent.preventDefault).toHaveBeenCalled();
-        expect(mockEvent.stopPropagation).toHaveBeenCalled();
+        // Ensure the delayed open is canceled
+        vi.advanceTimersByTime(300);
+        vi.runOnlyPendingTimers();
 
         // Verify removeMany was called (indicating batchReactToSiblings was called with 'love')
         expect(mockRemoveMany).toHaveBeenCalled();
+
+        vi.useRealTimers();
+    });
+
+    it('does not open container tab on double middle click', async () => {
+        vi.useFakeTimers();
+        const items = ref<FeedItem[]>([
+            {
+                id: 1,
+                width: 500,
+                height: 500,
+                page: 1,
+                key: '1-1',
+                index: 0,
+                src: 'https://example.com/image1.jpg',
+                containers: [{ id: 1, type: 'gallery', referrer: 'https://example.com/gallery/1' }],
+            } as FeedItem,
+        ]);
+
+        const mockRemoveMany = vi.fn().mockResolvedValue(undefined);
+        const masonry = ref({
+            remove: mockRemoveMany,
+        });
+        const onOpenContainerTab = vi.fn();
+
+        const { handlePillAuxClick } = useContainerPillInteractions(
+            items,
+            masonry,
+            1,
+            mockOnReaction,
+            onOpenContainerTab
+        );
+
+        const firstClick = {
+            button: 1,
+            altKey: false,
+            type: 'auxclick',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        } as unknown as MouseEvent;
+
+        const secondClick = {
+            button: 1,
+            altKey: false,
+            type: 'auxclick',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        } as unknown as MouseEvent;
+
+        handlePillAuxClick(1, firstClick);
+        handlePillAuxClick(1, secondClick);
+
+        await Promise.resolve();
+        vi.advanceTimersByTime(300);
+        vi.runOnlyPendingTimers();
+
+        expect(onOpenContainerTab).not.toHaveBeenCalled();
+        expect(mockRemoveMany).toHaveBeenCalled();
+
+        vi.useRealTimers();
     });
 });
+
