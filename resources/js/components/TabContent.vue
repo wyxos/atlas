@@ -535,6 +535,23 @@ async function loadNextPage(): Promise<void> {
     await masonry.value?.loadNextPage?.();
 }
 
+async function handleMasonryRemoved(payload: { items: FeedItem[]; ids: string[] }): Promise<void> {
+    if (form.data.feed !== 'online') {
+        return;
+    }
+    if (!masonry.value || masonry.value.isLoading || masonry.value.hasReachedEnd) {
+        return;
+    }
+    if (payload.ids.length === 0) {
+        return;
+    }
+
+    await nextTick();
+    if (items.value.length === 0) {
+        await masonry.value.loadNextPage?.();
+    }
+}
+
 
 // Auto-dislike queue composable
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
@@ -1002,7 +1019,8 @@ defineExpose({
                     :get-content="getPage" :page="startPageToken" :restored-pages="restoredPages ?? undefined"
                     :page-size="Number(form.data.limit)"
                     :gap-x="layout.gutterX" :gap-y="layout.gutterY"
-                    @preloaded="handleBatchPreloaded" @failures="handleBatchFailures" data-test="masonry-component">
+                    @preloaded="handleBatchPreloaded" @failures="handleBatchFailures"
+                    @removed="handleMasonryRemoved" data-test="masonry-component">
                     <MasonryItem @preloaded="handleItemPreloaded">
                         <template #loader>
                             <div class="flex h-full w-full items-center justify-center text-twilight-indigo-200">
