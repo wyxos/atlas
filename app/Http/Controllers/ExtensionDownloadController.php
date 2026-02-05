@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\ExtensionPackageService;
-use Illuminate\Http\Response;
 
 class ExtensionDownloadController extends Controller
 {

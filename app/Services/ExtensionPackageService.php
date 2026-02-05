@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use ZipArchive;
-use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
+use ZipArchive;
 
 class ExtensionPackageService
 {
@@ -42,7 +42,7 @@ class ExtensionPackageService
 
     private function buildZip(string $sourceDir, string $zipPath): void
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to create extension archive.');
         }

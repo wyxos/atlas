@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Jobs\DownloadFile;
 use App\Models\File;
-use App\Services\MetricsService;
 use App\Support\FileTypeDetector;
 use Illuminate\Support\Str;
 
