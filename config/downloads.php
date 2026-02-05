@@ -22,4 +22,6 @@ return [
     'video_preview_width' => (int) env('DOWNLOADS_VIDEO_PREVIEW_WIDTH', 450),
 
     'video_poster_second' => (float) env('DOWNLOADS_VIDEO_POSTER_SECOND', 1),
+
+    'extension_token' => env('ATLAS_EXTENSION_TOKEN'),
 ];

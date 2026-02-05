@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atlas Downloader Settings</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        margin: 0;
+        padding: 24px;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+
+      h1 {
+        font-size: 18px;
+        margin: 0 0 16px;
+      }
+
+      .field {
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: block;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 6px;
+        color: #94a3b8;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+        background: #0b1220;
+        color: #e2e8f0;
+        font-size: 14px;
+      }
+
+      button {
+        padding: 10px 14px;
+        border: none;
+        border-radius: 8px;
+        background: #38bdf8;
+        color: #0f172a;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .status {
+        margin-top: 12px;
+        font-size: 13px;
+        color: #a7f3d0;
+        min-height: 16px;
+      }
+
+      .hint {
+        margin-top: 12px;
+        font-size: 12px;
+        color: #94a3b8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Atlas Downloader Settings</h1>
+
+    <div class="field">
+      <label for="atlasBaseUrl">Atlas base URL</label>
+      <input id="atlasBaseUrl" type="text" placeholder="https://atlas.test" />
+    </div>
+
+    <div class="field">
+      <label for="atlasToken">Extension token</label>
+      <input id="atlasToken" type="password" placeholder="ATLAS_EXTENSION_TOKEN" />
+    </div>
+
+    <button id="save">Save settings</button>
+    <div id="status" class="status"></div>
+    <div class="hint">Set ATLAS_EXTENSION_TOKEN in your .env to match the token above.</div>
+
+    <script src="options.js"></script>
+  </body>
+</html>
