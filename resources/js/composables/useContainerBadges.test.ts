@@ -187,7 +187,7 @@ describe('useContainerBadges', () => {
     });
 
     describe('Container ordering', () => {
-        it('sorts containers by type priority (User before Post)', () => {
+        it('sorts containers by type priority (Post before User)', () => {
             const items = ref<FeedItem[]>([
                 {
                     id: 1,
@@ -202,11 +202,11 @@ describe('useContainerBadges', () => {
 
             const containers = getContainersForItem(items.value[0]);
 
-            // User should come before Post regardless of ID order
-            expect(containers[0].type).toBe('User');
-            expect(containers[0].id).toBe(1);
-            expect(containers[1].type).toBe('Post');
-            expect(containers[1].id).toBe(2);
+            // Post should come before User regardless of ID order
+            expect(containers[0].type).toBe('Post');
+            expect(containers[0].id).toBe(2);
+            expect(containers[1].type).toBe('User');
+            expect(containers[1].id).toBe(1);
         });
 
         it('sorts containers by ID when types have same priority', () => {
@@ -234,7 +234,7 @@ describe('useContainerBadges', () => {
             expect(containers[2].id).toBe(3);
         });
 
-        it('sorts User before Post even when Post has lower ID', () => {
+        it('sorts Post before User even when Post has lower ID', () => {
             const items = ref<FeedItem[]>([
                 {
                     id: 1,
@@ -249,11 +249,11 @@ describe('useContainerBadges', () => {
 
             const containers = getContainersForItem(items.value[0]);
 
-            // User should come first even though it has a higher ID
-            expect(containers[0].type).toBe('User');
-            expect(containers[0].id).toBe(2);
-            expect(containers[1].type).toBe('Post');
-            expect(containers[1].id).toBe(1);
+            // Post should come first even though it has a lower ID
+            expect(containers[0].type).toBe('Post');
+            expect(containers[0].id).toBe(1);
+            expect(containers[1].type).toBe('User');
+            expect(containers[1].id).toBe(2);
         });
     });
 });

@@ -41,6 +41,7 @@ export function useContainerPillInteractions(
     const tabIdValue = computed(() => typeof tabId === 'object' && 'value' in tabId ? tabId.value : tabId);
     const lastClickTime = ref<{ containerId: number; timestamp: number; button: number } | null>(null);
     const DOUBLE_CLICK_DELAY_MS = 300; // Maximum time between clicks to count as double-click
+    let pendingMiddleClickTimer: ReturnType<typeof setTimeout> | null = null;
     const { isLocal } = useBrowseForm();
 
     /**
@@ -135,10 +136,7 @@ export function useContainerPillInteractions(
     /**
      * Handle middle click to open container URL in new tab without focus.
      */
-    function handleMiddleClick(containerId: number, e: MouseEvent): void {
-        e.preventDefault();
-        e.stopPropagation();
-
+    function handleMiddleClick(containerId: number): void {
         if (onOpenContainerTab) {
             const container = getContainer(containerId);
             if (container) {
@@ -161,6 +159,22 @@ export function useContainerPillInteractions(
         }
     }
 
+    function cancelPendingMiddleClick(): void {
+        if (!pendingMiddleClickTimer) {
+            return;
+        }
+        clearTimeout(pendingMiddleClickTimer);
+        pendingMiddleClickTimer = null;
+    }
+
+    function scheduleMiddleClickOpen(containerId: number): void {
+        cancelPendingMiddleClick();
+        pendingMiddleClickTimer = setTimeout(() => {
+            pendingMiddleClickTimer = null;
+            handleMiddleClick(containerId);
+        }, DOUBLE_CLICK_DELAY_MS);
+    }
+
     /**
      * Handle click events (including alt+click and double-click) for batch reactions.
      */
@@ -171,11 +185,14 @@ export function useContainerPillInteractions(
     ): void {
         // Always stop propagation to prevent triggering parent click handlers (like file viewer)
         e.stopPropagation();
+        if (e.type === 'contextmenu' || e.button === 2) {
+            e.preventDefault();
+        }
 
         // Middle click without alt - open URL (unless it's a double-click)
         if (e.button === 1 && !e.altKey && !isDoubleClick) {
             e.preventDefault();
-            handleMiddleClick(containerId, e);
+            scheduleMiddleClickOpen(containerId);
             return;
         }
 
@@ -189,6 +206,7 @@ export function useContainerPillInteractions(
         );
 
         if (isDouble) {
+            cancelPendingMiddleClick();
             lastClickTime.value = null; // Reset after handling
         } else {
             // Track click time and button for double-click detection
@@ -220,6 +238,7 @@ export function useContainerPillInteractions(
         }
 
         if (reactionType) {
+            cancelPendingMiddleClick();
             e.preventDefault();
             batchReactToSiblings(containerId, reactionType);
         }
@@ -245,18 +264,20 @@ export function useContainerPillInteractions(
 
             if (isDouble) {
                 // Double Middle Click = Favorite (Love) all siblings
+                cancelPendingMiddleClick();
                 lastClickTime.value = null; // Reset after handling
                 e.preventDefault();
                 batchReactToSiblings(containerId, 'love');
             } else if (e.altKey) {
                 // Alt + Middle Click = Favorite (Love) all siblings
+                cancelPendingMiddleClick();
                 e.preventDefault();
                 batchReactToSiblings(containerId, 'love');
             } else {
                 // Middle click without alt and not double - open URL
                 lastClickTime.value = { containerId, timestamp: now, button: 1 };
                 e.preventDefault();
-                handleMiddleClick(containerId, e);
+                scheduleMiddleClickOpen(containerId);
             }
         }
     }

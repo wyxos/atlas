@@ -693,6 +693,7 @@ function handleContainerPillDblClick(containerId: number, e: MouseEvent): void {
 }
 
 function handleContainerPillContextMenu(containerId: number, e: MouseEvent): void {
+    e.preventDefault();
     containerPillInteractions.handlePillClick(containerId, e);
 }
 
@@ -1059,9 +1060,9 @@ defineExpose({
                                             @mouseenter="handleContainerPillMouseEnter(container.id)"
                                             @mouseleave="handleContainerPillMouseLeave"
                                             @click.stop="(e: MouseEvent) => handleContainerPillClick(container.id, e)"
-                                            @dblclick.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
-                                            @contextmenu.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
-                                            @auxclick.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
+                                            @dblclick.prevent.stop="(e: MouseEvent) => handleContainerPillDblClick(container.id, e)"
+                                            @contextmenu.prevent.stop="(e: MouseEvent) => handleContainerPillContextMenu(container.id, e)"
+                                            @auxclick.prevent.stop="(e: MouseEvent) => handleContainerPillAuxClick(container.id, e)"
                                             @mousedown.stop="handleContainerPillMouseDown">
                                             <Pill :label="container.type"
                                                 :value="containerBadges.getItemCountForContainerId(container.id)"
