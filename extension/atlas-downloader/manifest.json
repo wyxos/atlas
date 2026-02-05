@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Atlas Media Downloader",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Send large images and videos to Atlas for download.",
   "permissions": ["storage"],
   "host_permissions": ["<all_urls>"],
@@ -13,6 +13,12 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icon.svg"],
+      "matches": ["<all_urls>"]
     }
   ],
   "options_page": "options.html"
