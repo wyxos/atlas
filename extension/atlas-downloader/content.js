@@ -4,28 +4,36 @@
   const WRAP_CLASS = 'atlas-download-wrapper';
   const BUTTON_CLASS = 'atlas-download-button';
   const BUTTON_TEXT = 'Atlas';
-  const iconUrl = chrome.runtime.getURL('icon.svg');
+  const iconUrl =
+    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+DQogIDxkZWZzPg0KICAgIDwhLS0gQ2xlYW4gbGluZWFyIGdyYWRpZW50IGZvciBibG9ja3MgLS0+DQogICAgPGxpbmVhckdyYWRpZW50IGlkPSJibG9ja0dyYWQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPg0KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6IzI1NjNFQjtzdG9wLW9wYWNpdHk6MSIgLz4NCiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6IzA2QjZENDtzdG9wLW9wYWNpdHk6MSIgLz4NCiAgICA8L2xpbmVhckdyYWRpZW50Pg0KICAgIDwhLS0gRHJvcCBzaGFkb3cgZm9yIHRoZSBwbGF5IGVsZW1lbnQgLS0+DQogICAgPGZpbHRlciBpZD0icGxheVNoYWRvdyIgeD0iLTUwJSIgeT0iLTUwJSIgd2lkdGg9IjIwMCUiIGhlaWdodD0iMjAwJSI+DQogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNCIgc3RkRGV2aWF0aW9uPSI2IiBmbG9vZC1jb2xvcj0iIzAwMCIgZmxvb2Qtb3BhY2l0eT0iMC4yIi8+DQogICAgPC9maWx0ZXI+DQogIDwvZGVmcz4NCg0KICA8IS0tIFJhbmRvbSBNYXNvbnJ5IEdyaWQgKEZyZWUgc3RhbmRpbmcpIC0tPg0KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLCAxNikiPg0KICAgIDwhLS0gQ29sdW1uIDEgLS0+DQogICAgPHJlY3QgeD0iNTAiIHk9IjMwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjE1MCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNSIvPg0KICAgIDxyZWN0IHg9IjUwIiB5PSIxOTAiIHdpZHRoPSIxMjAiIGhlaWdodD0iMTAwIiByeD0iMTIiIGZpbGw9InVybCgjYmxvY2tHcmFkKSIgb3BhY2l0eT0iMC4zIi8+DQogICAgPHJlY3QgeD0iNTAiIHk9IjMwMCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxNTAiIHJ4PSIxMiIgZmlsbD0idXJsKCNibG9ja0dyYWQpIiBvcGFjaXR5PSIwLjYiLz4NCg0KICAgIDwhLS0gQ29sdW1uIDIgKENlbnRlcikgLS0+DQogICAgPHJlY3QgeD0iMTgwIiB5PSIwIiB3aWR0aD0iMTQ1IiBoZWlnaHQ9IjEzMCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNCIvPg0KICAgIDwhLS0gQ2VudHJhbCBIZXJvIEJsb2NrIC0tPg0KICAgIDxyZWN0IHg9IjE4MCIgeT0iMTQwIiB3aWR0aD0iMTQ1IiBoZWlnaHQ9IjIxMCIgcng9IjE2IiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjEuMCIvPg0KICAgIDxyZWN0IHg9IjE4MCIgeT0iMzYwIiB3aWR0aD0iMTQ1IiBoZWlnaHQ9IjEyMCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNCIvPg0KDQogICAgPCEtLSBDb2x1bW4gMyAtLT4NCiAgICA8cmVjdCB4PSIzMzUiIHk9IjUwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjE5MCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNiIvPg0KICAgIDxyZWN0IHg9IjMzNSIgeT0iMjUwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjExMCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuMyIvPg0KICAgIDxyZWN0IHg9IjMzNSIgeT0iMzcwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjkwIiByeD0iMTIiIGZpbGw9InVybCgjYmxvY2tHcmFkKSIgb3BhY2l0eT0iMC41Ii8+DQogIDwvZz4NCg0KICA8IS0tIENlbnRlcmVkIFBsYXkgQnV0dG9uIENvbXBvc2l0aW9uIC0tPg0KICA8ZyBmaWx0ZXI9InVybCgjcGxheVNoYWRvdykiPg0KICAgIDwhLS0gTm9uLWZpbGxlZCBDaXJjbGUgUmluZyAoRXh0cmEgTGFyZ2UpIC0tPg0KICAgIDxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMjQ2IiBzdHJva2U9IiNGNTlFMEIiIHN0cm9rZS13aWR0aD0iMTYiIGZpbGw9Im5vbmUiLz4NCiAgICANCiAgICA8IS0tIFBsYXkgVHJpYW5nbGUgKEV4dHJhIExhcmdlKSAtLT4NCiAgICA8cGF0aCBkPSJNMTU2IDk2IEwzOTYgMjU2IEwxNTYgNDE2IFoiIGZpbGw9IiNGNTlFMEIiLz4NCiAgPC9nPg0KICANCjwvc3ZnPg0K';
 
-  injectStyles();
-  scan(document);
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (!(node instanceof Element)) {
-          continue;
-        }
-
-        if (node.matches('img, video')) {
-          processMedia(node);
-        }
-
-        node.querySelectorAll('img, video').forEach(processMedia);
-      }
+  chrome.storage.sync.get(['atlasBaseUrl'], (data) => {
+    const baseHost = resolveHost(data.atlasBaseUrl || '');
+    if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
+      return;
     }
-  });
 
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+    injectStyles();
+    scan(document);
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof Element)) {
+            continue;
+          }
+
+          if (node.matches('img, video')) {
+            processMedia(node);
+          }
+
+          node.querySelectorAll('img, video').forEach(processMedia);
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  });
 
   function scan(root) {
     root.querySelectorAll('img, video').forEach(processMedia);
@@ -174,6 +182,32 @@
     }
 
     return resolveMetaVideoUrl();
+  }
+
+  function resolveHost(value) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      return new URL(withScheme).hostname;
+    } catch {
+      return '';
+    }
+  }
+
+  function isHostMatch(current, base) {
+    if (!current || !base) {
+      return false;
+    }
+
+    return current === base || current.endsWith(`.${base}`);
   }
 
   function safeUrl(value) {

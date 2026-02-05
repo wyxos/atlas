@@ -19,6 +19,10 @@ class ExternalFilesController extends Controller
             'created' => $result['created'],
             'queued' => $result['queued'],
             'file' => $file ? new FileResource($file) : null,
-        ], $result['created'] ? 201 : 200);
+        ], $result['created'] ? 201 : 200)->withHeaders([
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, X-Atlas-Extension-Token, Authorization',
+        ]);
     }
 }
