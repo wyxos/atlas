@@ -4,6 +4,7 @@
   const WRAP_CLASS = 'atlas-download-wrapper';
   const BUTTON_CLASS = 'atlas-download-button';
   const BUTTON_TEXT = 'Atlas';
+  const iconUrl = chrome.runtime.getURL('icon.svg');
 
   injectStyles();
   scan(document);
@@ -68,7 +69,8 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.className = BUTTON_CLASS;
-    button.textContent = BUTTON_TEXT;
+    button.setAttribute('aria-label', 'Send to Atlas');
+    button.innerHTML = `<img src="${iconUrl}" alt="" />`;
     button.title = 'Send to Atlas';
 
     button.addEventListener('click', (event) => {
@@ -189,7 +191,11 @@
   }
 
   function setButtonState(button, text, resetLater) {
-    button.textContent = text;
+    if (text === BUTTON_TEXT) {
+      button.innerHTML = `<img src="${iconUrl}" alt="" />`;
+    } else {
+      button.textContent = text;
+    }
     button.disabled = text !== BUTTON_TEXT;
 
     if (resetLater) {
@@ -229,35 +235,45 @@
       .${WRAP_CLASS} {
         position: relative;
         max-width: 100%;
+        overflow: visible;
       }
 
       .${BUTTON_CLASS} {
         position: absolute;
-        top: 10px;
-        right: 10px;
+        top: 8px;
+        right: 8px;
         z-index: 999999;
         border: none;
-        border-radius: 999px;
-        padding: 6px 10px;
+        border-radius: 18px;
+        width: 100px;
+        height: 100px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         background: rgba(15, 23, 42, 0.9);
         color: #fff;
         font-size: 12px;
         font-weight: 600;
         cursor: pointer;
-        opacity: 0;
+        opacity: 0.85;
         transition: opacity 0.2s ease, transform 0.2s ease;
-        transform: translateY(-2px);
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
       }
 
       .${WRAP_CLASS}:hover .${BUTTON_CLASS} {
         opacity: 1;
-        transform: translateY(0);
       }
 
       .${BUTTON_CLASS}:disabled {
         opacity: 1;
         cursor: default;
+      }
+
+      .${BUTTON_CLASS} img {
+        width: 64px;
+        height: 64px;
+        display: block;
       }
 
       .atlas-download-toast {
