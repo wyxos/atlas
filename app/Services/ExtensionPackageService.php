@@ -42,6 +42,11 @@ class ExtensionPackageService
 
     private function buildZip(string $sourceDir, string $zipPath): void
     {
+        $root = realpath($sourceDir);
+        if (! $root) {
+            throw new RuntimeException('Unable to resolve extension path.');
+        }
+
         $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to create extension archive.');
@@ -61,7 +66,12 @@ class ExtensionPackageService
                 continue;
             }
 
-            $relative = ltrim(str_replace($sourceDir, '', $filePath), DIRECTORY_SEPARATOR);
+            if (! str_starts_with($filePath, $root.DIRECTORY_SEPARATOR)) {
+                continue;
+            }
+
+            $relative = substr($filePath, strlen($root) + 1);
+            $relative = str_replace(DIRECTORY_SEPARATOR, '/', $relative);
             $zip->addFile($filePath, $relative);
         }
 
