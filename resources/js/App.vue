@@ -3,6 +3,7 @@ import { computed, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import DashboardLayout from './layouts/DashboardLayout.vue';
 import PublicLayout from './layouts/PublicLayout.vue';
+import packageInfo from '../../package.json';
 
 const route = useRoute();
 const layout = shallowRef(DashboardLayout);
@@ -35,6 +36,8 @@ const isAdmin = computed(() => {
     return metaTag?.getAttribute('content') === '1';
 });
 
+const appVersion = packageInfo.version ?? 'dev';
+
 function handleLogout() {
     // Re-implement logout logic or emit to layout if needed, 
     // but since the layout handles the UI, we might just need to pass it through
@@ -45,7 +48,7 @@ function handleLogout() {
 
 <template>
     <div id="app">
-        <component :is="layout" :user-name="userName" :app-name="appName" @logout="handleLogout">
+        <component :is="layout" :user-name="userName" :app-name="appName" :app-version="appVersion" @logout="handleLogout">
             <router-view />
         </component>
         <a
