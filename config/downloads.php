@@ -24,4 +24,8 @@ return [
     'video_poster_second' => (float) env('DOWNLOADS_VIDEO_POSTER_SECOND', 1),
 
     'extension_token' => env('ATLAS_EXTENSION_TOKEN'),
+
+    // User used for extension-triggered reactions/downloads.
+    // If unset and there is exactly 1 user in the DB, Atlas will use that user.
+    'extension_user_id' => env('ATLAS_EXTENSION_USER_ID'),
 ];

@@ -3,6 +3,7 @@
 namespace App\Services\Downloads;
 
 use App\Models\File;
+use App\Models\FileMetadata;
 use App\Services\MetricsService;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
@@ -36,6 +37,7 @@ class FileDownloadFinalizer
             $storedFilename = basename($file->path);
             $hashForSegmentation = $this->normalizeHash($file->hash) ?? hash('sha256', $storedFilename);
 
+            $this->persistImageDimensions($file, $absolutePath);
             $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
             if ($previewPath) {
                 $updates['preview_path'] = $previewPath;
@@ -103,6 +105,7 @@ class FileDownloadFinalizer
         if ($generatePreviews) {
             $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
             if ($this->isImageMimeType($mimeType)) {
+                $this->persistImageDimensions($file, $absolutePath);
                 $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);
                 if ($previewPath) {
                     $updates['preview_path'] = $previewPath;
@@ -486,5 +489,34 @@ class FileDownloadFinalizer
         $disk->put($thumbnailPath, $thumbnailContents);
 
         return $thumbnailPath;
+    }
+
+    /**
+     * Ensure the file has real (downloaded) width/height stored for Masonry aspect ratio.
+     * Extension ingests can provide rendered dimensions; we prefer the actual downloaded file.
+     */
+    private function persistImageDimensions(File $file, string $absolutePath): void
+    {
+        $size = @getimagesize($absolutePath);
+        if (! is_array($size)) {
+            return;
+        }
+
+        $width = isset($size[0]) ? (int) $size[0] : 0;
+        $height = isset($size[1]) ? (int) $size[1] : 0;
+
+        if ($width <= 0 || $height <= 0) {
+            return;
+        }
+
+        $meta = FileMetadata::query()->firstOrNew(['file_id' => $file->id]);
+        $payload = is_array($meta->payload) ? $meta->payload : [];
+
+        // Always prefer real downloaded dimensions.
+        $payload['width'] = $width;
+        $payload['height'] = $height;
+
+        $meta->payload = $payload;
+        $meta->save();
     }
 }

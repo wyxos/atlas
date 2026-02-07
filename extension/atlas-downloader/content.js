@@ -524,6 +524,8 @@
         alt: item.alt || '',
         preview_url: item.preview_url || '',
         source: 'Extension',
+        // Align with Atlas core behavior: reactions dispatch downloads.
+        reaction_type: 'like',
       }));
 
       chrome.runtime.sendMessage(

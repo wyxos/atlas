@@ -4,6 +4,7 @@ use App\Jobs\DownloadFile;
 use App\Jobs\Downloads\PumpDomainDownloads;
 use App\Models\DownloadTransfer;
 use App\Models\File;
+use App\Models\FileMetadata;
 use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -200,6 +201,12 @@ test('generates thumbnail for image files (finalizer)', function () {
 
     expect($file->downloaded)->toBeTrue();
     expect($file->filename)->toBe('test-image.jpg');
+
+    $meta = FileMetadata::query()->where('file_id', $file->id)->first();
+    expect($meta)->not->toBeNull();
+    expect($meta->payload)->toBeArray();
+    expect($meta->payload['width'] ?? null)->toBe(1);
+    expect($meta->payload['height'] ?? null)->toBe(1);
     // Preview should be generated for valid images
     // Verify the path structure and that it exists in fake storage
     if ($file->preview_path) {
