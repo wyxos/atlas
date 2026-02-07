@@ -6,7 +6,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     !message ||
     (message.type !== 'atlas-download' &&
       message.type !== 'atlas-download-batch' &&
-      message.type !== 'atlas-check-batch')
+      message.type !== 'atlas-check-batch' &&
+      message.type !== 'atlas-react')
   ) {
     return;
   }
@@ -16,7 +17,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ? handleDownloadBatch(message.payloads)
       : message.type === 'atlas-check-batch'
         ? handleCheckBatch(message.urls)
-      : handleDownload(message.payload);
+        : message.type === 'atlas-react'
+          ? handleReact(message.payload)
+          : handleDownload(message.payload);
 
   promise
     .then((result) => sendResponse(result))
@@ -33,6 +36,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleDownload(payload) {
   const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
   return handleDownloadWithSettings(payload, settings);
+}
+
+async function handleReact(payload) {
+  const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
+  return handleReactWithSettings(payload, settings);
 }
 
 async function handleCheckBatch(urls) {
@@ -125,6 +133,42 @@ async function handleDownloadWithSettings(payload, settings) {
   }
 
   const response = await fetch(`${baseUrl}/api/extension/files`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await safeJson(response);
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: data && data.message ? data.message : `Request failed (${response.status}).`,
+      status: response.status,
+      data,
+    };
+  }
+
+  return {
+    ok: true,
+    data,
+  };
+}
+
+async function handleReactWithSettings(payload, settings) {
+  const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
+  const token = (settings.atlasToken || '').trim();
+
+  if (!baseUrl) {
+    return {
+      ok: false,
+      error: 'Atlas base URL is not set. Open extension options to configure it.',
+    };
+  }
+
+  const response = await fetch(`${baseUrl}/api/extension/files/react`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

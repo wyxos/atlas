@@ -150,7 +150,7 @@
   display: grid;
   grid-template-columns: 18px 52px minmax(0, 1fr) minmax(92px, auto);
   gap: 10px;
-  align-items: center;
+  align-items: start;
   padding: 10px;
   border-radius: 12px;
   cursor: pointer;
@@ -218,11 +218,72 @@
   color: #94a3b8;
 }
 
+.atlas-shadow-root .atlas-downloader-reactions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn {
+  border: none;
+  background: rgba(0, 0, 0, 0.35);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn:hover {
+  transform: translateY(-1px);
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.love.active {
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.like.active {
+  background: rgba(56, 189, 248, 0.6);
+  color: #fff;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.dislike.active {
+  background: rgba(100, 116, 139, 0.75);
+  color: #fff;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.funny.active {
+  background: rgba(234, 179, 8, 0.75);
+  color: #fff;
+}
+
 .atlas-shadow-root .atlas-downloader-status {
   font-size: 11px;
   color: #94a3b8;
   text-align: right;
   min-width: 92px;
+  align-self: center;
 }
 
 .atlas-shadow-root .atlas-downloader-status.ok {
