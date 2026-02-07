@@ -147,6 +147,12 @@ async function startStubAtlasServer() {
         return;
       }
 
+      const reactionType = typeof payload?.reaction_type === 'string' ? payload.reaction_type : '';
+      if (!['love', 'like', 'dislike', 'funny'].includes(reactionType)) {
+        sendJson(422, { message: 'reaction_type is required' });
+        return;
+      }
+
       let record = records.get(mediaUrl);
       const created = !record;
       if (!record) {
@@ -155,7 +161,7 @@ async function startStubAtlasServer() {
       }
 
       // Simulate queueing then download completing shortly after.
-      if (!record.downloaded) {
+      if (!record.downloaded && reactionType !== 'dislike') {
         setTimeout(() => {
           const current = records.get(mediaUrl);
           if (current) current.downloaded = true;
@@ -163,10 +169,11 @@ async function startStubAtlasServer() {
       }
 
       sendJson(created ? 201 : 200, {
-        message: created ? 'Download queued.' : 'File stored.',
+        message: 'Reaction updated.',
         created,
-        queued: true,
+        queued: reactionType !== 'dislike',
         file: { id: record.id, downloaded: record.downloaded },
+        reaction: { type: reactionType },
       });
       return;
     }

@@ -28,6 +28,16 @@ Route::options('/api/extension/files', function () {
         ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
+Route::post('/api/extension/files/react', [\App\Http\Controllers\ExternalFilesController::class, 'react'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->name('api.extension.files.react');
+Route::options('/api/extension/files/react', function () {
+    return response()->noContent()
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 Route::post('/api/extension/files/check', [\App\Http\Controllers\ExternalFilesController::class, 'check'])
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->name('api.extension.files.check');

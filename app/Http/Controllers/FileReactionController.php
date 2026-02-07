@@ -2,11 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Models\Reaction;
-use App\Services\MetricsService;
-use App\Services\TabFileService;
+use App\Services\FileReactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,73 +22,11 @@ class FileReactionController extends Controller
         ]);
 
         $user = Auth::user();
-
-        // Find existing reaction for this user and file
-        $existingReaction = Reaction::where('user_id', $user->id)
-            ->where('file_id', $file->id)
-            ->first();
-        $metrics = app(MetricsService::class);
-        $oldType = $existingReaction?->type;
-        $wasBlacklisted = $file->blacklisted_at !== null;
-        $isBlacklisted = $wasBlacklisted;
-
-        // If clicking the same reaction type, remove it (toggle off)
-        if ($existingReaction && $existingReaction->type === $validated['type']) {
-            $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
-            $existingReaction->delete();
-
-            return response()->json([
-                'message' => 'Reaction removed.',
-                'reaction' => null,
-            ]);
-        }
-
-        // Remove auto_disliked flag if user is reacting (like, funny, favorite - not dislike)
-        // If user manually dislikes, keep auto_disliked flag
-        // Also remove blacklist flags if file was blacklisted and user is reacting positively
-        if (in_array($validated['type'], ['love', 'like', 'funny'])) {
-            $updates = ['auto_disliked' => false];
-
-            // Clear blacklist if file was blacklisted
-            if ($file->blacklisted_at !== null) {
-                $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
-                $metrics->applyBlacklistClear($file, $wasManual, false);
-                $updates['blacklisted_at'] = null;
-                $updates['blacklist_reason'] = null;
-                $isBlacklisted = false;
-            }
-
-            $file->update($updates);
-        }
-
-        $metrics->applyReactionChange($file, $oldType, $validated['type'], $wasBlacklisted, $isBlacklisted);
-
-        // Use updateOrCreate to atomically update or create the reaction
-        // This prevents race conditions where concurrent requests could create duplicates
-        $reaction = Reaction::updateOrCreate(
-            [
-                'file_id' => $file->id,
-                'user_id' => $user->id,
-            ],
-            [
-                'type' => $validated['type'],
-            ]
-        );
-
-        // Dispatch download job if reaction is not dislike
-        if ($validated['type'] !== 'dislike') {
-            DownloadFile::dispatch($file->id);
-        }
-
-        // Detach file from all tabs belonging to this user
-        // Once a file is reacted to, it should be removed from all tabs for that user
-        app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+        $result = app(FileReactionService::class)->toggle($file, $user, $validated['type']);
 
         return response()->json([
-            'message' => 'Reaction updated.',
-            'reaction' => [
-                'type' => $reaction->type,
-            ],
+            'message' => $result['reaction'] ? 'Reaction updated.' : 'Reaction removed.',
+            'reaction' => $result['reaction'],
         ]);
     }
 
@@ -160,77 +96,17 @@ class FileReactionController extends Controller
         ]);
 
         $user = Auth::user();
-        $metrics = app(MetricsService::class);
         $results = [];
+
+        $service = app(FileReactionService::class);
 
         foreach ($validated['reactions'] as $reactionData) {
             $file = File::findOrFail($reactionData['file_id']);
-
-            // Find existing reaction for this user and file
-            $existingReaction = Reaction::where('user_id', $user->id)
-                ->where('file_id', $file->id)
-                ->first();
-            $oldType = $existingReaction?->type;
-            $wasBlacklisted = $file->blacklisted_at !== null;
-            $isBlacklisted = $wasBlacklisted;
-
-            // If clicking the same reaction type, remove it (toggle off)
-            if ($existingReaction && $existingReaction->type === $reactionData['type']) {
-                $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
-                $existingReaction->delete();
-                $results[] = [
-                    'file_id' => $file->id,
-                    'reaction' => null,
-                ];
-
-                continue;
-            }
-
-            // Remove auto_disliked flag if user is reacting (like, funny, love - not dislike)
-            // Also remove blacklist flags if file was blacklisted and user is reacting positively
-            if (in_array($reactionData['type'], ['love', 'like', 'funny'])) {
-                $updates = ['auto_disliked' => false];
-
-                // Clear blacklist if file was blacklisted
-                if ($file->blacklisted_at !== null) {
-                    $wasManual = is_string($file->blacklist_reason) && $file->blacklist_reason !== '';
-                    $metrics->applyBlacklistClear($file, $wasManual, false);
-                    $updates['blacklisted_at'] = null;
-                    $updates['blacklist_reason'] = null;
-                    $isBlacklisted = false;
-                }
-
-                $file->update($updates);
-            }
-
-            $metrics->applyReactionChange($file, $oldType, $reactionData['type'], $wasBlacklisted, $isBlacklisted);
-
-            // Use updateOrCreate to atomically update or create the reaction
-            // This prevents race conditions where concurrent requests could create duplicates
-            $reaction = Reaction::updateOrCreate(
-                [
-                    'file_id' => $file->id,
-                    'user_id' => $user->id,
-                ],
-                [
-                    'type' => $reactionData['type'],
-                ]
-            );
-
-            // Dispatch download job if reaction is not dislike
-            if ($reactionData['type'] !== 'dislike') {
-                DownloadFile::dispatch($file->id);
-            }
-
-            // Detach file from all tabs belonging to this user
-            // Once a file is reacted to, it should be removed from all tabs for that user
-            app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+            $result = $service->toggle($file, $user, $reactionData['type']);
 
             $results[] = [
                 'file_id' => $file->id,
-                'reaction' => [
-                    'type' => $reaction->type,
-                ],
+                'reaction' => $result['reaction'],
             ];
         }
 

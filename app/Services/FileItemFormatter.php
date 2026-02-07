@@ -40,9 +40,11 @@ class FileItemFormatter
             // Full metadata will be loaded on-demand when needed (e.g., in FileViewer)
             $metadata = is_array($file->metadata?->payload) ? $file->metadata->payload : (is_string($file->metadata?->payload) ? json_decode($file->metadata->payload, true) : []);
 
-            // Extract only width/height from metadata (needed for masonry layout)
-            $width = (int) ($metadata['width'] ?? 500);
-            $height = (int) ($metadata['height'] ?? 500);
+            // Extract only width/height for masonry layout.
+            // Prefer FileMetadata payload, but fall back to listing_metadata (extension ingest uses this).
+            $listing = is_array($file->listing_metadata) ? $file->listing_metadata : [];
+            $width = (int) ($metadata['width'] ?? ($listing['width'] ?? 500));
+            $height = (int) ($metadata['height'] ?? ($listing['height'] ?? 500));
 
             // Extract prompt if available (used by usePromptData, but will fallback to API if missing)
             $prompt = $metadata['prompt'] ?? null;

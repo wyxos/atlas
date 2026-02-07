@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreExternalFileRequest extends FormRequest
+class ReactExternalFileRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -30,10 +30,8 @@ class StoreExternalFileRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'type' => ['required', 'string', 'in:love,like,dislike,funny'],
             'url' => ['required', 'string', 'url', 'max:2048'],
-            // Required: extension-triggered downloads are driven by the same reaction pipeline as the app.
-            // No fallback to "queue download without reaction".
-            'reaction_type' => ['required', 'string', 'in:love,like,dislike,funny'],
             'original_url' => ['nullable', 'string', 'url', 'max:2048'],
             'referrer_url' => ['nullable', 'string', 'url', 'max:2048'],
             'page_title' => ['nullable', 'string', 'max:500'],
@@ -47,21 +45,6 @@ class StoreExternalFileRequest extends FormRequest
             'height' => ['nullable', 'integer', 'min:1'],
             'tag_name' => ['nullable', 'string', 'max:50'],
             'alt' => ['nullable', 'string', 'max:500'],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'url.required' => 'A media URL is required.',
-            'url.url' => 'The media URL must be a valid URL.',
-            'reaction_type.required' => 'A reaction_type is required.',
-            'original_url.url' => 'The original URL must be a valid URL.',
-            'referrer_url.url' => 'The referrer URL must be a valid URL.',
-            'preview_url.url' => 'The preview URL must be a valid URL.',
-            'size.integer' => 'The size must be an integer.',
-            'width.integer' => 'The width must be an integer.',
-            'height.integer' => 'The height must be an integer.',
         ];
     }
 }

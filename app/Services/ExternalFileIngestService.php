@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 
 class ExternalFileIngestService
 {
-    public function ingest(array $payload): array
+    public function ingest(array $payload, bool $queueDownload = true): array
     {
         $url = trim((string) $payload['url']);
         $originalUrl = trim((string) ($payload['original_url'] ?? $url));
@@ -65,7 +65,7 @@ class ExternalFileIngestService
         $file = File::query()->where('referrer_url', $referrerKey)->first();
         $queued = false;
 
-        if ($file && ! $file->downloaded && $file->url) {
+        if ($queueDownload && $file && ! $file->downloaded && $file->url) {
             DownloadFile::dispatch($file->id);
             $queued = true;
         }
