@@ -64,6 +64,7 @@ const removeDialogOpen = ref(false);
 const removeTargetIds = ref<number[]>([]);
 const removeIsDeleting = ref(false);
 const removeMode = ref<'single' | 'selection' | 'all' | null>(null);
+const removeAlsoFromDisk = ref(false);
 const batchIsPausing = ref(false);
 const batchIsCanceling = ref(false);
 const removeCount = computed(() => removeTargetIds.value.length);
@@ -414,6 +415,7 @@ function openRemoveDialog(mode: 'single' | 'selection' | 'all', ids: number[]) {
     if (ids.length === 0) return;
     removeMode.value = mode;
     removeTargetIds.value = ids;
+    removeAlsoFromDisk.value = false;
     removeDialogOpen.value = true;
 }
 
@@ -423,7 +425,11 @@ async function confirmRemove(): Promise<void> {
     const ids = removeTargetIds.value;
 
     try {
-        if (ids.length === 1) {
+        if (removeAlsoFromDisk.value) {
+            await Promise.all(ids.map((id) =>
+                window.axios.delete(downloadTransfers.destroyDisk.url(id)),
+            ));
+        } else if (ids.length === 1) {
             await window.axios.delete(downloadTransfers.destroy.url(ids[0]));
         } else {
             await window.axios.post(downloadTransfers.destroyBatch.url(), { ids });
@@ -440,6 +446,7 @@ async function confirmRemove(): Promise<void> {
         removeDialogOpen.value = false;
         removeTargetIds.value = [];
         removeMode.value = null;
+        removeAlsoFromDisk.value = false;
     }
 }
 
@@ -1064,6 +1071,14 @@ watch(downloads, () => {
                         {{ removeDescription }}
                     </DialogDescription>
                 </DialogHeader>
+                <label class="flex items-center gap-2 mt-1 text-sm text-twilight-indigo-100 cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        v-model="removeAlsoFromDisk"
+                        class="h-4 w-4 rounded border border-twilight-indigo-500 bg-prussian-blue-700 text-danger-400"
+                    />
+                    Also delete file(s) from disk
+                </label>
                 <DialogFooter>
                     <DialogClose as-child>
                         <Button variant="outline" :disabled="removeIsDeleting">

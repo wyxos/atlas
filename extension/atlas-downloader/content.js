@@ -3,6 +3,32 @@
   const MIN_SIZE = 450;
   const ROOT_ID = 'atlas-downloader-root';
   const OPEN_CLASS = 'atlas-open';
+  const REACTIONS = [
+    {
+      type: 'love',
+      label: 'Favorite',
+      className: 'love',
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/></svg>',
+    },
+    {
+      type: 'like',
+      label: 'Like',
+      className: 'like',
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h6.14a2 2 0 0 1 1.94 2.46l-2.34 8.25A2 2 0 0 1 17.82 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.34a2 2 0 0 0 1.79-1.11l3.07-5.89A2 2 0 0 1 15 2a2 2 0 0 1 2 2v1.88Z"/></svg>',
+    },
+    {
+      type: 'dislike',
+      label: 'Dislike',
+      className: 'dislike',
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 14V2"/><path d="M9 18.12 10 14H3.86a2 2 0 0 1-1.94-2.46L4.26 3.29A2 2 0 0 1 6.18 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.34a2 2 0 0 0-1.79 1.11l-3.07 5.89A2 2 0 0 1 9 22a2 2 0 0 1-2-2v-1.88Z"/></svg>',
+    },
+    {
+      type: 'funny',
+      label: 'Funny',
+      className: 'funny',
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z"/></svg>',
+    },
+  ];
 
   chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
     const baseHost = resolveHost(data.atlasBaseUrl || '');
@@ -273,9 +299,31 @@
       sub.className = 'atlas-downloader-sub';
       sub.textContent = formatSubline(item);
 
+      const reactions = document.createElement('div');
+      reactions.className = 'atlas-downloader-reactions';
+      const currentReaction = item.atlas?.reaction?.type || null;
+      for (const reaction of REACTIONS) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `atlas-downloader-reaction-btn ${reaction.className}${
+          currentReaction === reaction.type ? ' active' : ''
+        }${item.reactionPending ? ' pending' : ''}`.trim();
+        button.setAttribute('aria-label', reaction.label);
+        button.title = reaction.label;
+        button.innerHTML = reaction.icon;
+        button.disabled = Boolean(item.reactionPending);
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          reactToItem(item, reaction.type);
+        });
+        reactions.appendChild(button);
+      }
+
       info.appendChild(kind);
       info.appendChild(url);
       info.appendChild(sub);
+      info.appendChild(reactions);
 
       const status = document.createElement('div');
       const displayStatus = getDisplayStatus(item);
@@ -375,11 +423,74 @@
             exists: Boolean(match.exists),
             downloaded: Boolean(match.downloaded),
             file_id: match.file_id ?? null,
+            reaction: match.reaction ?? null,
           };
         }
 
         renderList();
         setReady(summaryText());
+      });
+    }
+
+    function reactToItem(item, type) {
+      item.reactionPending = type;
+      item.status = 'Reacting…';
+      item.statusClass = '';
+      renderList();
+
+      const payload = {
+        type,
+        url: item.url,
+        original_url: item.url,
+        referrer_url: window.location.href,
+        page_title: document.title,
+        tag_name: item.tag_name,
+        width: item.width,
+        height: item.height,
+        alt: item.alt || '',
+        preview_url: item.preview_url || '',
+        source: 'Extension',
+      };
+
+      chrome.runtime.sendMessage({ type: 'atlas-react', payload }, (response) => {
+        item.reactionPending = null;
+
+        if (!response) {
+          item.status = 'No response';
+          item.statusClass = 'err';
+          renderList();
+          setReady(summaryText());
+          showToast('Atlas extension did not respond.');
+          return;
+        }
+
+        if (!response.ok) {
+          item.status = response.error || 'Failed';
+          item.statusClass = 'err';
+          renderList();
+          setReady(summaryText());
+          showToast(response.error || 'Reaction failed.');
+          return;
+        }
+
+        const data = response.data || null;
+        const file = data?.file || null;
+
+        item.atlas = {
+          exists: Boolean(file),
+          downloaded: Boolean(file?.downloaded),
+          file_id: file?.id ?? null,
+          reaction: data?.reaction ?? null,
+        };
+
+        item.status = '';
+        item.statusClass = '';
+        renderList();
+        setReady(summaryText());
+
+        if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
+          pollUntilDownloaded([item.url], 0);
+        }
       });
     }
 
@@ -500,6 +611,7 @@
               exists: Boolean(match.exists),
               downloaded: Boolean(match.downloaded),
               file_id: match.file_id ?? null,
+              reaction: match.reaction ?? null,
             };
 
             if (!match.downloaded) {
