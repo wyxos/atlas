@@ -14,6 +14,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "backend:lint": "php vendor/bin/pint --dirty",
     "backend:test": "php artisan test --compact",
     "generate-favicons": "tsx scripts/generate-favicons.ts",
@@ -24,6 +26,7 @@
   "devDependencies": {
     "@laravel/echo-vue": "^2.2.7",
     "@laravel/vite-plugin-wayfinder": "^0.1.7",
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/node": "^24.10.1",

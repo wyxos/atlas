@@ -41,6 +41,18 @@
         font-size: 14px;
       }
 
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #334155;
+        background: #0b1220;
+        color: #e2e8f0;
+        font-size: 14px;
+        min-height: 120px;
+        resize: vertical;
+      }
+
       button {
         padding: 10px 14px;
         border: none;
@@ -76,6 +88,17 @@
     <div class="field">
       <label for="atlasToken">Extension token</label>
       <input id="atlasToken" type="password" placeholder="ATLAS_EXTENSION_TOKEN" />
+    </div>
+
+    <div class="field">
+      <label for="atlasExcludedDomains">Excluded domains</label>
+      <textarea
+        id="atlasExcludedDomains"
+        placeholder="example.com&#10;news.ycombinator.com&#10;localhost"
+      ></textarea>
+      <div class="hint">
+        One domain per line (or comma-separated). Matches subdomains automatically.
+      </div>
     </div>
 
     <button id="save">Save settings</button>

@@ -1,226 +1,632 @@
 /* global chrome */
 (() => {
   const MIN_SIZE = 450;
-  const WRAP_CLASS = 'atlas-download-wrapper';
-  const BUTTON_CLASS = 'atlas-download-button';
-  const BUTTON_TEXT = 'Atlas';
-  const iconUrl =
-    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+DQogIDxkZWZzPg0KICAgIDwhLS0gQ2xlYW4gbGluZWFyIGdyYWRpZW50IGZvciBibG9ja3MgLS0+DQogICAgPGxpbmVhckdyYWRpZW50IGlkPSJibG9ja0dyYWQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPg0KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6IzI1NjNFQjtzdG9wLW9wYWNpdHk6MSIgLz4NCiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3R5bGU9InN0b3AtY29sb3I6IzA2QjZENDtzdG9wLW9wYWNpdHk6MSIgLz4NCiAgICA8L2xpbmVhckdyYWRpZW50Pg0KICAgIDwhLS0gRHJvcCBzaGFkb3cgZm9yIHRoZSBwbGF5IGVsZW1lbnQgLS0+DQogICAgPGZpbHRlciBpZD0icGxheVNoYWRvdyIgeD0iLTUwJSIgeT0iLTUwJSIgd2lkdGg9IjIwMCUiIGhlaWdodD0iMjAwJSI+DQogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNCIgc3RkRGV2aWF0aW9uPSI2IiBmbG9vZC1jb2xvcj0iIzAwMCIgZmxvb2Qtb3BhY2l0eT0iMC4yIi8+DQogICAgPC9maWx0ZXI+DQogIDwvZGVmcz4NCg0KICA8IS0tIFJhbmRvbSBNYXNvbnJ5IEdyaWQgKEZyZWUgc3RhbmRpbmcpIC0tPg0KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLCAxNikiPg0KICAgIDwhLS0gQ29sdW1uIDEgLS0+DQogICAgPHJlY3QgeD0iNTAiIHk9IjMwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjE1MCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNSIvPg0KICAgIDxyZWN0IHg9IjUwIiB5PSIxOTAiIHdpZHRoPSIxMjAiIGhlaWdodD0iMTAwIiByeD0iMTIiIGZpbGw9InVybCgjYmxvY2tHcmFkKSIgb3BhY2l0eT0iMC4zIi8+DQogICAgPHJlY3QgeD0iNTAiIHk9IjMwMCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxNTAiIHJ4PSIxMiIgZmlsbD0idXJsKCNibG9ja0dyYWQpIiBvcGFjaXR5PSIwLjYiLz4NCg0KICAgIDwhLS0gQ29sdW1uIDIgKENlbnRlcikgLS0+DQogICAgPHJlY3QgeD0iMTgwIiB5PSIwIiB3aWR0aD0iMTQ1IiBoZWlnaHQ9IjEzMCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNCIvPg0KICAgIDwhLS0gQ2VudHJhbCBIZXJvIEJsb2NrIC0tPg0KICAgIDxyZWN0IHg9IjE4MCIgeT0iMTQwIiB3aWR0aD0iMTQ1IiBoZWlnaHQ9IjIxMCIgcng9IjE2IiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjEuMCIvPg0KICAgIDxyZWN0IHg9IjE4MCIgeT0iMzYwIiB3aWR0aD0iMTQ1IiBoZWlnaHQ9IjEyMCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNCIvPg0KDQogICAgPCEtLSBDb2x1bW4gMyAtLT4NCiAgICA8cmVjdCB4PSIzMzUiIHk9IjUwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjE5MCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuNiIvPg0KICAgIDxyZWN0IHg9IjMzNSIgeT0iMjUwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjExMCIgcng9IjEyIiBmaWxsPSJ1cmwoI2Jsb2NrR3JhZCkiIG9wYWNpdHk9IjAuMyIvPg0KICAgIDxyZWN0IHg9IjMzNSIgeT0iMzcwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjkwIiByeD0iMTIiIGZpbGw9InVybCgjYmxvY2tHcmFkKSIgb3BhY2l0eT0iMC41Ii8+DQogIDwvZz4NCg0KICA8IS0tIENlbnRlcmVkIFBsYXkgQnV0dG9uIENvbXBvc2l0aW9uIC0tPg0KICA8ZyBmaWx0ZXI9InVybCgjcGxheVNoYWRvdykiPg0KICAgIDwhLS0gTm9uLWZpbGxlZCBDaXJjbGUgUmluZyAoRXh0cmEgTGFyZ2UpIC0tPg0KICAgIDxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMjQ2IiBzdHJva2U9IiNGNTlFMEIiIHN0cm9rZS13aWR0aD0iMTYiIGZpbGw9Im5vbmUiLz4NCiAgICANCiAgICA8IS0tIFBsYXkgVHJpYW5nbGUgKEV4dHJhIExhcmdlKSAtLT4NCiAgICA8cGF0aCBkPSJNMTU2IDk2IEwzOTYgMjU2IEwxNTYgNDE2IFoiIGZpbGw9IiNGNTlFMEIiLz4NCiAgPC9nPg0KICANCjwvc3ZnPg0K';
+  const ROOT_ID = 'atlas-downloader-root';
+  const OPEN_CLASS = 'atlas-downloader-open';
 
-  chrome.storage.sync.get(['atlasBaseUrl'], (data) => {
+  chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
     const baseHost = resolveHost(data.atlasBaseUrl || '');
     if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
       return;
     }
 
-    injectStyles();
-    scan(document);
+    const excluded = parseExcludedDomains(data.atlasExcludedDomains || '');
+    if (isHostExcluded(window.location.hostname, excluded)) {
+      return;
+    }
 
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof Element)) {
-            continue;
-          }
-
-          if (node.matches('img, video')) {
-            processMedia(node);
-          }
-
-          node.querySelectorAll('img, video').forEach(processMedia);
-        }
-      }
-    });
-
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    mountUi();
   });
 
-  function scan(root) {
-    root.querySelectorAll('img, video').forEach(processMedia);
-  }
-
-  function processMedia(element) {
-    if (element.dataset.atlasDownloadBound === '1') {
+  function mountUi() {
+    if (document.getElementById(ROOT_ID)) {
       return;
     }
 
-    if (element.tagName === 'IMG') {
-      processImage(element);
-      return;
-    }
+    const root = document.createElement('div');
+    root.id = ROOT_ID;
 
-    if (element.tagName === 'VIDEO') {
-      attachButton(element);
-    }
-  }
+    const toggle = document.createElement('button');
+    toggle.id = 'atlas-downloader-toggle';
+    toggle.type = 'button';
+    toggle.setAttribute('aria-label', 'Atlas Downloader');
+    toggle.title = 'Atlas Downloader';
 
-  function processImage(img) {
-    if (!img.complete) {
-      img.addEventListener('load', () => processImage(img), { once: true });
-      return;
-    }
+    const icon = document.createElement('img');
+    icon.alt = '';
+    icon.src = chrome.runtime.getURL('icon.svg');
+    toggle.appendChild(icon);
 
-    const width = img.naturalWidth || img.width || img.clientWidth;
-    const height = img.naturalHeight || img.height || img.clientHeight;
+    const overlay = document.createElement('div');
+    overlay.className = 'atlas-downloader-overlay';
 
-    if (width >= MIN_SIZE && height >= MIN_SIZE) {
-      attachButton(img);
-    }
-  }
+    const modal = document.createElement('div');
+    modal.className = 'atlas-downloader-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Atlas Media Picker');
 
-  function attachButton(element) {
-    if (element.dataset.atlasDownloadBound === '1') {
-      return;
-    }
+    const header = document.createElement('div');
+    header.className = 'atlas-downloader-header';
 
-    const wrapper = ensureWrapper(element);
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = BUTTON_CLASS;
-    button.setAttribute('aria-label', 'Send to Atlas');
-    button.innerHTML = `<img src="${iconUrl}" alt="" />`;
-    button.title = 'Send to Atlas';
+    const title = document.createElement('div');
+    title.className = 'atlas-downloader-title';
+    title.textContent = 'Atlas Media Picker';
 
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      sendDownload(element, button);
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'atlas-downloader-close';
+    close.setAttribute('aria-label', 'Close');
+    close.textContent = '×';
+
+    header.appendChild(title);
+    header.appendChild(close);
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'atlas-downloader-toolbar';
+
+    const refresh = makeButton('Rescan', () => refreshList());
+    const checkAtlas = makeButton('Check Atlas', () => checkAtlasStatus(false));
+    const selectAll = makeButton('Select all', () => setAllSelected(true));
+    const selectNone = makeButton('Select none', () => setAllSelected(false));
+
+    const spacer = document.createElement('span');
+    spacer.className = 'spacer';
+
+    const queue = makeButton('Queue selected', () => queueSelected(), {
+      primary: true,
     });
 
-    wrapper.appendChild(button);
-    element.dataset.atlasDownloadBound = '1';
-  }
+    toolbar.appendChild(refresh);
+    toolbar.appendChild(checkAtlas);
+    toolbar.appendChild(selectAll);
+    toolbar.appendChild(selectNone);
+    toolbar.appendChild(spacer);
+    toolbar.appendChild(queue);
 
-  function ensureWrapper(element) {
-    const parent = element.parentElement;
-    if (parent && parent.classList.contains(WRAP_CLASS)) {
-      return parent;
+    const meta = document.createElement('div');
+    meta.className = 'atlas-downloader-meta';
+
+    const list = document.createElement('div');
+    list.className = 'atlas-downloader-list';
+
+    modal.appendChild(header);
+    modal.appendChild(toolbar);
+    modal.appendChild(meta);
+    modal.appendChild(list);
+
+    root.appendChild(toggle);
+    root.appendChild(overlay);
+    root.appendChild(modal);
+    (document.body || document.documentElement).appendChild(root);
+
+    let items = [];
+    let scanNonce = 0;
+
+    toggle.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openModal();
+    });
+
+    overlay.addEventListener('click', () => closeModal());
+    close.addEventListener('click', () => closeModal());
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      if (!root.classList.contains(OPEN_CLASS)) {
+        return;
+      }
+      closeModal();
+    });
+
+    function openModal() {
+      root.classList.add(OPEN_CLASS);
+      refreshList();
     }
 
-    const wrapper = document.createElement('span');
-    wrapper.className = WRAP_CLASS;
-
-    const display = getComputedStyle(element).display;
-    const isBlock = display === 'block' || display === 'flex' || display === 'grid';
-    wrapper.style.display = isBlock ? 'block' : 'inline-block';
-
-    if (isBlock) {
-      wrapper.style.width = '100%';
+    function closeModal() {
+      root.classList.remove(OPEN_CLASS);
     }
 
-    element.parentNode.insertBefore(wrapper, element);
-    wrapper.appendChild(element);
-
-    return wrapper;
-  }
-
-  function sendDownload(element, button) {
-    const payload = buildPayload(element);
-
-    if (!payload.url) {
-      showToast('No media URL found.');
-      return;
+    function makeButton(label, onClick, options) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `atlas-downloader-btn${options?.primary ? ' primary' : ''}`;
+      button.textContent = label;
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      });
+      return button;
     }
 
-    setButtonState(button, 'Sending...');
+    function setLoading(text) {
+      meta.textContent = text;
+      queue.disabled = true;
+      refresh.disabled = true;
+      checkAtlas.disabled = true;
+      selectAll.disabled = true;
+      selectNone.disabled = true;
+    }
 
-    chrome.runtime.sendMessage({ type: 'atlas-download', payload }, (response) => {
-      if (!response) {
-        setButtonState(button, BUTTON_TEXT, true);
-        showToast('Atlas extension did not respond.');
+    function setReady(text) {
+      meta.textContent = text;
+      const selectedCount = items.filter((item) => item.selected).length;
+      queue.disabled = selectedCount === 0;
+      refresh.disabled = false;
+      checkAtlas.disabled = items.length === 0;
+      selectAll.disabled = items.length === 0;
+      selectNone.disabled = items.length === 0;
+    }
+
+    function refreshList() {
+      scanNonce += 1;
+      const currentScan = scanNonce;
+      items = [];
+      list.replaceChildren();
+      setLoading('Scanning this page…');
+
+      collectCandidates((progress) => {
+        if (scanNonce !== currentScan) {
+          return;
+        }
+        meta.textContent = `Scanning… ${progress.scanned}/${progress.total}`;
+      }).then((found) => {
+        if (scanNonce !== currentScan) {
+          return;
+        }
+
+        items = found.map((item) => ({
+          ...item,
+          selected: true,
+          status: '',
+          statusClass: '',
+          atlas: null,
+        }));
+
+        renderList();
+        setReady(summaryText());
+        checkAtlasStatus(true);
+      });
+    }
+
+    function setAllSelected(selected) {
+      for (const item of items) {
+        item.selected = selected;
+      }
+      renderList();
+      setReady(summaryText());
+    }
+
+    function renderList() {
+      list.replaceChildren();
+
+      if (items.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.padding = '10px 12px';
+        empty.style.color = '#94a3b8';
+        empty.style.fontSize = '12px';
+        empty.textContent = 'No matching images/videos found.';
+        list.appendChild(empty);
         return;
       }
 
-      if (response.ok) {
-        setButtonState(button, 'Queued');
-        showToast('Download queued in Atlas.');
-      } else {
-        setButtonState(button, BUTTON_TEXT, true);
-        showToast(response.error || 'Atlas request failed.');
+      for (const item of items) {
+        list.appendChild(renderItemRow(item));
       }
+    }
+
+    function renderItemRow(item) {
+      const row = document.createElement('div');
+      row.className = `atlas-downloader-item${item.selected ? ' selected' : ''}`;
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = item.selected;
+      checkbox.addEventListener('change', () => {
+        item.selected = checkbox.checked;
+        row.classList.toggle('selected', item.selected);
+        setReady(summaryText());
+      });
+
+      const preview = document.createElement('div');
+      preview.className = 'atlas-downloader-preview';
+      if (item.preview_url) {
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.alt = '';
+        img.src = item.preview_url;
+        preview.appendChild(img);
+      }
+
+      const info = document.createElement('div');
+      info.className = 'atlas-downloader-info';
+
+      const kind = document.createElement('div');
+      kind.className = 'atlas-downloader-kind';
+      kind.textContent = item.tag_name;
+
+      const url = document.createElement('div');
+      url.className = 'atlas-downloader-url';
+      url.textContent = item.url;
+      url.title = item.url;
+
+      const sub = document.createElement('div');
+      sub.className = 'atlas-downloader-sub';
+      sub.textContent = formatSubline(item);
+
+      info.appendChild(kind);
+      info.appendChild(url);
+      info.appendChild(sub);
+
+      const status = document.createElement('div');
+      const displayStatus = getDisplayStatus(item);
+      status.className = `atlas-downloader-status ${displayStatus.className}`.trim();
+      status.textContent = displayStatus.text;
+
+      row.addEventListener('click', (event) => {
+        const target = event.target;
+        if (target instanceof HTMLInputElement) {
+          return;
+        }
+
+        item.selected = !item.selected;
+        checkbox.checked = item.selected;
+        row.classList.toggle('selected', item.selected);
+        setReady(summaryText());
+      });
+
+      row.appendChild(checkbox);
+      row.appendChild(preview);
+      row.appendChild(info);
+      row.appendChild(status);
+
+      return row;
+    }
+
+    function formatSubline(item) {
+      const dims =
+        item.width && item.height ? `${item.width}×${item.height}` : 'size unknown';
+      const host = safeHost(item.url);
+      return host ? `${dims} • ${host}` : dims;
+    }
+
+    function safeHost(url) {
+      try {
+        return new URL(url).hostname;
+      } catch {
+        return '';
+      }
+    }
+
+    function summaryText() {
+      const selectedCount = items.filter((item) => item.selected).length;
+      return `${items.length} found • ${selectedCount} selected`;
+    }
+
+    function getDisplayStatus(item) {
+      if (item.status) {
+        return {
+          text: item.status,
+          className: item.statusClass || '',
+        };
+      }
+
+      if (item.atlas?.downloaded) {
+        return { text: 'Downloaded', className: 'ok' };
+      }
+
+      if (item.atlas?.exists) {
+        return { text: 'In Atlas', className: '' };
+      }
+
+      return { text: '', className: '' };
+    }
+
+    function checkAtlasStatus(silent) {
+      const urls = items.map((item) => item.url).filter(Boolean);
+      if (urls.length === 0) {
+        return;
+      }
+
+      chrome.runtime.sendMessage({ type: 'atlas-check-batch', urls }, (response) => {
+        if (!response) {
+          if (!silent) {
+            showToast('Atlas extension did not respond.');
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          if (!silent) {
+            showToast(response.error || 'Atlas check failed.');
+          }
+          return;
+        }
+
+        const results = Array.isArray(response.data?.results) ? response.data.results : [];
+        const byUrl = new Map(results.map((r) => [r.url, r]));
+
+        for (const item of items) {
+          const match = byUrl.get(item.url);
+          if (!match) {
+            continue;
+          }
+
+          item.atlas = {
+            exists: Boolean(match.exists),
+            downloaded: Boolean(match.downloaded),
+            file_id: match.file_id ?? null,
+          };
+        }
+
+        renderList();
+        setReady(summaryText());
+      });
+    }
+
+    function queueSelected() {
+      const selected = items.filter((item) => item.selected);
+      if (selected.length === 0) {
+        showToast('Select one or more items first.');
+        return;
+      }
+
+      queue.disabled = true;
+      refresh.disabled = true;
+      checkAtlas.disabled = true;
+      selectAll.disabled = true;
+      selectNone.disabled = true;
+
+      for (const item of selected) {
+        item.status = 'Sending…';
+        item.statusClass = '';
+      }
+      renderList();
+
+      const payloads = selected.map((item) => ({
+        url: item.url,
+        original_url: item.url,
+        referrer_url: window.location.href,
+        page_title: document.title,
+        tag_name: item.tag_name,
+        width: item.width,
+        height: item.height,
+        alt: item.alt || '',
+        preview_url: item.preview_url || '',
+        source: 'Extension',
+      }));
+
+      chrome.runtime.sendMessage(
+        { type: 'atlas-download-batch', payloads },
+        (response) => {
+          if (!response) {
+            for (const item of selected) {
+              item.status = 'No response';
+              item.statusClass = 'err';
+            }
+            renderList();
+            setReady(summaryText());
+            showToast('Atlas extension did not respond.');
+            return;
+          }
+
+          const results = Array.isArray(response.results) ? response.results : [];
+          const urlsToPoll = [];
+          for (let i = 0; i < selected.length; i += 1) {
+            const item = selected[i];
+            const result = results[i];
+            if (result?.ok) {
+              const data = result.data || null;
+              const file = data?.file || null;
+
+              item.atlas = {
+                exists: Boolean(file),
+                downloaded: Boolean(file?.downloaded),
+                file_id: file?.id ?? null,
+              };
+
+              if (data?.queued) {
+                item.status = 'Queued';
+                item.statusClass = 'queued';
+                urlsToPoll.push(item.url);
+              } else {
+                item.status = '';
+                item.statusClass = '';
+              }
+            } else {
+              item.status = result?.error || 'Failed';
+              item.statusClass = 'err';
+            }
+          }
+
+          renderList();
+          setReady(summaryText());
+
+          if (response.ok) {
+            showToast(`Queued ${selected.length} download(s) in Atlas.`);
+          } else {
+            showToast(response.error || 'Some requests failed.');
+          }
+
+          if (urlsToPoll.length > 0) {
+            pollUntilDownloaded(urlsToPoll, 0);
+          }
+        }
+      );
+    }
+
+    function pollUntilDownloaded(urls, attempt) {
+      if (attempt > 15) {
+        return;
+      }
+
+      setTimeout(() => {
+        chrome.runtime.sendMessage({ type: 'atlas-check-batch', urls }, (response) => {
+          if (!response || !response.ok) {
+            pollUntilDownloaded(urls, attempt + 1);
+            return;
+          }
+
+          const results = Array.isArray(response.data?.results) ? response.data.results : [];
+          const byUrl = new Map(results.map((r) => [r.url, r]));
+
+          let remaining = 0;
+          for (const item of items) {
+            const match = byUrl.get(item.url);
+            if (!match) {
+              continue;
+            }
+
+            item.atlas = {
+              exists: Boolean(match.exists),
+              downloaded: Boolean(match.downloaded),
+              file_id: match.file_id ?? null,
+            };
+
+            if (!match.downloaded) {
+              remaining += 1;
+            } else if (item.status === 'Queued') {
+              item.status = '';
+              item.statusClass = '';
+            }
+          }
+
+          renderList();
+          setReady(summaryText());
+
+          if (remaining > 0) {
+            pollUntilDownloaded(urls, attempt + 1);
+          }
+        });
+      }, 2000);
+    }
+  }
+
+  function collectCandidates(onProgress) {
+    return new Promise((resolve) => {
+      const root = document.body || document.documentElement;
+      const nodes = Array.from(root.querySelectorAll('img, video'));
+      const total = nodes.length;
+      const seen = new Set();
+      const items = [];
+      let index = 0;
+
+      const schedule = (fn) => {
+        if (typeof window.requestIdleCallback === 'function') {
+          window.requestIdleCallback(fn, { timeout: 500 });
+          return;
+        }
+
+        setTimeout(() => fn({ timeRemaining: () => 25 }), 0);
+      };
+
+      const work = (deadline) => {
+        const timeRemaining =
+          typeof deadline?.timeRemaining === 'function' ? deadline.timeRemaining() : 25;
+
+        let steps = 0;
+        while (index < total && (steps < 80 || timeRemaining > 5)) {
+          const element = nodes[index];
+          if (element.closest && element.closest(`#${ROOT_ID}`)) {
+            index += 1;
+            steps += 1;
+            continue;
+          }
+
+          const item = buildItemFromElement(element);
+          if (item?.url && !seen.has(item.url)) {
+            seen.add(item.url);
+            items.push(item);
+          }
+
+          index += 1;
+          steps += 1;
+        }
+
+        onProgress?.({ scanned: index, total });
+
+        if (index < total) {
+          schedule(work);
+          return;
+        }
+
+        resolve(items);
+      };
+
+      schedule(work);
     });
   }
 
-  function buildPayload(element) {
-    const tagName = element.tagName.toLowerCase();
-    const url = getMediaUrl(element);
-    const previewUrl = tagName === 'video' ? element.poster || '' : url;
+  function buildItemFromElement(element) {
+    if (!(element instanceof Element)) {
+      return null;
+    }
 
-    return {
-      url,
-      original_url: url,
-      referrer_url: window.location.href,
-      page_title: document.title,
-      tag_name: tagName,
-      width: getMediaWidth(element),
-      height: getMediaHeight(element),
-      alt: tagName === 'img' ? element.alt || '' : '',
-      preview_url: previewUrl || '',
-      source: 'Extension',
-    };
+    if (element.tagName === 'IMG') {
+      const img = element;
+      const width = img.naturalWidth || img.width || img.clientWidth || null;
+      const height = img.naturalHeight || img.height || img.clientHeight || null;
+      if (width && height && (width < MIN_SIZE || height < MIN_SIZE)) {
+        return null;
+      }
+
+      const url = safeUrl(img.currentSrc) || safeUrl(img.src) || safeUrl(img.getAttribute('src'));
+      if (!url) {
+        return null;
+      }
+
+      return {
+        tag_name: 'img',
+        url,
+        preview_url: url,
+        width,
+        height,
+        alt: img.alt || '',
+      };
+    }
+
+    if (element.tagName === 'VIDEO') {
+      const url = getVideoUrl(element);
+      if (!url) {
+        return null;
+      }
+
+      return {
+        tag_name: 'video',
+        url,
+        preview_url: element.poster || '',
+        width: element.videoWidth || element.clientWidth || null,
+        height: element.videoHeight || element.clientHeight || null,
+        alt: '',
+      };
+    }
+
+    return null;
   }
 
-  function getMediaUrl(element) {
-    const direct =
-      safeUrl(element.currentSrc) ||
-      safeUrl(element.src) ||
-      safeUrl(element.getAttribute('src'));
+  function getVideoUrl(video) {
+    const direct = safeUrl(video.currentSrc) || safeUrl(video.src) || safeUrl(video.getAttribute('src'));
     if (direct) {
       return direct;
     }
 
-    const source = element.querySelector('source[src]');
+    const source = video.querySelector('source[src]');
     const sourceUrl = source ? safeUrl(source.src || source.getAttribute('src')) : '';
     if (sourceUrl) {
       return sourceUrl;
     }
 
-    const dataStoreUrl = resolveDataStoreUrl(element);
+    const dataStoreUrl = resolveDataStoreUrl(video);
     if (dataStoreUrl) {
       return dataStoreUrl;
     }
 
     return resolveMetaVideoUrl();
-  }
-
-  function resolveHost(value) {
-    if (!value || typeof value !== 'string') {
-      return '';
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return '';
-    }
-
-    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    try {
-      return new URL(withScheme).hostname;
-    } catch {
-      return '';
-    }
-  }
-
-  function isHostMatch(current, base) {
-    if (!current || !base) {
-      return false;
-    }
-
-    return current === base || current.endsWith(`.${base}`);
-  }
-
-  function safeUrl(value) {
-    if (!value || typeof value !== 'string') {
-      return '';
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.startsWith('blob:')) {
-      return '';
-    }
-
-    return trimmed;
   }
 
   function resolveMetaVideoUrl() {
@@ -235,8 +641,9 @@
     for (const selector of selectors) {
       const tag = document.querySelector(selector);
       const content = tag?.getAttribute('content');
-      if (content) {
-        return content;
+      const url = safeUrl(content || '');
+      if (url) {
+        return url;
       }
     }
 
@@ -248,7 +655,7 @@
     let depth = 0;
 
     while (node && depth < 8) {
-      const dataStore = node.getAttribute('data-store');
+      const dataStore = node.getAttribute?.('data-store');
       if (dataStore) {
         const parsed = parseMaybeJson(dataStore);
         const url = findPlayableUrl(parsed, 0);
@@ -339,53 +746,9 @@
     return '';
   }
 
-  function getMediaWidth(element) {
-    if (element.tagName === 'IMG') {
-      return element.naturalWidth || element.width || element.clientWidth || null;
-    }
-
-    if (element.tagName === 'VIDEO') {
-      return element.videoWidth || element.clientWidth || null;
-    }
-
-    return null;
-  }
-
-  function getMediaHeight(element) {
-    if (element.tagName === 'IMG') {
-      return element.naturalHeight || element.height || element.clientHeight || null;
-    }
-
-    if (element.tagName === 'VIDEO') {
-      return element.videoHeight || element.clientHeight || null;
-    }
-
-    return null;
-  }
-
-  function setButtonState(button, text, resetLater) {
-    if (text === BUTTON_TEXT) {
-      button.innerHTML = `<img src="${iconUrl}" alt="" />`;
-    } else {
-      button.textContent = text;
-    }
-    button.disabled = text !== BUTTON_TEXT;
-
-    if (resetLater) {
-      return;
-    }
-
-    if (text !== BUTTON_TEXT) {
-      setTimeout(() => {
-        button.textContent = BUTTON_TEXT;
-        button.disabled = false;
-      }, 2000);
-    }
-  }
-
   function showToast(message) {
     const toast = document.createElement('div');
-    toast.className = 'atlas-download-toast';
+    toast.className = 'atlas-downloader-toast';
     toast.textContent = message;
     document.body.appendChild(toast);
 
@@ -397,78 +760,85 @@
     }, 2600);
   }
 
-  function injectStyles() {
-    if (document.getElementById('atlas-download-styles')) {
-      return;
+  function parseExcludedDomains(value) {
+    if (!value || typeof value !== 'string') {
+      return [];
     }
 
-    const style = document.createElement('style');
-    style.id = 'atlas-download-styles';
-    style.textContent = `
-      .${WRAP_CLASS} {
-        position: relative;
-        max-width: 100%;
-        overflow: visible;
-      }
+    return value
+      .split(/[\n,]/g)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry && !entry.startsWith('#'))
+      .map((entry) => {
+        const wildcard = entry.startsWith('*.') ? entry.slice(2) : entry;
+        return wildcard.toLowerCase();
+      })
+      .map((entry) => resolveHost(entry) || entry.replace(/^\.+/, '').trim())
+      .filter(Boolean);
+  }
 
-      .${BUTTON_CLASS} {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        z-index: 999999;
-        border: none;
-        border-radius: 18px;
-        width: 100px;
-        height: 100px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(15, 23, 42, 0.9);
-        color: #fff;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        opacity: 0.85;
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
-      }
+  function isHostExcluded(currentHost, excludedHosts) {
+    const current = (currentHost || '').toLowerCase();
+    if (!current) {
+      return false;
+    }
 
-      .${WRAP_CLASS}:hover .${BUTTON_CLASS} {
-        opacity: 1;
+    for (const host of excludedHosts) {
+      if (isHostMatch(current, host)) {
+        return true;
       }
+    }
 
-      .${BUTTON_CLASS}:disabled {
-        opacity: 1;
-        cursor: default;
-      }
+    return false;
+  }
 
-      .${BUTTON_CLASS} img {
-        width: 64px;
-        height: 64px;
-        display: block;
-      }
+  function resolveHost(value) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
 
-      .atlas-download-toast {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: rgba(15, 23, 42, 0.95);
-        color: #fff;
-        padding: 10px 14px;
-        border-radius: 8px;
-        font-size: 13px;
-        opacity: 0;
-        transform: translateY(6px);
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        z-index: 1000000;
-      }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
 
-      .atlas-download-toast.show {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    `;
-    document.head.appendChild(style);
+    const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    try {
+      return new URL(withScheme).hostname;
+    } catch {
+      return '';
+    }
+  }
+
+  function isHostMatch(current, base) {
+    if (!current || !base) {
+      return false;
+    }
+
+    return current === base || current.endsWith(`.${base}`);
+  }
+
+  function safeUrl(value) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    const lowered = trimmed.toLowerCase();
+    if (
+      lowered.startsWith('blob:') ||
+      lowered.startsWith('data:') ||
+      lowered.startsWith('chrome-extension:') ||
+      lowered.startsWith('moz-extension:') ||
+      lowered.startsWith('safari-extension:')
+    ) {
+      return '';
+    }
+
+    return trimmed;
   }
 })();
