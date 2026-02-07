@@ -8,6 +8,6 @@ Load this folder as an unpacked extension in Chrome/Brave.
 4. Open the extension options and set:
    - Atlas base URL (ex: `https://atlas.test`)
    - Extension token (must match `ATLAS_EXTENSION_TOKEN` in `.env`)
+   - (Optional) Excluded domains (one per line) to disable the content script on specific sites
 
-When browsing, hover large images (>= 450x450) or any video to reveal the Atlas button.
-Click the button to queue the download in your Atlas instance.
+When browsing, click the Atlas icon (top-right of the page) to open the picker, select items, and queue downloads in your Atlas instance.

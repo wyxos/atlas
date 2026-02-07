@@ -2,11 +2,23 @@
 const SETTINGS_KEYS = ['atlasBaseUrl', 'atlasToken'];
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.type !== 'atlas-download') {
+  if (
+    !message ||
+    (message.type !== 'atlas-download' &&
+      message.type !== 'atlas-download-batch' &&
+      message.type !== 'atlas-check-batch')
+  ) {
     return;
   }
 
-  handleDownload(message.payload)
+  const promise =
+    message.type === 'atlas-download-batch'
+      ? handleDownloadBatch(message.payloads)
+      : message.type === 'atlas-check-batch'
+        ? handleCheckBatch(message.urls)
+      : handleDownload(message.payload);
+
+  promise
     .then((result) => sendResponse(result))
     .catch((error) => {
       sendResponse({
@@ -20,6 +32,88 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleDownload(payload) {
   const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
+  return handleDownloadWithSettings(payload, settings);
+}
+
+async function handleCheckBatch(urls) {
+  const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
+  const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
+  const token = (settings.atlasToken || '').trim();
+
+  if (!baseUrl) {
+    return {
+      ok: false,
+      error: 'Atlas base URL is not set. Open extension options to configure it.',
+    };
+  }
+
+  const list = Array.isArray(urls)
+    ? urls.filter((u) => typeof u === 'string' && u.trim() !== '')
+    : [];
+
+  if (list.length === 0) {
+    return { ok: true, data: { results: [] } };
+  }
+
+  const results = [];
+  for (let i = 0; i < list.length; i += 200) {
+    const chunk = list.slice(i, i + 200);
+
+    const response = await fetch(`${baseUrl}/api/extension/files/check`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+      },
+      body: JSON.stringify({ urls: chunk }),
+    });
+
+    const data = await safeJson(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error:
+          data && data.message ? data.message : `Request failed (${response.status}).`,
+        status: response.status,
+        data,
+      };
+    }
+
+    if (Array.isArray(data?.results)) {
+      results.push(...data.results);
+    }
+  }
+
+  return {
+    ok: true,
+    data: { results },
+  };
+}
+
+async function handleDownloadBatch(payloads) {
+  const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
+  const list = Array.isArray(payloads) ? payloads : [];
+
+  if (list.length === 0) {
+    return { ok: true, results: [] };
+  }
+
+  const results = [];
+  for (const payload of list) {
+    // Run sequentially to avoid overwhelming Atlas / remote hosts.
+    // Atlas itself will queue the downloads; this just submits requests.
+    results.push(await handleDownloadWithSettings(payload, settings));
+  }
+
+  const allOk = results.every((r) => r && r.ok);
+  return {
+    ok: allOk,
+    results,
+    ...(allOk ? {} : { error: 'One or more requests failed.' }),
+  };
+}
+
+async function handleDownloadWithSettings(payload, settings) {
   const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
   const token = (settings.atlasToken || '').trim();
 
