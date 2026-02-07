@@ -2,7 +2,7 @@
 (() => {
   const MIN_SIZE = 450;
   const ROOT_ID = 'atlas-downloader-root';
-  const OPEN_CLASS = 'atlas-downloader-open';
+  const OPEN_CLASS = 'atlas-open';
 
   chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
     const baseHost = resolveHost(data.atlasBaseUrl || '');
@@ -23,11 +23,24 @@
       return;
     }
 
+    const host = document.createElement('div');
+    host.id = ROOT_ID;
+
+    const shadow = host.attachShadow({ mode: 'closed' });
+
+    // Inject styles into shadow DOM
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = chrome.runtime.getURL('content.css');
+    shadow.appendChild(style);
+
     const root = document.createElement('div');
-    root.id = ROOT_ID;
+    root.className = 'atlas-shadow-root';
+
+    const showToast = createToastFn(root);
 
     const toggle = document.createElement('button');
-    toggle.id = 'atlas-downloader-toggle';
+    toggle.className = 'atlas-downloader-toggle';
     toggle.type = 'button';
     toggle.setAttribute('aria-label', 'Atlas Downloader');
     toggle.title = 'Atlas Downloader';
@@ -98,7 +111,8 @@
     root.appendChild(toggle);
     root.appendChild(overlay);
     root.appendChild(modal);
-    (document.body || document.documentElement).appendChild(root);
+    shadow.appendChild(root);
+    (document.body || document.documentElement).appendChild(host);
 
     let items = [];
     let scanNonce = 0;
@@ -746,18 +760,20 @@
     return '';
   }
 
-  function showToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'atlas-downloader-toast';
-    toast.textContent = message;
-    document.body.appendChild(toast);
+  function createToastFn(container) {
+    return function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'atlas-downloader-toast';
+      toast.textContent = message;
+      container.appendChild(toast);
 
-    requestAnimationFrame(() => toast.classList.add('show'));
+      requestAnimationFrame(() => toast.classList.add('show'));
 
-    setTimeout(() => {
-      toast.classList.remove('show');
-      toast.addEventListener('transitionend', () => toast.remove(), { once: true });
-    }, 2600);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+      }, 2600);
+    };
   }
 
   function parseExcludedDomains(value) {

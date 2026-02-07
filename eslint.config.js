@@ -81,6 +81,7 @@ export default tseslint.config(
             'storage/**',
             'bootstrap/cache/**',
             'eslint.config.js',
+            'resources/js/actions/**',
         ],
     }
 );
