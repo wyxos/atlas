@@ -1,4 +1,13 @@
-#atlas-downloader-root {
+/* Reset all inherited styles from host page */
+.atlas-shadow-root,
+.atlas-shadow-root *,
+.atlas-shadow-root *::before,
+.atlas-shadow-root *::after {
+  all: revert;
+  box-sizing: border-box;
+}
+
+.atlas-shadow-root {
   position: fixed;
   top: 0;
   right: 0;
@@ -7,11 +16,7 @@
   pointer-events: none;
 }
 
-#atlas-downloader-root * {
-  box-sizing: border-box;
-}
-
-#atlas-downloader-toggle {
+.atlas-shadow-root .atlas-downloader-toggle {
   position: fixed;
   top: 16px;
   right: 16px;
@@ -30,17 +35,17 @@
   pointer-events: auto;
 }
 
-#atlas-downloader-toggle:hover {
+.atlas-shadow-root .atlas-downloader-toggle:hover {
   transform: translateY(-1px);
 }
 
-#atlas-downloader-toggle img {
+.atlas-shadow-root .atlas-downloader-toggle img {
   width: 22px;
   height: 22px;
   display: block;
 }
 
-#atlas-downloader-root .atlas-downloader-overlay {
+.atlas-shadow-root .atlas-downloader-overlay {
   position: fixed;
   inset: 0;
   background: rgba(2, 6, 23, 0.65);
@@ -48,11 +53,11 @@
   pointer-events: auto;
 }
 
-#atlas-downloader-root.atlas-downloader-open .atlas-downloader-overlay {
+.atlas-shadow-root.atlas-open .atlas-downloader-overlay {
   display: block;
 }
 
-#atlas-downloader-root .atlas-downloader-modal {
+.atlas-shadow-root .atlas-downloader-modal {
   position: fixed;
   top: 72px;
   right: 16px;
@@ -63,16 +68,16 @@
   border-radius: 14px;
   overflow: hidden;
   display: none;
+  flex-direction: column;
   color: #e2e8f0;
   pointer-events: auto;
 }
 
-#atlas-downloader-root.atlas-downloader-open .atlas-downloader-modal {
+.atlas-shadow-root.atlas-open .atlas-downloader-modal {
   display: flex;
-  flex-direction: column;
 }
 
-#atlas-downloader-root .atlas-downloader-header {
+.atlas-shadow-root .atlas-downloader-header {
   padding: 12px 14px;
   display: flex;
   align-items: center;
@@ -80,14 +85,14 @@
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
-#atlas-downloader-root .atlas-downloader-title {
+.atlas-shadow-root .atlas-downloader-title {
   font-weight: 700;
   letter-spacing: 0.01em;
   font-size: 13px;
   color: #f1f5f9;
 }
 
-#atlas-downloader-root .atlas-downloader-close {
+.atlas-shadow-root .atlas-downloader-close {
   border: none;
   background: transparent;
   color: #94a3b8;
@@ -97,7 +102,7 @@
   padding: 4px 6px;
 }
 
-#atlas-downloader-root .atlas-downloader-toolbar {
+.atlas-shadow-root .atlas-downloader-toolbar {
   padding: 10px 14px;
   display: flex;
   gap: 8px;
@@ -106,11 +111,11 @@
   border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
-#atlas-downloader-root .atlas-downloader-toolbar .spacer {
+.atlas-shadow-root .atlas-downloader-toolbar .spacer {
   flex: 1;
 }
 
-#atlas-downloader-root .atlas-downloader-btn {
+.atlas-shadow-root .atlas-downloader-btn {
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(30, 41, 59, 0.55);
   color: #e2e8f0;
@@ -120,54 +125,54 @@
   font-size: 12px;
 }
 
-#atlas-downloader-root .atlas-downloader-btn.primary {
+.atlas-shadow-root .atlas-downloader-btn.primary {
   border-color: rgba(56, 189, 248, 0.4);
   background: rgba(56, 189, 248, 0.18);
 }
 
-#atlas-downloader-root .atlas-downloader-btn:disabled {
+.atlas-shadow-root .atlas-downloader-btn:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-#atlas-downloader-root .atlas-downloader-meta {
+.atlas-shadow-root .atlas-downloader-meta {
   padding: 0 14px 10px;
   font-size: 12px;
   color: #94a3b8;
 }
 
-#atlas-downloader-root .atlas-downloader-list {
+.atlas-shadow-root .atlas-downloader-list {
   overflow: auto;
   padding: 8px 10px 12px;
 }
 
-#atlas-downloader-root .atlas-downloader-item {
-  display: grid !important;
-  grid-template-columns: 18px 52px minmax(0, 1fr) minmax(92px, auto) !important;
-  gap: 10px !important;
-  align-items: center !important;
+.atlas-shadow-root .atlas-downloader-item {
+  display: grid;
+  grid-template-columns: 18px 52px minmax(0, 1fr) minmax(92px, auto);
+  gap: 10px;
+  align-items: center;
   padding: 10px;
   border-radius: 12px;
   cursor: pointer;
 }
 
-#atlas-downloader-root .atlas-downloader-item:hover {
+.atlas-shadow-root .atlas-downloader-item:hover {
   background: rgba(148, 163, 184, 0.08);
 }
 
-#atlas-downloader-root .atlas-downloader-item.selected {
+.atlas-shadow-root .atlas-downloader-item.selected {
   background: rgba(56, 189, 248, 0.14);
   outline: 1px solid rgba(56, 189, 248, 0.35);
 }
 
-#atlas-downloader-root .atlas-downloader-item input[type='checkbox'] {
+.atlas-shadow-root .atlas-downloader-item input[type='checkbox'] {
   width: 16px;
   height: 16px;
   margin: 0;
   accent-color: #38bdf8;
 }
 
-#atlas-downloader-root .atlas-downloader-preview {
+.atlas-shadow-root .atlas-downloader-preview {
   width: 52px;
   height: 52px;
   border-radius: 10px;
@@ -179,18 +184,18 @@
   justify-content: center;
 }
 
-#atlas-downloader-root .atlas-downloader-preview img {
+.atlas-shadow-root .atlas-downloader-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-#atlas-downloader-root .atlas-downloader-info {
+.atlas-shadow-root .atlas-downloader-info {
   min-width: 0;
 }
 
-#atlas-downloader-root .atlas-downloader-kind {
+.atlas-shadow-root .atlas-downloader-kind {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -198,7 +203,7 @@
   margin-bottom: 2px;
 }
 
-#atlas-downloader-root .atlas-downloader-url {
+.atlas-shadow-root .atlas-downloader-url {
   font-size: 12px;
   color: #e2e8f0;
   white-space: nowrap;
@@ -207,32 +212,32 @@
   max-width: 100%;
 }
 
-#atlas-downloader-root .atlas-downloader-sub {
+.atlas-shadow-root .atlas-downloader-sub {
   margin-top: 2px;
   font-size: 11px;
   color: #94a3b8;
 }
 
-#atlas-downloader-root .atlas-downloader-status {
+.atlas-shadow-root .atlas-downloader-status {
   font-size: 11px;
   color: #94a3b8;
   text-align: right;
   min-width: 92px;
 }
 
-#atlas-downloader-root .atlas-downloader-status.ok {
+.atlas-shadow-root .atlas-downloader-status.ok {
   color: #a7f3d0;
 }
 
-#atlas-downloader-root .atlas-downloader-status.queued {
+.atlas-shadow-root .atlas-downloader-status.queued {
   color: #93c5fd;
 }
 
-#atlas-downloader-root .atlas-downloader-status.err {
+.atlas-shadow-root .atlas-downloader-status.err {
   color: #fca5a5;
 }
 
-#atlas-downloader-root .atlas-downloader-toast {
+.atlas-shadow-root .atlas-downloader-toast {
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -248,7 +253,7 @@
   pointer-events: auto;
 }
 
-#atlas-downloader-root .atlas-downloader-toast.show {
+.atlas-shadow-root .atlas-downloader-toast.show {
   opacity: 1;
   transform: translateY(0);
 }
