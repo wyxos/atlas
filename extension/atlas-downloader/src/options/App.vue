@@ -177,7 +177,7 @@ onMounted(() => {
 
 <template>
   <main class="min-h-screen bg-slate-950 text-slate-100">
-    <div class="mx-auto w-full max-w-none px-5 py-8">
+    <div class="mx-auto w-full max-w-4xl px-5 py-8">
       <header class="flex items-center gap-3">
         <div
           class="grid size-10 place-items-center rounded-xl border border-slate-700/60 bg-slate-900/60"
@@ -193,7 +193,7 @@ onMounted(() => {
       </header>
 
       <section class="mt-6 rounded-2xl border border-slate-700/50 bg-slate-900/40 p-4">
-        <div class="grid gap-4 md:grid-cols-2">
+        <div class="grid gap-4">
           <div>
             <label for="baseUrl" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
               Atlas base URL
@@ -235,7 +235,7 @@ onMounted(() => {
             </p>
           </div>
 
-          <div class="md:col-span-2">
+          <div>
             <label for="addDomain" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
               Excluded domains
             </label>
