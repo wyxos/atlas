@@ -40,12 +40,48 @@ class ExternalFileIngestService
             'download_via' => $downloadVia,
         ], fn ($value) => $value !== null && $value !== '');
 
-        $now = now();
-        $fileRow = [
-            'source' => $payload['source'] ?? 'Extension',
-            'source_id' => $payload['source_id'] ?? null,
+        $file = File::query()->where('referrer_url', $referrerKey)->first();
+
+        if (! $file && $downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
+            // Repair older client-key based duplicates by promoting one row to the stable referrer key.
+            $dupe = File::query()
+                ->where('url', $url)
+                ->where('referrer_url', 'like', $url.'#atlas-ext-video=%')
+                ->orderByDesc('downloaded')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($dupe) {
+                $dupe->forceFill([
+                    'referrer_url' => $referrerKey,
+                ])->save();
+
+                $file = $dupe->refresh();
+            }
+        }
+
+        $isNew = $file === null;
+        if (! $file) {
+            $file = new File;
+            $file->referrer_url = $referrerKey;
+            $file->source = $payload['source'] ?? 'Extension';
+            $file->source_id = $payload['source_id'] ?? null;
+            $file->filename = $filename;
+        }
+
+        $existingMetadata = $file->listing_metadata;
+        if (! is_array($existingMetadata)) {
+            $existingMetadata = [];
+        }
+
+        $mergedMetadata = [
+            ...$existingMetadata,
+            ...$metadata,
+        ];
+        $mergedMetadata = array_filter($mergedMetadata, fn ($value) => $value !== null && $value !== '');
+
+        $updates = array_filter([
             'url' => $url,
-            'referrer_url' => $referrerKey,
             'filename' => $filename,
             'ext' => $ext,
             'mime_type' => $mimeType,
@@ -53,19 +89,22 @@ class ExternalFileIngestService
             'description' => $payload['description'] ?? null,
             'preview_url' => $payload['preview_url'] ?? null,
             'size' => $payload['size'] ?? null,
-            'listing_metadata' => empty($metadata) ? null : json_encode($metadata),
-            'detail_metadata' => null,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ];
+            'listing_metadata' => $mergedMetadata !== [] ? $mergedMetadata : null,
+        ], fn ($value) => $value !== null && $value !== '');
 
-        $isNew = ! File::query()->where('referrer_url', $referrerKey)->exists();
+        // Avoid clobbering known file metadata with null guesses from page URLs.
+        if (empty($ext)) {
+            unset($updates['ext']);
+        }
+        if (empty($mimeType)) {
+            unset($updates['mime_type']);
+        }
+        if (! isset($updates['size']) || ! is_numeric($updates['size']) || (int) $updates['size'] <= 0) {
+            unset($updates['size']);
+        }
 
-        File::upsert(
-            [$fileRow],
-            ['referrer_url'],
-            ['url', 'filename', 'ext', 'mime_type', 'title', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at']
-        );
+        $file->fill($updates);
+        $file->save();
 
         if ($isNew) {
             $metrics = app(MetricsService::class);
@@ -73,7 +112,6 @@ class ExternalFileIngestService
             $metrics->incrementMetric(MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED, 1);
         }
 
-        $file = File::query()->where('referrer_url', $referrerKey)->first();
         $queued = false;
 
         if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {

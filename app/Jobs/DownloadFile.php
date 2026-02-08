@@ -96,7 +96,13 @@ class DownloadFile implements ShouldQueue
             return false;
         }
 
-        if (data_get($file->listing_metadata, 'download_via') === 'yt-dlp') {
+        $downloadVia = data_get($file->listing_metadata, 'download_via');
+        $pageUrl = data_get($file->listing_metadata, 'page_url');
+        $shouldExpectAudio = $downloadVia === 'yt-dlp'
+            || $this->isYoutubeUrl((string) $file->url)
+            || $this->isYoutubeUrl(is_string($pageUrl) ? $pageUrl : '');
+
+        if ($shouldExpectAudio) {
             $hasAudio = $this->hasAudioStream($file);
             if ($hasAudio === false) {
                 return true;
@@ -114,6 +120,26 @@ class DownloadFile implements ShouldQueue
         }
 
         return false;
+    }
+
+    private function isYoutubeUrl(string $url): bool
+    {
+        if ($url === '') {
+            return false;
+        }
+
+        try {
+            $host = parse_url($url, PHP_URL_HOST);
+            if (! is_string($host) || $host === '') {
+                return false;
+            }
+
+            $host = strtolower($host);
+
+            return $host === 'youtu.be' || str_ends_with($host, '.youtube.com') || $host === 'youtube.com';
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function hasAudioStream(File $file): ?bool
