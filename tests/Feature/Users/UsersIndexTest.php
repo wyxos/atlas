@@ -30,8 +30,8 @@ test('admin can filter users by search name', function () {
         'name' => 'Admin User',
         'email' => 'admin@example.com',
     ]);
-    User::factory()->create(['name' => 'John Doe']);
-    User::factory()->create(['name' => 'Jane Smith']);
+    User::factory()->create(['name' => 'John Doe', 'email' => 'john.doe@example.com']);
+    User::factory()->create(['name' => 'Jane Smith', 'email' => 'jane.smith@example.com']);
 
     $response = $this->actingAs($admin)->getJson('/api/users?search=John');
 
@@ -42,7 +42,10 @@ test('admin can filter users by search name', function () {
 });
 
 test('admin can filter users by search email', function () {
-    $admin = User::factory()->admin()->create();
+    $admin = User::factory()->admin()->create([
+        'name' => 'Admin User',
+        'email' => 'admin@example.com',
+    ]);
     User::factory()->create(['email' => 'john@example.com']);
     User::factory()->create(['email' => 'jane@example.com']);
 
