@@ -80,20 +80,24 @@ declare const chrome: ChromeApi;
       return;
     }
 
-    chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
-      const baseHost = resolveHost(data.atlasBaseUrl || '');
-      if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
-        return;
-      }
+    try {
+      chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
+        const baseHost = resolveHost(data.atlasBaseUrl || '');
+        if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
+          return;
+        }
 
-      const excluded = parseExcludedDomains(data.atlasExcludedDomains || '');
-      if (isHostExcluded(window.location.hostname, excluded)) {
-        return;
-      }
+        const excluded = parseExcludedDomains(data.atlasExcludedDomains || '');
+        if (isHostExcluded(window.location.hostname, excluded)) {
+          return;
+        }
 
-      mountUi();
-      openSheet?.();
-    });
+        mountUi();
+        openSheet?.();
+      });
+    } catch {
+      // Happens if the extension was reloaded while this tab stayed open.
+    }
   });
 
   chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
@@ -130,6 +134,35 @@ declare const chrome: ChromeApi;
     root.className = 'atlas-shadow-root';
 
     const showToast = createToastFn(root);
+    const sendMessageSafe = (
+      message: unknown,
+      callback: (response: unknown) => void
+    ) => {
+      try {
+        chrome.runtime.sendMessage(message, callback);
+      } catch (error) {
+        const messageText = (() => {
+          if (error instanceof Error) {
+            return error.message;
+          }
+
+          if (error && typeof error === 'object' && 'message' in error) {
+            const messageValue = (error as { message?: unknown }).message;
+            return typeof messageValue === 'string' ? messageValue : String(messageValue);
+          }
+
+          return String(error);
+        })();
+
+        if (messageText.includes('Extension context invalidated')) {
+          showToast('Atlas extension was reloaded. Refresh this tab.');
+        } else {
+          showToast('Atlas extension error. Refresh this tab.');
+        }
+
+        callback(null);
+      }
+    };
 
     const toggle = document.createElement('button');
     toggle.className = 'atlas-downloader-toggle';
@@ -463,7 +496,7 @@ declare const chrome: ChromeApi;
         return;
       }
 
-      chrome.runtime.sendMessage({ type: 'atlas-check-batch', urls }, (response) => {
+      sendMessageSafe({ type: 'atlas-check-batch', urls }, (response) => {
         if (!response) {
           if (!silent) {
             showToast('Atlas extension did not respond.');
@@ -520,7 +553,7 @@ declare const chrome: ChromeApi;
         source: 'Extension',
       };
 
-      chrome.runtime.sendMessage({ type: 'atlas-react', payload }, (response) => {
+      sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
         item.reactionPending = null;
 
         if (!response) {
@@ -596,7 +629,7 @@ declare const chrome: ChromeApi;
         reaction_type: 'like',
       }));
 
-      chrome.runtime.sendMessage(
+      sendMessageSafe(
         { type: 'atlas-download-batch', payloads },
         (response) => {
           if (!response) {
@@ -661,7 +694,7 @@ declare const chrome: ChromeApi;
       }
 
       setTimeout(() => {
-        chrome.runtime.sendMessage({ type: 'atlas-check-batch', urls }, (response) => {
+        sendMessageSafe({ type: 'atlas-check-batch', urls }, (response) => {
           if (!response || !response.ok) {
             pollUntilDownloaded(urls, attempt + 1);
             return;
