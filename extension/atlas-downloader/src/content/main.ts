@@ -246,12 +246,17 @@ declare const chrome: ChromeApi;
     const refresh = makeButton('Rescan', () => refreshList());
     const checkAtlas = makeButton('Check Atlas', () => checkAtlasStatus(false));
     let debugEnabled = false;
-    let activeDebugUrl: string | null = null;
+    let activeDebug: { url: string; reactionType: string } | null = null;
     const debugButton = makeButton('Debug', () => {
       debugEnabled = !debugEnabled;
+      debugButton.textContent = debugEnabled ? 'Debug: on' : 'Debug';
+
       if (!debugEnabled) {
-        activeDebugUrl = null;
+        activeDebug = null;
+      } else if (!activeDebug && items.length > 0) {
+        activeDebug = { url: items[0].url, reactionType: 'like' };
       }
+
       renderList();
       setReady(summaryText());
     });
@@ -361,6 +366,9 @@ declare const chrome: ChromeApi;
       scanNonce += 1;
       const currentScan = scanNonce;
       items = [];
+      if (debugEnabled) {
+        activeDebug = null;
+      }
       list.replaceChildren();
       setLoading('Scanning this page…');
 
@@ -381,6 +389,10 @@ declare const chrome: ChromeApi;
           statusClass: '',
           atlas: null,
         }));
+
+        if (debugEnabled && !activeDebug && items.length > 0) {
+          activeDebug = { url: items[0].url, reactionType: 'like' };
+        }
 
         renderList();
         setReady(summaryText());
@@ -470,7 +482,7 @@ declare const chrome: ChromeApi;
           event.preventDefault();
           event.stopPropagation();
           if (debugEnabled) {
-            activeDebugUrl = item.url;
+            activeDebug = { url: item.url, reactionType: reaction.type };
             renderList();
           }
           reactToItem(item, reaction.type);
@@ -483,8 +495,8 @@ declare const chrome: ChromeApi;
       info.appendChild(sub);
       info.appendChild(reactions);
 
-      if (debugEnabled && activeDebugUrl === item.url) {
-        info.appendChild(renderDebugDetails(item));
+      if (debugEnabled && activeDebug?.url === item.url) {
+        info.appendChild(renderDebugDetails(item, activeDebug.reactionType));
       }
 
       const status = document.createElement('div');
@@ -499,7 +511,7 @@ declare const chrome: ChromeApi;
         }
 
         if (debugEnabled) {
-          activeDebugUrl = item.url;
+          activeDebug = { url: item.url, reactionType: activeDebug?.reactionType ?? 'like' };
         }
 
         item.selected = !item.selected;
@@ -549,7 +561,7 @@ declare const chrome: ChromeApi;
       };
     }
 
-    function renderDebugDetails(item) {
+    function renderDebugDetails(item, reactionType) {
       const container = document.createElement('details');
       container.className = 'atlas-downloader-debug';
       container.open = true;
@@ -561,7 +573,7 @@ declare const chrome: ChromeApi;
       const pre = document.createElement('pre');
       pre.textContent = JSON.stringify(
         {
-          react: buildReactionPayload(item, 'like'),
+          react: buildReactionPayload(item, reactionType),
           download: buildDownloadPayload(item),
         },
         null,
