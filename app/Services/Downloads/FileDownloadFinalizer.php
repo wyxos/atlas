@@ -304,6 +304,7 @@ class FileDownloadFinalizer
         }
 
         $previewWidth = (int) config('downloads.video_preview_width', 450);
+        $previewSeconds = (float) config('downloads.video_preview_seconds', 6);
         $posterSecond = (float) config('downloads.video_poster_second', 1);
         $timeout = (int) config('downloads.ffmpeg_timeout_seconds', 120);
 
@@ -322,6 +323,10 @@ class FileDownloadFinalizer
         $previewProcess = new Process([
             $ffmpegPath,
             '-y',
+            '-ss',
+            (string) $posterSecond,
+            '-t',
+            (string) max(1, $previewSeconds),
             '-i',
             $absolutePath,
             '-vf',
@@ -332,6 +337,10 @@ class FileDownloadFinalizer
             'veryfast',
             '-crf',
             '28',
+            '-pix_fmt',
+            'yuv420p',
+            '-movflags',
+            '+faststart',
             '-an',
             $previewAbsolutePath,
         ]);
