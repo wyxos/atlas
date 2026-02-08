@@ -13,10 +13,38 @@ type ChromeRuntime = {
       ) => void | boolean
     ) => void;
   };
+  openOptionsPage: () => void;
+  onInstalled: {
+    addListener: (callback: () => void) => void;
+  };
 };
 
 type ChromeStorageSync = {
   get: (keys: string[]) => Promise<AtlasSettings>;
+};
+
+type ChromeTabs = {
+  sendMessage: (tabId: number, message: unknown) => void;
+  create: (createProperties: { url: string }) => void;
+};
+
+type ChromeAction = {
+  onClicked: {
+    addListener: (callback: (tab: { id?: number } | undefined) => void) => void;
+  };
+};
+
+type ChromeContextMenus = {
+  create: (createProperties: {
+    id: string;
+    title: string;
+    contexts: string[];
+  }) => void;
+  onClicked: {
+    addListener: (
+      callback: (info: { menuItemId: string | number }, tab?: { id?: number }) => void
+    ) => void;
+  };
 };
 
 type ChromeApi = {
@@ -24,11 +52,62 @@ type ChromeApi = {
   storage: {
     sync: ChromeStorageSync;
   };
+  tabs: ChromeTabs;
+  action: ChromeAction;
+  contextMenus: ChromeContextMenus;
 };
 
 declare const chrome: ChromeApi;
 
 const SETTINGS_KEYS = ['atlasBaseUrl', 'atlasToken'];
+
+chrome.runtime.onInstalled.addListener(() => {
+  // Right click on the extension toolbar icon shows this menu (in addition to Chrome's built-ins).
+  try {
+    chrome.contextMenus.create({
+      id: 'atlas-open-options',
+      title: 'Options',
+      contexts: ['action'],
+    });
+    chrome.contextMenus.create({
+      id: 'atlas-open-site',
+      title: 'Open Atlas',
+      contexts: ['action'],
+    });
+  } catch {
+    // Some Chromium builds may not support the "action" context; failing silently is fine.
+  }
+});
+
+chrome.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId === 'atlas-open-options') {
+    chrome.runtime.openOptionsPage();
+    return;
+  }
+
+  if (info.menuItemId === 'atlas-open-site') {
+    chrome.storage.sync.get(['atlasBaseUrl']).then((settings) => {
+      const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
+      if (!baseUrl) {
+        chrome.runtime.openOptionsPage();
+        return;
+      }
+
+      // Opening a new tab doesn't require tab permission.
+      chrome.tabs.create({ url: baseUrl });
+    });
+  }
+});
+
+chrome.action.onClicked.addListener((tab) => {
+  const tabId = tab?.id;
+  if (!tabId) {
+    return;
+  }
+
+  // Left click on the toolbar icon asks the content script to open the sheet.
+  chrome.tabs.sendMessage(tabId, { type: 'atlas-open-sheet' });
+});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (
