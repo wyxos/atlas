@@ -6,6 +6,11 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "build:extension:clean": "node -e \"require('node:fs').rmSync('extension/atlas-downloader/dist', { recursive: true, force: true })\"",
+    "build:extension:options": "vite build -c extension/atlas-downloader/vite.options.config.ts",
+    "build:extension:background": "vite build -c extension/atlas-downloader/vite.background.config.ts",
+    "build:extension:content": "vite build -c extension/atlas-downloader/vite.content.config.ts",
+    "build:extension": "npm run build:extension:clean && npm run build:extension:options && npm run build:extension:background && npm run build:extension:content",
     "check": "npm run lint && npm run typecheck && npm run test && npm run backend:lint && npm run backend:test",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",

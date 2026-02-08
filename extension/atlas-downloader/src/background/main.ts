@@ -1,4 +1,33 @@
-/* global chrome */
+type AtlasSettings = {
+  atlasBaseUrl?: string;
+  atlasToken?: string;
+};
+
+type ChromeRuntime = {
+  onMessage: {
+    addListener: (
+      callback: (
+        message: unknown,
+        sender: unknown,
+        sendResponse: (response: unknown) => void
+      ) => void | boolean
+    ) => void;
+  };
+};
+
+type ChromeStorageSync = {
+  get: (keys: string[]) => Promise<AtlasSettings>;
+};
+
+type ChromeApi = {
+  runtime: ChromeRuntime;
+  storage: {
+    sync: ChromeStorageSync;
+  };
+};
+
+declare const chrome: ChromeApi;
+
 const SETTINGS_KEYS = ['atlasBaseUrl', 'atlasToken'];
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -33,17 +62,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-async function handleDownload(payload) {
+async function handleDownload(payload: unknown) {
   const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
   return handleDownloadWithSettings(payload, settings);
 }
 
-async function handleReact(payload) {
+async function handleReact(payload: unknown) {
   const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
   return handleReactWithSettings(payload, settings);
 }
 
-async function handleCheckBatch(urls) {
+async function handleCheckBatch(urls: unknown) {
   const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
   const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
   const token = (settings.atlasToken || '').trim();
@@ -98,7 +127,7 @@ async function handleCheckBatch(urls) {
   };
 }
 
-async function handleDownloadBatch(payloads) {
+async function handleDownloadBatch(payloads: unknown) {
   const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
   const list = Array.isArray(payloads) ? payloads : [];
 
@@ -121,7 +150,7 @@ async function handleDownloadBatch(payloads) {
   };
 }
 
-async function handleDownloadWithSettings(payload, settings) {
+async function handleDownloadWithSettings(payload: unknown, settings: AtlasSettings) {
   const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
   const token = (settings.atlasToken || '').trim();
 
@@ -157,7 +186,7 @@ async function handleDownloadWithSettings(payload, settings) {
   };
 }
 
-async function handleReactWithSettings(payload, settings) {
+async function handleReactWithSettings(payload: unknown, settings: AtlasSettings) {
   const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
   const token = (settings.atlasToken || '').trim();
 
@@ -193,7 +222,7 @@ async function handleReactWithSettings(payload, settings) {
   };
 }
 
-function normalizeBaseUrl(input) {
+function normalizeBaseUrl(input: string) {
   const trimmed = input.trim();
   if (!trimmed) {
     return '';
@@ -206,7 +235,7 @@ function normalizeBaseUrl(input) {
   return withScheme.replace(/\/+$/, '');
 }
 
-async function safeJson(response) {
+async function safeJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch {

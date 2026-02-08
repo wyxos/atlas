@@ -26,11 +26,12 @@ class ExtensionPackageService
         $filename = "atlas-extension-{$version}.zip";
         $zipPath = storage_path("app/{$filename}");
 
-        $latestChange = $this->latestMtime($extensionPath);
+        $includedFiles = $this->includedFiles($extensionPath);
+        $latestChange = $this->latestMtime($includedFiles);
         $needsRebuild = $force || ! is_file($zipPath) || filemtime($zipPath) < $latestChange;
 
         if ($needsRebuild) {
-            $this->buildZip($extensionPath, $zipPath);
+            $this->buildZip($extensionPath, $zipPath, $includedFiles);
         }
 
         return [
@@ -40,7 +41,10 @@ class ExtensionPackageService
         ];
     }
 
-    private function buildZip(string $sourceDir, string $zipPath): void
+    /**
+     * @param  array<int, string>  $files
+     */
+    private function buildZip(string $sourceDir, string $zipPath, array $files): void
     {
         $root = realpath($sourceDir);
         if (! $root) {
@@ -52,17 +56,8 @@ class ExtensionPackageService
             throw new RuntimeException('Unable to create extension archive.');
         }
 
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-
-        foreach ($files as $file) {
-            if (! $file->isFile()) {
-                continue;
-            }
-
-            $filePath = $file->getRealPath();
-            if (! $filePath) {
+        foreach ($files as $filePath) {
+            if (! is_file($filePath)) {
                 continue;
             }
 
@@ -78,22 +73,74 @@ class ExtensionPackageService
         $zip->close();
     }
 
-    private function latestMtime(string $path): int
+    /**
+     * @param  array<int, string>  $files
+     */
+    private function latestMtime(array $files): int
     {
         $latest = 0;
 
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
+        foreach ($files as $file) {
+            if (! is_file($file)) {
+                continue;
+            }
+
+            $latest = max($latest, (int) filemtime($file));
+        }
+
+        return $latest;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function includedFiles(string $extensionPath): array
+    {
+        $distPath = $extensionPath.'/dist';
+        if (! is_dir($distPath)) {
+            throw new RuntimeException('Extension dist folder not found. Run `npm run build:extension`.');
+        }
+
+        $required = [
+            $extensionPath.'/manifest.json',
+            $extensionPath.'/icon.svg',
+            $extensionPath.'/icon-16.png',
+            $extensionPath.'/icon-32.png',
+            $extensionPath.'/icon-48.png',
+            $extensionPath.'/icon-256.png',
+        ];
+
+        foreach ($required as $path) {
+            if (! is_file($path)) {
+                throw new RuntimeException("Missing required extension file: {$path}");
+            }
+        }
+
+        $files = $required;
+
+        $distFiles = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($distPath, RecursiveDirectoryIterator::SKIP_DOTS)
         );
 
-        foreach ($iterator as $file) {
+        foreach ($distFiles as $file) {
             if (! $file->isFile()) {
                 continue;
             }
 
-            $latest = max($latest, $file->getMTime());
+            $real = $file->getRealPath();
+            if (! $real) {
+                continue;
+            }
+
+            $files[] = $real;
         }
 
-        return $latest;
+        // Optional, but handy when someone opens the zip.
+        $readme = $extensionPath.'/README.md';
+        if (is_file($readme)) {
+            $files[] = $readme;
+        }
+
+        return array_values(array_unique($files));
     }
 }

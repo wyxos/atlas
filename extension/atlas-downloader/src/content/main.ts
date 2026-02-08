@@ -1,4 +1,28 @@
-/* global chrome */
+import './content.css';
+
+type ContentSettings = {
+  atlasBaseUrl?: string;
+  atlasExcludedDomains?: string;
+};
+
+type ChromeStorageSync = {
+  get: (keys: string[], callback: (data: ContentSettings) => void) => void;
+};
+
+type ChromeRuntime = {
+  getURL: (path: string) => string;
+  sendMessage: (message: unknown, callback?: (response: unknown) => void) => void;
+};
+
+type ChromeApi = {
+  storage: {
+    sync: ChromeStorageSync;
+  };
+  runtime: ChromeRuntime;
+};
+
+declare const chrome: ChromeApi;
+
 (() => {
   const MIN_SIZE = 450;
   const ROOT_ID = 'atlas-downloader-root';
@@ -67,7 +91,7 @@
     // Inject styles into shadow DOM
     const style = document.createElement('link');
     style.rel = 'stylesheet';
-    style.href = chrome.runtime.getURL('content.css');
+    style.href = chrome.runtime.getURL('dist/content.css');
     shadow.appendChild(style);
 
     const root = document.createElement('div');

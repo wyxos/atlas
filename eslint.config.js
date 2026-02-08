@@ -82,6 +82,7 @@ export default tseslint.config(
             'bootstrap/cache/**',
             'eslint.config.js',
             'resources/js/actions/**',
+            'extension/atlas-downloader/dist/**',
         ],
     }
 );
