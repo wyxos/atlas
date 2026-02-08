@@ -316,7 +316,9 @@ declare const chrome: ChromeApi;
 
     let items = [];
     let scanNonce = 0;
-    let hotkeysEnabled = false;
+    // Enable hotkeys immediately after UI mounts; event delegation makes it work for dynamic content too.
+    const hotkeysEnabled = true;
+    let hotkeysHintShown = false;
 
     toggle.addEventListener('click', (event) => {
       event.preventDefault();
@@ -340,11 +342,6 @@ declare const chrome: ChromeApi;
     function openModal() {
       root.classList.add(OPEN_CLASS);
       refreshList();
-
-      if (!hotkeysEnabled) {
-        hotkeysEnabled = true;
-        showToast('Hotkeys enabled: Alt+Left=Like, Alt+Middle=Love, Alt+Right=Dislike');
-      }
     }
 
     function closeModal() {
@@ -374,6 +371,11 @@ declare const chrome: ChromeApi;
         // Match Atlas web shortcuts: alt+left=like, alt+middle=love
         const reactionType = e.button === 0 ? 'like' : e.button === 1 ? 'love' : null;
         if (!reactionType) return;
+
+        if (!hotkeysHintShown) {
+          hotkeysHintShown = true;
+          showToast('Hotkeys: Alt+Left=Like, Alt+Middle=Love, Alt+Right=Dislike');
+        }
 
         e.preventDefault();
         e.stopPropagation();
@@ -418,6 +420,11 @@ declare const chrome: ChromeApi;
         if (!media) return;
 
         // alt+right=dislike (contextmenu)
+        if (!hotkeysHintShown) {
+          hotkeysHintShown = true;
+          showToast('Hotkeys: Alt+Left=Like, Alt+Middle=Love, Alt+Right=Dislike');
+        }
+
         e.preventDefault();
         e.stopPropagation();
 
