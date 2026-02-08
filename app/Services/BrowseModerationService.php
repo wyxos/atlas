@@ -10,7 +10,7 @@ class BrowseModerationService
     /**
      * Process moderation for browse files.
      */
-    public function process(Collection|array $files): array
+    public function process(Collection|array $files, array $context = []): array
     {
         $files = $files instanceof Collection ? $files : collect($files);
 
@@ -43,22 +43,26 @@ class BrowseModerationService
         // immediateActions only contains blacklisted files (auto-disliked files are not in immediateActions)
         $blacklistedFileIds = array_column($immediateActions, 'file_id');
 
+        $filterBlacklisted = (bool) ($context['filterBlacklisted'] ?? true);
+
         // Filter out only blacklisted files from response (auto-disliked files should be shown)
         // This includes files that were blacklisted in this request (via immediateActions)
         // and files that were already blacklisted (defensive check)
-        $filteredFiles = $files->reject(function ($file) use ($blacklistedFileIds) {
-            // Filter if file was blacklisted in this request
-            if (in_array($file->id, $blacklistedFileIds, true)) {
-                return true;
-            }
+        $filteredFiles = $filterBlacklisted
+            ? $files->reject(function ($file) use ($blacklistedFileIds) {
+                // Filter if file was blacklisted in this request
+                if (in_array($file->id, $blacklistedFileIds, true)) {
+                    return true;
+                }
 
-            // Defensive check: filter if file is already blacklisted
-            // (refresh from DB to get latest state, as model instances may be stale)
-            // Note: We no longer filter auto_disliked files - they should be shown
-            $fresh = $file->fresh();
+                // Defensive check: filter if file is already blacklisted
+                // (refresh from DB to get latest state, as model instances may be stale)
+                // Note: We no longer filter auto_disliked files - they should be shown
+                $fresh = $file->fresh();
 
-            return $fresh && $fresh->blacklisted_at !== null;
-        })->values()->all();
+                return $fresh && $fresh->blacklisted_at !== null;
+            })->values()->all()
+            : $files->values()->all();
 
         // Format immediately processed files (auto-disliked/blacklisted) for frontend toast notifications
         // These are files that were immediately processed (before they were filtered out)

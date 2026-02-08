@@ -499,11 +499,17 @@ class Wallhaven extends BaseService
 
         $mapped = array_map(fn ($row) => $this->transformRow((array) $row), $rows);
 
+        $totalRaw = $response['meta']['total'] ?? null;
+        $total = is_numeric($totalRaw) ? (int) $totalRaw : null;
+
         return [
             'files' => $mapped,
             'filter' => [
                 ...$this->params,
                 'next' => $next,
+            ],
+            'meta' => [
+                'total' => $total,
             ],
         ];
     }

@@ -292,6 +292,42 @@ test('browse filters by source in local mode', function () {
     expect(count($data['items']))->toBeGreaterThanOrEqual(0);
 });
 
+test('local browse can return blacklisted files when blacklisted filter is yes', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $blacklisted = \App\Models\File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDay(),
+        'blacklisted_at' => now(),
+        'auto_disliked' => false,
+        'source' => 'CivitAI',
+    ]);
+    $notBlacklisted = \App\Models\File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subHours(12),
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'source' => 'Wallhaven',
+    ]);
+
+    \App\Models\File::makeAllSearchable();
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&blacklisted=yes");
+
+    $response->assertSuccessful();
+    $data = $response->json();
+
+    expect($data['total'])->toBeInt();
+    expect($data['items'])->toBeArray();
+
+    $ids = collect($data['items'])->pluck('id')->all();
+    expect($ids)->toContain($blacklisted->id);
+    expect($ids)->not->toContain($notBlacklisted->id);
+});
+
 test('browse detaches all tab files when page is 1', function () {
     $user = User::factory()->create();
     $tab = \App\Models\Tab::factory()->for($user)->create();

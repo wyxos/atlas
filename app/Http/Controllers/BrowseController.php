@@ -20,6 +20,7 @@ class BrowseController extends Controller
         return response()->json([
             'items' => $payload['items'],
             'nextPage' => $payload['filter']['next'] ?? null, // Return cursor as nextPage for frontend
+            'total' => $payload['meta']['total'] ?? null,
             'services' => $payload['services'] ?? [], // Return available services
             'moderation' => $payload['moderation'] ?? [ // Include moderation data
                 'toDislike' => [],
@@ -77,6 +78,8 @@ class BrowseController extends Controller
                     // Tri-state selects.
                     'downloaded' => 'any',
                     'blacklisted' => 'any',
+                    'sort' => 'downloaded_at',
+                    'seed' => null,
                 ],
                 'schema' => $localSchema->fields([
                     $localSchema->pageField([
@@ -122,6 +125,22 @@ class BrowseController extends Controller
                             ['label' => 'No', 'value' => 'no'],
                         ],
                         'default' => 'any',
+                    ]),
+                    $localSchema->field('sort', [
+                        'type' => 'select',
+                        'description' => 'Sort local results.',
+                        'options' => [
+                            ['label' => 'Downloaded At', 'value' => 'downloaded_at'],
+                            ['label' => 'Updated At', 'value' => 'updated_at'],
+                            ['label' => 'Blacklisted At', 'value' => 'blacklisted_at'],
+                            ['label' => 'Random', 'value' => 'random'],
+                        ],
+                        'default' => 'downloaded_at',
+                    ]),
+                    $localSchema->field('seed', [
+                        'type' => 'number',
+                        'description' => 'Random seed (positive integer). Only used when sort is Random.',
+                        'default' => null,
                     ]),
                 ]),
             ],

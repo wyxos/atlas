@@ -70,6 +70,7 @@ const emit = defineEmits<{
 // Use shallowRef to reduce Vue reactivity overhead with large arrays (3k+ items)
 // This prevents deep reactivity tracking on each item, significantly improving performance
 const items = shallowRef<FeedItem[]>([]);
+const totalAvailable = ref<number | null>(null);
 
 // Diagnostic: Log item size analysis when items change (only in dev mode)
 watch(
@@ -326,6 +327,10 @@ async function getPage(page: PageToken, context?: BrowseFormData) {
     handleLoadingStart();
     try {
         const { data } = await window.axios.get(browseIndex.url({ query: params }));
+
+        totalAvailable.value = typeof data.total === 'number'
+            ? data.total
+            : (Number.isFinite(Number(data.total)) ? Number(data.total) : null);
 
         return {
             items: data.items || [],
@@ -1120,7 +1125,7 @@ defineExpose({
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
-            :visible="tab !== null && tab !== undefined && !shouldShowForm" />
+            :visible="tab !== null && tab !== undefined && !shouldShowForm" :total="totalAvailable" />
 
         <!-- Prompt Dialog -->
         <Dialog v-model="promptData.promptDialogOpen.value" @update:model-value="handlePromptDialogUpdate">

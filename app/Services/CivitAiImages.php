@@ -308,6 +308,9 @@ class CivitAiImages extends BaseService
                 ...$this->params,
                 'next' => $next,
             ],
+            'meta' => [
+                'total' => null,
+            ],
         ];
     }
 
