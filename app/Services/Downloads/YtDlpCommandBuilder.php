@@ -38,4 +38,3 @@ class YtDlpCommandBuilder
         return $args;
     }
 }
-
