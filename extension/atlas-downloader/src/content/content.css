@@ -1,16 +1,9 @@
-/* Reset all inherited styles from host page */
+/* Shadow DOM already isolates most site CSS; keep a lightweight, predictable reset. */
 .atlas-shadow-root,
 .atlas-shadow-root *,
 .atlas-shadow-root *::before,
 .atlas-shadow-root *::after {
-  all: revert;
   box-sizing: border-box;
-}
-
-/* The global reset above can break `currentColor` inside SVGs. Force inheritance back on. */
-.atlas-shadow-root svg,
-.atlas-shadow-root svg * {
-  color: inherit !important;
 }
 
 .atlas-shadow-root {
@@ -19,7 +12,17 @@
   right: 0;
   z-index: 2147483647;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #e2e8f0;
   pointer-events: none;
+}
+
+.atlas-shadow-root button,
+.atlas-shadow-root input,
+.atlas-shadow-root select,
+.atlas-shadow-root textarea {
+  font: inherit;
 }
 
 .atlas-shadow-root .atlas-downloader-toggle {
