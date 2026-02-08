@@ -1,8 +1,8 @@
 <?php
 
+use App\Models\File;
 use App\Services\ExternalFileIngestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use App\Models\File;
 
 uses(RefreshDatabase::class);
 
@@ -39,4 +39,3 @@ it('dedupes yt-dlp video ingests by page URL and removes client-key duplicates',
     expect(File::query()->where('referrer_url', $url)->count())->toBe(1);
     expect(File::query()->where('referrer_url', 'like', $url.'#atlas-ext-video=%')->count())->toBe(0);
 });
-
