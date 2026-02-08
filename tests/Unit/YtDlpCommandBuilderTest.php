@@ -16,4 +16,3 @@ it('builds a yt-dlp command including ffmpeg location and an audio-capable forma
     expect($args)->toContain('--format');
     expect($args)->toContain('bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo*+bestaudio/best');
 });
-
