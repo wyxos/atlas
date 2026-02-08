@@ -21,7 +21,7 @@ test('extension react returns json and dispatches download for positive reaction
             'url' => 'https://example.com/media/one.jpg',
             'original_url' => 'https://example.com/media/one.jpg',
             'referrer_url' => 'https://example.com/page',
-            'page_title' => 'Example',
+            'page_title' => str_repeat('A', 600),
             'source' => 'Extension',
         ]);
 
