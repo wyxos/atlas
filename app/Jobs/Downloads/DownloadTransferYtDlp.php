@@ -163,4 +163,3 @@ class DownloadTransferYtDlp implements ShouldQueue
         PumpDomainDownloads::dispatch((string) $transfer->domain);
     }
 }
-
