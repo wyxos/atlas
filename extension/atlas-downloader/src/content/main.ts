@@ -245,6 +245,16 @@ declare const chrome: ChromeApi;
 
     const refresh = makeButton('Rescan', () => refreshList());
     const checkAtlas = makeButton('Check Atlas', () => checkAtlasStatus(false));
+    let debugEnabled = false;
+    let activeDebugUrl: string | null = null;
+    const debugButton = makeButton('Debug', () => {
+      debugEnabled = !debugEnabled;
+      if (!debugEnabled) {
+        activeDebugUrl = null;
+      }
+      renderList();
+      setReady(summaryText());
+    });
     const selectAll = makeButton('Select all', () => setAllSelected(true));
     const selectNone = makeButton('Select none', () => setAllSelected(false));
 
@@ -257,6 +267,7 @@ declare const chrome: ChromeApi;
 
     toolbar.appendChild(refresh);
     toolbar.appendChild(checkAtlas);
+    toolbar.appendChild(debugButton);
     toolbar.appendChild(selectAll);
     toolbar.appendChild(selectNone);
     toolbar.appendChild(spacer);
@@ -330,6 +341,7 @@ declare const chrome: ChromeApi;
       queue.disabled = true;
       refresh.disabled = true;
       checkAtlas.disabled = true;
+      debugButton.disabled = true;
       selectAll.disabled = true;
       selectNone.disabled = true;
     }
@@ -340,6 +352,7 @@ declare const chrome: ChromeApi;
       queue.disabled = selectedCount === 0;
       refresh.disabled = false;
       checkAtlas.disabled = items.length === 0;
+      debugButton.disabled = items.length === 0;
       selectAll.disabled = items.length === 0;
       selectNone.disabled = items.length === 0;
     }
@@ -456,6 +469,10 @@ declare const chrome: ChromeApi;
         button.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (debugEnabled) {
+            activeDebugUrl = item.url;
+            renderList();
+          }
           reactToItem(item, reaction.type);
         });
         reactions.appendChild(button);
@@ -466,6 +483,10 @@ declare const chrome: ChromeApi;
       info.appendChild(sub);
       info.appendChild(reactions);
 
+      if (debugEnabled && activeDebugUrl === item.url) {
+        info.appendChild(renderDebugDetails(item));
+      }
+
       const status = document.createElement('div');
       const displayStatus = getDisplayStatus(item);
       status.className = `atlas-downloader-status ${displayStatus.className}`.trim();
@@ -475,6 +496,10 @@ declare const chrome: ChromeApi;
         const target = event.target;
         if (target instanceof HTMLInputElement) {
           return;
+        }
+
+        if (debugEnabled) {
+          activeDebugUrl = item.url;
         }
 
         item.selected = !item.selected;
@@ -489,6 +514,62 @@ declare const chrome: ChromeApi;
       row.appendChild(status);
 
       return row;
+    }
+
+    function buildReactionPayload(item, type) {
+      return {
+        type,
+        url: item.url,
+        original_url: item.url,
+        referrer_url: window.location.href,
+        page_title: document.title,
+        tag_name: item.tag_name,
+        width: item.width,
+        height: item.height,
+        alt: item.alt || '',
+        preview_url: item.preview_url || '',
+        source: 'Extension',
+      };
+    }
+
+    function buildDownloadPayload(item) {
+      return {
+        url: item.url,
+        original_url: item.url,
+        referrer_url: window.location.href,
+        page_title: document.title,
+        tag_name: item.tag_name,
+        width: item.width,
+        height: item.height,
+        alt: item.alt || '',
+        preview_url: item.preview_url || '',
+        source: 'Extension',
+        // Align with Atlas core behavior: reactions dispatch downloads.
+        reaction_type: 'like',
+      };
+    }
+
+    function renderDebugDetails(item) {
+      const container = document.createElement('details');
+      container.className = 'atlas-downloader-debug';
+      container.open = true;
+
+      const summary = document.createElement('summary');
+      summary.textContent = 'Debug payload';
+      container.appendChild(summary);
+
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(
+        {
+          react: buildReactionPayload(item, 'like'),
+          download: buildDownloadPayload(item),
+        },
+        null,
+        2
+      );
+      container.appendChild(pre);
+
+      return container;
     }
 
     function formatSubline(item) {
@@ -579,19 +660,7 @@ declare const chrome: ChromeApi;
       item.statusClass = '';
       renderList();
 
-      const payload = {
-        type,
-        url: item.url,
-        original_url: item.url,
-        referrer_url: window.location.href,
-        page_title: document.title,
-        tag_name: item.tag_name,
-        width: item.width,
-        height: item.height,
-        alt: item.alt || '',
-        preview_url: item.preview_url || '',
-        source: 'Extension',
-      };
+      const payload = buildReactionPayload(item, type);
 
       sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
         item.reactionPending = null;
@@ -659,20 +728,7 @@ declare const chrome: ChromeApi;
       }
       renderList();
 
-      const payloads = selected.map((item) => ({
-        url: item.url,
-        original_url: item.url,
-        referrer_url: window.location.href,
-        page_title: document.title,
-        tag_name: item.tag_name,
-        width: item.width,
-        height: item.height,
-        alt: item.alt || '',
-        preview_url: item.preview_url || '',
-        source: 'Extension',
-        // Align with Atlas core behavior: reactions dispatch downloads.
-        reaction_type: 'like',
-      }));
+      const payloads = selected.map((item) => buildDownloadPayload(item));
 
       sendMessageSafe(
         { type: 'atlas-download-batch', payloads },
