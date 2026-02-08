@@ -96,6 +96,55 @@ class PrepareDownloadTransfer implements ShouldQueue
             $contentLength = $head->header('Content-Length');
             $acceptRanges = $head->header('Accept-Ranges');
 
+            $tagName = data_get($transfer->file->listing_metadata, 'tag_name');
+            if (is_string($contentType)) {
+                $mime = strtolower(trim(explode(';', $contentType, 2)[0]));
+
+                // Some "video" URLs are actually HTML pages (e.g. YouTube embeds). For videos/iframes, prefer
+                // yt-dlp so we don't "download" HTML and mark it as completed.
+                if (in_array($tagName, ['video', 'iframe'], true) && in_array($mime, ['text/html', 'application/xhtml+xml'], true)) {
+                    try {
+                        $metadata = $transfer->file->listing_metadata;
+                        if ($metadata instanceof \Illuminate\Support\Collection) {
+                            $metadata = $metadata->all();
+                        }
+                        if (! is_array($metadata)) {
+                            $metadata = [];
+                        }
+
+                        $metadata['download_via'] = 'yt-dlp';
+                        $metadata['download_via_reason'] = 'content-type-html';
+
+                        $transfer->file->forceFill([
+                            'listing_metadata' => $metadata,
+                        ])->save();
+                    } catch (Throwable) {
+                        // Metadata updates shouldn't block the download fallback.
+                    }
+
+                    $transfer->update([
+                        'bytes_total' => null,
+                        'bytes_downloaded' => 0,
+                        'last_broadcast_percent' => 0,
+                        'status' => DownloadTransferStatus::DOWNLOADING,
+                        'started_at' => $transfer->started_at ?? now(),
+                    ]);
+
+                    $transfer->refresh();
+                    try {
+                        event(new DownloadTransferProgressUpdated(
+                            DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                        ));
+                    } catch (Throwable) {
+                        // Broadcast errors shouldn't fail downloads.
+                    }
+
+                    DownloadTransferYtDlp::dispatch($transfer->id);
+
+                    return;
+                }
+            }
+
             $totalBytes = is_numeric($contentLength) && (int) $contentLength > 0 ? (int) $contentLength : null;
             $rangesSupported = is_string($acceptRanges) && str_contains(strtolower($acceptRanges), 'bytes');
 
