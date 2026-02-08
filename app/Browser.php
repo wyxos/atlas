@@ -132,10 +132,12 @@ class Browser
             $transformed = $service->transform($response, $params);
             $filesPayload = $transformed['files'] ?? [];
             $filter = $transformed['filter'] ?? [];
+            $meta = $transformed['meta'] ?? [];
         } catch (\Throwable $e) {
             // If transform fails, use empty arrays
             $filesPayload = [];
             $filter = $params;
+            $meta = [];
             if (! $serviceError) {
                 $serviceError = [
                     'message' => 'Failed to process service response: '.$e->getMessage(),
@@ -180,7 +182,12 @@ class Browser
         }
 
         // Process moderation (file and container moderation, filtering, immediate actions)
-        $moderationResult = app(BrowseModerationService::class)->process($persisted);
+        $localBlacklistFilter = $isLocalMode ? (string) ($params['blacklisted'] ?? 'any') : 'no';
+        $shouldFilterBlacklisted = ! $isLocalMode || $localBlacklistFilter === 'no';
+
+        $moderationResult = app(BrowseModerationService::class)->process($persisted, [
+            'filterBlacklisted' => $shouldFilterBlacklisted,
+        ]);
         $persisted = $moderationResult['files'];
         $flaggedIds = $moderationResult['flaggedIds'];
         $immediateActions = $moderationResult['immediateActions'];
@@ -280,6 +287,7 @@ class Browser
 
         return [
             'items' => $items,
+            'meta' => is_array($meta) ? $meta : [],
             'filter' => [
                 'service' => $serviceKey, // Store the service key as 'service' for frontend compatibility
                 ...$service->defaultParams(),

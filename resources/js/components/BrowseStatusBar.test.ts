@@ -34,4 +34,22 @@ describe('BrowseStatusBar', () => {
 
         expect(nextPill?.props('value')).toBe('cursor-from-masonry');
     });
+
+    it('disables total pill when total is null', () => {
+        const wrapper = mount(BrowseStatusBar, {
+            props: {
+                items: [],
+                masonry: null,
+                tab: { params: { page: 1, next: null } },
+                total: null,
+                visible: true,
+            },
+        });
+
+        const pills = wrapper.findAllComponents({ name: 'Pill' });
+        const totalPill = pills.find((pill) => pill.props('label') === 'Total');
+
+        expect(totalPill?.props('value')).toBe('N/A');
+        expect(wrapper.get('[data-test="total-pill-wrapper"]').classes()).toContain('opacity-50');
+    });
 });

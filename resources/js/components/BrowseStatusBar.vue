@@ -11,6 +11,7 @@ interface Props {
     tab: { params?: { page?: string | number; next?: string | number | null } } | null;
     isLoading?: boolean;
     visible?: boolean;
+    total?: number | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -82,12 +83,18 @@ const backfillCooldownWidth = computed(() => {
     const pct = Math.max(0, 100 - Math.round((remaining / total) * 100));
     return `${pct}%`;
 });
+
+const totalDisabled = computed(() => props.total === null || props.total === undefined);
 </script>
 
 <template>
     <div v-if="visible" class="my-2 flex flex-wrap items-center justify-center gap-3" data-test="pagination-info">
         <!-- Count Pill -->
         <Pill label="Items" :value="items.length" variant="primary" reversed data-test="items-pill" />
+        <!-- Total Pill -->
+        <span :class="totalDisabled ? 'opacity-50' : ''" data-test="total-pill-wrapper">
+            <Pill label="Total" :value="totalDisabled ? 'N/A' : total!" variant="info" reversed data-test="total-pill" />
+        </span>
         <!-- Current Page Pill -->
         <Pill label="Page" :value="displayPage" variant="neutral" reversed data-test="page-pill" />
         <!-- Next Page Pill -->
