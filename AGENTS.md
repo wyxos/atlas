@@ -86,6 +86,23 @@ npm run test                # Run Vitest tests
 - If the backend returns `params`, use `params`. Don't map it to `queryParams` unless absolutely necessary.
 - Align the backend to return what's needed instead of transforming in the frontend.
 
+### Code edit instructions
+
+After you've finished editing
+- Use the jetbrains mcp (if available) to find any problems
+- Run format command if available
+- Run lint command if available
+
+### How to find problems
+
+- DO THIS FIRST: Check the jetbrains provided MCP server (one of intellij, pycharm, webstorm) using get_file_problems
+    - Only provide a file path if you know where the problem is, but not what the problem is. If you don't know where the problem is:
+        - Inspect code changes with git
+        - Run tests
+- Run tests
+- Run lint
+- Inspect changed files
+
 ### Rework Expectations (Implicit)
 - If a feature or section is messy, fragile, or behaviorally wrong, treat any request to extend or fix it as implicit permission to refactor or rebuild it cleanly.
 - Prefer deleting the problematic path and replacing it with a minimal, direct implementation that matches the requested behavior.
