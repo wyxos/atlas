@@ -43,4 +43,3 @@ test('extension store drives download through reaction pipeline', function () {
 
     Queue::assertPushed(DownloadFile::class);
 });
-
