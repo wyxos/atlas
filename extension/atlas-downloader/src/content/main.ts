@@ -15,6 +15,7 @@ type ChromeRuntime = {
   onMessage: {
     addListener: (callback: (message: unknown) => void) => void;
   };
+  getManifest: () => { version?: string };
 };
 
 type ChromeApi = {
@@ -30,6 +31,13 @@ declare const chrome: ChromeApi;
   const MIN_SIZE = 450;
   const ROOT_ID = 'atlas-downloader-root';
   const OPEN_CLASS = 'atlas-open';
+  const EXT_VERSION = (() => {
+    try {
+      return chrome.runtime.getManifest?.().version ?? '';
+    } catch {
+      return '';
+    }
+  })();
 
   let openSheet: (() => void) | null = null;
 
@@ -218,6 +226,10 @@ declare const chrome: ChromeApi;
     title.className = 'atlas-downloader-title';
     title.textContent = 'Atlas Media Picker';
 
+    const version = document.createElement('div');
+    version.className = 'atlas-downloader-version';
+    version.textContent = EXT_VERSION ? `v${EXT_VERSION}` : '';
+
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'atlas-downloader-close';
@@ -225,6 +237,7 @@ declare const chrome: ChromeApi;
     close.textContent = '×';
 
     header.appendChild(title);
+    header.appendChild(version);
     header.appendChild(close);
 
     const toolbar = document.createElement('div');
