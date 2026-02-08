@@ -33,6 +33,7 @@ class FilesController extends Controller
     {
         // Load metadata relationship for prompt data
         $file->load('metadata');
+        $this->hydrateDiskMetadata($file);
 
         return response()->json([
             'file' => new \App\Http\Resources\FileResource($file),
@@ -279,6 +280,56 @@ class FilesController extends Controller
             ...$baseHeaders,
             'Content-Length' => (string) $size,
         ]);
+    }
+
+    private function hydrateDiskMetadata(File $file): void
+    {
+        if (! $file->downloaded || ! $file->path) {
+            return;
+        }
+
+        if ($file->mime_type && $file->ext && is_int($file->size) && $file->size > 0) {
+            return;
+        }
+
+        $disk = Storage::disk(config('downloads.disk'));
+        if (! $disk->exists($file->path)) {
+            return;
+        }
+
+        $fullPath = $disk->path($file->path);
+
+        $updates = [];
+
+        if (! $file->ext) {
+            $ext = pathinfo($fullPath, PATHINFO_EXTENSION);
+            if (is_string($ext) && $ext !== '') {
+                $updates['ext'] = strtolower($ext);
+            }
+        }
+
+        if (! $file->mime_type) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo !== false) {
+                $mime = finfo_file($finfo, $fullPath) ?: null;
+                finfo_close($finfo);
+
+                if (is_string($mime) && $mime !== '' && $mime !== 'application/octet-stream') {
+                    $updates['mime_type'] = $mime;
+                }
+            }
+        }
+
+        if (! is_int($file->size) || $file->size <= 0) {
+            $size = $disk->size($file->path);
+            if (is_int($size) && $size > 0) {
+                $updates['size'] = $size;
+            }
+        }
+
+        if ($updates !== []) {
+            $file->forceFill($updates)->save();
+        }
     }
 
     private function dispatchPreviewGeneration(File $file, \Illuminate\Contracts\Filesystem\Filesystem $disk): void
