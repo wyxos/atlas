@@ -18,8 +18,8 @@
 
 .atlas-shadow-root .atlas-downloader-toggle {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: calc(50% - 22px);
+  left: 16px;
   width: 44px;
   height: 44px;
   border-radius: 12px;
@@ -59,22 +59,27 @@
 
 .atlas-shadow-root .atlas-downloader-modal {
   position: fixed;
-  top: 72px;
-  right: 16px;
-  width: min(560px, calc(100vw - 32px));
-  max-height: calc(100vh - 96px);
+  top: 0;
+  left: 0;
+  width: min(560px, calc(100vw - 56px));
+  height: 100vh;
+  max-height: 100vh;
   background: rgba(11, 18, 32, 0.98);
   border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 14px;
+  border-left: none;
+  border-radius: 0 14px 14px 0;
   overflow: hidden;
-  display: none;
+  display: flex;
   flex-direction: column;
   color: #e2e8f0;
   pointer-events: auto;
+  transform: translateX(-102%);
+  transition: transform 160ms ease;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
 }
 
 .atlas-shadow-root.atlas-open .atlas-downloader-modal {
-  display: flex;
+  transform: translateX(0);
 }
 
 .atlas-shadow-root .atlas-downloader-header {
