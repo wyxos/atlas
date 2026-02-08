@@ -104,6 +104,10 @@
                             class="text-smart-blue-200 underline underline-offset-4 hover:text-smart-blue-100">
                             GitHub
                         </a>
+                        <a href="https://discord.gg/reebNY9w" target="_blank" rel="noreferrer"
+                            class="text-smart-blue-200 underline underline-offset-4 hover:text-smart-blue-100">
+                            Discord
+                        </a>
                         <a href="https://www.youtube.com/watch?v=g1Ogg5vivSM" target="_blank" rel="noreferrer"
                             class="text-smart-blue-200 underline underline-offset-4 hover:text-smart-blue-100">
                             Demo video
