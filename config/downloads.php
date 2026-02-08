@@ -23,6 +23,10 @@ return [
 
     'video_poster_second' => (float) env('DOWNLOADS_VIDEO_POSTER_SECOND', 1),
 
+    'yt_dlp_path' => env('DOWNLOADS_YT_DLP_PATH', 'yt-dlp'),
+
+    'yt_dlp_timeout_seconds' => (int) env('DOWNLOADS_YT_DLP_TIMEOUT_SECONDS', 1800),
+
     'extension_token' => env('ATLAS_EXTENSION_TOKEN'),
 
     // User used for extension-triggered reactions/downloads.

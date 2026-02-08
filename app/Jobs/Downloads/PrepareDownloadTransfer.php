@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
+use function data_get;
 
 class PrepareDownloadTransfer implements ShouldQueue
 {
@@ -43,6 +44,29 @@ class PrepareDownloadTransfer implements ShouldQueue
 
         try {
             if (! in_array($transfer->status, [DownloadTransferStatus::QUEUED, DownloadTransferStatus::PREPARING], true)) {
+                return;
+            }
+
+            if (data_get($transfer->file->listing_metadata, 'download_via') === 'yt-dlp') {
+                $transfer->update([
+                    'bytes_total' => null,
+                    'bytes_downloaded' => 0,
+                    'last_broadcast_percent' => 0,
+                    'status' => DownloadTransferStatus::DOWNLOADING,
+                    'started_at' => $transfer->started_at ?? now(),
+                ]);
+
+                $transfer->refresh();
+                try {
+                    event(new DownloadTransferProgressUpdated(
+                        DownloadTransferPayload::forProgress($transfer, (int) ($transfer->last_broadcast_percent ?? 0))
+                    ));
+                } catch (Throwable) {
+                    // Broadcast errors shouldn't fail downloads.
+                }
+
+                DownloadTransferYtDlp::dispatch($transfer->id);
+
                 return;
             }
 

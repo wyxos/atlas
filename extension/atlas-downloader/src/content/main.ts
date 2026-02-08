@@ -1375,13 +1375,39 @@ declare const chrome: ChromeApi;
           if (media instanceof HTMLVideoElement) {
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
             if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
-              options.showToast('Streaming video (blob). No direct URL to download.');
-            } else {
-              options.showToast('No direct video URL found.');
+              // Fallback: send the page URL and let Atlas resolve/download via yt-dlp.
+              const payload = {
+                type: reactionType,
+                url: window.location.href,
+                original_url: window.location.href,
+                referrer_url: window.location.href,
+                page_title: limitString(document.title, MAX_METADATA_LEN),
+                tag_name: 'video',
+                width: media.videoWidth || media.clientWidth || null,
+                height: media.videoHeight || media.clientHeight || null,
+                alt: '',
+                preview_url: media.poster || '',
+                source: sourceFromMediaUrl(window.location.href),
+                download_via: 'yt-dlp',
+              };
+
+              options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+                if (!response || !response.ok) {
+                  options.showToast(response?.error || 'Reaction failed.');
+                  return;
+                }
+
+                options.showToast(`Reacted (${reactionType}). Resolving video in Atlas…`);
+              });
+
+              return;
             }
-          } else {
-            options.showToast('No valid media URL found.');
+
+            options.showToast('No direct video URL found.');
+            return;
           }
+
+          options.showToast('No valid media URL found.');
           return;
         }
 
@@ -1435,13 +1461,38 @@ declare const chrome: ChromeApi;
           if (media instanceof HTMLVideoElement) {
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
             if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
-              options.showToast('Streaming video (blob). No direct URL to download.');
-            } else {
-              options.showToast('No direct video URL found.');
+              const payload = {
+                type: 'dislike',
+                url: window.location.href,
+                original_url: window.location.href,
+                referrer_url: window.location.href,
+                page_title: limitString(document.title, MAX_METADATA_LEN),
+                tag_name: 'video',
+                width: media.videoWidth || media.clientWidth || null,
+                height: media.videoHeight || media.clientHeight || null,
+                alt: '',
+                preview_url: media.poster || '',
+                source: sourceFromMediaUrl(window.location.href),
+                download_via: 'yt-dlp',
+              };
+
+              options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+                if (!response || !response.ok) {
+                  options.showToast(response?.error || 'Reaction failed.');
+                  return;
+                }
+
+                options.showToast('Disliked.');
+              });
+
+              return;
             }
-          } else {
-            options.showToast('No valid media URL found.');
+
+            options.showToast('No direct video URL found.');
+            return;
           }
+
+          options.showToast('No valid media URL found.');
           return;
         }
 
