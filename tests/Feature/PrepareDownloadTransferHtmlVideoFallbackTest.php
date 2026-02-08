@@ -70,4 +70,3 @@ it('falls back to yt-dlp when a video url resolves to HTML', function () {
 
     Bus::assertNotDispatched(DownloadTransferSingleStream::class);
 });
-
