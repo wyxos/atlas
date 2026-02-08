@@ -7,6 +7,12 @@
   box-sizing: border-box;
 }
 
+/* The global reset above can break `currentColor` inside SVGs. Force inheritance back on. */
+.atlas-shadow-root svg,
+.atlas-shadow-root svg * {
+  color: inherit !important;
+}
+
 .atlas-shadow-root {
   position: fixed;
   top: 0;
