@@ -12,6 +12,9 @@ type ChromeStorageSync = {
 type ChromeRuntime = {
   getURL: (path: string) => string;
   sendMessage: (message: unknown, callback?: (response: unknown) => void) => void;
+  onMessage: {
+    addListener: (callback: (message: unknown) => void) => void;
+  };
 };
 
 type ChromeApi = {
@@ -27,6 +30,8 @@ declare const chrome: ChromeApi;
   const MIN_SIZE = 450;
   const ROOT_ID = 'atlas-downloader-root';
   const OPEN_CLASS = 'atlas-open';
+
+  let openSheet: (() => void) | null = null;
   const makeIcon = (paths) =>
     `<svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
   const REACTIONS = [
@@ -63,6 +68,33 @@ declare const chrome: ChromeApi;
       ),
     },
   ];
+
+  // Allow the toolbar icon (background script) to open the sheet.
+  chrome.runtime.onMessage.addListener((message: unknown) => {
+    if (!message || typeof message !== 'object') {
+      return;
+    }
+
+    const msg = message as { type?: unknown };
+    if (msg.type !== 'atlas-open-sheet') {
+      return;
+    }
+
+    chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
+      const baseHost = resolveHost(data.atlasBaseUrl || '');
+      if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
+        return;
+      }
+
+      const excluded = parseExcludedDomains(data.atlasExcludedDomains || '');
+      if (isHostExcluded(window.location.hostname, excluded)) {
+        return;
+      }
+
+      mountUi();
+      openSheet?.();
+    });
+  });
 
   chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
     const baseHost = resolveHost(data.atlasBaseUrl || '');
@@ -204,6 +236,8 @@ declare const chrome: ChromeApi;
     function closeModal() {
       root.classList.remove(OPEN_CLASS);
     }
+
+    openSheet = openModal;
 
     function makeButton(label, onClick, options) {
       const button = document.createElement('button');
