@@ -1,4 +1,5 @@
 import './content.css';
+import { registrableDomainFromUrl } from '../shared/domain';
 
 type ContentSettings = {
   atlasBaseUrl?: string;
@@ -29,6 +30,8 @@ declare const chrome: ChromeApi;
 
 (() => {
   const MIN_SIZE = 450;
+  // Keep extension metadata short; some Atlas deployments validate at 500 chars.
+  const MAX_METADATA_LEN = 500;
   const ROOT_ID = 'atlas-downloader-root';
   const OPEN_CLASS = 'atlas-open';
   const EXT_VERSION = (() => {
@@ -47,17 +50,23 @@ declare const chrome: ChromeApi;
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor');
     svg.setAttribute('stroke-width', '2');
     svg.setAttribute('stroke-linecap', 'round');
     svg.setAttribute('stroke-linejoin', 'round');
     // Make it visible even if some site messes with our CSS.
     svg.setAttribute('width', '18');
     svg.setAttribute('height', '18');
+    // Inline styles beat most CSS issues (including pages messing with svg defaults).
+    svg.setAttribute('style', 'color: #e2e8f0; stroke: currentColor; fill: none;');
 
     for (const d of pathDs) {
       const path = document.createElementNS(SVG_NS, 'path');
       path.setAttribute('d', d);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', 'currentColor');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
       svg.appendChild(path);
     }
 
@@ -103,6 +112,16 @@ declare const chrome: ChromeApi;
       ],
     },
   ];
+
+  function limitString(value, max) {
+    const v = typeof value === 'string' ? value : '';
+    if (v.length <= max) return v;
+    return v.slice(0, max);
+  }
+
+  function sourceFromMediaUrl(url) {
+    return registrableDomainFromUrl(url) || 'Extension';
+  }
 
   // Allow the toolbar icon (background script) to open the sheet.
   chrome.runtime.onMessage.addListener((message: unknown) => {
@@ -234,7 +253,7 @@ declare const chrome: ChromeApi;
     close.type = 'button';
     close.className = 'atlas-downloader-close';
     close.setAttribute('aria-label', 'Close');
-    close.textContent = '×';
+    close.textContent = 'x';
 
     header.appendChild(title);
     header.appendChild(version);
@@ -247,9 +266,9 @@ declare const chrome: ChromeApi;
     const checkAtlas = makeButton('Check Atlas', () => checkAtlasStatus(false));
     let debugEnabled = false;
     let activeDebug: { url: string; reactionType: string } | null = null;
-    const debugButton = makeButton('Debug', () => {
+    const debugButton = makeButton('Debug: off', () => {
       debugEnabled = !debugEnabled;
-      debugButton.textContent = debugEnabled ? 'Debug: on' : 'Debug';
+      debugButton.textContent = debugEnabled ? 'Debug: on' : 'Debug: off';
 
       if (!debugEnabled) {
         activeDebug = null;
@@ -297,6 +316,7 @@ declare const chrome: ChromeApi;
 
     let items = [];
     let scanNonce = 0;
+    let hotkeysEnabled = false;
 
     toggle.addEventListener('click', (event) => {
       event.preventDefault();
@@ -320,6 +340,11 @@ declare const chrome: ChromeApi;
     function openModal() {
       root.classList.add(OPEN_CLASS);
       refreshList();
+
+      if (!hotkeysEnabled) {
+        hotkeysEnabled = true;
+        showToast('Hotkeys enabled: Alt+Left=Like, Alt+Middle=Love, Alt+Right=Dislike');
+      }
     }
 
     function closeModal() {
@@ -327,6 +352,92 @@ declare const chrome: ChromeApi;
     }
 
     openSheet = openModal;
+
+    document.addEventListener(
+      'mousedown',
+      (e) => {
+        if (!hotkeysEnabled) return;
+        if (!(e instanceof MouseEvent)) return;
+        if (!e.altKey) return;
+        if (root.classList.contains(OPEN_CLASS)) return;
+
+        // Ignore clicks on our own UI (closed shadow retargets to host).
+        const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+        if (path.some((p) => p instanceof HTMLElement && p.id === ROOT_ID)) {
+          return;
+        }
+
+        const target = e.target instanceof Element ? e.target : null;
+        const media = target?.closest?.('img, video') ?? null;
+        if (!media) return;
+
+        // Match Atlas web shortcuts: alt+left=like, alt+middle=love
+        const reactionType = e.button === 0 ? 'like' : e.button === 1 ? 'love' : null;
+        if (!reactionType) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const item = buildItemFromElement(media);
+        if (!item) {
+          showToast('No valid media URL found.');
+          return;
+        }
+
+        const payload = buildReactionPayload(item, reactionType);
+        sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          if (!response || !response.ok) {
+            showToast(response?.error || 'Reaction failed.');
+            return;
+          }
+          showToast(
+            reactionType === 'dislike'
+              ? 'Disliked.'
+              : `Reacted (${reactionType}). Queued download in Atlas.`
+          );
+        });
+      },
+      true
+    );
+
+    document.addEventListener(
+      'contextmenu',
+      (e) => {
+        if (!hotkeysEnabled) return;
+        if (!(e instanceof MouseEvent)) return;
+        if (!e.altKey) return;
+        if (root.classList.contains(OPEN_CLASS)) return;
+
+        const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+        if (path.some((p) => p instanceof HTMLElement && p.id === ROOT_ID)) {
+          return;
+        }
+
+        const target = e.target instanceof Element ? e.target : null;
+        const media = target?.closest?.('img, video') ?? null;
+        if (!media) return;
+
+        // alt+right=dislike (contextmenu)
+        e.preventDefault();
+        e.stopPropagation();
+
+        const item = buildItemFromElement(media);
+        if (!item) {
+          showToast('No valid media URL found.');
+          return;
+        }
+
+        const payload = buildReactionPayload(item, 'dislike');
+        sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          if (!response || !response.ok) {
+            showToast(response?.error || 'Reaction failed.');
+            return;
+          }
+          showToast('Disliked.');
+        });
+      },
+      true
+    );
 
     function makeButton(label, onClick, options) {
       const button = document.createElement('button');
@@ -534,13 +645,13 @@ declare const chrome: ChromeApi;
         url: item.url,
         original_url: item.url,
         referrer_url: window.location.href,
-        page_title: document.title,
+        page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
         width: item.width,
         height: item.height,
-        alt: item.alt || '',
+        alt: limitString(item.alt || '', MAX_METADATA_LEN),
         preview_url: item.preview_url || '',
-        source: 'Extension',
+        source: sourceFromMediaUrl(item.url),
       };
     }
 
@@ -549,13 +660,13 @@ declare const chrome: ChromeApi;
         url: item.url,
         original_url: item.url,
         referrer_url: window.location.href,
-        page_title: document.title,
+        page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
         width: item.width,
         height: item.height,
-        alt: item.alt || '',
+        alt: limitString(item.alt || '', MAX_METADATA_LEN),
         preview_url: item.preview_url || '',
-        source: 'Extension',
+        source: sourceFromMediaUrl(item.url),
         // Align with Atlas core behavior: reactions dispatch downloads.
         reaction_type: 'like',
       };
@@ -647,6 +758,8 @@ declare const chrome: ChromeApi;
         const results = Array.isArray(response.data?.results) ? response.data.results : [];
         const byUrl = new Map(results.map((r) => [r.url, r]));
 
+        let existsCount = 0;
+        let downloadedCount = 0;
         for (const item of items) {
           const match = byUrl.get(item.url);
           if (!match) {
@@ -659,10 +772,17 @@ declare const chrome: ChromeApi;
             file_id: match.file_id ?? null,
             reaction: match.reaction ?? null,
           };
+
+          if (match.exists) existsCount += 1;
+          if (match.downloaded) downloadedCount += 1;
         }
 
         renderList();
         setReady(summaryText());
+
+        if (!silent) {
+          showToast(`Atlas check: ${downloadedCount}/${existsCount} downloaded.`);
+        }
       });
     }
 

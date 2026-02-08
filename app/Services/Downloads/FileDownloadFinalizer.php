@@ -509,6 +509,13 @@ class FileDownloadFinalizer
             return;
         }
 
+        // Keep listing_metadata width/height aligned so Masonry can render correct aspect ratio
+        // even when FileMetadata isn't eager-loaded.
+        $listing = is_array($file->listing_metadata) ? $file->listing_metadata : [];
+        $listing['width'] = $width;
+        $listing['height'] = $height;
+        $file->listing_metadata = $listing;
+
         $meta = FileMetadata::query()->firstOrNew(['file_id' => $file->id]);
         $payload = is_array($meta->payload) ? $meta->payload : [];
 
