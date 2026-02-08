@@ -52,4 +52,19 @@ describe('BrowseStatusBar', () => {
         expect(totalPill?.props('value')).toBe('N/A');
         expect(wrapper.get('[data-test="total-pill-wrapper"]').classes()).toContain('opacity-50');
     });
+
+    it('emits firstPage when first page CTA is clicked', async () => {
+        const wrapper = mount(BrowseStatusBar, {
+            props: {
+                items: [],
+                masonry: null,
+                tab: { params: { page: 2, next: null } },
+                visible: true,
+            },
+        });
+
+        await wrapper.get('[data-test="first-page-cta"]').trigger('click');
+
+        expect(wrapper.emitted('firstPage')?.length).toBe(1);
+    });
 });

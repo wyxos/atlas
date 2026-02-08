@@ -10,7 +10,7 @@ import { useBrowseForm } from '@/composables/useBrowseForm';
 import { Masonry } from '@wyxos/vibe';
 import Input from '@/components/ui/input/Input.vue';
 import type { ServiceOption, ServiceFilterField } from '@/composables/useBrowseService';
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { coerceBoolean } from '@/utils/coerceBoolean';
 
 interface Props {
@@ -175,9 +175,42 @@ function handleApply(): void {
 
 // Handle reset button
 function handleReset(): void {
+    const feed = form.data.feed;
+    const tabId = form.data.tab_id;
+
     form.reset();
+
+    // Keep the current tab and browse mode (online/local) so reset doesn't "kick" the user out.
+    form.data.feed = feed;
+    form.data.tab_id = tabId;
+    form.data.page = 1;
     emit('reset');
 }
+
+function ensureRandomSeed(): void {
+    if (form.data.feed !== 'local') {
+        return;
+    }
+
+    if (form.data.serviceFilters.sort !== 'random') {
+        return;
+    }
+
+    const raw = form.data.serviceFilters.seed;
+    const seed = typeof raw === 'number' ? raw : Number(raw);
+    if (Number.isFinite(seed) && seed > 0) {
+        return;
+    }
+
+    // Typesense requires a positive integer seed.
+    form.data.serviceFilters.seed = Math.floor(Date.now() / 1000);
+}
+
+watch(
+    () => [form.data.feed, form.data.serviceFilters.sort],
+    () => ensureRandomSeed(),
+    { immediate: true }
+);
 </script>
 
 <template>
