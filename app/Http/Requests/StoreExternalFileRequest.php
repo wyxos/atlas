@@ -47,7 +47,8 @@ class StoreExternalFileRequest extends FormRequest
             'width' => ['nullable', 'integer', 'min:1'],
             'height' => ['nullable', 'integer', 'min:1'],
             'tag_name' => ['nullable', 'string', 'max:50'],
-            'alt' => ['nullable', 'string', 'max:500'],
+            // Some sites embed large/SEO-heavy alt text.
+            'alt' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
