@@ -22,6 +22,9 @@ type ChromeStorageSync = {
 };
 
 type ChromeApi = {
+  runtime?: {
+    getManifest?: () => { version?: string };
+  };
   storage: {
     sync: ChromeStorageSync;
   };
@@ -39,6 +42,7 @@ const baseUrl = ref('');
 const token = ref('');
 const tokenVisible = ref(false);
 const status = ref('');
+const extensionVersion = ref('');
 
 const addDomain = ref('');
 const domains = ref<EditableDomain[]>([]);
@@ -163,6 +167,12 @@ async function saveSettings(): Promise<void> {
 }
 
 onMounted(() => {
+  try {
+    extensionVersion.value = chrome.runtime?.getManifest?.().version ?? '';
+  } catch {
+    extensionVersion.value = '';
+  }
+
   chrome.storage.sync.get(['atlasBaseUrl', 'atlasToken', 'atlasExcludedDomains'], (data) => {
     baseUrl.value = data.atlasBaseUrl || '';
     token.value = data.atlasToken || '';
@@ -185,7 +195,10 @@ onMounted(() => {
           <img src="../../icon.svg" alt="" class="size-6" />
         </div>
         <div class="min-w-0">
-          <h1 class="text-lg font-semibold tracking-tight">Atlas Downloader</h1>
+          <div class="flex items-baseline gap-2">
+            <h1 class="text-lg font-semibold tracking-tight">Atlas Downloader</h1>
+            <span v-if="extensionVersion" class="text-xs text-slate-400">v{{ extensionVersion }}</span>
+          </div>
           <p class="mt-0.5 text-xs text-slate-400">
             Configure where downloads are sent and which sites are ignored.
           </p>
