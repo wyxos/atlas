@@ -57,17 +57,18 @@ class ExtensionPackageService
         }
 
         foreach ($files as $filePath) {
-            if (! is_file($filePath)) {
+            $real = realpath($filePath);
+            if (! $real || ! is_file($real)) {
                 continue;
             }
 
-            if (! str_starts_with($filePath, $root.DIRECTORY_SEPARATOR)) {
+            if (! str_starts_with($real, $root.DIRECTORY_SEPARATOR)) {
                 continue;
             }
 
-            $relative = substr($filePath, strlen($root) + 1);
+            $relative = substr($real, strlen($root) + 1);
             $relative = str_replace(DIRECTORY_SEPARATOR, '/', $relative);
-            $zip->addFile($filePath, $relative);
+            $zip->addFile($real, $relative);
         }
 
         $zip->close();
@@ -110,13 +111,17 @@ class ExtensionPackageService
             $extensionPath.'/icon-256.png',
         ];
 
+        $files = [];
         foreach ($required as $path) {
             if (! is_file($path)) {
                 throw new RuntimeException("Missing required extension file: {$path}");
             }
+            $real = realpath($path);
+            if (! $real) {
+                throw new RuntimeException("Unable to resolve extension file: {$path}");
+            }
+            $files[] = $real;
         }
-
-        $files = $required;
 
         $distFiles = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($distPath, RecursiveDirectoryIterator::SKIP_DOTS)
@@ -138,7 +143,10 @@ class ExtensionPackageService
         // Optional, but handy when someone opens the zip.
         $readme = $extensionPath.'/README.md';
         if (is_file($readme)) {
-            $files[] = $readme;
+            $real = realpath($readme);
+            if ($real) {
+                $files[] = $real;
+            }
         }
 
         return array_values(array_unique($files));
