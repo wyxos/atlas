@@ -27,6 +27,7 @@ class ExternalFileIngestService
             'alt' => $payload['alt'] ?? null,
             'width' => $payload['width'] ?? null,
             'height' => $payload['height'] ?? null,
+            'download_via' => $payload['download_via'] ?? null,
         ], fn ($value) => $value !== null && $value !== '');
 
         $now = now();

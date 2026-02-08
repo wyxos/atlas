@@ -98,12 +98,26 @@ class FileDownloadFinalizer
             'downloaded' => true,
             'downloaded_at' => now(),
         ];
+
+        // Ensure mime_type/ext reflect the actual downloaded file. This matters for yt-dlp downloads
+        // where the source URL can be a page URL (text/html), not a direct media URL.
+        $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
+        if (
+            ! $file->mime_type
+            || $file->mime_type === 'application/octet-stream'
+            || str_starts_with((string) $file->mime_type, 'text/')
+        ) {
+            $updates['mime_type'] = $mimeType;
+        }
+        if (! $file->ext || $file->ext === 'bin') {
+            $updates['ext'] = $extension;
+        }
+
         if (is_int($size) && $size > 0 && (! $file->size || $file->size <= 0)) {
             $updates['size'] = $size;
         }
 
         if ($generatePreviews) {
-            $mimeType = $this->getMimeTypeFromFile($absolutePath, $contentTypeHeader);
             if ($this->isImageMimeType($mimeType)) {
                 $this->persistImageDimensions($file, $absolutePath);
                 $previewPath = $this->generateThumbnailFromFile($disk, $absolutePath, $storedFilename, $hashForSegmentation);

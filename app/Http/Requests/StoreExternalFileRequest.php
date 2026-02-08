@@ -49,6 +49,7 @@ class StoreExternalFileRequest extends FormRequest
             'tag_name' => ['nullable', 'string', 'max:50'],
             // Some sites embed large/SEO-heavy alt text.
             'alt' => ['nullable', 'string', 'max:2000'],
+            'download_via' => ['nullable', 'string', 'in:yt-dlp'],
         ];
     }
 
