@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Jobs\GenerateFilePreviewAssets;
 use App\Models\File;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Bus;
 
 class QueueMissingPreviewAssets extends Command
 {
@@ -78,4 +77,3 @@ class QueueMissingPreviewAssets extends Command
         return self::SUCCESS;
     }
 }
-

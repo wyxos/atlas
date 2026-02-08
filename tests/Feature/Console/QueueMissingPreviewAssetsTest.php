@@ -55,4 +55,3 @@ test('atlas:queue-missing-previews dry-run does not dispatch jobs', function () 
 
     Bus::assertNotDispatched(GenerateFilePreviewAssets::class);
 });
-
