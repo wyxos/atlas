@@ -14,8 +14,18 @@ class ExternalFileIngestService
         $url = trim((string) $payload['url']);
         $originalUrl = trim((string) ($payload['original_url'] ?? $url));
         $pageUrl = $payload['referrer_url'] ?? null;
+        $downloadVia = $payload['download_via'] ?? null;
+        $tagName = $payload['tag_name'] ?? null;
 
+        // The extension's check endpoint uses the "url" field, but the DB dedupe key is `files.referrer_url`.
+        // For yt-dlp (page-based downloads), the stable identifier should be the page URL, not a per-trigger client key.
         $referrerKey = $originalUrl !== '' ? $originalUrl : $url;
+        if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
+            $referrerKey = $url !== '' ? $url : $referrerKey;
+        }
+
+        $referrerKey = $this->stripFragment($referrerKey);
+        $url = $this->stripFragment($url);
         $filename = $this->resolveFilename($payload['filename'] ?? null, $url);
         $ext = $payload['ext'] ?? FileTypeDetector::extensionFromUrl($url);
         $mimeType = $payload['mime_type'] ?? FileTypeDetector::mimeFromUrl($url);
@@ -27,7 +37,7 @@ class ExternalFileIngestService
             'alt' => $payload['alt'] ?? null,
             'width' => $payload['width'] ?? null,
             'height' => $payload['height'] ?? null,
-            'download_via' => $payload['download_via'] ?? null,
+            'download_via' => $downloadVia,
         ], fn ($value) => $value !== null && $value !== '');
 
         $now = now();
@@ -65,6 +75,16 @@ class ExternalFileIngestService
 
         $file = File::query()->where('referrer_url', $referrerKey)->first();
         $queued = false;
+
+        if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
+            // Cleanup duplicates from the earlier client-key based scheme.
+            // Example: https://site/video#atlas-ext-video=... should not create multiple DB rows.
+            File::query()
+                ->where('url', $url)
+                ->where('referrer_url', 'like', $url.'#atlas-ext-video=%')
+                ->whereKeyNot($file?->id)
+                ->delete();
+        }
 
         if ($queueDownload && $file && ! $file->downloaded && $file->url) {
             DownloadFile::dispatch($file->id);
@@ -108,5 +128,15 @@ class ExternalFileIngestService
         }
 
         return substr($name, 0, 200);
+    }
+
+    private function stripFragment(string $url): string
+    {
+        $hashPos = strpos($url, '#');
+        if ($hashPos === false) {
+            return $url;
+        }
+
+        return substr($url, 0, $hashPos);
     }
 }

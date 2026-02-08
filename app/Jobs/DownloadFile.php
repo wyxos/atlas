@@ -14,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
 
 class DownloadFile implements ShouldQueue
 {
@@ -95,6 +96,13 @@ class DownloadFile implements ShouldQueue
             return false;
         }
 
+        if (data_get($file->listing_metadata, 'download_via') === 'yt-dlp') {
+            $hasAudio = $this->hasAudioStream($file);
+            if ($hasAudio === false) {
+                return true;
+            }
+        }
+
         $path = strtolower((string) $file->path);
         if (str_ends_with($path, '.html') || str_ends_with($path, '.htm')) {
             return true;
@@ -108,6 +116,73 @@ class DownloadFile implements ShouldQueue
         return false;
     }
 
+    private function hasAudioStream(File $file): ?bool
+    {
+        if (! $file->path) {
+            return null;
+        }
+
+        $disk = Storage::disk(config('downloads.disk'));
+        if (! $disk->exists($file->path)) {
+            return null;
+        }
+
+        $ffprobe = $this->resolveFfprobePath();
+        if (! $ffprobe) {
+            return null;
+        }
+
+        $fullPath = $disk->path($file->path);
+
+        try {
+            $process = new Process([
+                $ffprobe,
+                '-hide_banner',
+                '-v',
+                'error',
+                '-select_streams',
+                'a',
+                '-show_entries',
+                'stream=index',
+                '-of',
+                'csv=p=0',
+                $fullPath,
+            ]);
+            $process->setTimeout(10);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                return null;
+            }
+
+            return trim($process->getOutput()) !== '';
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function resolveFfprobePath(): ?string
+    {
+        $ffmpeg = (string) config('downloads.ffmpeg_path', 'ffmpeg');
+        if ($ffmpeg === '') {
+            return null;
+        }
+
+        // Windows: ffprobe sits next to ffmpeg in the same folder.
+        if (str_ends_with(strtolower($ffmpeg), 'ffmpeg.exe')) {
+            $candidate = substr($ffmpeg, 0, -strlen('ffmpeg.exe')).'ffprobe.exe';
+            return is_file($candidate) ? $candidate : null;
+        }
+
+        // Linux/macOS: ffprobe is usually available alongside ffmpeg.
+        if (str_ends_with(strtolower($ffmpeg), DIRECTORY_SEPARATOR.'ffmpeg')) {
+            $candidate = substr($ffmpeg, 0, -strlen('ffmpeg')).'ffprobe';
+            return is_file($candidate) ? $candidate : 'ffprobe';
+        }
+
+        return 'ffprobe';
+    }
+
     private function repairDownloadedFile(File $file): void
     {
         $disk = Storage::disk(config('downloads.disk'));
@@ -118,6 +193,24 @@ class DownloadFile implements ShouldQueue
                 $disk->delete($path);
             } catch (\Throwable) {
                 // If cleanup fails we can still retry the download.
+            }
+        }
+
+        $previewPath = $file->preview_path;
+        if (is_string($previewPath) && $previewPath !== '' && $disk->exists($previewPath)) {
+            try {
+                $disk->delete($previewPath);
+            } catch (\Throwable) {
+                // Ignore cleanup failures.
+            }
+        }
+
+        $posterPath = $file->poster_path;
+        if (is_string($posterPath) && $posterPath !== '' && $disk->exists($posterPath)) {
+            try {
+                $disk->delete($posterPath);
+            } catch (\Throwable) {
+                // Ignore cleanup failures.
             }
         }
 
