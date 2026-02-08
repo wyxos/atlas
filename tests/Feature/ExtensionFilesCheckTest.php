@@ -1,16 +1,25 @@
 <?php
 
 use App\Models\File;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 it('checks whether external files exist by original url', function () {
     config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
 
-    File::factory()->create([
+    $file = File::factory()->create([
         'referrer_url' => 'https://example.com/media/one.jpg',
         'downloaded' => true,
+    ]);
+
+    \App\Models\Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'like',
     ]);
 
     $response = $this
@@ -29,6 +38,7 @@ it('checks whether external files exist by original url', function () {
                 'url' => 'https://example.com/media/one.jpg',
                 'exists' => true,
                 'downloaded' => true,
+                'reaction' => ['type' => 'like'],
             ],
             [
                 'url' => 'https://example.com/media/two.jpg',
