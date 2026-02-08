@@ -34,6 +34,14 @@ declare const chrome: ChromeApi;
   const MAX_METADATA_LEN = 500;
   const ROOT_ID = 'atlas-downloader-root';
   const OPEN_CLASS = 'atlas-open';
+  const IS_TOP_WINDOW = (() => {
+    try {
+      return window.top === window.self;
+    } catch {
+      // Cross-origin frames can throw; treat as NOT top so we don't inject the sheet UI into iframes.
+      return false;
+    }
+  })();
   const EXT_VERSION = (() => {
     try {
       return chrome.runtime.getManifest?.().version ?? '';
@@ -134,6 +142,10 @@ declare const chrome: ChromeApi;
       return;
     }
 
+    if (!IS_TOP_WINDOW) {
+      return;
+    }
+
     try {
       chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
         const baseHost = resolveHost(data.atlasBaseUrl || '');
@@ -165,8 +177,71 @@ declare const chrome: ChromeApi;
       return;
     }
 
-    mountUi();
+    if (IS_TOP_WINDOW) {
+      mountUi();
+    } else {
+      mountHotkeysOnly();
+    }
   });
+
+  function mountHotkeysOnly() {
+    if (document.getElementById(ROOT_ID)) {
+      return;
+    }
+
+    const host = document.createElement('div');
+    host.id = ROOT_ID;
+
+    const shadow = host.attachShadow({ mode: 'closed' });
+
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = chrome.runtime.getURL('dist/content.css');
+    shadow.appendChild(style);
+
+    const root = document.createElement('div');
+    root.className = 'atlas-shadow-root';
+
+    const showToast = createToastFn(root);
+    const sendMessageSafe = (
+      message: unknown,
+      callback: (response: unknown) => void
+    ) => {
+      try {
+        chrome.runtime.sendMessage(message, callback);
+      } catch (error) {
+        const messageText = (() => {
+          if (error instanceof Error) {
+            return error.message;
+          }
+
+          if (error && typeof error === 'object' && 'message' in error) {
+            const messageValue = (error as { message?: unknown }).message;
+            return typeof messageValue === 'string' ? messageValue : String(messageValue);
+          }
+
+          return String(error);
+        })();
+
+        if (messageText.includes('Extension context invalidated')) {
+          showToast('Atlas extension was reloaded. Refresh this tab.');
+        } else {
+          showToast('Atlas extension error. Refresh this tab.');
+        }
+
+        callback(null);
+      }
+    };
+
+    shadow.appendChild(root);
+    (document.body || document.documentElement).appendChild(host);
+
+    installHotkeys({
+      showToast,
+      sendMessageSafe,
+      isSheetOpen: () => false,
+    });
+  }
 
   function mountUi() {
     if (document.getElementById(ROOT_ID)) {
@@ -350,101 +425,16 @@ declare const chrome: ChromeApi;
 
     openSheet = openModal;
 
-    document.addEventListener(
-      'mousedown',
-      (e) => {
-        if (!hotkeysEnabled) return;
-        if (!(e instanceof MouseEvent)) return;
-        if (!e.altKey) return;
-        if (root.classList.contains(OPEN_CLASS)) return;
-
-        // Ignore clicks on our own UI (closed shadow retargets to host).
-        const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
-        if (path.some((p) => p instanceof HTMLElement && p.id === ROOT_ID)) {
-          return;
-        }
-
-        const target = e.target instanceof Element ? e.target : null;
-        const media = target?.closest?.('img, video') ?? null;
-        if (!media) return;
-
-        // Match Atlas web shortcuts: alt+left=like, alt+middle=love
-        const reactionType = e.button === 0 ? 'like' : e.button === 1 ? 'love' : null;
-        if (!reactionType) return;
-
-        if (!hotkeysHintShown) {
-          hotkeysHintShown = true;
-          showToast('Hotkeys: Alt+Left=Like, Alt+Middle=Love, Alt+Right=Dislike');
-        }
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        const item = buildItemFromElement(media);
-        if (!item) {
-          showToast('No valid media URL found.');
-          return;
-        }
-
-        const payload = buildReactionPayload(item, reactionType);
-        sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-          if (!response || !response.ok) {
-            showToast(response?.error || 'Reaction failed.');
-            return;
-          }
-          showToast(
-            reactionType === 'dislike'
-              ? 'Disliked.'
-              : `Reacted (${reactionType}). Queued download in Atlas.`
-          );
-        });
+    installHotkeys({
+      showToast,
+      sendMessageSafe,
+      isSheetOpen: () => root.classList.contains(OPEN_CLASS),
+      setHintShown: (value) => {
+        hotkeysHintShown = value;
       },
-      true
-    );
-
-    document.addEventListener(
-      'contextmenu',
-      (e) => {
-        if (!hotkeysEnabled) return;
-        if (!(e instanceof MouseEvent)) return;
-        if (!e.altKey) return;
-        if (root.classList.contains(OPEN_CLASS)) return;
-
-        const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
-        if (path.some((p) => p instanceof HTMLElement && p.id === ROOT_ID)) {
-          return;
-        }
-
-        const target = e.target instanceof Element ? e.target : null;
-        const media = target?.closest?.('img, video') ?? null;
-        if (!media) return;
-
-        // alt+right=dislike (contextmenu)
-        if (!hotkeysHintShown) {
-          hotkeysHintShown = true;
-          showToast('Hotkeys: Alt+Left=Like, Alt+Middle=Love, Alt+Right=Dislike');
-        }
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        const item = buildItemFromElement(media);
-        if (!item) {
-          showToast('No valid media URL found.');
-          return;
-        }
-
-        const payload = buildReactionPayload(item, 'dislike');
-        sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-          if (!response || !response.ok) {
-            showToast(response?.error || 'Reaction failed.');
-            return;
-          }
-          showToast('Disliked.');
-        });
-      },
-      true
-    );
+      getHintShown: () => hotkeysHintShown,
+      enabled: hotkeysEnabled,
+    });
 
     function makeButton(label, onClick, options) {
       const button = document.createElement('button');
@@ -1289,10 +1279,10 @@ declare const chrome: ChromeApi;
     return current === base || current.endsWith(`.${base}`);
   }
 
-  function safeUrl(value) {
-    if (!value || typeof value !== 'string') {
-      return '';
-    }
+    function safeUrl(value) {
+      if (!value || typeof value !== 'string') {
+        return '';
+      }
 
     const trimmed = value.trim();
     if (!trimmed) {
@@ -1311,5 +1301,174 @@ declare const chrome: ChromeApi;
     }
 
     return trimmed;
+  }
+
+  function installHotkeys(options: {
+    showToast: (message: string) => void;
+    sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void;
+    isSheetOpen: () => boolean;
+    enabled?: boolean;
+    setHintShown?: (value: boolean) => void;
+    getHintShown?: () => boolean;
+  }) {
+    const enabled = options.enabled ?? true;
+    const getHintShown = options.getHintShown ?? (() => false);
+    const setHintShown = options.setHintShown ?? (() => {});
+
+    const maybeHint = () => {
+      if (getHintShown()) return;
+      setHintShown(true);
+      options.showToast('Hotkeys: Alt+Left=Like, Alt+Middle=Love, Alt+Right=Dislike');
+    };
+
+    const isOwnUiEvent = (event: MouseEvent) => {
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      return path.some((p) => p instanceof HTMLElement && p.id === ROOT_ID);
+    };
+
+    // Some sites (especially video players) trigger actions on click/pointerup even if mousedown is prevented.
+    // Swallow the click when we're handling a hotkey so play/pause/seek doesn't fire.
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (!enabled) return;
+        if (!(e instanceof MouseEvent)) return;
+        if (!e.altKey) return;
+        if (options.isSheetOpen()) return;
+        if (isOwnUiEvent(e)) return;
+
+        const target = e.target instanceof Element ? e.target : null;
+        const media = target?.closest?.('img, video') ?? null;
+        if (!media) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      },
+      true
+    );
+
+    document.addEventListener(
+      'mousedown',
+      (e) => {
+        if (!enabled) return;
+        if (!(e instanceof MouseEvent)) return;
+        if (!e.altKey) return;
+        if (options.isSheetOpen()) return;
+        if (isOwnUiEvent(e)) return;
+
+        const target = e.target instanceof Element ? e.target : null;
+        const media = target?.closest?.('img, video') ?? null;
+        if (!media) return;
+
+        const reactionType = e.button === 0 ? 'like' : e.button === 1 ? 'love' : null;
+        if (!reactionType) return;
+
+        maybeHint();
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        const item = buildItemFromElement(media);
+        if (!item) {
+          if (media instanceof HTMLVideoElement) {
+            const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
+            if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
+              options.showToast('Streaming video (blob). No direct URL to download.');
+            } else {
+              options.showToast('No direct video URL found.');
+            }
+          } else {
+            options.showToast('No valid media URL found.');
+          }
+          return;
+        }
+
+        const payload = {
+          type: reactionType,
+          url: item.url,
+          original_url: item.url,
+          referrer_url: window.location.href,
+          page_title: limitString(document.title, MAX_METADATA_LEN),
+          tag_name: item.tag_name,
+          width: item.width,
+          height: item.height,
+          alt: limitString(item.alt || '', MAX_METADATA_LEN),
+          preview_url: item.preview_url || '',
+          source: sourceFromMediaUrl(item.url),
+        };
+
+        options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          if (!response || !response.ok) {
+            options.showToast(response?.error || 'Reaction failed.');
+            return;
+          }
+
+          options.showToast(`Reacted (${reactionType}). Queued download in Atlas.`);
+        });
+      },
+      true
+    );
+
+    document.addEventListener(
+      'contextmenu',
+      (e) => {
+        if (!enabled) return;
+        if (!(e instanceof MouseEvent)) return;
+        if (!e.altKey) return;
+        if (options.isSheetOpen()) return;
+        if (isOwnUiEvent(e)) return;
+
+        const target = e.target instanceof Element ? e.target : null;
+        const media = target?.closest?.('img, video') ?? null;
+        if (!media) return;
+
+        maybeHint();
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        const item = buildItemFromElement(media);
+        if (!item) {
+          if (media instanceof HTMLVideoElement) {
+            const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
+            if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
+              options.showToast('Streaming video (blob). No direct URL to download.');
+            } else {
+              options.showToast('No direct video URL found.');
+            }
+          } else {
+            options.showToast('No valid media URL found.');
+          }
+          return;
+        }
+
+        const payload = {
+          type: 'dislike',
+          url: item.url,
+          original_url: item.url,
+          referrer_url: window.location.href,
+          page_title: limitString(document.title, MAX_METADATA_LEN),
+          tag_name: item.tag_name,
+          width: item.width,
+          height: item.height,
+          alt: limitString(item.alt || '', MAX_METADATA_LEN),
+          preview_url: item.preview_url || '',
+          source: sourceFromMediaUrl(item.url),
+        };
+
+        options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          if (!response || !response.ok) {
+            options.showToast(response?.error || 'Reaction failed.');
+            return;
+          }
+
+          options.showToast('Disliked.');
+        });
+      },
+      true
+    );
   }
 })();
