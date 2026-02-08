@@ -18,6 +18,13 @@ class GenerateTransferPreview implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $tries = 3;
+
+    public int $backoff = 30;
+
+    // ffmpeg-based preview generation can exceed the default queue:work timeout (60s).
+    public int $timeout = 300;
+
     public int $uniqueFor = 600;
 
     public function __construct(public int $transferId)
@@ -41,9 +48,13 @@ class GenerateTransferPreview implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $updates = $finalizer->generatePreviewAssets($transfer->file);
-        if ($updates !== []) {
-            $transfer->file->update($updates);
+        try {
+            $updates = $finalizer->generatePreviewAssets($transfer->file);
+            if ($updates !== []) {
+                $transfer->file->update($updates);
+            }
+        } catch (\Throwable) {
+            // Preview generation is best-effort. Transfers should still complete.
         }
 
         $transfer->update([

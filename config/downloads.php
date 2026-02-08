@@ -21,6 +21,10 @@ return [
 
     'video_preview_width' => (int) env('DOWNLOADS_VIDEO_PREVIEW_WIDTH', 450),
 
+    // Duration of generated video previews (in seconds).
+    // Keep this short: previews are for fast grid rendering, not full playback.
+    'video_preview_seconds' => (float) env('DOWNLOADS_VIDEO_PREVIEW_SECONDS', 6),
+
     'video_poster_second' => (float) env('DOWNLOADS_VIDEO_POSTER_SECOND', 1),
 
     'yt_dlp_path' => env('DOWNLOADS_YT_DLP_PATH', 'yt-dlp'),

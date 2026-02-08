@@ -25,6 +25,9 @@ class DownloadTransferYtDlp implements ShouldQueue
 
     public int $backoff = 60;
 
+    // yt-dlp downloads can take a long time (especially for videos + merging).
+    public int $timeout = 1900;
+
     public function __construct(public int $downloadTransferId)
     {
         $this->onQueue('downloads');
