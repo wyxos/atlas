@@ -171,12 +171,14 @@ class DownloadFile implements ShouldQueue
         // Windows: ffprobe sits next to ffmpeg in the same folder.
         if (str_ends_with(strtolower($ffmpeg), 'ffmpeg.exe')) {
             $candidate = substr($ffmpeg, 0, -strlen('ffmpeg.exe')).'ffprobe.exe';
+
             return is_file($candidate) ? $candidate : null;
         }
 
         // Linux/macOS: ffprobe is usually available alongside ffmpeg.
         if (str_ends_with(strtolower($ffmpeg), DIRECTORY_SEPARATOR.'ffmpeg')) {
             $candidate = substr($ffmpeg, 0, -strlen('ffmpeg')).'ffprobe';
+
             return is_file($candidate) ? $candidate : 'ffprobe';
         }
 
