@@ -52,4 +52,3 @@ test('extension react does not dispatch download for dislike', function () {
     $response->assertJsonPath('reaction.type', 'dislike');
     Queue::assertNotPushed(DownloadFile::class);
 });
-
