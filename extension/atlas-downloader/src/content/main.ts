@@ -1376,18 +1376,21 @@ declare const chrome: ChromeApi;
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
             if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
               // Fallback: send the page URL and let Atlas resolve/download via yt-dlp.
+              // Make it unique per trigger so multiple videos on the same page don't collide.
+              const pageUrl = window.location.href;
+              const uniqueUrl = `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random().toString(16).slice(2)}`;
               const payload = {
                 type: reactionType,
-                url: window.location.href,
-                original_url: window.location.href,
-                referrer_url: window.location.href,
+                url: pageUrl,
+                original_url: uniqueUrl,
+                referrer_url: pageUrl,
                 page_title: limitString(document.title, MAX_METADATA_LEN),
                 tag_name: 'video',
                 width: media.videoWidth || media.clientWidth || null,
                 height: media.videoHeight || media.clientHeight || null,
                 alt: '',
                 preview_url: media.poster || '',
-                source: sourceFromMediaUrl(window.location.href),
+                source: sourceFromMediaUrl(pageUrl),
                 download_via: 'yt-dlp',
               };
 
@@ -1461,18 +1464,20 @@ declare const chrome: ChromeApi;
           if (media instanceof HTMLVideoElement) {
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
             if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
+              const pageUrl = window.location.href;
+              const uniqueUrl = `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random().toString(16).slice(2)}`;
               const payload = {
                 type: 'dislike',
-                url: window.location.href,
-                original_url: window.location.href,
-                referrer_url: window.location.href,
+                url: pageUrl,
+                original_url: uniqueUrl,
+                referrer_url: pageUrl,
                 page_title: limitString(document.title, MAX_METADATA_LEN),
                 tag_name: 'video',
                 width: media.videoWidth || media.clientWidth || null,
                 height: media.videoHeight || media.clientHeight || null,
                 alt: '',
                 preview_url: media.poster || '',
-                source: sourceFromMediaUrl(window.location.href),
+                source: sourceFromMediaUrl(pageUrl),
                 download_via: 'yt-dlp',
               };
 
