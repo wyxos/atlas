@@ -355,6 +355,10 @@ async function applyFilters() {
     await nextTick();
 }
 
+async function goToFirstPage(): Promise<void> {
+    await applyFilters();
+}
+
 async function applyService() {
     shouldShowForm.value = false;
     items.value = [];
@@ -1125,7 +1129,8 @@ defineExpose({
 
         <!-- Status/Pagination Info at Bottom (only show when masonry is visible, not when showing form) -->
         <BrowseStatusBar :items="items" :masonry="masonry" :tab="tab" :is-loading="masonry?.isLoading"
-            :visible="tab !== null && tab !== undefined && !shouldShowForm" :total="totalAvailable" />
+            :visible="tab !== null && tab !== undefined && !shouldShowForm" :total="totalAvailable"
+            @first-page="goToFirstPage" />
 
         <!-- Prompt Dialog -->
         <Dialog v-model="promptData.promptDialogOpen.value" @update:model-value="handlePromptDialogUpdate">

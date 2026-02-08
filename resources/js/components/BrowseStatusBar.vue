@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Loader2 } from 'lucide-vue-next';
+import { ChevronsUp, Loader2 } from 'lucide-vue-next';
 import Pill from './ui/Pill.vue';
+import { Button } from '@/components/ui/button';
 import type { FeedItem } from '@/composables/useTabs';
 import type { BackfillStats, MasonryInstance } from '@wyxos/vibe';
 
@@ -18,6 +19,10 @@ const props = withDefaults(defineProps<Props>(), {
     isLoading: false,
     visible: true,
 });
+
+const emit = defineEmits<{
+    firstPage: [];
+}>();
 
 const backfillStats = computed<BackfillStats | null>(() => props.masonry?.backfillStats ?? null);
 
@@ -97,6 +102,12 @@ const totalDisabled = computed(() => props.total === null || props.total === und
         </span>
         <!-- Current Page Pill -->
         <Pill label="Page" :value="displayPage" variant="neutral" reversed data-test="page-pill" />
+        <!-- Go to first page CTA -->
+        <Button size="sm" variant="ghost" class="h-8 gap-2" type="button" data-test="first-page-cta"
+            @click="emit('firstPage')">
+            <ChevronsUp :size="14" />
+            First page
+        </Button>
         <!-- Next Page Pill -->
         <Pill label="Next" :value="nextCursor || 'N/A'" variant="secondary" reversed data-test="next-pill" />
         <!-- Status Pill -->
