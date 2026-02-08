@@ -7,6 +7,7 @@ use App\Events\DownloadTransferProgressUpdated;
 use App\Models\DownloadTransfer;
 use App\Services\Downloads\DownloadTransferPayload;
 use App\Services\Downloads\FileDownloadFinalizer;
+use App\Services\Downloads\YtDlpCommandBuilder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -29,7 +30,7 @@ class DownloadTransferYtDlp implements ShouldQueue
         $this->onQueue('downloads');
     }
 
-    public function handle(FileDownloadFinalizer $finalizer): void
+    public function handle(FileDownloadFinalizer $finalizer, YtDlpCommandBuilder $commandBuilder): void
     {
         $transfer = DownloadTransfer::query()->with('file')->find($this->downloadTransferId);
         if (! $transfer || ! $transfer->file) {
@@ -53,20 +54,9 @@ class DownloadTransferYtDlp implements ShouldQueue
             $absoluteTmpDir = $disk->path($tmpDir);
             $outputTemplate = $absoluteTmpDir.DIRECTORY_SEPARATOR.'download.%(ext)s';
 
-            $ytDlp = (string) config('downloads.yt_dlp_path', 'yt-dlp');
             $timeoutSeconds = (int) config('downloads.yt_dlp_timeout_seconds', 1800);
 
-            $process = new Process([
-                $ytDlp,
-                '--no-playlist',
-                '--format',
-                'bv*+ba/b',
-                '--merge-output-format',
-                'mp4',
-                '--output',
-                $outputTemplate,
-                (string) $transfer->url,
-            ]);
+            $process = new Process($commandBuilder->build((string) $transfer->url, $outputTemplate));
             $process->setTimeout(max(60, $timeoutSeconds));
             $process->run();
 
