@@ -4,6 +4,7 @@ use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
@@ -142,3 +143,13 @@ Schedule::command('horizon:snapshot')->everyFiveMinutes();
 Schedule::command('horizon:clear-metrics')->hourly();
 Schedule::command('horizon:clear')->daily();
 Schedule::command('metrics:sync')->hourly();
+
+Artisan::command('mail:test {to : Recipient email address}', function () {
+    $to = (string) $this->argument('to');
+
+    Mail::raw('Atlas mail test: '.now()->toIso8601String(), function ($message) use ($to) {
+        $message->to($to)->subject('Atlas mail test');
+    });
+
+    $this->info("Sent test mail to {$to}.");
+})->purpose('Send a test email using current mail configuration');
