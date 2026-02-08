@@ -179,12 +179,20 @@ async function handleCheckBatch(urls: unknown) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
         ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
       },
       body: JSON.stringify({ urls: chunk }),
     });
 
     const data = await safeJson(response);
+    if (response.ok && data === null) {
+      return {
+        ok: false,
+        error: 'Atlas returned a non-JSON response. Check your base URL/token.',
+        status: response.status,
+      };
+    }
     if (!response.ok) {
       return {
         ok: false,
@@ -244,12 +252,20 @@ async function handleDownloadWithSettings(payload: unknown, settings: AtlasSetti
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'application/json',
       ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
     },
     body: JSON.stringify(payload),
   });
 
   const data = await safeJson(response);
+  if (response.ok && data === null) {
+    return {
+      ok: false,
+      error: 'Atlas returned a non-JSON response. Check your base URL/token.',
+      status: response.status,
+    };
+  }
   if (!response.ok) {
     return {
       ok: false,
@@ -280,12 +296,20 @@ async function handleReactWithSettings(payload: unknown, settings: AtlasSettings
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'application/json',
       ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
     },
     body: JSON.stringify(payload),
   });
 
   const data = await safeJson(response);
+  if (response.ok && data === null) {
+    return {
+      ok: false,
+      error: 'Atlas returned a non-JSON response. Check your base URL/token.',
+      status: response.status,
+    };
+  }
   if (!response.ok) {
     return {
       ok: false,
