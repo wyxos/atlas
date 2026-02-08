@@ -51,11 +51,44 @@ test('skips download if file is already downloaded', function () {
         'path' => 'downloads/existing-file.jpg',
     ]);
 
+    Storage::disk('atlas-app')->put('downloads/existing-file.jpg', 'already downloaded');
+
     $job = new DownloadFile($file->id);
     $job->handle();
 
     expect(DownloadTransfer::query()->where('file_id', $file->id)->exists())->toBeFalse();
     Bus::assertNotDispatched(PumpDomainDownloads::class);
+});
+
+test('re-queues download when a downloaded video resolved to HTML', function () {
+    Bus::fake();
+
+    $file = File::factory()->create([
+        'url' => 'https://www.youtube.com/embed/MD99_p7XLD8',
+        'referrer_url' => 'https://www.youtube.com/embed/MD99_p7XLD8',
+        'downloaded' => true,
+        'path' => 'downloads/existing-video.html',
+        'listing_metadata' => [
+            'tag_name' => 'video',
+            'page_url' => 'https://www.youtube.com/watch?v=MD99_p7XLD8',
+        ],
+    ]);
+
+    Storage::disk('atlas-app')->put('downloads/existing-video.html', '<!doctype html>');
+
+    $job = new DownloadFile($file->id);
+    $job->handle();
+
+    $file->refresh();
+    expect($file->downloaded)->toBeFalse();
+    expect($file->path)->toBeNull();
+    expect($file->url)->toBe('https://www.youtube.com/watch?v=MD99_p7XLD8');
+
+    $transfer = DownloadTransfer::query()->where('file_id', $file->id)->latest('id')->first();
+    expect($transfer)->not->toBeNull();
+    expect($transfer->domain)->toBe('www.youtube.com');
+
+    Bus::assertDispatched(PumpDomainDownloads::class, fn (PumpDomainDownloads $job) => $job->domain === 'www.youtube.com');
 });
 
 test('skips download if file has no URL', function () {

@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 
 class DownloadFile implements ShouldQueue
 {
@@ -32,7 +33,11 @@ class DownloadFile implements ShouldQueue
         }
 
         if ($file->downloaded && ! empty($file->path)) {
-            return;
+            if ($this->isInvalidDownloadedFile($file)) {
+                $this->repairDownloadedFile($file);
+            } else {
+                return;
+            }
         }
 
         $domain = $this->extractDomain((string) $file->url) ?? 'unknown';
@@ -72,6 +77,69 @@ class DownloadFile implements ShouldQueue
         }
 
         PumpDomainDownloads::dispatch($domain);
+    }
+
+    private function isInvalidDownloadedFile(File $file): bool
+    {
+        if (! $file->path) {
+            return true;
+        }
+
+        $disk = Storage::disk(config('downloads.disk'));
+        if (! $disk->exists($file->path)) {
+            return true;
+        }
+
+        $tagName = data_get($file->listing_metadata, 'tag_name');
+        if (! in_array($tagName, ['video', 'iframe'], true)) {
+            return false;
+        }
+
+        $path = strtolower((string) $file->path);
+        if (str_ends_with($path, '.html') || str_ends_with($path, '.htm')) {
+            return true;
+        }
+
+        $mime = strtolower((string) ($file->mime_type ?? ''));
+        if ($mime !== '' && str_starts_with($mime, 'text/html')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function repairDownloadedFile(File $file): void
+    {
+        $disk = Storage::disk(config('downloads.disk'));
+
+        $path = $file->path;
+        if (is_string($path) && $path !== '' && $disk->exists($path)) {
+            try {
+                $disk->delete($path);
+            } catch (\Throwable) {
+                // If cleanup fails we can still retry the download.
+            }
+        }
+
+        $pageUrl = data_get($file->listing_metadata, 'page_url');
+        if (! is_string($pageUrl) || $pageUrl === '') {
+            $pageUrl = null;
+        }
+
+        $file->forceFill([
+            'downloaded' => false,
+            'downloaded_at' => null,
+            'download_progress' => 0,
+            'path' => null,
+            'preview_path' => null,
+            'poster_path' => null,
+            'size' => null,
+            'mime_type' => null,
+            'ext' => null,
+            // Prefer the actual page URL for video/iframe downloads (yt-dlp fallback uses it).
+            'url' => $pageUrl ?? $file->url,
+            'referrer_url' => $pageUrl ?? $file->referrer_url,
+        ])->save();
     }
 
     private function extractDomain(string $url): ?string

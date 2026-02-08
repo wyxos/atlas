@@ -122,6 +122,15 @@ class PrepareDownloadTransfer implements ShouldQueue
                         // Metadata updates shouldn't block the download fallback.
                     }
 
+                    // If the extension provided a page URL, prefer it for yt-dlp (embed URLs frequently return HTML).
+                    $pageUrl = data_get($transfer->file->listing_metadata, 'page_url');
+                    if (is_string($pageUrl) && $pageUrl !== '') {
+                        $transfer->update([
+                            'url' => $pageUrl,
+                            'updated_at' => now(),
+                        ]);
+                    }
+
                     $transfer->update([
                         'bytes_total' => null,
                         'bytes_downloaded' => 0,
