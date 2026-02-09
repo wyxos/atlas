@@ -34,10 +34,12 @@ class LocalService extends BaseService
         $seed = is_numeric($seedRaw) ? (int) $seedRaw : null;
         $maxPreviewedRaw = $params['max_previewed_count'] ?? null;
         $maxPreviewed = is_numeric($maxPreviewedRaw) ? (int) $maxPreviewedRaw : null;
-        if (is_int($maxPreviewed) && $maxPreviewed < 1) {
+        // Allow 0 (fresh queue); negative values disable the filter.
+        if (is_int($maxPreviewed) && $maxPreviewed < 0) {
             $maxPreviewed = null;
         }
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
+        $autoDisliked = is_string($params['auto_disliked'] ?? null) ? (string) $params['auto_disliked'] : 'any';
         $reaction = $params['reaction'] ?? null;
 
         // Filter by current user's reaction types (optional)
@@ -78,6 +80,12 @@ class LocalService extends BaseService
             ];
         }
 
+        // "Reacted" is defined as positive reactions only (love/like/funny), excluding dislikes.
+        if ($reactionMode === 'reacted') {
+            $reactionMode = 'types';
+            $reactionTypes = ['love', 'like', 'funny'];
+        }
+
         // Stabilize random sort by generating a seed once and letting Browser persist it into the tab params.
         if ($sort === 'random' && (! is_int($seed) || $seed < 1)) {
             $seed = time();
@@ -95,9 +103,28 @@ class LocalService extends BaseService
                 blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
                 blacklistType: $blacklistType,
                 maxPreviewed: $maxPreviewed,
+                autoDisliked: $autoDisliked,
                 reactionMode: $reactionMode,
                 reactionTypes: $reactionTypes,
                 allTypes: $allTypes,
+                sort: $sort,
+            );
+        }
+
+        if ($sort === 'reaction_at_asc') {
+            return $this->fetchByReactionTimestamp(
+                page: $page,
+                limit: $limit,
+                source: is_string($source) ? $source : null,
+                downloaded: is_string($downloaded) ? $downloaded : 'any',
+                blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
+                blacklistType: $blacklistType,
+                maxPreviewed: $maxPreviewed,
+                autoDisliked: $autoDisliked,
+                reactionMode: $reactionMode,
+                reactionTypes: $reactionTypes,
+                allTypes: $allTypes,
+                sort: $sort,
             );
         }
 
@@ -111,6 +138,7 @@ class LocalService extends BaseService
                 downloaded: is_string($downloaded) ? $downloaded : 'any',
                 blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
                 blacklistType: $blacklistType,
+                autoDisliked: $autoDisliked,
                 sort: $sort,
                 seed: $seed,
                 maxPreviewed: $maxPreviewed,
@@ -153,7 +181,7 @@ class LocalService extends BaseService
             }
 
             // Cap previewed_count (optional).
-            if (is_int($maxPreviewed) && $maxPreviewed > 0) {
+            if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
                 $builder->where('previewed_count', ['<=', $maxPreviewed]);
             }
 
@@ -162,11 +190,23 @@ class LocalService extends BaseService
             if ($sort === 'random' && $driver === 'typesense') {
                 $rand = $seed && $seed > 0 ? "_rand({$seed})" : '_rand()';
                 $builder->orderBy($rand, 'desc');
+            } elseif ($sort === 'created_at_asc') {
+                $builder->orderBy('created_at', 'asc');
+            } elseif ($sort === 'created_at') {
+                $builder->orderBy('created_at', 'desc');
             } elseif ($sort === 'updated_at') {
                 $builder->orderBy('updated_at', 'desc');
+            } elseif ($sort === 'updated_at_asc') {
+                $builder->orderBy('updated_at', 'asc');
             } elseif ($sort === 'blacklisted_at') {
                 $builder->orderBy('blacklisted_at', 'desc')
                     ->orderBy('updated_at', 'desc');
+            } elseif ($sort === 'blacklisted_at_asc') {
+                $builder->orderBy('blacklisted_at', 'asc')
+                    ->orderBy('updated_at', 'asc');
+            } elseif ($sort === 'downloaded_at_asc') {
+                $builder->orderBy('downloaded_at', 'asc')
+                    ->orderBy('updated_at', 'asc');
             } else {
                 // Default sort: newest downloads first, then recently updated.
                 $builder->orderBy('downloaded_at', 'desc')
@@ -182,12 +222,19 @@ class LocalService extends BaseService
             return $builder;
         };
 
-        if ($reactionMode === 'types' && is_array($reactionTypes) && count($reactionTypes) === count($allTypes)) {
-            // Treat "all types selected" as "reacted (any type)".
-            $reactionMode = 'reacted';
-        }
+        // Auto-dislike tri-state filter (optional).
+        $applyAutoDislikedFilter = function ($builder) use ($autoDisliked) {
+            if ($autoDisliked === 'yes') {
+                $builder->where('auto_disliked', true);
+            } elseif ($autoDisliked === 'no') {
+                $builder->where('auto_disliked', false);
+            }
 
-        if ($reactionMode === 'reacted') {
+            return $builder;
+        };
+
+        // Unreacted: files you have not reacted to. This is per-user and depends on reacted_user_ids.
+        if ($reactionMode === 'unreacted') {
             $userId = auth()->id();
             if (! $userId) {
                 return [
@@ -199,8 +246,8 @@ class LocalService extends BaseService
                 ];
             }
 
-            $pagination = $buildSearch()
-                ->where('reacted_user_ids', (string) $userId)
+            $pagination = $applyAutoDislikedFilter($buildSearch())
+                ->whereNotIn('reacted_user_ids', [(string) $userId])
                 ->paginate($limit, 'page', $page);
 
             return [
@@ -213,106 +260,131 @@ class LocalService extends BaseService
         }
 
         if ($reactionMode === 'types' && $reactionTypes !== null) {
-            if (count($reactionTypes) < count($allTypes)) {
-                $userId = auth()->id();
-                if (! $userId) {
-                    return [
-                        'files' => [],
-                        'metadata' => [
-                            'nextCursor' => null,
-                            'total' => 0,
-                        ],
-                    ];
+            $userId = auth()->id();
+            if (! $userId) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                        'total' => 0,
+                    ],
+                ];
+            }
+
+            if (count($reactionTypes) === 1) {
+                $reactionField = "{$reactionTypes[0]}_user_ids";
+                $pagination = $applyAutoDislikedFilter($buildSearch())
+                    ->where($reactionField, (string) $userId)
+                    ->paginate($limit, 'page', $page);
+
+                $files = collect($pagination->items());
+                $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
+
+                $filesList = $files->all();
+                $driver = config('scout.driver');
+                if ($sort === 'random' && $driver !== 'typesense') {
+                    $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
+                    $filesList = collect($filesList)
+                        ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
+                        ->values()
+                        ->all();
                 }
 
-                if (count($reactionTypes) === 1) {
-                    $reactionField = "{$reactionTypes[0]}_user_ids";
-                    $pagination = $buildSearch()
-                        ->where($reactionField, (string) $userId)
-                        ->paginate($limit, 'page', $page);
+                return [
+                    'files' => $filesList,
+                    'metadata' => [
+                        'nextCursor' => $nextCursor,
+                        'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
+                    ],
+                ];
+            }
 
-                    $files = collect($pagination->items());
-                    $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
+            $targetLimit = $page * $limit;
+            $results = collect();
+            $total = 0;
 
-                    $filesList = $files->all();
-                    $driver = config('scout.driver');
-                    if ($sort === 'random' && $driver !== 'typesense') {
-                        $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-                        $filesList = collect($filesList)
-                            ->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)))
-                            ->values()
-                            ->all();
+            foreach ($reactionTypes as $type) {
+                $reactionField = "{$type}_user_ids";
+                $pagination = $applyAutoDislikedFilter($buildSearch())
+                    ->where($reactionField, (string) $userId)
+                    ->paginate($targetLimit, 'page', 1);
+
+                $results = $results->merge($pagination->items());
+                $total += $pagination->total();
+            }
+
+            $files = $results
+                ->unique('id')
+                ->when($sort === 'random', function ($c) use ($seed) {
+                    $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
+
+                    return $c->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)));
+                }, function ($c) use ($sort) {
+                    if ($sort === 'created_at_asc') {
+                        return $c->sortBy(fn (File $f) => $f->created_at?->timestamp ?? 0);
+                    }
+                    if ($sort === 'created_at') {
+                        return $c->sortByDesc(fn (File $f) => $f->created_at?->timestamp ?? 0);
+                    }
+                    if ($sort === 'updated_at') {
+                        return $c->sortByDesc(fn (File $f) => $f->updated_at?->timestamp ?? 0);
+                    }
+                    if ($sort === 'updated_at_asc') {
+                        return $c->sortBy(fn (File $f) => $f->updated_at?->timestamp ?? 0);
                     }
 
-                    return [
-                        'files' => $filesList,
-                        'metadata' => [
-                            'nextCursor' => $nextCursor,
-                            'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
-                        ],
-                    ];
-                }
-
-                $targetLimit = $page * $limit;
-                $results = collect();
-                $total = 0;
-
-                foreach ($reactionTypes as $type) {
-                    $reactionField = "{$type}_user_ids";
-                    $pagination = $buildSearch()
-                        ->where($reactionField, (string) $userId)
-                        ->paginate($targetLimit, 'page', 1);
-
-                    $results = $results->merge($pagination->items());
-                    $total += $pagination->total();
-                }
-
-                $files = $results
-                    ->unique('id')
-                    ->when($sort === 'random', function ($c) use ($seed) {
-                        $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
-
-                        return $c->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)));
-                    }, function ($c) use ($sort) {
-                        if ($sort === 'updated_at') {
-                            return $c->sortByDesc(fn (File $f) => $f->updated_at?->timestamp ?? 0);
-                        }
-
-                        if ($sort === 'blacklisted_at') {
-                            return $c->sortByDesc(fn (File $f) => $f->blacklisted_at?->timestamp ?? 0)
-                                ->sortByDesc(fn (File $f) => $f->updated_at?->timestamp ?? 0);
-                        }
-
+                    if ($sort === 'blacklisted_at') {
+                        return $c->sortByDesc(fn (File $f) => $f->blacklisted_at?->timestamp ?? 0)
+                            ->sortByDesc(fn (File $f) => $f->updated_at?->timestamp ?? 0);
+                    }
+                    if ($sort === 'blacklisted_at_asc') {
+                        return $c->sortBy(fn (File $f) => $f->blacklisted_at?->timestamp ?? 0)
+                            ->sortBy(fn (File $f) => $f->updated_at?->timestamp ?? 0);
+                    }
+                    if ($sort === 'downloaded_at_asc') {
                         return $c->sort(function (File $a, File $b) {
                             $aDownloaded = $a->downloaded_at?->timestamp ?? 0;
                             $bDownloaded = $b->downloaded_at?->timestamp ?? 0;
                             if ($aDownloaded !== $bDownloaded) {
-                                return $bDownloaded <=> $aDownloaded;
+                                return $aDownloaded <=> $bDownloaded;
                             }
 
                             $aUpdated = $a->updated_at?->timestamp ?? 0;
                             $bUpdated = $b->updated_at?->timestamp ?? 0;
 
-                            return $bUpdated <=> $aUpdated;
+                            return $aUpdated <=> $bUpdated;
                         });
-                    })
-                    ->values();
+                    }
 
-                $totalPages = (int) ceil($total / $limit);
-                $filesPage = $files->slice(($page - 1) * $limit, $limit)->values();
-                $nextCursor = $page < $totalPages ? $page + 1 : null;
+                    return $c->sort(function (File $a, File $b) {
+                        $aDownloaded = $a->downloaded_at?->timestamp ?? 0;
+                        $bDownloaded = $b->downloaded_at?->timestamp ?? 0;
+                        if ($aDownloaded !== $bDownloaded) {
+                            return $bDownloaded <=> $aDownloaded;
+                        }
 
-                return [
-                    'files' => $filesPage->all(),
-                    'metadata' => [
-                        'nextCursor' => $nextCursor,
-                        'total' => $total,
-                    ],
-                ];
-            }
+                        $aUpdated = $a->updated_at?->timestamp ?? 0;
+                        $bUpdated = $b->updated_at?->timestamp ?? 0;
+
+                        return $bUpdated <=> $aUpdated;
+                    });
+                })
+                ->values();
+
+            $totalPages = (int) ceil($total / $limit);
+            $filesPage = $files->slice(($page - 1) * $limit, $limit)->values();
+            $nextCursor = $page < $totalPages ? $page + 1 : null;
+
+            return [
+                'files' => $filesPage->all(),
+                'metadata' => [
+                    'nextCursor' => $nextCursor,
+                    'total' => $total,
+                ],
+            ];
         }
 
-        $pagination = $buildSearch()->paginate($limit, 'page', $page);
+        $pagination = $applyAutoDislikedFilter($buildSearch())->paginate($limit, 'page', $page);
         $files = collect($pagination->items());
         $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
 
@@ -352,6 +424,7 @@ class LocalService extends BaseService
         string $downloaded,
         string $blacklisted,
         string $blacklistType,
+        string $autoDisliked,
         string $sort,
         ?int $seed,
         ?int $maxPreviewed,
@@ -361,10 +434,6 @@ class LocalService extends BaseService
     ): array {
         $page = max(1, $page);
         $limit = max(1, $limit);
-
-        if ($reactionMode === 'types' && is_array($reactionTypes) && count($reactionTypes) === count($allTypes)) {
-            $reactionMode = 'reacted';
-        }
 
         $query = File::query()->with('metadata');
 
@@ -396,11 +465,23 @@ class LocalService extends BaseService
             }
         }
 
-        if (is_int($maxPreviewed) && $maxPreviewed > 0) {
+        if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
             $query->where('previewed_count', '<=', $maxPreviewed);
         }
 
+        if ($autoDisliked === 'yes') {
+            $query->where('auto_disliked', true);
+        } elseif ($autoDisliked === 'no') {
+            $query->where('auto_disliked', false);
+        }
+
+        // Keep reaction_mode semantics aligned with Typesense path.
         if ($reactionMode === 'reacted') {
+            $reactionMode = 'types';
+            $reactionTypes = ['love', 'like', 'funny'];
+        }
+
+        if ($reactionMode === 'types') {
             $userId = auth()->id();
             if (! $userId) {
                 return [
@@ -412,12 +493,8 @@ class LocalService extends BaseService
                 ];
             }
 
-            $query->whereHas('reactions', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            });
-        } elseif ($reactionMode === 'types' && $reactionTypes !== null && count($reactionTypes) < count($allTypes)) {
-            $userId = auth()->id();
-            if (! $userId) {
+            $reactionTypes = is_array($reactionTypes) ? array_values(array_filter($reactionTypes, fn ($t) => in_array($t, $allTypes, true))) : null;
+            if (! $reactionTypes || count($reactionTypes) === 0) {
                 return [
                     'files' => [],
                     'metadata' => [
@@ -430,14 +507,39 @@ class LocalService extends BaseService
             $query->whereHas('reactions', function ($q) use ($userId, $reactionTypes) {
                 $q->where('user_id', $userId)->whereIn('type', $reactionTypes);
             });
+        } elseif ($reactionMode === 'unreacted') {
+            $userId = auth()->id();
+            if (! $userId) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                        'total' => 0,
+                    ],
+                ];
+            }
+
+            $query->whereDoesntHave('reactions', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            });
         }
 
         if ($sort === 'random') {
             $query->inRandomOrder();
+        } elseif ($sort === 'created_at') {
+            $query->orderBy('created_at', 'desc');
+        } elseif ($sort === 'created_at_asc') {
+            $query->orderBy('created_at', 'asc');
         } elseif ($sort === 'updated_at') {
             $query->orderBy('updated_at', 'desc');
+        } elseif ($sort === 'updated_at_asc') {
+            $query->orderBy('updated_at', 'asc');
         } elseif ($sort === 'blacklisted_at') {
             $query->orderBy('blacklisted_at', 'desc')->orderBy('updated_at', 'desc');
+        } elseif ($sort === 'blacklisted_at_asc') {
+            $query->orderBy('blacklisted_at', 'asc')->orderBy('updated_at', 'asc');
+        } elseif ($sort === 'downloaded_at_asc') {
+            $query->orderBy('downloaded_at', 'asc')->orderBy('updated_at', 'asc');
         } else {
             $query->orderBy('downloaded_at', 'desc')->orderBy('updated_at', 'desc');
         }
@@ -479,9 +581,11 @@ class LocalService extends BaseService
         string $blacklisted,
         string $blacklistType,
         ?int $maxPreviewed,
+        string $autoDisliked,
         string $reactionMode,
         ?array $reactionTypes,
         array $allTypes,
+        string $sort,
     ): array {
         $page = max(1, $page);
         $limit = max(1, $limit);
@@ -519,6 +623,12 @@ class LocalService extends BaseService
             }
         }
 
+        // Reacted == positive only.
+        if ($reactionMode === 'reacted') {
+            $reactionMode = 'types';
+            $reactionTypes = ['love', 'like', 'funny'];
+        }
+
         $idQuery = Reaction::query()
             ->join('files', 'files.id', '=', 'reactions.file_id')
             ->where('reactions.user_id', $userId)
@@ -528,6 +638,8 @@ class LocalService extends BaseService
             ->when($downloaded === 'no', fn ($q) => $q->where('files.downloaded', false))
             ->when($blacklisted === 'yes', fn ($q) => $q->whereNotNull('files.blacklisted_at'))
             ->when($blacklisted === 'no', fn ($q) => $q->whereNull('files.blacklisted_at'))
+            ->when($autoDisliked === 'yes', fn ($q) => $q->where('files.auto_disliked', true))
+            ->when($autoDisliked === 'no', fn ($q) => $q->where('files.auto_disliked', false))
             ->when(in_array($blacklistType, ['manual', 'auto'], true), function ($q) use ($blacklistType) {
                 $q->whereNotNull('files.blacklisted_at');
                 if ($blacklistType === 'manual') {
@@ -538,9 +650,9 @@ class LocalService extends BaseService
                     });
                 }
             })
-            ->when(is_int($maxPreviewed) && $maxPreviewed > 0, fn ($q) => $q->where('files.previewed_count', '<=', $maxPreviewed))
+            ->when(is_int($maxPreviewed) && $maxPreviewed >= 0, fn ($q) => $q->where('files.previewed_count', '<=', $maxPreviewed))
             ->select('reactions.file_id')
-            ->orderByDesc('reactions.created_at');
+            ->when($sort === 'reaction_at_asc', fn ($q) => $q->orderBy('reactions.created_at', 'asc'), fn ($q) => $q->orderByDesc('reactions.created_at'));
 
         $pagination = $idQuery->paginate($limit, ['reactions.file_id'], 'page', $page);
         $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;

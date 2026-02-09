@@ -144,3 +144,85 @@ test('local browse can cap previewed_count', function () {
     expect($ids)->toContain($ok->id);
     expect($ids)->not->toContain($tooMany->id);
 });
+
+test('local reacted mode excludes dislikes', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $liked = File::factory()->create([
+        'source' => 'CivitAI',
+    ]);
+    $disliked = File::factory()->create([
+        'source' => 'CivitAI',
+    ]);
+
+    Reaction::create([
+        'file_id' => $liked->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+    Reaction::create([
+        'file_id' => $disliked->id,
+        'user_id' => $user->id,
+        'type' => 'dislike',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&reaction_mode=reacted");
+    $response->assertSuccessful();
+
+    $ids = collect($response->json('items'))->pluck('id')->all();
+    expect($ids)->toContain($liked->id);
+    expect($ids)->not->toContain($disliked->id);
+});
+
+test('local browse can filter to unreacted files', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $reacted = File::factory()->create([
+        'source' => 'CivitAI',
+    ]);
+    $unreacted = File::factory()->create([
+        'source' => 'CivitAI',
+    ]);
+
+    Reaction::create([
+        'file_id' => $reacted->id,
+        'user_id' => $user->id,
+        'type' => 'funny',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&reaction_mode=unreacted");
+    $response->assertSuccessful();
+
+    $ids = collect($response->json('items'))->pluck('id')->all();
+    expect($ids)->toContain($unreacted->id);
+    expect($ids)->not->toContain($reacted->id);
+});
+
+test('max_previewed_count=0 returns only unpreviewed files', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $zero = File::factory()->create([
+        'source' => 'CivitAI',
+        'previewed_count' => 0,
+    ]);
+    $one = File::factory()->create([
+        'source' => 'CivitAI',
+        'previewed_count' => 1,
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&max_previewed_count=0");
+    $response->assertSuccessful();
+
+    $ids = collect($response->json('items'))->pluck('id')->all();
+    expect($ids)->toContain($zero->id);
+    expect($ids)->not->toContain($one->id);
+});

@@ -35,6 +35,7 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($local['defaults']['downloaded'])->toBe('any');
     expect($local['defaults']['blacklisted'])->toBe('any');
     expect($local['defaults']['blacklist_type'])->toBe('any');
+    expect($local['defaults']['auto_disliked'])->toBe('any');
     expect($local['defaults']['sort'])->toBe('downloaded_at');
     expect($local['defaults'])->toHaveKey('seed');
     expect($local['defaults'])->toHaveKey('max_previewed_count');
@@ -50,6 +51,7 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'downloaded',
         'blacklisted',
         'blacklist_type',
+        'auto_disliked',
         'sort',
         'seed',
         'max_previewed_count',
