@@ -167,6 +167,20 @@ function updateServiceFilterValue(uiKey: string, value: unknown): void {
     form.data.serviceFilters[uiKey] = value;
 }
 
+function isCheckboxGroupDisabled(field: ServiceFilterField): boolean {
+    if (form.data.feed !== 'local') {
+        return false;
+    }
+
+    // Local reaction types only apply when reaction_mode is "types".
+    if (field.uiKey === 'reaction') {
+        const mode = String(form.data.serviceFilters.reaction_mode ?? 'any');
+        return mode !== 'types';
+    }
+
+    return false;
+}
+
 // Handle apply button
 function handleApply(): void {
     emit('apply');
@@ -293,6 +307,7 @@ watch(
                                     v-for="opt in (field.options || [])"
                                     :key="String(opt.value)"
                                     :model-value="checkboxGroupSelection(field).includes(String(opt.value))"
+                                    :disabled="isCheckboxGroupDisabled(field)"
                                     @update:model-value="(checked: boolean) => setCheckboxGroupValue(field, String(opt.value), checked)"
                                 >
                                     {{ opt.label }}

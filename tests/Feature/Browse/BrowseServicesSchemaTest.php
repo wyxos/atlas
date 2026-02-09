@@ -30,11 +30,14 @@ test('browse services endpoint returns civitai schema with expected field mappin
     $local = $response->json('local');
     expect($local)->toBeArray();
     expect($local['key'])->toBe('local');
+    expect($local['defaults']['reaction_mode'])->toBe('any');
     expect($local['defaults']['reaction'])->toBe(['love', 'like', 'dislike', 'funny']);
     expect($local['defaults']['downloaded'])->toBe('any');
     expect($local['defaults']['blacklisted'])->toBe('any');
+    expect($local['defaults']['blacklist_type'])->toBe('any');
     expect($local['defaults']['sort'])->toBe('downloaded_at');
     expect($local['defaults'])->toHaveKey('seed');
+    expect($local['defaults'])->toHaveKey('max_previewed_count');
 
     $localFields = $local['schema']['fields'] ?? null;
     expect($localFields)->toBeArray();
@@ -42,11 +45,14 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'page',
         'limit',
         'source',
+        'reaction_mode',
         'reaction',
         'downloaded',
         'blacklisted',
+        'blacklist_type',
         'sort',
         'seed',
+        'max_previewed_count',
     ]);
 
     $civit = collect($services)->firstWhere('key', 'civit-ai-images');
