@@ -10,7 +10,7 @@ import { useBrowseForm } from '@/composables/useBrowseForm';
 import { Masonry } from '@wyxos/vibe';
 import Input from '@/components/ui/input/Input.vue';
 import type { ServiceOption, ServiceFilterField } from '@/composables/useBrowseService';
-import { computed, watch } from 'vue';
+import { computed, watch, ref } from 'vue';
 import { coerceBoolean } from '@/utils/coerceBoolean';
 
 interface Props {
@@ -88,6 +88,160 @@ const visibleServiceFields = computed(() => {
         }
         return true;
     });
+});
+
+type LocalPreset = {
+    label: string;
+    value: string;
+    // Only serviceFilters keys go here; global keys (limit/source) are left untouched.
+    filters: Record<string, unknown>;
+};
+
+const localPresets = computed<LocalPreset[]>(() => {
+    if (form.data.feed !== 'local') {
+        return [];
+    }
+
+    const baseCap = 2;
+
+    return [
+        {
+            label: 'All',
+            value: 'all',
+            filters: {
+                reaction_mode: 'any',
+                auto_disliked: 'any',
+                blacklisted: 'any',
+                blacklist_type: 'any',
+                max_previewed_count: null,
+                sort: 'downloaded_at',
+                seed: null,
+            },
+        },
+        {
+            label: 'Reacted (Random)',
+            value: 'reacted_random',
+            filters: {
+                reaction_mode: 'reacted',
+                blacklisted: 'no',
+                auto_disliked: 'no',
+                max_previewed_count: baseCap,
+                sort: 'random',
+            },
+        },
+        {
+            label: 'Reacted (Newest)',
+            value: 'reacted_newest',
+            filters: {
+                reaction_mode: 'reacted',
+                blacklisted: 'no',
+                auto_disliked: 'no',
+                max_previewed_count: baseCap,
+                sort: 'reaction_at',
+            },
+        },
+        {
+            label: 'Reacted (Oldest)',
+            value: 'reacted_oldest',
+            filters: {
+                reaction_mode: 'reacted',
+                blacklisted: 'no',
+                auto_disliked: 'no',
+                max_previewed_count: baseCap,
+                sort: 'reaction_at_asc',
+            },
+        },
+        {
+            label: 'Inbox (Fresh)',
+            value: 'inbox_fresh',
+            filters: {
+                reaction_mode: 'unreacted',
+                blacklisted: 'no',
+                auto_disliked: 'no',
+                max_previewed_count: 0,
+                sort: 'created_at',
+            },
+        },
+        {
+            label: 'Inbox (Newest)',
+            value: 'inbox_newest',
+            filters: {
+                reaction_mode: 'unreacted',
+                blacklisted: 'no',
+                auto_disliked: 'no',
+                max_previewed_count: baseCap,
+                sort: 'created_at',
+            },
+        },
+        {
+            label: 'Inbox (Oldest)',
+            value: 'inbox_oldest',
+            filters: {
+                reaction_mode: 'unreacted',
+                blacklisted: 'no',
+                auto_disliked: 'no',
+                max_previewed_count: baseCap,
+                sort: 'created_at_asc',
+            },
+        },
+        {
+            label: 'Disliked (Manual)',
+            value: 'disliked_manual',
+            filters: {
+                reaction_mode: 'types',
+                reaction: ['dislike'],
+                blacklisted: 'no',
+                auto_disliked: 'no',
+                max_previewed_count: baseCap,
+                sort: 'reaction_at',
+            },
+        },
+        {
+            label: 'Disliked (Auto)',
+            value: 'disliked_auto',
+            filters: {
+                reaction_mode: 'types',
+                reaction: ['dislike'],
+                blacklisted: 'no',
+                auto_disliked: 'yes',
+                max_previewed_count: baseCap,
+                sort: 'reaction_at',
+            },
+        },
+        {
+            label: 'Blacklisted (Any)',
+            value: 'blacklisted_any',
+            filters: {
+                reaction_mode: 'any',
+                blacklisted: 'yes',
+                blacklist_type: 'any',
+                max_previewed_count: baseCap,
+                sort: 'blacklisted_at',
+            },
+        },
+        {
+            label: 'Blacklisted (Manual)',
+            value: 'blacklisted_manual',
+            filters: {
+                reaction_mode: 'any',
+                blacklisted: 'yes',
+                blacklist_type: 'manual',
+                max_previewed_count: baseCap,
+                sort: 'blacklisted_at',
+            },
+        },
+        {
+            label: 'Blacklisted (Auto)',
+            value: 'blacklisted_auto',
+            filters: {
+                reaction_mode: 'any',
+                blacklisted: 'yes',
+                blacklist_type: 'auto',
+                max_previewed_count: baseCap,
+                sort: 'blacklisted_at',
+            },
+        },
+    ];
 });
 
 function valueOrDefault(field: ServiceFilterField): unknown {
@@ -225,6 +379,26 @@ watch(
     () => ensureRandomSeed(),
     { immediate: true }
 );
+
+const selectedLocalPreset = ref<string>('');
+
+function applyLocalPreset(value: string): void {
+    selectedLocalPreset.value = value;
+
+    const preset = localPresets.value.find((p) => p.value === value);
+    if (!preset) {
+        return;
+    }
+
+    // Apply only the preset keys; user may already have other serviceFilters.
+    form.data.serviceFilters = {
+        ...form.data.serviceFilters,
+        ...preset.filters,
+    };
+
+    form.data.page = 1;
+    ensureRandomSeed();
+}
 </script>
 
 <template>
@@ -256,6 +430,23 @@ watch(
 
                 <!-- Local mode fields -->
                 <template v-if="form.data.feed === 'local' && activeSchema">
+                    <div class="form-field">
+                        <label class="form-label">Preset</label>
+                        <Select :model-value="selectedLocalPreset" @update:model-value="(v) => applyLocalPreset(v as string)">
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="Select a preset…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem v-for="preset in localPresets" :key="preset.value" :value="preset.value">
+                                    {{ preset.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p class="form-help">
+                            Presets set sensible defaults. You can tweak fields below after applying.
+                        </p>
+                    </div>
+
                     <!-- Limit (global) -->
                     <div class="form-field">
                         <label class="form-label">Limit</label>

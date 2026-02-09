@@ -75,7 +75,8 @@ class BrowseController extends Controller
                     'source' => 'all',
                     // Reaction filtering:
                     // - any: ignore reactions entirely (show all files)
-                    // - reacted: any file you've reacted to
+                    // - reacted: positive reactions (love/like/funny), excludes dislikes
+                    // - unreacted: files you have not reacted to
                     // - types: only selected reaction types
                     'reaction_mode' => 'any',
                     'reaction' => ['love', 'like', 'dislike', 'funny'],
@@ -83,6 +84,7 @@ class BrowseController extends Controller
                     'downloaded' => 'any',
                     'blacklisted' => 'any',
                     'blacklist_type' => 'any',
+                    'auto_disliked' => 'any',
                     'sort' => 'downloaded_at',
                     'seed' => null,
                     'max_previewed_count' => null,
@@ -106,7 +108,8 @@ class BrowseController extends Controller
                         'description' => 'How to filter by your reactions.',
                         'options' => [
                             ['label' => 'Any (ignore reactions)', 'value' => 'any'],
-                            ['label' => 'Reacted (any type)', 'value' => 'reacted'],
+                            ['label' => 'Reacted (love/like/funny)', 'value' => 'reacted'],
+                            ['label' => 'Unreacted (no reactions)', 'value' => 'unreacted'],
                             ['label' => 'Specific reaction types', 'value' => 'types'],
                         ],
                         'default' => 'any',
@@ -152,14 +155,30 @@ class BrowseController extends Controller
                         ],
                         'default' => 'any',
                     ]),
+                    $localSchema->field('auto_disliked', [
+                        'type' => 'radio',
+                        'description' => 'Whether the file was auto-disliked.',
+                        'options' => [
+                            ['label' => 'Any', 'value' => 'any'],
+                            ['label' => 'Yes', 'value' => 'yes'],
+                            ['label' => 'No', 'value' => 'no'],
+                        ],
+                        'default' => 'any',
+                    ]),
                     $localSchema->field('sort', [
                         'type' => 'select',
                         'description' => 'Sort local results.',
                         'options' => [
                             ['label' => 'Downloaded At', 'value' => 'downloaded_at'],
+                            ['label' => 'Downloaded At (Oldest)', 'value' => 'downloaded_at_asc'],
+                            ['label' => 'Created At', 'value' => 'created_at'],
+                            ['label' => 'Created At (Oldest)', 'value' => 'created_at_asc'],
                             ['label' => 'Updated At', 'value' => 'updated_at'],
+                            ['label' => 'Updated At (Oldest)', 'value' => 'updated_at_asc'],
                             ['label' => 'Blacklisted At', 'value' => 'blacklisted_at'],
+                            ['label' => 'Blacklisted At (Oldest)', 'value' => 'blacklisted_at_asc'],
                             ['label' => 'Reaction Timestamp', 'value' => 'reaction_at'],
+                            ['label' => 'Reaction Timestamp (Oldest)', 'value' => 'reaction_at_asc'],
                             ['label' => 'Random', 'value' => 'random'],
                         ],
                         'default' => 'downloaded_at',

@@ -50,4 +50,3 @@ test('file show includes manual blacklist type when reason is present', function
     $response->assertSuccessful();
     $response->assertJsonPath('file.blacklist_type', 'manual');
 });
-
