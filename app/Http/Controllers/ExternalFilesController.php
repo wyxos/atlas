@@ -8,10 +8,10 @@ use App\Http\Requests\StoreExternalFileRequest;
 use App\Http\Resources\FileResource;
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\DownloadedFileResetService;
 use App\Services\ExtensionUserResolver;
 use App\Services\ExternalFileIngestService;
 use App\Services\FileReactionService;
-use App\Services\DownloadedFileResetService;
 use Illuminate\Http\JsonResponse;
 
 class ExternalFilesController extends Controller
