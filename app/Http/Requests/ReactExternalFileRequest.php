@@ -48,6 +48,7 @@ class ReactExternalFileRequest extends FormRequest
             // Some sites embed large/SEO-heavy alt text.
             'alt' => ['nullable', 'string', 'max:2000'],
             'download_via' => ['nullable', 'string', 'in:yt-dlp'],
+            'force_download' => ['nullable', 'boolean'],
         ];
     }
 }
