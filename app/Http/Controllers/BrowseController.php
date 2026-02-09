@@ -73,13 +73,19 @@ class BrowseController extends Controller
                 'defaults' => [
                     'limit' => 20,
                     'source' => 'all',
-                    // UI default: all reaction types enabled.
+                    // Reaction filtering:
+                    // - any: ignore reactions entirely (show all files)
+                    // - reacted: any file you've reacted to
+                    // - types: only selected reaction types
+                    'reaction_mode' => 'any',
                     'reaction' => ['love', 'like', 'dislike', 'funny'],
                     // Tri-state selects.
                     'downloaded' => 'any',
                     'blacklisted' => 'any',
+                    'blacklist_type' => 'any',
                     'sort' => 'downloaded_at',
                     'seed' => null,
+                    'max_previewed_count' => null,
                 ],
                 'schema' => $localSchema->fields([
                     $localSchema->pageField([
@@ -95,9 +101,19 @@ class BrowseController extends Controller
                         'options' => $sourceOptions,
                         'default' => 'all',
                     ]),
+                    $localSchema->field('reaction_mode', [
+                        'type' => 'select',
+                        'description' => 'How to filter by your reactions.',
+                        'options' => [
+                            ['label' => 'Any (ignore reactions)', 'value' => 'any'],
+                            ['label' => 'Reacted (any type)', 'value' => 'reacted'],
+                            ['label' => 'Specific reaction types', 'value' => 'types'],
+                        ],
+                        'default' => 'any',
+                    ]),
                     $localSchema->field('reaction', [
                         'type' => 'checkbox-group',
-                        'description' => 'Filter by your reaction on a file.',
+                        'description' => 'Reaction types (used when Reaction Mode is "Specific reaction types").',
                         'options' => [
                             ['label' => 'Favorite', 'value' => 'love'],
                             ['label' => 'Like', 'value' => 'like'],
@@ -126,6 +142,16 @@ class BrowseController extends Controller
                         ],
                         'default' => 'any',
                     ]),
+                    $localSchema->field('blacklist_type', [
+                        'type' => 'select',
+                        'description' => 'Filter blacklisted files by how they were blacklisted.',
+                        'options' => [
+                            ['label' => 'Any', 'value' => 'any'],
+                            ['label' => 'Manual', 'value' => 'manual'],
+                            ['label' => 'Auto', 'value' => 'auto'],
+                        ],
+                        'default' => 'any',
+                    ]),
                     $localSchema->field('sort', [
                         'type' => 'select',
                         'description' => 'Sort local results.',
@@ -133,6 +159,7 @@ class BrowseController extends Controller
                             ['label' => 'Downloaded At', 'value' => 'downloaded_at'],
                             ['label' => 'Updated At', 'value' => 'updated_at'],
                             ['label' => 'Blacklisted At', 'value' => 'blacklisted_at'],
+                            ['label' => 'Reaction Timestamp', 'value' => 'reaction_at'],
                             ['label' => 'Random', 'value' => 'random'],
                         ],
                         'default' => 'downloaded_at',
@@ -140,6 +167,12 @@ class BrowseController extends Controller
                     $localSchema->field('seed', [
                         'type' => 'number',
                         'description' => 'Random seed (positive integer). Only used when sort is Random.',
+                        'default' => null,
+                    ]),
+                    $localSchema->field('max_previewed_count', [
+                        'type' => 'number',
+                        'description' => 'Hide files with previewed_count above this value. Leave blank to disable (typical: 2).',
+                        'min' => 0,
                         'default' => null,
                     ]),
                 ]),

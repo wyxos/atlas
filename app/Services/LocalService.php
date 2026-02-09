@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\File;
+use App\Models\Reaction;
 
 class LocalService extends BaseService
 {
@@ -27,9 +28,16 @@ class LocalService extends BaseService
         $source = $params['source'] ?? null; // Filter by source if provided
         $downloaded = $params['downloaded'] ?? 'any';
         $blacklisted = $params['blacklisted'] ?? 'any';
+        $blacklistType = is_string($params['blacklist_type'] ?? null) ? (string) $params['blacklist_type'] : 'any';
         $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'downloaded_at';
         $seedRaw = $params['seed'] ?? null;
         $seed = is_numeric($seedRaw) ? (int) $seedRaw : null;
+        $maxPreviewedRaw = $params['max_previewed_count'] ?? null;
+        $maxPreviewed = is_numeric($maxPreviewedRaw) ? (int) $maxPreviewedRaw : null;
+        if (is_int($maxPreviewed) && $maxPreviewed < 1) {
+            $maxPreviewed = null;
+        }
+        $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
         $reaction = $params['reaction'] ?? null;
 
         // Filter by current user's reaction types (optional)
@@ -56,14 +64,41 @@ class LocalService extends BaseService
 
             // When all reaction types are selected (default), treat this as "no filter".
             if (count($reactionTypes) === count($allTypes)) {
-                $reactionTypes = null;
+                $reactionTypes = $allTypes;
             }
+        }
+
+        if ($reactionMode === 'types' && ($reactionTypes === null || count($reactionTypes) === 0)) {
+            return [
+                'files' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                    'total' => 0,
+                ],
+            ];
         }
 
         // Stabilize random sort by generating a seed once and letting Browser persist it into the tab params.
         if ($sort === 'random' && (! is_int($seed) || $seed < 1)) {
             $seed = time();
             $this->params['seed'] = $seed;
+        }
+
+        // Reaction timestamp sorting is inherently per-user and requires DB ordering.
+        // This stays fast because it is scoped to the current user's reactions.
+        if ($sort === 'reaction_at') {
+            return $this->fetchByReactionTimestamp(
+                page: $page,
+                limit: $limit,
+                source: is_string($source) ? $source : null,
+                downloaded: is_string($downloaded) ? $downloaded : 'any',
+                blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
+                blacklistType: $blacklistType,
+                maxPreviewed: $maxPreviewed,
+                reactionMode: $reactionMode,
+                reactionTypes: $reactionTypes,
+                allTypes: $allTypes,
+            );
         }
 
         // Only Typesense can efficiently browse the entire dataset without direct DB queries.
@@ -75,14 +110,17 @@ class LocalService extends BaseService
                 source: is_string($source) ? $source : null,
                 downloaded: is_string($downloaded) ? $downloaded : 'any',
                 blacklisted: is_string($blacklisted) ? $blacklisted : 'any',
+                blacklistType: $blacklistType,
                 sort: $sort,
                 seed: $seed,
+                maxPreviewed: $maxPreviewed,
+                reactionMode: $reactionMode,
                 reactionTypes: $reactionTypes,
                 allTypes: $allTypes,
             );
         }
 
-        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted, $sort, $seed) {
+        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted, $blacklistType, $sort, $seed, $maxPreviewed) {
             $search = $params['search'] ?? '';
             if ($search === '') {
                 $search = config('scout.driver') === 'typesense' ? '*' : '';
@@ -106,6 +144,17 @@ class LocalService extends BaseService
                 $builder->where('blacklisted', true);
             } elseif ($blacklisted === 'no') {
                 $builder->where('blacklisted', false);
+            }
+
+            // Blacklist type (manual/auto) - only makes sense when blacklisted is allowed.
+            if (in_array($blacklistType, ['manual', 'auto'], true)) {
+                $builder->where('blacklisted', true);
+                $builder->where('blacklist_type', $blacklistType);
+            }
+
+            // Cap previewed_count (optional).
+            if (is_int($maxPreviewed) && $maxPreviewed > 0) {
+                $builder->where('previewed_count', ['<=', $maxPreviewed]);
             }
 
             // Sorting (Typesense supports special sort fields like _rand(seed)).
@@ -133,7 +182,37 @@ class LocalService extends BaseService
             return $builder;
         };
 
-        if ($reactionTypes !== null) {
+        if ($reactionMode === 'types' && is_array($reactionTypes) && count($reactionTypes) === count($allTypes)) {
+            // Treat "all types selected" as "reacted (any type)".
+            $reactionMode = 'reacted';
+        }
+
+        if ($reactionMode === 'reacted') {
+            $userId = auth()->id();
+            if (! $userId) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                        'total' => 0,
+                    ],
+                ];
+            }
+
+            $pagination = $buildSearch()
+                ->where('reacted_user_ids', (string) $userId)
+                ->paginate($limit, 'page', $page);
+
+            return [
+                'files' => collect($pagination->items())->all(),
+                'metadata' => [
+                    'nextCursor' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
+                    'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
+                ],
+            ];
+        }
+
+        if ($reactionMode === 'types' && $reactionTypes !== null) {
             if (count($reactionTypes) < count($allTypes)) {
                 $userId = auth()->id();
                 if (! $userId) {
@@ -272,13 +351,20 @@ class LocalService extends BaseService
         ?string $source,
         string $downloaded,
         string $blacklisted,
+        string $blacklistType,
         string $sort,
         ?int $seed,
+        ?int $maxPreviewed,
+        string $reactionMode,
         ?array $reactionTypes,
         array $allTypes,
     ): array {
         $page = max(1, $page);
         $limit = max(1, $limit);
+
+        if ($reactionMode === 'types' && is_array($reactionTypes) && count($reactionTypes) === count($allTypes)) {
+            $reactionMode = 'reacted';
+        }
 
         $query = File::query()->with('metadata');
 
@@ -298,7 +384,38 @@ class LocalService extends BaseService
             $query->whereNull('blacklisted_at');
         }
 
-        if ($reactionTypes !== null && count($reactionTypes) < count($allTypes)) {
+        if (in_array($blacklistType, ['manual', 'auto'], true)) {
+            $query->whereNotNull('blacklisted_at');
+
+            if ($blacklistType === 'manual') {
+                $query->whereNotNull('blacklist_reason')->where('blacklist_reason', '!=', '');
+            } else {
+                $query->where(function ($q) {
+                    $q->whereNull('blacklist_reason')->orWhere('blacklist_reason', '=', '');
+                });
+            }
+        }
+
+        if (is_int($maxPreviewed) && $maxPreviewed > 0) {
+            $query->where('previewed_count', '<=', $maxPreviewed);
+        }
+
+        if ($reactionMode === 'reacted') {
+            $userId = auth()->id();
+            if (! $userId) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                        'total' => 0,
+                    ],
+                ];
+            }
+
+            $query->whereHas('reactions', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            });
+        } elseif ($reactionMode === 'types' && $reactionTypes !== null && count($reactionTypes) < count($allTypes)) {
             $userId = auth()->id();
             if (! $userId) {
                 return [
@@ -339,6 +456,125 @@ class LocalService extends BaseService
 
         return [
             'files' => $filesList,
+            'metadata' => [
+                'nextCursor' => $nextCursor,
+                'total' => (int) $pagination->total(),
+            ],
+        ];
+    }
+
+    /**
+     * Fetch files ordered by the current user's reaction timestamp.
+     *
+     * This is intentionally DB-backed (Typesense does not have per-user reaction timestamps).
+     *
+     * @param  array<int, string>|null  $reactionTypes
+     * @param  array<int, string>  $allTypes
+     */
+    protected function fetchByReactionTimestamp(
+        int $page,
+        int $limit,
+        ?string $source,
+        string $downloaded,
+        string $blacklisted,
+        string $blacklistType,
+        ?int $maxPreviewed,
+        string $reactionMode,
+        ?array $reactionTypes,
+        array $allTypes,
+    ): array {
+        $page = max(1, $page);
+        $limit = max(1, $limit);
+
+        $userId = auth()->id();
+        if (! $userId) {
+            return [
+                'files' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                    'total' => 0,
+                ],
+            ];
+        }
+
+        if ($reactionMode !== 'reacted' && $reactionMode !== 'types') {
+            // Sorting by reaction timestamp without a reaction scope doesn't make sense.
+            // Treat as "reacted".
+            $reactionMode = 'reacted';
+        }
+
+        if ($reactionMode === 'types') {
+            $reactionTypes = is_array($reactionTypes) ? array_values(array_filter($reactionTypes, fn ($t) => in_array($t, $allTypes, true))) : null;
+            if (! $reactionTypes || count($reactionTypes) === 0) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                        'total' => 0,
+                    ],
+                ];
+            }
+            if (count($reactionTypes) === count($allTypes)) {
+                $reactionMode = 'reacted';
+            }
+        }
+
+        $idQuery = Reaction::query()
+            ->join('files', 'files.id', '=', 'reactions.file_id')
+            ->where('reactions.user_id', $userId)
+            ->when($reactionMode === 'types', fn ($q) => $q->whereIn('reactions.type', $reactionTypes ?? []))
+            ->when($source && $source !== 'all', fn ($q) => $q->where('files.source', $source))
+            ->when($downloaded === 'yes', fn ($q) => $q->where('files.downloaded', true))
+            ->when($downloaded === 'no', fn ($q) => $q->where('files.downloaded', false))
+            ->when($blacklisted === 'yes', fn ($q) => $q->whereNotNull('files.blacklisted_at'))
+            ->when($blacklisted === 'no', fn ($q) => $q->whereNull('files.blacklisted_at'))
+            ->when(in_array($blacklistType, ['manual', 'auto'], true), function ($q) use ($blacklistType) {
+                $q->whereNotNull('files.blacklisted_at');
+                if ($blacklistType === 'manual') {
+                    $q->whereNotNull('files.blacklist_reason')->where('files.blacklist_reason', '!=', '');
+                } else {
+                    $q->where(function ($qq) {
+                        $qq->whereNull('files.blacklist_reason')->orWhere('files.blacklist_reason', '=', '');
+                    });
+                }
+            })
+            ->when(is_int($maxPreviewed) && $maxPreviewed > 0, fn ($q) => $q->where('files.previewed_count', '<=', $maxPreviewed))
+            ->select('reactions.file_id')
+            ->orderByDesc('reactions.created_at');
+
+        $pagination = $idQuery->paginate($limit, ['reactions.file_id'], 'page', $page);
+        $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
+
+        $ids = collect($pagination->items())
+            ->pluck('file_id')
+            ->map(fn ($v) => (int) $v)
+            ->values()
+            ->all();
+
+        if (empty($ids)) {
+            return [
+                'files' => [],
+                'metadata' => [
+                    'nextCursor' => null,
+                    'total' => (int) $pagination->total(),
+                ],
+            ];
+        }
+
+        $filesById = File::query()
+            ->with('metadata')
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        $orderedFiles = collect($ids)
+            ->map(fn (int $id) => $filesById->get($id))
+            ->filter()
+            ->values()
+            ->all();
+
+        return [
+            'files' => $orderedFiles,
             'metadata' => [
                 'nextCursor' => $nextCursor,
                 'total' => (int) $pagination->total(),
