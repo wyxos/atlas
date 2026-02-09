@@ -192,6 +192,7 @@ class LocalService extends BaseService
                     ->unique('id')
                     ->when($sort === 'random', function ($c) use ($seed) {
                         $seedValue = $seed && $seed > 0 ? (string) $seed : (string) time();
+
                         return $c->sortBy(fn (File $f) => sprintf('%u', crc32($seedValue.':'.$f->id)));
                     }, function ($c) use ($sort) {
                         if ($sort === 'updated_at') {
