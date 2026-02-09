@@ -163,6 +163,24 @@ const emit = defineEmits<{
                         <div class="font-semibold text-white mb-1">Seen</div>
                         <div>{{ fileData.seen_count }} times</div>
                     </div>
+                    <div v-if="fileData.blacklisted_at" class="space-y-2">
+                        <div class="font-semibold text-white mb-1">Blacklisted</div>
+                        <div>{{ new Date(fileData.blacklisted_at).toLocaleString() }}</div>
+                        <div>
+                            <div class="font-semibold text-white mb-1">Blacklist Type</div>
+                            <div class="uppercase tracking-wide text-xs text-twilight-indigo-100">
+                                {{ fileData.blacklist_type || (fileData.blacklist_reason ? 'manual' : 'auto') }}
+                            </div>
+                        </div>
+                        <div v-if="fileData.blacklist_reason">
+                            <div class="font-semibold text-white mb-1">Blacklist Reason</div>
+                            <div class="wrap-break-word">{{ fileData.blacklist_reason }}</div>
+                        </div>
+                        <div v-else-if="fileData.blacklist_rule">
+                            <div class="font-semibold text-white mb-1">Moderation Rule (Matched)</div>
+                            <div class="wrap-break-word">#{{ fileData.blacklist_rule.id }} {{ fileData.blacklist_rule.name }}</div>
+                        </div>
+                    </div>
                     <div v-if="fileData.created_at">
                         <div class="font-semibold text-white mb-1">Created</div>
                         <div>{{ new Date(fileData.created_at).toLocaleString() }}</div>
@@ -175,7 +193,6 @@ const emit = defineEmits<{
         </div>
     </div>
 </template>
-
 
 
 

@@ -35,6 +35,26 @@ final class FileModerationService extends BaseModerationService
         return $this->process($files);
     }
 
+    /**
+     * Return the first active rule (by id asc) that matches this file's prompt.
+     *
+     * This is used for "explain" style UI (e.g. File viewer sheet), not for applying actions.
+     */
+    public function matchRule(File $file, ?string $actionType = null): ?ModerationRule
+    {
+        $query = ModerationRule::query()
+            ->where('active', true)
+            ->orderBy('id', 'asc');
+
+        if (is_string($actionType) && $actionType !== '') {
+            $query->where('action_type', $actionType);
+        }
+
+        $this->activeRules = $query->get();
+
+        return $this->getMatchForFile($file);
+    }
+
     protected function hasRules(): bool
     {
         return $this->activeRules !== null && ! $this->activeRules->isEmpty();
