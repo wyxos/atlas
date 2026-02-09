@@ -52,6 +52,29 @@ class FileResource extends JsonResource
         $previewFileUrl = $this->preview_path ? route('api.files.preview', ['file' => $this->id]) : null;
         $posterUrl = $this->poster_path ? route('api.files.poster', ['file' => $this->id]) : null;
 
+        $blacklistType = null;
+        $blacklistRule = null;
+        if ($this->blacklisted_at !== null) {
+            $hasReason = is_string($this->blacklist_reason) && trim($this->blacklist_reason) !== '';
+            $blacklistType = $hasReason ? 'manual' : 'auto';
+
+            // We don't currently persist which rule caused an auto-blacklist.
+            // For the viewer sheet, we infer the current matching blacklist rule (if any).
+            if (! $hasReason) {
+                try {
+                    $rule = app(\App\Services\FileModerationService::class)->matchRule($this->resource, 'blacklist');
+                    if ($rule) {
+                        $blacklistRule = [
+                            'id' => $rule->id,
+                            'name' => $rule->name,
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    // If moderation rules table isn't ready or anything fails, omit inferred details.
+                }
+            }
+        }
+
         return [
             'id' => $this->id,
             'source' => $this->source,
@@ -84,6 +107,8 @@ class FileResource extends JsonResource
             'seen_count' => $this->seen_count,
             'blacklisted_at' => $this->blacklisted_at?->toIso8601String(),
             'blacklist_reason' => $this->blacklist_reason,
+            'blacklist_type' => $blacklistType,
+            'blacklist_rule' => $blacklistRule,
             'downloaded' => $this->downloaded,
             'downloaded_at' => $this->downloaded_at?->toIso8601String(),
             'download_progress' => $this->download_progress,

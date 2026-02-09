@@ -30,6 +30,8 @@ export interface File {
     seen_count: number;
     blacklisted_at: string | null;
     blacklist_reason: string | null;
+    blacklist_type?: 'manual' | 'auto' | null;
+    blacklist_rule?: { id: number; name: string } | null;
     downloaded: boolean;
     downloaded_at: string | null;
     download_progress: number;
