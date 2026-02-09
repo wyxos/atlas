@@ -124,8 +124,11 @@ class LocalService extends BaseService
                     ->orderBy('updated_at', 'desc');
             }
 
-            // Paginate with eager loaded metadata (needed for moderation)
-            $builder->query(fn ($query) => $query->with('metadata'));
+            // Important: do NOT set a Scout query callback here.
+            // When a query callback is present, Scout will attempt to compute pagination totals by
+            // enumerating IDs (bounded by Scout's max_total_results, default 1000), which makes the
+            // "Total" shown in local browse incorrect for large datasets. We load metadata after the
+            // fact in Browser.php for local mode, per-page.
 
             return $builder;
         };

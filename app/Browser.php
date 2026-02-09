@@ -148,10 +148,15 @@ class Browser
         }
 
         // Only persist files if not in local mode (local files already exist in DB)
-        // For local mode, files are already File models from LocalService.transform()
-        // LocalService.fetch() already eager loads metadata, so no additional query needed
+        // For local mode, files are already File models from LocalService.transform().
+        // We intentionally lazy-load per-page relationships to avoid Scout total-count caps.
         if ($isLocalMode) {
             $persisted = $filesPayload;
+
+            if (! empty($persisted)) {
+                // Needed for moderation logic and UI details. Keep it per-page to avoid scanning the dataset.
+                (new \Illuminate\Database\Eloquent\Collection($persisted))->load('metadata');
+            }
         } else {
             $persisted = app(BrowsePersister::class)->persist($filesPayload);
         }
