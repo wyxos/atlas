@@ -144,4 +144,3 @@ test('local browse can cap previewed_count', function () {
     expect($ids)->toContain($ok->id);
     expect($ids)->not->toContain($tooMany->id);
 });
-
