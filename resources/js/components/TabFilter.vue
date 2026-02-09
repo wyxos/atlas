@@ -109,6 +109,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'All',
             value: 'all',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'any',
                 auto_disliked: 'any',
                 blacklisted: 'any',
@@ -122,6 +123,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Reacted (Random)',
             value: 'reacted_random',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'reacted',
                 blacklisted: 'no',
                 auto_disliked: 'no',
@@ -133,6 +135,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Reacted (Newest)',
             value: 'reacted_newest',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'reacted',
                 blacklisted: 'no',
                 auto_disliked: 'no',
@@ -144,6 +147,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Reacted (Oldest)',
             value: 'reacted_oldest',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'reacted',
                 blacklisted: 'no',
                 auto_disliked: 'no',
@@ -155,6 +159,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Inbox (Fresh)',
             value: 'inbox_fresh',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'unreacted',
                 blacklisted: 'no',
                 auto_disliked: 'no',
@@ -166,6 +171,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Inbox (Newest)',
             value: 'inbox_newest',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'unreacted',
                 blacklisted: 'no',
                 auto_disliked: 'no',
@@ -177,6 +183,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Inbox (Oldest)',
             value: 'inbox_oldest',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'unreacted',
                 blacklisted: 'no',
                 auto_disliked: 'no',
@@ -188,6 +195,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Disliked (Manual)',
             value: 'disliked_manual',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'types',
                 reaction: ['dislike'],
                 blacklisted: 'no',
@@ -200,6 +208,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Disliked (Auto)',
             value: 'disliked_auto',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'types',
                 reaction: ['dislike'],
                 blacklisted: 'no',
@@ -212,6 +221,7 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Blacklisted (Any)',
             value: 'blacklisted_any',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'any',
                 blacklisted: 'yes',
                 blacklist_type: 'any',
