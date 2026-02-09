@@ -52,6 +52,12 @@ declare const chrome: ChromeApi;
 
   let openSheet: (() => void) | null = null;
 
+  const ATLAS_STATUS_TTL_MS = 30_000;
+  const atlasStatusCache = new Map<
+    string,
+    { exists: boolean; downloaded: boolean; reactionType: string | null; ts: number }
+  >();
+
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const createSvgIcon = (pathDs: string[]): SVGSVGElement => {
     const svg = document.createElementNS(SVG_NS, 'svg');
@@ -126,6 +132,57 @@ declare const chrome: ChromeApi;
 
   function sourceFromMediaUrl(url) {
     return registrableDomainFromUrl(url) || 'Extension';
+  }
+
+  function getCachedAtlasStatus(url: string) {
+    const cached = atlasStatusCache.get(url);
+    if (!cached) return null;
+    if (Date.now() - cached.ts > ATLAS_STATUS_TTL_MS) {
+      atlasStatusCache.delete(url);
+      return null;
+    }
+    return cached;
+  }
+
+  function fetchAtlasStatus(
+    sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void,
+    url: string,
+    callback: (status: { exists: boolean; downloaded: boolean; reactionType: string | null } | null) => void
+  ) {
+    if (!url) {
+      callback(null);
+      return;
+    }
+
+    const cached = getCachedAtlasStatus(url);
+    if (cached) {
+      callback(cached);
+      return;
+    }
+
+    sendMessageSafe({ type: 'atlas-check-batch', urls: [url] }, (response) => {
+      if (!response || !response.ok) {
+        callback(null);
+        return;
+      }
+
+      const results = Array.isArray(response.data?.results) ? response.data.results : [];
+      const match = results.find((r) => r?.url === url) ?? results[0] ?? null;
+      if (!match) {
+        callback(null);
+        return;
+      }
+
+      const status = {
+        exists: Boolean(match.exists),
+        downloaded: Boolean(match.downloaded),
+        reactionType: match.reaction?.type ? String(match.reaction.type) : null,
+        ts: Date.now(),
+      };
+
+      atlasStatusCache.set(url, status);
+      callback(status);
+    });
   }
 
   // Allow the toolbar icon (background script) to open the sheet.
@@ -795,12 +852,23 @@ declare const chrome: ChromeApi;
     }
 
     function reactToItem(item, type) {
+      if (type !== 'dislike' && item.atlas?.downloaded) {
+        const ok = window.confirm('This file is already downloaded in Atlas. Re-download it?');
+        if (!ok) {
+          showToast('Cancelled.');
+          return;
+        }
+      }
+
       item.reactionPending = type;
       item.status = 'Reacting…';
       item.statusClass = '';
       renderList();
 
       const payload = buildReactionPayload(item, type);
+      if (type !== 'dislike' && item.atlas?.downloaded) {
+        payload.force_download = true;
+      }
 
       sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
         item.reactionPending = null;
@@ -856,6 +924,17 @@ declare const chrome: ChromeApi;
         return;
       }
 
+      const hasDownloaded = selected.some((item) => Boolean(item.atlas?.downloaded));
+      if (hasDownloaded) {
+        const ok = window.confirm(
+          'One or more selected files are already downloaded in Atlas. Re-download them?'
+        );
+        if (!ok) {
+          showToast('Cancelled.');
+          return;
+        }
+      }
+
       queue.disabled = true;
       refresh.disabled = true;
       checkAtlas.disabled = true;
@@ -868,7 +947,13 @@ declare const chrome: ChromeApi;
       }
       renderList();
 
-      const payloads = selected.map((item) => buildDownloadPayload(item));
+      const payloads = selected.map((item) => {
+        const payload = buildDownloadPayload(item);
+        if (hasDownloaded) {
+          payload.force_download = true;
+        }
+        return payload;
+      });
 
       sendMessageSafe(
         { type: 'atlas-download-batch', payloads },
@@ -1405,13 +1490,39 @@ declare const chrome: ChromeApi;
                 download_via: 'yt-dlp',
               };
 
-              options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-                if (!response || !response.ok) {
-                  options.showToast(response?.error || 'Reaction failed.');
-                  return;
+              fetchAtlasStatus(options.sendMessageSafe, payload.url, (status) => {
+                if (status?.downloaded) {
+                  const ok = window.confirm(
+                    'This file is already downloaded in Atlas. Re-download it?'
+                  );
+                  if (!ok) {
+                    options.showToast('Cancelled.');
+                    return;
+                  }
+
+                  payload.force_download = true;
                 }
 
-                options.showToast(`Reacted (${reactionType}). Resolving video in Atlas…`);
+                options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+                  if (!response || !response.ok) {
+                    options.showToast(response?.error || 'Reaction failed.');
+                    return;
+                  }
+
+                  const data = response.data || null;
+                  const file = data?.file || null;
+                  const newReactionType = data?.reaction?.type
+                    ? String(data.reaction.type)
+                    : reactionType;
+                  atlasStatusCache.set(payload.url, {
+                    exists: Boolean(file),
+                    downloaded: Boolean(file?.downloaded),
+                    reactionType: newReactionType,
+                    ts: Date.now(),
+                  });
+
+                  options.showToast(`Reacted (${reactionType}). Resolving video in Atlas…`);
+                });
               });
 
               return;
@@ -1439,13 +1550,37 @@ declare const chrome: ChromeApi;
           source: sourceFromMediaUrl(item.url),
         };
 
-        options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-          if (!response || !response.ok) {
-            options.showToast(response?.error || 'Reaction failed.');
-            return;
+        fetchAtlasStatus(options.sendMessageSafe, payload.url, (status) => {
+          if (status?.downloaded) {
+            const ok = window.confirm('This file is already downloaded in Atlas. Re-download it?');
+            if (!ok) {
+              options.showToast('Cancelled.');
+              return;
+            }
+
+            payload.force_download = true;
           }
 
-          options.showToast(`Reacted (${reactionType}). Queued download in Atlas.`);
+          options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+            if (!response || !response.ok) {
+              options.showToast(response?.error || 'Reaction failed.');
+              return;
+            }
+
+            const data = response.data || null;
+            const file = data?.file || null;
+            const newReactionType = data?.reaction?.type
+              ? String(data.reaction.type)
+              : reactionType;
+            atlasStatusCache.set(payload.url, {
+              exists: Boolean(file),
+              downloaded: Boolean(file?.downloaded),
+              reactionType: newReactionType,
+              ts: Date.now(),
+            });
+
+            options.showToast(`Reacted (${reactionType}). Queued download in Atlas.`);
+          });
         });
       },
       true
@@ -1603,7 +1738,17 @@ declare const chrome: ChromeApi;
     toolbar.setAttribute('aria-label', 'Atlas reactions');
 
     let activeMedia: Element | null = null;
+    let activeKey: string | null = null;
     let hideTimer: number | null = null;
+
+    const buttonsByType = new Map<string, HTMLButtonElement>();
+    const setToolbarActive = (reactionType: string | null) => {
+      for (const reaction of REACTIONS) {
+        const btn = buttonsByType.get(reaction.type);
+        if (!btn) continue;
+        btn.classList.toggle('active', reactionType === reaction.type);
+      }
+    };
 
     const cancelHide = () => {
       if (hideTimer) {
@@ -1614,9 +1759,11 @@ declare const chrome: ChromeApi;
 
     const hide = () => {
       activeMedia = null;
+      activeKey = null;
       toolbar.classList.remove('open');
       toolbar.style.left = '';
       toolbar.style.top = '';
+      setToolbarActive(null);
     };
 
     const scheduleHide = () => {
@@ -1641,6 +1788,7 @@ declare const chrome: ChromeApi;
       button.setAttribute('aria-label', reaction.label);
       button.title = reaction.label;
       button.replaceChildren(createSvgIcon(reaction.pathDs));
+      buttonsByType.set(reaction.type, button);
 
       button.addEventListener('pointerdown', swallow, true);
       button.addEventListener('mousedown', swallow, true);
@@ -1658,18 +1806,47 @@ declare const chrome: ChromeApi;
           return;
         }
 
-        options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-          if (!response || !response.ok) {
-            options.showToast(response?.error || 'Reaction failed.');
-            return;
+        const checkKey = payload.url || '';
+
+        fetchAtlasStatus(options.sendMessageSafe, checkKey, (status) => {
+          if (reaction.type !== 'dislike' && status?.downloaded) {
+            const ok = window.confirm('This file is already downloaded in Atlas. Re-download it?');
+            if (!ok) {
+              options.showToast('Cancelled.');
+              return;
+            }
+
+            payload.force_download = true;
           }
 
-          if (payload.download_via === 'yt-dlp') {
-            options.showToast(`Reacted (${reaction.type}). Resolving video in Atlas…`);
-            return;
-          }
+          options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+            if (!response || !response.ok) {
+              options.showToast(response?.error || 'Reaction failed.');
+              return;
+            }
 
-          options.showToast(`Reacted (${reaction.type}). Queued download in Atlas.`);
+            const data = response.data || null;
+            const file = data?.file || null;
+            const newReactionType = data?.reaction?.type ? String(data.reaction.type) : reaction.type;
+
+            if (checkKey) {
+              atlasStatusCache.set(checkKey, {
+                exists: Boolean(file),
+                downloaded: Boolean(file?.downloaded),
+                reactionType: newReactionType,
+                ts: Date.now(),
+              });
+            }
+
+            setToolbarActive(newReactionType);
+
+            if (payload.download_via === 'yt-dlp') {
+              options.showToast(`Reacted (${reaction.type}). Resolving video in Atlas…`);
+              return;
+            }
+
+            options.showToast(`Reacted (${reaction.type}). Queued download in Atlas.`);
+          });
         });
       });
 
@@ -1708,15 +1885,31 @@ declare const chrome: ChromeApi;
       }
 
       // Validate this media has a usable URL (or is a supported video fallback) before showing.
-      const canShow = Boolean(buildOverlayReactionPayload(media, 'like'));
-      if (!canShow) {
+      const previewPayload = buildOverlayReactionPayload(media, 'like');
+      if (!previewPayload) {
         hide();
         return;
       }
 
       activeMedia = media;
+      activeKey = previewPayload.url || null;
       toolbar.classList.add('open');
       updatePosition();
+
+      setToolbarActive(null);
+      if (activeKey) {
+        const cached = getCachedAtlasStatus(activeKey);
+        if (cached) {
+          setToolbarActive(cached.reactionType);
+        } else {
+          const keyAtRequest = activeKey;
+          fetchAtlasStatus(options.sendMessageSafe, keyAtRequest, (status) => {
+            if (!status) return;
+            if (activeKey !== keyAtRequest) return;
+            setToolbarActive(status.reactionType);
+          });
+        }
+      }
     };
 
     document.addEventListener(

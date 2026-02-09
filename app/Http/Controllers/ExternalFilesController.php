@@ -11,6 +11,7 @@ use App\Models\Reaction;
 use App\Services\ExtensionUserResolver;
 use App\Services\ExternalFileIngestService;
 use App\Services\FileReactionService;
+use App\Services\DownloadedFileResetService;
 use Illuminate\Http\JsonResponse;
 
 class ExternalFilesController extends Controller
@@ -19,10 +20,12 @@ class ExternalFilesController extends Controller
         StoreExternalFileRequest $request,
         ExternalFileIngestService $service,
         ExtensionUserResolver $extensionUserResolver,
-        FileReactionService $fileReactions
+        FileReactionService $fileReactions,
+        DownloadedFileResetService $downloadedFileReset,
     ): JsonResponse {
         $validated = $request->validated();
         $reactionType = $validated['reaction_type'];
+        $forceDownload = (bool) ($validated['force_download'] ?? false);
 
         // Always drive download through the reaction pipeline (no fallback path).
         $result = $service->ingest($validated, false);
@@ -40,6 +43,11 @@ class ExternalFilesController extends Controller
                 'Access-Control-Allow-Methods' => 'POST, OPTIONS',
                 'Access-Control-Allow-Headers' => 'Content-Type, X-Atlas-Extension-Token, Authorization',
             ]);
+        }
+
+        if ($forceDownload && $reactionType !== 'dislike') {
+            $downloadedFileReset->reset($file);
+            $file = $file->refresh();
         }
 
         $user = $extensionUserResolver->resolve();
@@ -114,9 +122,11 @@ class ExternalFilesController extends Controller
         ReactExternalFileRequest $request,
         ExternalFileIngestService $service,
         ExtensionUserResolver $extensionUserResolver,
-        FileReactionService $fileReactions
+        FileReactionService $fileReactions,
+        DownloadedFileResetService $downloadedFileReset,
     ): JsonResponse {
         $validated = $request->validated();
+        $forceDownload = (bool) ($validated['force_download'] ?? false);
 
         // Create/update the file record, but let the reaction pipeline decide whether to dispatch download.
         $result = $service->ingest($validated, false);
@@ -132,6 +142,11 @@ class ExternalFilesController extends Controller
                 'Access-Control-Allow-Methods' => 'POST, OPTIONS',
                 'Access-Control-Allow-Headers' => 'Content-Type, X-Atlas-Extension-Token, Authorization',
             ]);
+        }
+
+        if ($forceDownload && $validated['type'] !== 'dislike') {
+            $downloadedFileReset->reset($file);
+            $file = $file->refresh();
         }
 
         $user = $extensionUserResolver->resolve();

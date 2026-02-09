@@ -1,9 +1,11 @@
 <?php
 
 use App\Jobs\DownloadFile;
+use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -52,4 +54,47 @@ test('extension react does not dispatch download for dislike', function () {
     $response->assertOk();
     $response->assertJsonPath('reaction.type', 'dislike');
     Queue::assertNotPushed(DownloadFile::class);
+});
+
+test('extension react can force a re-download for already downloaded files', function () {
+    Queue::fake();
+    Storage::fake('atlas-app');
+
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $file = File::factory()->create([
+        'referrer_url' => 'https://example.com/media/one.jpg',
+        'url' => 'https://example.com/media/one.jpg',
+        'downloaded' => true,
+        'path' => 'downloads/original.jpg',
+        'preview_path' => 'downloads/preview.jpg',
+        'poster_path' => null,
+    ]);
+
+    Storage::disk('atlas-app')->put($file->path, 'original');
+    Storage::disk('atlas-app')->put($file->preview_path, 'preview');
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/react', [
+            'type' => 'like',
+            'url' => 'https://example.com/media/one.jpg',
+            'original_url' => 'https://example.com/media/one.jpg',
+            'source' => 'Extension',
+            'force_download' => true,
+        ]);
+
+    $response->assertOk();
+
+    $file->refresh();
+    expect($file->downloaded)->toBeFalse();
+    expect($file->path)->toBeNull();
+    expect($file->preview_path)->toBeNull();
+
+    Storage::disk('atlas-app')->assertMissing('downloads/original.jpg');
+    Storage::disk('atlas-app')->assertMissing('downloads/preview.jpg');
+
+    Queue::assertPushed(DownloadFile::class);
 });
