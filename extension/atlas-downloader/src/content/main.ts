@@ -61,11 +61,8 @@ declare const chrome: ChromeApi;
     svg.setAttribute('stroke-width', '2');
     svg.setAttribute('stroke-linecap', 'round');
     svg.setAttribute('stroke-linejoin', 'round');
-    // Make it visible even if some site messes with our CSS.
     svg.setAttribute('width', '18');
     svg.setAttribute('height', '18');
-    // Inline styles beat most CSS issues (including pages messing with svg defaults).
-    svg.setAttribute('style', 'color: #e2e8f0; stroke: currentColor; fill: none;');
 
     for (const d of pathDs) {
       const path = document.createElementNS(SVG_NS, 'path');
@@ -237,6 +234,13 @@ declare const chrome: ChromeApi;
     (document.body || document.documentElement).appendChild(host);
 
     installHotkeys({
+      showToast,
+      sendMessageSafe,
+      isSheetOpen: () => false,
+    });
+
+    installMediaReactionOverlay({
+      root,
       showToast,
       sendMessageSafe,
       isSheetOpen: () => false,
@@ -434,6 +438,13 @@ declare const chrome: ChromeApi;
       },
       getHintShown: () => hotkeysHintShown,
       enabled: hotkeysEnabled,
+    });
+
+    installMediaReactionOverlay({
+      root,
+      showToast,
+      sendMessageSafe,
+      isSheetOpen: () => root.classList.contains(OPEN_CLASS),
     });
 
     function makeButton(label, onClick, options) {
@@ -1526,5 +1537,225 @@ declare const chrome: ChromeApi;
       },
       true
     );
+  }
+
+  function clamp(value: number, min: number, max: number) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  function buildOverlayReactionPayload(media: Element, reactionType: string) {
+    const item = buildItemFromElement(media);
+    if (item) {
+      return {
+        type: reactionType,
+        url: item.url,
+        original_url: item.url,
+        referrer_url: window.location.href,
+        page_title: limitString(document.title, MAX_METADATA_LEN),
+        tag_name: item.tag_name,
+        width: item.width,
+        height: item.height,
+        alt: limitString(item.alt || '', MAX_METADATA_LEN),
+        preview_url: item.preview_url || '',
+        source: sourceFromMediaUrl(item.url),
+      };
+    }
+
+    if (media instanceof HTMLVideoElement) {
+      const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
+      if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
+        const pageUrl = window.location.href;
+        const uniqueUrl = `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random()
+          .toString(16)
+          .slice(2)}`;
+
+        return {
+          type: reactionType,
+          url: pageUrl,
+          original_url: uniqueUrl,
+          referrer_url: pageUrl,
+          page_title: limitString(document.title, MAX_METADATA_LEN),
+          tag_name: 'video',
+          width: media.videoWidth || media.clientWidth || null,
+          height: media.videoHeight || media.clientHeight || null,
+          alt: '',
+          preview_url: media.poster || '',
+          source: sourceFromMediaUrl(pageUrl),
+          download_via: 'yt-dlp',
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function installMediaReactionOverlay(options: {
+    root: HTMLElement;
+    showToast: (message: string) => void;
+    sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void;
+    isSheetOpen: () => boolean;
+  }) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'atlas-downloader-media-toolbar';
+    toolbar.setAttribute('role', 'toolbar');
+    toolbar.setAttribute('aria-label', 'Atlas reactions');
+
+    let activeMedia: Element | null = null;
+    let hideTimer: number | null = null;
+
+    const cancelHide = () => {
+      if (hideTimer) {
+        window.clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+    };
+
+    const hide = () => {
+      activeMedia = null;
+      toolbar.classList.remove('open');
+      toolbar.style.left = '';
+      toolbar.style.top = '';
+    };
+
+    const scheduleHide = () => {
+      cancelHide();
+      hideTimer = window.setTimeout(() => {
+        if (toolbar.matches(':hover')) return;
+        hide();
+      }, 140);
+    };
+
+    const swallow = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      // @ts-expect-error stopImmediatePropagation exists on MouseEvent/PointerEvent.
+      event.stopImmediatePropagation?.();
+    };
+
+    for (const reaction of REACTIONS) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `atlas-downloader-reaction-btn ${reaction.className}`.trim();
+      button.setAttribute('aria-label', reaction.label);
+      button.title = reaction.label;
+      button.replaceChildren(createSvgIcon(reaction.pathDs));
+
+      button.addEventListener('pointerdown', swallow, true);
+      button.addEventListener('mousedown', swallow, true);
+      button.addEventListener('click', (event) => {
+        swallow(event);
+
+        if (!activeMedia) {
+          options.showToast('No media selected.');
+          return;
+        }
+
+        const payload = buildOverlayReactionPayload(activeMedia, reaction.type);
+        if (!payload) {
+          options.showToast('No valid media URL found.');
+          return;
+        }
+
+        options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          if (!response || !response.ok) {
+            options.showToast(response?.error || 'Reaction failed.');
+            return;
+          }
+
+          if (payload.download_via === 'yt-dlp') {
+            options.showToast(`Reacted (${reaction.type}). Resolving video in Atlas…`);
+            return;
+          }
+
+          options.showToast(`Reacted (${reaction.type}). Queued download in Atlas.`);
+        });
+      });
+
+      toolbar.appendChild(button);
+    }
+
+    options.root.appendChild(toolbar);
+
+    const isOwnUiEvent = (event: Event) => {
+      const composedPath =
+        typeof (event as Event & { composedPath?: () => unknown[] }).composedPath === 'function'
+          ? (event as Event & { composedPath: () => unknown[] }).composedPath()
+          : [];
+      return composedPath.some((p) => p instanceof HTMLElement && p.id === ROOT_ID);
+    };
+
+    const updatePosition = () => {
+      if (!activeMedia) return;
+
+      const rect = activeMedia.getBoundingClientRect();
+      if (!Number.isFinite(rect.left) || rect.width <= 0 || rect.height <= 0) {
+        hide();
+        return;
+      }
+
+      const top = clamp(rect.top + 8, 8, window.innerHeight - 8);
+      const left = clamp(rect.right - 8, 8, window.innerWidth - 8);
+      toolbar.style.top = `${top}px`;
+      toolbar.style.left = `${left}px`;
+    };
+
+    const showFor = (media: Element) => {
+      if (options.isSheetOpen()) {
+        hide();
+        return;
+      }
+
+      // Validate this media has a usable URL (or is a supported video fallback) before showing.
+      const canShow = Boolean(buildOverlayReactionPayload(media, 'like'));
+      if (!canShow) {
+        hide();
+        return;
+      }
+
+      activeMedia = media;
+      toolbar.classList.add('open');
+      updatePosition();
+    };
+
+    document.addEventListener(
+      'pointerover',
+      (event) => {
+        if (options.isSheetOpen()) return;
+        if (!(event.target instanceof Element)) return;
+        if (isOwnUiEvent(event)) return;
+
+        const media = event.target.closest?.('img, video') ?? null;
+        if (!media) return;
+
+        cancelHide();
+        showFor(media);
+      },
+      true
+    );
+
+    document.addEventListener(
+      'pointerout',
+      (event) => {
+        if (!activeMedia) return;
+        if (options.isSheetOpen()) return;
+        if (!(event.target instanceof Element)) return;
+        if (isOwnUiEvent(event)) return;
+
+        const leavingMedia = event.target.closest?.('img, video') ?? null;
+        if (!leavingMedia) return;
+
+        scheduleHide();
+      },
+      true
+    );
+
+    toolbar.addEventListener('pointerenter', cancelHide, true);
+    toolbar.addEventListener('pointerleave', scheduleHide, true);
+
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('blur', hide);
   }
 })();
