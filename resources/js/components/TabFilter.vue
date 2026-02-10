@@ -273,6 +273,44 @@ function checkboxGroupSelection(field: ServiceFilterField): string[] {
 }
 
 function setCheckboxGroupValue(field: ServiceFilterField, value: string, checked: boolean): void {
+    // Special-case: local file type filter has an "All" option that is exclusive.
+    // Values: all, image, video, audio, other
+    if (field.uiKey === 'file_type') {
+        const allTypes = ['image', 'video', 'audio', 'other'];
+        const current = new Set(checkboxGroupSelection(field));
+
+        if (checked) {
+            if (value === 'all') {
+                updateServiceFilterValue(field.uiKey, ['all']);
+                return;
+            }
+
+            current.delete('all');
+            current.add(value);
+
+            const hasAll = allTypes.every((t) => current.has(t));
+            updateServiceFilterValue(field.uiKey, hasAll ? ['all'] : Array.from(current));
+            return;
+        }
+
+        // Unchecking
+        if (value === 'all') {
+            // Keep "all" selected unless the user explicitly selects specific types.
+            updateServiceFilterValue(field.uiKey, ['all']);
+            return;
+        }
+
+        current.delete(value);
+
+        if (current.size === 0) {
+            updateServiceFilterValue(field.uiKey, ['all']);
+            return;
+        }
+
+        updateServiceFilterValue(field.uiKey, Array.from(current));
+        return;
+    }
+
     const current = new Set(checkboxGroupSelection(field));
 
     if (checked) {
@@ -392,6 +430,12 @@ watch(
 );
 
 const selectedLocalPreset = ref<string>('');
+const selectedLocalPresetLabel = computed(() => {
+    if (!selectedLocalPreset.value) {
+        return null;
+    }
+    return localPresets.value.find((p) => p.value === selectedLocalPreset.value)?.label ?? selectedLocalPreset.value;
+});
 
 function applyLocalPreset(value: string): void {
     selectedLocalPreset.value = value;
@@ -445,7 +489,9 @@ function applyLocalPreset(value: string): void {
                         <label class="form-label">Preset</label>
                         <Select :model-value="selectedLocalPreset" @update:model-value="(v) => applyLocalPreset(v as string)">
                             <SelectTrigger class="w-full">
-                                <SelectValue placeholder="Select a preset…" />
+                                <span class="truncate">
+                                    {{ selectedLocalPresetLabel || 'Select a preset…' }}
+                                </span>
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem v-for="preset in localPresets" :key="preset.value" :value="preset.value">
