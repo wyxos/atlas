@@ -39,6 +39,7 @@ test('browse services endpoint returns civitai schema with expected field mappin
     expect($local['defaults']['sort'])->toBe('downloaded_at');
     expect($local['defaults'])->toHaveKey('seed');
     expect($local['defaults'])->toHaveKey('max_previewed_count');
+    expect($local['defaults']['file_type'])->toBe('all');
 
     $localFields = $local['schema']['fields'] ?? null;
     expect($localFields)->toBeArray();
@@ -46,6 +47,7 @@ test('browse services endpoint returns civitai schema with expected field mappin
         'page',
         'limit',
         'source',
+        'file_type',
         'reaction_mode',
         'reaction',
         'downloaded',

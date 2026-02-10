@@ -226,3 +226,26 @@ test('max_previewed_count=0 returns only unpreviewed files', function () {
     expect($ids)->toContain($zero->id);
     expect($ids)->not->toContain($one->id);
 });
+
+test('local browse can filter by file type (audio only)', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $audio = File::factory()->create([
+        'source' => 'CivitAI',
+        'mime_type' => 'audio/mpeg',
+    ]);
+    $image = File::factory()->create([
+        'source' => 'CivitAI',
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&file_type=audio");
+    $response->assertSuccessful();
+
+    $ids = collect($response->json('items'))->pluck('id')->all();
+    expect($ids)->toContain($audio->id);
+    expect($ids)->not->toContain($image->id);
+});

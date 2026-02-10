@@ -257,6 +257,12 @@ class File extends Model
             $dislikeIds = $toIds($groups->get('dislike', collect()));
             $funnyIds = $toIds($groups->get('funny', collect()));
 
+            $positiveReactedIds = collect([$loveIds, $likeIds, $funnyIds])
+                ->flatten()
+                ->unique()
+                ->values()
+                ->all();
+
             $reactedIds = collect([$loveIds, $likeIds, $dislikeIds, $funnyIds])
                 ->flatten()
                 ->unique()
@@ -277,6 +283,9 @@ class File extends Model
             }
             if (! empty($reactedIds)) {
                 $array['reacted_user_ids'] = $reactedIds;
+            }
+            if (! empty($positiveReactedIds)) {
+                $array['positive_reacted_user_ids'] = $positiveReactedIds;
             }
 
             // Add has_reactions boolean for efficient filtering

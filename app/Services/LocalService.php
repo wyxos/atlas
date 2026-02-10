@@ -30,6 +30,7 @@ class LocalService extends BaseService
         $blacklisted = $params['blacklisted'] ?? 'any';
         $blacklistType = is_string($params['blacklist_type'] ?? null) ? (string) $params['blacklist_type'] : 'any';
         $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'downloaded_at';
+        $fileType = is_string($params['file_type'] ?? null) ? (string) $params['file_type'] : 'all';
         $seedRaw = $params['seed'] ?? null;
         $seed = is_numeric($seedRaw) ? (int) $seedRaw : null;
         $hasMaxPreviewedParam = array_key_exists('max_previewed_count', $params);
@@ -82,10 +83,7 @@ class LocalService extends BaseService
         }
 
         // "Reacted" is defined as positive reactions only (love/like/funny), excluding dislikes.
-        if ($reactionMode === 'reacted') {
-            $reactionMode = 'types';
-            $reactionTypes = ['love', 'like', 'funny'];
-        }
+        // Keep it as a distinct mode so we can use a single Typesense filter field for pagination stability.
 
         // Default preview cap:
         // For almost all presets, we want to surface only fresh (unpreviewed) files.
@@ -158,13 +156,14 @@ class LocalService extends BaseService
                 sort: $sort,
                 seed: $seed,
                 maxPreviewed: $maxPreviewed,
+                fileType: $fileType,
                 reactionMode: $reactionMode,
                 reactionTypes: $reactionTypes,
                 allTypes: $allTypes,
             );
         }
 
-        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted, $blacklistType, $sort, $seed, $maxPreviewed) {
+        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted, $blacklistType, $sort, $seed, $maxPreviewed, $fileType) {
             $search = $params['search'] ?? '';
             if ($search === '') {
                 $search = config('scout.driver') === 'typesense' ? '*' : '';
@@ -199,6 +198,18 @@ class LocalService extends BaseService
             // Cap previewed_count (optional).
             if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
                 $builder->where('previewed_count', ['<=', $maxPreviewed]);
+            }
+
+            // File type filter (optional, based on indexed mime_group).
+            // Values: all, image, video, audio, image_video.
+            if ($fileType === 'image') {
+                $builder->where('mime_group', 'image');
+            } elseif ($fileType === 'video') {
+                $builder->where('mime_group', 'video');
+            } elseif ($fileType === 'audio') {
+                $builder->where('mime_group', 'audio');
+            } elseif ($fileType === 'image_video') {
+                $builder->where('mime_group', ['image', 'video']);
             }
 
             // Sorting (Typesense supports special sort fields like _rand(seed)).
@@ -264,6 +275,32 @@ class LocalService extends BaseService
 
             $pagination = $applyAutoDislikedFilter($buildSearch())
                 ->whereNotIn('reacted_user_ids', [(string) $userId])
+                ->paginate($limit, 'page', $page);
+
+            return [
+                'files' => collect($pagination->items())->all(),
+                'metadata' => [
+                    'nextCursor' => $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null,
+                    'total' => method_exists($pagination, 'total') ? (int) $pagination->total() : null,
+                ],
+            ];
+        }
+
+        // Reacted: positive only (love/like/funny). This is per-user and depends on positive_reacted_user_ids.
+        if ($reactionMode === 'reacted') {
+            $userId = auth()->id();
+            if (! $userId) {
+                return [
+                    'files' => [],
+                    'metadata' => [
+                        'nextCursor' => null,
+                        'total' => 0,
+                    ],
+                ];
+            }
+
+            $pagination = $applyAutoDislikedFilter($buildSearch())
+                ->where('positive_reacted_user_ids', (string) $userId)
                 ->paginate($limit, 'page', $page);
 
             return [
@@ -444,6 +481,7 @@ class LocalService extends BaseService
         string $sort,
         ?int $seed,
         ?int $maxPreviewed,
+        string $fileType,
         string $reactionMode,
         ?array $reactionTypes,
         array $allTypes,
@@ -483,6 +521,19 @@ class LocalService extends BaseService
 
         if (is_int($maxPreviewed) && $maxPreviewed >= 0) {
             $query->where('previewed_count', '<=', $maxPreviewed);
+        }
+
+        if ($fileType === 'image') {
+            $query->where('mime_type', 'like', 'image/%');
+        } elseif ($fileType === 'video') {
+            $query->where('mime_type', 'like', 'video/%');
+        } elseif ($fileType === 'audio') {
+            $query->where('mime_type', 'like', 'audio/%');
+        } elseif ($fileType === 'image_video') {
+            $query->where(function ($q) {
+                $q->where('mime_type', 'like', 'image/%')
+                    ->orWhere('mime_type', 'like', 'video/%');
+            });
         }
 
         if ($autoDisliked === 'yes') {
