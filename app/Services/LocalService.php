@@ -300,7 +300,9 @@ class LocalService extends BaseService
             }
 
             $pagination = $applyAutoDislikedFilter($buildSearch())
-                ->where('positive_reacted_user_ids', (string) $userId)
+                ->where('reacted_user_ids', (string) $userId)
+                // Reacted excludes dislikes by definition.
+                ->whereNotIn('dislike_user_ids', [(string) $userId])
                 ->paginate($limit, 'page', $page);
 
             return [
