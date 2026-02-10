@@ -30,6 +30,12 @@ class ExtensionPackageService
         $latestChange = $this->latestMtime($includedFiles);
         $needsRebuild = $force || ! is_file($zipPath) || filemtime($zipPath) < $latestChange;
 
+        // If the packaging rules change (e.g. newly-required files), mtime checks alone won't detect it.
+        // Ensure the existing archive contains the required entry list; otherwise rebuild it.
+        if (! $needsRebuild && is_file($zipPath)) {
+            $needsRebuild = ! $this->zipContainsRequiredEntries($zipPath);
+        }
+
         if ($needsRebuild) {
             $this->buildZip($extensionPath, $zipPath, $includedFiles);
         }
@@ -90,6 +96,42 @@ class ExtensionPackageService
         }
 
         return $latest;
+    }
+
+    private function zipContainsRequiredEntries(string $zipPath): bool
+    {
+        $requiredEntries = [
+            'manifest.json',
+            'icon.svg',
+            'icon-16.png',
+            'icon-32.png',
+            'icon-48.png',
+            'icon-256.png',
+            // The extension won't function without the compiled artifacts.
+            'dist/background.js',
+            'dist/content.js',
+            'dist/content.css',
+            'dist/options.html',
+            'dist/options.js',
+            'dist/options.css',
+        ];
+
+        $zip = new ZipArchive;
+        if ($zip->open($zipPath) !== true) {
+            return false;
+        }
+
+        foreach ($requiredEntries as $entry) {
+            if ($zip->locateName($entry, ZipArchive::FL_NOCASE) === false) {
+                $zip->close();
+
+                return false;
+            }
+        }
+
+        $zip->close();
+
+        return true;
     }
 
     /**
