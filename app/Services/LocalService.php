@@ -221,7 +221,9 @@ class LocalService extends BaseService
                 if (count($fileTypes) === 1) {
                     $builder->where('mime_group', $fileTypes[0]);
                 } else {
-                    $builder->where('mime_group', $fileTypes);
+                    // Scout's TypesenseEngine treats array values passed to `where()` as a raw token concat,
+                    // so multi-select must use whereIn() to generate `field:=[a, b]`.
+                    $builder->whereIn('mime_group', $fileTypes);
                 }
             }
 
