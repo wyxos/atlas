@@ -336,6 +336,28 @@ async function getPage(page: PageToken, context?: BrowseFormData) {
             items: data.items || [],
             nextPage: data.nextPage,
         };
+    } catch (error: unknown) {
+        const err = error as { message?: unknown; response?: { data?: { message?: unknown } } };
+        const message =
+            (typeof err?.response?.data?.message === 'string' ? err.response.data.message : null) ||
+            (typeof err?.message === 'string' ? err.message : null) ||
+            'Browse request failed.';
+        const trimmed = typeof message === 'string' && message.length > 280
+            ? `${message.slice(0, 280)}…`
+            : message;
+
+        // Avoid silent "blank page" when Typesense / network errors occur.
+        toast.error(trimmed);
+        // Keep a console breadcrumb for diagnosing intermittent refresh failures.
+        // Tests suppress console.error by default.
+        console.error('Browse request failed', { params, error });
+
+        totalAvailable.value = null;
+
+        return {
+            items: [],
+            nextPage: null,
+        };
     } finally {
         // Best-effort: Masonry no longer emits loading:stop, so we stop here.
         handleLoadingStop();

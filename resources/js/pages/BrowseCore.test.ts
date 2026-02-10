@@ -387,7 +387,8 @@ describe('Browse - Core', () => {
         tabContentVm.items = [];
         const getNextPage = tabContentVm.getPage;
 
-        await expect(getNextPage(1)).rejects.toThrow('Network error');
+        await expect(getNextPage(1)).resolves.toEqual({ items: [], nextPage: null });
+        expect(console.error).toHaveBeenCalled();
     });
 
     it('returns correct structure from getPage with null nextPage', async () => {
