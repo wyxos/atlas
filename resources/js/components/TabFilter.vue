@@ -164,7 +164,8 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction_mode: 'unreacted',
                 blacklisted: 'no',
                 auto_disliked: 'no',
-                max_previewed_count: baseCap,
+                // Fresh means: never previewed.
+                max_previewed_count: 0,
                 sort: 'created_at',
             },
         },
@@ -253,6 +254,21 @@ const localPresets = computed<LocalPreset[]>(() => {
             },
         },
     ];
+});
+
+const localPageInput = computed<number>({
+    get() {
+        const raw = form.data.page;
+        const n = typeof raw === 'number' ? raw : Number(raw);
+        if (!Number.isFinite(n) || n < 1) {
+            return 1;
+        }
+        return Math.floor(n);
+    },
+    set(value) {
+        const n = typeof value === 'number' ? value : Number(value);
+        form.data.page = Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+    },
 });
 
 function valueOrDefault(field: ServiceFilterField): unknown {
@@ -520,6 +536,20 @@ function applyLocalPreset(value: string): void {
                                 <SelectItem value="200">200</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <!-- Page (local only, numeric). -->
+                    <div class="form-field">
+                        <label class="form-label">Page</label>
+                        <Input
+                            v-model="localPageInput"
+                            type="number"
+                            min="1"
+                            step="1"
+                            placeholder="1"
+                            :class="inputClass"
+                        />
+                        <p class="form-help">Jump to a specific local page (1-based).</p>
                     </div>
 
                     <!-- Source (global) -->
