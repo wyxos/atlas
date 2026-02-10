@@ -174,6 +174,57 @@ class FilesController extends Controller
     }
 
     /**
+     * Serve a lightweight SVG icon for non-image/video files.
+     *
+     * This avoids trying to generate thumbnails for formats where we don't yet have preview support
+     * (audio, documents, archives, etc.).
+     */
+    public function serveIcon(File $file)
+    {
+        $mime = strtolower((string) ($file->mime_type ?? ''));
+        $ext = strtolower((string) ($file->ext ?? ''));
+
+        $kind = match (true) {
+            str_starts_with($mime, 'audio/') => 'audio',
+            $mime === 'application/pdf' || $ext === 'pdf' => 'pdf',
+            str_contains($mime, 'zip') || in_array($ext, ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'], true) => 'archive',
+            str_starts_with($mime, 'text/') || in_array($ext, ['txt', 'md', 'json', 'csv', 'log'], true) => 'text',
+            default => 'file',
+        };
+
+        $label = match ($kind) {
+            'audio' => 'AUDIO',
+            'pdf' => 'PDF',
+            'archive' => 'ZIP',
+            'text' => 'TXT',
+            default => strtoupper(substr($ext !== '' ? $ext : 'FILE', 0, 4)),
+        };
+
+        // Simple, readable icon: document + label. Keep it self-contained for fast rendering.
+        $svg = <<<SVG
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-label="{$label} file">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="88" height="88" rx="18" fill="url(#bg)" stroke="rgba(148,163,184,0.25)" stroke-width="2"/>
+  <path d="M34 24h20l8 8v34a6 6 0 0 1-6 6H34a6 6 0 0 1-6-6V30a6 6 0 0 1 6-6z" fill="rgba(148,163,184,0.10)" stroke="rgba(226,232,240,0.55)" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M54 24v10h10" fill="none" stroke="rgba(226,232,240,0.55)" stroke-width="2" stroke-linejoin="round"/>
+  <text x="48" y="62" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" font-size="12" font-weight="700" fill="#e2e8f0" letter-spacing="0.08em">{$label}</text>
+</svg>
+SVG;
+
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml; charset=utf-8',
+            // Cache aggressively; behind auth, but identical per (mime/ext) isn't worth re-requesting.
+            'Cache-Control' => 'private, max-age=604800',
+        ]);
+    }
+
+    /**
      * Remove the specified file from storage.
      */
     public function destroy(File $file): JsonResponse

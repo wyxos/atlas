@@ -1,6 +1,8 @@
 import { nextTick, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 
+type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
+
 export function useFileViewerOpen(params: {
     containerRef: Ref<HTMLElement | null>;
     masonryContainerRef: Ref<HTMLElement | null>;
@@ -12,8 +14,9 @@ export function useFileViewerOpen(params: {
     overlay: {
         rect: { top: number; left: number; width: number; height: number } | null;
         image: { src: string; srcset?: string; sizes?: string; alt?: string } | null;
-        mediaType: 'image' | 'video';
+        mediaType: OverlayMediaType;
         videoSrc: string | null;
+        audioSrc: string | null;
         borderRadius: string | null;
         key: number;
         isAnimating: boolean;
@@ -55,6 +58,7 @@ export function useFileViewerOpen(params: {
         image,
         mediaType,
         videoSrc,
+        audioSrc,
         borderRadius,
         key,
         isAnimating,
@@ -119,9 +123,24 @@ export function useFileViewerOpen(params: {
             return;
         }
 
-        const nextMediaType: 'image' | 'video' = masonryItem.type === 'video' ? 'video' : 'image';
+        const resolveMediaType = (item: FeedItem): OverlayMediaType => {
+            const kind = typeof item.media_kind === 'string' ? item.media_kind : null;
+            if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'file') {
+                return kind;
+            }
+
+            const mime = typeof item.mime_type === 'string' ? item.mime_type : '';
+            if (mime.startsWith('video/')) return 'video';
+            if (mime.startsWith('image/')) return 'image';
+            if (mime.startsWith('audio/')) return 'audio';
+
+            return item.type === 'video' ? 'video' : 'image';
+        };
+
+        const nextMediaType = resolveMediaType(masonryItem);
         mediaType.value = nextMediaType;
         videoSrc.value = null;
+        audioSrc.value = null;
 
         const itemBox = itemEl.getBoundingClientRect();
         const tabContentBox = tabContent.getBoundingClientRect();
@@ -176,6 +195,29 @@ export function useFileViewerOpen(params: {
                     height: masonryItem.height,
                 };
                 videoSrc.value = fullSizeUrl;
+                isLoading.value = false;
+
+                await params.handleItemSeen(masonryItem.id);
+                await nextTick();
+            } else if (nextMediaType === 'audio') {
+                originalDimensions.value = {
+                    width: masonryItem.width,
+                    height: masonryItem.height,
+                };
+                // The overlay still renders an image (icon), but we load/play the audio URL.
+                fullSizeImage.value = src;
+                audioSrc.value = fullSizeUrl;
+                isLoading.value = false;
+
+                await params.handleItemSeen(masonryItem.id);
+                await nextTick();
+            } else if (nextMediaType === 'file') {
+                originalDimensions.value = {
+                    width: masonryItem.width,
+                    height: masonryItem.height,
+                };
+                // Generic files show the icon in the overlay; sheet can show details/actions.
+                fullSizeImage.value = src;
                 isLoading.value = false;
 
                 await params.handleItemSeen(masonryItem.id);

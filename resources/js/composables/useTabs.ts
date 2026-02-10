@@ -16,6 +16,7 @@ export type FeedItem = {
     originalUrl?: string; // Original full-size URL
     thumbnail?: string; // Thumbnail URL (may be same as src)
     type?: 'image' | 'video';
+    media_kind?: 'image' | 'video' | 'audio' | 'file';
     notFound?: boolean;
     reaction?: { type: string } | null;
     previewed_count?: number;

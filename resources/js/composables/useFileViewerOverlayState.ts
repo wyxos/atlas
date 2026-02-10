@@ -1,5 +1,7 @@
 import { toRefs, type Ref } from 'vue';
 
+type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
+
 export function useFileViewerOverlayState(params: {
     containerRef: Ref<HTMLElement | null>;
     container: {
@@ -17,8 +19,9 @@ export function useFileViewerOverlayState(params: {
         imageSize: { width: number; height: number } | null;
         centerPosition: { top: number; left: number } | null;
         image: { src: string; srcset?: string; sizes?: string; alt?: string } | null;
-        mediaType: 'image' | 'video';
+        mediaType: OverlayMediaType;
         videoSrc: string | null;
+        audioSrc: string | null;
         borderRadius: string | null;
         isLoading: boolean;
         fullSizeImage: string | null;
@@ -50,6 +53,7 @@ export function useFileViewerOverlayState(params: {
         image,
         mediaType,
         videoSrc,
+        audioSrc,
         borderRadius,
         isLoading,
         fullSizeImage,
@@ -77,6 +81,7 @@ export function useFileViewerOverlayState(params: {
         image.value = null;
         mediaType.value = 'image';
         videoSrc.value = null;
+        audioSrc.value = null;
         borderRadius.value = null;
         isLoading.value = false;
         fullSizeImage.value = null;

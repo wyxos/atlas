@@ -67,10 +67,16 @@ export function useFileViewerPreload({
     }
 
     function preloadItem(item: FeedItem): void {
+        const mediaKind = typeof item.media_kind === 'string' ? item.media_kind : null;
         const mimeType = typeof item.mime_type === 'string' ? item.mime_type : null;
-        const isVideo = mimeType?.startsWith('video/') ||
-                        item.preview?.includes('/video/') ||
-                        item.original?.includes('/video/');
+
+        const isVideo = mediaKind === 'video' ||
+            mimeType?.startsWith('video/') ||
+            item.preview?.includes('/video/') ||
+            item.original?.includes('/video/');
+
+        const isAudio = mediaKind === 'audio' || mimeType?.startsWith('audio/');
+        const isFile = mediaKind === 'file';
 
         if (isVideo) {
             // Preload video poster (preview image) and optionally video metadata
@@ -79,6 +85,11 @@ export function useFileViewerPreload({
             }
             if (item.original) {
                 void preloadVideo(item.original);
+            }
+        } else if (isAudio || isFile) {
+            // Keep it light: preload the icon/thumbnail, not the underlying file stream.
+            if (item.preview) {
+                void preloadImage(item.preview);
             }
         } else {
             // Preload full-size image

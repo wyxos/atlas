@@ -1,6 +1,8 @@
 import { nextTick, toRefs, type Ref } from 'vue';
 import type { FeedItem } from '@/composables/useTabs';
 
+type OverlayMediaType = 'image' | 'video' | 'audio' | 'file';
+
 export function useFileViewerPaging(params: {
     containerRef: Ref<HTMLElement | null>;
     items: Ref<FeedItem[]>;
@@ -8,8 +10,9 @@ export function useFileViewerPaging(params: {
         rect: { top: number; left: number; width: number; height: number } | null;
         fillComplete: boolean;
         isAnimating: boolean;
-        mediaType: 'image' | 'video';
+        mediaType: OverlayMediaType;
         videoSrc: string | null;
+        audioSrc: string | null;
         isLoading: boolean;
         fullSizeImage: string | null;
         image: { src: string; srcset?: string; sizes?: string; alt?: string } | null;
@@ -49,6 +52,7 @@ export function useFileViewerPaging(params: {
         isAnimating,
         mediaType,
         videoSrc,
+        audioSrc,
         isLoading,
         fullSizeImage,
         image,
@@ -66,6 +70,20 @@ export function useFileViewerPaging(params: {
         direction,
     } = toRefs(params.navigation);
     const waitForLayout = () => new Promise(resolve => setTimeout(resolve, 0));
+
+    const resolveMediaType = (item: FeedItem): OverlayMediaType => {
+        const kind = typeof item.media_kind === 'string' ? item.media_kind : null;
+        if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'file') {
+            return kind;
+        }
+
+        const mime = typeof item.mime_type === 'string' ? item.mime_type : '';
+        if (mime.startsWith('video/')) return 'video';
+        if (mime.startsWith('image/')) return 'image';
+        if (mime.startsWith('audio/')) return 'audio';
+
+        return item.type === 'video' ? 'video' : 'image';
+    };
 
     async function navigateToNext(): Promise<void> {
         if (!rect.value || !fillComplete.value || currentItemIndex.value === null) return;
@@ -120,7 +138,10 @@ export function useFileViewerPaging(params: {
             return;
         }
 
-        const nextIsVideo = nextItem.type === 'video';
+        const nextMediaType = resolveMediaType(nextItem);
+        const nextIsVideo = nextMediaType === 'video';
+        const nextIsAudio = nextMediaType === 'audio';
+        const nextIsFile = nextMediaType === 'file';
         const nextImageSrc = (nextItem.preview || nextItem.original) as string;
         const nextFullSizeUrl = nextItem.original || nextImageSrc;
 
@@ -130,10 +151,14 @@ export function useFileViewerPaging(params: {
             sizes: undefined,
             alt: nextItem.id.toString(),
         };
-        mediaType.value = nextIsVideo ? 'video' : 'image';
+        mediaType.value = nextMediaType;
         videoSrc.value = nextIsVideo ? nextFullSizeUrl : null;
-        isLoading.value = !nextIsVideo;
+        audioSrc.value = nextIsAudio ? nextFullSizeUrl : null;
+        isLoading.value = nextMediaType === 'image';
         fullSizeImage.value = null;
+        if (nextIsAudio || nextIsFile) {
+            fullSizeImage.value = nextImageSrc;
+        }
         key.value++;
 
         const tabContentBox = tabContent.getBoundingClientRect();
@@ -212,6 +237,71 @@ export function useFileViewerPaging(params: {
 
                 await nextTick();
 
+                await waitForLayout();
+                await waitForLayout();
+
+                if (currentTarget.value !== preloadTarget) {
+                    isNavigating.value = false;
+                    isAnimating.value = false;
+                    return;
+                }
+
+                imageTranslateY.value = 0;
+                await new Promise(resolve => setTimeout(resolve, 500));
+                if (currentTarget.value !== preloadTarget) {
+                    isNavigating.value = false;
+                    isAnimating.value = false;
+                    return;
+                }
+
+                isNavigating.value = false;
+                isAnimating.value = false;
+                return;
+            }
+
+            if (nextIsAudio || nextIsFile) {
+                if (currentTarget.value !== preloadTarget) {
+                    isNavigating.value = false;
+                    isAnimating.value = false;
+                    return;
+                }
+
+                originalDimensions.value = {
+                    width: nextItem.width,
+                    height: nextItem.height,
+                };
+                // Display stays as icon image; audioSrc already set for audio.
+                fullSizeImage.value = nextImageSrc;
+
+                if (nextItem?.id) {
+                    await params.handleItemSeen(nextItem.id);
+                }
+
+                const tabContentBox = tabContent.getBoundingClientRect();
+                const containerWidth = tabContentBox.width;
+                const containerHeight = tabContentBox.height;
+                const borderWidth = 4;
+                const availableWidth = params.getAvailableWidth(containerWidth, borderWidth);
+                const availableHeight = containerHeight - (borderWidth * 2);
+
+                const bestFitSize = params.calculateBestFitSize(
+                    nextItem.width,
+                    nextItem.height,
+                    availableWidth,
+                    availableHeight
+                );
+
+                imageSize.value = bestFitSize;
+                centerPosition.value = params.getCenteredPosition(
+                    availableWidth,
+                    availableHeight,
+                    bestFitSize.width,
+                    bestFitSize.height
+                );
+
+                isLoading.value = false;
+
+                await nextTick();
                 await waitForLayout();
                 await waitForLayout();
 

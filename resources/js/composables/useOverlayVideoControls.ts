@@ -2,7 +2,7 @@ import { computed, nextTick, ref, type Ref, watch } from 'vue';
 
 export function useOverlayVideoControls(params: {
     overlayVideoRef: Ref<HTMLVideoElement | null>;
-    overlayMediaType: Ref<'image' | 'video'>;
+    overlayMediaType: Ref<'image' | 'video' | 'audio' | 'file'>;
     overlayFillComplete: Ref<boolean>;
     overlayIsClosing: Ref<boolean>;
     overlayVideoSrc: Ref<string | null>;
