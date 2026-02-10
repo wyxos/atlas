@@ -53,6 +53,7 @@ class BrowseController extends Controller
             $servicesMeta[] = [
                 'key' => $serviceInstance::key(),
                 'label' => $serviceInstance::label(),
+                'source' => $serviceInstance::source(),
                 'defaults' => $serviceInstance->defaultParams(),
                 'schema' => $serviceInstance->filterSchema(),
             ];

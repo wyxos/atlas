@@ -6,6 +6,7 @@ import { services as browseServices, sources as browseSources } from '@/actions/
 export type ServiceOption = {
     key: string;
     label: string;
+    source?: string;
     defaults?: Record<string, unknown>;
     schema?: ServiceFilterSchema;
 };
@@ -106,5 +107,4 @@ export function useBrowseService(_options?: UseBrowseServiceOptions) {
         getCurrentService,
     };
 }
-
 

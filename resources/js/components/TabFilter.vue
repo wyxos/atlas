@@ -102,7 +102,7 @@ const localPresets = computed<LocalPreset[]>(() => {
         return [];
     }
 
-    const baseCap = 2;
+    const baseCap = 0;
 
     return [
         {
@@ -114,7 +114,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 auto_disliked: 'any',
                 blacklisted: 'any',
                 blacklist_type: 'any',
-                max_previewed_count: null,
+                max_previewed_count: baseCap,
                 sort: 'downloaded_at',
                 seed: null,
             },
@@ -200,7 +200,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction: ['dislike'],
                 blacklisted: 'no',
                 auto_disliked: 'no',
-                max_previewed_count: baseCap,
+                max_previewed_count: null,
                 sort: 'reaction_at',
             },
         },
@@ -213,7 +213,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction: ['dislike'],
                 blacklisted: 'no',
                 auto_disliked: 'yes',
-                max_previewed_count: baseCap,
+                max_previewed_count: null,
                 sort: 'reaction_at',
             },
         },
@@ -225,7 +225,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction_mode: 'any',
                 blacklisted: 'yes',
                 blacklist_type: 'any',
-                max_previewed_count: baseCap,
+                max_previewed_count: null,
                 sort: 'blacklisted_at',
             },
         },
@@ -236,7 +236,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction_mode: 'any',
                 blacklisted: 'yes',
                 blacklist_type: 'manual',
-                max_previewed_count: baseCap,
+                max_previewed_count: null,
                 sort: 'blacklisted_at',
             },
         },
@@ -247,7 +247,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction_mode: 'any',
                 blacklisted: 'yes',
                 blacklist_type: 'auto',
-                max_previewed_count: baseCap,
+                max_previewed_count: null,
                 sort: 'blacklisted_at',
             },
         },

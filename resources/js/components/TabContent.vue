@@ -479,11 +479,49 @@ const containerPillInteractions = useContainerPillInteractions(
         props.onReaction(fileId, type);
     },
     (container) => {
-        if (!props.onOpenContainerTab || form.data.feed !== 'online' || !form.data.service) {
+        const openExternal = (url: string | null | undefined): void => {
+            if (!url) {
+                return;
+            }
+            try {
+                const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                if (newWindow) {
+                    newWindow.blur();
+                    window.focus();
+                }
+            } catch {
+                // ignore
+            }
+        };
+
+        if (!props.onOpenContainerTab) {
+            openExternal(container.referrer ?? null);
             return;
         }
 
-        const serviceKey = form.data.service;
+        const resolveServiceKey = (): string | null => {
+            // When browsing online, use the current service directly.
+            if (form.data.feed === 'online' && form.data.service) {
+                return form.data.service;
+            }
+
+            // In local mode, infer the online service based on the container.source (stored using BaseService::source()).
+            if (form.data.feed === 'local' && container.source) {
+                const match = availableServices.value.find((service) => (
+                    service.source === container.source || service.key === container.source
+                ));
+                return match?.key ?? null;
+            }
+
+            return null;
+        };
+
+        const serviceKey = resolveServiceKey();
+        if (!serviceKey) {
+            openExternal(container.referrer ?? null);
+            return;
+        }
+
         const serviceLabel = availableServices.value.find((service) => service.key === serviceKey)?.label ?? serviceKey;
         const containerValue = container.source_id ?? container.id;
 
@@ -494,12 +532,16 @@ const containerPillInteractions = useContainerPillInteractions(
             limit: form.data.limit,
         };
 
-        const reserved = new Set(['service', 'source', 'feed', 'tab_id', 'page', 'limit', 'serviceFilters']);
-        for (const [k, v] of Object.entries(form.data.serviceFilters || {})) {
-            if (reserved.has(k)) {
-                continue;
+        // When browsing online, keep any existing serviceFilters so a user can keep their current context.
+        // In local mode, serviceFilters are local-specific and should not be forwarded to an online service tab.
+        if (form.data.feed === 'online') {
+            const reserved = new Set(['service', 'source', 'feed', 'tab_id', 'page', 'limit', 'serviceFilters']);
+            for (const [k, v] of Object.entries(form.data.serviceFilters || {})) {
+                if (reserved.has(k)) {
+                    continue;
+                }
+                params[k] = v;
             }
-            params[k] = v;
         }
 
         let hasContainerFilter = false;
@@ -515,6 +557,7 @@ const containerPillInteractions = useContainerPillInteractions(
         }
 
         if (!hasContainerFilter) {
+            openExternal(container.referrer ?? null);
             return;
         }
 
