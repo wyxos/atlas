@@ -23,4 +23,3 @@ test('icon endpoint returns an svg for non-image/video files', function () {
     $response->assertHeader('Content-Type', 'image/svg+xml; charset=utf-8');
     expect($response->getContent())->toContain('<svg');
 });
-

@@ -32,6 +32,7 @@ class LocalService extends BaseService
         $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'downloaded_at';
         $seedRaw = $params['seed'] ?? null;
         $seed = is_numeric($seedRaw) ? (int) $seedRaw : null;
+        $hasMaxPreviewedParam = array_key_exists('max_previewed_count', $params);
         $maxPreviewedRaw = $params['max_previewed_count'] ?? null;
         $maxPreviewed = is_numeric($maxPreviewedRaw) ? (int) $maxPreviewedRaw : null;
         // Allow 0 (fresh queue); negative values disable the filter.
@@ -84,6 +85,21 @@ class LocalService extends BaseService
         if ($reactionMode === 'reacted') {
             $reactionMode = 'types';
             $reactionTypes = ['love', 'like', 'funny'];
+        }
+
+        // Default preview cap:
+        // For almost all presets, we want to surface only fresh (unpreviewed) files.
+        // Exceptions: Disliked and Blacklisted views should show items regardless of preview count.
+        if (! $hasMaxPreviewedParam) {
+            $isDislikedView = $reactionMode === 'types'
+                && is_array($reactionTypes)
+                && in_array('dislike', $reactionTypes, true);
+
+            $isBlacklistedView = $blacklisted === 'yes'
+                || in_array($blacklistType, ['manual', 'auto'], true);
+
+            $maxPreviewed = ($isDislikedView || $isBlacklistedView) ? null : 0;
+            $this->params['max_previewed_count'] = $maxPreviewed;
         }
 
         // Stabilize random sort by generating a seed once and letting Browser persist it into the tab params.
