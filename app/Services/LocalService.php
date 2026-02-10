@@ -86,8 +86,7 @@ class LocalService extends BaseService
         // Keep it as a distinct mode so we can use a single Typesense filter field for pagination stability.
 
         // Default preview cap:
-        // For almost all presets, we want to surface only fresh (unpreviewed) files.
-        // Exceptions: Disliked and Blacklisted views should show items regardless of preview count.
+        // Most presets do not cap previewed_count (null). Disliked/Blacklisted use a bounded cap.
         if (! $hasMaxPreviewedParam) {
             $isDislikedView = $reactionMode === 'types'
                 && is_array($reactionTypes)
@@ -96,7 +95,7 @@ class LocalService extends BaseService
             $isBlacklistedView = $blacklisted === 'yes'
                 || in_array($blacklistType, ['manual', 'auto'], true);
 
-            $maxPreviewed = ($isDislikedView || $isBlacklistedView) ? null : 0;
+            $maxPreviewed = ($isDislikedView || $isBlacklistedView) ? 2 : null;
             $this->params['max_previewed_count'] = $maxPreviewed;
         }
 
