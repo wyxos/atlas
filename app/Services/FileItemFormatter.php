@@ -89,6 +89,21 @@ class FileItemFormatter
                 }
             }
 
+            $mime = $file->mime_type ? (string) $file->mime_type : '';
+            $isVideo = $mime !== '' && str_starts_with($mime, 'video/');
+            $isImage = $mime !== '' && str_starts_with($mime, 'image/');
+            $isAudio = $mime !== '' && str_starts_with($mime, 'audio/');
+
+            // Vibe currently only knows how to load "image" and "video" items.
+            // For audio/other files, use an icon SVG as the preview image, but keep the real
+            // file URL in `original` for the viewer/actions.
+            $mediaKind = $isVideo ? 'video' : ($isImage ? 'image' : ($isAudio ? 'audio' : 'file'));
+            $vibeType = $isVideo ? 'video' : 'image';
+
+            if ($mediaKind !== 'image' && $mediaKind !== 'video') {
+                $thumbnailUrl = route('api.files.icon', ['file' => $file->id]);
+            }
+
             $item = [
                 'id' => $file->id,
                 'width' => $width,
@@ -101,7 +116,11 @@ class FileItemFormatter
                 'timeoutSeconds' => 30,
                 'originalUrl' => $originalUrl, // Needed for FileViewer to show original images
                 'thumbnail' => $thumbnailUrl,
-                'type' => str_starts_with($file->mime_type ?? '', 'video/') ? 'video' : 'image',
+                'type' => $vibeType,
+                'media_kind' => $mediaKind,
+                'mime_type' => $file->mime_type,
+                'ext' => $file->ext,
+                'filename' => $file->filename,
                 'page' => $page,
                 'key' => "{$page}-{$file->id}",
                 'index' => $index,

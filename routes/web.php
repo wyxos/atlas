@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::get('/api/files/{file}/downloaded', [\App\Http\Controllers\FilesController::class, 'serveDownloaded'])->name('api.files.downloaded');
     Route::get('/api/files/{file}/preview', [\App\Http\Controllers\FilesController::class, 'servePreview'])->name('api.files.preview');
+    Route::get('/api/files/{file}/icon', [\App\Http\Controllers\FilesController::class, 'serveIcon'])->name('api.files.icon');
     Route::get('/api/files/{file}/poster', [\App\Http\Controllers\FilesController::class, 'serveVideoPoster'])->name('api.files.poster');
     Route::delete('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'destroy'])->name('api.files.destroy');
     Route::get('/api/files/{file}/reaction', [\App\Http\Controllers\FileReactionController::class, 'show'])->name('api.files.reaction.show');

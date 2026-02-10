@@ -7,6 +7,7 @@ import type {FeedItem} from '@/composables/useTabs';
 import type {ReactionType} from '@/types/reaction';
 import type {Masonry} from '@wyxos/vibe';
 import {useOverlayVideoControls} from '@/composables/useOverlayVideoControls';
+import {useOverlayAudioControls} from '@/composables/useOverlayAudioControls';
 import {useFileViewerNavigation} from '@/composables/useFileViewerNavigation';
 import {useFileViewerSizing} from '@/composables/useFileViewerSizing';
 import {useFileViewerOverlayState} from '@/composables/useFileViewerOverlayState';
@@ -46,12 +47,14 @@ const currentItemId = ref<number | null>(null);
 
 // Overlay state
 const overlayVideoRef = ref<HTMLVideoElement | null>(null);
+const overlayAudioRef = ref<HTMLAudioElement | null>(null);
 
 const overlayState = reactive({
     rect: null as { top: number; left: number; width: number; height: number } | null,
     image: null as { src: string; srcset?: string; sizes?: string; alt?: string } | null,
-    mediaType: 'image' as 'image' | 'video',
+    mediaType: 'image' as 'image' | 'video' | 'audio' | 'file',
     videoSrc: null as string | null,
+    audioSrc: null as string | null,
     borderRadius: null as string | null,
     key: 0,
     isAnimating: false,
@@ -116,6 +119,32 @@ const {
     overlayIsClosing: toRef(overlayState, 'isClosing'),
     overlayVideoSrc: toRef(overlayState, 'videoSrc'),
     overlayImageSrc: computed(() => overlayState.image?.src ?? null),
+});
+
+const {
+    audioCurrentTime,
+    audioDuration,
+    isAudioPlaying,
+    audioVolume,
+    audioProgressPercent,
+    audioVolumePercent,
+    handleAudioLoadedMetadata,
+    handleAudioTimeUpdate,
+    handleAudioPlay,
+    handleAudioPause,
+    handleAudioEnded,
+    handleAudioVolumeChange,
+    toggleAudioPlayback,
+    handleAudioSeek,
+    handleAudioSeekStart,
+    handleAudioSeekEnd,
+    handleAudioVolumeInput,
+} = useOverlayAudioControls({
+    overlayAudioRef,
+    overlayMediaType: toRef(overlayState, 'mediaType'),
+    overlayFillComplete: toRef(overlayState, 'fillComplete'),
+    overlayIsClosing: toRef(overlayState, 'isClosing'),
+    overlayAudioSrc: toRef(overlayState, 'audioSrc'),
 });
 
 const {getAvailableWidth, calculateBestFitSize, getCenteredPosition} = useFileViewerSizing({
@@ -361,6 +390,12 @@ watch(() => items.value.map((item) => item.id), () => {
     }
 });
 
+watch(() => [overlayState.mediaType, overlayState.fillComplete, overlayState.isClosing], ([mediaType, filled, isClosing]) => {
+    if (mediaType === 'file' && filled && !isClosing) {
+        sheetState.isOpen = true;
+    }
+});
+
 // Cleanup on unmount
 onUnmounted(() => {
     const tabContent = props.containerRef;
@@ -411,8 +446,8 @@ defineExpose({
                     <Loader2 :size="32" class="animate-spin text-smart-blue-500"/>
                 </div>
 
-                <!-- Full-size media (image or video) -->
-                <img v-if="!overlayState.isLoading && overlayState.mediaType === 'image'" :key="overlayState.key"
+                <!-- Full-size media (image/icon or video) -->
+                <img v-if="!overlayState.isLoading && overlayState.mediaType !== 'video'" :key="overlayState.key"
                      :src="overlayState.fullSizeImage || overlayState.image.src" :alt="overlayState.image.alt"
                      :class="[
                         'absolute select-none',
@@ -473,6 +508,68 @@ defineExpose({
                             <Minimize2 v-if="isVideoFullscreen" :size="16"/>
                             <Maximize2 v-else :size="16"/>
                         </button>
+                    </div>
+                </div>
+
+                <audio
+                    v-if="!overlayState.isLoading && overlayState.mediaType === 'audio'"
+                    ref="overlayAudioRef"
+                    class="hidden"
+                    preload="metadata"
+                    @loadedmetadata="handleAudioLoadedMetadata"
+                    @timeupdate="handleAudioTimeUpdate"
+                    @play="handleAudioPlay"
+                    @pause="handleAudioPause"
+                    @ended="handleAudioEnded"
+                    @volumechange="handleAudioVolumeChange"
+                />
+
+                <div
+                    v-if="!overlayState.isLoading && overlayState.mediaType === 'audio' && overlayState.fillComplete && !overlayState.isClosing"
+                    class="absolute bottom-4 left-0 right-0 z-50 pointer-events-auto px-4"
+                >
+                    <div
+                        class="flex w-full items-center gap-3 rounded border border-twilight-indigo-500/80 bg-prussian-blue-800/80 px-3 py-2 backdrop-blur"
+                    >
+                        <button
+                            type="button"
+                            class="rounded-full p-2 text-smart-blue-100 hover:text-white"
+                            :aria-label="isAudioPlaying ? 'Pause audio' : 'Play audio'"
+                            @click.stop="toggleAudioPlayback"
+                        >
+                            <Pause v-if="isAudioPlaying" :size="16" />
+                            <Play v-else :size="16" />
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <input
+                                class="file-viewer-video-slider w-full"
+                                type="range"
+                                min="0"
+                                :max="audioDuration || 0"
+                                step="0.1"
+                                :value="audioCurrentTime"
+                                :style="{
+                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${audioProgressPercent}%, var(--color-twilight-indigo-600) ${audioProgressPercent}%)`
+                                }"
+                                @input="handleAudioSeek"
+                                @pointerdown="handleAudioSeekStart"
+                                @pointerup="handleAudioSeekEnd"
+                            />
+                        </div>
+                        <div class="w-24 shrink-0">
+                            <input
+                                class="file-viewer-video-slider w-full"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                :value="audioVolume"
+                                :style="{
+                                    backgroundImage: `linear-gradient(to right, var(--color-smart-blue-400) ${audioVolumePercent}%, var(--color-twilight-indigo-600) ${audioVolumePercent}%)`
+                                }"
+                                @input="handleAudioVolumeInput"
+                            />
+                        </div>
                     </div>
                 </div>
 
