@@ -242,7 +242,7 @@ test('local browse can filter by file type (audio only)', function () {
         'mime_type' => 'image/jpeg',
     ]);
 
-    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&file_type=audio");
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&file_type[]=audio");
     $response->assertSuccessful();
 
     $ids = collect($response->json('items'))->pluck('id')->all();

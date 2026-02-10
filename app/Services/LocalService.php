@@ -30,7 +30,23 @@ class LocalService extends BaseService
         $blacklisted = $params['blacklisted'] ?? 'any';
         $blacklistType = is_string($params['blacklist_type'] ?? null) ? (string) $params['blacklist_type'] : 'any';
         $sort = is_string($params['sort'] ?? null) ? (string) $params['sort'] : 'downloaded_at';
-        $fileType = is_string($params['file_type'] ?? null) ? (string) $params['file_type'] : 'all';
+        $fileTypeRaw = $params['file_type'] ?? ['all'];
+        $fileTypes = [];
+        if (is_array($fileTypeRaw)) {
+            $fileTypes = array_values(array_filter(array_map(fn ($v) => is_string($v) ? $v : (is_numeric($v) ? (string) $v : ''), $fileTypeRaw)));
+        } elseif (is_string($fileTypeRaw) && $fileTypeRaw !== '') {
+            $fileTypes = [$fileTypeRaw];
+        }
+        $fileTypes = array_values(array_unique(array_filter($fileTypes)));
+        $allowedFileTypes = ['all', 'image', 'video', 'audio', 'other'];
+        $fileTypes = array_values(array_filter($fileTypes, fn ($t) => in_array($t, $allowedFileTypes, true)));
+        if ($fileTypes === []) {
+            $fileTypes = ['all'];
+        }
+        // "All" is exclusive.
+        if (in_array('all', $fileTypes, true)) {
+            $fileTypes = ['all'];
+        }
         $seedRaw = $params['seed'] ?? null;
         $seed = is_numeric($seedRaw) ? (int) $seedRaw : null;
         $hasMaxPreviewedParam = array_key_exists('max_previewed_count', $params);
@@ -155,14 +171,14 @@ class LocalService extends BaseService
                 sort: $sort,
                 seed: $seed,
                 maxPreviewed: $maxPreviewed,
-                fileType: $fileType,
+                fileTypes: $fileTypes,
                 reactionMode: $reactionMode,
                 reactionTypes: $reactionTypes,
                 allTypes: $allTypes,
             );
         }
 
-        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted, $blacklistType, $sort, $seed, $maxPreviewed, $fileType) {
+        $buildSearch = function () use ($params, $source, $downloaded, $blacklisted, $blacklistType, $sort, $seed, $maxPreviewed, $fileTypes) {
             $search = $params['search'] ?? '';
             if ($search === '') {
                 $search = config('scout.driver') === 'typesense' ? '*' : '';
@@ -200,15 +216,13 @@ class LocalService extends BaseService
             }
 
             // File type filter (optional, based on indexed mime_group).
-            // Values: all, image, video, audio, image_video.
-            if ($fileType === 'image') {
-                $builder->where('mime_group', 'image');
-            } elseif ($fileType === 'video') {
-                $builder->where('mime_group', 'video');
-            } elseif ($fileType === 'audio') {
-                $builder->where('mime_group', 'audio');
-            } elseif ($fileType === 'image_video') {
-                $builder->where('mime_group', ['image', 'video']);
+            // Values: array of {all,image,video,audio,other}; "all" disables the filter.
+            if (! in_array('all', $fileTypes, true)) {
+                if (count($fileTypes) === 1) {
+                    $builder->where('mime_group', $fileTypes[0]);
+                } else {
+                    $builder->where('mime_group', $fileTypes);
+                }
             }
 
             // Sorting (Typesense supports special sort fields like _rand(seed)).
@@ -482,7 +496,7 @@ class LocalService extends BaseService
         string $sort,
         ?int $seed,
         ?int $maxPreviewed,
-        string $fileType,
+        array $fileTypes,
         string $reactionMode,
         ?array $reactionTypes,
         array $allTypes,
@@ -524,16 +538,39 @@ class LocalService extends BaseService
             $query->where('previewed_count', '<=', $maxPreviewed);
         }
 
-        if ($fileType === 'image') {
-            $query->where('mime_type', 'like', 'image/%');
-        } elseif ($fileType === 'video') {
-            $query->where('mime_type', 'like', 'video/%');
-        } elseif ($fileType === 'audio') {
-            $query->where('mime_type', 'like', 'audio/%');
-        } elseif ($fileType === 'image_video') {
-            $query->where(function ($q) {
-                $q->where('mime_type', 'like', 'image/%')
-                    ->orWhere('mime_type', 'like', 'video/%');
+        if (! in_array('all', $fileTypes, true)) {
+            $query->where(function ($q) use ($fileTypes) {
+                $hasClause = false;
+
+                if (in_array('image', $fileTypes, true)) {
+                    $q->orWhere('mime_type', 'like', 'image/%');
+                    $hasClause = true;
+                }
+                if (in_array('video', $fileTypes, true)) {
+                    $q->orWhere('mime_type', 'like', 'video/%');
+                    $hasClause = true;
+                }
+                if (in_array('audio', $fileTypes, true)) {
+                    $q->orWhere('mime_type', 'like', 'audio/%');
+                    $hasClause = true;
+                }
+                if (in_array('other', $fileTypes, true)) {
+                    $q->orWhere(function ($qq) {
+                        $qq->whereNull('mime_type')
+                            ->orWhere('mime_type', '=', '')
+                            ->orWhere(function ($qqq) {
+                                $qqq->where('mime_type', 'not like', 'image/%')
+                                    ->where('mime_type', 'not like', 'video/%')
+                                    ->where('mime_type', 'not like', 'audio/%');
+                            });
+                    });
+                    $hasClause = true;
+                }
+
+                // Defensive: if nothing matched, allow everything.
+                if (! $hasClause) {
+                    $q->orWhereRaw('1=1');
+                }
             });
         }
 

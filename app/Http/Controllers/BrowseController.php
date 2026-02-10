@@ -68,13 +68,13 @@ class BrowseController extends Controller
 
         return response()->json([
             'services' => $servicesMeta,
-            'local' => [
-                'key' => LocalService::key(),
-                'label' => LocalService::label(),
-                'defaults' => [
-                    'limit' => 20,
-                    'source' => 'all',
-                    'file_type' => 'all',
+                'local' => [
+                    'key' => LocalService::key(),
+                    'label' => LocalService::label(),
+                    'defaults' => [
+                        'limit' => 20,
+                        'source' => 'all',
+                        'file_type' => ['all'],
                     // Reaction filtering:
                     // - any: ignore reactions entirely (show all files)
                     // - reacted: positive reactions (love/like/funny), excludes dislikes
@@ -106,16 +106,16 @@ class BrowseController extends Controller
                         'default' => 'all',
                     ]),
                     $localSchema->field('file_type', [
-                        'type' => 'select',
+                        'type' => 'checkbox-group',
                         'description' => 'Filter by file type.',
                         'options' => [
                             ['label' => 'All', 'value' => 'all'],
                             ['label' => 'Images', 'value' => 'image'],
-                            ['label' => 'Images + Videos', 'value' => 'image_video'],
                             ['label' => 'Videos', 'value' => 'video'],
                             ['label' => 'Audio', 'value' => 'audio'],
+                            ['label' => 'Other', 'value' => 'other'],
                         ],
-                        'default' => 'all',
+                        'default' => ['all'],
                     ]),
                     $localSchema->field('reaction_mode', [
                         'type' => 'select',
