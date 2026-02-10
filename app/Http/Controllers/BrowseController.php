@@ -68,13 +68,13 @@ class BrowseController extends Controller
 
         return response()->json([
             'services' => $servicesMeta,
-                'local' => [
-                    'key' => LocalService::key(),
-                    'label' => LocalService::label(),
-                    'defaults' => [
-                        'limit' => 20,
-                        'source' => 'all',
-                        'file_type' => ['all'],
+            'local' => [
+                'key' => LocalService::key(),
+                'label' => LocalService::label(),
+                'defaults' => [
+                    'limit' => 20,
+                    'source' => 'all',
+                    'file_type' => ['all'],
                     // Reaction filtering:
                     // - any: ignore reactions entirely (show all files)
                     // - reacted: positive reactions (love/like/funny), excludes dislikes
