@@ -713,10 +713,14 @@ async function handleItemInViewAndLoaded(item: FeedItem): Promise<void> {
         // incrementPreviewCount mutates the item in place, so item already has updated values
         const isModerationFlagged = item.will_auto_dislike === true;
 
+        // If you already reacted to this item, never start an auto-dislike countdown.
+        // (Moderation flags should not override a user's explicit reaction.)
+        const alreadyReacted = Boolean(item.reaction?.type);
+
         // Start countdown if:
         // 1. Item was already flagged for auto-dislike (from moderation rules) OR
         // 2. Preview count increment indicates it should be auto-disliked (from preview count threshold)
-        const shouldAutoDislike = isModerationFlagged || result?.will_auto_dislike === true;
+        const shouldAutoDislike = !alreadyReacted && (isModerationFlagged || result?.will_auto_dislike === true);
 
         if (shouldAutoDislike) {
             autoDislikeQueue.startAutoDislikeCountdown(itemId, item);

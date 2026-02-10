@@ -71,6 +71,22 @@ abstract class BaseModerationService
                 continue;
             }
 
+            // If the current user already reacted to this file, do not auto-moderate it.
+            // This prevents the UI from starting an auto-dislike countdown on already-reacted items.
+            if (Auth::check()) {
+                $hasUserReaction = $file->relationLoaded('reaction') && $file->getRelation('reaction');
+                if (! $hasUserReaction) {
+                    $hasUserReaction = Reaction::query()
+                        ->where('file_id', $file->id)
+                        ->where('user_id', Auth::id())
+                        ->exists();
+                }
+
+                if ($hasUserReaction) {
+                    continue;
+                }
+            }
+
             // Check if file should be skipped (e.g., no prompt, no containers)
             if ($this->shouldSkipFile($file)) {
                 continue;

@@ -68,16 +68,17 @@ class BrowseController extends Controller
 
         return response()->json([
             'services' => $servicesMeta,
-            'local' => [
-                'key' => LocalService::key(),
-                'label' => LocalService::label(),
-                'defaults' => [
-                    'limit' => 20,
-                    'source' => 'all',
-                    // Reaction filtering:
-                    // - any: ignore reactions entirely (show all files)
-                    // - reacted: positive reactions (love/like/funny), excludes dislikes
-                    // - unreacted: files you have not reacted to
+                'local' => [
+                    'key' => LocalService::key(),
+                    'label' => LocalService::label(),
+                    'defaults' => [
+                        'limit' => 20,
+                        'source' => 'all',
+                        'file_type' => 'all',
+                        // Reaction filtering:
+                        // - any: ignore reactions entirely (show all files)
+                        // - reacted: positive reactions (love/like/funny), excludes dislikes
+                        // - unreacted: files you have not reacted to
                     // - types: only selected reaction types
                     'reaction_mode' => 'any',
                     'reaction' => ['love', 'like', 'dislike', 'funny'],
@@ -102,6 +103,18 @@ class BrowseController extends Controller
                         'type' => 'select',
                         'description' => 'Filter by file source.',
                         'options' => $sourceOptions,
+                        'default' => 'all',
+                    ]),
+                    $localSchema->field('file_type', [
+                        'type' => 'select',
+                        'description' => 'Filter by file type.',
+                        'options' => [
+                            ['label' => 'All', 'value' => 'all'],
+                            ['label' => 'Images', 'value' => 'image'],
+                            ['label' => 'Images + Videos', 'value' => 'image_video'],
+                            ['label' => 'Videos', 'value' => 'video'],
+                            ['label' => 'Audio', 'value' => 'audio'],
+                        ],
                         'default' => 'all',
                     ]),
                     $localSchema->field('reaction_mode', [
