@@ -138,6 +138,40 @@ describe('useBrowseForm - defaults merging', () => {
         expect(form.data.serviceFilters.postId).toBe(321);
     });
 
+    it('does not let online service cache override local limit and preset', () => {
+        const form = useBrowseForm();
+        form.reset();
+
+        const tab: TabData = {
+            id: 4,
+            label: 'Local tab',
+            position: 0,
+            isActive: true,
+            params: {
+                feed: 'local',
+                service: 'civit-ai-images',
+                source: 'all',
+                page: 50,
+                limit: 200,
+                local_preset: 'reacted_random',
+                serviceFiltersByKey: {
+                    'civit-ai-images': {
+                        page: 1,
+                        limit: 20,
+                        type: 'video',
+                    },
+                },
+            } as any,
+        };
+
+        form.syncFromTab(tab);
+
+        expect(form.data.feed).toBe('local');
+        expect(form.data.page).toBe(50);
+        expect(form.data.limit).toBe('200');
+        expect(form.data.serviceFilters.local_preset).toBe('reacted_random');
+    });
+
 
     it('uses provided instance when available (tab isolation)', () => {
         const Parent = defineComponent({

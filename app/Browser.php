@@ -53,7 +53,9 @@ class Browser
             }
         }
 
-        $serviceKey = $requestedService !== '' ? $requestedService : CivitAiImages::key();
+        $serviceKey = $isLocalMode
+            ? LocalService::key()
+            : ($requestedService !== '' ? $requestedService : CivitAiImages::key());
         $servicesMeta = [];
         foreach ($services as $key => $serviceClass) {
             $serviceInstance = app($serviceClass);
@@ -265,7 +267,7 @@ class Browser
                 $tab->update([
                     'params' => [
                         // Active selection envelope
-                        'service' => $serviceKey,
+                        'service' => $isLocalMode ? LocalService::key() : $serviceKey,
                         'feed' => $isLocalMode ? 'local' : 'online',
                         // Keep local source around (used by local mode UI)
                         'source' => $isLocalMode
@@ -276,6 +278,7 @@ class Browser
                         ...$flatFilter,
                         // Persist the next token to load.
                         'page' => $pageToPersist,
+                        'limit' => $serviceEntry['limit'],
                         'next' => $nextToPersist,
                         // Per-service cache
                         'serviceFiltersByKey' => $existingServiceFilters,
@@ -294,7 +297,7 @@ class Browser
             'items' => $items,
             'meta' => is_array($meta) ? $meta : [],
             'filter' => [
-                'service' => $serviceKey, // Store the service key as 'service' for frontend compatibility
+                'service' => $serviceKey, // Store the active feed service key as 'service' for frontend compatibility
                 ...$service->defaultParams(),
                 ...$filter,
                 'page' => request()->input('page', 1),
