@@ -410,6 +410,9 @@ SVG;
         $file->touch('previewed_at');
         $file->refresh();
 
+        // previewed_count/previewed_at are Typesense-filterable; ensure the index stays in sync.
+        $file->searchable();
+
         $willAutoDislike = false;
 
         // Check if we should auto-dislike: previewed_count >= 3, no reactions exist,
@@ -455,6 +458,9 @@ SVG;
 
         // Refresh files to get updated counts
         $files->each->refresh();
+
+        // previewed_count/previewed_at are Typesense-filterable; ensure the index stays in sync.
+        $files->load(['metadata', 'reactions'])->searchable();
 
         // Check for will-auto-dislike candidates (previewed_count >= 3, no reactions, etc.)
         $willAutoDislikeFileIds = [];
@@ -570,6 +576,13 @@ SVG;
         // Detach files from all tabs belonging to this user
         app(TabFileService::class)->detachFilesFromUserTabs($user->id, $validFileIds);
 
+        // Keep Typesense in sync (auto_disliked + dislike reaction arrays).
+        File::query()
+            ->whereIn('id', $validFileIds)
+            ->with(['metadata', 'reactions'])
+            ->get()
+            ->searchable();
+
         return response()->json([
             'message' => 'Files auto-disliked successfully.',
             'auto_disliked_count' => count($validFileIds),
@@ -584,6 +597,10 @@ SVG;
     {
         $file->increment('seen_count');
         $file->touch('seen_at');
+        $file->refresh();
+
+        // seen_count/seen_at are Typesense-filterable; ensure the index stays in sync.
+        $file->searchable();
 
         return response()->json([
             'message' => 'Seen count incremented.',
