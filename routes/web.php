@@ -10,7 +10,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('home');
+    return response()
+        ->view('home')
+        // Avoid serving stale SPA HTML across deploys (hashed Vite assets).
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('Pragma', 'no-cache');
 })->name('home');
 
 Route::middleware('guest')->group(function () {
@@ -163,6 +167,10 @@ Route::middleware('auth')->group(function () {
     // for direct navigation (e.g., refreshing the page or typing the URL)
     // API routes above (POST/DELETE) won't match this GET route
     Route::get('/{any}', function () {
-        return view('dashboard');
+        return response()
+            ->view('dashboard')
+            // Avoid serving stale SPA HTML across deploys (hashed Vite assets).
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
     })->where('any', '.*')->name('spa');
 });
