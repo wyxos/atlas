@@ -100,4 +100,78 @@ describe('TabFilter', () => {
         expect((input.element as HTMLInputElement).value).toBe('atlasUser');
         expect(input.classes()).toContain('text-twilight-indigo-100');
     });
+
+    it('restores local preset label from persisted service filters', async () => {
+        const form = createBrowseForm();
+
+        const tab: TabData = {
+            id: 11,
+            label: 'Local Tab',
+            position: 0,
+            isActive: true,
+            params: {
+                feed: 'local',
+                source: 'all',
+                page: 50,
+                limit: 100,
+                local_preset: 'reacted_random',
+            } as any,
+        };
+
+        form.syncFromTab(tab);
+
+        const wrapper = mount(TabFilter, {
+            props: {
+                open: true,
+                availableServices: [],
+                localDef: {
+                    key: 'local',
+                    label: 'Local Files',
+                    defaults: {},
+                    schema: {
+                        fields: [
+                            { uiKey: 'page', serviceKey: 'page', type: 'hidden', label: 'Page' },
+                            { uiKey: 'limit', serviceKey: 'limit', type: 'number', label: 'Limit' },
+                            {
+                                uiKey: 'source',
+                                serviceKey: 'source',
+                                type: 'select',
+                                label: 'Source',
+                                options: [{ label: 'All', value: 'all' }],
+                            },
+                        ],
+                    },
+                },
+                masonry: null,
+            },
+            global: {
+                provide: {
+                    [BrowseFormKey as symbol]: form,
+                },
+                stubs: {
+                    Sheet: Stub,
+                    SheetContent: Stub,
+                    SheetHeader: Stub,
+                    SheetTitle: Stub,
+                    SheetTrigger: Stub,
+                    SheetFooter: Stub,
+                    Select: Stub,
+                    SelectContent: Stub,
+                    SelectItem: Stub,
+                    SelectTrigger: Stub,
+                    SelectValue: Stub,
+                    RadioGroup: Stub,
+                    RadioGroupItem: Stub,
+                    Switch: Stub,
+                    Checkbox: Stub,
+                    Button: Stub,
+                },
+            },
+        });
+
+        await nextTick();
+
+        expect(wrapper.text()).toContain('Reacted (Random)');
+        expect(form.data.serviceFilters.local_preset).toBe('reacted_random');
+    });
 });

@@ -878,9 +878,6 @@ onMounted(async () => {
     if (data.tab) {
         tab.value = data.tab;
 
-        // reset form to default
-        form.reset()
-
         form.syncFromTab(tab.value);
 
         const params = (tab.value?.params ?? {}) as Record<string, unknown>;

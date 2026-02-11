@@ -1,8 +1,6 @@
 - [ ] Browse feature improvements
     - [ ] Browse
       - [ ] Evaluate other default feeds (Youtube, etc)
-    - [ ] FileViewer enhancements
-        - [ ] Preload next items in FileViewer for smoother navigation
 - [ ] File listing feature
     - [ ] List view
         - [ ] Display content from containers of the file
@@ -26,3 +24,16 @@
         - [ ] Generate preview seekbar with keyframe thumbnails
         - [ ] Extract and store subtitles from video files
         - [ ] Generate video segments (HLS/DASH) to enable adaptive streaming
+
+
+- [ ] Dashboard
+  - [ ] Disliked and Unreacted files to exclude blacklisted files
+  - [ ] Need stats to showcase files that are
+    - [ ] Reacted but not on disk
+    - [ ] Unreacted but on disk (Not downloaded, source local)
+    - [ ] Downloaded but not on disk
+    - [ ] Downloaded but not reacted
+- [ ] Issues
+  - [ ] Backfill old records for missing containers
+  - 
+
