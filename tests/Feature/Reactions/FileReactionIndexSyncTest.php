@@ -44,4 +44,3 @@ it('queues a scout reindex when a reaction is toggled off', function () {
         return (int) ($job->models->first()?->id ?? 0) === (int) $file->id;
     });
 });
-
