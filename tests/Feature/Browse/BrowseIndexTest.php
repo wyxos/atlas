@@ -420,3 +420,40 @@ test('browse persists current page token for local tabs', function () {
     expect($tab->params['feed'])->toBe('local');
     expect($file)->toBeInstanceOf(\App\Models\File::class);
 });
+
+test('browse persists local limit and preset params for tab restore', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create([
+        'params' => [
+            'feed' => 'local',
+            // Simulate stale online cache from a previously browsed service.
+            'service' => 'civit-ai-images',
+            'serviceFiltersByKey' => [
+                'civit-ai-images' => [
+                    'page' => 1,
+                    'limit' => 20,
+                ],
+            ],
+        ],
+    ]);
+
+    \App\Models\File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDay(),
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'source' => 'CivitAI',
+    ]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=100&page=50&local_preset=inbox_fresh&reaction_mode=unreacted");
+
+    $response->assertSuccessful();
+
+    $tab->refresh();
+    expect((string) ($tab->params['service'] ?? ''))->toBe('local');
+    expect((string) $tab->params['feed'])->toBe('local');
+    expect((string) $tab->params['page'])->toBe('50');
+    expect((string) $tab->params['limit'])->toBe('100');
+    expect((string) ($tab->params['local_preset'] ?? ''))->toBe('inbox_fresh');
+    expect((string) ($tab->params['reaction_mode'] ?? ''))->toBe('unreacted');
+});

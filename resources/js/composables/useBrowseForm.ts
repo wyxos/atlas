@@ -82,7 +82,9 @@ function createFormInstance() {
 
         // Restore per-service filters. Prefer an explicit per-service map, if present.
         // Otherwise, fall back to storing unknown keys as serviceFilters for the current service.
-        const serviceKey = data.service;
+        // Local tabs persist filters at the top-level params and should not hydrate
+        // from online per-service cache entries.
+        const serviceKey = data.feed === 'local' ? '' : data.service;
         const serviceFiltersByKey = params.serviceFiltersByKey;
         let restoredFilters: Record<string, unknown> | null = null;
         const reservedFilters = new Set([
@@ -123,6 +125,10 @@ function createFormInstance() {
             if (Object.keys(inferredFilters).length > 0) {
                 filtersByServiceKey[serviceKey] = { ...inferredFilters };
             }
+        }
+
+        if (!serviceKey && Object.keys(inferredFilters).length > 0) {
+            data.serviceFilters = { ...inferredFilters };
         }
 
         if (serviceKey) {
