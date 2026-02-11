@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\ContainerModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Config;
 use Laravel\Scout\Jobs\MakeSearchable;
 
 uses(RefreshDatabase::class);
@@ -57,6 +58,7 @@ test('flags files for dislike action type', function () {
 
 test('blacklists files for blacklist action type', function () {
     Bus::fake();
+    Config::set('scout.queue', ['queue' => 'scout']);
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -86,6 +88,10 @@ test('blacklists files for blacklist action type', function () {
 
     Bus::assertDispatched(DeleteAutoDislikedFileJob::class, function ($job) use ($file) {
         return $job->filePath === $file->path;
+    });
+
+    Bus::assertDispatched(MakeSearchable::class, function (MakeSearchable $job) use ($file) {
+        return (int) ($job->models->first()?->id ?? 0) === (int) $file->id;
     });
 });
 
