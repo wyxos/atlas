@@ -761,7 +761,9 @@ class LocalService extends BaseService
             ->select('reactions.file_id')
             ->when($sort === 'reaction_at_asc', fn ($q) => $q->orderBy('reactions.created_at', 'asc'), fn ($q) => $q->orderByDesc('reactions.created_at'));
 
-        $pagination = $idQuery->paginate($limit, ['reactions.file_id'], 'page', $page);
+        // Avoid running COUNT(*) on large reaction history queries.
+        // We only need page-wise navigation here.
+        $pagination = $idQuery->simplePaginate($limit, ['reactions.file_id'], 'page', $page);
         $nextCursor = $pagination->hasMorePages() ? $pagination->currentPage() + 1 : null;
 
         $ids = collect($pagination->items())
@@ -775,7 +777,7 @@ class LocalService extends BaseService
                 'files' => [],
                 'metadata' => [
                     'nextCursor' => null,
-                    'total' => (int) $pagination->total(),
+                    'total' => null,
                 ],
             ];
         }
@@ -796,7 +798,7 @@ class LocalService extends BaseService
             'files' => $orderedFiles,
             'metadata' => [
                 'nextCursor' => $nextCursor,
-                'total' => (int) $pagination->total(),
+                'total' => null,
             ],
         ];
     }
