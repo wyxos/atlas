@@ -3,6 +3,8 @@ import { mount as baseMount, flushPromises } from '@vue/test-utils';
 import { cloneVNode, defineComponent, h, nextTick, ref } from 'vue';
 import TabContent from './TabContent.vue';
 import type { FeedItem } from '@/composables/useTabs';
+import { BrowseFormKey } from '@/composables/useBrowseForm';
+import TabFilter from './TabFilter.vue';
 
 const mount = baseMount;
 
@@ -634,6 +636,56 @@ describe('TabContent - Resume Session', () => {
         expect(masonry.props('page')).toBe('CURSOR_NEXT');
             // Restored sessions should keep backfill enabled for online browsing.
             expect(masonry.props('mode')).toBe('backfill');
+    });
+});
+
+describe('TabContent - Local Page Jump', () => {
+    it('respects the local page value when applying filters (does not force page 1)', async () => {
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab: {
+                    id: 444,
+                    label: 'Browse 1',
+                    params: {
+                        feed: 'local',
+                        source: 'all',
+                        page: 1,
+                        limit: 20,
+                    },
+                    items: [],
+                    position: 0,
+                    isActive: true,
+                },
+            },
+        });
+
+        const wrapper = mount(TabContent, {
+            props: {
+                tabId: 444,
+                availableServices: [],
+                onReaction: vi.fn(),
+                updateActiveTab: vi.fn(),
+            },
+        });
+
+        await flushPromises();
+
+        const form = (wrapper.vm as any).$?.provides?.[BrowseFormKey];
+        expect(form).toBeTruthy();
+
+        // Simulate user entering a local page number in Advanced Filters.
+        form.data.page = 50;
+
+        const filter = wrapper.findComponent(TabFilter);
+        expect(filter.exists()).toBe(true);
+        filter.vm.$emit('apply');
+
+        await nextTick();
+
+        // Masonry should restart at the requested local page (numeric pagination).
+        const masonry = wrapper.findComponent({ name: 'MasonryGrid' });
+        expect(masonry.props('page')).toBe(50);
+        expect(form.data.page).toBe(50);
     });
 });
 
