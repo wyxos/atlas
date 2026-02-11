@@ -194,6 +194,21 @@ const localPresets = computed<LocalPreset[]>(() => {
             },
         },
         {
+            label: 'Disliked (Any)',
+            value: 'disliked_any',
+            filters: {
+                downloaded: 'any',
+                reaction_mode: 'types',
+                reaction: ['dislike'],
+                blacklisted: 'no',
+                blacklist_type: 'any',
+                auto_disliked: 'any',
+                max_previewed_count: moderatedCap,
+                // Newest disliked first.
+                sort: 'reaction_at',
+            },
+        },
+        {
             label: 'Disliked (Manual)',
             value: 'disliked_manual',
             filters: {
@@ -201,8 +216,10 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction_mode: 'types',
                 reaction: ['dislike'],
                 blacklisted: 'no',
+                blacklist_type: 'any',
                 auto_disliked: 'no',
                 max_previewed_count: moderatedCap,
+                // Newest disliked first.
                 sort: 'reaction_at',
             },
         },
@@ -214,8 +231,10 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction_mode: 'types',
                 reaction: ['dislike'],
                 blacklisted: 'no',
+                blacklist_type: 'any',
                 auto_disliked: 'yes',
                 max_previewed_count: moderatedCap,
+                // Newest disliked first.
                 sort: 'reaction_at',
             },
         },
@@ -227,7 +246,9 @@ const localPresets = computed<LocalPreset[]>(() => {
                 reaction_mode: 'any',
                 blacklisted: 'yes',
                 blacklist_type: 'any',
+                auto_disliked: 'any',
                 max_previewed_count: moderatedCap,
+                // Newest blacklisted first.
                 sort: 'blacklisted_at',
             },
         },
@@ -235,10 +256,13 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Blacklisted (Manual)',
             value: 'blacklisted_manual',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'any',
                 blacklisted: 'yes',
                 blacklist_type: 'manual',
+                auto_disliked: 'any',
                 max_previewed_count: moderatedCap,
+                // Newest blacklisted first.
                 sort: 'blacklisted_at',
             },
         },
@@ -246,10 +270,13 @@ const localPresets = computed<LocalPreset[]>(() => {
             label: 'Blacklisted (Auto)',
             value: 'blacklisted_auto',
             filters: {
+                downloaded: 'any',
                 reaction_mode: 'any',
                 blacklisted: 'yes',
                 blacklist_type: 'auto',
+                auto_disliked: 'any',
                 max_previewed_count: moderatedCap,
+                // Newest blacklisted first.
                 sort: 'blacklisted_at',
             },
         },

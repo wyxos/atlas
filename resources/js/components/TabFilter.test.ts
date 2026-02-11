@@ -174,4 +174,73 @@ describe('TabFilter', () => {
         expect(wrapper.text()).toContain('Reacted (Random)');
         expect(form.data.serviceFilters.local_preset).toBe('reacted_random');
     });
+
+    it('includes disliked any preset option', async () => {
+        const form = createBrowseForm();
+        form.syncFromTab({
+            id: 12,
+            label: 'Local Tab',
+            position: 0,
+            isActive: true,
+            params: {
+                feed: 'local',
+                source: 'all',
+                page: 1,
+                limit: 20,
+            } as any,
+        });
+
+        const wrapper = mount(TabFilter, {
+            props: {
+                open: true,
+                availableServices: [],
+                localDef: {
+                    key: 'local',
+                    label: 'Local Files',
+                    defaults: {},
+                    schema: {
+                        fields: [
+                            { uiKey: 'page', serviceKey: 'page', type: 'hidden', label: 'Page' },
+                            { uiKey: 'limit', serviceKey: 'limit', type: 'number', label: 'Limit' },
+                            {
+                                uiKey: 'source',
+                                serviceKey: 'source',
+                                type: 'select',
+                                label: 'Source',
+                                options: [{ label: 'All', value: 'all' }],
+                            },
+                        ],
+                    },
+                },
+                masonry: null,
+            },
+            global: {
+                provide: {
+                    [BrowseFormKey as symbol]: form,
+                },
+                stubs: {
+                    Sheet: Stub,
+                    SheetContent: Stub,
+                    SheetHeader: Stub,
+                    SheetTitle: Stub,
+                    SheetTrigger: Stub,
+                    SheetFooter: Stub,
+                    Select: Stub,
+                    SelectContent: Stub,
+                    SelectItem: Stub,
+                    SelectTrigger: Stub,
+                    SelectValue: Stub,
+                    RadioGroup: Stub,
+                    RadioGroupItem: Stub,
+                    Switch: Stub,
+                    Checkbox: Stub,
+                    Button: Stub,
+                },
+            },
+        });
+
+        await nextTick();
+
+        expect(wrapper.text()).toContain('Disliked (Any)');
+    });
 });
