@@ -65,6 +65,10 @@ class FileReactionService
         if ($existingReaction && $existingReaction->type === $type) {
             $metrics->applyReactionChange($file, $oldType, null, $wasBlacklisted, $isBlacklisted);
             $existingReaction->delete();
+            // Reactions are indexed into Typesense via File::toSearchableArray(), but toggling a
+            // reaction does not mutate the File model. Force a reindex so local browse filters
+            // (reaction_mode, reacted_user_ids, etc.) stay in sync.
+            $file->searchable();
 
             return ['reaction' => null];
         }
@@ -115,6 +119,9 @@ class FileReactionService
         }
 
         app(TabFileService::class)->detachFileFromUserTabs($user->id, $file->id);
+
+        // Ensure the search index reflects the new reaction arrays.
+        $file->searchable();
 
         return $reaction;
     }
