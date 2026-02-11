@@ -367,17 +367,31 @@ async function getPage(page: PageToken, context?: BrowseFormData) {
 async function applyFilters() {
     // Best-effort cancel/reset: remount Masonry.
     shouldShowForm.value = false;
-    form.data.page = 1;
+
+    // Online browsing uses cursor-based pagination; when filters change, always restart at page 1.
+    // Local browsing can optionally jump to a specific numeric page via Advanced Filters.
+    const normalizeLocalPage = (): number => {
+        const raw = form.data.page;
+        const n = typeof raw === 'number' ? raw : Number(raw);
+        if (!Number.isFinite(n) || n < 1) {
+            return 1;
+        }
+        return Math.floor(n);
+    };
+
+    const nextStart: PageToken = form.data.feed === 'local' ? normalizeLocalPage() : 1;
+    form.data.page = nextStart;
     items.value = [];
     preloadedItemIds.value = new Set();
     restoredPages.value = null;
-    startPageToken.value = 1;
+    startPageToken.value = nextStart;
     masonryRenderKey.value += 1;
     // Wait for next tick to ensure form data updates are reactive
     await nextTick();
 }
 
 async function goToFirstPage(): Promise<void> {
+    form.data.page = 1;
     await applyFilters();
 }
 
