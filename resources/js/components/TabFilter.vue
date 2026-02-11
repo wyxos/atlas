@@ -10,7 +10,7 @@ import { useBrowseForm } from '@/composables/useBrowseForm';
 import { Masonry } from '@wyxos/vibe';
 import Input from '@/components/ui/input/Input.vue';
 import type { ServiceOption, ServiceFilterField } from '@/composables/useBrowseService';
-import { computed, watch, ref } from 'vue';
+import { computed, watch } from 'vue';
 import { coerceBoolean } from '@/utils/coerceBoolean';
 
 interface Props {
@@ -445,7 +445,27 @@ watch(
     { immediate: true }
 );
 
-const selectedLocalPreset = ref<string>('');
+const selectedLocalPreset = computed<string>({
+    get() {
+        if (form.data.feed !== 'local') {
+            return '';
+        }
+        const raw = form.data.serviceFilters.local_preset;
+        return typeof raw === 'string' ? raw : '';
+    },
+    set(value) {
+        if (form.data.feed !== 'local') {
+            return;
+        }
+
+        if (typeof value === 'string' && value.length > 0) {
+            form.data.serviceFilters.local_preset = value;
+            return;
+        }
+
+        delete form.data.serviceFilters.local_preset;
+    },
+});
 const selectedLocalPresetLabel = computed(() => {
     if (!selectedLocalPreset.value) {
         return null;
