@@ -53,11 +53,6 @@ export const buttonVariants = cva(
       },
       {
         variant: "ghost",
-        color: "default",
-        class: "bg-smart-blue-500 text-white border-2 border-smart-blue-400 hover:bg-smart-blue-400",
-      },
-      {
-        variant: "ghost",
         color: "danger",
         class: "bg-danger-500 text-white border-2 border-danger-400 hover:bg-danger-600",
       },

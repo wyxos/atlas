@@ -37,7 +37,8 @@ class FileFactory extends Factory
             'source' => fake()->randomElement($sources),
             'source_id' => fake()->optional()->uuid(),
             'url' => fake()->optional()->url(),
-            'referrer_url' => fake()->optional()->url(),
+            // `files.referrer_url` is the dedupe key and is unique in the DB; keep it unique in tests.
+            'referrer_url' => fake()->unique()->url(),
             // Avoid Faker's filePath() (tempnam) which can emit warnings that PHPUnit treats as exceptions.
             'path' => $pathToken ? 'files/'.$pathToken.'.'.$ext : null,
             'filename' => fake()->word().'.'.$ext,

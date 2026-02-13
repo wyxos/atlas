@@ -44,7 +44,7 @@ export function useMasonryReactionHandler(
 
         // Queue reaction with countdown toast (pass thumbnail, restore callback, and items for local mode updates)
         const thumbnail = item.preview;
-        queueReaction(fileId, type, thumbnail, restoreCallback, items);
+        queueReaction(fileId, type, thumbnail, restoreCallback, items, { allowRedownloadPrompt: isLocal.value });
 
         // Emit to parent (reaction is queued, not executed yet)
         onReaction(fileId, type);

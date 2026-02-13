@@ -142,7 +142,7 @@ describe('reactionQueue', () => {
             queueReaction(123, 'love', thumbnail, restoreCallback);
 
             const item = queue.getAll().find((item) => item.id === 'love-123');
-            expect(item?.metadata).toEqual({
+            expect(item?.metadata).toMatchObject({
                 fileId: 123,
                 reactionType: 'love',
                 thumbnail,
@@ -352,7 +352,7 @@ describe('reactionQueue', () => {
             queueBatchReaction(fileIds, 'dislike', previews, restoreCallback);
 
             const items = queue.getAll();
-            expect(items[0]?.metadata).toEqual({
+            expect(items[0]?.metadata).toMatchObject({
                 fileIds,
                 reactionType: 'dislike',
                 previews,

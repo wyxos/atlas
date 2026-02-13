@@ -45,6 +45,7 @@ import BatchModerationToast from './toasts/BatchModerationToast.vue';
 import { useToast } from 'vue-toastification';
 import { show as tabsShow } from '@/actions/App/Http/Controllers/TabController';
 import { index as browseIndex } from '@/actions/App/Http/Controllers/BrowseController';
+import { getLocalPresetLabel } from '@/lib/localPresets';
 // Diagnostic utilities (dev-only, tree-shaken in production)
 import { analyzeItemSizes, logItemSizeDiagnostics } from '@/utils/itemSizeDiagnostics';
 import type { ReactionType } from '@/types/reaction';
@@ -316,9 +317,15 @@ async function getPage(page: PageToken, context?: BrowseFormData) {
 
     if (props.onUpdateTabLabel) {
         if (formData.feed === 'local' || (formData.feed === 'online' && formData.service)) {
-        const serviceLabel = formData.feed === 'local'
-            ? (localService.value?.label ?? 'Local')
-            : (availableServices.value.find((s) => s.key === formData.service)?.label ?? formData.service);
+            const baseServiceLabel = formData.feed === 'local'
+                ? (localService.value?.label ?? 'Local')
+                : (availableServices.value.find((s) => s.key === formData.service)?.label ?? formData.service);
+
+            const localPresetLabel = formData.feed === 'local'
+                ? getLocalPresetLabel(formData.serviceFilters?.local_preset)
+                : null;
+
+            const serviceLabel = localPresetLabel ? `${baseServiceLabel} - ${localPresetLabel}` : baseServiceLabel;
             const containerLabel = getContainerLabelFromFilters();
             props.onUpdateTabLabel(formatTabLabel(serviceLabel, page, containerLabel));
         }
