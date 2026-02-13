@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\File;
 use App\Models\Reaction;
+use App\Services\DownloadedFileResetService;
 use App\Services\FileReactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,14 +20,37 @@ class FileReactionController extends Controller
     {
         $validated = $request->validate([
             'type' => ['required', 'string', 'in:love,like,dislike,funny'],
+            'force_download' => ['nullable', 'boolean'],
         ]);
 
         $user = Auth::user();
-        $result = app(FileReactionService::class)->toggle($file, $user, $validated['type']);
+
+        $type = $validated['type'];
+        $forceDownload = (bool) ($validated['force_download'] ?? false);
+        $wasDownloaded = (bool) $file->downloaded;
+        $hasUrl = is_string($file->url) && $file->url !== '';
+        $hadReactionBefore = Reaction::query()
+            ->where('user_id', $user->id)
+            ->where('file_id', $file->id)
+            ->exists();
+
+        if ($forceDownload && $type !== 'dislike') {
+            app(DownloadedFileResetService::class)->reset($file);
+            $file = $file->refresh();
+            $result = app(FileReactionService::class)->set($file, $user, $type);
+        } else {
+            $result = app(FileReactionService::class)->toggle($file, $user, $type);
+        }
 
         return response()->json([
             'message' => $result['reaction'] ? 'Reaction updated.' : 'Reaction removed.',
             'reaction' => $result['reaction'],
+            'should_prompt_redownload' => ! $forceDownload
+                && $type !== 'dislike'
+                && $wasDownloaded
+                && $hasUrl
+                && $hadReactionBefore
+                && $result['reaction'] !== null,
         ]);
     }
 

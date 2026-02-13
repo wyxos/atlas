@@ -128,6 +128,7 @@ defineExpose({
         <Button
             size="sm"
             variant="ghost"
+            color="danger"
             class="h-10 w-10"
             data-test="container-blacklist-button"
             title="Container Blacklists"
@@ -305,4 +306,3 @@ defineExpose({
         />
     </div>
 </template>
-

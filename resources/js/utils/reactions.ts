@@ -3,17 +3,28 @@ import type { ReactionType } from '@/types/reaction';
 
 const BATCH_STORE_URL = '/api/files/reactions/batch/store';
 
+export type ReactionStoreResponse = {
+    reaction: { type: ReactionType } | null;
+    should_prompt_redownload?: boolean;
+};
+
 /**
  * Creates a callback function for queuing reactions
  * This standardizes the reaction API call pattern across the application
  */
 export function createReactionCallback(): (
     fileId: number,
-    type: ReactionType
-) => Promise<void> {
-    return async (fileId: number, type: ReactionType) => {
+    type: ReactionType,
+    options?: { forceDownload?: boolean }
+) => Promise<ReactionStoreResponse> {
+    return async (fileId: number, type: ReactionType, options?: { forceDownload?: boolean }) => {
         try {
-            await window.axios.post(storeReaction.url(fileId), { type });
+            const { data } = await window.axios.post(storeReaction.url(fileId), {
+                type,
+                force_download: options?.forceDownload === true ? true : undefined,
+            });
+
+            return data as ReactionStoreResponse;
         } catch (error) {
             console.error('Failed to update reaction:', error);
             throw error;
