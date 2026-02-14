@@ -153,7 +153,6 @@ const mockDestroy = vi.fn();
 const mockInit = vi.fn();
 const mockRemove = vi.fn();
 const mockRemoveMany = vi.fn();
-const mockRefreshLayout = vi.fn();
 const mockLoadPage = vi.fn();
 const mockLoadNext = vi.fn();
 const mockReset = vi.fn();
@@ -223,7 +222,6 @@ vi.mock('@wyxos/vibe', () => {
             expose({
                 init: mockInit,
                 initialize,
-                refreshLayout: mockRefreshLayout,
                 cancelLoad: mockCancelLoad,
                 cancel,
                 destroy: mockDestroy,
@@ -517,7 +515,6 @@ vi.mock('lucide-vue-next', () => ({
     AlertTriangle: { name: 'AlertTriangle', template: '<div class="alert-icon"></div>', props: ['size'] },
     Info: { name: 'Info', template: '<div class="info-icon"></div>', props: ['size'] },
     Copy: { name: 'Copy', template: '<div class="copy-icon"></div>', props: ['size', 'class'] },
-    RefreshCcw: { name: 'RefreshCcw', template: '<div class="refresh-icon"></div>', props: ['size'] },
     ChevronsLeft: { name: 'ChevronsLeft', template: '<div class="chevrons-left-icon"></div>', props: ['size'] },
     SlidersHorizontal: { name: 'SlidersHorizontal', template: '<div class="sliders-icon"></div>', props: ['size'] },
     X: { name: 'X', template: '<div class="x-icon"></div>', props: ['size', 'class'] },
@@ -572,7 +569,6 @@ beforeEach(() => {
     mockInit.mockClear();
     mockRemove.mockClear();
     mockRemoveMany.mockClear();
-    mockRefreshLayout.mockClear();
     mockLoadPage.mockClear();
     mockLoadNext.mockClear();
     mockReset.mockClear();

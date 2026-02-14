@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, ref, reactive, nextTick, onUnmounted, watch, toRef} from 'vue';
-import {X, Loader2, Menu, Pause, Play, Maximize2, Minimize2} from 'lucide-vue-next';
+import {X, Loader2, PanelRightOpen, Pause, Play, Maximize2, Minimize2} from 'lucide-vue-next';
 import FileViewerSheet from './FileViewerSheet.vue';
 import FileReactions from './FileReactions.vue';
 import type {FeedItem} from '@/composables/useTabs';
@@ -81,6 +81,61 @@ const navigationState = reactive({
 const sheetState = reactive({
     isOpen: false,
 });
+
+const FILE_VIEWER_SHEET_OPEN_STORAGE_KEY = 'atlas:fileViewerSheetOpen';
+
+function readFileViewerSheetOpenPreference(): boolean | null {
+    if (typeof window === 'undefined' || !('localStorage' in window)) {
+        return null;
+    }
+
+    try {
+        const raw = window.localStorage.getItem(FILE_VIEWER_SHEET_OPEN_STORAGE_KEY);
+        if (raw === null) {
+            return null;
+        }
+
+        if (raw === '1' || raw === 'true') {
+            return true;
+        }
+
+        if (raw === '0' || raw === 'false') {
+            return false;
+        }
+
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+function writeFileViewerSheetOpenPreference(value: boolean): void {
+    if (typeof window === 'undefined' || !('localStorage' in window)) {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(FILE_VIEWER_SHEET_OPEN_STORAGE_KEY, value ? '1' : '0');
+    } catch {
+        // Ignore storage errors (private mode, quota, etc.)
+    }
+}
+
+const sheetOpenPreference = ref<boolean | null>(readFileViewerSheetOpenPreference());
+if (sheetOpenPreference.value !== null) {
+    sheetState.isOpen = sheetOpenPreference.value;
+}
+
+function setSheetOpen(isOpen: boolean, options?: { persist?: boolean }): void {
+    sheetState.isOpen = isOpen;
+
+    if (options?.persist === false) {
+        return;
+    }
+
+    sheetOpenPreference.value = isOpen;
+    writeFileViewerSheetOpenPreference(isOpen);
+}
 
 const containerState = reactive({
     isLoadingMore: false,
@@ -392,7 +447,11 @@ watch(() => items.value.map((item) => item.id), () => {
 
 watch(() => [overlayState.mediaType, overlayState.fillComplete, overlayState.isClosing], ([mediaType, filled, isClosing]) => {
     if (mediaType === 'file' && filled && !isClosing) {
-        sheetState.isOpen = true;
+        // Keep existing UX (file view prefers the details panel), but don't override
+        // an explicit user preference to keep it closed.
+        if (sheetOpenPreference.value !== false) {
+            setSheetOpen(true, { persist: false });
+        }
     }
 });
 
@@ -612,10 +671,10 @@ defineExpose({
         <div v-if="overlayState.isFilled && overlayState.fillComplete && !overlayState.isClosing && !sheetState.isOpen"
              class="flex flex-col items-center justify-center gap-4 p-4 bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out w-16">
             <!-- CTA Button to open sheet -->
-            <button @click="sheetState.isOpen = true"
+            <button @click="setSheetOpen(true)"
                     class="p-3 rounded-lg bg-smart-blue-500 hover:bg-smart-blue-600 text-white transition-colors"
                     aria-label="Open sheet">
-                <Menu :size="20"/>
+                <PanelRightOpen :size="20"/>
             </button>
         </div>
 
@@ -625,7 +684,7 @@ defineExpose({
             :file-id="navigationState.currentItemIndex !== null && items[navigationState.currentItemIndex] ? items[navigationState.currentItemIndex].id : null"
             :file-data="fileData ?? null"
             :is-loading="isLoadingFileData"
-            @close="sheetState.isOpen = false"
+            @close="setSheetOpen(false)"
         />
     </div>
 </template>

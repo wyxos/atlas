@@ -17,6 +17,8 @@ containerRef.getBoundingClientRect = () => ({
 });
 
 beforeEach(() => {
+    window.localStorage.clear();
+
     const mockAxios = {
         post: vi.fn().mockResolvedValue({ data: { seen_count: 1 } }),
         get: vi.fn().mockResolvedValue({ data: { file: null } }),
@@ -171,5 +173,90 @@ describe('FileViewer reactions', () => {
 
         expect(vm.navigationState.currentItemIndex).toBe(3);
         expect(items[vm.navigationState.currentItemIndex]?.id).toBe(4);
+    });
+});
+
+describe('FileViewer sheet persistence', () => {
+    it('restores sheet open state from localStorage', async () => {
+        window.localStorage.setItem('atlas:fileViewerSheetOpen', '1');
+
+        const items = reactive([
+            { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },
+        ]);
+
+        const wrapper = mount(FileViewer, {
+            props: {
+                containerRef,
+                masonryContainerRef: containerRef,
+                items,
+                masonry: null,
+            },
+        });
+
+        const vm = wrapper.vm as any;
+        expect(vm.sheetState.isOpen).toBe(true);
+    });
+
+    it('persists user toggles for sheet visibility', async () => {
+        window.localStorage.setItem('atlas:fileViewerSheetOpen', '0');
+
+        const items = reactive([
+            { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },
+        ]);
+
+        const wrapper = mount(FileViewer, {
+            props: {
+                containerRef,
+                masonryContainerRef: containerRef,
+                items,
+                masonry: null,
+            },
+        });
+
+        const vm = wrapper.vm as any;
+        vm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        vm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+        vm.overlayState.isFilled = true;
+        vm.overlayState.fillComplete = true;
+        vm.navigationState.currentItemIndex = 0;
+        await nextTick();
+
+        // Open via taskbar CTA and persist.
+        await wrapper.get('button[aria-label="Open sheet"]').trigger('click');
+        await nextTick();
+        expect(window.localStorage.getItem('atlas:fileViewerSheetOpen')).toBe('1');
+
+        // Close via sheet header CTA and persist.
+        await wrapper.get('button[aria-label="Hide details panel"]').trigger('click');
+        await nextTick();
+        expect(window.localStorage.getItem('atlas:fileViewerSheetOpen')).toBe('0');
+    });
+
+    it('does not auto-open the sheet for file media when user preference is closed', async () => {
+        window.localStorage.setItem('atlas:fileViewerSheetOpen', '0');
+
+        const items = reactive([
+            { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'file', page: 1, index: 0, notFound: false },
+        ]);
+
+        const wrapper = mount(FileViewer, {
+            props: {
+                containerRef,
+                masonryContainerRef: containerRef,
+                items,
+                masonry: null,
+            },
+        });
+
+        const vm = wrapper.vm as any;
+        vm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+        vm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+        vm.overlayState.isFilled = true;
+        vm.overlayState.fillComplete = true;
+        vm.overlayState.mediaType = 'file';
+        vm.navigationState.currentItemIndex = 0;
+        await nextTick();
+
+        expect(vm.sheetState.isOpen).toBe(false);
     });
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X, Loader2 } from 'lucide-vue-next';
+import { Copy, Loader2, PanelRightClose } from 'lucide-vue-next';
 import { copyToClipboard } from '@/utils/clipboard';
 
 interface Props {
@@ -32,6 +32,18 @@ async function handleCopyPath(absolutePath: string | null): Promise<void> {
     }
 }
 
+async function handleCopyText(text: string | null, label: string): Promise<void> {
+    if (!text) {
+        return;
+    }
+
+    try {
+        await copyToClipboard(text, label, { showToast: false });
+    } catch {
+        // Ignore clipboard errors; there is no fallback UI in this sheet.
+    }
+}
+
 const emit = defineEmits<{
     close: [];
 }>();
@@ -39,10 +51,10 @@ const emit = defineEmits<{
 
 <template>
     <div
-        class="flex flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden"
+        class="flex h-full min-h-0 flex-col bg-prussian-blue-800 border-l-2 border-twilight-indigo-500 shrink-0 transition-all duration-300 ease-in-out overflow-hidden pointer-events-auto"
         :class="isOpen ? 'w-80 max-w-80' : 'w-0 max-w-0'"
     >
-        <div class="flex w-80 min-w-80 max-w-80 flex-col">
+        <div class="flex h-full min-h-0 w-80 min-w-80 max-w-80 flex-col">
             <div
                 class="flex items-center justify-between p-4 border-b border-twilight-indigo-500 shrink-0 whitespace-nowrap"
                 :class="isOpen ? '' : 'opacity-0 pointer-events-none'"
@@ -53,12 +65,15 @@ const emit = defineEmits<{
                 <button
                     @click="emit('close')"
                     class="p-2 rounded-lg hover:bg-prussian-blue-700 text-white transition-colors"
-                    aria-label="Close sheet"
+                    aria-label="Hide details panel"
                 >
-                    <X :size="20" />
+                    <PanelRightClose :size="20" />
                 </button>
             </div>
-            <div class="flex-1 overflow-y-auto p-4 min-w-0" :class="isOpen ? '' : 'opacity-0 pointer-events-none'">
+            <div
+                class="flex-1 min-h-0 overflow-y-auto overscroll-y-contain p-4 min-w-0"
+                :class="isOpen ? '' : 'opacity-0 pointer-events-none'"
+            >
                 <div v-if="isLoading" class="flex items-center justify-center py-8">
                     <Loader2 :size="24" class="animate-spin text-smart-blue-500" />
                 </div>
@@ -101,50 +116,110 @@ const emit = defineEmits<{
                     </div>
                     <div v-if="fileData.url">
                         <div class="font-semibold text-white mb-1">URL</div>
-                        <a :href="fileData.url" target="_blank" rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
-                            {{ fileData.url }}
-                        </a>
+                        <div class="mt-1 flex min-w-0 items-center gap-2">
+                            <a
+                                :href="fileData.url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="min-w-0 flex-1 truncate text-smart-blue-400 hover:text-smart-blue-300"
+                                :title="fileData.url"
+                            >
+                                {{ fileData.url }}
+                            </a>
+                            <button
+                                type="button"
+                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white disabled:opacity-50"
+                                aria-label="Copy URL"
+                                :disabled="!fileData.url"
+                                @click="handleCopyText(fileData.url, 'URL')"
+                            >
+                                <Copy :size="16" />
+                            </button>
+                        </div>
                     </div>
                     <div v-if="fileData.disk_url">
                         <div class="font-semibold text-white mb-1">Disk URL</div>
-                        <a :href="fileData.disk_url" target="_blank" rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
-                            {{ fileData.disk_url }}
-                        </a>
+                        <div class="mt-1 flex min-w-0 items-center gap-2">
+                            <a
+                                :href="fileData.disk_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="min-w-0 flex-1 truncate text-smart-blue-400 hover:text-smart-blue-300"
+                                :title="fileData.disk_url"
+                            >
+                                {{ fileData.disk_url }}
+                            </a>
+                            <button
+                                type="button"
+                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white disabled:opacity-50"
+                                aria-label="Copy disk URL"
+                                :disabled="!fileData.disk_url"
+                                @click="handleCopyText(fileData.disk_url, 'Disk URL')"
+                            >
+                                <Copy :size="16" />
+                            </button>
+                        </div>
                     </div>
                     <div v-if="fileData.path">
                         <div class="font-semibold text-white mb-1">Path</div>
-                        <button
-                            type="button"
-                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all text-left w-full"
-                            title="Click to copy absolute path"
-                            data-test="file-path"
-                            :disabled="!fileData.absolute_path"
-                            @click="handleCopyPath(fileData.absolute_path)"
-                        >
-                            {{ fileData.path }}
-                        </button>
+                        <div class="mt-1 flex min-w-0 items-center gap-2">
+                            <span class="min-w-0 flex-1 truncate text-smart-blue-400" :title="fileData.path">
+                                {{ fileData.path }}
+                            </span>
+                            <button
+                                type="button"
+                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white disabled:opacity-50"
+                                title="Copy absolute path"
+                                aria-label="Copy path"
+                                data-test="file-path"
+                                :disabled="!fileData.absolute_path"
+                                @click="handleCopyPath(fileData.absolute_path)"
+                            >
+                                <Copy :size="16" />
+                            </button>
+                        </div>
                     </div>
                     <div v-if="fileData.preview_path">
                         <div class="font-semibold text-white mb-1">Preview Path</div>
-                        <button
-                            type="button"
-                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all text-left w-full"
-                            title="Click to copy absolute preview path"
-                            data-test="preview-path"
-                            :disabled="!fileData.absolute_preview_path"
-                            @click="handleCopyPath(fileData.absolute_preview_path)"
-                        >
-                            {{ fileData.preview_path }}
-                        </button>
+                        <div class="mt-1 flex min-w-0 items-center gap-2">
+                            <span class="min-w-0 flex-1 truncate text-smart-blue-400" :title="fileData.preview_path">
+                                {{ fileData.preview_path }}
+                            </span>
+                            <button
+                                type="button"
+                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white disabled:opacity-50"
+                                title="Copy absolute preview path"
+                                aria-label="Copy preview path"
+                                data-test="preview-path"
+                                :disabled="!fileData.absolute_preview_path"
+                                @click="handleCopyPath(fileData.absolute_preview_path)"
+                            >
+                                <Copy :size="16" />
+                            </button>
+                        </div>
                     </div>
                     <div v-if="fileData.referrer_url">
                         <div class="font-semibold text-white mb-1">Referrer</div>
-                        <a :href="fileData.referrer_url" target="_blank" rel="noopener noreferrer"
-                            class="text-smart-blue-400 hover:text-smart-blue-300 break-all">
-                            {{ fileData.referrer_url }}
-                        </a>
+                        <div class="mt-1 flex min-w-0 items-center gap-2">
+                            <a
+                                :href="fileData.referrer_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="min-w-0 flex-1 truncate text-smart-blue-400 hover:text-smart-blue-300"
+                                :title="fileData.referrer_url"
+                            >
+                                {{ fileData.referrer_url }}
+                            </a>
+                            <button
+                                type="button"
+                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white disabled:opacity-50"
+                                aria-label="Copy referrer URL"
+                                :disabled="!fileData.referrer_url"
+                                @click="handleCopyText(fileData.referrer_url, 'Referrer')"
+                            >
+                                <Copy :size="16" />
+                            </button>
+                        </div>
                     </div>
                     <div v-if="fileData.tags && Array.isArray(fileData.tags) && fileData.tags.length > 0">
                         <div class="font-semibold text-white mb-1">Tags</div>

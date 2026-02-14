@@ -156,7 +156,6 @@ vi.mock('@wyxos/vibe', () => ({
             const exposed = {
                 init: mockInit,
                 initialize,
-                refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,
@@ -526,7 +525,6 @@ describe('Browse - Tab Management', () => {
         expect(wrapper.find('[data-test="play-button"]').exists()).toBe(true);
     });
 });
-
 
 
 

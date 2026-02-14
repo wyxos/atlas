@@ -130,7 +130,6 @@ vi.mock('@wyxos/vibe', () => ({
             const exposed = {
                 init: mockInit,
                 initialize,
-                refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,
@@ -429,7 +428,6 @@ describe('Browse - Overlay Display', () => {
         expect(overlay.classes()).toContain('border-smart-blue-500');
     });
 });
-
 
 
 
