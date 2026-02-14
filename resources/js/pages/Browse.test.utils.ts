@@ -33,7 +33,6 @@ vi.mock('lucide-vue-next', () => ({
     AlertTriangle: { name: 'AlertTriangle', template: '<div class="alert-icon"></div>', props: ['size'] },
     Info: { name: 'Info', template: '<div class="info-icon"></div>', props: ['size'] },
     Copy: { name: 'Copy', template: '<div class="copy-icon"></div>', props: ['size', 'class'] },
-    RefreshCcw: { name: 'RefreshCcw', template: '<div class="refresh-icon"></div>', props: ['size'] },
     ChevronsLeft: { name: 'ChevronsLeft', template: '<div class="chevrons-left-icon"></div>', props: ['size'] },
     SlidersHorizontal: { name: 'SlidersHorizontal', template: '<div class="sliders-icon"></div>', props: ['size'] },
     X: { name: 'X', template: '<div class="x-icon"></div>', props: ['size', 'class'] },
@@ -167,7 +166,6 @@ vi.mock('@wyxos/vibe', () => ({
             return {
                 isLoading: mockIsLoading,
                 init: mockInit,
-                refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
                 remove,
@@ -431,7 +429,6 @@ export async function setupOverlayTest() {
     await waitForStable(wrapper);
     return { wrapper, router };
 }
-
 
 
 

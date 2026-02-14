@@ -147,7 +147,6 @@ vi.mock('@wyxos/vibe', () => ({
             const exposed = {
                 init: mockInit,
                 initialize,
-                refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,
@@ -249,7 +248,6 @@ describe('Browse - Info Badge and Prompt Tooltip', () => {
     // If prompt data is not in metadata, loadPromptData will fetch it from the API, but that's an edge case
     // that's already covered by the usePromptData composable tests.
 });
-
 
 
 

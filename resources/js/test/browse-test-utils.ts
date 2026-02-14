@@ -182,7 +182,6 @@ export function createVibeMockFactory(mocks: BrowseMocks) {
                 const exposed = {
                     init: mocks.mockInit,
                     initialize,
-                    refreshLayout: vi.fn(),
                     cancelLoad: mocks.mockCancelLoad,
                     destroy: mocks.mockDestroy,
                     remove,
@@ -542,7 +541,6 @@ export function setupBoundingClientRectMock(): void {
         toJSON: vi.fn(),
     }));
 }
-
 
 
 

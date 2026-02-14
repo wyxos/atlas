@@ -160,7 +160,6 @@ vi.mock('@wyxos/vibe', () => ({
             const exposed = {
                 init: mockInit,
                 initialize,
-                refreshLayout: vi.fn(),
                 cancel: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,

@@ -120,7 +120,6 @@ vi.mock('@wyxos/vibe', () => ({
             const exposed = {
                 init: mockInit,
                 initialize,
-                refreshLayout: vi.fn(),
                 cancelLoad: mockCancelLoad,
                 destroy: mockDestroy,
                 remove: mockRemove,
@@ -246,7 +245,7 @@ describe('Browse - Overlay Drawer', () => {
         fileViewerVm.sheetState.isOpen = true;
         await wrapper.vm.$nextTick();
 
-        const closeButton = fileViewer.find('button[aria-label="Close sheet"]');
+        const closeButton = fileViewer.find('button[aria-label="Hide details panel"]');
         expect(closeButton.exists()).toBe(true);
 
         await closeButton.trigger('click');
@@ -255,6 +254,4 @@ describe('Browse - Overlay Drawer', () => {
         expect(fileViewerVm.sheetState.isOpen).toBe(false);
     });
 });
-
-
 
