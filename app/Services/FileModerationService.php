@@ -21,6 +21,21 @@ final class FileModerationService extends BaseModerationService
         $this->moderator = new Moderator;
     }
 
+    private function getPromptForFile(File $file): ?string
+    {
+        $payload = (array) optional($file->metadata)->payload;
+
+        $prompt = data_get($payload, 'prompt')
+            ?? data_get($file->detail_metadata, 'prompt')
+            ?? data_get($file->listing_metadata, 'meta.prompt');
+
+        if (! is_string($prompt) || $prompt === '') {
+            return null;
+        }
+
+        return $prompt;
+    }
+
     /**
      * Apply file moderation rules to files based on their action_type.
      */
@@ -62,19 +77,13 @@ final class FileModerationService extends BaseModerationService
 
     protected function shouldSkipFile(File $file): bool
     {
-        $payload = (array) optional($file->metadata)->payload;
-        // Support both metadata payload and listing_metadata fallback (for Browser.php)
-        $prompt = data_get($payload, 'prompt') ?? data_get($file->listing_metadata, 'meta.prompt');
-
-        return ! is_string($prompt) || $prompt === '';
+        return $this->getPromptForFile($file) === null;
     }
 
     protected function getMatchForFile(File $file): ?ModerationRule
     {
-        $payload = (array) optional($file->metadata)->payload;
-        $prompt = data_get($payload, 'prompt') ?? data_get($file->listing_metadata, 'meta.prompt');
-
-        if (! is_string($prompt) || $prompt === '') {
+        $prompt = $this->getPromptForFile($file);
+        if ($prompt === null) {
             return null;
         }
 
