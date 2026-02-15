@@ -387,6 +387,52 @@ test('blacklist rules match buzz in underscores, quotes, and different casing', 
     }
 });
 
+test('blacklist rules match terms followed by punctuation (comma)', function () {
+    Bus::fake();
+
+    ModerationRule::factory()->any(['papaya'])->create([
+        'name' => 'Papaya rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+        // Simulate UI form posts where booleans may arrive as strings.
+        'options' => [
+            'case_sensitive' => 'false',
+            'whole_word' => 'true',
+        ],
+    ]);
+
+    $prompts = [
+        'papaya,',
+        'fresh papaya, please',
+        'papaya,then more words',
+    ];
+
+    $files = collect($prompts)->map(function (string $prompt, int $index) {
+        $file = File::factory()->create([
+            'referrer_url' => "https://example.com/file-papaya{$index}.jpg",
+            'auto_disliked' => false,
+            'blacklisted_at' => null,
+            'path' => "downloads/papaya{$index}.jpg",
+        ]);
+
+        FileMetadata::factory()->create([
+            'file_id' => $file->id,
+            'payload' => ['prompt' => $prompt],
+        ]);
+
+        return $file->fresh()->load('metadata');
+    });
+
+    $result = $this->service->moderate($files);
+
+    expect($result['flaggedIds'])->toBeEmpty();
+
+    foreach ($files as $file) {
+        expect($result['processedIds'])->toContain($file->id);
+        expect($file->fresh()->blacklisted_at)->not->toBeNull();
+    }
+});
+
 test('immediate blacklist updates file but does not create reaction', function () {
     Bus::fake();
 
