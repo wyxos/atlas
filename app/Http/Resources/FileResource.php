@@ -37,6 +37,33 @@ class FileResource extends JsonResource
         $absolutePath = $resolveAbsolutePath($this->path);
         $absolutePreviewPath = $resolveAbsolutePath($this->preview_path);
 
+        $payload = is_array($this->metadata?->payload)
+            ? $this->metadata->payload
+            : (is_string($this->metadata?->payload) ? json_decode($this->metadata->payload, true) : []);
+        $listingMetadata = is_array($this->listing_metadata) ? $this->listing_metadata : [];
+        $detailMetadata = is_array($this->detail_metadata) ? $this->detail_metadata : [];
+
+        $normalizeDimension = function (mixed $value): ?int {
+            if (! is_numeric($value)) {
+                return null;
+            }
+
+            $int = (int) $value;
+
+            return $int > 0 ? $int : null;
+        };
+
+        $width = $normalizeDimension(
+            data_get($payload, 'width')
+            ?? data_get($detailMetadata, 'width')
+            ?? data_get($listingMetadata, 'width')
+        );
+        $height = $normalizeDimension(
+            data_get($payload, 'height')
+            ?? data_get($detailMetadata, 'height')
+            ?? data_get($listingMetadata, 'height')
+        );
+
         $fileUrl = null;
         if ($this->url) {
             $fileUrl = $this->url;
@@ -82,6 +109,8 @@ class FileResource extends JsonResource
             'filename' => $this->filename,
             'ext' => $this->ext,
             'size' => $this->size,
+            'width' => $width,
+            'height' => $height,
             'mime_type' => $this->mime_type,
             'hash' => $this->hash,
             'title' => $this->title,

@@ -94,6 +94,10 @@ const emit = defineEmits<{
                         <div class="font-semibold text-white mb-1">Size</div>
                         <div>{{ (fileData.size / 1024 / 1024).toFixed(2) }} MB</div>
                     </div>
+                    <div v-if="fileData.width !== null && fileData.height !== null">
+                        <div class="font-semibold text-white mb-1">Resolution</div>
+                        <div>{{ fileData.width }} x {{ fileData.height }}</div>
+                    </div>
                     <div v-if="fileData.downloaded !== undefined">
                         <div class="font-semibold text-white mb-1">Downloaded</div>
                         <div>{{ fileData.downloaded ? 'Yes' : 'No' }}</div>
@@ -268,6 +272,7 @@ const emit = defineEmits<{
         </div>
     </div>
 </template>
+
 
 
 

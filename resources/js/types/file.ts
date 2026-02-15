@@ -5,6 +5,8 @@ export interface File {
     filename: string;
     ext: string | null;
     size: number | null;
+    width: number | null;
+    height: number | null;
     mime_type: string | null;
     hash: string | null;
     title: string | null;
@@ -41,3 +43,4 @@ export interface File {
     created_at: string;
     updated_at: string;
 }
+
