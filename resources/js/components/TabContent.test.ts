@@ -116,12 +116,16 @@ vi.mock('@/utils/masonryInteractions', () => ({
 
 vi.mock('@/composables/useItemPreview', async () => {
     const { ref } = await import('vue');
+    const mockIncrementPreviewCount = vi.fn();
     return {
         useItemPreview: vi.fn(() => ({
             previewedItems: ref(new Set()),
-            incrementPreviewCount: vi.fn(),
+            incrementPreviewCount: mockIncrementPreviewCount,
             clearPreviewedItems: vi.fn(),
         })),
+        __test: {
+            mockIncrementPreviewCount,
+        },
     };
 });
 
@@ -813,6 +817,110 @@ describe('TabContent - Moderation auto-dislike countdown', () => {
                 2622441,
                 expect.objectContaining({ id: 2622441, will_auto_dislike: true })
             );
+        } finally {
+            wrapper?.unmount();
+            window.IntersectionObserver = originalIntersectionObserver;
+            vibeShouldEmitPreloaded = true;
+        }
+    });
+});
+
+describe('TabContent - Local disliked presets preview increment', () => {
+    it('increments preview count on intersection when using reaction_at sort even if Vibe does not emit preloaded', async () => {
+        vibeShouldEmitPreloaded = false;
+        const { __test } = await import('@/composables/useItemPreview');
+        __test.mockIncrementPreviewCount.mockClear();
+
+        const originalIntersectionObserver = window.IntersectionObserver;
+        let lastObserverCallback: IntersectionObserverCallback | null = null;
+
+        class TestIntersectionObserver {
+            observe = vi.fn();
+            unobserve = vi.fn();
+            disconnect = vi.fn();
+            takeRecords = vi.fn(() => []);
+
+            constructor(cb: IntersectionObserverCallback) {
+                lastObserverCallback = cb;
+            }
+        }
+        window.IntersectionObserver = TestIntersectionObserver as unknown as typeof IntersectionObserver;
+
+        let wrapper: ReturnType<typeof mount> | null = null;
+        try {
+            mockAxios.get.mockResolvedValueOnce({
+                data: {
+                    tab: {
+                        id: 889,
+                        label: 'Browse 1',
+                        params: {
+                            feed: 'local',
+                            source: 'all',
+                            page: 1,
+                            limit: 20,
+                            local_preset: 'disliked_any',
+                            reaction_mode: 'types',
+                            reaction: ['dislike'],
+                            sort: 'reaction_at',
+                            blacklisted: 'no',
+                            auto_disliked: 'any',
+                        },
+                        items: [
+                            {
+                                id: 2622442,
+                                width: 500,
+                                height: 500,
+                                page: 1,
+                                key: '1-2622442',
+                                index: 0,
+                                src: 'https://example.com/preview.jpg',
+                                preview: 'https://example.com/preview.jpg',
+                                original: 'https://example.com/original.jpg',
+                                type: 'image',
+                                notFound: false,
+                                previewed_count: 0,
+                                will_auto_dislike: false,
+                                reaction: { type: 'dislike' },
+                            },
+                        ],
+                        position: 0,
+                        isActive: true,
+                    },
+                },
+            });
+
+            wrapper = mount(TabContent, {
+                props: {
+                    tabId: 889,
+                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+            await flushPromises();
+            await nextTick();
+
+            const overlay = wrapper.find('[data-file-id="2622442"]');
+            expect(overlay.exists()).toBe(true);
+            expect(lastObserverCallback).toBeTruthy();
+
+            lastObserverCallback?.(
+                [
+                    {
+                        isIntersecting: true,
+                        intersectionRatio: 0.75,
+                        target: overlay.element,
+                    } as unknown as IntersectionObserverEntry,
+                ],
+                {} as IntersectionObserver
+            );
+
+            await flushPromises();
+
+            expect(__test.mockIncrementPreviewCount).toHaveBeenCalledWith(2622442);
         } finally {
             wrapper?.unmount();
             window.IntersectionObserver = originalIntersectionObserver;
