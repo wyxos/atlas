@@ -212,7 +212,6 @@ const {closeOverlay} = useFileViewerOverlayState({
     container: containerState,
     overlay: overlayState,
     navigation: navigationState,
-    sheet: sheetState,
     emitClose: () => emit('close'),
 });
 
@@ -688,3 +687,5 @@ defineExpose({
         />
     </div>
 </template>
+
+
