@@ -265,6 +265,21 @@ final class Moderator
         return false;
     }
 
+    private function normalizeBool(mixed $value, bool $default): bool
+    {
+        if ($value === null) {
+            return $default;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        $parsed = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+        return $parsed ?? $default;
+    }
+
     /**
      * Clean and normalize the list of terms, dropping empties.
      * Terms can be strings or objects with 'term' and optional 'allow_digit_prefix' flag.
@@ -283,7 +298,7 @@ final class Moderator
                 if ($trimmed !== '') {
                     $clean[] = [
                         'term' => $trimmed,
-                        'allow_digit_prefix' => (bool) ($t['allow_digit_prefix'] ?? false),
+                        'allow_digit_prefix' => $this->normalizeBool($t['allow_digit_prefix'] ?? null, false),
                     ];
                 }
             }
@@ -300,9 +315,9 @@ final class Moderator
         $opts = is_array($node['options'] ?? null) ? $node['options'] : [];
 
         return [
-            'case_sensitive' => (bool) ($opts['case_sensitive'] ?? false),
-            'whole_word' => (bool) ($opts['whole_word'] ?? true),
-            'allow_digit_prefix' => (bool) ($opts['allow_digit_prefix'] ?? false),
+            'case_sensitive' => $this->normalizeBool($opts['case_sensitive'] ?? null, false),
+            'whole_word' => $this->normalizeBool($opts['whole_word'] ?? null, true),
+            'allow_digit_prefix' => $this->normalizeBool($opts['allow_digit_prefix'] ?? null, false),
         ];
     }
 
