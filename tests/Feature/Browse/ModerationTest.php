@@ -387,6 +387,42 @@ test('blacklist rules match buzz in underscores, quotes, and different casing', 
     }
 });
 
+test('blacklist rules use detail_metadata prompt when metadata payload is missing', function () {
+    Bus::fake();
+
+    ModerationRule::factory()->any(['buzz'])->create([
+        'name' => 'Buzz rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+        'options' => [
+            'case_sensitive' => 'false',
+            'whole_word' => 'true',
+        ],
+    ]);
+
+    $file = File::factory()->create([
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'path' => 'downloads/buzz-detail.jpg',
+        'detail_metadata' => [
+            'prompt' => 'Master Yoda holding a glowing yellow lightning bolt symbol, above it glowing green text reads "Buzz you have? Send, you should.", futuristic sci-fi background',
+        ],
+    ]);
+
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => [],
+    ]);
+
+    $file = $file->fresh()->load('metadata');
+
+    $result = $this->service->moderate(collect([$file]));
+
+    expect($result['flaggedIds'])->toBeEmpty();
+    expect($result['processedIds'])->toContain($file->id);
+    expect($file->fresh()->blacklisted_at)->not->toBeNull();
+});
+
 test('blacklist rules match terms followed by punctuation (comma)', function () {
     Bus::fake();
 
