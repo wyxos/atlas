@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { installAxiosCsrfRetryInterceptor } from '@/utils/axiosCsrfRetry';
 
 declare global {
     interface Window {
@@ -10,25 +11,11 @@ window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
-// Set up CSRF token for axios
-// Wait for DOM to be ready to ensure meta tag is available
-function setupCsrfToken(): void {
-    const token = document.querySelector('meta[name="csrf-token"]');
-    if (token) {
-        const tokenValue = token.getAttribute('content');
-        if (tokenValue) {
-            window.axios.defaults.headers.common['X-CSRF-TOKEN'] = tokenValue;
-        }
-    }
-}
+// Prefer Laravel's XSRF cookie over pinning a CSRF token from the initial HTML.
+// The token can rotate when the session is regenerated; the cookie will stay current.
+window.axios.defaults.xsrfCookieName = 'XSRF-TOKEN';
+window.axios.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 
-// Try immediately
-setupCsrfToken();
-
-// Also try after DOM is ready (in case meta tag loads later)
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupCsrfToken);
-} else {
-    setupCsrfToken();
-}
+// Auto-recover from 419 (CSRF mismatch) without forcing a full reload.
+installAxiosCsrfRetryInterceptor(window.axios);
 
