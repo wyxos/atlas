@@ -651,6 +651,68 @@ async function handleMasonryRemoved(payload: { items: FeedItem[]; ids: string[] 
 // Auto-dislike queue composable
 const autoDislikeQueue = useAutoDislikeQueue(items, masonry);
 
+function ensureModerationAutoDislikeCountdown(item: FeedItem): void {
+    const itemId = item.id;
+    if (typeof itemId !== 'number') {
+        return;
+    }
+    if (autoDislikeQueue.hasActiveCountdown(itemId)) {
+        return;
+    }
+    // Moderation flags must not override explicit user reactions.
+    if (item.reaction?.type) {
+        return;
+    }
+    if (item.will_auto_dislike === true) {
+        autoDislikeQueue.startAutoDislikeCountdown(itemId, item);
+        // Keep Vibe computed state fresh for overlays (e.g., progress bar visibility).
+        triggerRef(items);
+    }
+}
+
+let moderationAutoDislikeObserver: IntersectionObserver | null = null;
+const moderationAutoDislikeObservedTargets = new Map<number, Element>();
+
+function syncModerationAutoDislikeObserver(): void {
+    if (!moderationAutoDislikeObserver) {
+        return;
+    }
+    const container = masonryContainer.value;
+    if (!container) {
+        return;
+    }
+
+    const nextTargets = new Map<number, Element>();
+    for (const el of container.querySelectorAll('[data-file-id]')) {
+        const raw = (el as HTMLElement).getAttribute('data-file-id');
+        const id = raw ? Number(raw) : NaN;
+        if (!Number.isFinite(id)) {
+            continue;
+        }
+        nextTargets.set(id, el);
+    }
+
+    for (const [id, target] of nextTargets) {
+        const existing = moderationAutoDislikeObservedTargets.get(id);
+        if (existing === target) {
+            continue;
+        }
+        if (existing) {
+            moderationAutoDislikeObserver.unobserve(existing);
+        }
+        moderationAutoDislikeObserver.observe(target);
+        moderationAutoDislikeObservedTargets.set(id, target);
+    }
+
+    for (const [id, target] of moderationAutoDislikeObservedTargets) {
+        if (nextTargets.has(id)) {
+            continue;
+        }
+        moderationAutoDislikeObserver.unobserve(target);
+        moderationAutoDislikeObservedTargets.delete(id);
+    }
+}
+
 function findNearestVideoElement(from: EventTarget | null): HTMLVideoElement | null {
     let el = from as HTMLElement | null;
     for (let i = 0; i < 8 && el; i += 1) {
@@ -669,6 +731,9 @@ function handleMasonryItemMouseEnter(e: MouseEvent, item: FeedItem): void {
     const index = items.value.findIndex((i) => i.id === itemId);
     hoveredItemIndex.value = index === -1 ? null : index;
     hoveredItemId.value = itemId;
+
+    // Fallback: start moderation countdown even if Vibe doesn't emit `preloaded` for this item.
+    ensureModerationAutoDislikeCountdown(item);
 
     if (item.type === 'video') {
         const video = findNearestVideoElement(e.currentTarget);
@@ -939,6 +1004,46 @@ onMounted(async () => {
     await fetchSources();
 });
 
+onMounted(() => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    if (typeof window.IntersectionObserver !== 'function') {
+        return;
+    }
+
+    moderationAutoDislikeObserver = new window.IntersectionObserver(
+        (entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting || entry.intersectionRatio < 0.5) {
+                    continue;
+                }
+                const raw = (entry.target as HTMLElement).getAttribute('data-file-id');
+                const id = raw ? Number(raw) : NaN;
+                if (!Number.isFinite(id)) {
+                    continue;
+                }
+                const item = items.value.find((it) => it.id === id);
+                if (!item) {
+                    continue;
+                }
+                ensureModerationAutoDislikeCountdown(item);
+            }
+        },
+        { threshold: 0.5 }
+    );
+
+    void nextTick().then(syncModerationAutoDislikeObserver);
+});
+
+watch(
+    () => items.value,
+    () => {
+        void nextTick().then(syncModerationAutoDislikeObserver);
+    },
+    { deep: false }
+);
+
 
 
 // Cleanup on unmount
@@ -946,6 +1051,9 @@ onUnmounted(() => {
     // cancel any in-flight masonry requests
     masonry.value?.cancel?.();
     autoDislikeQueue.clearAutoDislikeCountdowns();
+    moderationAutoDislikeObserver?.disconnect();
+    moderationAutoDislikeObserver = null;
+    moderationAutoDislikeObservedTargets.clear();
 });
 
 defineExpose({

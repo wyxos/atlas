@@ -126,15 +126,17 @@ vi.mock('@/composables/useItemPreview', async () => {
 });
 
 const mockClearAutoDislikeCountdowns = vi.fn();
+const mockStartAutoDislikeCountdown = vi.fn();
+const mockHasActiveCountdown = vi.fn(() => false);
 vi.mock('@/composables/useAutoDislikeQueue', async () => {
     const { ref } = await import('vue');
     return {
         useAutoDislikeQueue: vi.fn(() => ({
-            startAutoDislikeCountdown: vi.fn(),
+            startAutoDislikeCountdown: mockStartAutoDislikeCountdown,
             cancelAutoDislikeCountdown: vi.fn(),
             getCountdownRemainingTime: vi.fn(() => 0),
             getCountdownProgress: vi.fn(() => 0),
-            hasActiveCountdown: vi.fn(() => false),
+            hasActiveCountdown: mockHasActiveCountdown,
             formatCountdown: vi.fn(() => '00:00'),
             freezeAll: vi.fn(),
             unfreezeAll: vi.fn(),
@@ -157,6 +159,8 @@ const mockLoadPage = vi.fn();
 const mockLoadNext = vi.fn();
 const mockReset = vi.fn();
 const mockInitialize = vi.fn();
+
+let vibeShouldEmitPreloaded = true;
 
 vi.mock('@wyxos/vibe', () => {
     const Masonry = defineComponent({
@@ -245,7 +249,7 @@ vi.mock('@wyxos/vibe', () => {
             // Simulate Vibe's debounced batch preloaded emit for items already "in view".
             // TabContent uses this to mark items as preloaded (for hover overlays).
             Promise.resolve().then(() => {
-                if ((props.items ?? []).length > 0) {
+                if (vibeShouldEmitPreloaded && (props.items ?? []).length > 0) {
                     emit('preloaded', [...props.items]);
                 }
             });
@@ -717,6 +721,103 @@ describe('TabContent - Auto-dislike cleanup', () => {
         wrapper.unmount();
 
         expect(mockClearAutoDislikeCountdowns).toHaveBeenCalled();
+    });
+});
+
+describe('TabContent - Moderation auto-dislike countdown', () => {
+    it('starts the countdown when an item is in view even if Vibe does not emit preloaded', async () => {
+        vibeShouldEmitPreloaded = false;
+        mockStartAutoDislikeCountdown.mockClear();
+        mockHasActiveCountdown.mockReturnValue(false);
+
+        const originalIntersectionObserver = window.IntersectionObserver;
+        let lastObserverCallback: IntersectionObserverCallback | null = null;
+
+        // Allow the test to manually trigger intersection for the observed target(s).
+        class TestIntersectionObserver {
+            observe = vi.fn();
+            unobserve = vi.fn();
+            disconnect = vi.fn();
+            takeRecords = vi.fn(() => []);
+
+            constructor(cb: IntersectionObserverCallback) {
+                lastObserverCallback = cb;
+            }
+        }
+        window.IntersectionObserver = TestIntersectionObserver as unknown as typeof IntersectionObserver;
+
+        let wrapper: ReturnType<typeof mount> | null = null;
+        try {
+            mockAxios.get.mockResolvedValueOnce({
+                data: {
+                    tab: {
+                        id: 888,
+                        label: 'Browse 1',
+                        params: {
+                            page: 1,
+                            service: 'test-service',
+                        },
+                        items: [
+                            {
+                                id: 2622441,
+                                width: 500,
+                                height: 500,
+                                page: 1,
+                                key: '1-2622441',
+                                index: 0,
+                                src: 'https://example.com/preview.jpg',
+                                preview: 'https://example.com/preview.jpg',
+                                original: 'https://example.com/original.jpg',
+                                type: 'image',
+                                notFound: false,
+                                will_auto_dislike: true,
+                                reaction: null,
+                            },
+                        ],
+                        position: 0,
+                        isActive: true,
+                    },
+                },
+            });
+
+            wrapper = mount(TabContent, {
+                props: {
+                    tabId: 888,
+                    availableServices: [{ key: 'test-service', label: 'Test Service' }],
+                    onReaction: vi.fn(),
+                    updateActiveTab: vi.fn(),
+                },
+            });
+
+            await flushPromises();
+            await nextTick();
+            await flushPromises();
+            await nextTick();
+
+            const overlay = wrapper.find('[data-file-id="2622441"]');
+            expect(overlay.exists()).toBe(true);
+            expect(lastObserverCallback).toBeTruthy();
+
+            lastObserverCallback?.(
+                [
+                    {
+                        isIntersecting: true,
+                        intersectionRatio: 0.75,
+                        target: overlay.element,
+                    } as unknown as IntersectionObserverEntry,
+                ],
+                {} as IntersectionObserver
+            );
+
+            expect(mockStartAutoDislikeCountdown).toHaveBeenCalledWith(
+                2622441,
+                expect.objectContaining({ id: 2622441, will_auto_dislike: true })
+            );
+        } finally {
+            wrapper?.unmount();
+            window.IntersectionObserver = originalIntersectionObserver;
+            vibeShouldEmitPreloaded = true;
+        }
     });
 });
 
