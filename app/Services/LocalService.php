@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\File;
 use App\Models\Reaction;
+use Illuminate\Support\Facades\Cache;
 
 class LocalService extends BaseService
 {
@@ -59,6 +60,7 @@ class LocalService extends BaseService
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
         $autoDisliked = is_string($params['auto_disliked'] ?? null) ? (string) $params['auto_disliked'] : 'any';
         $reaction = $params['reaction'] ?? null;
+        $includeTotal = filter_var($params['include_total'] ?? null, FILTER_VALIDATE_BOOLEAN);
 
         // Filter by current user's reaction types (optional)
         $allTypes = ['love', 'like', 'dislike', 'funny'];
@@ -137,6 +139,7 @@ class LocalService extends BaseService
                 reactionTypes: $reactionTypes,
                 allTypes: $allTypes,
                 sort: $sort,
+                includeTotal: $includeTotal,
             );
         }
 
@@ -154,6 +157,7 @@ class LocalService extends BaseService
                 reactionTypes: $reactionTypes,
                 allTypes: $allTypes,
                 sort: $sort,
+                includeTotal: $includeTotal,
             );
         }
 
@@ -693,6 +697,7 @@ class LocalService extends BaseService
         ?array $reactionTypes,
         array $allTypes,
         string $sort,
+        bool $includeTotal = false,
     ): array {
         $page = max(1, $page);
         $limit = max(1, $limit);
@@ -761,6 +766,24 @@ class LocalService extends BaseService
             ->select('reactions.file_id')
             ->when($sort === 'reaction_at_asc', fn ($q) => $q->orderBy('reactions.created_at', 'asc'), fn ($q) => $q->orderByDesc('reactions.created_at'));
 
+        $total = null;
+        if ($includeTotal) {
+            $hash = sha1(json_encode([
+                'user_id' => $userId,
+                'reaction_mode' => $reactionMode,
+                'reaction_types' => $reactionTypes,
+                'source' => $source,
+                'downloaded' => $downloaded,
+                'blacklisted' => $blacklisted,
+                'blacklist_type' => $blacklistType,
+                'auto_disliked' => $autoDisliked,
+                'max_previewed' => $maxPreviewed,
+            ]));
+
+            $cacheKey = "local:reaction_at_total:{$hash}";
+            $total = Cache::remember($cacheKey, now()->addMinutes(5), fn () => (int) (clone $idQuery)->reorder()->count());
+        }
+
         // Avoid running COUNT(*) on large reaction history queries.
         // We only need page-wise navigation here.
         $pagination = $idQuery->simplePaginate($limit, ['reactions.file_id'], 'page', $page);
@@ -777,7 +800,7 @@ class LocalService extends BaseService
                 'files' => [],
                 'metadata' => [
                     'nextCursor' => null,
-                    'total' => null,
+                    'total' => $total,
                 ],
             ];
         }
@@ -798,7 +821,7 @@ class LocalService extends BaseService
             'files' => $orderedFiles,
             'metadata' => [
                 'nextCursor' => $nextCursor,
-                'total' => null,
+                'total' => $total,
             ],
         ];
     }
