@@ -203,6 +203,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 blacklisted: 'no',
                 blacklist_type: 'any',
                 auto_disliked: 'any',
+                include_total: true,
                 max_previewed_count: moderatedCap,
                 // Newest disliked first.
                 sort: 'reaction_at',
@@ -218,6 +219,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 blacklisted: 'no',
                 blacklist_type: 'any',
                 auto_disliked: 'no',
+                include_total: true,
                 max_previewed_count: moderatedCap,
                 // Newest disliked first.
                 sort: 'reaction_at',
@@ -233,6 +235,7 @@ const localPresets = computed<LocalPreset[]>(() => {
                 blacklisted: 'no',
                 blacklist_type: 'any',
                 auto_disliked: 'yes',
+                include_total: true,
                 max_previewed_count: moderatedCap,
                 // Newest disliked first.
                 sort: 'reaction_at',

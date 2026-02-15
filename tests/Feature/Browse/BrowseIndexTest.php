@@ -505,3 +505,50 @@ test('local reaction_at dislike browse does not require total count and keeps re
     expect($data['items'][0]['id'])->toBe($newer->id);
     expect($data['total'])->toBeNull();
 });
+
+test('local reaction_at dislike browse can include total count when requested', function () {
+    $user = User::factory()->create();
+    $tab = \App\Models\Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $older = \App\Models\File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDays(2),
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'source' => 'CivitAI',
+        'previewed_count' => 1,
+    ]);
+
+    $newer = \App\Models\File::factory()->create([
+        'downloaded' => true,
+        'downloaded_at' => now()->subDay(),
+        'blacklisted_at' => null,
+        'auto_disliked' => false,
+        'source' => 'Wallhaven',
+        'previewed_count' => 1,
+    ]);
+
+    Reaction::create([
+        'file_id' => $older->id,
+        'user_id' => $user->id,
+        'type' => 'dislike',
+    ])->update(['created_at' => now()->subHours(6), 'updated_at' => now()->subHours(6)]);
+
+    Reaction::create([
+        'file_id' => $newer->id,
+        'user_id' => $user->id,
+        'type' => 'dislike',
+    ])->update(['created_at' => now()->subHours(1), 'updated_at' => now()->subHours(1)]);
+
+    $response = $this->actingAs($user)->getJson("/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=20&reaction_mode=types&reaction[]=dislike&sort=reaction_at&blacklisted=no&auto_disliked=no&max_previewed_count=2&include_total=1");
+
+    $response->assertSuccessful();
+
+    $data = $response->json();
+    expect($data['items'])->toBeArray();
+    expect($data['items'])->not->toBeEmpty();
+    expect($data['items'][0]['id'])->toBe($newer->id);
+    expect($data['total'])->toBe(2);
+});
