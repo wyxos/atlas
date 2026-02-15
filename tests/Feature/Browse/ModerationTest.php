@@ -340,6 +340,52 @@ test('immediate blacklist updates file', function () {
     // Verify delete job was dispatched
     Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
 });
+test('blacklist rules match buzz in underscores, quotes, and different casing', function () {
+    Bus::fake();
+
+    ModerationRule::factory()->any(['buzz'])->create([
+        'name' => 'Buzz rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+        // Simulate UI form posts where booleans may arrive as strings.
+        'options' => [
+            'case_sensitive' => 'false',
+            'whole_word' => 'true',
+        ],
+    ]);
+
+    $prompts = [
+        'need_buzz',
+        'give_buzz_please',
+        'BUZZ',
+        '"Buzz Tips?"',
+    ];
+
+    $files = collect($prompts)->map(function (string $prompt, int $index) {
+        $file = File::factory()->create([
+            'referrer_url' => "https://example.com/file{$index}.jpg",
+            'auto_disliked' => false,
+            'blacklisted_at' => null,
+            'path' => "downloads/test{$index}.jpg",
+        ]);
+
+        FileMetadata::factory()->create([
+            'file_id' => $file->id,
+            'payload' => ['prompt' => $prompt],
+        ]);
+
+        return $file->fresh()->load('metadata');
+    });
+
+    $result = $this->service->moderate($files);
+
+    expect($result['flaggedIds'])->toBeEmpty();
+
+    foreach ($files as $file) {
+        expect($result['processedIds'])->toContain($file->id);
+        expect($file->fresh()->blacklisted_at)->not->toBeNull();
+    }
+});
 
 test('immediate blacklist updates file but does not create reaction', function () {
     Bus::fake();
