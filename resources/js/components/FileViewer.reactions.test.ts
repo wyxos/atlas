@@ -232,6 +232,65 @@ describe('FileViewer sheet persistence', () => {
         expect(window.localStorage.getItem('atlas:fileViewerSheetOpen')).toBe('0');
     });
 
+    it('keeps sheet state when closing and reopening the overlay', async () => {
+        vi.useFakeTimers();
+
+        let wrapper: ReturnType<typeof mount> | null = null;
+
+        try {
+            window.localStorage.setItem('atlas:fileViewerSheetOpen', '0');
+
+            const items = reactive([
+                { id: 1, width: 300, height: 400, src: 'test1.jpg', type: 'video', page: 1, index: 0, notFound: false },
+            ]);
+
+            wrapper = mount(FileViewer, {
+                props: {
+                    containerRef,
+                    masonryContainerRef: containerRef,
+                    items,
+                    masonry: null,
+                },
+            });
+
+            const vm = wrapper.vm as any;
+            vm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+            vm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+            vm.overlayState.isFilled = true;
+            vm.overlayState.fillComplete = true;
+            vm.navigationState.currentItemIndex = 0;
+            await nextTick();
+
+            await wrapper.get('button[aria-label="Open sheet"]').trigger('click');
+            await nextTick();
+
+            expect(vm.sheetState.isOpen).toBe(true);
+            expect(window.localStorage.getItem('atlas:fileViewerSheetOpen')).toBe('1');
+
+            await wrapper.get('[data-test="close-overlay-button"]').trigger('click');
+            vi.advanceTimersByTime(500);
+            await nextTick();
+
+            expect(vm.sheetState.isOpen).toBe(true);
+            expect(window.localStorage.getItem('atlas:fileViewerSheetOpen')).toBe('1');
+
+            // Simulate reopening the overlay.
+            vm.overlayState.rect = { top: 0, left: 0, width: 800, height: 600 };
+            vm.overlayState.image = { src: 'test1.jpg', alt: 'Test 1' };
+            vm.overlayState.isFilled = true;
+            vm.overlayState.fillComplete = true;
+            vm.overlayState.isClosing = false;
+            vm.navigationState.currentItemIndex = 0;
+            await nextTick();
+
+            expect(vm.sheetState.isOpen).toBe(true);
+        } finally {
+            wrapper?.unmount();
+            vi.clearAllTimers();
+            vi.useRealTimers();
+        }
+    });
+
     it('does not auto-open the sheet for file media when user preference is closed', async () => {
         window.localStorage.setItem('atlas:fileViewerSheetOpen', '0');
 
@@ -260,3 +319,5 @@ describe('FileViewer sheet persistence', () => {
         expect(vm.sheetState.isOpen).toBe(false);
     });
 });
+
+

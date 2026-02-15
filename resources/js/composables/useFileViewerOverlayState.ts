@@ -34,9 +34,7 @@ export function useFileViewerOverlayState(params: {
         direction: 'up' | 'down' | null;
         isNavigating: boolean;
     };
-    sheet: {
-        isOpen: boolean;
-    };
+
     emitClose: () => void;
 }) {
     const { overflow, overscroll } = toRefs(params.container);
@@ -66,7 +64,6 @@ export function useFileViewerOverlayState(params: {
         direction,
         isNavigating,
     } = toRefs(params.navigation);
-    const { isOpen } = toRefs(params.sheet);
 
     function resetOverlayState(): void {
         key.value++;
@@ -91,7 +88,6 @@ export function useFileViewerOverlayState(params: {
         imageTranslateY.value = 0;
         direction.value = null;
         isNavigating.value = false;
-        isOpen.value = false;
         params.emitClose();
     }
 
@@ -154,3 +150,5 @@ export function useFileViewerOverlayState(params: {
         restoreContainerStyles,
     };
 }
+
+
