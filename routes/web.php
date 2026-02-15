@@ -22,6 +22,11 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [LoginController::class, 'login']);
 });
 
+// Lightweight endpoint to refresh the XSRF cookie for SPA requests.
+Route::get('/api/csrf', function () {
+    return response()->noContent();
+})->name('api.csrf');
+
 Route::post('/api/extension/files', [\App\Http\Controllers\ExternalFilesController::class, 'store'])
     ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
     ->name('api.extension.files.store');
