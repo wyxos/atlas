@@ -713,6 +713,15 @@ function syncModerationAutoDislikeObserver(): void {
     }
 }
 
+function shouldIncrementPreviewsFromIntersection(): boolean {
+    if (form.data.feed !== 'local') {
+        return false;
+    }
+
+    const sort = form.data.serviceFilters?.sort;
+    return sort === 'reaction_at' || sort === 'reaction_at_asc';
+}
+
 function findNearestVideoElement(from: EventTarget | null): HTMLVideoElement | null {
     let el = from as HTMLElement | null;
     for (let i = 0; i < 8 && el; i += 1) {
@@ -1026,6 +1035,12 @@ onMounted(() => {
                 const item = items.value.find((it) => it.id === id);
                 if (!item) {
                     continue;
+                }
+
+                // Local disliked presets (`reaction_at*`) use DB-backed pagination where Vibe's `preloaded`
+                // event is not always reliable; ensure preview counts still increment when items are in view.
+                if (shouldIncrementPreviewsFromIntersection()) {
+                    void itemPreview.incrementPreviewCount(id);
                 }
                 ensureModerationAutoDislikeCountdown(item);
             }
