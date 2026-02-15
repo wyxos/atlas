@@ -16,6 +16,8 @@ function makeFile(overrides: Partial<File> = {}): File {
         filename: 'test.jpg',
         ext: 'jpg',
         size: 1024,
+        width: null,
+        height: null,
         mime_type: 'image/jpeg',
         hash: null,
         title: null,
@@ -86,3 +88,4 @@ describe('FileViewerSheet', () => {
         );
     });
 });
+
