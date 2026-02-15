@@ -10,4 +10,3 @@ test('csrf refresh endpoint returns no content and sets xsrf cookie', function (
     $response->assertNoContent();
     $response->assertCookie('XSRF-TOKEN');
 });
-

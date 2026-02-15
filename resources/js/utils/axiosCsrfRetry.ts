@@ -1,20 +1,6 @@
-type AxiosRequestConfig = {
-    [key: string]: unknown;
-    headers?: Record<string, unknown>;
-};
+import type { AxiosInstance, AxiosRequestConfig } from 'axios';
 
-type AxiosLike = {
-    get: (url: string, config?: AxiosRequestConfig) => Promise<unknown>;
-    request: (config: AxiosRequestConfig) => Promise<unknown>;
-    interceptors: {
-        response: {
-            use: (
-                onFulfilled: (response: unknown) => unknown,
-                onRejected: (error: unknown) => Promise<unknown>
-            ) => unknown;
-        };
-    };
-};
+type AxiosLike = Pick<AxiosInstance, 'get' | 'request' | 'interceptors'>;
 
 type CsrfRetryOptions = {
     refreshUrl?: string;
@@ -49,6 +35,7 @@ async function ensureFreshCsrfCookie(axios: AxiosLike, refreshUrl: string): Prom
  */
 export function installAxiosCsrfRetryInterceptor(axios: AxiosLike, options?: CsrfRetryOptions): void {
     const refreshUrl = options?.refreshUrl ?? '/api/csrf';
+    const retryKey = '__atlasCsrfRetried' as const;
 
     axios.interceptors.response.use(
         (response) => response,
@@ -58,11 +45,17 @@ export function installAxiosCsrfRetryInterceptor(axios: AxiosLike, options?: Csr
             const status = response && typeof response.status === 'number' ? response.status : null;
             const config = err && isRecord(err.config) ? (err.config as AxiosRequestConfig) : null;
 
-            if (status !== 419 || !config || config['__atlasCsrfRetried']) {
+            if (status !== 419 || !config) {
                 return Promise.reject(error);
             }
 
-            config['__atlasCsrfRetried'] = true;
+            const configRecord = config as unknown as Record<string, unknown>;
+
+            if (configRecord[retryKey]) {
+                return Promise.reject(error);
+            }
+
+            configRecord[retryKey] = true;
 
             try {
                 await ensureFreshCsrfCookie(axios, refreshUrl);
