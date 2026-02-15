@@ -117,14 +117,16 @@ vi.mock('@/utils/masonryInteractions', () => ({
 vi.mock('@/composables/useItemPreview', async () => {
     const { ref } = await import('vue');
     const mockIncrementPreviewCount = vi.fn();
+    const mockClearPreviewedItems = vi.fn();
     return {
         useItemPreview: vi.fn(() => ({
             previewedItems: ref(new Set()),
             incrementPreviewCount: mockIncrementPreviewCount,
-            clearPreviewedItems: vi.fn(),
+            clearPreviewedItems: mockClearPreviewedItems,
         })),
         __test: {
             mockIncrementPreviewCount,
+            mockClearPreviewedItems,
         },
     };
 });
@@ -926,6 +928,52 @@ describe('TabContent - Local disliked presets preview increment', () => {
             window.IntersectionObserver = originalIntersectionObserver;
             vibeShouldEmitPreloaded = true;
         }
+    });
+});
+
+describe('TabContent - Preview Cache Reset', () => {
+    it('clears previewed items when applying filters/presets', async () => {
+        const { __test } = await import('@/composables/useItemPreview');
+        __test.mockClearPreviewedItems.mockClear();
+
+        mockAxios.get.mockResolvedValueOnce({
+            data: {
+                tab: {
+                    id: 990,
+                    label: 'Browse 1',
+                    params: {
+                        feed: 'local',
+                        source: 'all',
+                        page: 1,
+                        limit: 20,
+                    },
+                    items: [],
+                    position: 0,
+                    isActive: true,
+                },
+            },
+        });
+
+        const wrapper = mount(TabContent, {
+            props: {
+                tabId: 990,
+                availableServices: [],
+                onReaction: vi.fn(),
+                updateActiveTab: vi.fn(),
+            },
+        });
+
+        await flushPromises();
+
+        const filter = wrapper.findComponent(TabFilter);
+        expect(filter.exists()).toBe(true);
+
+        filter.vm.$emit('apply');
+        await nextTick();
+
+        expect(__test.mockClearPreviewedItems).toHaveBeenCalled();
+
+        wrapper.unmount();
     });
 });
 

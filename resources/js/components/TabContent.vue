@@ -375,6 +375,10 @@ async function applyFilters() {
     // Best-effort cancel/reset: remount Masonry.
     shouldShowForm.value = false;
 
+    // Preview increments are de-duped for the lifetime of this TabContent instance.
+    // When filters/presets change, we want a clean slate for the new result set.
+    itemPreview.clearPreviewedItems();
+
     // Online browsing uses cursor-based pagination; when filters change, always restart at page 1.
     // Local browsing can optionally jump to a specific numeric page via Advanced Filters.
     const normalizeLocalPage = (): number => {
@@ -404,6 +408,7 @@ async function goToFirstPage(): Promise<void> {
 
 async function applyService() {
     shouldShowForm.value = false;
+    itemPreview.clearPreviewedItems();
     items.value = [];
     preloadedItemIds.value = new Set();
     restoredPages.value = null;
