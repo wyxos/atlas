@@ -18,9 +18,9 @@ final class FileModerationService extends BaseModerationService
     private Moderator $moderator;
 
     /**
-     * @var array<int, array{file_id:int, action_type:string, moderation_rule_id:int, moderation_rule_name:string, created_at:mixed, updated_at:mixed}>
+     * @var array<string, array{file_id:int, action_type:string, moderation_rule_id:int, moderation_rule_name:string, created_at:mixed, updated_at:mixed}>
      */
-    private array $recordedDislikeActions = [];
+    private array $recordedActions = [];
 
     public function __construct()
     {
@@ -111,12 +111,12 @@ final class FileModerationService extends BaseModerationService
     protected function resetState(): void
     {
         parent::resetState();
-        $this->recordedDislikeActions = [];
+        $this->recordedActions = [];
     }
 
     protected function recordMatch(File $file, object $match, string $actionType): void
     {
-        if ($actionType !== ActionType::DISLIKE) {
+        if (! in_array($actionType, [ActionType::DISLIKE, ActionType::BLACKLIST], true)) {
             return;
         }
 
@@ -124,11 +124,11 @@ final class FileModerationService extends BaseModerationService
             return;
         }
 
-        // Only persist the first rule that ever flagged this file for auto-dislike.
+        // Only persist the first rule that ever flagged this file for this action type.
         // This avoids repeated writes during browsing and preserves provenance even if rules later change.
-        $this->recordedDislikeActions[$file->id] = [
+        $this->recordedActions[$file->id.'-'.$actionType] = [
             'file_id' => (int) $file->id,
-            'action_type' => ActionType::DISLIKE,
+            'action_type' => $actionType,
             'moderation_rule_id' => (int) $match->id,
             'moderation_rule_name' => (string) $match->name,
             'created_at' => now(),
@@ -138,11 +138,11 @@ final class FileModerationService extends BaseModerationService
 
     protected function flushRecordedMatches(): void
     {
-        if ($this->recordedDislikeActions === []) {
+        if ($this->recordedActions === []) {
             return;
         }
 
         // Insert-only: keep the first persisted reason for this file/action_type.
-        FileModerationAction::query()->insertOrIgnore(array_values($this->recordedDislikeActions));
+        FileModerationAction::query()->insertOrIgnore(array_values($this->recordedActions));
     }
 }

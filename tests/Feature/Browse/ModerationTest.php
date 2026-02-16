@@ -375,6 +375,48 @@ test('immediate blacklist updates file', function () {
     // Verify delete job was dispatched
     Bus::assertDispatched(\App\Jobs\DeleteAutoDislikedFileJob::class);
 });
+
+test('persist the moderation rule that auto-blacklisted a file (no inference)', function () {
+    Bus::fake();
+
+    $rule = ModerationRule::factory()->any(['spam'])->create([
+        'name' => 'Spam rule',
+        'active' => true,
+        'action_type' => ActionType::BLACKLIST,
+    ]);
+
+    $file = File::factory()->create([
+        'referrer_url' => 'https://example.com/file-blacklist-hit.jpg',
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'blacklist_reason' => null,
+        'path' => 'downloads/test-blacklist-hit.jpg',
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This is spam content'],
+    ]);
+    $file = $file->fresh()->load('metadata');
+
+    $result = $this->service->moderate(collect([$file]));
+    expect($result['flaggedIds'])->toBeEmpty()
+        ->and($result['processedIds'])->toContain($file->id);
+
+    $this->assertDatabaseHas('file_moderation_actions', [
+        'file_id' => $file->id,
+        'action_type' => ActionType::BLACKLIST,
+        'moderation_rule_id' => $rule->id,
+        'moderation_rule_name' => $rule->name,
+    ]);
+
+    $response = $this->actingAs($this->user)->getJson("/api/files/{$file->id}");
+    $response
+        ->assertOk()
+        ->assertJsonPath('file.blacklist_type', 'auto')
+        ->assertJsonPath('file.blacklist_rule.id', $rule->id)
+        ->assertJsonPath('file.blacklist_rule.name', $rule->name);
+});
+
 test('blacklist rules match buzz in underscores, quotes, and different casing', function () {
     Bus::fake();
 
