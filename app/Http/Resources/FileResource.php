@@ -85,19 +85,23 @@ class FileResource extends JsonResource
             $hasReason = is_string($this->blacklist_reason) && trim($this->blacklist_reason) !== '';
             $blacklistType = $hasReason ? 'manual' : 'auto';
 
-            // We don't currently persist which rule caused an auto-blacklist.
-            // For the viewer sheet, we infer the current matching blacklist rule (if any).
             if (! $hasReason) {
                 try {
-                    $rule = app(\App\Services\FileModerationService::class)->matchRule($this->resource, 'blacklist');
-                    if ($rule) {
-                        $blacklistRule = [
-                            'id' => $rule->id,
-                            'name' => $rule->name,
-                        ];
+                    if ($this->resource->relationLoaded('autoBlacklistModerationAction')) {
+                        $hit = $this->resource->getRelation('autoBlacklistModerationAction');
+                        if ($hit) {
+                            $blacklistRule = [
+                                'id' => (int) ($hit->moderation_rule_id ?? 0),
+                                'name' => (string) ($hit->moderation_rule_name ?? ''),
+                            ];
+                        }
                     }
                 } catch (\Throwable $e) {
-                    // If moderation rules table isn't ready or anything fails, omit inferred details.
+                    // Omit persisted details if relation isn't available or anything fails.
+                }
+
+                if ($blacklistRule && $blacklistRule['id'] <= 0 && $blacklistRule['name'] === '') {
+                    $blacklistRule = null;
                 }
             }
         }

@@ -3,16 +3,19 @@
 use App\Models\File;
 use App\Models\ModerationRule;
 use App\Models\User;
+use App\Services\FileModerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('file show includes blacklist type and inferred rule for auto-blacklisted files', function () {
+test('file show includes blacklist type and persisted rule for auto-blacklisted files', function () {
     $user = User::factory()->create();
 
     $file = File::factory()->create([
-        'blacklisted_at' => now(),
+        'blacklisted_at' => null,
         'blacklist_reason' => null,
+        'auto_disliked' => false,
+        'path' => null,
     ]);
 
     $file->metadata()->create([
@@ -28,6 +31,8 @@ test('file show includes blacklist type and inferred rule for auto-blacklisted f
         'op' => 'any',
         'terms' => ['car'],
     ]);
+
+    app(FileModerationService::class)->moderate(collect([$file->fresh()->load('metadata')]));
 
     $response = $this->actingAs($user)->getJson("/api/files/{$file->id}");
 

@@ -160,6 +160,12 @@ class File extends Model
             ->where('action_type', ActionType::DISLIKE);
     }
 
+    public function autoBlacklistModerationAction(): HasOne
+    {
+        return $this->hasOne(FileModerationAction::class)
+            ->where('action_type', ActionType::BLACKLIST);
+    }
+
     /**
      * Get the indexable data array for the model.
      *
