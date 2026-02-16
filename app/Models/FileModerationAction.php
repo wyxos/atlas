@@ -32,4 +32,3 @@ final class FileModerationAction extends Model
         return $this->belongsTo(File::class);
     }
 }
-
