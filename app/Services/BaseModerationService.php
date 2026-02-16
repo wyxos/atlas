@@ -100,6 +100,8 @@ abstract class BaseModerationService
 
             $actionType = $this->getActionType($match);
 
+            $this->recordMatch($file, $match, $actionType);
+
             // Track immediate actions (blacklist only - dislike shows countdown)
             if ($actionType === ActionType::BLACKLIST) {
                 $this->immediateActions[$file->id] = [
@@ -110,6 +112,8 @@ abstract class BaseModerationService
 
             $this->handleActionType($actionType, $file);
         }
+
+        $this->flushRecordedMatches();
 
         // Process files
         $processedIds = $this->processFiles();
@@ -262,4 +266,20 @@ abstract class BaseModerationService
      * Get the action type from a matched rule/container.
      */
     abstract protected function getActionType(object $match): string;
+
+    /**
+     * Record match metadata (e.g. to show which rule flagged a file for auto-dislike).
+     */
+    protected function recordMatch(File $file, object $match, string $actionType): void
+    {
+        // Default: no-op.
+    }
+
+    /**
+     * Flush any recorded match metadata to persistent storage.
+     */
+    protected function flushRecordedMatches(): void
+    {
+        // Default: no-op.
+    }
 }

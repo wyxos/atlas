@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Laravel\Scout\Searchable;
+use App\Enums\ActionType;
 
 class File extends Model
 {
@@ -146,6 +147,17 @@ class File extends Model
     public function reactions(): HasMany
     {
         return $this->hasMany(Reaction::class);
+    }
+
+    public function moderationActions(): HasMany
+    {
+        return $this->hasMany(FileModerationAction::class);
+    }
+
+    public function autoDislikeModerationAction(): HasOne
+    {
+        return $this->hasOne(FileModerationAction::class)
+            ->where('action_type', ActionType::DISLIKE);
     }
 
     /**

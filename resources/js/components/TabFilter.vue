@@ -283,6 +283,22 @@ const localPresets = computed<LocalPreset[]>(() => {
                 sort: 'blacklisted_at',
             },
         },
+        {
+            label: 'Disliked + Blacklisted (Auto)',
+            value: 'disliked_blacklisted_auto',
+            filters: {
+                downloaded: 'any',
+                reaction_mode: 'types',
+                reaction: ['dislike'],
+                blacklisted: 'yes',
+                blacklist_type: 'auto',
+                auto_disliked: 'any',
+                include_total: true,
+                max_previewed_count: moderatedCap,
+                // Newest blacklisted first.
+                sort: 'blacklisted_at',
+            },
+        },
     ];
 });
 

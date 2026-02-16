@@ -102,6 +102,21 @@ class FileResource extends JsonResource
             }
         }
 
+        $autoDislikeRule = null;
+        try {
+            if ($this->resource->relationLoaded('autoDislikeModerationAction')) {
+                $hit = $this->resource->getRelation('autoDislikeModerationAction');
+                if ($hit) {
+                    $autoDislikeRule = [
+                        'id' => (int) ($hit->moderation_rule_id ?? 0),
+                        'name' => (string) ($hit->moderation_rule_name ?? ''),
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            // Omit persisted details if relation isn't available or anything fails.
+        }
+
         return [
             'id' => $this->id,
             'source' => $this->source,
@@ -134,6 +149,8 @@ class FileResource extends JsonResource
             'previewed_count' => $this->previewed_count,
             'seen_at' => $this->seen_at?->toIso8601String(),
             'seen_count' => $this->seen_count,
+            'auto_disliked' => (bool) ($this->auto_disliked ?? false),
+            'auto_dislike_rule' => $autoDislikeRule && ($autoDislikeRule['id'] > 0 || $autoDislikeRule['name'] !== '') ? $autoDislikeRule : null,
             'blacklisted_at' => $this->blacklisted_at?->toIso8601String(),
             'blacklist_reason' => $this->blacklist_reason,
             'blacklist_type' => $blacklistType,
