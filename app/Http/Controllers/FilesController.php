@@ -32,7 +32,7 @@ class FilesController extends Controller
     public function show(File $file): JsonResponse
     {
         // Load metadata relationship for prompt data
-        $file->load('metadata');
+        $file->load(['metadata', 'autoDislikeModerationAction']);
         $this->hydrateDiskMetadata($file);
 
         return response()->json([

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\ActionType;
 use App\Models\File;
+use App\Models\FileModerationAction;
 use App\Models\ModerationRule;
 use App\Services\Moderation\Moderator;
 use Illuminate\Support\Collection;
@@ -15,6 +16,11 @@ final class FileModerationService extends BaseModerationService
     private ?Collection $activeRules = null;
 
     private Moderator $moderator;
+
+    /**
+     * @var array<int, array{file_id:int, action_type:string, moderation_rule_id:int, moderation_rule_name:string, created_at:mixed, updated_at:mixed}>
+     */
+    private array $recordedDislikeActions = [];
 
     public function __construct()
     {
@@ -100,5 +106,43 @@ final class FileModerationService extends BaseModerationService
     protected function getActionType(object $match): string
     {
         return $match->action_type ?? ActionType::DISLIKE;
+    }
+
+    protected function resetState(): void
+    {
+        parent::resetState();
+        $this->recordedDislikeActions = [];
+    }
+
+    protected function recordMatch(File $file, object $match, string $actionType): void
+    {
+        if ($actionType !== ActionType::DISLIKE) {
+            return;
+        }
+
+        if (! ($match instanceof ModerationRule)) {
+            return;
+        }
+
+        // Only persist the first rule that ever flagged this file for auto-dislike.
+        // This avoids repeated writes during browsing and preserves provenance even if rules later change.
+        $this->recordedDislikeActions[$file->id] = [
+            'file_id' => (int) $file->id,
+            'action_type' => ActionType::DISLIKE,
+            'moderation_rule_id' => (int) $match->id,
+            'moderation_rule_name' => (string) $match->name,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+
+    protected function flushRecordedMatches(): void
+    {
+        if ($this->recordedDislikeActions === []) {
+            return;
+        }
+
+        // Insert-only: keep the first persisted reason for this file/action_type.
+        FileModerationAction::query()->insertOrIgnore(array_values($this->recordedDislikeActions));
     }
 }

@@ -59,6 +59,41 @@ test('files with matching prompts are flagged for auto-dislike', function () {
     expect($file1->fresh()->auto_disliked)->toBeFalse();
 });
 
+test('persist the moderation rule that flagged a file for auto-dislike', function () {
+    $rule = ModerationRule::factory()->any(['spam', 'advertisement'])->create([
+        'name' => 'Block spam',
+        'active' => true,
+        'action_type' => ActionType::DISLIKE,
+    ]);
+
+    $file = File::factory()->create([
+        'referrer_url' => 'https://example.com/file-rule-hit.jpg',
+        'auto_disliked' => false,
+    ]);
+    FileMetadata::factory()->create([
+        'file_id' => $file->id,
+        'payload' => ['prompt' => 'This is a spam advertisement'],
+    ]);
+    $file = $file->fresh()->load('metadata');
+
+    $result = $this->service->moderate(collect([$file]));
+    expect($result['flaggedIds'])->toContain($file->id);
+
+    $this->assertDatabaseHas('file_moderation_actions', [
+        'file_id' => $file->id,
+        'action_type' => ActionType::DISLIKE,
+        'moderation_rule_id' => $rule->id,
+        'moderation_rule_name' => $rule->name,
+    ]);
+
+    $response = $this->actingAs($this->user)->getJson("/api/files/{$file->id}");
+    $response
+        ->assertOk()
+        ->assertJsonPath('file.auto_disliked', false)
+        ->assertJsonPath('file.auto_dislike_rule.id', $rule->id)
+        ->assertJsonPath('file.auto_dislike_rule.name', $rule->name);
+});
+
 test('files without matching prompts are not flagged', function () {
     // Create an active moderation rule
     ModerationRule::factory()->any(['spam', 'advertisement'])->create([

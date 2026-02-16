@@ -242,6 +242,18 @@ const emit = defineEmits<{
                         <div class="font-semibold text-white mb-1">Seen</div>
                         <div>{{ fileData.seen_count }} times</div>
                     </div>
+                    <div v-if="fileData.auto_disliked || fileData.auto_dislike_rule" class="space-y-2">
+                        <div class="font-semibold text-white mb-1">Auto Dislike</div>
+                        <div class="uppercase tracking-wide text-xs text-twilight-indigo-100">
+                            {{ fileData.auto_disliked ? 'applied' : 'flagged' }}
+                        </div>
+                        <div v-if="fileData.auto_dislike_rule">
+                            <div class="font-semibold text-white mb-1">Moderation Rule (Flagged)</div>
+                            <div class="wrap-break-word">
+                                #{{ fileData.auto_dislike_rule.id }} {{ fileData.auto_dislike_rule.name }}
+                            </div>
+                        </div>
+                    </div>
                     <div v-if="fileData.blacklisted_at" class="space-y-2">
                         <div class="font-semibold text-white mb-1">Blacklisted</div>
                         <div>{{ new Date(fileData.blacklisted_at).toLocaleString() }}</div>
