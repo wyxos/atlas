@@ -55,7 +55,13 @@ declare const chrome: ChromeApi;
   const ATLAS_STATUS_TTL_MS = 30_000;
   const atlasStatusCache = new Map<
     string,
-    { exists: boolean; downloaded: boolean; reactionType: string | null; ts: number }
+    {
+      exists: boolean;
+      downloaded: boolean;
+      blacklisted: boolean;
+      reactionType: string | null;
+      ts: number;
+    }
   >();
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -123,6 +129,14 @@ declare const chrome: ChromeApi;
       ],
     },
   ];
+  const BLACKLIST_ACTION = {
+    type: 'blacklist',
+    label: 'Blacklist',
+    className: 'blacklist',
+    pathDs: ['M18 6 6 18', 'M6 6l12 12', 'M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0Z'],
+  };
+
+  const PAGE_MARKER_STYLE_ID = 'atlas-downloader-page-markers';
 
   function limitString(value, max) {
     const v = typeof value === 'string' ? value : '';
@@ -147,7 +161,9 @@ declare const chrome: ChromeApi;
   function fetchAtlasStatus(
     sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void,
     url: string,
-    callback: (status: { exists: boolean; downloaded: boolean; reactionType: string | null } | null) => void
+    callback: (
+      status: { exists: boolean; downloaded: boolean; blacklisted: boolean; reactionType: string | null } | null
+    ) => void
   ) {
     if (!url) {
       callback(null);
@@ -176,6 +192,7 @@ declare const chrome: ChromeApi;
       const status = {
         exists: Boolean(match.exists),
         downloaded: Boolean(match.downloaded),
+        blacklisted: Boolean(match.blacklisted),
         reactionType: match.reaction?.type ? String(match.reaction.type) : null,
         ts: Date.now(),
       };
@@ -257,6 +274,7 @@ declare const chrome: ChromeApi;
     root.className = 'atlas-shadow-root';
 
     const showToast = createToastFn(root);
+    const chooseDialog = createDialogChooser(root);
     const sendMessageSafe = (
       message: unknown,
       callback: (response: unknown) => void
@@ -294,6 +312,7 @@ declare const chrome: ChromeApi;
       showToast,
       sendMessageSafe,
       isSheetOpen: () => false,
+      chooseDialog,
     });
 
     installMediaReactionOverlay({
@@ -301,6 +320,7 @@ declare const chrome: ChromeApi;
       showToast,
       sendMessageSafe,
       isSheetOpen: () => false,
+      chooseDialog,
     });
   }
 
@@ -450,8 +470,11 @@ declare const chrome: ChromeApi;
     shadow.appendChild(root);
     (document.body || document.documentElement).appendChild(host);
 
+    const chooseDialog = createDialogChooser(root);
+
     let items = [];
     let scanNonce = 0;
+    let reactingItemUrl: string | null = null;
     // Enable hotkeys immediately after UI mounts; event delegation makes it work for dynamic content too.
     const hotkeysEnabled = true;
     let hotkeysHintShown = false;
@@ -466,13 +489,37 @@ declare const chrome: ChromeApi;
     close.addEventListener('click', () => closeModal());
 
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape') {
+      const key = event.key.toLowerCase();
+      if (event.altKey && event.shiftKey && key === 'a') {
+        event.preventDefault();
+        if (!root.classList.contains(OPEN_CLASS)) {
+          openModal();
+        }
         return;
       }
+
+      if (event.key === 'Escape' && root.classList.contains(OPEN_CLASS)) {
+        closeModal();
+        return;
+      }
+
       if (!root.classList.contains(OPEN_CLASS)) {
         return;
       }
-      closeModal();
+
+      const hotkeyType =
+        event.key === '1' ? 'love' : event.key === '2' ? 'like' : event.key === '3' ? 'funny' : null;
+      if (!hotkeyType) {
+        return;
+      }
+
+      const target = items.find((item) => item.selected) ?? items[0] ?? null;
+      if (!target) {
+        return;
+      }
+
+      event.preventDefault();
+      reactToItem(target, hotkeyType, { closeOnSuccess: true });
     });
 
     function openModal() {
@@ -490,6 +537,7 @@ declare const chrome: ChromeApi;
       showToast,
       sendMessageSafe,
       isSheetOpen: () => root.classList.contains(OPEN_CLASS),
+      chooseDialog,
       setHintShown: (value) => {
         hotkeysHintShown = value;
       },
@@ -502,6 +550,7 @@ declare const chrome: ChromeApi;
       showToast,
       sendMessageSafe,
       isSheetOpen: () => root.classList.contains(OPEN_CLASS),
+      chooseDialog,
     });
 
     function makeButton(label, onClick, options) {
@@ -530,12 +579,13 @@ declare const chrome: ChromeApi;
     function setReady(text) {
       meta.textContent = text;
       const selectedCount = items.filter((item) => item.selected).length;
-      queue.disabled = selectedCount === 0;
-      refresh.disabled = false;
-      checkAtlas.disabled = items.length === 0;
+      const busy = reactingItemUrl !== null;
+      queue.disabled = selectedCount === 0 || busy;
+      refresh.disabled = busy;
+      checkAtlas.disabled = items.length === 0 || busy;
       debugButton.disabled = items.length === 0;
-      selectAll.disabled = items.length === 0;
-      selectNone.disabled = items.length === 0;
+      selectAll.disabled = items.length === 0 || busy;
+      selectNone.disabled = items.length === 0 || busy;
     }
 
     function refreshList() {
@@ -644,16 +694,17 @@ declare const chrome: ChromeApi;
       const reactions = document.createElement('div');
       reactions.className = 'atlas-downloader-reactions';
       const currentReaction = item.atlas?.reaction?.type || null;
+      const isBusy = reactingItemUrl !== null;
       for (const reaction of REACTIONS) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = `atlas-downloader-reaction-btn ${reaction.className}${
           currentReaction === reaction.type ? ' active' : ''
-        }${item.reactionPending ? ' pending' : ''}`.trim();
+        }${item.reactionPending === reaction.type ? ' pending' : ''}`.trim();
         button.setAttribute('aria-label', reaction.label);
         button.title = reaction.label;
         button.replaceChildren(createSvgIcon(reaction.pathDs));
-        button.disabled = Boolean(item.reactionPending);
+        button.disabled = isBusy;
         button.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -664,6 +715,42 @@ declare const chrome: ChromeApi;
           reactToItem(item, reaction.type);
         });
         reactions.appendChild(button);
+      }
+
+      const blacklistButton = document.createElement('button');
+      blacklistButton.type = 'button';
+      blacklistButton.className = `atlas-downloader-reaction-btn ${BLACKLIST_ACTION.className}${
+        item.atlas?.blacklisted ? ' active' : ''
+      }${item.reactionPending === BLACKLIST_ACTION.type ? ' pending' : ''}`.trim();
+      blacklistButton.setAttribute('aria-label', BLACKLIST_ACTION.label);
+      blacklistButton.title = BLACKLIST_ACTION.label;
+      blacklistButton.replaceChildren(createSvgIcon(BLACKLIST_ACTION.pathDs));
+      blacklistButton.disabled = isBusy;
+      blacklistButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        reactToItem(item, 'dislike', { blacklist: true });
+      });
+      reactions.appendChild(blacklistButton);
+
+      if (item.atlas?.downloaded) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = `atlas-downloader-reaction-btn delete${
+          item.reactionPending === 'delete-download' ? ' pending' : ''
+        }`.trim();
+        deleteButton.setAttribute('aria-label', 'Delete download');
+        deleteButton.title = 'Delete download';
+        deleteButton.replaceChildren(
+          createSvgIcon(['M3 6h18', 'M8 6V4h8v2', 'M8 10v8', 'M12 10v8', 'M16 10v8', 'M6 6l1 14h10l1-14'])
+        );
+        deleteButton.disabled = isBusy;
+        deleteButton.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          deleteDownloadForItem(item);
+        });
+        reactions.appendChild(deleteButton);
       }
 
       info.appendChild(kind);
@@ -708,8 +795,8 @@ declare const chrome: ChromeApi;
       return {
         type,
         url: item.url,
-        original_url: item.url,
-        referrer_url: window.location.href,
+        original_url: item.original_url || item.url,
+        referrer_url: item.referrer_url || window.location.href,
         page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
         width: item.width,
@@ -717,14 +804,15 @@ declare const chrome: ChromeApi;
         alt: limitString(item.alt || '', MAX_METADATA_LEN),
         preview_url: item.preview_url || '',
         source: sourceFromMediaUrl(item.url),
+        ...(item.download_via ? { download_via: item.download_via } : {}),
       };
     }
 
     function buildDownloadPayload(item) {
       return {
         url: item.url,
-        original_url: item.url,
-        referrer_url: window.location.href,
+        original_url: item.original_url || item.url,
+        referrer_url: item.referrer_url || window.location.href,
         page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
         width: item.width,
@@ -732,6 +820,7 @@ declare const chrome: ChromeApi;
         alt: limitString(item.alt || '', MAX_METADATA_LEN),
         preview_url: item.preview_url || '',
         source: sourceFromMediaUrl(item.url),
+        ...(item.download_via ? { download_via: item.download_via } : {}),
         // Align with Atlas core behavior: reactions dispatch downloads.
         reaction_type: 'like',
       };
@@ -792,6 +881,10 @@ declare const chrome: ChromeApi;
         return { text: 'Downloaded', className: 'ok' };
       }
 
+      if (item.atlas?.blacklisted) {
+        return { text: 'Blacklisted', className: 'err' };
+      }
+
       if (item.atlas?.exists) {
         return { text: 'In Atlas', className: '' };
       }
@@ -834,6 +927,7 @@ declare const chrome: ChromeApi;
           item.atlas = {
             exists: Boolean(match.exists),
             downloaded: Boolean(match.downloaded),
+            blacklisted: Boolean(match.blacklisted),
             file_id: match.file_id ?? null,
             reaction: match.reaction ?? null,
           };
@@ -844,6 +938,7 @@ declare const chrome: ChromeApi;
 
         renderList();
         setReady(summaryText());
+        applyPageMarkers(items);
 
         if (!silent) {
           showToast(`Atlas check: ${downloadedCount}/${existsCount} downloaded.`);
@@ -851,69 +946,180 @@ declare const chrome: ChromeApi;
       });
     }
 
-    function reactToItem(item, type) {
-      if (type !== 'dislike' && item.atlas?.downloaded) {
-        const ok = window.confirm('This file is already downloaded in Atlas. Re-download it?');
-        if (!ok) {
-          showToast('Cancelled.');
-          return;
-        }
-      }
-
-      item.reactionPending = type;
-      item.status = 'Reacting…';
-      item.statusClass = '';
-      renderList();
-
-      const payload = buildReactionPayload(item, type);
-      if (type !== 'dislike' && item.atlas?.downloaded) {
-        payload.force_download = true;
-      }
-
-      sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-        item.reactionPending = null;
-
-        if (!response) {
-          item.status = 'No response';
-          item.statusClass = 'err';
-          renderList();
-          setReady(summaryText());
-          showToast('Atlas extension did not respond.');
-          return;
-        }
-
-        if (!response.ok) {
-          item.status = response.error || 'Failed';
-          item.statusClass = 'err';
-          renderList();
-          setReady(summaryText());
-          showToast(response.error || 'Reaction failed.');
-          return;
-        }
-
-        const data = response.data || null;
-        const file = data?.file || null;
-
-        item.atlas = {
-          exists: Boolean(file),
-          downloaded: Boolean(file?.downloaded),
-          file_id: file?.id ?? null,
-          reaction: data?.reaction ?? null,
-        };
-
-        if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
-          item.status = 'Queued';
-          item.statusClass = 'queued';
-        } else {
-          item.status = '';
-          item.statusClass = '';
-        }
+    function reactToItem(
+      item,
+      type,
+      options: { blacklist?: boolean; closeOnSuccess?: boolean } = {}
+    ) {
+      const proceed = (extraPayload: Record<string, unknown> = {}) => {
+        item.reactionPending = options.blacklist ? BLACKLIST_ACTION.type : type;
+        item.status = 'Reacting…';
+        item.statusClass = '';
+        reactingItemUrl = item.url;
         renderList();
         setReady(summaryText());
 
-        if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
-          pollUntilDownloaded([item.url], 0);
+        const payload = {
+          ...buildReactionPayload(item, type),
+          ...extraPayload,
+          ...(options.blacklist ? { blacklist: true } : {}),
+        };
+
+        sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          item.reactionPending = null;
+          reactingItemUrl = null;
+
+          if (!response) {
+            item.status = 'No response';
+            item.statusClass = 'err';
+            renderList();
+            setReady(summaryText());
+            showToast('Atlas extension did not respond.');
+            return;
+          }
+
+          if (!response.ok) {
+            item.status = response.error || 'Failed';
+            item.statusClass = 'err';
+            renderList();
+            setReady(summaryText());
+            showToast(response.error || 'Reaction failed.');
+            return;
+          }
+
+          const data = response.data || null;
+          const file = data?.file || null;
+
+          item.atlas = {
+            exists: Boolean(file),
+            downloaded: Boolean(file?.downloaded),
+            blacklisted: Boolean(file?.blacklisted_at),
+            file_id: file?.id ?? null,
+            reaction: data?.reaction ?? null,
+          };
+
+          atlasStatusCache.set(item.url, {
+            exists: item.atlas.exists,
+            downloaded: item.atlas.downloaded,
+            blacklisted: item.atlas.blacklisted,
+            reactionType: item.atlas.reaction?.type ? String(item.atlas.reaction.type) : null,
+            ts: Date.now(),
+          });
+
+          if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
+            item.status = 'Queued';
+            item.statusClass = 'queued';
+          } else {
+            item.status = '';
+            item.statusClass = '';
+          }
+          renderList();
+          setReady(summaryText());
+          applyPageMarkers(items);
+
+          if (options.closeOnSuccess) {
+            closeModal();
+          }
+
+          if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
+            pollUntilDownloaded([item.url], 0);
+          }
+        });
+      };
+
+      const hasExistingReaction = Boolean(item.atlas?.reaction?.type);
+      if (type !== 'dislike' && item.atlas?.downloaded && hasExistingReaction) {
+        chooseDialog({
+          title: 'Already downloaded',
+          message: 'This file is already downloaded. Re-download before updating the reaction?',
+          confirmLabel: 'Re-download',
+          cancelLabel: 'Keep existing file',
+        }).then((choice) => {
+          proceed(choice === 'confirm' ? { force_download: true } : {});
+        });
+        return;
+      }
+
+      if (type === 'dislike' && item.atlas?.downloaded) {
+        chooseDialog({
+          title: options.blacklist ? 'Blacklist file' : 'Dislike file',
+          message: 'Delete the downloaded file before applying this action?',
+          confirmLabel: 'Delete then proceed',
+          cancelLabel: 'Keep file and proceed',
+          alternateLabel: 'Cancel',
+          danger: true,
+        }).then((choice) => {
+          if (choice === 'alternate') {
+            showToast('Cancelled.');
+            return;
+          }
+
+          proceed(choice === 'confirm' ? { clear_download: true } : {});
+        });
+        return;
+      }
+
+      proceed();
+    }
+
+    function deleteDownloadForItem(item) {
+      chooseDialog({
+        title: 'Delete downloaded file',
+        message: 'This removes the stored file from disk and keeps the Atlas record.',
+        confirmLabel: 'Delete download',
+        cancelLabel: 'Cancel',
+        danger: true,
+      }).then((choice) => {
+        if (choice !== 'confirm') {
+          return;
         }
+
+        item.reactionPending = 'delete-download';
+        item.status = 'Deleting…';
+        item.statusClass = '';
+        reactingItemUrl = item.url;
+        renderList();
+        setReady(summaryText());
+
+        sendMessageSafe(
+          {
+            type: 'atlas-delete-download',
+            payload: {
+              url: item.url,
+              original_url: item.original_url || item.url,
+              tag_name: item.tag_name,
+              download_via: item.download_via || null,
+            },
+          },
+          (response) => {
+            item.reactionPending = null;
+            reactingItemUrl = null;
+
+            if (!response || !response.ok) {
+              item.status = response?.error || 'Failed';
+              item.statusClass = 'err';
+              renderList();
+              setReady(summaryText());
+              showToast(response?.error || 'Delete failed.');
+              return;
+            }
+
+            const file = response.data?.file || null;
+            item.atlas = {
+              exists: Boolean(file),
+              downloaded: Boolean(file?.downloaded),
+              blacklisted: Boolean(file?.blacklisted_at),
+              file_id: file?.id ?? null,
+              reaction: item.atlas?.reaction ?? null,
+            };
+            item.status = '';
+            item.statusClass = '';
+            renderList();
+            setReady(summaryText());
+            applyPageMarkers(items);
+            showToast('Download deleted.');
+          }
+        );
       });
     }
 
@@ -926,38 +1132,48 @@ declare const chrome: ChromeApi;
 
       const hasDownloaded = selected.some((item) => Boolean(item.atlas?.downloaded));
       if (hasDownloaded) {
-        const ok = window.confirm(
-          'One or more selected files are already downloaded in Atlas. Re-download them?'
-        );
-        if (!ok) {
-          showToast('Cancelled.');
-          return;
-        }
+        chooseDialog({
+          title: 'Re-download selected files',
+          message: 'One or more selected files are already downloaded. Re-download them?',
+          confirmLabel: 'Re-download',
+          cancelLabel: 'Keep existing files',
+          alternateLabel: 'Cancel',
+        }).then((choice) => {
+          if (choice === 'alternate') {
+            showToast('Cancelled.');
+            return;
+          }
+
+          runQueueSelected(choice === 'confirm');
+        });
+        return;
       }
+      runQueueSelected(false);
 
-      queue.disabled = true;
-      refresh.disabled = true;
-      checkAtlas.disabled = true;
-      selectAll.disabled = true;
-      selectNone.disabled = true;
+      function runQueueSelected(forceDownload) {
+        queue.disabled = true;
+        refresh.disabled = true;
+        checkAtlas.disabled = true;
+        selectAll.disabled = true;
+        selectNone.disabled = true;
 
-      for (const item of selected) {
-        item.status = 'Sending…';
-        item.statusClass = '';
-      }
-      renderList();
-
-      const payloads = selected.map((item) => {
-        const payload = buildDownloadPayload(item);
-        if (hasDownloaded) {
-          payload.force_download = true;
+        for (const item of selected) {
+          item.status = 'Sending…';
+          item.statusClass = '';
         }
-        return payload;
-      });
+        renderList();
 
-      sendMessageSafe(
-        { type: 'atlas-download-batch', payloads },
-        (response) => {
+        const payloads = selected.map((item) => {
+          const payload = buildDownloadPayload(item);
+          if (forceDownload) {
+            payload.force_download = true;
+          }
+          return payload;
+        });
+
+        sendMessageSafe(
+          { type: 'atlas-download-batch', payloads },
+          (response) => {
           if (!response) {
             for (const item of selected) {
               item.status = 'No response';
@@ -981,7 +1197,9 @@ declare const chrome: ChromeApi;
               item.atlas = {
                 exists: Boolean(file),
                 downloaded: Boolean(file?.downloaded),
+                blacklisted: Boolean(file?.blacklisted_at),
                 file_id: file?.id ?? null,
+                reaction: item.atlas?.reaction ?? null,
               };
 
               if (data?.queued) {
@@ -1000,6 +1218,7 @@ declare const chrome: ChromeApi;
 
           renderList();
           setReady(summaryText());
+          applyPageMarkers(items);
 
           if (response.ok) {
             showToast(`Queued ${selected.length} download(s) in Atlas.`);
@@ -1007,11 +1226,12 @@ declare const chrome: ChromeApi;
             showToast(response.error || 'Some requests failed.');
           }
 
-          if (urlsToPoll.length > 0) {
-            pollUntilDownloaded(urlsToPoll, 0);
+            if (urlsToPoll.length > 0) {
+              pollUntilDownloaded(urlsToPoll, 0);
+            }
           }
-        }
-      );
+        );
+      }
     }
 
     function pollUntilDownloaded(urls, attempt) {
@@ -1039,6 +1259,7 @@ declare const chrome: ChromeApi;
             item.atlas = {
               exists: Boolean(match.exists),
               downloaded: Boolean(match.downloaded),
+              blacklisted: Boolean(match.blacklisted),
               file_id: match.file_id ?? null,
               reaction: match.reaction ?? null,
             };
@@ -1053,12 +1274,90 @@ declare const chrome: ChromeApi;
 
           renderList();
           setReady(summaryText());
+          applyPageMarkers(items);
 
           if (remaining > 0) {
             pollUntilDownloaded(urls, attempt + 1);
           }
         });
       }, 2000);
+    }
+
+    function applyPageMarkers(sheetItems) {
+      ensurePageMarkerStyles();
+
+      const marked = document.querySelectorAll('[data-atlas-marked="1"]');
+      for (const node of marked) {
+        node.removeAttribute('data-atlas-marked');
+        node.removeAttribute('data-atlas-state');
+        node.removeAttribute('data-atlas-reaction');
+      }
+
+      const statusByUrl = new Map<
+        string,
+        { exists: boolean; downloaded: boolean; blacklisted: boolean; reactionType: string | null }
+      >();
+
+      for (const item of sheetItems) {
+        if (!item?.url || !item?.atlas) {
+          continue;
+        }
+
+        const reactionType = item.atlas?.reaction?.type ? String(item.atlas.reaction.type) : null;
+        const status = {
+          exists: Boolean(item.atlas.exists),
+          downloaded: Boolean(item.atlas.downloaded),
+          blacklisted: Boolean(item.atlas.blacklisted),
+          reactionType,
+        };
+
+        statusByUrl.set(item.url, status);
+        statusByUrl.set(stripHash(item.url), status);
+      }
+
+      if (statusByUrl.size === 0) {
+        return;
+      }
+
+      const nodes = document.querySelectorAll('img, video, a[href]');
+      for (const node of nodes) {
+        const candidateUrl = (() => {
+          if (node instanceof HTMLImageElement) {
+            return safeUrl(node.currentSrc) || safeUrl(node.src) || '';
+          }
+          if (node instanceof HTMLVideoElement) {
+            return getVideoUrl(node) || '';
+          }
+          if (node instanceof HTMLAnchorElement) {
+            return safeUrl(node.href) || '';
+          }
+          return '';
+        })();
+
+        if (!candidateUrl) {
+          continue;
+        }
+
+        const status = statusByUrl.get(candidateUrl) || statusByUrl.get(stripHash(candidateUrl));
+        if (!status) {
+          continue;
+        }
+
+        node.setAttribute('data-atlas-marked', '1');
+        if (status.downloaded) {
+          node.setAttribute('data-atlas-state', 'downloaded');
+        } else if (status.blacklisted) {
+          node.setAttribute('data-atlas-state', 'blacklisted');
+        } else if (status.reactionType) {
+          node.setAttribute('data-atlas-state', 'reacted');
+        } else if (status.exists) {
+          node.setAttribute('data-atlas-state', 'exists');
+        }
+
+        if (status.reactionType) {
+          node.setAttribute('data-atlas-reaction', status.reactionType);
+        }
+      }
     }
   }
 
@@ -1110,6 +1409,12 @@ declare const chrome: ChromeApi;
           return;
         }
 
+        const direct = buildDirectPageCandidate();
+        if (direct && !seen.has(direct.url)) {
+          seen.add(direct.url);
+          items.push(direct);
+        }
+
         resolve(items);
       };
 
@@ -1130,14 +1435,31 @@ declare const chrome: ChromeApi;
         return null;
       }
 
-      const url = safeUrl(img.currentSrc) || safeUrl(img.src) || safeUrl(img.getAttribute('src'));
+      const rawSrc = (img.currentSrc || img.src || img.getAttribute('src') || '').trim();
+      const url = safeUrl(rawSrc);
       if (!url) {
-        return null;
+        const fallback = safeUrl(document.referrer) || '';
+        if (!fallback || (!rawSrc.toLowerCase().startsWith('blob:') && !rawSrc.toLowerCase().startsWith('data:'))) {
+          return null;
+        }
+
+        return {
+          tag_name: 'img',
+          url: fallback,
+          original_url: fallback,
+          referrer_url: rawSrc,
+          preview_url: '',
+          width,
+          height,
+          alt: img.alt || '',
+        };
       }
 
       return {
         tag_name: 'img',
         url,
+        original_url: url,
+        referrer_url: window.location.href,
         preview_url: url,
         width,
         height,
@@ -1148,15 +1470,84 @@ declare const chrome: ChromeApi;
     if (element.tagName === 'VIDEO') {
       const url = getVideoUrl(element);
       if (!url) {
+        const video = element as HTMLVideoElement;
+        const rawSrc = (video.currentSrc || video.src || '').trim().toLowerCase();
+        if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
+          const pageUrl = window.location.href;
+          return {
+            tag_name: 'video',
+            url: pageUrl,
+            original_url: `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            referrer_url: pageUrl,
+            preview_url: video.poster || '',
+            width: video.videoWidth || video.clientWidth || null,
+            height: video.videoHeight || video.clientHeight || null,
+            alt: '',
+            download_via: 'yt-dlp',
+          };
+        }
         return null;
       }
 
       return {
         tag_name: 'video',
         url,
+        original_url: url,
+        referrer_url: window.location.href,
         preview_url: element.poster || '',
         width: element.videoWidth || element.clientWidth || null,
         height: element.videoHeight || element.clientHeight || null,
+        alt: '',
+      };
+    }
+
+    return null;
+  }
+
+  function buildDirectPageCandidate() {
+    const locationUrl = (window.location.href || '').trim();
+    if (!locationUrl) {
+      return null;
+    }
+
+    const lowerLocation = locationUrl.toLowerCase();
+    const mediaExtMatch = /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|webm|mov|m4v|mkv)(\?|#|$)/i.test(
+      lowerLocation
+    );
+    const mimeHint =
+      (document.contentType || '').startsWith('image/') || (document.contentType || '').startsWith('video/');
+
+    if (!mediaExtMatch && !mimeHint) {
+      return null;
+    }
+
+    if (lowerLocation.startsWith('http://') || lowerLocation.startsWith('https://')) {
+      return {
+        tag_name: lowerLocation.match(/\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i) ? 'video' : 'img',
+        url: locationUrl,
+        original_url: locationUrl,
+        referrer_url: locationUrl,
+        preview_url: locationUrl,
+        width: null,
+        height: null,
+        alt: '',
+      };
+    }
+
+    if (lowerLocation.startsWith('blob:') || lowerLocation.startsWith('data:')) {
+      const fallback = safeUrl(document.referrer) || '';
+      if (!fallback) {
+        return null;
+      }
+
+      return {
+        tag_name: 'img',
+        url: fallback,
+        original_url: fallback,
+        referrer_url: locationUrl,
+        preview_url: '',
+        width: null,
+        height: null,
         alt: '',
       };
     }
@@ -1317,6 +1708,125 @@ declare const chrome: ChromeApi;
     };
   }
 
+  function createDialogChooser(root: HTMLElement) {
+    return (options: {
+      title: string;
+      message: string;
+      confirmLabel: string;
+      cancelLabel?: string;
+      alternateLabel?: string;
+      danger?: boolean;
+    }): Promise<'confirm' | 'cancel' | 'alternate'> =>
+      new Promise((resolve) => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'atlas-downloader-dialog-backdrop';
+
+        const panel = document.createElement('div');
+        panel.className = `atlas-downloader-dialog${options.danger ? ' danger' : ''}`.trim();
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+        panel.setAttribute('aria-label', options.title);
+
+        const titleNode = document.createElement('h3');
+        titleNode.className = 'atlas-downloader-dialog-title';
+        titleNode.textContent = options.title;
+
+        const messageNode = document.createElement('p');
+        messageNode.className = 'atlas-downloader-dialog-message';
+        messageNode.textContent = options.message;
+
+        const actions = document.createElement('div');
+        actions.className = 'atlas-downloader-dialog-actions';
+
+        const finish = (result: 'confirm' | 'cancel' | 'alternate') => {
+          backdrop.remove();
+          resolve(result);
+        };
+
+        if (options.alternateLabel) {
+          const alternate = document.createElement('button');
+          alternate.type = 'button';
+          alternate.className = 'atlas-downloader-dialog-btn secondary';
+          alternate.textContent = options.alternateLabel;
+          alternate.addEventListener('click', () => finish('alternate'));
+          actions.appendChild(alternate);
+        }
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'atlas-downloader-dialog-btn';
+        cancel.textContent = options.cancelLabel || 'Cancel';
+        cancel.addEventListener('click', () => finish('cancel'));
+        actions.appendChild(cancel);
+
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = `atlas-downloader-dialog-btn primary${options.danger ? ' danger' : ''}`.trim();
+        confirm.textContent = options.confirmLabel;
+        confirm.addEventListener('click', () => finish('confirm'));
+        actions.appendChild(confirm);
+
+        panel.appendChild(titleNode);
+        panel.appendChild(messageNode);
+        panel.appendChild(actions);
+        backdrop.appendChild(panel);
+        root.appendChild(backdrop);
+
+        requestAnimationFrame(() => {
+          confirm.focus();
+        });
+      });
+  }
+
+  function ensurePageMarkerStyles() {
+    if (document.getElementById(PAGE_MARKER_STYLE_ID)) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = PAGE_MARKER_STYLE_ID;
+    style.textContent = `
+[data-atlas-marked="1"][data-atlas-state="exists"] {
+  outline: 2px solid rgba(148, 163, 184, 0.5) !important;
+  outline-offset: 2px !important;
+}
+[data-atlas-marked="1"][data-atlas-state="downloaded"] {
+  outline: 2px solid rgba(34, 197, 94, 0.85) !important;
+  outline-offset: 2px !important;
+}
+[data-atlas-marked="1"][data-atlas-state="blacklisted"] {
+  outline: 2px solid rgba(239, 68, 68, 0.9) !important;
+  outline-offset: 2px !important;
+}
+[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="love"] {
+  outline: 2px solid rgba(239, 68, 68, 0.9) !important;
+  outline-offset: 2px !important;
+}
+[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="like"] {
+  outline: 2px solid rgba(56, 189, 248, 0.9) !important;
+  outline-offset: 2px !important;
+}
+[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="funny"] {
+  outline: 2px solid rgba(234, 179, 8, 0.95) !important;
+  outline-offset: 2px !important;
+}
+[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="dislike"] {
+  outline: 2px solid rgba(71, 85, 105, 0.95) !important;
+  outline-offset: 2px !important;
+}
+`;
+
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function stripHash(value: string): string {
+    const hashPos = value.indexOf('#');
+    if (hashPos === -1) {
+      return value;
+    }
+    return value.slice(0, hashPos);
+  }
+
   function parseExcludedDomains(value) {
     if (!value || typeof value !== 'string') {
       return [];
@@ -1375,10 +1885,10 @@ declare const chrome: ChromeApi;
     return current === base || current.endsWith(`.${base}`);
   }
 
-    function safeUrl(value) {
-      if (!value || typeof value !== 'string') {
-        return '';
-      }
+  function safeUrl(value) {
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
 
     const trimmed = value.trim();
     if (!trimmed) {
@@ -1403,6 +1913,14 @@ declare const chrome: ChromeApi;
     showToast: (message: string) => void;
     sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void;
     isSheetOpen: () => boolean;
+    chooseDialog: (options: {
+      title: string;
+      message: string;
+      confirmLabel: string;
+      cancelLabel?: string;
+      alternateLabel?: string;
+      danger?: boolean;
+    }) => Promise<'confirm' | 'cancel' | 'alternate'>;
     enabled?: boolean;
     setHintShown?: (value: boolean) => void;
     getHintShown?: () => boolean;
@@ -1492,17 +2010,42 @@ declare const chrome: ChromeApi;
 
               fetchAtlasStatus(options.sendMessageSafe, payload.url, (status) => {
                 if (status?.downloaded) {
-                  const ok = window.confirm(
-                    'This file is already downloaded in Atlas. Re-download it?'
-                  );
-                  if (!ok) {
-                    options.showToast('Cancelled.');
-                    return;
-                  }
+                  options
+                    .chooseDialog({
+                      title: 'Already downloaded',
+                      message: 'Re-download before updating the reaction?',
+                      confirmLabel: 'Re-download',
+                      cancelLabel: 'Keep existing file',
+                    })
+                    .then((choice) => {
+                      if (choice === 'confirm') {
+                        payload.force_download = true;
+                      }
 
-                  payload.force_download = true;
+                      options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+                        if (!response || !response.ok) {
+                          options.showToast(response?.error || 'Reaction failed.');
+                          return;
+                        }
+
+                        const data = response.data || null;
+                        const file = data?.file || null;
+                        const newReactionType = data?.reaction?.type
+                          ? String(data.reaction.type)
+                          : reactionType;
+                        atlasStatusCache.set(payload.url, {
+                          exists: Boolean(file),
+                          downloaded: Boolean(file?.downloaded),
+                          blacklisted: Boolean(file?.blacklisted_at),
+                          reactionType: newReactionType,
+                          ts: Date.now(),
+                        });
+
+                        options.showToast(`Reacted (${reactionType}). Resolving video in Atlas…`);
+                      });
+                    });
+                  return;
                 }
-
                 options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
                   if (!response || !response.ok) {
                     options.showToast(response?.error || 'Reaction failed.');
@@ -1517,6 +2060,7 @@ declare const chrome: ChromeApi;
                   atlasStatusCache.set(payload.url, {
                     exists: Boolean(file),
                     downloaded: Boolean(file?.downloaded),
+                    blacklisted: Boolean(file?.blacklisted_at),
                     reactionType: newReactionType,
                     ts: Date.now(),
                   });
@@ -1552,15 +2096,42 @@ declare const chrome: ChromeApi;
 
         fetchAtlasStatus(options.sendMessageSafe, payload.url, (status) => {
           if (status?.downloaded) {
-            const ok = window.confirm('This file is already downloaded in Atlas. Re-download it?');
-            if (!ok) {
-              options.showToast('Cancelled.');
-              return;
-            }
+            options
+              .chooseDialog({
+                title: 'Already downloaded',
+                message: 'Re-download before updating the reaction?',
+                confirmLabel: 'Re-download',
+                cancelLabel: 'Keep existing file',
+              })
+              .then((choice) => {
+                if (choice === 'confirm') {
+                  payload.force_download = true;
+                }
 
-            payload.force_download = true;
+                options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+                  if (!response || !response.ok) {
+                    options.showToast(response?.error || 'Reaction failed.');
+                    return;
+                  }
+
+                  const data = response.data || null;
+                  const file = data?.file || null;
+                  const newReactionType = data?.reaction?.type
+                    ? String(data.reaction.type)
+                    : reactionType;
+                  atlasStatusCache.set(payload.url, {
+                    exists: Boolean(file),
+                    downloaded: Boolean(file?.downloaded),
+                    blacklisted: Boolean(file?.blacklisted_at),
+                    reactionType: newReactionType,
+                    ts: Date.now(),
+                  });
+
+                  options.showToast(`Reacted (${reactionType}). Queued download in Atlas.`);
+                });
+              });
+            return;
           }
-
           options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
             if (!response || !response.ok) {
               options.showToast(response?.error || 'Reaction failed.');
@@ -1575,6 +2146,7 @@ declare const chrome: ChromeApi;
             atlasStatusCache.set(payload.url, {
               exists: Boolean(file),
               downloaded: Boolean(file?.downloaded),
+              blacklisted: Boolean(file?.blacklisted_at),
               reactionType: newReactionType,
               ts: Date.now(),
             });
@@ -1731,6 +2303,14 @@ declare const chrome: ChromeApi;
     showToast: (message: string) => void;
     sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void;
     isSheetOpen: () => boolean;
+    chooseDialog: (options: {
+      title: string;
+      message: string;
+      confirmLabel: string;
+      cancelLabel?: string;
+      alternateLabel?: string;
+      danger?: boolean;
+    }) => Promise<'confirm' | 'cancel' | 'alternate'>;
   }) {
     const toolbar = document.createElement('div');
     toolbar.className = 'atlas-downloader-media-toolbar';
@@ -1781,7 +2361,7 @@ declare const chrome: ChromeApi;
       event.stopImmediatePropagation?.();
     };
 
-    for (const reaction of REACTIONS) {
+    for (const reaction of [...REACTIONS, BLACKLIST_ACTION]) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `atlas-downloader-reaction-btn ${reaction.className}`.trim();
@@ -1800,7 +2380,8 @@ declare const chrome: ChromeApi;
           return;
         }
 
-        const payload = buildOverlayReactionPayload(activeMedia, reaction.type);
+        const reactionType = reaction.type === BLACKLIST_ACTION.type ? 'dislike' : reaction.type;
+        const payload = buildOverlayReactionPayload(activeMedia, reactionType);
         if (!payload) {
           options.showToast('No valid media URL found.');
           return;
@@ -1809,17 +2390,74 @@ declare const chrome: ChromeApi;
         const checkKey = payload.url || '';
 
         fetchAtlasStatus(options.sendMessageSafe, checkKey, (status) => {
-          if (reaction.type !== 'dislike' && status?.downloaded) {
-            const ok = window.confirm('This file is already downloaded in Atlas. Re-download it?');
-            if (!ok) {
-              options.showToast('Cancelled.');
-              return;
-            }
+          if (reactionType !== 'dislike' && status?.downloaded) {
+            options
+              .chooseDialog({
+                title: 'Already downloaded',
+                message: 'Re-download before updating the reaction?',
+                confirmLabel: 'Re-download',
+                cancelLabel: 'Keep existing file',
+              })
+              .then((choice) => {
+                if (choice === 'confirm') {
+                  payload.force_download = true;
+                }
 
-            payload.force_download = true;
+                options.sendMessageSafe(
+                  {
+                    type: 'atlas-react',
+                    payload: {
+                      ...payload,
+                      ...(reaction.type === BLACKLIST_ACTION.type ? { blacklist: true } : {}),
+                    },
+                  },
+                  (response) => {
+                  if (!response || !response.ok) {
+                    options.showToast(response?.error || 'Reaction failed.');
+                    return;
+                  }
+
+                  const data = response.data || null;
+                  const file = data?.file || null;
+                    const newReactionType =
+                      data?.reaction?.type
+                        ? String(data.reaction.type)
+                        : reaction.type === BLACKLIST_ACTION.type
+                          ? 'dislike'
+                          : reaction.type;
+
+                  if (checkKey) {
+                    atlasStatusCache.set(checkKey, {
+                      exists: Boolean(file),
+                      downloaded: Boolean(file?.downloaded),
+                      blacklisted: Boolean(file?.blacklisted_at),
+                      reactionType: newReactionType,
+                      ts: Date.now(),
+                    });
+                  }
+
+                  setToolbarActive(newReactionType);
+
+                  if (payload.download_via === 'yt-dlp') {
+                    options.showToast(`Reacted (${reaction.label}). Resolving video in Atlas…`);
+                    return;
+                  }
+
+                  options.showToast(`Reacted (${reaction.label}). Queued download in Atlas.`);
+                }
+                );
+              });
+            return;
           }
-
-          options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          options.sendMessageSafe(
+            {
+              type: 'atlas-react',
+              payload: {
+                ...payload,
+                ...(reaction.type === BLACKLIST_ACTION.type ? { blacklist: true } : {}),
+              },
+            },
+            (response) => {
             if (!response || !response.ok) {
               options.showToast(response?.error || 'Reaction failed.');
               return;
@@ -1827,12 +2465,18 @@ declare const chrome: ChromeApi;
 
             const data = response.data || null;
             const file = data?.file || null;
-            const newReactionType = data?.reaction?.type ? String(data.reaction.type) : reaction.type;
+            const newReactionType =
+              data?.reaction?.type
+                ? String(data.reaction.type)
+                : reaction.type === BLACKLIST_ACTION.type
+                  ? 'dislike'
+                  : reaction.type;
 
             if (checkKey) {
               atlasStatusCache.set(checkKey, {
                 exists: Boolean(file),
                 downloaded: Boolean(file?.downloaded),
+                blacklisted: Boolean(file?.blacklisted_at),
                 reactionType: newReactionType,
                 ts: Date.now(),
               });
@@ -1841,12 +2485,13 @@ declare const chrome: ChromeApi;
             setToolbarActive(newReactionType);
 
             if (payload.download_via === 'yt-dlp') {
-              options.showToast(`Reacted (${reaction.type}). Resolving video in Atlas…`);
+              options.showToast(`Reacted (${reaction.label}). Resolving video in Atlas…`);
               return;
             }
 
-            options.showToast(`Reacted (${reaction.type}). Queued download in Atlas.`);
-          });
+            options.showToast(`Reacted (${reaction.label}). Queued download in Atlas.`);
+          }
+          );
         });
       });
 

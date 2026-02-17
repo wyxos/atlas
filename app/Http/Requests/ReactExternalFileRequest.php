@@ -49,6 +49,8 @@ class ReactExternalFileRequest extends FormRequest
             'alt' => ['nullable', 'string', 'max:2000'],
             'download_via' => ['nullable', 'string', 'in:yt-dlp'],
             'force_download' => ['nullable', 'boolean'],
+            'clear_download' => ['nullable', 'boolean'],
+            'blacklist' => ['nullable', 'boolean'],
         ];
     }
 }

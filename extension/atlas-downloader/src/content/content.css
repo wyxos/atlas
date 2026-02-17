@@ -293,6 +293,22 @@
   transform: none;
 }
 
+.atlas-shadow-root .atlas-downloader-reaction-btn.pending {
+  position: relative;
+  color: transparent;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.pending::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(226, 232, 240, 0.25);
+  border-top-color: #e2e8f0;
+  animation: atlas-spin 0.75s linear infinite;
+}
+
 .atlas-shadow-root .atlas-downloader-reaction-btn svg {
   width: 18px;
   height: 18px;
@@ -328,6 +344,16 @@
   color: #fff;
 }
 
+.atlas-shadow-root .atlas-downloader-reaction-btn.blacklist.active {
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.delete {
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  background: rgba(127, 29, 29, 0.4);
+}
+
 .atlas-shadow-root .atlas-downloader-media-toolbar {
   position: fixed;
   top: 0;
@@ -356,6 +382,77 @@
 
 .atlas-shadow-root .atlas-downloader-media-toolbar .atlas-downloader-reaction-btn:hover {
   background: rgba(148, 163, 184, 0.14);
+}
+
+.atlas-shadow-root .atlas-downloader-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.55);
+  pointer-events: auto;
+}
+
+.atlas-shadow-root .atlas-downloader-dialog {
+  width: min(460px, calc(100vw - 32px));
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5);
+  padding: 14px;
+}
+
+.atlas-shadow-root .atlas-downloader-dialog.danger {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.atlas-shadow-root .atlas-downloader-dialog-title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.atlas-shadow-root .atlas-downloader-dialog-message {
+  margin: 8px 0 0;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.atlas-shadow-root .atlas-downloader-dialog-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.atlas-shadow-root .atlas-downloader-dialog-btn {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.atlas-shadow-root .atlas-downloader-dialog-btn.primary {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.atlas-shadow-root .atlas-downloader-dialog-btn.primary.danger {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.2);
+}
+
+@keyframes atlas-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .atlas-shadow-root .atlas-downloader-status {

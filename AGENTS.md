@@ -47,6 +47,9 @@ npm run check               # TypeScript + ESLint check
 npm run test                # Run Vitest tests
 ```
 
+Extension gotcha:
+- `npm run build:extension` starts with `build:extension:clean`, which deletes `extension/atlas-downloader/dist` before rebuilding. If the build fails early, restore tracked dist files with `git restore extension/atlas-downloader/dist` before continuing.
+
 ---
 
 ## Universal Conventions
@@ -219,5 +222,6 @@ After any code changes, always run frontend linting and report the result:
 ## WSL + Herd Runtime
 - Environment assumption: commands run from WSL on a Windows host where Laravel Herd manages primary PHP/Laravel services.
 - Before PHP/Laravel tasks, verify runtime resolution (`which php`, `php -v`).
+- In this workspace, `php` may resolve to a WSL shim (`/home/wyxos/.local/bin/php`) that forwards to `cmd.exe`; if Windows interop is unavailable, PHP/Artisan/Pint/tests cannot run from this shell.
 - If binaries/services are not available in WSL PATH, use Windows/Herd-aware invocation paths as needed.
 - For DB/service operations, confirm whether runtime/services are Windows-hosted before executing maintenance/debug commands.
