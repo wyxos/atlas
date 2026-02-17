@@ -57,6 +57,16 @@ Route::options('/api/extension/files/check', function () {
         ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
 })->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
+Route::post('/api/extension/files/delete-download', [\App\Http\Controllers\ExternalFilesController::class, 'deleteDownload'])
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])
+    ->name('api.extension.files.delete-download');
+Route::options('/api/extension/files/delete-download', function () {
+    return response()->noContent()
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, X-Atlas-Extension-Token, Authorization');
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 

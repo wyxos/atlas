@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CheckExternalFilesRequest;
+use App\Http\Requests\DeleteExternalFileDownloadRequest;
 use App\Http\Requests\ReactExternalFileRequest;
 use App\Http\Requests\StoreExternalFileRequest;
 use App\Http\Resources\FileResource;
@@ -104,6 +105,7 @@ class ExternalFilesController extends Controller
                 'url' => $url,
                 'exists' => $file !== null,
                 'downloaded' => $file ? (bool) $file->downloaded : false,
+                'blacklisted' => $file ? $file->blacklisted_at !== null : false,
                 'file_id' => $file?->id,
                 'reaction' => $reaction ? ['type' => $reaction->type] : null,
             ];
@@ -127,6 +129,8 @@ class ExternalFilesController extends Controller
     ): JsonResponse {
         $validated = $request->validated();
         $forceDownload = (bool) ($validated['force_download'] ?? false);
+        $clearDownload = (bool) ($validated['clear_download'] ?? false);
+        $blacklist = (bool) ($validated['blacklist'] ?? false);
 
         // Create/update the file record, but let the reaction pipeline decide whether to dispatch download.
         $result = $service->ingest($validated, false);
@@ -148,9 +152,22 @@ class ExternalFilesController extends Controller
             $downloadedFileReset->reset($file);
             $file = $file->refresh();
         }
+        if ($clearDownload) {
+            $downloadedFileReset->reset($file);
+            $file = $file->refresh();
+        }
 
         $user = $extensionUserResolver->resolve();
         $reaction = $fileReactions->set($file, $user, $validated['type'])['reaction'];
+
+        if ($blacklist && $file->blacklisted_at === null) {
+            app(\App\Services\MetricsService::class)->applyBlacklistAdd([$file->id], true);
+            $file->forceFill([
+                'blacklisted_at' => now(),
+                'blacklist_reason' => 'Extension blacklist',
+            ])->save();
+            $file->searchable();
+        }
 
         return response()->json([
             'message' => 'Reaction updated.',
@@ -161,5 +178,61 @@ class ExternalFilesController extends Controller
             'Access-Control-Allow-Methods' => 'POST, OPTIONS',
             'Access-Control-Allow-Headers' => 'Content-Type, X-Atlas-Extension-Token, Authorization',
         ]);
+    }
+
+    public function deleteDownload(
+        DeleteExternalFileDownloadRequest $request,
+        DownloadedFileResetService $downloadedFileReset,
+    ): JsonResponse {
+        $validated = $request->validated();
+        $referrerKey = $this->resolveReferrerKey(
+            (string) ($validated['url'] ?? ''),
+            (string) ($validated['original_url'] ?? ''),
+            (string) ($validated['download_via'] ?? ''),
+            (string) ($validated['tag_name'] ?? '')
+        );
+
+        $file = File::query()->where('referrer_url', $referrerKey)->first();
+        if (! $file) {
+            return response()->json([
+                'message' => 'File not found.',
+                'file' => null,
+            ], 404)->withHeaders([
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Content-Type, X-Atlas-Extension-Token, Authorization',
+            ]);
+        }
+
+        $downloadedFileReset->reset($file);
+        $file = $file->refresh();
+        $file->searchable();
+
+        return response()->json([
+            'message' => 'Download deleted.',
+            'file' => new FileResource($file),
+        ])->withHeaders([
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, X-Atlas-Extension-Token, Authorization',
+        ]);
+    }
+
+    private function resolveReferrerKey(string $url, string $originalUrl, string $downloadVia, string $tagName): string
+    {
+        $url = trim($url);
+        $originalUrl = trim($originalUrl);
+
+        $referrerKey = $originalUrl !== '' ? $originalUrl : $url;
+        if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
+            $referrerKey = $url !== '' ? $url : $referrerKey;
+        }
+
+        $hashPos = strpos($referrerKey, '#');
+        if ($hashPos !== false) {
+            $referrerKey = substr($referrerKey, 0, $hashPos);
+        }
+
+        return $referrerKey;
     }
 }

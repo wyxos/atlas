@@ -115,7 +115,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (message.type !== 'atlas-download' &&
       message.type !== 'atlas-download-batch' &&
       message.type !== 'atlas-check-batch' &&
-      message.type !== 'atlas-react')
+      message.type !== 'atlas-react' &&
+      message.type !== 'atlas-delete-download')
   ) {
     return;
   }
@@ -125,6 +126,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       ? handleDownloadBatch(message.payloads)
       : message.type === 'atlas-check-batch'
         ? handleCheckBatch(message.urls)
+        : message.type === 'atlas-delete-download'
+          ? handleDeleteDownload(message.payload)
         : message.type === 'atlas-react'
           ? handleReact(message.payload)
           : handleDownload(message.payload);
@@ -149,6 +152,11 @@ async function handleDownload(payload: unknown) {
 async function handleReact(payload: unknown) {
   const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
   return handleReactWithSettings(payload, settings);
+}
+
+async function handleDeleteDownload(payload: unknown) {
+  const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
+  return handleDeleteDownloadWithSettings(payload, settings);
 }
 
 async function handleCheckBatch(urls: unknown) {
@@ -293,6 +301,50 @@ async function handleReactWithSettings(payload: unknown, settings: AtlasSettings
   }
 
   const response = await fetch(`${baseUrl}/api/extension/files/react`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await safeJson(response);
+  if (response.ok && data === null) {
+    return {
+      ok: false,
+      error: 'Atlas returned a non-JSON response. Check your base URL/token.',
+      status: response.status,
+    };
+  }
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: data && data.message ? data.message : `Request failed (${response.status}).`,
+      status: response.status,
+      data,
+    };
+  }
+
+  return {
+    ok: true,
+    data,
+  };
+}
+
+async function handleDeleteDownloadWithSettings(payload: unknown, settings: AtlasSettings) {
+  const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
+  const token = (settings.atlasToken || '').trim();
+
+  if (!baseUrl) {
+    return {
+      ok: false,
+      error: 'Atlas base URL is not set. Open extension options to configure it.',
+    };
+  }
+
+  const response = await fetch(`${baseUrl}/api/extension/files/delete-download`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
