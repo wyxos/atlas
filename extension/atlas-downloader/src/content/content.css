@@ -491,6 +491,11 @@
   pointer-events: auto;
 }
 
+.atlas-shadow-root .atlas-downloader-toast.danger {
+  background: rgba(127, 29, 29, 0.96);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+}
+
 .atlas-shadow-root .atlas-downloader-toast.show {
   opacity: 1;
   transform: translateY(0);
