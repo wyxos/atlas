@@ -1375,24 +1375,15 @@ declare const chrome: ChromeApi;
 
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
-        const candidateUrl = (() => {
-          if (node instanceof HTMLImageElement) {
-            return safeUrl(node.currentSrc) || safeUrl(node.src) || '';
-          }
-          if (node instanceof HTMLVideoElement) {
-            return getVideoUrl(node) || '';
-          }
-          if (node instanceof HTMLAnchorElement) {
-            return safeUrl(node.href) || '';
-          }
-          return '';
-        })();
-
-        if (!candidateUrl) {
+        const lookupKeys = collectLookupKeysForNode(node);
+        if (lookupKeys.length === 0) {
           continue;
         }
 
-        const status = statusByUrl.get(candidateUrl) || statusByUrl.get(stripHash(candidateUrl));
+        const status =
+          lookupKeys
+            .map((key) => statusByUrl.get(key) || statusByUrl.get(stripHash(key)))
+            .find((value) => Boolean(value)) ?? null;
         if (!status) {
           continue;
         }
@@ -1402,8 +1393,6 @@ declare const chrome: ChromeApi;
           node.setAttribute('data-atlas-state', 'blacklisted');
         } else if (status.reactionType) {
           node.setAttribute('data-atlas-state', 'reacted');
-        } else if (status.downloaded) {
-          node.setAttribute('data-atlas-state', 'downloaded');
         } else if (status.exists) {
           node.setAttribute('data-atlas-state', 'exists');
         }
@@ -1418,25 +1407,10 @@ declare const chrome: ChromeApi;
       const urls = new Set<string>();
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
-        const candidateUrl = (() => {
-          if (node instanceof HTMLImageElement) {
-            return safeUrl(node.currentSrc) || safeUrl(node.src) || '';
-          }
-          if (node instanceof HTMLVideoElement) {
-            return getVideoUrl(node) || '';
-          }
-          if (node instanceof HTMLAnchorElement) {
-            return safeUrl(node.href) || '';
-          }
-          return '';
-        })();
-
-        if (!candidateUrl) {
-          continue;
+        for (const key of collectLookupKeysForNode(node)) {
+          urls.add(key);
+          urls.add(stripHash(key));
         }
-
-        urls.add(candidateUrl);
-        urls.add(stripHash(candidateUrl));
       }
 
       const direct = buildDirectPageCandidate();
@@ -1446,6 +1420,39 @@ declare const chrome: ChromeApi;
       }
 
       return [...urls].filter(Boolean);
+    }
+
+    function collectLookupKeysForNode(node: Element): string[] {
+      const keys = new Set<string>();
+
+      const mediaUrl = (() => {
+        if (node instanceof HTMLImageElement) {
+          return safeUrl(node.currentSrc) || safeUrl(node.src) || '';
+        }
+        if (node instanceof HTMLVideoElement) {
+          return getVideoUrl(node) || '';
+        }
+        if (node instanceof HTMLAnchorElement) {
+          return safeUrl(node.href) || '';
+        }
+        return '';
+      })();
+      if (mediaUrl) {
+        keys.add(mediaUrl);
+      }
+
+      const anchorHref = node.closest('a[href]')?.getAttribute('href') ?? '';
+      const anchorUrl = safeUrl(anchorHref);
+      if (anchorUrl) {
+        keys.add(anchorUrl);
+      }
+
+      const pageUrl = safeUrl(window.location.href);
+      if (pageUrl) {
+        keys.add(pageUrl);
+      }
+
+      return [...keys];
     }
 
     function syncAtlasStatusForPageMarkers() {
