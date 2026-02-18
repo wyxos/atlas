@@ -17,13 +17,9 @@ class File extends Model
     protected static function booted(): void
     {
         static::saving(function (self $file): void {
-            $originalUrl = trim((string) ($file->original_url ?? ''));
-            if ($originalUrl === '') {
-                $originalUrl = trim((string) ($file->referrer_url ?? $file->url ?? ''));
-            }
-
-            $file->original_url = $originalUrl !== '' ? $originalUrl : null;
-            $file->original_url_hash = $originalUrl !== '' ? hash('sha256', $originalUrl) : null;
+            $url = trim((string) ($file->url ?? ''));
+            $file->url = $url !== '' ? $url : null;
+            $file->url_hash = $url !== '' ? hash('sha256', $url) : null;
         });
     }
 
@@ -36,8 +32,7 @@ class File extends Model
         'source',
         'source_id',
         'url',
-        'original_url',
-        'original_url_hash',
+        'url_hash',
         'referrer_url',
         'path',
         'filename',
@@ -193,7 +188,6 @@ class File extends Model
             'source' => $this->source ?? 'unknown',
             'source_id' => $this->source_id,
             'url' => $this->url,
-            'original_url' => $this->original_url,
             'referrer_url' => $this->referrer_url,
             'path' => $this->path ?? '__missing__',
             'has_path' => (bool) $this->path,

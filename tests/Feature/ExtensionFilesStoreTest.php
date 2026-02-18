@@ -31,7 +31,6 @@ test('extension store drives download through reaction pipeline', function () {
         ->withHeader('X-Atlas-Extension-Token', 'test-token')
         ->postJson('/api/extension/files', [
             'url' => 'https://example.com/media/one.jpg',
-            'original_url' => 'https://example.com/media/one.jpg',
             'reaction_type' => 'like',
             'source' => 'Extension',
         ]);
@@ -39,7 +38,7 @@ test('extension store drives download through reaction pipeline', function () {
     $response->assertCreated();
     $response->assertJsonPath('reaction.type', 'like');
     $response->assertJsonPath('queued', true);
-    $response->assertJsonPath('file.original_url', 'https://example.com/media/one.jpg');
+    $response->assertJsonPath('file.url', 'https://example.com/media/one.jpg');
     $response->assertJsonPath('file.referrer_url', 'https://example.com/media/one.jpg');
 
     Queue::assertPushed(DownloadFile::class);

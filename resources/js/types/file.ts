@@ -12,7 +12,6 @@ export interface File {
     title: string | null;
     description: string | null;
     url: string | null;
-    original_url: string | null;
     file_url?: string | null;
     referrer_url: string | null;
     path: string | null;

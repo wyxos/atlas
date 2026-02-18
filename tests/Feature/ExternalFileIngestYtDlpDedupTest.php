@@ -6,15 +6,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('dedupes yt-dlp video ingests by page URL and removes client-key duplicates', function () {
+it('dedupes yt-dlp video ingests by canonical url and strips fragments', function () {
     $url = 'https://www.youtube.com/shorts/2YldSt4sv_s';
 
-    // Simulate an older buggy ingest that keyed by a per-trigger client URL fragment.
     File::query()->create([
         'source' => 'youtube.com',
         'url' => $url,
-        'original_url' => $url.'#atlas-ext-video=old',
-        'referrer_url' => $url.'#atlas-ext-video=old',
+        'referrer_url' => $url,
         'filename' => 'old',
         'downloaded' => true,
         'path' => 'downloads/existing.mp4',
@@ -24,8 +22,7 @@ it('dedupes yt-dlp video ingests by page URL and removes client-key duplicates',
     $service = app(ExternalFileIngestService::class);
 
     $result = $service->ingest([
-        'url' => $url,
-        'original_url' => $url.'#atlas-ext-video=new',
+        'url' => $url.'#atlas-ext-video=new',
         'referrer_url' => $url,
         'page_title' => 'Test',
         'tag_name' => 'video',
@@ -35,9 +32,9 @@ it('dedupes yt-dlp video ingests by page URL and removes client-key duplicates',
     ], false);
 
     expect($result['file'])->not->toBeNull();
-    expect($result['file']->original_url)->toBe($url);
+    expect($result['file']->url)->toBe($url);
     expect($result['file']->referrer_url)->toBe($url);
 
-    expect(File::query()->where('original_url', $url)->count())->toBe(1);
-    expect(File::query()->where('original_url', 'like', $url.'#atlas-ext-video=%')->count())->toBe(0);
+    expect(File::query()->where('url', $url)->count())->toBe(1);
+    expect(File::query()->where('url', 'like', $url.'#atlas-ext-video=%')->count())->toBe(0);
 });

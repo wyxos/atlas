@@ -31,7 +31,6 @@ class DeleteExternalFileDownloadRequest extends FormRequest
     {
         return [
             'url' => ['required', 'string', 'url', 'max:2048'],
-            'original_url' => ['nullable', 'string', 'url', 'max:2048'],
             'tag_name' => ['nullable', 'string', 'max:50'],
             'download_via' => ['nullable', 'string', 'in:yt-dlp'],
         ];

@@ -25,11 +25,11 @@ class BrowsePersister
         $preparedItems = collect($normalized)
             ->map(function (array $item): array {
                 $file = $item['file'];
-                $originalUrl = $this->resolveOriginalUrlFromFileRow($file);
-                if ($originalUrl !== '') {
-                    $file['original_url'] = $originalUrl;
+                $canonicalUrl = $this->resolveCanonicalUrlFromFileRow($file);
+                if ($canonicalUrl !== '') {
+                    $file['url'] = $canonicalUrl;
                 }
-                $file['original_url_hash'] = $originalUrl !== '' ? hash('sha256', $originalUrl) : null;
+                $file['url_hash'] = $canonicalUrl !== '' ? hash('sha256', $canonicalUrl) : null;
                 if (array_key_exists('listing_metadata', $file) && is_array($file['listing_metadata'])) {
                     $file['listing_metadata'] = json_encode($file['listing_metadata']);
                 }
@@ -37,33 +37,37 @@ class BrowsePersister
                 return [
                     'file' => $file,
                     'metadata' => $item['metadata'],
-                    'original_url' => $originalUrl,
-                    'original_url_hash' => $file['original_url_hash'],
+                    'url' => $canonicalUrl,
+                    'url_hash' => $file['url_hash'],
                 ];
             })
+            ->filter(fn (array $item): bool => is_string($item['url_hash'] ?? null) && ($item['url_hash'] ?? '') !== '')
             ->values()
             ->all();
+        if (empty($preparedItems)) {
+            return [];
+        }
 
-        $originalUrlHashes = collect($preparedItems)
-            ->pluck('original_url_hash')
+        $urlHashes = collect($preparedItems)
+            ->pluck('url_hash')
             ->filter(fn ($value) => is_string($value) && $value !== '')
             ->unique()
             ->values()
             ->all();
-        $existingOriginalUrlHashes = ! empty($originalUrlHashes)
-            ? File::whereIn('original_url_hash', $originalUrlHashes)->pluck('original_url_hash')->all()
+        $existingUrlHashes = ! empty($urlHashes)
+            ? File::whereIn('url_hash', $urlHashes)->pluck('url_hash')->all()
             : [];
         $newFileCount = 0;
-        if (! empty($originalUrlHashes)) {
-            $newFileCount = count(array_diff($originalUrlHashes, $existingOriginalUrlHashes));
+        if (! empty($urlHashes)) {
+            $newFileCount = count(array_diff($urlHashes, $existingUrlHashes));
         }
 
         $fileRows = collect($preparedItems)->pluck('file')->all();
 
         File::upsert(
             $fileRows,
-            ['original_url_hash'],
-            ['url', 'original_url', 'referrer_url', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at']
+            ['url_hash'],
+            ['url', 'referrer_url', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at']
         );
 
         if ($newFileCount > 0) {
@@ -72,17 +76,17 @@ class BrowsePersister
             $metrics->incrementMetric(MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $newFileCount);
         }
 
-        $fileMap = File::whereIn('original_url_hash', $originalUrlHashes)->get()->keyBy('original_url_hash');
+        $fileMap = File::whereIn('url_hash', $urlHashes)->get()->keyBy('url_hash');
 
         $metaRows = collect($preparedItems)
             ->map(function ($i) use ($fileMap) {
                 $meta = $i['metadata'];
-                $originalUrlHash = is_string($i['original_url_hash'] ?? null) ? $i['original_url_hash'] : '';
-                if ($originalUrlHash === '') {
+                $urlHash = is_string($i['url_hash'] ?? null) ? $i['url_hash'] : '';
+                if ($urlHash === '') {
                     return null;
                 }
 
-                $file = $fileMap->get($originalUrlHash);
+                $file = $fileMap->get($urlHash);
                 if (! $file) {
                     return null;
                 }
@@ -107,7 +111,7 @@ class BrowsePersister
             FileMetadata::upsert($metaRows, ['file_id'], ['payload', 'updated_at']);
         }
 
-        $allFiles = File::with('metadata')->whereIn('original_url_hash', $originalUrlHashes)->get();
+        $allFiles = File::with('metadata')->whereIn('url_hash', $urlHashes)->get();
 
         // Create containers and attach files in batch
         $this->createContainersForFiles($allFiles);
@@ -120,9 +124,9 @@ class BrowsePersister
         })->values()->all();
     }
 
-    private function resolveOriginalUrlFromFileRow(array $file): string
+    private function resolveCanonicalUrlFromFileRow(array $file): string
     {
-        $candidate = trim((string) ($file['original_url'] ?? ''));
+        $candidate = trim((string) ($file['url'] ?? ''));
         if ($candidate !== '') {
             return $candidate;
         }
@@ -132,7 +136,7 @@ class BrowsePersister
             return $candidate;
         }
 
-        return trim((string) ($file['url'] ?? ''));
+        return '';
     }
 
     /**

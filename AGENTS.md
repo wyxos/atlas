@@ -52,6 +52,7 @@ Extension gotcha:
 
 Database gotcha:
 - For long URL fields on MySQL/MariaDB, do not rely on unique indexes directly on `text`/large `varchar` columns. Use a deterministic hash column (e.g. SHA-256) as the unique/upsert key.
+- For large `files` table backfills, prefer set-based SQL updates over PHP `chunkById` loops to avoid very long deploy-time migrations.
 
 ---
 

@@ -141,29 +141,6 @@ const emit = defineEmits<{
                             </button>
                         </div>
                     </div>
-                    <div v-if="fileData.original_url">
-                        <div class="font-semibold text-white mb-1">Original URL</div>
-                        <div class="mt-1 flex min-w-0 items-center gap-2">
-                            <a
-                                :href="fileData.original_url"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="min-w-0 flex-1 truncate text-smart-blue-400 hover:text-smart-blue-300"
-                                :title="fileData.original_url"
-                            >
-                                {{ fileData.original_url }}
-                            </a>
-                            <button
-                                type="button"
-                                class="shrink-0 rounded p-1 text-white/80 hover:bg-prussian-blue-700 hover:text-white disabled:opacity-50"
-                                aria-label="Copy original URL"
-                                :disabled="!fileData.original_url"
-                                @click="handleCopyText(fileData.original_url, 'Original URL')"
-                            >
-                                <Copy :size="16" />
-                            </button>
-                        </div>
-                    </div>
                     <div v-if="fileData.disk_url">
                         <div class="font-semibold text-white mb-1">Disk URL</div>
                         <div class="mt-1 flex min-w-0 items-center gap-2">

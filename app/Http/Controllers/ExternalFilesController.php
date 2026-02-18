@@ -71,17 +71,18 @@ class ExternalFilesController extends Controller
     {
         $urls = $request->validated()['urls'];
         $urlHashes = collect($urls)
-            ->map(fn (string $url) => hash('sha256', trim($url)))
+            ->map(fn (string $url) => hash('sha256', $this->stripFragment(trim($url))))
             ->filter(fn (string $hash) => $hash !== '')
             ->unique()
             ->values()
             ->all();
 
         $files = File::query()
-            ->whereIn('original_url_hash', $urlHashes)
-            ->get(['id', 'original_url', 'downloaded', 'blacklisted_at']);
+            ->whereIn('url_hash', $urlHashes)
+            ->orWhereIn('url', $urls)
+            ->get(['id', 'url', 'downloaded', 'blacklisted_at']);
 
-        $byUrl = $files->keyBy('original_url');
+        $byUrl = $files->keyBy('url');
 
         $user = null;
         $reactionsByFileId = collect();
@@ -101,8 +102,9 @@ class ExternalFilesController extends Controller
         }
 
         $results = array_map(function (string $url) use ($byUrl, $reactionsByFileId): array {
+            $lookupUrl = $this->stripFragment(trim($url));
             /** @var File|null $file */
-            $file = $byUrl->get($url);
+            $file = $byUrl->get($lookupUrl);
 
             /** @var Reaction|null $reaction */
             $reaction = $file ? $reactionsByFileId->get($file->id) : null;
@@ -191,18 +193,21 @@ class ExternalFilesController extends Controller
         DownloadedFileResetService $downloadedFileReset,
     ): JsonResponse {
         $validated = $request->validated();
-        $originalKey = $this->resolveOriginalKey(
+        $canonicalUrl = $this->resolveCanonicalUrl(
             (string) ($validated['url'] ?? ''),
-            (string) ($validated['original_url'] ?? ''),
             (string) ($validated['download_via'] ?? ''),
             (string) ($validated['tag_name'] ?? '')
         );
-        $originalKeyHash = hash('sha256', $originalKey);
+        $urlHash = hash('sha256', $canonicalUrl);
 
         $file = File::query()
-            ->where('original_url_hash', $originalKeyHash)
-            ->where('original_url', $originalKey)
+            ->where('url_hash', $urlHash)
+            ->where('url', $canonicalUrl)
             ->first();
+        if (! $file) {
+            $file = File::query()->where('url', $canonicalUrl)->first();
+        }
+
         if (! $file) {
             return response()->json([
                 'message' => 'File not found.',
@@ -228,21 +233,25 @@ class ExternalFilesController extends Controller
         ]);
     }
 
-    private function resolveOriginalKey(string $url, string $originalUrl, string $downloadVia, string $tagName): string
+    private function resolveCanonicalUrl(string $url, string $downloadVia, string $tagName): string
     {
         $url = trim($url);
-        $originalUrl = trim($originalUrl);
 
-        $originalKey = $originalUrl !== '' ? $originalUrl : $url;
+        $canonicalUrl = $url;
         if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
-            $originalKey = $url !== '' ? $url : $originalKey;
+            $canonicalUrl = $url !== '' ? $url : $canonicalUrl;
         }
 
-        $hashPos = strpos($originalKey, '#');
+        return $this->stripFragment($canonicalUrl);
+    }
+
+    private function stripFragment(string $url): string
+    {
+        $hashPos = strpos($url, '#');
         if ($hashPos !== false) {
-            $originalKey = substr($originalKey, 0, $hashPos);
+            return substr($url, 0, $hashPos);
         }
 
-        return $originalKey;
+        return $url;
     }
 }
