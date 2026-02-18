@@ -12,26 +12,28 @@ class ExternalFileIngestService
     public function ingest(array $payload, bool $queueDownload = true): array
     {
         $url = trim((string) $payload['url']);
-        $originalUrl = trim((string) ($payload['original_url'] ?? $url));
-        $pageUrl = $payload['referrer_url'] ?? null;
+        $providedOriginalUrl = trim((string) ($payload['original_url'] ?? $url));
+        $pageUrl = trim((string) ($payload['referrer_url'] ?? ''));
         $downloadVia = $payload['download_via'] ?? null;
         $tagName = $payload['tag_name'] ?? null;
 
-        // The extension's check endpoint uses the "url" field, but the DB dedupe key is `files.referrer_url`.
-        // For yt-dlp (page-based downloads), the stable identifier should be the page URL, not a per-trigger client key.
-        $referrerKey = $originalUrl !== '' ? $originalUrl : $url;
+        // Canonical file identity is original_url. referrer_url is provenance and may be non-unique.
+        // For yt-dlp (page-based downloads), use the stable page URL as canonical identity.
+        $originalKey = $providedOriginalUrl !== '' ? $providedOriginalUrl : $url;
         if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
-            $referrerKey = $url !== '' ? $url : $referrerKey;
+            $originalKey = $url !== '' ? $url : $originalKey;
         }
 
-        $referrerKey = $this->stripFragment($referrerKey);
+        $originalKey = $this->stripFragment($originalKey);
         $url = $this->stripFragment($url);
+        $referrerUrl = $pageUrl !== '' ? $pageUrl : ($url !== '' ? $url : $originalKey);
+        $originalKeyHash = hash('sha256', $originalKey);
         $filename = $this->resolveFilename($payload['filename'] ?? null, $url);
         $ext = $payload['ext'] ?? FileTypeDetector::extensionFromUrl($url);
         $mimeType = $payload['mime_type'] ?? FileTypeDetector::mimeFromUrl($url);
 
         $metadata = array_filter([
-            'page_url' => $pageUrl,
+            'page_url' => $pageUrl !== '' ? $pageUrl : null,
             'page_title' => $payload['page_title'] ?? null,
             'tag_name' => $payload['tag_name'] ?? null,
             'alt' => $payload['alt'] ?? null,
@@ -40,20 +42,23 @@ class ExternalFileIngestService
             'download_via' => $downloadVia,
         ], fn ($value) => $value !== null && $value !== '');
 
-        $file = File::query()->where('referrer_url', $referrerKey)->first();
+        $file = File::query()
+            ->where('original_url_hash', $originalKeyHash)
+            ->where('original_url', $originalKey)
+            ->first();
 
         if (! $file && $downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
-            // Repair older client-key based duplicates by promoting one row to the stable referrer key.
+            // Repair older client-key based duplicates by promoting one row to the stable original key.
             $dupe = File::query()
                 ->where('url', $url)
-                ->where('referrer_url', 'like', $url.'#atlas-ext-video=%')
+                ->where('original_url', 'like', $url.'#atlas-ext-video=%')
                 ->orderByDesc('downloaded')
                 ->orderByDesc('id')
                 ->first();
 
             if ($dupe) {
                 $dupe->forceFill([
-                    'referrer_url' => $referrerKey,
+                    'original_url' => $originalKey,
                 ])->save();
 
                 $file = $dupe->refresh();
@@ -63,7 +68,7 @@ class ExternalFileIngestService
         $isNew = $file === null;
         if (! $file) {
             $file = new File;
-            $file->referrer_url = $referrerKey;
+            $file->original_url = $originalKey;
             $file->source = $payload['source'] ?? 'Extension';
             $file->source_id = $payload['source_id'] ?? null;
             $file->filename = $filename;
@@ -82,6 +87,8 @@ class ExternalFileIngestService
 
         $updates = array_filter([
             'url' => $url,
+            'original_url' => $originalKey,
+            'referrer_url' => $referrerUrl,
             'filename' => $filename,
             'ext' => $ext,
             'mime_type' => $mimeType,
@@ -119,7 +126,7 @@ class ExternalFileIngestService
             // Example: https://site/video#atlas-ext-video=... should not create multiple DB rows.
             File::query()
                 ->where('url', $url)
-                ->where('referrer_url', 'like', $url.'#atlas-ext-video=%')
+                ->where('original_url', 'like', $url.'#atlas-ext-video=%')
                 ->whereKeyNot($file?->id)
                 ->delete();
         }

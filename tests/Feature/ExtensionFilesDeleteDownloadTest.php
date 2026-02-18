@@ -12,6 +12,7 @@ test('extension delete-download resets downloaded file assets', function () {
     config()->set('downloads.extension_token', 'test-token');
 
     $file = File::factory()->create([
+        'original_url' => 'https://example.com/media/one.jpg',
         'referrer_url' => 'https://example.com/media/one.jpg',
         'url' => 'https://example.com/media/one.jpg',
         'downloaded' => true,

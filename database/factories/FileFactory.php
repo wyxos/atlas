@@ -33,12 +33,17 @@ class FileFactory extends Factory
         $previewPathToken = fake()->optional()->uuid();
         $posterPathToken = fake()->optional()->uuid();
 
+        $referrerUrl = fake()->unique()->url();
+
         return [
             'source' => fake()->randomElement($sources),
             'source_id' => fake()->optional()->uuid(),
             'url' => fake()->optional()->url(),
-            // `files.referrer_url` is the dedupe key and is unique in the DB; keep it unique in tests.
-            'referrer_url' => fake()->unique()->url(),
+            // Canonical dedupe key for extension and browse ingest.
+            'original_url' => $referrerUrl,
+            'original_url_hash' => hash('sha256', $referrerUrl),
+            // Provenance page URL is now non-unique.
+            'referrer_url' => $referrerUrl,
             // Avoid Faker's filePath() (tempnam) which can emit warnings that PHPUnit treats as exceptions.
             'path' => $pathToken ? 'files/'.$pathToken.'.'.$ext : null,
             'filename' => fake()->word().'.'.$ext,

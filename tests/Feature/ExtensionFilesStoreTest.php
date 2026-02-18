@@ -39,6 +39,7 @@ test('extension store drives download through reaction pipeline', function () {
     $response->assertCreated();
     $response->assertJsonPath('reaction.type', 'like');
     $response->assertJsonPath('queued', true);
+    $response->assertJsonPath('file.original_url', 'https://example.com/media/one.jpg');
     $response->assertJsonPath('file.referrer_url', 'https://example.com/media/one.jpg');
 
     Queue::assertPushed(DownloadFile::class);

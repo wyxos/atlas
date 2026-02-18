@@ -13,6 +13,7 @@ it('dedupes yt-dlp video ingests by page URL and removes client-key duplicates',
     File::query()->create([
         'source' => 'youtube.com',
         'url' => $url,
+        'original_url' => $url.'#atlas-ext-video=old',
         'referrer_url' => $url.'#atlas-ext-video=old',
         'filename' => 'old',
         'downloaded' => true,
@@ -34,8 +35,9 @@ it('dedupes yt-dlp video ingests by page URL and removes client-key duplicates',
     ], false);
 
     expect($result['file'])->not->toBeNull();
+    expect($result['file']->original_url)->toBe($url);
     expect($result['file']->referrer_url)->toBe($url);
 
-    expect(File::query()->where('referrer_url', $url)->count())->toBe(1);
-    expect(File::query()->where('referrer_url', 'like', $url.'#atlas-ext-video=%')->count())->toBe(0);
+    expect(File::query()->where('original_url', $url)->count())->toBe(1);
+    expect(File::query()->where('original_url', 'like', $url.'#atlas-ext-video=%')->count())->toBe(0);
 });
