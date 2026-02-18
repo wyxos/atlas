@@ -32,7 +32,7 @@ return new class extends Migration
 
         if (! Schema::hasColumn('files', 'url_hash')) {
             Schema::table('files', function (Blueprint $table) {
-                $table->string('url_hash', 64)->nullable()->after('url');
+                $table->string('url_hash', 64)->nullable();
             });
         }
 
