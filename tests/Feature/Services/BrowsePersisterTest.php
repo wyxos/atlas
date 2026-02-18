@@ -2,6 +2,7 @@
 
 use App\Models\Container;
 use App\Models\File;
+use App\Services\BaseService;
 use App\Services\BrowsePersister;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -352,4 +353,51 @@ it('handles non-civitai sources without referrer', function () {
         'source_id' => '111',
         'referrer' => null, // No referrer for non-CivitAI sources
     ]);
+});
+
+it('avoids duplicate container_file rows when a service returns duplicate containers', function () {
+    $persister = new class extends BrowsePersister
+    {
+        protected function resolveServiceForSource(string $source): BaseService
+        {
+            return new class extends BaseService
+            {
+                public const string KEY = 'test';
+
+                public const string SOURCE = 'TestSource';
+
+                public function containers(array $listingMetadata = [], array $detailMetadata = []): array
+                {
+                    return [
+                        ['type' => 'User', 'source_id' => 'dupe-user', 'referrer' => null],
+                        ['type' => 'User', 'source_id' => 'dupe-user', 'referrer' => null],
+                    ];
+                }
+            };
+        }
+    };
+
+    $transformedItems = [
+        [
+            'file' => [
+                'referrer_url' => 'https://example.com/dupe-file.jpg',
+                'source' => 'TestSource',
+                'url' => 'https://example.com/dupe-file.jpg',
+                'filename' => 'dupe-file.jpg',
+                'ext' => 'jpg',
+                'mime_type' => 'image/jpeg',
+                'listing_metadata' => [],
+            ],
+            'metadata' => [
+                'file_referrer_url' => 'https://example.com/dupe-file.jpg',
+                'payload' => ['test' => 'data'],
+            ],
+        ],
+    ];
+
+    $result = $persister->persist($transformedItems);
+
+    expect($result)->toHaveCount(1);
+    $this->assertDatabaseCount('containers', 1);
+    $this->assertDatabaseCount('container_file', 1);
 });

@@ -10,6 +10,7 @@ use App\Services\FileItemFormatter;
 use App\Services\LocalService;
 use App\Services\Wallhaven;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\DB;
 
 class Browser
 {
@@ -339,22 +340,32 @@ class Browser
         // Get current highest position in tab
         $maxPosition = $tab->files()->max('tab_file.position') ?? -1;
 
-        // Prepare sync data with positions
-        $syncData = [];
-        foreach ($files as $index => $file) {
+        // Build bulk upsert rows with positions.
+        // This avoids one insert query per file from syncWithoutDetaching().
+        $rows = [];
+        $position = $maxPosition + 1;
+        foreach ($files as $file) {
             if (! $file instanceof \App\Models\File) {
                 continue; // Skip invalid entries
             }
-            $position = $maxPosition + 1 + $index;
-            $syncData[$file->id] = ['position' => $position];
+            $rows[] = [
+                'tab_id' => $tab->id,
+                'file_id' => $file->id,
+                'position' => $position++,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
         }
 
-        if (empty($syncData)) {
+        if (empty($rows)) {
             return; // No valid files to attach
         }
 
-        // Sync files to tab (without detaching existing files)
-        $tab->files()->syncWithoutDetaching($syncData);
+        DB::table('tab_file')->upsert(
+            $rows,
+            ['tab_id', 'file_id'],
+            ['position', 'updated_at']
+        );
     }
 
     /**
