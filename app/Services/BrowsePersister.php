@@ -31,7 +31,16 @@ class BrowsePersister
             $newFileCount = count(array_diff($referrers, $existingReferrers));
         }
 
-        $fileRows = collect($normalized)->map(fn ($i) => $i['file'])->toArray();
+        $fileRows = collect($normalized)
+            ->map(function ($i) {
+                $file = $i['file'];
+                if (array_key_exists('listing_metadata', $file) && is_array($file['listing_metadata'])) {
+                    $file['listing_metadata'] = json_encode($file['listing_metadata']);
+                }
+
+                return $file;
+            })
+            ->toArray();
 
         File::upsert(
             $fileRows,
@@ -56,9 +65,14 @@ class BrowsePersister
                     return null;
                 }
 
+                $payload = $meta['payload'];
+                if (is_array($payload)) {
+                    $payload = json_encode($payload);
+                }
+
                 return [
                     'file_id' => $file->id,
-                    'payload' => $meta['payload'],
+                    'payload' => $payload,
                     'created_at' => $meta['created_at'] ?? now(),
                     'updated_at' => $meta['updated_at'] ?? now(),
                 ];
@@ -146,7 +160,7 @@ class BrowsePersister
             }
 
             if (! empty($fileContainers)) {
-                $fileContainerMap[$file->id] = $fileContainers;
+                $fileContainerMap[$file->id] = array_values(array_unique($fileContainers));
             }
         }
 
@@ -275,6 +289,7 @@ class BrowsePersister
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
+                $existingPairMap[$pairKey] = true;
 
                 $totalCounts[$containerId] = ($totalCounts[$containerId] ?? 0) + 1;
 
@@ -295,7 +310,7 @@ class BrowsePersister
         if (! empty($pivotInserts)) {
             // Use chunking to avoid query size limits
             foreach (array_chunk($pivotInserts, 500) as $chunk) {
-                DB::table('container_file')->insert($chunk);
+                DB::table('container_file')->insertOrIgnore($chunk);
             }
 
             $metrics->incrementContainersByCounts('files_total', $totalCounts);
@@ -305,7 +320,7 @@ class BrowsePersister
         }
     }
 
-    private function resolveServiceForSource(string $source): BaseService
+    protected function resolveServiceForSource(string $source): BaseService
     {
         $browser = new \App\Browser;
         $reflection = new \ReflectionClass($browser);
