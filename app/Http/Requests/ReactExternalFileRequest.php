@@ -32,7 +32,6 @@ class ReactExternalFileRequest extends FormRequest
         return [
             'type' => ['required', 'string', 'in:love,like,dislike,funny'],
             'url' => ['required', 'string', 'url', 'max:2048'],
-            'original_url' => ['nullable', 'string', 'url', 'max:2048'],
             'referrer_url' => ['nullable', 'string', 'url', 'max:2048'],
             // Some sites generate very long titles; keep it permissive since we only store it as metadata.
             'page_title' => ['nullable', 'string', 'max:2000'],

@@ -12,9 +12,8 @@ test('extension delete-download resets downloaded file assets', function () {
     config()->set('downloads.extension_token', 'test-token');
 
     $file = File::factory()->create([
-        'original_url' => 'https://example.com/media/one.jpg',
-        'referrer_url' => 'https://example.com/media/one.jpg',
         'url' => 'https://example.com/media/one.jpg',
+        'referrer_url' => 'https://example.com/media/one.jpg',
         'downloaded' => true,
         'path' => 'downloads/original.jpg',
         'preview_path' => 'downloads/preview.jpg',
@@ -27,7 +26,6 @@ test('extension delete-download resets downloaded file assets', function () {
         ->withHeader('X-Atlas-Extension-Token', 'test-token')
         ->postJson('/api/extension/files/delete-download', [
             'url' => 'https://example.com/media/one.jpg',
-            'original_url' => 'https://example.com/media/one.jpg',
         ]);
 
     $response->assertOk();
@@ -49,7 +47,6 @@ test('extension delete-download returns 404 when file is unknown', function () {
         ->withHeader('X-Atlas-Extension-Token', 'test-token')
         ->postJson('/api/extension/files/delete-download', [
             'url' => 'https://example.com/media/missing.jpg',
-            'original_url' => 'https://example.com/media/missing.jpg',
         ]);
 
     $response->assertNotFound();

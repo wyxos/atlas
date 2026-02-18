@@ -167,7 +167,6 @@ class FileResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'url' => $this->url,
-            'original_url' => $this->original_url,
             'file_url' => $fileUrl,
             'referrer_url' => $this->referrer_url,
             'path' => $this->path,

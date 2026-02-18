@@ -10,7 +10,6 @@ it('preserves existing listing metadata keys when new ingests omit them', functi
     $file = File::query()->create([
         'source' => 'youtube.com',
         'url' => 'https://www.youtube.com/embed/QTpf6orkalY',
-        'original_url' => 'https://www.youtube.com/embed/QTpf6orkalY',
         'referrer_url' => 'https://www.youtube.com/embed/QTpf6orkalY',
         'filename' => 'QTpf6orkalY',
         'downloaded' => true,
@@ -29,7 +28,6 @@ it('preserves existing listing metadata keys when new ingests omit them', functi
 
     $service->ingest([
         'url' => $file->url,
-        'original_url' => $file->url,
         'referrer_url' => 'https://www.youtube.com/watch?v=QTpf6orkalY',
         'page_title' => 'Some title',
         'tag_name' => 'video',

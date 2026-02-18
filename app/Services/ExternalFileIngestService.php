@@ -12,22 +12,13 @@ class ExternalFileIngestService
     public function ingest(array $payload, bool $queueDownload = true): array
     {
         $url = trim((string) $payload['url']);
-        $providedOriginalUrl = trim((string) ($payload['original_url'] ?? $url));
         $pageUrl = trim((string) ($payload['referrer_url'] ?? ''));
         $downloadVia = $payload['download_via'] ?? null;
-        $tagName = $payload['tag_name'] ?? null;
 
-        // Canonical file identity is original_url. referrer_url is provenance and may be non-unique.
-        // For yt-dlp (page-based downloads), use the stable page URL as canonical identity.
-        $originalKey = $providedOriginalUrl !== '' ? $providedOriginalUrl : $url;
-        if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
-            $originalKey = $url !== '' ? $url : $originalKey;
-        }
-
-        $originalKey = $this->stripFragment($originalKey);
+        // Canonical file identity is url. referrer_url is provenance and may be non-unique.
         $url = $this->stripFragment($url);
-        $referrerUrl = $pageUrl !== '' ? $pageUrl : ($url !== '' ? $url : $originalKey);
-        $originalKeyHash = hash('sha256', $originalKey);
+        $referrerUrl = $pageUrl !== '' ? $pageUrl : $url;
+        $urlHash = $url !== '' ? hash('sha256', $url) : null;
         $filename = $this->resolveFilename($payload['filename'] ?? null, $url);
         $ext = $payload['ext'] ?? FileTypeDetector::extensionFromUrl($url);
         $mimeType = $payload['mime_type'] ?? FileTypeDetector::mimeFromUrl($url);
@@ -42,33 +33,24 @@ class ExternalFileIngestService
             'download_via' => $downloadVia,
         ], fn ($value) => $value !== null && $value !== '');
 
-        $file = File::query()
-            ->where('original_url_hash', $originalKeyHash)
-            ->where('original_url', $originalKey)
-            ->first();
-
-        if (! $file && $downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
-            // Repair older client-key based duplicates by promoting one row to the stable original key.
-            $dupe = File::query()
+        $file = null;
+        if ($urlHash !== null) {
+            $file = File::query()
+                ->where('url_hash', $urlHash)
                 ->where('url', $url)
-                ->where('original_url', 'like', $url.'#atlas-ext-video=%')
+                ->first();
+        }
+        if (! $file) {
+            $file = File::query()
+                ->where('url', $url)
                 ->orderByDesc('downloaded')
                 ->orderByDesc('id')
                 ->first();
-
-            if ($dupe) {
-                $dupe->forceFill([
-                    'original_url' => $originalKey,
-                ])->save();
-
-                $file = $dupe->refresh();
-            }
         }
 
         $isNew = $file === null;
         if (! $file) {
             $file = new File;
-            $file->original_url = $originalKey;
             $file->source = $payload['source'] ?? 'Extension';
             $file->source_id = $payload['source_id'] ?? null;
             $file->filename = $filename;
@@ -87,7 +69,6 @@ class ExternalFileIngestService
 
         $updates = array_filter([
             'url' => $url,
-            'original_url' => $originalKey,
             'referrer_url' => $referrerUrl,
             'filename' => $filename,
             'ext' => $ext,
@@ -120,14 +101,11 @@ class ExternalFileIngestService
         }
 
         $queued = false;
-
-        if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
-            // Cleanup duplicates from the earlier client-key based scheme.
-            // Example: https://site/video#atlas-ext-video=... should not create multiple DB rows.
+        if ($file && $file->url_hash) {
             File::query()
-                ->where('url', $url)
-                ->where('original_url', 'like', $url.'#atlas-ext-video=%')
-                ->whereKeyNot($file?->id)
+                ->where('url_hash', $file->url_hash)
+                ->where('url', $file->url)
+                ->whereKeyNot($file->id)
                 ->delete();
         }
 

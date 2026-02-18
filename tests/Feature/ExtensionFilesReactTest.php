@@ -21,7 +21,6 @@ test('extension react returns json and dispatches download for positive reaction
         ->postJson('/api/extension/files/react', [
             'type' => 'love',
             'url' => 'https://example.com/media/one.jpg',
-            'original_url' => 'https://example.com/media/one.jpg',
             'referrer_url' => 'https://example.com/page',
             'page_title' => str_repeat('A', 600),
             'alt' => str_repeat('B', 600),
@@ -30,7 +29,7 @@ test('extension react returns json and dispatches download for positive reaction
 
     $response->assertOk();
     $response->assertJsonPath('reaction.type', 'love');
-    $response->assertJsonPath('file.original_url', 'https://example.com/media/one.jpg');
+    $response->assertJsonPath('file.url', 'https://example.com/media/one.jpg');
     $response->assertJsonPath('file.referrer_url', 'https://example.com/page');
 
     Queue::assertPushed(DownloadFile::class);
@@ -48,7 +47,6 @@ test('extension react does not dispatch download for dislike', function () {
         ->postJson('/api/extension/files/react', [
             'type' => 'dislike',
             'url' => 'https://example.com/media/two.jpg',
-            'original_url' => 'https://example.com/media/two.jpg',
             'source' => 'Extension',
         ]);
 
@@ -66,9 +64,8 @@ test('extension react can force a re-download for already downloaded files', fun
     config()->set('downloads.extension_user_id', $user->id);
 
     $file = File::factory()->create([
-        'original_url' => 'https://example.com/media/one.jpg',
-        'referrer_url' => 'https://example.com/media/one.jpg',
         'url' => 'https://example.com/media/one.jpg',
+        'referrer_url' => 'https://example.com/media/one.jpg',
         'downloaded' => true,
         'path' => 'downloads/original.jpg',
         'preview_path' => 'downloads/preview.jpg',
@@ -83,7 +80,6 @@ test('extension react can force a re-download for already downloaded files', fun
         ->postJson('/api/extension/files/react', [
             'type' => 'like',
             'url' => 'https://example.com/media/one.jpg',
-            'original_url' => 'https://example.com/media/one.jpg',
             'source' => 'Extension',
             'force_download' => true,
         ]);
@@ -110,9 +106,8 @@ test('extension react can clear downloaded assets without forcing a re-download'
     config()->set('downloads.extension_user_id', $user->id);
 
     $file = File::factory()->create([
-        'original_url' => 'https://example.com/media/clear.jpg',
-        'referrer_url' => 'https://example.com/media/clear.jpg',
         'url' => 'https://example.com/media/clear.jpg',
+        'referrer_url' => 'https://example.com/media/clear.jpg',
         'downloaded' => true,
         'path' => 'downloads/clear-original.jpg',
         'preview_path' => 'downloads/clear-preview.jpg',
@@ -126,7 +121,6 @@ test('extension react can clear downloaded assets without forcing a re-download'
         ->postJson('/api/extension/files/react', [
             'type' => 'dislike',
             'url' => 'https://example.com/media/clear.jpg',
-            'original_url' => 'https://example.com/media/clear.jpg',
             'source' => 'Extension',
             'clear_download' => true,
         ]);
@@ -156,7 +150,6 @@ test('extension react can blacklist a file', function () {
         ->postJson('/api/extension/files/react', [
             'type' => 'dislike',
             'url' => 'https://example.com/media/blacklist.jpg',
-            'original_url' => 'https://example.com/media/blacklist.jpg',
             'source' => 'Extension',
             'blacklist' => true,
         ]);
@@ -165,7 +158,7 @@ test('extension react can blacklist a file', function () {
     $response->assertJsonPath('reaction.type', 'dislike');
     $response->assertJsonPath('file.blacklist_type', 'manual');
 
-    $file = File::query()->where('original_url', 'https://example.com/media/blacklist.jpg')->firstOrFail();
+    $file = File::query()->where('url', 'https://example.com/media/blacklist.jpg')->firstOrFail();
     expect($file->blacklisted_at)->not->toBeNull()
         ->and($file->blacklist_reason)->toBe('Extension blacklist');
 });
@@ -188,7 +181,6 @@ test('extension react allows multiple files from the same referrer page', functi
         ->postJson('/api/extension/files/react', [
             ...$payloadBase,
             'url' => 'https://images.example.com/a.jpg',
-            'original_url' => 'https://images.example.com/a.jpg',
         ]);
     $first->assertOk();
 
@@ -197,11 +189,10 @@ test('extension react allows multiple files from the same referrer page', functi
         ->postJson('/api/extension/files/react', [
             ...$payloadBase,
             'url' => 'https://images.example.com/b.jpg',
-            'original_url' => 'https://images.example.com/b.jpg',
         ]);
     $second->assertOk();
 
     expect(File::query()->where('referrer_url', 'https://www.deviantart.com/artist/art/sample-page')->count())->toBe(2);
-    expect(File::query()->where('original_url', 'https://images.example.com/a.jpg')->exists())->toBeTrue();
-    expect(File::query()->where('original_url', 'https://images.example.com/b.jpg')->exists())->toBeTrue();
+    expect(File::query()->where('url', 'https://images.example.com/a.jpg')->exists())->toBeTrue();
+    expect(File::query()->where('url', 'https://images.example.com/b.jpg')->exists())->toBeTrue();
 });

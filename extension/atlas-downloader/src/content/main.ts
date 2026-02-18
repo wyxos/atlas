@@ -834,7 +834,6 @@ declare const chrome: ChromeApi;
       return {
         type,
         url: item.url,
-        original_url: item.original_url || item.url,
         referrer_url: item.referrer_url || window.location.href,
         page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
@@ -850,7 +849,6 @@ declare const chrome: ChromeApi;
     function buildDownloadPayload(item) {
       return {
         url: item.url,
-        original_url: item.original_url || item.url,
         referrer_url: item.referrer_url || window.location.href,
         page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
@@ -1132,7 +1130,6 @@ declare const chrome: ChromeApi;
             type: 'atlas-delete-download',
             payload: {
               url: item.url,
-              original_url: item.original_url || item.url,
               tag_name: item.tag_name,
               download_via: item.download_via || null,
             },
@@ -1844,13 +1841,10 @@ declare const chrome: ChromeApi;
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
             if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
               // Fallback: send the page URL and let Atlas resolve/download via yt-dlp.
-              // Make it unique per trigger so multiple videos on the same page don't collide.
               const pageUrl = window.location.href;
-              const uniqueUrl = `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random().toString(16).slice(2)}`;
               const payload = {
                 type: reactionType,
                 url: pageUrl,
-                original_url: uniqueUrl,
                 referrer_url: pageUrl,
                 page_title: limitString(document.title, MAX_METADATA_LEN),
                 tag_name: 'video',
@@ -1943,7 +1937,6 @@ declare const chrome: ChromeApi;
         const payload = {
           type: reactionType,
           url: item.url,
-          original_url: item.original_url || item.url,
           referrer_url: item.referrer_url || window.location.href,
           page_title: limitString(document.title, MAX_METADATA_LEN),
           tag_name: item.tag_name,
@@ -2049,11 +2042,9 @@ declare const chrome: ChromeApi;
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
             if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
               const pageUrl = window.location.href;
-              const uniqueUrl = `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random().toString(16).slice(2)}`;
               const payload = {
                 type: 'dislike',
                 url: pageUrl,
-                original_url: uniqueUrl,
                 referrer_url: pageUrl,
                 page_title: limitString(document.title, MAX_METADATA_LEN),
                 tag_name: 'video',
@@ -2090,7 +2081,6 @@ declare const chrome: ChromeApi;
         const payload = {
           type: 'dislike',
           url: item.url,
-          original_url: item.original_url || item.url,
           referrer_url: item.referrer_url || window.location.href,
           page_title: limitString(document.title, MAX_METADATA_LEN),
           tag_name: item.tag_name,
@@ -2128,7 +2118,6 @@ declare const chrome: ChromeApi;
       return {
         type: reactionType,
         url: item.url,
-        original_url: item.original_url || item.url,
         referrer_url: item.referrer_url || window.location.href,
         page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
@@ -2144,14 +2133,10 @@ declare const chrome: ChromeApi;
       const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
       if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
         const pageUrl = window.location.href;
-        const uniqueUrl = `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random()
-          .toString(16)
-          .slice(2)}`;
 
         return {
           type: reactionType,
           url: pageUrl,
-          original_url: uniqueUrl,
           referrer_url: pageUrl,
           page_title: limitString(document.title, MAX_METADATA_LEN),
           tag_name: 'video',

@@ -3,7 +3,6 @@ import { resolveAbsoluteUrl, shouldBypassMinSize } from './media';
 type MediaItem = {
   tag_name: 'img' | 'video';
   url: string;
-  original_url: string;
   referrer_url: string;
   preview_url: string;
   width: number | null;
@@ -63,7 +62,6 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
       return {
         tag_name: 'img',
         url: fallback,
-        original_url: fallback,
         referrer_url: window.location.href,
         preview_url: '',
         width,
@@ -75,7 +73,6 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
     return {
       tag_name: 'img',
       url,
-      original_url: url,
       referrer_url: window.location.href,
       preview_url: url,
       width,
@@ -94,7 +91,6 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
         return {
           tag_name: 'video',
           url: pageUrl,
-          original_url: `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random().toString(16).slice(2)}`,
           referrer_url: pageUrl,
           preview_url: video.poster || '',
           width: video.videoWidth || video.clientWidth || null,
@@ -109,7 +105,6 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
     return {
       tag_name: 'video',
       url,
-      original_url: url,
       referrer_url: window.location.href,
       preview_url: video.poster || '',
       width: video.videoWidth || video.clientWidth || null,
@@ -142,7 +137,6 @@ export function buildDirectPageCandidate(): MediaItem | null {
     return {
       tag_name: lowerLocation.match(/\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i) ? 'video' : 'img',
       url: locationUrl,
-      original_url: locationUrl,
       referrer_url: locationUrl,
       preview_url: locationUrl,
       width: null,
@@ -160,7 +154,6 @@ export function buildDirectPageCandidate(): MediaItem | null {
     return {
       tag_name: 'img',
       url: fallback,
-      original_url: fallback,
       referrer_url: locationUrl,
       preview_url: '',
       width: null,

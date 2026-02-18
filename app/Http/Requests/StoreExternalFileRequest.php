@@ -34,7 +34,6 @@ class StoreExternalFileRequest extends FormRequest
             // Required: extension-triggered downloads are driven by the same reaction pipeline as the app.
             // No fallback to "queue download without reaction".
             'reaction_type' => ['required', 'string', 'in:love,like,dislike,funny'],
-            'original_url' => ['nullable', 'string', 'url', 'max:2048'],
             'referrer_url' => ['nullable', 'string', 'url', 'max:2048'],
             // Some sites generate very long titles; keep it permissive since we only store it as metadata.
             'page_title' => ['nullable', 'string', 'max:2000'],
@@ -60,7 +59,6 @@ class StoreExternalFileRequest extends FormRequest
             'url.required' => 'A media URL is required.',
             'url.url' => 'The media URL must be a valid URL.',
             'reaction_type.required' => 'A reaction_type is required.',
-            'original_url.url' => 'The original URL must be a valid URL.',
             'referrer_url.url' => 'The referrer URL must be a valid URL.',
             'preview_url.url' => 'The preview URL must be a valid URL.',
             'size.integer' => 'The size must be an integer.',
