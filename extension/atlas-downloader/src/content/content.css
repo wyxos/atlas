@@ -309,6 +309,42 @@
   animation: atlas-spin 0.75s linear infinite;
 }
 
+.atlas-shadow-root .atlas-downloader-reaction-btn.queued {
+  position: relative;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.queued svg {
+  opacity: 0;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.queued::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(226, 232, 240, 0.2);
+  border-top-color: currentColor;
+  animation: atlas-spin 0.75s linear infinite;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.love.queued {
+  color: #ef4444;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.like.queued {
+  color: #38bdf8;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.funny.queued {
+  color: #f59e0b;
+}
+
+.atlas-shadow-root .atlas-downloader-reaction-btn.dislike.queued,
+.atlas-shadow-root .atlas-downloader-reaction-btn.blacklist.queued {
+  color: #94a3b8;
+}
+
 .atlas-shadow-root .atlas-downloader-reaction-btn svg {
   width: 18px;
   height: 18px;

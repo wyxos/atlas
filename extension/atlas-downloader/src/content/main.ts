@@ -1,5 +1,6 @@
 import './content.css';
 import { registrableDomainFromUrl } from '../shared/domain';
+import { buildDirectPageCandidate, buildItemFromElement, collectLookupKeysForNode } from './items';
 
 type ContentSettings = {
   atlasBaseUrl?: string;
@@ -734,7 +735,9 @@ declare const chrome: ChromeApi;
         button.type = 'button';
         button.className = `atlas-downloader-reaction-btn ${reaction.className}${
           currentReaction === reaction.type ? ' active' : ''
-        }${item.reactionPending === reaction.type ? ' pending' : ''}`.trim();
+        }${item.reactionPending === reaction.type ? ' pending' : ''}${
+          item.reactionQueued === reaction.type ? ' queued' : ''
+        }`.trim();
         button.setAttribute('aria-label', reaction.label);
         button.title = reaction.label;
         button.replaceChildren(createSvgIcon(reaction.pathDs));
@@ -755,7 +758,9 @@ declare const chrome: ChromeApi;
       blacklistButton.type = 'button';
       blacklistButton.className = `atlas-downloader-reaction-btn ${BLACKLIST_ACTION.className}${
         item.atlas?.blacklisted ? ' active' : ''
-      }${item.reactionPending === BLACKLIST_ACTION.type ? ' pending' : ''}`.trim();
+      }${item.reactionPending === BLACKLIST_ACTION.type ? ' pending' : ''}${
+        item.reactionQueued === BLACKLIST_ACTION.type ? ' queued' : ''
+      }`.trim();
       blacklistButton.setAttribute('aria-label', BLACKLIST_ACTION.label);
       blacklistButton.title = BLACKLIST_ACTION.label;
       blacklistButton.replaceChildren(createSvgIcon(BLACKLIST_ACTION.pathDs));
@@ -965,6 +970,11 @@ declare const chrome: ChromeApi;
             file_id: match.file_id ?? null,
             reaction: match.reaction ?? null,
           };
+          if (item.atlas.exists && !item.atlas.downloaded && item.atlas.reaction?.type && item.atlas.reaction.type !== 'dislike') {
+            item.reactionQueued = item.atlas.reaction.type;
+          } else {
+            item.reactionQueued = null;
+          }
 
           if (match.exists) existsCount += 1;
           if (match.downloaded) downloadedCount += 1;
@@ -1043,9 +1053,11 @@ declare const chrome: ChromeApi;
           if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
             item.status = 'Queued';
             item.statusClass = 'queued';
+            item.reactionQueued = options.blacklist ? BLACKLIST_ACTION.type : type;
           } else {
             item.status = '';
             item.statusClass = '';
+            item.reactionQueued = null;
           }
           renderList();
           setReady(summaryText());
@@ -1239,10 +1251,14 @@ declare const chrome: ChromeApi;
               if (data?.queued) {
                 item.status = 'Queued';
                 item.statusClass = 'queued';
+                if (item.atlas?.reaction?.type && item.atlas.reaction.type !== 'dislike') {
+                  item.reactionQueued = item.atlas.reaction.type;
+                }
                 urlsToPoll.push(item.url);
               } else {
                 item.status = '';
                 item.statusClass = '';
+                item.reactionQueued = null;
               }
             } else {
               item.status = result?.error || 'Failed';
@@ -1297,6 +1313,20 @@ declare const chrome: ChromeApi;
               file_id: match.file_id ?? null,
               reaction: match.reaction ?? null,
             };
+            if (match?.url) {
+              atlasStatusCache.set(String(match.url), {
+                exists: Boolean(match.exists),
+                downloaded: Boolean(match.downloaded),
+                blacklisted: Boolean(match.blacklisted),
+                reactionType: match.reaction?.type ? String(match.reaction.type) : null,
+                ts: Date.now(),
+              });
+            }
+            if (item.atlas.exists && !item.atlas.downloaded && item.atlas.reaction?.type && item.atlas.reaction.type !== 'dislike') {
+              item.reactionQueued = item.atlas.reaction.type;
+            } else {
+              item.reactionQueued = null;
+            }
 
             if (!match.downloaded) {
               remaining += 1;
@@ -1422,38 +1452,7 @@ declare const chrome: ChromeApi;
       return [...urls].filter(Boolean);
     }
 
-    function collectLookupKeysForNode(node: Element): string[] {
-      const keys = new Set<string>();
-
-      const mediaUrl = (() => {
-        if (node instanceof HTMLImageElement) {
-          return safeUrl(node.currentSrc) || safeUrl(node.src) || '';
-        }
-        if (node instanceof HTMLVideoElement) {
-          return getVideoUrl(node) || '';
-        }
-        if (node instanceof HTMLAnchorElement) {
-          return safeUrl(node.href) || '';
-        }
-        return '';
-      })();
-      if (mediaUrl) {
-        keys.add(mediaUrl);
-      }
-
-      const anchorHref = node.closest('a[href]')?.getAttribute('href') ?? '';
-      const anchorUrl = safeUrl(anchorHref);
-      if (anchorUrl) {
-        keys.add(anchorUrl);
-      }
-
-      const pageUrl = safeUrl(window.location.href);
-      if (pageUrl) {
-        keys.add(pageUrl);
-      }
-
-      return [...keys];
-    }
+    // collectLookupKeysForNode moved to items.ts
 
     function syncAtlasStatusForPageMarkers() {
       const urls = collectPageMarkerUrls();
@@ -1519,7 +1518,7 @@ declare const chrome: ChromeApi;
             continue;
           }
 
-          const item = buildItemFromElement(element);
+      const item = buildItemFromElement(element, MIN_SIZE);
           if (item?.url && !seen.has(item.url)) {
             seen.add(item.url);
             items.push(item);
@@ -1549,275 +1548,9 @@ declare const chrome: ChromeApi;
     });
   }
 
-  function buildItemFromElement(element) {
-    if (!(element instanceof Element)) {
-      return null;
-    }
+  // buildItemFromElement moved to items.ts
 
-    if (element.tagName === 'IMG') {
-      const img = element;
-      const width = img.naturalWidth || img.width || img.clientWidth || null;
-      const height = img.naturalHeight || img.height || img.clientHeight || null;
-      if (width && height && (width < MIN_SIZE || height < MIN_SIZE)) {
-        return null;
-      }
-
-      const rawSrc = (img.currentSrc || img.src || img.getAttribute('src') || '').trim();
-      const url = safeUrl(rawSrc);
-      if (!url) {
-        const fallback = safeUrl(document.referrer) || '';
-        if (!fallback || (!rawSrc.toLowerCase().startsWith('blob:') && !rawSrc.toLowerCase().startsWith('data:'))) {
-          return null;
-        }
-
-        return {
-          tag_name: 'img',
-          url: fallback,
-          original_url: fallback,
-          referrer_url: rawSrc,
-          preview_url: '',
-          width,
-          height,
-          alt: img.alt || '',
-        };
-      }
-
-      return {
-        tag_name: 'img',
-        url,
-        original_url: url,
-        referrer_url: window.location.href,
-        preview_url: url,
-        width,
-        height,
-        alt: img.alt || '',
-      };
-    }
-
-    if (element.tagName === 'VIDEO') {
-      const url = getVideoUrl(element);
-      if (!url) {
-        const video = element as HTMLVideoElement;
-        const rawSrc = (video.currentSrc || video.src || '').trim().toLowerCase();
-        if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
-          const pageUrl = window.location.href;
-          return {
-            tag_name: 'video',
-            url: pageUrl,
-            original_url: `${pageUrl}#atlas-ext-video=${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            referrer_url: pageUrl,
-            preview_url: video.poster || '',
-            width: video.videoWidth || video.clientWidth || null,
-            height: video.videoHeight || video.clientHeight || null,
-            alt: '',
-            download_via: 'yt-dlp',
-          };
-        }
-        return null;
-      }
-
-      return {
-        tag_name: 'video',
-        url,
-        original_url: url,
-        referrer_url: window.location.href,
-        preview_url: element.poster || '',
-        width: element.videoWidth || element.clientWidth || null,
-        height: element.videoHeight || element.clientHeight || null,
-        alt: '',
-      };
-    }
-
-    return null;
-  }
-
-  function buildDirectPageCandidate() {
-    const locationUrl = (window.location.href || '').trim();
-    if (!locationUrl) {
-      return null;
-    }
-
-    const lowerLocation = locationUrl.toLowerCase();
-    const mediaExtMatch = /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|webm|mov|m4v|mkv)(\?|#|$)/i.test(
-      lowerLocation
-    );
-    const mimeHint =
-      (document.contentType || '').startsWith('image/') || (document.contentType || '').startsWith('video/');
-
-    if (!mediaExtMatch && !mimeHint) {
-      return null;
-    }
-
-    if (lowerLocation.startsWith('http://') || lowerLocation.startsWith('https://')) {
-      return {
-        tag_name: lowerLocation.match(/\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i) ? 'video' : 'img',
-        url: locationUrl,
-        original_url: locationUrl,
-        referrer_url: locationUrl,
-        preview_url: locationUrl,
-        width: null,
-        height: null,
-        alt: '',
-      };
-    }
-
-    if (lowerLocation.startsWith('blob:') || lowerLocation.startsWith('data:')) {
-      const fallback = safeUrl(document.referrer) || '';
-      if (!fallback) {
-        return null;
-      }
-
-      return {
-        tag_name: 'img',
-        url: fallback,
-        original_url: fallback,
-        referrer_url: locationUrl,
-        preview_url: '',
-        width: null,
-        height: null,
-        alt: '',
-      };
-    }
-
-    return null;
-  }
-
-  function getVideoUrl(video) {
-    const direct = safeUrl(video.currentSrc) || safeUrl(video.src) || safeUrl(video.getAttribute('src'));
-    if (direct) {
-      return direct;
-    }
-
-    const source = video.querySelector('source[src]');
-    const sourceUrl = source ? safeUrl(source.src || source.getAttribute('src')) : '';
-    if (sourceUrl) {
-      return sourceUrl;
-    }
-
-    const dataStoreUrl = resolveDataStoreUrl(video);
-    if (dataStoreUrl) {
-      return dataStoreUrl;
-    }
-
-    return resolveMetaVideoUrl();
-  }
-
-  function resolveMetaVideoUrl() {
-    const selectors = [
-      'meta[property="og:video"]',
-      'meta[property="og:video:url"]',
-      'meta[property="og:video:secure_url"]',
-      'meta[name="twitter:player:stream"]',
-      'meta[name="twitter:player:stream:url"]',
-    ];
-
-    for (const selector of selectors) {
-      const tag = document.querySelector(selector);
-      const content = tag?.getAttribute('content');
-      const url = safeUrl(content || '');
-      if (url) {
-        return url;
-      }
-    }
-
-    return '';
-  }
-
-  function resolveDataStoreUrl(element) {
-    let node = element;
-    let depth = 0;
-
-    while (node && depth < 8) {
-      const dataStore = node.getAttribute?.('data-store');
-      if (dataStore) {
-        const parsed = parseMaybeJson(dataStore);
-        const url = findPlayableUrl(parsed, 0);
-        if (url) {
-          return url;
-        }
-      }
-
-      node = node.parentElement;
-      depth += 1;
-    }
-
-    return '';
-  }
-
-  function parseMaybeJson(value) {
-    if (!value) {
-      return null;
-    }
-
-    const decoded = decodeHtmlEntities(value);
-    try {
-      return JSON.parse(decoded);
-    } catch {
-      return null;
-    }
-  }
-
-  function decodeHtmlEntities(value) {
-    if (!value || typeof value !== 'string') {
-      return '';
-    }
-
-    return value
-      .replace(/&quot;/g, '"')
-      .replace(/&#34;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&#38;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>');
-  }
-
-  function findPlayableUrl(value, depth) {
-    if (!value || depth > 4) {
-      return '';
-    }
-
-    if (typeof value === 'string') {
-      return value.startsWith('http') ? value : '';
-    }
-
-    if (Array.isArray(value)) {
-      for (const entry of value) {
-        const found = findPlayableUrl(entry, depth + 1);
-        if (found) {
-          return found;
-        }
-      }
-      return '';
-    }
-
-    if (typeof value !== 'object') {
-      return '';
-    }
-
-    const directKeys = [
-      'hd_src',
-      'sd_src',
-      'playable_url',
-      'playable_url_quality_hd',
-      'playable_url_quality_sd',
-    ];
-
-    for (const key of directKeys) {
-      const candidate = value[key];
-      if (typeof candidate === 'string' && candidate.startsWith('http')) {
-        return candidate;
-      }
-    }
-
-    for (const key of Object.keys(value)) {
-      const found = findPlayableUrl(value[key], depth + 1);
-      if (found) {
-        return found;
-      }
-    }
-
-    return '';
-  }
+  // buildDirectPageCandidate helpers moved to items.ts
 
   function createToastFn(container) {
     return function showToast(message, tone: 'info' | 'danger' = 'info') {
@@ -2012,29 +1745,7 @@ declare const chrome: ChromeApi;
     return current === base || current.endsWith(`.${base}`);
   }
 
-  function safeUrl(value) {
-    if (!value || typeof value !== 'string') {
-      return '';
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return '';
-    }
-
-    const lowered = trimmed.toLowerCase();
-    if (
-      lowered.startsWith('blob:') ||
-      lowered.startsWith('data:') ||
-      lowered.startsWith('chrome-extension:') ||
-      lowered.startsWith('moz-extension:') ||
-      lowered.startsWith('safari-extension:')
-    ) {
-      return '';
-    }
-
-    return trimmed;
-  }
+  // safeUrl moved to items.ts
 
   function installHotkeys(options: {
     showToast: (message: string, tone?: 'info' | 'danger') => void;
@@ -2127,7 +1838,7 @@ declare const chrome: ChromeApi;
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        const item = buildItemFromElement(media);
+          const item = buildItemFromElement(media, MIN_SIZE);
         if (!item) {
           if (media instanceof HTMLVideoElement) {
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
@@ -2332,7 +2043,7 @@ declare const chrome: ChromeApi;
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        const item = buildItemFromElement(media);
+        const item = buildItemFromElement(media, MIN_SIZE);
         if (!item) {
           if (media instanceof HTMLVideoElement) {
             const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
@@ -2412,7 +2123,7 @@ declare const chrome: ChromeApi;
   }
 
   function buildOverlayReactionPayload(media: Element, reactionType: string) {
-    const item = buildItemFromElement(media);
+    const item = buildItemFromElement(media, MIN_SIZE);
     if (item) {
       return {
         type: reactionType,
@@ -2500,6 +2211,18 @@ declare const chrome: ChromeApi;
           ? reactionType === 'dislike'
           : reactionType === reaction.type;
         btn.classList.toggle('active', isActive);
+      }
+    };
+    const setToolbarQueued = (reactionType: string | null, downloaded: boolean | null) => {
+      const queuedType =
+        reactionType && downloaded === false && reactionType !== 'dislike' ? reactionType : null;
+      for (const reaction of [...REACTIONS, BLACKLIST_ACTION]) {
+        const btn = buttonsByType.get(reaction.type);
+        if (!btn) continue;
+        const isQueued = reaction.type === BLACKLIST_ACTION.type
+          ? queuedType === 'dislike'
+          : queuedType === reaction.type;
+        btn.classList.toggle('queued', isQueued);
       }
     };
 
@@ -2687,16 +2410,19 @@ declare const chrome: ChromeApi;
       updatePosition();
 
       setToolbarActive(null);
+      setToolbarQueued(null, null);
       if (activeKey) {
         const cached = getCachedAtlasStatus(activeKey);
         if (cached) {
           setToolbarActive(cached.reactionType);
+          setToolbarQueued(cached.reactionType, cached.downloaded);
         } else {
           const keyAtRequest = activeKey;
           fetchAtlasStatus(options.sendMessageSafe, keyAtRequest, (status) => {
             if (!status) return;
             if (activeKey !== keyAtRequest) return;
             setToolbarActive(status.reactionType);
+            setToolbarQueued(status.reactionType, status.downloaded);
           });
         }
       }
@@ -2711,19 +2437,23 @@ declare const chrome: ChromeApi;
       if (pointerX < 0 || pointerY < 0 || options.isSheetOpen()) {
         return;
       }
-      const underPointer = document.elementFromPoint(pointerX, pointerY);
-      if (!(underPointer instanceof Element)) {
+      const underPointer = document.elementsFromPoint?.(pointerX, pointerY) ?? [];
+      const fromPoint = underPointer.find((node) => node instanceof Element && node.closest?.('img, video'));
+      const media = fromPoint instanceof Element ? fromPoint.closest?.('img, video') ?? null : null;
+      const resolved =
+        media ??
+        (() => {
+          const fallback = document.elementFromPoint?.(pointerX, pointerY);
+          return fallback instanceof Element ? fallback.closest?.('img, video') ?? null : null;
+        })();
+      if (!resolved) {
         return;
       }
-      if (underPointer.closest?.(`#${ROOT_ID}`)) {
-        return;
-      }
-      const media = underPointer.closest?.('img, video') ?? null;
-      if (!media) {
+      if (resolved.closest?.(`#${ROOT_ID}`)) {
         return;
       }
       cancelHide();
-      showFor(media);
+      showFor(resolved);
     };
 
     const scheduleDetectMediaUnderPointer = (delayMs = 80) => {
@@ -2743,7 +2473,12 @@ declare const chrome: ChromeApi;
         if (!(event.target instanceof Element)) return;
         if (isOwnUiEvent(event)) return;
 
-        const media = event.target.closest?.('img, video') ?? null;
+        const fromTarget = event.target.closest?.('img, video') ?? null;
+        const candidates = document.elementsFromPoint?.(event.clientX, event.clientY) ?? [];
+        const fromPoint =
+          candidates.find((node) => node instanceof Element && node.closest?.('img, video')) ?? null;
+        const media =
+          fromTarget || (fromPoint instanceof Element ? fromPoint.closest?.('img, video') ?? null : null);
         if (!media) return;
 
         cancelHide();
@@ -2777,7 +2512,10 @@ declare const chrome: ChromeApi;
 
         setToolbarBusy(false, null);
         if (reactionType) {
-          setToolbarActive(reactionType === 'blacklist' ? 'dislike' : reactionType);
+          const nextType = reactionType === 'blacklist' ? 'dislike' : reactionType;
+          setToolbarActive(nextType);
+          const cached = activeKey ? getCachedAtlasStatus(activeKey) : null;
+          setToolbarQueued(nextType, cached?.downloaded ?? null);
         }
       },
       true
