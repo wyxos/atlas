@@ -8,6 +8,33 @@ use Illuminate\Database\Eloquent\Collection;
 
 class FileItemFormatter
 {
+    private static function toRelativeInternalApiUrl(?string $url): ?string
+    {
+        if (! is_string($url) || $url === '') {
+            return $url;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return $url;
+        }
+
+        $parts = parse_url($url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
+        if ($host === '' || $path === '' || ! str_starts_with($path, '/')) {
+            return $url;
+        }
+
+        $requestHost = request()?->getHost();
+        if (! is_string($requestHost) || strtolower($requestHost) !== $host) {
+            return $url;
+        }
+
+        $query = isset($parts['query']) && $parts['query'] !== '' ? '?'.$parts['query'] : '';
+
+        return $path.$query;
+    }
+
     /**
      * Format files into items structure for frontend.
      */
@@ -81,11 +108,11 @@ class FileItemFormatter
             $thumbnailUrl = $file->preview_url;
 
             if ($file->downloaded && $file->path) {
-                $originalUrl = route('api.files.downloaded', ['file' => $file->id]);
-                $thumbnailUrl = route('api.files.preview', ['file' => $file->id]);
+                $originalUrl = route('api.files.downloaded', ['file' => $file->id], false);
+                $thumbnailUrl = route('api.files.preview', ['file' => $file->id], false);
             } else {
                 if (! $originalUrl && $file->path) {
-                    $originalUrl = route('api.files.serve', ['file' => $file->id]);
+                    $originalUrl = route('api.files.serve', ['file' => $file->id], false);
                 }
             }
 
@@ -101,8 +128,11 @@ class FileItemFormatter
             $vibeType = $isVideo ? 'video' : 'image';
 
             if ($mediaKind !== 'image' && $mediaKind !== 'video') {
-                $thumbnailUrl = route('api.files.icon', ['file' => $file->id]);
+                $thumbnailUrl = route('api.files.icon', ['file' => $file->id], false);
             }
+
+            $originalUrl = self::toRelativeInternalApiUrl($originalUrl);
+            $thumbnailUrl = self::toRelativeInternalApiUrl($thumbnailUrl);
 
             $item = [
                 'id' => $file->id,
