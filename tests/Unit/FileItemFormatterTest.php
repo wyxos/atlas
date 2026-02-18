@@ -21,9 +21,9 @@ it('uses preview route for downloaded video thumbnails', function () {
 
     $item = $items[0];
 
-    expect($item['src'])->toBe(route('api.files.preview', ['file' => $file->id]));
-    expect($item['preview'])->toBe(route('api.files.preview', ['file' => $file->id]));
-    expect($item['original'])->toBe(route('api.files.downloaded', ['file' => $file->id]));
+    expect($item['src'])->toBe(route('api.files.preview', ['file' => $file->id], false));
+    expect($item['preview'])->toBe(route('api.files.preview', ['file' => $file->id], false));
+    expect($item['original'])->toBe(route('api.files.downloaded', ['file' => $file->id], false));
 });
 
 it('uses an icon preview for downloaded audio files but keeps the original URL', function () {
@@ -39,9 +39,9 @@ it('uses an icon preview for downloaded audio files but keeps the original URL',
 
     expect($item['media_kind'])->toBe('audio');
     expect($item['type'])->toBe('image'); // Vibe loader expects image/video only
-    expect($item['src'])->toBe(route('api.files.icon', ['file' => $file->id]));
-    expect($item['preview'])->toBe(route('api.files.icon', ['file' => $file->id]));
-    expect($item['original'])->toBe(route('api.files.downloaded', ['file' => $file->id]));
+    expect($item['src'])->toBe(route('api.files.icon', ['file' => $file->id], false));
+    expect($item['preview'])->toBe(route('api.files.icon', ['file' => $file->id], false));
+    expect($item['original'])->toBe(route('api.files.downloaded', ['file' => $file->id], false));
 });
 
 it('uses an icon preview for non-image/video files', function () {
@@ -57,6 +57,6 @@ it('uses an icon preview for non-image/video files', function () {
 
     expect($item['media_kind'])->toBe('file');
     expect($item['type'])->toBe('image'); // Vibe loader expects image/video only
-    expect($item['src'])->toBe(route('api.files.icon', ['file' => $file->id]));
-    expect($item['original'])->toBe(route('api.files.downloaded', ['file' => $file->id]));
+    expect($item['src'])->toBe(route('api.files.icon', ['file' => $file->id], false));
+    expect($item['original'])->toBe(route('api.files.downloaded', ['file' => $file->id], false));
 });

@@ -8,6 +8,33 @@ use Illuminate\Support\Facades\Storage;
 
 class FileResource extends JsonResource
 {
+    private static function toRelativeInternalApiUrl(?string $url): ?string
+    {
+        if (! is_string($url) || $url === '') {
+            return $url;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return $url;
+        }
+
+        $parts = parse_url($url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = (string) ($parts['path'] ?? '');
+        if ($host === '' || $path === '' || ! str_starts_with($path, '/')) {
+            return $url;
+        }
+
+        $requestHost = request()?->getHost();
+        if (! is_string($requestHost) || strtolower($requestHost) !== $host) {
+            return $url;
+        }
+
+        $query = isset($parts['query']) && $parts['query'] !== '' ? '?'.$parts['query'] : '';
+
+        return $path.$query;
+    }
+
     /**
      * Transform the resource into an array.
      */
@@ -69,15 +96,20 @@ class FileResource extends JsonResource
             $fileUrl = $this->url;
         } elseif ($this->path) {
             // Generate URL for local files
-            $fileUrl = route('api.files.serve', ['file' => $this->id]);
+            $fileUrl = route('api.files.serve', ['file' => $this->id], false);
         }
 
         $diskUrl = null;
         if ($this->downloaded && $this->path) {
-            $diskUrl = route('api.files.downloaded', ['file' => $this->id]);
+            $diskUrl = route('api.files.downloaded', ['file' => $this->id], false);
         }
-        $previewFileUrl = $this->preview_path ? route('api.files.preview', ['file' => $this->id]) : null;
-        $posterUrl = $this->poster_path ? route('api.files.poster', ['file' => $this->id]) : null;
+        $previewFileUrl = $this->preview_path ? route('api.files.preview', ['file' => $this->id], false) : null;
+        $posterUrl = $this->poster_path ? route('api.files.poster', ['file' => $this->id], false) : null;
+
+        $fileUrl = self::toRelativeInternalApiUrl($fileUrl);
+        $diskUrl = self::toRelativeInternalApiUrl($diskUrl);
+        $previewFileUrl = self::toRelativeInternalApiUrl($previewFileUrl);
+        $posterUrl = self::toRelativeInternalApiUrl($posterUrl);
 
         $blacklistType = null;
         $blacklistRule = null;

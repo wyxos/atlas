@@ -8,6 +8,7 @@ type AtlasRecord = {
   id: number;
   url: string;
   downloaded: boolean;
+  reactionType: string | null;
 };
 
 function createBmp(width: number, height: number): Buffer {
@@ -93,6 +94,132 @@ async function startStubAtlasServer() {
       return;
     }
 
+    if (req.method === 'GET' && url.pathname === '/fixture/scenario1') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scenario 1</title>
+    <style>
+      #modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none; align-items: center; justify-content: center; }
+      #modal.open { display: flex; }
+      #modal-content { background: white; padding: 10px; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <a id="s1-link" href="${`/fixture/s1-large.bmp`}">
+      <img id="s1-thumb" src="${`/fixture/s1-small.bmp`}" alt="small" />
+    </a>
+    <div id="modal">
+      <div id="modal-content">
+        <button id="close-modal">Close</button>
+        <img id="s1-modal-image" src="${`/fixture/s1-large.bmp`}" alt="large" />
+      </div>
+    </div>
+    <script>
+      const link = document.getElementById('s1-link');
+      const modal = document.getElementById('modal');
+      const close = document.getElementById('close-modal');
+      link.addEventListener('click', (e) => { e.preventDefault(); modal.classList.add('open'); });
+      close.addEventListener('click', () => modal.classList.remove('open'));
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+    </script>
+  </body>
+</html>`);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/fixture/scenario2') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scenario 2</title>
+    <style>
+      #modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none; align-items: center; justify-content: center; }
+      #modal.open { display: flex; }
+      #modal-content { background: white; padding: 10px; border-radius: 8px; }
+    </style>
+  </head>
+  <body>
+    <a id="s2-link" href="${`/fixture/s2-small.bmp`}">
+      <img id="s2-main" src="${`/fixture/s2-large.bmp`}" alt="large-initial" />
+    </a>
+    <div id="modal">
+      <div id="modal-content">
+        <button id="close-modal">Close</button>
+        <img id="s2-modal-image" src="${`/fixture/s2-small.bmp`}" alt="small-modal" />
+      </div>
+    </div>
+    <script>
+      const link = document.getElementById('s2-link');
+      const modal = document.getElementById('modal');
+      const close = document.getElementById('close-modal');
+      link.addEventListener('click', (e) => { e.preventDefault(); modal.classList.add('open'); });
+      close.addEventListener('click', () => modal.classList.remove('open'));
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+    </script>
+  </body>
+</html>`);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/fixture/scenario3') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scenario 3</title>
+    <style>
+      #modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none; align-items: center; justify-content: center; }
+      #modal.open { display: flex; }
+      #modal-content { background: white; padding: 10px; border-radius: 8px; min-width: 220px; min-height: 220px; }
+    </style>
+  </head>
+  <body>
+    <a id="s3-link" href="${`/fixture/s3-large-modal.bmp`}">
+      <img id="s3-main" src="${`/fixture/s3-large-initial.bmp`}" alt="large-initial" />
+    </a>
+    <div id="modal">
+      <div id="modal-content">
+        <button id="close-modal">Close</button>
+        <div id="s3-slot"></div>
+      </div>
+    </div>
+    <script>
+      const link = document.getElementById('s3-link');
+      const modal = document.getElementById('modal');
+      const close = document.getElementById('close-modal');
+      const slot = document.getElementById('s3-slot');
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        modal.classList.add('open');
+        slot.innerHTML = '';
+        setTimeout(() => {
+          const img = document.createElement('img');
+          img.id = 's3-modal-image';
+          img.src = '${`/fixture/s3-large-modal.bmp`}';
+          img.alt = 'large-modal';
+          slot.appendChild(img);
+        }, 120);
+      });
+      close.addEventListener('click', () => modal.classList.remove('open'));
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+    </script>
+  </body>
+</html>`);
+      return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/fixture/hero.bmp') {
       const bmp = createBmp(512, 512);
       res.statusCode = 200;
@@ -103,6 +230,49 @@ async function startStubAtlasServer() {
 
     if (req.method === 'GET' && url.pathname === '/fixture/wide.bmp') {
       const bmp = createBmp(800, 450);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/bmp');
+      res.end(bmp);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/fixture/s1-small.bmp') {
+      const bmp = createBmp(320, 320);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/bmp');
+      res.end(bmp);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/fixture/s1-large.bmp') {
+      const bmp = createBmp(900, 900);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/bmp');
+      res.end(bmp);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/fixture/s2-large.bmp') {
+      const bmp = createBmp(900, 900);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/bmp');
+      res.end(bmp);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/fixture/s2-small.bmp') {
+      const bmp = createBmp(280, 280);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/bmp');
+      res.end(bmp);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/fixture/s3-large-initial.bmp') {
+      const bmp = createBmp(920, 920);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/bmp');
+      res.end(bmp);
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/fixture/s3-large-modal.bmp') {
+      const bmp = createBmp(960, 960);
       res.statusCode = 200;
       res.setHeader('Content-Type', 'image/bmp');
       res.end(bmp);
@@ -126,6 +296,7 @@ async function startStubAtlasServer() {
           exists: Boolean(record),
           downloaded: Boolean(record?.downloaded),
           file_id: record?.id ?? null,
+          reaction: record?.reactionType ? { type: record.reactionType } : null,
         };
       });
 
@@ -156,9 +327,10 @@ async function startStubAtlasServer() {
       let record = records.get(mediaUrl);
       const created = !record;
       if (!record) {
-        record = { id: id++, url: mediaUrl, downloaded: false };
+        record = { id: id++, url: mediaUrl, downloaded: false, reactionType: null };
         records.set(mediaUrl, record);
       }
+      record.reactionType = reactionType;
 
       // Simulate queueing then download completing shortly after.
       if (!record.downloaded && reactionType !== 'dislike') {
@@ -190,6 +362,21 @@ async function startStubAtlasServer() {
 
   return {
     baseUrl: `http://127.0.0.1:${port}`,
+    seed: (url: string, options?: { downloaded?: boolean; reactionType?: string | null }) => {
+      const existing = records.get(url);
+      if (existing) {
+        existing.downloaded = Boolean(options?.downloaded ?? existing.downloaded);
+        existing.reactionType = options?.reactionType ?? existing.reactionType ?? null;
+        return;
+      }
+
+      records.set(url, {
+        id: id++,
+        url,
+        downloaded: Boolean(options?.downloaded ?? false),
+        reactionType: options?.reactionType ?? null,
+      });
+    },
     close: async () =>
       new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
@@ -238,7 +425,7 @@ async function launchWithExtension(): Promise<{
 }
 
 async function configureExtension(optionsPage: Page, extensionId: string, atlasBaseUrl: string) {
-  await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
+  await optionsPage.goto(`chrome-extension://${extensionId}/dist/options.html`);
 
   await optionsPage.locator('#atlasBaseUrl').fill(atlasBaseUrl);
   await optionsPage.locator('#atlasToken').fill('test-token');
@@ -246,6 +433,37 @@ async function configureExtension(optionsPage: Page, extensionId: string, atlasB
   await optionsPage.getByRole('button', { name: 'Save settings' }).click();
 
   await expect(optionsPage.locator('#status')).toHaveText('Settings saved.');
+}
+
+async function expectBorderState(
+  page: Page,
+  selector: string,
+  state: 'reacted' | 'exists' | 'blacklisted' | 'downloaded',
+  reactionType?: 'love' | 'like' | 'dislike' | 'funny'
+) {
+  await expect
+    .poll(async () => {
+      return page.evaluate(
+        ({ selector: sel }) => {
+          const node = document.querySelector(sel) as HTMLElement | null;
+          if (!node) {
+            return null;
+          }
+
+          return {
+            marked: node.getAttribute('data-atlas-marked'),
+            state: node.getAttribute('data-atlas-state'),
+            reaction: node.getAttribute('data-atlas-reaction'),
+          };
+        },
+        { selector }
+      );
+    })
+    .toEqual({
+      marked: '1',
+      state,
+      reaction: reactionType ?? null,
+    });
 }
 
 test('atlas-downloader: local fixture (select + queue + downloaded state)', async () => {
@@ -314,6 +532,96 @@ test('atlas-downloader: wallhaven picker smoke test', async () => {
     // At minimum, ensure we don't list our own extension URL.
     const urls = await page.locator('.atlas-downloader-url').allTextContents();
     expect(urls.every((u) => !u.startsWith('chrome-extension://'))).toBeTruthy();
+  } finally {
+    await context.close();
+    await stub.close();
+    await fs.rm(userDataDir, { recursive: true, force: true });
+  }
+});
+
+test('atlas-downloader scenario1: small and modal large share reaction border', async () => {
+  const stub = await startStubAtlasServer();
+  const { context, extensionId, userDataDir } = await launchWithExtension();
+
+  try {
+    const fixtureUrl = stub.baseUrl.replace('127.0.0.1', 'localhost');
+    stub.seed(`${fixtureUrl}/fixture/s1-large.bmp`, {
+      downloaded: true,
+      reactionType: 'love',
+    });
+
+    const optionsPage = await context.newPage();
+    await configureExtension(optionsPage, extensionId, stub.baseUrl);
+    await optionsPage.close();
+
+    const page = await context.newPage();
+    await page.goto(`${fixtureUrl}/fixture/scenario1`);
+
+    await expectBorderState(page, '#s1-thumb', 'reacted', 'love');
+    await page.locator('#s1-link').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expectBorderState(page, '#s1-modal-image', 'reacted', 'love');
+  } finally {
+    await context.close();
+    await stub.close();
+    await fs.rm(userDataDir, { recursive: true, force: true });
+  }
+});
+
+test('atlas-downloader scenario2: initial large can be reacted, modal small gets neutral border', async () => {
+  const stub = await startStubAtlasServer();
+  const { context, extensionId, userDataDir } = await launchWithExtension();
+
+  try {
+    const fixtureUrl = stub.baseUrl.replace('127.0.0.1', 'localhost');
+    stub.seed(`${fixtureUrl}/fixture/s2-large.bmp`, {
+      downloaded: true,
+      reactionType: 'love',
+    });
+    stub.seed(`${fixtureUrl}/fixture/s2-small.bmp`, {
+      downloaded: false,
+      reactionType: null,
+    });
+
+    const optionsPage = await context.newPage();
+    await configureExtension(optionsPage, extensionId, stub.baseUrl);
+    await optionsPage.close();
+
+    const page = await context.newPage();
+    await page.goto(`${fixtureUrl}/fixture/scenario2`);
+
+    await expectBorderState(page, '#s2-main', 'reacted', 'love');
+    await page.locator('#s2-link').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expectBorderState(page, '#s2-modal-image', 'exists');
+  } finally {
+    await context.close();
+    await stub.close();
+    await fs.rm(userDataDir, { recursive: true, force: true });
+  }
+});
+
+test('atlas-downloader scenario3: dynamically injected modal image is marked after open', async () => {
+  const stub = await startStubAtlasServer();
+  const { context, extensionId, userDataDir } = await launchWithExtension();
+
+  try {
+    const fixtureUrl = stub.baseUrl.replace('127.0.0.1', 'localhost');
+    stub.seed(`${fixtureUrl}/fixture/s3-large-modal.bmp`, {
+      downloaded: true,
+      reactionType: 'like',
+    });
+
+    const optionsPage = await context.newPage();
+    await configureExtension(optionsPage, extensionId, stub.baseUrl);
+    await optionsPage.close();
+
+    const page = await context.newPage();
+    await page.goto(`${fixtureUrl}/fixture/scenario3`);
+    await page.locator('#s3-link').click();
+    await expect(page.locator('#modal')).toHaveClass(/open/);
+    await expect(page.locator('#s3-modal-image')).toBeVisible();
+    await expectBorderState(page, '#s3-modal-image', 'reacted', 'like');
   } finally {
     await context.close();
     await stub.close();

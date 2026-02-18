@@ -65,6 +65,11 @@
       show either after the reaction is applied.
     - [x] Tested: `php artisan test --compact tests/Feature/ExtensionFilesCheckTest.php tests/Feature/ExtensionFilesStoreTest.php tests/Feature/ExtensionFilesReactTest.php tests/Feature/ExtensionFilesDeleteDownloadTest.php`,
       `npm run lint`, `npm run typecheck`, `npm run build:extension`
+    - [x] Added deterministic extension E2E fixtures for modal/image border behavior scenarios 1-3 in
+      `tests/e2e/atlas-downloader.spec.ts`
+    - [ ] Execute new E2E scenario tests in WSL:
+      `npx playwright test tests/e2e/atlas-downloader.spec.ts -g "scenario1|scenario2|scenario3"`
+      (blocked in current WSL runtime: Playwright extension browser launch requires Linux deps + headed/Xvfb-capable session)
 - [ ] Issues
     - [ ] Backfill old records for missing containers
     - [ ] Pill reaction does not exclude items flagged for dislike that are outside viewport (reacting from outside
