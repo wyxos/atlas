@@ -70,12 +70,18 @@ class ExternalFilesController extends Controller
     public function check(CheckExternalFilesRequest $request): JsonResponse
     {
         $urls = $request->validated()['urls'];
+        $urlHashes = collect($urls)
+            ->map(fn (string $url) => hash('sha256', trim($url)))
+            ->filter(fn (string $hash) => $hash !== '')
+            ->unique()
+            ->values()
+            ->all();
 
         $files = File::query()
-            ->whereIn('referrer_url', $urls)
-            ->get(['id', 'referrer_url', 'downloaded']);
+            ->whereIn('original_url_hash', $urlHashes)
+            ->get(['id', 'original_url', 'downloaded', 'blacklisted_at']);
 
-        $byUrl = $files->keyBy('referrer_url');
+        $byUrl = $files->keyBy('original_url');
 
         $user = null;
         $reactionsByFileId = collect();
@@ -185,14 +191,18 @@ class ExternalFilesController extends Controller
         DownloadedFileResetService $downloadedFileReset,
     ): JsonResponse {
         $validated = $request->validated();
-        $referrerKey = $this->resolveReferrerKey(
+        $originalKey = $this->resolveOriginalKey(
             (string) ($validated['url'] ?? ''),
             (string) ($validated['original_url'] ?? ''),
             (string) ($validated['download_via'] ?? ''),
             (string) ($validated['tag_name'] ?? '')
         );
+        $originalKeyHash = hash('sha256', $originalKey);
 
-        $file = File::query()->where('referrer_url', $referrerKey)->first();
+        $file = File::query()
+            ->where('original_url_hash', $originalKeyHash)
+            ->where('original_url', $originalKey)
+            ->first();
         if (! $file) {
             return response()->json([
                 'message' => 'File not found.',
@@ -218,21 +228,21 @@ class ExternalFilesController extends Controller
         ]);
     }
 
-    private function resolveReferrerKey(string $url, string $originalUrl, string $downloadVia, string $tagName): string
+    private function resolveOriginalKey(string $url, string $originalUrl, string $downloadVia, string $tagName): string
     {
         $url = trim($url);
         $originalUrl = trim($originalUrl);
 
-        $referrerKey = $originalUrl !== '' ? $originalUrl : $url;
+        $originalKey = $originalUrl !== '' ? $originalUrl : $url;
         if ($downloadVia === 'yt-dlp' && in_array($tagName, ['video', 'iframe'], true)) {
-            $referrerKey = $url !== '' ? $url : $referrerKey;
+            $originalKey = $url !== '' ? $url : $originalKey;
         }
 
-        $hashPos = strpos($referrerKey, '#');
+        $hashPos = strpos($originalKey, '#');
         if ($hashPos !== false) {
-            $referrerKey = substr($referrerKey, 0, $hashPos);
+            $originalKey = substr($originalKey, 0, $hashPos);
         }
 
-        return $referrerKey;
+        return $originalKey;
     }
 }

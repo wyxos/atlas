@@ -30,7 +30,8 @@ test('extension react returns json and dispatches download for positive reaction
 
     $response->assertOk();
     $response->assertJsonPath('reaction.type', 'love');
-    $response->assertJsonPath('file.referrer_url', 'https://example.com/media/one.jpg');
+    $response->assertJsonPath('file.original_url', 'https://example.com/media/one.jpg');
+    $response->assertJsonPath('file.referrer_url', 'https://example.com/page');
 
     Queue::assertPushed(DownloadFile::class);
 });
@@ -65,6 +66,7 @@ test('extension react can force a re-download for already downloaded files', fun
     config()->set('downloads.extension_user_id', $user->id);
 
     $file = File::factory()->create([
+        'original_url' => 'https://example.com/media/one.jpg',
         'referrer_url' => 'https://example.com/media/one.jpg',
         'url' => 'https://example.com/media/one.jpg',
         'downloaded' => true,
@@ -108,6 +110,7 @@ test('extension react can clear downloaded assets without forcing a re-download'
     config()->set('downloads.extension_user_id', $user->id);
 
     $file = File::factory()->create([
+        'original_url' => 'https://example.com/media/clear.jpg',
         'referrer_url' => 'https://example.com/media/clear.jpg',
         'url' => 'https://example.com/media/clear.jpg',
         'downloaded' => true,
@@ -162,7 +165,43 @@ test('extension react can blacklist a file', function () {
     $response->assertJsonPath('reaction.type', 'dislike');
     $response->assertJsonPath('file.blacklist_type', 'manual');
 
-    $file = File::query()->where('referrer_url', 'https://example.com/media/blacklist.jpg')->firstOrFail();
+    $file = File::query()->where('original_url', 'https://example.com/media/blacklist.jpg')->firstOrFail();
     expect($file->blacklisted_at)->not->toBeNull()
         ->and($file->blacklist_reason)->toBe('Extension blacklist');
+});
+
+test('extension react allows multiple files from the same referrer page', function () {
+    Queue::fake();
+
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $payloadBase = [
+        'type' => 'like',
+        'referrer_url' => 'https://www.deviantart.com/artist/art/sample-page',
+        'source' => 'Extension',
+    ];
+
+    $first = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/react', [
+            ...$payloadBase,
+            'url' => 'https://images.example.com/a.jpg',
+            'original_url' => 'https://images.example.com/a.jpg',
+        ]);
+    $first->assertOk();
+
+    $second = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/react', [
+            ...$payloadBase,
+            'url' => 'https://images.example.com/b.jpg',
+            'original_url' => 'https://images.example.com/b.jpg',
+        ]);
+    $second->assertOk();
+
+    expect(File::query()->where('referrer_url', 'https://www.deviantart.com/artist/art/sample-page')->count())->toBe(2);
+    expect(File::query()->where('original_url', 'https://images.example.com/a.jpg')->exists())->toBeTrue();
+    expect(File::query()->where('original_url', 'https://images.example.com/b.jpg')->exists())->toBeTrue();
 });

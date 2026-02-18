@@ -14,6 +14,19 @@ class File extends Model
 {
     use HasFactory, Searchable;
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $file): void {
+            $originalUrl = trim((string) ($file->original_url ?? ''));
+            if ($originalUrl === '') {
+                $originalUrl = trim((string) ($file->referrer_url ?? $file->url ?? ''));
+            }
+
+            $file->original_url = $originalUrl !== '' ? $originalUrl : null;
+            $file->original_url_hash = $originalUrl !== '' ? hash('sha256', $originalUrl) : null;
+        });
+    }
+
     /**
      * The attributes that are mass assignable.
      *
@@ -23,6 +36,8 @@ class File extends Model
         'source',
         'source_id',
         'url',
+        'original_url',
+        'original_url_hash',
         'referrer_url',
         'path',
         'filename',
@@ -178,6 +193,7 @@ class File extends Model
             'source' => $this->source ?? 'unknown',
             'source_id' => $this->source_id,
             'url' => $this->url,
+            'original_url' => $this->original_url,
             'referrer_url' => $this->referrer_url,
             'path' => $this->path ?? '__missing__',
             'has_path' => (bool) $this->path,

@@ -22,30 +22,48 @@ class BrowsePersister
             return isset($item['file']) && isset($item['metadata']);
         }));
 
-        $referrers = collect($normalized)->map(fn ($i) => $i['file']['referrer_url'])->filter()->values()->all();
-        $existingReferrers = ! empty($referrers)
-            ? File::whereIn('referrer_url', $referrers)->pluck('referrer_url')->all()
-            : [];
-        $newFileCount = 0;
-        if (! empty($referrers)) {
-            $newFileCount = count(array_diff($referrers, $existingReferrers));
-        }
-
-        $fileRows = collect($normalized)
-            ->map(function ($i) {
-                $file = $i['file'];
+        $preparedItems = collect($normalized)
+            ->map(function (array $item): array {
+                $file = $item['file'];
+                $originalUrl = $this->resolveOriginalUrlFromFileRow($file);
+                if ($originalUrl !== '') {
+                    $file['original_url'] = $originalUrl;
+                }
+                $file['original_url_hash'] = $originalUrl !== '' ? hash('sha256', $originalUrl) : null;
                 if (array_key_exists('listing_metadata', $file) && is_array($file['listing_metadata'])) {
                     $file['listing_metadata'] = json_encode($file['listing_metadata']);
                 }
 
-                return $file;
+                return [
+                    'file' => $file,
+                    'metadata' => $item['metadata'],
+                    'original_url' => $originalUrl,
+                    'original_url_hash' => $file['original_url_hash'],
+                ];
             })
-            ->toArray();
+            ->values()
+            ->all();
+
+        $originalUrlHashes = collect($preparedItems)
+            ->pluck('original_url_hash')
+            ->filter(fn ($value) => is_string($value) && $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+        $existingOriginalUrlHashes = ! empty($originalUrlHashes)
+            ? File::whereIn('original_url_hash', $originalUrlHashes)->pluck('original_url_hash')->all()
+            : [];
+        $newFileCount = 0;
+        if (! empty($originalUrlHashes)) {
+            $newFileCount = count(array_diff($originalUrlHashes, $existingOriginalUrlHashes));
+        }
+
+        $fileRows = collect($preparedItems)->pluck('file')->all();
 
         File::upsert(
             $fileRows,
-            ['referrer_url'],
-            ['url', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at']
+            ['original_url_hash'],
+            ['url', 'original_url', 'referrer_url', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at']
         );
 
         if ($newFileCount > 0) {
@@ -54,13 +72,17 @@ class BrowsePersister
             $metrics->incrementMetric(MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $newFileCount);
         }
 
-        $fileMap = File::whereIn('referrer_url', $referrers)->get()->keyBy('referrer_url');
+        $fileMap = File::whereIn('original_url_hash', $originalUrlHashes)->get()->keyBy('original_url_hash');
 
-        $metaRows = collect($normalized)
+        $metaRows = collect($preparedItems)
             ->map(function ($i) use ($fileMap) {
                 $meta = $i['metadata'];
-                $ref = $meta['file_referrer_url'] ?? $i['file']['referrer_url'];
-                $file = $fileMap->get($ref);
+                $originalUrlHash = is_string($i['original_url_hash'] ?? null) ? $i['original_url_hash'] : '';
+                if ($originalUrlHash === '') {
+                    return null;
+                }
+
+                $file = $fileMap->get($originalUrlHash);
                 if (! $file) {
                     return null;
                 }
@@ -85,7 +107,7 @@ class BrowsePersister
             FileMetadata::upsert($metaRows, ['file_id'], ['payload', 'updated_at']);
         }
 
-        $allFiles = File::with('metadata')->whereIn('referrer_url', $referrers)->get();
+        $allFiles = File::with('metadata')->whereIn('original_url_hash', $originalUrlHashes)->get();
 
         // Create containers and attach files in batch
         $this->createContainersForFiles($allFiles);
@@ -96,6 +118,21 @@ class BrowsePersister
                 && ! $file->blacklisted_at
                 && ! $file->auto_disliked;
         })->values()->all();
+    }
+
+    private function resolveOriginalUrlFromFileRow(array $file): string
+    {
+        $candidate = trim((string) ($file['original_url'] ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+
+        $candidate = trim((string) ($file['referrer_url'] ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+
+        return trim((string) ($file['url'] ?? ''));
     }
 
     /**

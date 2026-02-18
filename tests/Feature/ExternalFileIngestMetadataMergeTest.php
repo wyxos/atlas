@@ -10,6 +10,7 @@ it('preserves existing listing metadata keys when new ingests omit them', functi
     $file = File::query()->create([
         'source' => 'youtube.com',
         'url' => 'https://www.youtube.com/embed/QTpf6orkalY',
+        'original_url' => 'https://www.youtube.com/embed/QTpf6orkalY',
         'referrer_url' => 'https://www.youtube.com/embed/QTpf6orkalY',
         'filename' => 'QTpf6orkalY',
         'downloaded' => true,

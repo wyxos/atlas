@@ -1943,8 +1943,8 @@ declare const chrome: ChromeApi;
         const payload = {
           type: reactionType,
           url: item.url,
-          original_url: item.url,
-          referrer_url: window.location.href,
+          original_url: item.original_url || item.url,
+          referrer_url: item.referrer_url || window.location.href,
           page_title: limitString(document.title, MAX_METADATA_LEN),
           tag_name: item.tag_name,
           width: item.width,
@@ -2090,8 +2090,8 @@ declare const chrome: ChromeApi;
         const payload = {
           type: 'dislike',
           url: item.url,
-          original_url: item.url,
-          referrer_url: window.location.href,
+          original_url: item.original_url || item.url,
+          referrer_url: item.referrer_url || window.location.href,
           page_title: limitString(document.title, MAX_METADATA_LEN),
           tag_name: item.tag_name,
           width: item.width,
@@ -2128,8 +2128,8 @@ declare const chrome: ChromeApi;
       return {
         type: reactionType,
         url: item.url,
-        original_url: item.url,
-        referrer_url: window.location.href,
+        original_url: item.original_url || item.url,
+        referrer_url: item.referrer_url || window.location.href,
         page_title: limitString(document.title, MAX_METADATA_LEN),
         tag_name: item.tag_name,
         width: item.width,

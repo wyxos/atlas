@@ -12,6 +12,7 @@ it('checks whether external files exist by original url', function () {
     config()->set('downloads.extension_user_id', $user->id);
 
     $file = File::factory()->create([
+        'original_url' => 'https://example.com/media/one.jpg',
         'referrer_url' => 'https://example.com/media/one.jpg',
         'downloaded' => true,
     ]);
