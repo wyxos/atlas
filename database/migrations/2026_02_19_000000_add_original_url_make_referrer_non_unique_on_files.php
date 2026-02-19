@@ -49,41 +49,18 @@ return new class extends Migration
             ");
 
             // Keep one row per canonical URL before adding unique(url).
-            DB::statement('DROP TEMPORARY TABLE IF EXISTS atlas_file_url_keep');
-            DB::statement('
-                CREATE TEMPORARY TABLE atlas_file_url_keep (
-                    url_hash VARCHAR(64) NOT NULL PRIMARY KEY,
-                    keep_id BIGINT UNSIGNED NOT NULL
-                )
-            ');
-            DB::statement('
-                INSERT INTO atlas_file_url_keep (url_hash, keep_id)
-                SELECT f1.url_hash, f1.id
-                FROM (
-                    SELECT SHA2(url, 256) AS url_hash, id, downloaded
-                    FROM files
-                    WHERE url IS NOT NULL
-                ) f1
-                LEFT JOIN (
-                    SELECT SHA2(url, 256) AS url_hash, id, downloaded
-                    FROM files
-                    WHERE url IS NOT NULL
-                ) f2
-                  ON f1.url_hash = f2.url_hash
-                 AND (
-                   f2.downloaded > f1.downloaded
-                   OR (f2.downloaded = f1.downloaded AND f2.id > f1.id)
-                 )
-                WHERE f2.id IS NULL
-            ');
             DB::statement('
                 DELETE f
                 FROM files f
-                INNER JOIN atlas_file_url_keep k ON k.url_hash = SHA2(f.url, 256)
+                INNER JOIN (
+                    SELECT SHA2(url, 256) AS url_hash, MAX(id) AS keep_id
+                    FROM files
+                    WHERE url IS NOT NULL
+                    GROUP BY SHA2(url, 256)
+                ) k ON k.url_hash = SHA2(f.url, 256)
                 WHERE f.url IS NOT NULL
                   AND f.id <> k.keep_id
             ');
-            DB::statement('DROP TEMPORARY TABLE atlas_file_url_keep');
         } else {
             DB::table('files')
                 ->select(['id', 'url'])
