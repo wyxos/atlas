@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Support\FileTypeDetector;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ExternalFileIngestService
@@ -31,8 +32,14 @@ class ExternalFileIngestService
             'height' => $payload['height'] ?? null,
             'download_via' => $downloadVia,
         ], fn ($value) => $value !== null && $value !== '');
+        $hasUrlHashColumns = $this->hasUrlHashColumns();
+        $urlHash = $hasUrlHashColumns ? hash('sha256', $url) : null;
 
         $file = File::query()
+            ->when(
+                $hasUrlHashColumns,
+                fn ($query) => $query->where('url_hash', $urlHash)
+            )
             ->where('url', $url)
             ->orderByDesc('downloaded')
             ->orderByDesc('id')
@@ -144,5 +151,19 @@ class ExternalFileIngestService
         }
 
         return substr($url, 0, $hashPos);
+    }
+
+    private function hasUrlHashColumns(): bool
+    {
+        static $hasColumns;
+
+        if ($hasColumns !== null) {
+            return $hasColumns;
+        }
+
+        $hasColumns = Schema::hasColumn('files', 'url_hash')
+            && Schema::hasColumn('files', 'referrer_url_hash');
+
+        return $hasColumns;
     }
 }

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Scout\Searchable;
 
 class File extends Model
@@ -19,6 +20,16 @@ class File extends Model
         static::saving(function (self $file): void {
             $url = trim((string) ($file->url ?? ''));
             $file->url = $url !== '' ? $url : null;
+
+            $referrerUrl = trim((string) ($file->referrer_url ?? ''));
+            $file->referrer_url = $referrerUrl !== '' ? $referrerUrl : null;
+
+            if (! self::hasUrlHashColumns()) {
+                return;
+            }
+
+            $file->url_hash = $url !== '' ? hash('sha256', $url) : null;
+            $file->referrer_url_hash = $referrerUrl !== '' ? hash('sha256', $referrerUrl) : null;
         });
     }
 
@@ -31,7 +42,9 @@ class File extends Model
         'source',
         'source_id',
         'url',
+        'url_hash',
         'referrer_url',
+        'referrer_url_hash',
         'path',
         'filename',
         'ext',
@@ -78,6 +91,20 @@ class File extends Model
             'downloaded' => 'boolean',
             'auto_disliked' => 'boolean',
         ];
+    }
+
+    private static function hasUrlHashColumns(): bool
+    {
+        static $hasColumns;
+
+        if ($hasColumns !== null) {
+            return $hasColumns;
+        }
+
+        $hasColumns = Schema::hasColumn('files', 'url_hash')
+            && Schema::hasColumn('files', 'referrer_url_hash');
+
+        return $hasColumns;
     }
 
     /**

@@ -83,6 +83,12 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
 
   if (element.tagName === 'VIDEO') {
     const video = element as HTMLVideoElement;
+    const width = video.videoWidth || video.clientWidth || null;
+    const height = video.videoHeight || video.clientHeight || null;
+    if (width && height && (width < minSize || height < minSize)) {
+      return null;
+    }
+
     const url = getVideoUrl(video);
     if (!url) {
       const rawSrc = (video.currentSrc || video.src || '').trim().toLowerCase();
@@ -93,8 +99,8 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
           url: pageUrl,
           referrer_url: pageUrl,
           preview_url: video.poster || '',
-          width: video.videoWidth || video.clientWidth || null,
-          height: video.videoHeight || video.clientHeight || null,
+          width,
+          height,
           alt: '',
           download_via: 'yt-dlp',
         };
@@ -107,8 +113,8 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
       url,
       referrer_url: window.location.href,
       preview_url: video.poster || '',
-      width: video.videoWidth || video.clientWidth || null,
-      height: video.videoHeight || video.clientHeight || null,
+      width,
+      height,
       alt: '',
     };
   }
