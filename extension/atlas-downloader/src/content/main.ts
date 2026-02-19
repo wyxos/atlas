@@ -162,26 +162,24 @@ declare const chrome: ChromeApi;
   function fetchAtlasStatus(
     sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void,
     url: string,
-    referrerUrl: string | null,
+    _referrerUrl: string | null,
     callback: (
       status: { exists: boolean; downloaded: boolean; blacklisted: boolean; reactionType: string | null } | null
     ) => void
   ) {
-    const lookupUrls = [...new Set([url, referrerUrl || ''].map((value) => stripHash((value || '').trim())).filter(Boolean))];
-    if (lookupUrls.length === 0) {
+    const lookupUrl = stripHash((url || '').trim());
+    if (!lookupUrl) {
       callback(null);
       return;
     }
 
-    for (const key of lookupUrls) {
-      const cached = getCachedAtlasStatus(key);
-      if (cached) {
-        callback(cached);
-        return;
-      }
+    const cached = getCachedAtlasStatus(lookupUrl);
+    if (cached) {
+      callback(cached);
+      return;
     }
 
-    sendMessageSafe({ type: 'atlas-check-batch', urls: lookupUrls }, (response) => {
+    sendMessageSafe({ type: 'atlas-check-batch', urls: [lookupUrl] }, (response) => {
       if (!response || !response.ok) {
         callback(null);
         return;
@@ -193,7 +191,7 @@ declare const chrome: ChromeApi;
           .filter((r) => typeof r?.url === 'string' && r.url.trim() !== '')
           .map((r) => [stripHash(String(r.url)), r])
       );
-      const match = byUrl.get(stripHash(url)) ?? byUrl.get(stripHash(referrerUrl || '')) ?? results[0] ?? null;
+      const match = byUrl.get(lookupUrl) ?? null;
       if (!match) {
         callback(null);
         return;
@@ -207,9 +205,7 @@ declare const chrome: ChromeApi;
         ts: Date.now(),
       };
 
-      for (const key of lookupUrls) {
-        atlasStatusCache.set(key, status);
-      }
+      atlasStatusCache.set(lookupUrl, status);
       callback(status);
     });
   }
@@ -692,7 +688,7 @@ declare const chrome: ChromeApi;
     function setReady(text) {
       meta.textContent = text;
       const selectedCount = items.filter((item) => item.selected).length;
-      const busy = reactingItemUrl !== null;
+      const busy = items.some((item) => Boolean(item.reactionPending)) || reactingItemUrl === '__external-reaction__';
       queue.disabled = selectedCount === 0 || busy;
       refresh.disabled = busy;
       checkAtlas.disabled = items.length === 0 || busy;
@@ -800,7 +796,7 @@ declare const chrome: ChromeApi;
       const reactions = document.createElement('div');
       reactions.className = 'atlas-downloader-reactions';
       const currentReaction = item.atlas?.reaction?.type || null;
-      const isBusy = reactingItemUrl !== null || Boolean(item.reactionQueued);
+      const isBusy = Boolean(item.reactionPending) || Boolean(item.reactionQueued);
       for (const reaction of REACTIONS) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -1081,7 +1077,7 @@ declare const chrome: ChromeApi;
     }
 
     function itemLookupUrl(item) {
-      const preferred = (item?.referrer_url || item?.url || '').trim();
+      const preferred = (item?.url || item?.referrer_url || '').trim();
       return preferred ? stripHash(preferred) : '';
     }
 
@@ -1627,10 +1623,10 @@ declare const chrome: ChromeApi;
         node.setAttribute('data-atlas-marked', '1');
         if (status.blacklisted) {
           node.setAttribute('data-atlas-state', 'blacklisted');
-        } else if (status.downloaded) {
-          node.setAttribute('data-atlas-state', 'downloaded');
         } else if (status.reactionType) {
           node.setAttribute('data-atlas-state', 'reacted');
+        } else if (status.downloaded) {
+          node.setAttribute('data-atlas-state', 'downloaded');
         } else if (status.exists) {
           node.setAttribute('data-atlas-state', 'exists');
         }

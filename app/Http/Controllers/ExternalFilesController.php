@@ -78,7 +78,23 @@ class ExternalFilesController extends Controller
             ->values()
             ->all();
 
+        $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
         $filesByLookup = [];
+
+        $filesByUrl = collect();
+        if ($normalizedUrls !== []) {
+            $filesByUrl = File::query()
+                ->whereIn('url', $normalizedUrls)
+                ->get(['id', 'url', 'referrer_url', 'downloaded', 'blacklisted_at']);
+
+            foreach ($filesByUrl as $file) {
+                $fileUrl = $this->stripFragment(is_string($file->url) ? trim($file->url) : '');
+                if ($fileUrl !== '' && isset($normalizedLookupSet[$fileUrl])) {
+                    $filesByLookup[$fileUrl][] = $file;
+                }
+            }
+        }
+
         $referrerCandidates = array_values(array_filter(
             $normalizedUrls,
             fn (string $url): bool => $this->looksLikePageUrl($url)
@@ -90,14 +106,13 @@ class ExternalFilesController extends Controller
                 ->whereIn('referrer_url', $referrerCandidates)
                 ->get(['id', 'url', 'referrer_url', 'downloaded', 'blacklisted_at']);
             foreach ($filesByReferrer as $file) {
-                $referrerUrl = is_string($file->referrer_url) ? trim($file->referrer_url) : '';
-                if ($referrerUrl !== '') {
+                $referrerUrl = $this->stripFragment(is_string($file->referrer_url) ? trim($file->referrer_url) : '');
+                if ($referrerUrl !== '' && isset($normalizedLookupSet[$referrerUrl])) {
                     $filesByLookup[$referrerUrl][] = $file;
                 }
             }
         }
-        $files = $filesByReferrer->unique('id')->values();
-        $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
+        $files = $filesByUrl->concat($filesByReferrer)->unique('id')->values();
 
         foreach ($filesByLookup as $lookup => $candidates) {
             if (! isset($normalizedLookupSet[$lookup])) {

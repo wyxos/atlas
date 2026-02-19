@@ -6,6 +6,42 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+it('checks whether external files exist by canonical file url', function () {
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $file = File::factory()->create([
+        'url' => 'https://images.example.com/media/direct.jpg',
+        'referrer_url' => 'https://example.com/art/direct',
+        'downloaded' => true,
+    ]);
+
+    \App\Models\Reaction::query()->create([
+        'file_id' => $file->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/check', [
+            'urls' => [
+                'https://images.example.com/media/direct.jpg',
+                'https://images.example.com/media/missing.jpg',
+            ],
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('results.0.url', 'https://images.example.com/media/direct.jpg');
+    $response->assertJsonPath('results.0.exists', true);
+    $response->assertJsonPath('results.0.downloaded', true);
+    $response->assertJsonPath('results.0.reaction.type', 'love');
+    $response->assertJsonPath('results.1.url', 'https://images.example.com/media/missing.jpg');
+    $response->assertJsonPath('results.1.exists', false);
+    $response->assertJsonPath('results.1.downloaded', false);
+});
+
 it('checks whether external files exist by referrer page url', function () {
     config()->set('downloads.extension_token', 'test-token');
     $user = User::factory()->create();
@@ -121,4 +157,47 @@ it('aggregates status when multiple files share the same referrer url', function
     $response->assertJsonPath('results.0.exists', true);
     $response->assertJsonPath('results.0.downloaded', true);
     $response->assertJsonPath('results.0.reaction.type', 'funny');
+});
+
+it('does not leak reaction state across files when checking by media urls', function () {
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $first = File::factory()->create([
+        'url' => 'https://images.example.com/media/first.jpg',
+        'referrer_url' => 'https://example.com/art/shared-page',
+        'downloaded' => true,
+    ]);
+    $second = File::factory()->create([
+        'url' => 'https://images.example.com/media/second.jpg',
+        'referrer_url' => 'https://example.com/art/shared-page',
+        'downloaded' => false,
+    ]);
+
+    \App\Models\Reaction::query()->create([
+        'file_id' => $first->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/check', [
+            'urls' => [
+                'https://images.example.com/media/first.jpg',
+                'https://images.example.com/media/second.jpg',
+            ],
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('results.0.url', 'https://images.example.com/media/first.jpg');
+    $response->assertJsonPath('results.0.exists', true);
+    $response->assertJsonPath('results.0.downloaded', true);
+    $response->assertJsonPath('results.0.reaction.type', 'love');
+
+    $response->assertJsonPath('results.1.url', 'https://images.example.com/media/second.jpg');
+    $response->assertJsonPath('results.1.exists', true);
+    $response->assertJsonPath('results.1.downloaded', false);
+    $response->assertJsonPath('results.1.reaction', null);
 });
