@@ -70,16 +70,15 @@ class ExternalFilesController extends Controller
     public function check(CheckExternalFilesRequest $request): JsonResponse
     {
         $urls = $request->validated()['urls'];
-        $urlHashes = collect($urls)
-            ->map(fn (string $url) => hash('sha256', $this->stripFragment(trim($url))))
-            ->filter(fn (string $hash) => $hash !== '')
+        $normalizedUrls = collect($urls)
+            ->map(fn (string $url) => $this->stripFragment(trim($url)))
+            ->filter(fn (string $url) => $url !== '')
             ->unique()
             ->values()
             ->all();
 
         $files = File::query()
-            ->whereIn('url_hash', $urlHashes)
-            ->orWhereIn('url', $urls)
+            ->whereIn('url', $normalizedUrls)
             ->get(['id', 'url', 'downloaded', 'blacklisted_at']);
 
         $byUrl = $files->keyBy('url');
@@ -198,10 +197,8 @@ class ExternalFilesController extends Controller
             (string) ($validated['download_via'] ?? ''),
             (string) ($validated['tag_name'] ?? '')
         );
-        $urlHash = hash('sha256', $canonicalUrl);
 
         $file = File::query()
-            ->where('url_hash', $urlHash)
             ->where('url', $canonicalUrl)
             ->first();
         if (! $file) {

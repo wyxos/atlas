@@ -18,7 +18,6 @@ class ExternalFileIngestService
         // Canonical file identity is url. referrer_url is provenance and may be non-unique.
         $url = $this->stripFragment($url);
         $referrerUrl = $pageUrl !== '' ? $pageUrl : $url;
-        $urlHash = $url !== '' ? hash('sha256', $url) : null;
         $filename = $this->resolveFilename($payload['filename'] ?? null, $url);
         $ext = $payload['ext'] ?? FileTypeDetector::extensionFromUrl($url);
         $mimeType = $payload['mime_type'] ?? FileTypeDetector::mimeFromUrl($url);
@@ -33,20 +32,11 @@ class ExternalFileIngestService
             'download_via' => $downloadVia,
         ], fn ($value) => $value !== null && $value !== '');
 
-        $file = null;
-        if ($urlHash !== null) {
-            $file = File::query()
-                ->where('url_hash', $urlHash)
-                ->where('url', $url)
-                ->first();
-        }
-        if (! $file) {
-            $file = File::query()
-                ->where('url', $url)
-                ->orderByDesc('downloaded')
-                ->orderByDesc('id')
-                ->first();
-        }
+        $file = File::query()
+            ->where('url', $url)
+            ->orderByDesc('downloaded')
+            ->orderByDesc('id')
+            ->first();
 
         $isNew = $file === null;
         if (! $file) {
@@ -101,9 +91,8 @@ class ExternalFileIngestService
         }
 
         $queued = false;
-        if ($file && $file->url_hash) {
+        if ($file && $file->url) {
             File::query()
-                ->where('url_hash', $file->url_hash)
                 ->where('url', $file->url)
                 ->whereKeyNot($file->id)
                 ->delete();

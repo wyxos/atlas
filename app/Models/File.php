@@ -19,7 +19,6 @@ class File extends Model
         static::saving(function (self $file): void {
             $url = trim((string) ($file->url ?? ''));
             $file->url = $url !== '' ? $url : null;
-            $file->url_hash = $url !== '' ? hash('sha256', $url) : null;
         });
     }
 
@@ -32,7 +31,6 @@ class File extends Model
         'source',
         'source_id',
         'url',
-        'url_hash',
         'referrer_url',
         'path',
         'filename',

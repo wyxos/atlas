@@ -29,7 +29,6 @@ class BrowsePersister
                 if ($canonicalUrl !== '') {
                     $file['url'] = $canonicalUrl;
                 }
-                $file['url_hash'] = $canonicalUrl !== '' ? hash('sha256', $canonicalUrl) : null;
                 if (array_key_exists('listing_metadata', $file) && is_array($file['listing_metadata'])) {
                     $file['listing_metadata'] = json_encode($file['listing_metadata']);
                 }
@@ -38,35 +37,34 @@ class BrowsePersister
                     'file' => $file,
                     'metadata' => $item['metadata'],
                     'url' => $canonicalUrl,
-                    'url_hash' => $file['url_hash'],
                 ];
             })
-            ->filter(fn (array $item): bool => is_string($item['url_hash'] ?? null) && ($item['url_hash'] ?? '') !== '')
+            ->filter(fn (array $item): bool => is_string($item['url'] ?? null) && ($item['url'] ?? '') !== '')
             ->values()
             ->all();
         if (empty($preparedItems)) {
             return [];
         }
 
-        $urlHashes = collect($preparedItems)
-            ->pluck('url_hash')
+        $urls = collect($preparedItems)
+            ->pluck('url')
             ->filter(fn ($value) => is_string($value) && $value !== '')
             ->unique()
             ->values()
             ->all();
-        $existingUrlHashes = ! empty($urlHashes)
-            ? File::whereIn('url_hash', $urlHashes)->pluck('url_hash')->all()
+        $existingUrls = ! empty($urls)
+            ? File::whereIn('url', $urls)->pluck('url')->all()
             : [];
         $newFileCount = 0;
-        if (! empty($urlHashes)) {
-            $newFileCount = count(array_diff($urlHashes, $existingUrlHashes));
+        if (! empty($urls)) {
+            $newFileCount = count(array_diff($urls, $existingUrls));
         }
 
         $fileRows = collect($preparedItems)->pluck('file')->all();
 
         File::upsert(
             $fileRows,
-            ['url_hash'],
+            ['url'],
             ['url', 'referrer_url', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at']
         );
 
@@ -76,17 +74,17 @@ class BrowsePersister
             $metrics->incrementMetric(MetricsService::KEY_FILES_UNREACTED_NOT_BLACKLISTED, $newFileCount);
         }
 
-        $fileMap = File::whereIn('url_hash', $urlHashes)->get()->keyBy('url_hash');
+        $fileMap = File::whereIn('url', $urls)->get()->keyBy('url');
 
         $metaRows = collect($preparedItems)
             ->map(function ($i) use ($fileMap) {
                 $meta = $i['metadata'];
-                $urlHash = is_string($i['url_hash'] ?? null) ? $i['url_hash'] : '';
-                if ($urlHash === '') {
+                $url = is_string($i['url'] ?? null) ? $i['url'] : '';
+                if ($url === '') {
                     return null;
                 }
 
-                $file = $fileMap->get($urlHash);
+                $file = $fileMap->get($url);
                 if (! $file) {
                     return null;
                 }
@@ -111,7 +109,7 @@ class BrowsePersister
             FileMetadata::upsert($metaRows, ['file_id'], ['payload', 'updated_at']);
         }
 
-        $allFiles = File::with('metadata')->whereIn('url_hash', $urlHashes)->get();
+        $allFiles = File::with('metadata')->whereIn('url', $urls)->get();
 
         // Create containers and attach files in batch
         $this->createContainersForFiles($allFiles);
