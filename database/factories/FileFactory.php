@@ -40,7 +40,6 @@ class FileFactory extends Factory
             'source' => fake()->randomElement($sources),
             'source_id' => fake()->optional()->uuid(),
             'url' => $url,
-            'url_hash' => hash('sha256', $url),
             // Provenance page URL is now non-unique.
             'referrer_url' => $referrerUrl,
             // Avoid Faker's filePath() (tempnam) which can emit warnings that PHPUnit treats as exceptions.
