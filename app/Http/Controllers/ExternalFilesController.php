@@ -14,6 +14,7 @@ use App\Services\ExtensionUserResolver;
 use App\Services\ExternalFileIngestService;
 use App\Services\FileReactionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Collection;
 
 class ExternalFilesController extends Controller
 {
@@ -79,9 +80,21 @@ class ExternalFilesController extends Controller
 
         $files = File::query()
             ->whereIn('url', $normalizedUrls)
-            ->get(['id', 'url', 'downloaded', 'blacklisted_at']);
+            ->orWhereIn('referrer_url', $normalizedUrls)
+            ->get(['id', 'url', 'referrer_url', 'downloaded', 'blacklisted_at']);
+        $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
+        $filesByLookup = [];
+        foreach ($files as $file) {
+            $directUrl = is_string($file->url) ? trim($file->url) : '';
+            if ($directUrl !== '' && isset($normalizedLookupSet[$directUrl])) {
+                $filesByLookup[$directUrl][] = $file;
+            }
 
-        $byUrl = $files->keyBy('url');
+            $referrerUrl = is_string($file->referrer_url) ? trim($file->referrer_url) : '';
+            if ($referrerUrl !== '' && isset($normalizedLookupSet[$referrerUrl])) {
+                $filesByLookup[$referrerUrl][] = $file;
+            }
+        }
 
         $user = null;
         $reactionsByFileId = collect();
@@ -100,19 +113,31 @@ class ExternalFilesController extends Controller
                 ->keyBy('file_id');
         }
 
-        $results = array_map(function (string $url) use ($byUrl, $reactionsByFileId): array {
+        $results = array_map(function (string $url) use ($filesByLookup, $reactionsByFileId): array {
             $lookupUrl = $this->stripFragment(trim($url));
-            /** @var File|null $file */
-            $file = $byUrl->get($lookupUrl);
-
-            /** @var Reaction|null $reaction */
+            /** @var Collection<int, File> $candidates */
+            $candidates = collect($filesByLookup[$lookupUrl] ?? []);
+            $file = $this->pickBestCheckMatch($candidates, $lookupUrl, $reactionsByFileId);
             $reaction = $file ? $reactionsByFileId->get($file->id) : null;
+            if (! $reaction) {
+                foreach ($candidates as $candidate) {
+                    if (! $candidate instanceof File) {
+                        continue;
+                    }
+
+                    $candidateReaction = $reactionsByFileId->get($candidate->id);
+                    if ($candidateReaction) {
+                        $reaction = $candidateReaction;
+                        break;
+                    }
+                }
+            }
 
             return [
                 'url' => $url,
-                'exists' => $file !== null,
-                'downloaded' => $file ? (bool) $file->downloaded : false,
-                'blacklisted' => $file ? $file->blacklisted_at !== null : false,
+                'exists' => $candidates->isNotEmpty(),
+                'downloaded' => $candidates->contains(fn (File $candidate): bool => (bool) $candidate->downloaded),
+                'blacklisted' => $candidates->contains(fn (File $candidate): bool => $candidate->blacklisted_at !== null),
                 'file_id' => $file?->id,
                 'reaction' => $reaction ? ['type' => $reaction->type] : null,
             ];
@@ -250,5 +275,49 @@ class ExternalFilesController extends Controller
         }
 
         return $url;
+    }
+
+    /**
+     * Pick the most relevant file when a lookup URL can match many rows.
+     * Priority: direct URL match, downloaded, has current-user reaction, newest row.
+     */
+    private function pickBestCheckMatch(Collection $candidates, string $lookupUrl, Collection $reactionsByFileId): ?File
+    {
+        $best = null;
+        $bestScore = [-1, -1, -1, -1];
+
+        foreach ($candidates as $candidate) {
+            if (! $candidate instanceof File) {
+                continue;
+            }
+
+            $score = [
+                (int) ($candidate->url === $lookupUrl),
+                (int) ((bool) $candidate->downloaded),
+                (int) $reactionsByFileId->has($candidate->id),
+                (int) $candidate->id,
+            ];
+
+            if ($this->isLexicographicallyGreater($score, $bestScore)) {
+                $best = $candidate;
+                $bestScore = $score;
+            }
+        }
+
+        return $best;
+    }
+
+    private function isLexicographicallyGreater(array $left, array $right): bool
+    {
+        $count = min(count($left), count($right));
+        for ($i = 0; $i < $count; $i++) {
+            if ($left[$i] === $right[$i]) {
+                continue;
+            }
+
+            return $left[$i] > $right[$i];
+        }
+
+        return false;
     }
 }

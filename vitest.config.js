@@ -12,7 +12,10 @@ export default defineConfig({
     test: {
         globals: true,
         environment: 'jsdom',
-        include: ['resources/js/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+        include: [
+            'resources/js/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+            'extension/atlas-downloader/src/**/*.test.ts',
+        ],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
@@ -30,5 +33,4 @@ export default defineConfig({
         ],
     },
 });
-
 

@@ -729,7 +729,7 @@ declare const chrome: ChromeApi;
       const reactions = document.createElement('div');
       reactions.className = 'atlas-downloader-reactions';
       const currentReaction = item.atlas?.reaction?.type || null;
-      const isBusy = reactingItemUrl !== null;
+      const isBusy = reactingItemUrl !== null || Boolean(item.reactionQueued);
       for (const reaction of REACTIONS) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -1410,7 +1410,9 @@ declare const chrome: ChromeApi;
         const status =
           lookupKeys
             .map((key) => statusByUrl.get(key) || statusByUrl.get(stripHash(key)))
-            .find((value) => Boolean(value)) ?? null;
+            .find((value) =>
+              Boolean(value && (value.exists || value.downloaded || value.blacklisted || value.reactionType))
+            ) ?? null;
         if (!status) {
           continue;
         }
@@ -1418,6 +1420,8 @@ declare const chrome: ChromeApi;
         node.setAttribute('data-atlas-marked', '1');
         if (status.blacklisted) {
           node.setAttribute('data-atlas-state', 'blacklisted');
+        } else if (status.downloaded) {
+          node.setAttribute('data-atlas-state', 'downloaded');
         } else if (status.reactionType) {
           node.setAttribute('data-atlas-state', 'reacted');
         } else if (status.exists) {
@@ -2176,17 +2180,24 @@ declare const chrome: ChromeApi;
     let activeKey: string | null = null;
     let hideTimer: number | null = null;
     let toolbarBusy = false;
+    let toolbarQueuedType: string | null = null;
+    let toolbarPendingType: string | null = null;
     let pointerX = -1;
     let pointerY = -1;
     let hoverDetectTimer: number | null = null;
 
     const buttonsByType = new Map<string, HTMLButtonElement>();
+    const syncToolbarButtonState = () => {
+      const locked = toolbarBusy || toolbarQueuedType !== null;
+      for (const [type, button] of buttonsByType.entries()) {
+        button.disabled = locked;
+        button.classList.toggle('pending', toolbarBusy && toolbarPendingType === type);
+      }
+    };
     const setToolbarBusy = (busy: boolean, pendingType: string | null = null) => {
       toolbarBusy = busy;
-      for (const [type, button] of buttonsByType.entries()) {
-        button.disabled = busy;
-        button.classList.toggle('pending', busy && pendingType === type);
-      }
+      toolbarPendingType = busy ? pendingType : null;
+      syncToolbarButtonState();
     };
     const setToolbarActive = (reactionType: string | null) => {
       for (const reaction of [...REACTIONS, BLACKLIST_ACTION]) {
@@ -2199,16 +2210,17 @@ declare const chrome: ChromeApi;
       }
     };
     const setToolbarQueued = (reactionType: string | null, downloaded: boolean | null) => {
-      const queuedType =
+      toolbarQueuedType =
         reactionType && downloaded === false && reactionType !== 'dislike' ? reactionType : null;
       for (const reaction of [...REACTIONS, BLACKLIST_ACTION]) {
         const btn = buttonsByType.get(reaction.type);
         if (!btn) continue;
         const isQueued = reaction.type === BLACKLIST_ACTION.type
-          ? queuedType === 'dislike'
-          : queuedType === reaction.type;
+          ? toolbarQueuedType === 'dislike'
+          : toolbarQueuedType === reaction.type;
         btn.classList.toggle('queued', isQueued);
       }
+      syncToolbarButtonState();
     };
 
     const cancelHide = () => {
@@ -2319,6 +2331,7 @@ declare const chrome: ChromeApi;
               }
 
               setToolbarActive(newReactionType);
+              setToolbarQueued(newReactionType, Boolean(file?.downloaded));
 
               if (payload.download_via === 'yt-dlp') {
                 options.showToast(`Reacted (${reaction.label}). Resolving video in Atlas…`);
@@ -2376,6 +2389,56 @@ declare const chrome: ChromeApi;
       toolbar.style.left = `${left}px`;
     };
 
+    const findMediaAtPoint = (x: number, y: number): Element | null => {
+      const pickFromCandidate = (candidate: Element): Element | null => {
+        if (candidate.matches('img, video')) {
+          return candidate;
+        }
+
+        const closest = candidate.closest?.('img, video');
+        if (closest instanceof Element) {
+          return closest;
+        }
+
+        const descendants = candidate.querySelectorAll?.('img, video');
+        if (!descendants || descendants.length === 0) {
+          return null;
+        }
+
+        for (const descendant of descendants) {
+          const rect = descendant.getBoundingClientRect();
+          if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+            return descendant;
+          }
+        }
+
+        return null;
+      };
+
+      const stack = document.elementsFromPoint?.(x, y) ?? [];
+      for (const node of stack) {
+        if (!(node instanceof Element)) {
+          continue;
+        }
+
+        if (node.closest?.(`#${ROOT_ID}`)) {
+          continue;
+        }
+
+        const media = pickFromCandidate(node);
+        if (media) {
+          return media;
+        }
+      }
+
+      const fallback = document.elementFromPoint?.(x, y);
+      if (fallback instanceof Element && !fallback.closest?.(`#${ROOT_ID}`)) {
+        return pickFromCandidate(fallback);
+      }
+
+      return null;
+    };
+
     const showFor = (media: Element) => {
       if (options.isSheetOpen()) {
         hide();
@@ -2422,15 +2485,7 @@ declare const chrome: ChromeApi;
       if (pointerX < 0 || pointerY < 0 || options.isSheetOpen()) {
         return;
       }
-      const underPointer = document.elementsFromPoint?.(pointerX, pointerY) ?? [];
-      const fromPoint = underPointer.find((node) => node instanceof Element && node.closest?.('img, video'));
-      const media = fromPoint instanceof Element ? fromPoint.closest?.('img, video') ?? null : null;
-      const resolved =
-        media ??
-        (() => {
-          const fallback = document.elementFromPoint?.(pointerX, pointerY);
-          return fallback instanceof Element ? fallback.closest?.('img, video') ?? null : null;
-        })();
+      const resolved = findMediaAtPoint(pointerX, pointerY);
       if (!resolved) {
         return;
       }
@@ -2458,12 +2513,7 @@ declare const chrome: ChromeApi;
         if (!(event.target instanceof Element)) return;
         if (isOwnUiEvent(event)) return;
 
-        const fromTarget = event.target.closest?.('img, video') ?? null;
-        const candidates = document.elementsFromPoint?.(event.clientX, event.clientY) ?? [];
-        const fromPoint =
-          candidates.find((node) => node instanceof Element && node.closest?.('img, video')) ?? null;
-        const media =
-          fromTarget || (fromPoint instanceof Element ? fromPoint.closest?.('img, video') ?? null : null);
+        const media = findMediaAtPoint(event.clientX, event.clientY);
         if (!media) return;
 
         cancelHide();
