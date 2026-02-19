@@ -215,6 +215,7 @@ class ExternalFilesController extends Controller
     public function deleteDownload(
         DeleteExternalFileDownloadRequest $request,
         DownloadedFileResetService $downloadedFileReset,
+        ExtensionUserResolver $extensionUserResolver,
     ): JsonResponse {
         $validated = $request->validated();
         $canonicalUrl = $this->resolveCanonicalUrl(
@@ -242,6 +243,20 @@ class ExternalFilesController extends Controller
         }
 
         $downloadedFileReset->reset($file);
+
+        try {
+            $user = $extensionUserResolver->resolve();
+        } catch (\Throwable) {
+            $user = null;
+        }
+
+        if ($user) {
+            Reaction::query()
+                ->where('file_id', $file->id)
+                ->where('user_id', $user->id)
+                ->delete();
+        }
+
         $file = $file->refresh();
         $file->searchable();
 
