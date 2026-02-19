@@ -167,6 +167,7 @@ export function buildDirectPageCandidate(): MediaItem | null {
 
 export function collectLookupKeysForNode(node: Element): string[] {
   const keys = new Set<string>();
+  const pageUrl = safeUrl(window.location.href);
 
   const mediaUrl = (() => {
     if (node instanceof HTMLImageElement) {
@@ -176,7 +177,7 @@ export function collectLookupKeysForNode(node: Element): string[] {
       return getVideoUrl(node) || '';
     }
     if (node instanceof HTMLAnchorElement) {
-      return safeUrl(node.href) || '';
+      return resolveAnchorLookupUrl(node.getAttribute('href') || '') || '';
     }
     return '';
   })();
@@ -185,17 +186,48 @@ export function collectLookupKeysForNode(node: Element): string[] {
   }
 
   const anchorHref = node.closest('a[href]')?.getAttribute('href') ?? '';
-  const anchorUrl = safeUrl(anchorHref);
+  const anchorUrl = resolveAnchorLookupUrl(anchorHref);
   if (anchorUrl) {
     keys.add(anchorUrl);
   }
 
-  const pageUrl = safeUrl(window.location.href);
-  if (pageUrl) {
+  if (pageUrl && isBlobOrDataMediaNode(node)) {
     keys.add(pageUrl);
   }
 
   return [...keys];
+}
+
+function resolveAnchorLookupUrl(rawHref: string): string {
+  const href = (rawHref || '').trim();
+  if (!href) {
+    return '';
+  }
+
+  // Hash-only links ("#...") are page controls, not media/page provenance.
+  if (href.startsWith('#')) {
+    return '';
+  }
+
+  if (href.toLowerCase().startsWith('javascript:')) {
+    return '';
+  }
+
+  return safeUrl(href);
+}
+
+function isBlobOrDataMediaNode(node: Element): boolean {
+  if (node instanceof HTMLImageElement) {
+    const raw = (node.currentSrc || node.src || node.getAttribute('src') || '').trim().toLowerCase();
+    return raw.startsWith('blob:') || raw.startsWith('data:');
+  }
+
+  if (node instanceof HTMLVideoElement) {
+    const raw = (node.currentSrc || node.src || '').trim().toLowerCase();
+    return raw.startsWith('blob:') || raw.startsWith('data:');
+  }
+
+  return false;
 }
 
 function resolveMetaVideoUrl(): string {
