@@ -6,14 +6,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('checks whether external files exist by url', function () {
+it('checks whether external files exist by referrer page url', function () {
     config()->set('downloads.extension_token', 'test-token');
     $user = User::factory()->create();
     config()->set('downloads.extension_user_id', $user->id);
 
     $file = File::factory()->create([
         'url' => 'https://example.com/media/one.jpg',
-        'referrer_url' => 'https://example.com/media/one.jpg',
+        'referrer_url' => 'https://example.com/art/one',
         'downloaded' => true,
     ]);
 
@@ -27,8 +27,8 @@ it('checks whether external files exist by url', function () {
         ->withHeader('X-Atlas-Extension-Token', 'test-token')
         ->postJson('/api/extension/files/check', [
             'urls' => [
-                'https://example.com/media/one.jpg',
-                'https://example.com/media/two.jpg',
+                'https://example.com/art/one',
+                'https://example.com/art/two',
             ],
         ]);
 
@@ -36,13 +36,13 @@ it('checks whether external files exist by url', function () {
     $response->assertJson([
         'results' => [
             [
-                'url' => 'https://example.com/media/one.jpg',
+                'url' => 'https://example.com/art/one',
                 'exists' => true,
                 'downloaded' => true,
                 'reaction' => ['type' => 'like'],
             ],
             [
-                'url' => 'https://example.com/media/two.jpg',
+                'url' => 'https://example.com/art/two',
                 'exists' => false,
                 'downloaded' => false,
                 'file_id' => null,
