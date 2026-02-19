@@ -79,24 +79,8 @@ class ExternalFilesController extends Controller
             ->all();
 
         $filesByLookup = [];
-
-        $filesByUrl = File::query()
-            ->whereIn('url', $normalizedUrls)
-            ->get(['id', 'url', 'referrer_url', 'downloaded', 'blacklisted_at']);
-        foreach ($filesByUrl as $file) {
-            $directUrl = is_string($file->url) ? trim($file->url) : '';
-            if ($directUrl !== '') {
-                $filesByLookup[$directUrl][] = $file;
-            }
-        }
-
-        $missingUrls = array_values(array_filter(
-            $normalizedUrls,
-            fn (string $url): bool => ! isset($filesByLookup[$url])
-        ));
-
         $referrerCandidates = array_values(array_filter(
-            $missingUrls,
+            $normalizedUrls,
             fn (string $url): bool => $this->looksLikePageUrl($url)
         ));
 
@@ -112,8 +96,7 @@ class ExternalFilesController extends Controller
                 }
             }
         }
-
-        $files = $filesByUrl->merge($filesByReferrer)->unique('id')->values();
+        $files = $filesByReferrer->unique('id')->values();
         $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
 
         foreach ($filesByLookup as $lookup => $candidates) {
