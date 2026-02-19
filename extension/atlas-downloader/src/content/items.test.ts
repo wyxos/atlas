@@ -59,6 +59,15 @@ describe('items', () => {
     expect(item?.url).toBe('https://cdn.example.com/foo.mp4');
   });
 
+  it('filters small videos', () => {
+    setLocation('https://example.com/page');
+    const video = document.createElement('video');
+    video.src = 'https://cdn.example.com/small.mp4';
+    setVideoSize(video, 320, 320);
+
+    expect(buildItemFromElement(video, 400)).toBeNull();
+  });
+
   it('collects lookup keys from media and meaningful anchor href', () => {
     setLocation('/artist/art/Example-1#hash');
 
