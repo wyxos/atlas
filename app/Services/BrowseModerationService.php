@@ -45,22 +45,35 @@ class BrowseModerationService
 
         $filterBlacklisted = (bool) ($context['filterBlacklisted'] ?? true);
 
+        $blacklistedIdSet = [];
+        if ($filterBlacklisted) {
+            $fileIds = $files
+                ->pluck('id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $alreadyBlacklistedIds = empty($fileIds)
+                ? []
+                : File::query()
+                    ->whereIn('id', $fileIds)
+                    ->whereNotNull('blacklisted_at')
+                    ->pluck('id')
+                    ->all();
+
+            $blacklistedIdSet = array_fill_keys(
+                array_map('intval', array_merge($blacklistedFileIds, $alreadyBlacklistedIds)),
+                true
+            );
+        }
+
         // Filter out only blacklisted files from response (auto-disliked files should be shown)
         // This includes files that were blacklisted in this request (via immediateActions)
-        // and files that were already blacklisted (defensive check)
+        // and files that were already blacklisted (queried in one batch).
         $filteredFiles = $filterBlacklisted
-            ? $files->reject(function ($file) use ($blacklistedFileIds) {
-                // Filter if file was blacklisted in this request
-                if (in_array($file->id, $blacklistedFileIds, true)) {
-                    return true;
-                }
-
-                // Defensive check: filter if file is already blacklisted
-                // (refresh from DB to get latest state, as model instances may be stale)
-                // Note: We no longer filter auto_disliked files - they should be shown
-                $fresh = $file->fresh();
-
-                return $fresh && $fresh->blacklisted_at !== null;
+            ? $files->reject(function ($file) use ($blacklistedIdSet) {
+                return isset($blacklistedIdSet[(int) $file->id]);
             })->values()->all()
             : $files->values()->all();
 
