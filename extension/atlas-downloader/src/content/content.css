@@ -261,13 +261,73 @@
   user-select: none;
 }
 
-.atlas-shadow-root .atlas-downloader-debug pre {
-  margin: 8px 0 0;
+.atlas-shadow-root .atlas-downloader-json-tree {
+  margin-top: 8px;
   font-size: 10px;
-  line-height: 1.35;
+  line-height: 1.4;
   color: #e2e8f0;
-  white-space: pre-wrap;
+}
+
+.atlas-shadow-root .atlas-downloader-json-node {
+  margin: 2px 0;
+}
+
+.atlas-shadow-root .atlas-downloader-json-node > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.atlas-shadow-root .atlas-downloader-json-node > summary::-webkit-details-marker {
+  display: none;
+}
+
+.atlas-shadow-root .atlas-downloader-json-node > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 10px;
+  margin-right: 4px;
+  color: #94a3b8;
+}
+
+.atlas-shadow-root .atlas-downloader-json-node[open] > summary::before {
+  content: '▾';
+}
+
+.atlas-shadow-root .atlas-downloader-json-line {
+  margin: 2px 0;
   word-break: break-word;
+}
+
+.atlas-shadow-root .atlas-downloader-json-key {
+  color: #cbd5e1;
+}
+
+.atlas-shadow-root .atlas-downloader-json-preview {
+  color: #7dd3fc;
+}
+
+.atlas-shadow-root .atlas-downloader-json-value {
+  color: #86efac;
+}
+
+.atlas-shadow-root .atlas-downloader-debug-toggle {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.45);
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.atlas-shadow-root .atlas-downloader-debug-toggle:hover {
+  background: rgba(30, 41, 59, 0.75);
+}
+
+.atlas-shadow-root .atlas-downloader-debug-toggle.active {
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #bae6fd;
 }
 
 .atlas-shadow-root .atlas-downloader-reaction-btn {

@@ -421,21 +421,6 @@ declare const chrome: ChromeApi;
 
     const refresh = makeButton('Rescan', () => refreshList());
     const checkAtlas = makeButton('Check Atlas', () => checkAtlasStatus(false));
-    let debugEnabled = false;
-    let activeDebug: { url: string; reactionType: string } | null = null;
-    const debugButton = makeButton('Debug: off', () => {
-      debugEnabled = !debugEnabled;
-      debugButton.textContent = debugEnabled ? 'Debug: on' : 'Debug: off';
-
-      if (!debugEnabled) {
-        activeDebug = null;
-      } else if (!activeDebug && items.length > 0) {
-        activeDebug = { url: items[0].url, reactionType: 'like' };
-      }
-
-      renderList();
-      setReady(summaryText());
-    });
     const selectAll = makeButton('Select all', () => setAllSelected(true));
     const selectNone = makeButton('Select none', () => setAllSelected(false));
 
@@ -448,7 +433,6 @@ declare const chrome: ChromeApi;
 
     toolbar.appendChild(refresh);
     toolbar.appendChild(checkAtlas);
-    toolbar.appendChild(debugButton);
     toolbar.appendChild(selectAll);
     toolbar.appendChild(selectNone);
     toolbar.appendChild(spacer);
@@ -476,6 +460,7 @@ declare const chrome: ChromeApi;
     let items = [];
     let scanNonce = 0;
     let reactingItemUrl: string | null = null;
+    let debugTargetUrl: string | null = null;
     let markerSyncTimer: number | null = null;
     // Enable hotkeys immediately after UI mounts; event delegation makes it work for dynamic content too.
     const hotkeysEnabled = true;
@@ -484,7 +469,7 @@ declare const chrome: ChromeApi;
     toggle.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openModal();
+      toggleModal();
     });
 
     overlay.addEventListener('click', () => closeModal());
@@ -494,9 +479,7 @@ declare const chrome: ChromeApi;
       const key = event.key.toLowerCase();
       if (event.altKey && event.shiftKey && key === 'a') {
         event.preventDefault();
-        if (!root.classList.contains(OPEN_CLASS)) {
-          openModal();
-        }
+        toggleModal();
         return;
       }
 
@@ -529,11 +512,20 @@ declare const chrome: ChromeApi;
       refreshList();
     }
 
+    function toggleModal() {
+      if (root.classList.contains(OPEN_CLASS)) {
+        closeModal();
+        return;
+      }
+
+      openModal();
+    }
+
     function closeModal() {
       root.classList.remove(OPEN_CLASS);
     }
 
-    openSheet = openModal;
+    openSheet = toggleModal;
 
     installHotkeys({
       showToast,
@@ -606,7 +598,6 @@ declare const chrome: ChromeApi;
       queue.disabled = true;
       refresh.disabled = true;
       checkAtlas.disabled = true;
-      debugButton.disabled = true;
       selectAll.disabled = true;
       selectNone.disabled = true;
     }
@@ -618,7 +609,6 @@ declare const chrome: ChromeApi;
       queue.disabled = selectedCount === 0 || busy;
       refresh.disabled = busy;
       checkAtlas.disabled = items.length === 0 || busy;
-      debugButton.disabled = items.length === 0;
       selectAll.disabled = items.length === 0 || busy;
       selectNone.disabled = items.length === 0 || busy;
     }
@@ -627,9 +617,7 @@ declare const chrome: ChromeApi;
       scanNonce += 1;
       const currentScan = scanNonce;
       items = [];
-      if (debugEnabled) {
-        activeDebug = null;
-      }
+      debugTargetUrl = null;
       list.replaceChildren();
       setLoading('Scanning this page…');
 
@@ -650,10 +638,6 @@ declare const chrome: ChromeApi;
           statusClass: '',
           atlas: null,
         }));
-
-        if (debugEnabled && !activeDebug && items.length > 0) {
-          activeDebug = { url: items[0].url, reactionType: 'like' };
-        }
 
         renderList();
         setReady(summaryText());
@@ -745,10 +729,6 @@ declare const chrome: ChromeApi;
         button.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (debugEnabled) {
-            activeDebug = { url: item.url, reactionType: reaction.type };
-            renderList();
-          }
           reactToItem(item, reaction.type);
         });
         reactions.appendChild(button);
@@ -792,13 +772,26 @@ declare const chrome: ChromeApi;
         reactions.appendChild(deleteButton);
       }
 
+      const debugButton = document.createElement('button');
+      debugButton.type = 'button';
+      debugButton.className = `atlas-downloader-debug-toggle${debugTargetUrl === item.url ? ' active' : ''}`;
+      debugButton.textContent = debugTargetUrl === item.url ? 'Hide debug' : 'Debug';
+      debugButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        debugTargetUrl = debugTargetUrl === item.url ? null : item.url;
+        renderList();
+        setReady(summaryText());
+      });
+      reactions.appendChild(debugButton);
+
       info.appendChild(kind);
       info.appendChild(url);
       info.appendChild(sub);
       info.appendChild(reactions);
 
-      if (debugEnabled && activeDebug?.url === item.url) {
-        info.appendChild(renderDebugDetails(item, activeDebug.reactionType));
+      if (debugTargetUrl === item.url) {
+        info.appendChild(renderDebugDetails(item));
       }
 
       const status = document.createElement('div');
@@ -810,10 +803,6 @@ declare const chrome: ChromeApi;
         const target = event.target;
         if (target instanceof HTMLInputElement) {
           return;
-        }
-
-        if (debugEnabled) {
-          activeDebug = { url: item.url, reactionType: activeDebug?.reactionType ?? 'like' };
         }
 
         item.selected = !item.selected;
@@ -863,7 +852,7 @@ declare const chrome: ChromeApi;
       };
     }
 
-    function renderDebugDetails(item, reactionType) {
+    function renderDebugDetails(item) {
       const container = document.createElement('details');
       container.className = 'atlas-downloader-debug';
       container.open = true;
@@ -872,18 +861,116 @@ declare const chrome: ChromeApi;
       summary.textContent = 'Debug payload';
       container.appendChild(summary);
 
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(
-        {
-          react: buildReactionPayload(item, reactionType),
-          download: buildDownloadPayload(item),
-        },
-        null,
-        2
-      );
-      container.appendChild(pre);
+      const payload = {
+        react: buildReactionPayload(item, item.atlas?.reaction?.type || 'like'),
+        download: buildDownloadPayload(item),
+      };
+      container.appendChild(renderJsonTree(payload));
 
       return container;
+    }
+
+    function renderJsonTree(value, depth = 0) {
+      const root = document.createElement('div');
+      root.className = 'atlas-downloader-json-tree';
+      const normalized = normalizeJsonValue(value);
+      if (!isJsonContainer(normalized)) {
+        const primitive = document.createElement('div');
+        primitive.className = 'atlas-downloader-json-line';
+        primitive.textContent = formatJsonPrimitive(normalized);
+        root.appendChild(primitive);
+        return root;
+      }
+
+      const entries = Array.isArray(normalized)
+        ? normalized.map((entry, index) => [String(index), entry])
+        : Object.entries(normalized);
+      for (const [key, child] of entries) {
+        root.appendChild(renderJsonEntry(key, child, depth));
+      }
+
+      return root;
+    }
+
+    function renderJsonEntry(key, value, depth) {
+      const normalized = normalizeJsonValue(value);
+      const line = document.createElement('div');
+      line.className = 'atlas-downloader-json-line';
+      line.style.paddingLeft = `${depth * 12}px`;
+
+      if (!isJsonContainer(normalized)) {
+        line.innerHTML = `<span class="atlas-downloader-json-key">${escapeHtml(
+          key
+        )}</span>: <span class="atlas-downloader-json-value">${escapeHtml(
+          formatJsonPrimitive(normalized)
+        )}</span>`;
+        return line;
+      }
+
+      const details = document.createElement('details');
+      details.className = 'atlas-downloader-json-node';
+      details.open = depth === 0;
+
+      const summary = document.createElement('summary');
+      summary.style.paddingLeft = `${depth * 12}px`;
+      const preview = Array.isArray(normalized)
+        ? `[${normalized.length}]`
+        : `{${Object.keys(normalized).length}}`;
+      summary.innerHTML = `<span class="atlas-downloader-json-key">${escapeHtml(
+        key
+      )}</span>: <span class="atlas-downloader-json-preview">${escapeHtml(preview)}</span>`;
+      details.appendChild(summary);
+
+      const children = Array.isArray(normalized)
+        ? normalized.map((entry, index) => [String(index), entry])
+        : Object.entries(normalized);
+      for (const [childKey, childValue] of children) {
+        details.appendChild(renderJsonEntry(childKey, childValue, depth + 1));
+      }
+
+      return details;
+    }
+
+    function normalizeJsonValue(value) {
+      if (value === undefined) {
+        return null;
+      }
+
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return value;
+      }
+
+      if (Array.isArray(value)) {
+        return value.map((entry) => normalizeJsonValue(entry));
+      }
+
+      if (!value || typeof value !== 'object') {
+        return null;
+      }
+
+      const normalized = {};
+      for (const [key, entry] of Object.entries(value)) {
+        normalized[key] = normalizeJsonValue(entry);
+      }
+
+      return normalized;
+    }
+
+    function isJsonContainer(value) {
+      return Array.isArray(value) || (value && typeof value === 'object');
+    }
+
+    function formatJsonPrimitive(value) {
+      return JSON.stringify(value);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
     }
 
     function formatSubline(item) {
@@ -1153,8 +1240,16 @@ declare const chrome: ChromeApi;
               downloaded: Boolean(file?.downloaded),
               blacklisted: Boolean(file?.blacklisted_at),
               file_id: file?.id ?? null,
-              reaction: item.atlas?.reaction ?? null,
+              reaction: null,
             };
+            item.reactionQueued = null;
+            atlasStatusCache.set(item.url, {
+              exists: item.atlas.exists,
+              downloaded: item.atlas.downloaded,
+              blacklisted: item.atlas.blacklisted,
+              reactionType: null,
+              ts: Date.now(),
+            });
             item.status = '';
             item.statusClass = '';
             renderList();
