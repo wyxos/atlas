@@ -78,21 +78,47 @@ class ExternalFilesController extends Controller
             ->values()
             ->all();
 
-        $files = File::query()
-            ->whereIn('url', $normalizedUrls)
-            ->orWhereIn('referrer_url', $normalizedUrls)
-            ->get(['id', 'url', 'referrer_url', 'downloaded', 'blacklisted_at']);
-        $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
         $filesByLookup = [];
-        foreach ($files as $file) {
+
+        $filesByUrl = File::query()
+            ->whereIn('url', $normalizedUrls)
+            ->get(['id', 'url', 'referrer_url', 'downloaded', 'blacklisted_at']);
+        foreach ($filesByUrl as $file) {
             $directUrl = is_string($file->url) ? trim($file->url) : '';
-            if ($directUrl !== '' && isset($normalizedLookupSet[$directUrl])) {
+            if ($directUrl !== '') {
                 $filesByLookup[$directUrl][] = $file;
             }
+        }
 
-            $referrerUrl = is_string($file->referrer_url) ? trim($file->referrer_url) : '';
-            if ($referrerUrl !== '' && isset($normalizedLookupSet[$referrerUrl])) {
-                $filesByLookup[$referrerUrl][] = $file;
+        $missingUrls = array_values(array_filter(
+            $normalizedUrls,
+            fn (string $url): bool => ! isset($filesByLookup[$url])
+        ));
+
+        $referrerCandidates = array_values(array_filter(
+            $missingUrls,
+            fn (string $url): bool => $this->looksLikePageUrl($url)
+        ));
+
+        $filesByReferrer = collect();
+        if ($referrerCandidates !== []) {
+            $filesByReferrer = File::query()
+                ->whereIn('referrer_url', $referrerCandidates)
+                ->get(['id', 'url', 'referrer_url', 'downloaded', 'blacklisted_at']);
+            foreach ($filesByReferrer as $file) {
+                $referrerUrl = is_string($file->referrer_url) ? trim($file->referrer_url) : '';
+                if ($referrerUrl !== '') {
+                    $filesByLookup[$referrerUrl][] = $file;
+                }
+            }
+        }
+
+        $files = $filesByUrl->merge($filesByReferrer)->unique('id')->values();
+        $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
+
+        foreach ($filesByLookup as $lookup => $candidates) {
+            if (! isset($normalizedLookupSet[$lookup])) {
+                unset($filesByLookup[$lookup]);
             }
         }
 
@@ -290,6 +316,25 @@ class ExternalFilesController extends Controller
         }
 
         return $url;
+    }
+
+    private function looksLikePageUrl(string $url): bool
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if ($path === '') {
+            return false;
+        }
+
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if ($extension === '') {
+            return true;
+        }
+
+        return ! in_array($extension, [
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif', 'ico',
+            'mp4', 'webm', 'mov', 'm4v', 'mkv', 'avi', 'wmv',
+            'mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac',
+        ], true);
     }
 
     /**
