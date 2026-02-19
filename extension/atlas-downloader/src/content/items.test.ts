@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { buildItemFromElement, collectLookupKeysForNode } from './items';
 
 function setLocation(url: string) {
-  window.history.pushState({}, '', url);
+  const next = new URL(url, window.location.origin);
+  window.history.pushState({}, '', `${next.pathname}${next.search}${next.hash}`);
 }
 
 function setImageSize(img: HTMLImageElement, width: number, height: number) {
@@ -18,14 +19,14 @@ function setVideoSize(video: HTMLVideoElement, width: number, height: number) {
 
 describe('items', () => {
   it('builds image items with page referrer and absolute urls', () => {
-    setLocation('https://www.deviantart.com/havenpoint/art/Adoptable-123#atlas');
+    setLocation('/havenpoint/art/Adoptable-123#atlas');
     const img = document.createElement('img');
     img.src = '/images/foo.png';
     setImageSize(img, 1200, 1200);
 
     const item = buildItemFromElement(img, 450);
     expect(item).not.toBeNull();
-    expect(item?.url).toBe('https://www.deviantart.com/images/foo.png');
+    expect(item?.url).toBe(`${window.location.origin}/images/foo.png`);
     expect(item?.referrer_url).toBe(window.location.href);
   });
 
@@ -59,7 +60,7 @@ describe('items', () => {
   });
 
   it('collects lookup keys from media, anchor, and page', () => {
-    setLocation('https://www.deviantart.com/artist/art/Example-1#hash');
+    setLocation('/artist/art/Example-1#hash');
 
     const anchor = document.createElement('a');
     anchor.href = '/artist/art/Example-1';
@@ -71,7 +72,7 @@ describe('items', () => {
 
     const keys = collectLookupKeysForNode(img);
     expect(keys).toContain('https://images.example.com/foo.jpg');
-    expect(keys).toContain('https://www.deviantart.com/artist/art/Example-1');
-    expect(keys).toContain('https://www.deviantart.com/artist/art/Example-1#hash');
+    expect(keys).toContain(`${window.location.origin}/artist/art/Example-1`);
+    expect(keys).toContain(`${window.location.origin}/artist/art/Example-1#hash`);
   });
 });

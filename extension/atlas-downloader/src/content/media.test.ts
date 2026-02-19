@@ -3,14 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { isElementInModal, resolveAbsoluteUrl, shouldBypassMinSize } from './media';
 
 function setLocation(url: string) {
-  window.history.pushState({}, '', url);
+  const next = new URL(url, window.location.origin);
+  window.history.pushState({}, '', `${next.pathname}${next.search}${next.hash}`);
 }
 
 describe('media utils', () => {
   it('resolves absolute urls relative to the page', () => {
-    setLocation('https://www.deviantart.com/havenpoint/art/Adoptable-123');
+    setLocation('/havenpoint/art/Adoptable-123');
     expect(resolveAbsoluteUrl('/art/foo', window.location.href)).toBe(
-      'https://www.deviantart.com/art/foo'
+      `${window.location.origin}/art/foo`
     );
   });
 
@@ -20,6 +21,27 @@ describe('media utils', () => {
     const img = document.createElement('img');
     modal.appendChild(img);
     document.body.appendChild(modal);
+
+    expect(isElementInModal(img)).toBe(true);
+  });
+
+  it('detects deep fixed overlay containers', () => {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+
+    let parent: Element = overlay;
+    for (let i = 0; i < 12; i += 1) {
+      const wrapper = document.createElement('div');
+      parent.appendChild(wrapper);
+      parent = wrapper;
+    }
+
+    const img = document.createElement('img');
+    parent.appendChild(img);
+    document.body.appendChild(overlay);
 
     expect(isElementInModal(img)).toBe(true);
   });
