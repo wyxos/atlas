@@ -91,12 +91,6 @@ class ExternalFileIngestService
         }
 
         $queued = false;
-        if ($file && $file->url) {
-            File::query()
-                ->where('url', $file->url)
-                ->whereKeyNot($file->id)
-                ->delete();
-        }
 
         if ($queueDownload && $file && ! $file->downloaded && $file->url) {
             DownloadFile::dispatch($file->id);

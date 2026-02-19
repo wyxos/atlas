@@ -60,6 +60,7 @@ type ChromeApi = {
 declare const chrome: ChromeApi;
 
 const SETTINGS_KEYS = ['atlasBaseUrl', 'atlasToken'];
+const REQUEST_TIMEOUT_MS = 25_000;
 
 chrome.runtime.onInstalled.addListener(() => {
   // Right click on the extension toolbar icon shows this menu (in addition to Chrome's built-ins).
@@ -183,15 +184,23 @@ async function handleCheckBatch(urls: unknown) {
   for (let i = 0; i < list.length; i += 200) {
     const chunk = list.slice(i, i + 200);
 
-    const response = await fetch(`${baseUrl}/api/extension/files/check`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
-      },
-      body: JSON.stringify({ urls: chunk }),
-    });
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(`${baseUrl}/api/extension/files/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+        },
+        body: JSON.stringify({ urls: chunk }),
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        error: networkErrorMessage(error),
+      };
+    }
 
     const data = await safeJson(response);
     if (response.ok && data === null) {
@@ -256,15 +265,23 @@ async function handleDownloadWithSettings(payload: unknown, settings: AtlasSetti
     };
   }
 
-  const response = await fetch(`${baseUrl}/api/extension/files`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${baseUrl}/api/extension/files`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: networkErrorMessage(error),
+    };
+  }
 
   const data = await safeJson(response);
   if (response.ok && data === null) {
@@ -300,15 +317,23 @@ async function handleReactWithSettings(payload: unknown, settings: AtlasSettings
     };
   }
 
-  const response = await fetch(`${baseUrl}/api/extension/files/react`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${baseUrl}/api/extension/files/react`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: networkErrorMessage(error),
+    };
+  }
 
   const data = await safeJson(response);
   if (response.ok && data === null) {
@@ -344,15 +369,23 @@ async function handleDeleteDownloadWithSettings(payload: unknown, settings: Atla
     };
   }
 
-  const response = await fetch(`${baseUrl}/api/extension/files/delete-download`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${baseUrl}/api/extension/files/delete-download`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      error: networkErrorMessage(error),
+    };
+  }
 
   const data = await safeJson(response);
   if (response.ok && data === null) {
@@ -396,4 +429,30 @@ async function safeJson(response: Response): Promise<unknown> {
   } catch {
     return null;
   }
+}
+
+async function fetchWithTimeout(input: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function networkErrorMessage(error: unknown): string {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return 'Atlas request timed out. Please try again.';
+  }
+
+  if (error instanceof Error && error.message) {
+    return `Atlas request failed: ${error.message}`;
+  }
+
+  return 'Atlas request failed. Please try again.';
 }
