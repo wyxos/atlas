@@ -162,29 +162,38 @@ declare const chrome: ChromeApi;
   function fetchAtlasStatus(
     sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void,
     url: string,
+    referrerUrl: string | null,
     callback: (
       status: { exists: boolean; downloaded: boolean; blacklisted: boolean; reactionType: string | null } | null
     ) => void
   ) {
-    if (!url) {
+    const lookupUrls = [...new Set([url, referrerUrl || ''].map((value) => stripHash((value || '').trim())).filter(Boolean))];
+    if (lookupUrls.length === 0) {
       callback(null);
       return;
     }
 
-    const cached = getCachedAtlasStatus(url);
-    if (cached) {
-      callback(cached);
-      return;
+    for (const key of lookupUrls) {
+      const cached = getCachedAtlasStatus(key);
+      if (cached) {
+        callback(cached);
+        return;
+      }
     }
 
-    sendMessageSafe({ type: 'atlas-check-batch', urls: [url] }, (response) => {
+    sendMessageSafe({ type: 'atlas-check-batch', urls: lookupUrls }, (response) => {
       if (!response || !response.ok) {
         callback(null);
         return;
       }
 
       const results = Array.isArray(response.data?.results) ? response.data.results : [];
-      const match = results.find((r) => r?.url === url) ?? results[0] ?? null;
+      const byUrl = new Map(
+        results
+          .filter((r) => typeof r?.url === 'string' && r.url.trim() !== '')
+          .map((r) => [stripHash(String(r.url)), r])
+      );
+      const match = byUrl.get(stripHash(url)) ?? byUrl.get(stripHash(referrerUrl || '')) ?? results[0] ?? null;
       if (!match) {
         callback(null);
         return;
@@ -198,7 +207,9 @@ declare const chrome: ChromeApi;
         ts: Date.now(),
       };
 
-      atlasStatusCache.set(url, status);
+      for (const key of lookupUrls) {
+        atlasStatusCache.set(key, status);
+      }
       callback(status);
     });
   }
@@ -546,6 +557,82 @@ declare const chrome: ChromeApi;
       isSheetOpen: () => root.classList.contains(OPEN_CLASS),
       chooseDialog,
     });
+
+    window.addEventListener(
+      'atlas-shortcut-reaction-state',
+      (event: Event) => {
+        const custom = event as CustomEvent<{
+          media?: Element;
+          pending?: boolean;
+          reactionType?: string | null;
+          url?: string | null;
+        }>;
+
+        const pending = Boolean(custom.detail?.pending);
+        const reactionType = custom.detail?.reactionType ? String(custom.detail.reactionType) : null;
+        const explicitUrl = typeof custom.detail?.url === 'string' ? custom.detail.url : '';
+        const resolvedUrl = explicitUrl || (custom.detail?.media ? buildItemFromElement(custom.detail.media, MIN_SIZE)?.url || '' : '');
+        const lookup = resolvedUrl ? stripHash(resolvedUrl) : '';
+
+        if (pending) {
+          reactingItemUrl = lookup || '__external-reaction__';
+          for (const item of items) {
+            if (lookup && stripHash(String(item.url || '')) !== lookup) {
+              continue;
+            }
+            item.reactionPending = reactionType || item.reactionPending || 'like';
+          }
+          renderList();
+          setReady(summaryText());
+          return;
+        }
+
+        reactingItemUrl = null;
+        for (const item of items) {
+          if (lookup && stripHash(String(item.url || '')) !== lookup) {
+            continue;
+          }
+
+          if (item.reactionPending) {
+            item.reactionPending = null;
+          }
+
+          const cached =
+            (lookup ? getCachedAtlasStatus(lookup) : null) ??
+            getCachedAtlasStatus(itemLookupUrl(item)) ??
+            getCachedAtlasStatus(stripHash(String(item.url || '')));
+
+          if (cached) {
+            item.atlas = {
+              exists: Boolean(cached.exists),
+              downloaded: Boolean(cached.downloaded),
+              blacklisted: Boolean(cached.blacklisted),
+              file_id: item.atlas?.file_id ?? null,
+              reaction: cached.reactionType ? { type: cached.reactionType } : item.atlas?.reaction ?? null,
+            };
+          } else if (reactionType) {
+            item.atlas = {
+              exists: item.atlas?.exists ?? true,
+              downloaded: item.atlas?.downloaded ?? false,
+              blacklisted: item.atlas?.blacklisted ?? false,
+              file_id: item.atlas?.file_id ?? null,
+              reaction: { type: reactionType },
+            };
+          }
+
+          if (item.atlas?.exists && !item.atlas?.downloaded && item.atlas?.reaction?.type && item.atlas.reaction.type !== 'dislike') {
+            item.reactionQueued = item.atlas.reaction.type;
+          } else {
+            item.reactionQueued = null;
+          }
+        }
+
+        renderList();
+        setReady(summaryText());
+        applyPageMarkers(items);
+      },
+      true
+    );
 
     const scheduleMarkerSync = (delayMs = 300) => {
       if (markerSyncTimer !== null) {
@@ -993,6 +1080,11 @@ declare const chrome: ChromeApi;
       return `${items.length} found • ${selectedCount} selected`;
     }
 
+    function itemLookupUrl(item) {
+      const preferred = (item?.referrer_url || item?.url || '').trim();
+      return preferred ? stripHash(preferred) : '';
+    }
+
     function getDisplayStatus(item) {
       if (item.status) {
         return {
@@ -1017,7 +1109,7 @@ declare const chrome: ChromeApi;
     }
 
     function checkAtlasStatus(silent) {
-      const urls = items.map((item) => item.url).filter(Boolean);
+      const urls = [...new Set(items.map((item) => itemLookupUrl(item)).filter(Boolean))];
       if (urls.length === 0) {
         return;
       }
@@ -1038,12 +1130,17 @@ declare const chrome: ChromeApi;
         }
 
         const results = Array.isArray(response.data?.results) ? response.data.results : [];
-        const byUrl = new Map(results.map((r) => [r.url, r]));
+        const byUrl = new Map(
+          results
+            .filter((r) => typeof r?.url === 'string' && r.url.trim() !== '')
+            .map((r) => [stripHash(String(r.url)), r])
+        );
 
         let existsCount = 0;
         let downloadedCount = 0;
         for (const item of items) {
-          const match = byUrl.get(item.url);
+          const lookup = itemLookupUrl(item);
+          const match = byUrl.get(lookup);
           if (!match) {
             continue;
           }
@@ -1060,6 +1157,14 @@ declare const chrome: ChromeApi;
           } else {
             item.reactionQueued = null;
           }
+
+          atlasStatusCache.set(lookup, {
+            exists: Boolean(match.exists),
+            downloaded: Boolean(match.downloaded),
+            blacklisted: Boolean(match.blacklisted),
+            reactionType: match.reaction?.type ? String(match.reaction.type) : null,
+            ts: Date.now(),
+          });
 
           if (match.exists) existsCount += 1;
           if (match.downloaded) downloadedCount += 1;
@@ -1084,7 +1189,7 @@ declare const chrome: ChromeApi;
         item.reactionPending = options.blacklist ? BLACKLIST_ACTION.type : type;
         item.status = 'Reacting…';
         item.statusClass = '';
-        reactingItemUrl = item.url;
+        reactingItemUrl = itemLookupUrl(item) || item.url;
         renderList();
         setReady(summaryText());
 
@@ -1127,7 +1232,8 @@ declare const chrome: ChromeApi;
             reaction: data?.reaction ?? null,
           };
 
-          atlasStatusCache.set(item.url, {
+          const lookup = itemLookupUrl(item) || item.url;
+          atlasStatusCache.set(lookup, {
             exists: item.atlas.exists,
             downloaded: item.atlas.downloaded,
             blacklisted: item.atlas.blacklisted,
@@ -1153,7 +1259,7 @@ declare const chrome: ChromeApi;
           }
 
           if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
-            pollUntilDownloaded([item.url], 0);
+            pollUntilDownloaded([lookup], 0);
           }
         });
       };
@@ -1208,7 +1314,7 @@ declare const chrome: ChromeApi;
         item.reactionPending = 'delete-download';
         item.status = 'Deleting…';
         item.statusClass = '';
-        reactingItemUrl = item.url;
+          reactingItemUrl = itemLookupUrl(item) || item.url;
         renderList();
         setReady(summaryText());
 
@@ -1243,7 +1349,8 @@ declare const chrome: ChromeApi;
               reaction: null,
             };
             item.reactionQueued = null;
-            atlasStatusCache.set(item.url, {
+            const lookup = itemLookupUrl(item) || item.url;
+            atlasStatusCache.set(lookup, {
               exists: item.atlas.exists,
               downloaded: item.atlas.downloaded,
               blacklisted: item.atlas.blacklisted,
@@ -1346,7 +1453,7 @@ declare const chrome: ChromeApi;
                 if (item.atlas?.reaction?.type && item.atlas.reaction.type !== 'dislike') {
                   item.reactionQueued = item.atlas.reaction.type;
                 }
-                urlsToPoll.push(item.url);
+                urlsToPoll.push(itemLookupUrl(item) || item.url);
               } else {
                 item.status = '';
                 item.statusClass = '';
@@ -1389,11 +1496,16 @@ declare const chrome: ChromeApi;
           }
 
           const results = Array.isArray(response.data?.results) ? response.data.results : [];
-          const byUrl = new Map(results.map((r) => [r.url, r]));
+          const byUrl = new Map(
+            results
+              .filter((r) => typeof r?.url === 'string' && r.url.trim() !== '')
+              .map((r) => [stripHash(String(r.url)), r])
+          );
 
           let remaining = 0;
           for (const item of items) {
-            const match = byUrl.get(item.url);
+            const lookup = itemLookupUrl(item) || item.url;
+            const match = byUrl.get(stripHash(lookup));
             if (!match) {
               continue;
             }
@@ -1405,8 +1517,8 @@ declare const chrome: ChromeApi;
               file_id: match.file_id ?? null,
               reaction: match.reaction ?? null,
             };
-            if (match?.url) {
-              atlasStatusCache.set(String(match.url), {
+            if (lookup) {
+              atlasStatusCache.set(stripHash(lookup), {
                 exists: Boolean(match.exists),
                 downloaded: Boolean(match.downloaded),
                 blacklisted: Boolean(match.blacklisted),
@@ -1872,7 +1984,8 @@ declare const chrome: ChromeApi;
     const emitShortcutReactionState = (
       media: Element,
       pending: boolean,
-      reactionType: string | null
+      reactionType: string | null,
+      url: string | null = null
     ) => {
       window.dispatchEvent(
         new CustomEvent('atlas-shortcut-reaction-state', {
@@ -1880,6 +1993,7 @@ declare const chrome: ChromeApi;
             media,
             pending,
             reactionType,
+            url,
           },
         })
       );
@@ -1955,7 +2069,7 @@ declare const chrome: ChromeApi;
                 download_via: 'yt-dlp',
               };
 
-                fetchAtlasStatus(options.sendMessageSafe, payload.url, (status) => {
+                fetchAtlasStatus(options.sendMessageSafe, payload.url, payload.referrer_url || null, (status) => {
                   if (status?.downloaded) {
                   options
                     .chooseDialog({
@@ -1965,14 +2079,14 @@ declare const chrome: ChromeApi;
                       cancelLabel: 'Keep existing file',
                     })
                     .then((choice) => {
-                      emitShortcutReactionState(media, true, reactionType);
+                      emitShortcutReactionState(media, true, reactionType, payload.url);
                       if (choice === 'confirm') {
                         payload.force_download = true;
                       }
 
                       options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
                         if (!response || !response.ok) {
-                          emitShortcutReactionState(media, false, null);
+                          emitShortcutReactionState(media, false, null, payload.url);
                           options.showToast(response?.error || 'Reaction failed.', 'danger');
                           return;
                         }
@@ -1989,17 +2103,17 @@ declare const chrome: ChromeApi;
                           reactionType: newReactionType,
                           ts: Date.now(),
                         });
-                        emitShortcutReactionState(media, false, newReactionType);
+                        emitShortcutReactionState(media, false, newReactionType, payload.url);
 
                         options.showToast(`Reacted (${reactionType}). Resolving video in Atlas…`);
                       });
                     });
                   return;
                 }
-                emitShortcutReactionState(media, true, reactionType);
+                emitShortcutReactionState(media, true, reactionType, payload.url);
                 options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
                   if (!response || !response.ok) {
-                    emitShortcutReactionState(media, false, null);
+                    emitShortcutReactionState(media, false, null, payload.url);
                     options.showToast(response?.error || 'Reaction failed.', 'danger');
                     return;
                   }
@@ -2016,7 +2130,7 @@ declare const chrome: ChromeApi;
                     reactionType: newReactionType,
                     ts: Date.now(),
                   });
-                  emitShortcutReactionState(media, false, newReactionType);
+                  emitShortcutReactionState(media, false, newReactionType, payload.url);
 
                   options.showToast(`Reacted (${reactionType}). Resolving video in Atlas…`);
                 });
@@ -2046,7 +2160,7 @@ declare const chrome: ChromeApi;
           source: sourceFromMediaUrl(item.url),
         };
 
-        fetchAtlasStatus(options.sendMessageSafe, payload.url, (status) => {
+        fetchAtlasStatus(options.sendMessageSafe, payload.url, payload.referrer_url || null, (status) => {
           if (status?.downloaded) {
             options
               .chooseDialog({
@@ -2056,14 +2170,14 @@ declare const chrome: ChromeApi;
                 cancelLabel: 'Keep existing file',
               })
               .then((choice) => {
-                emitShortcutReactionState(media, true, reactionType);
+                emitShortcutReactionState(media, true, reactionType, payload.url);
                 if (choice === 'confirm') {
                   payload.force_download = true;
                 }
 
                 options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
                   if (!response || !response.ok) {
-                    emitShortcutReactionState(media, false, null);
+                    emitShortcutReactionState(media, false, null, payload.url);
                     options.showToast(response?.error || 'Reaction failed.', 'danger');
                     return;
                   }
@@ -2080,17 +2194,17 @@ declare const chrome: ChromeApi;
                     reactionType: newReactionType,
                     ts: Date.now(),
                   });
-                  emitShortcutReactionState(media, false, newReactionType);
+                  emitShortcutReactionState(media, false, newReactionType, payload.url);
 
                   options.showToast(`Reacted (${reactionType}). Queued download in Atlas.`);
                 });
               });
             return;
           }
-          emitShortcutReactionState(media, true, reactionType);
+          emitShortcutReactionState(media, true, reactionType, payload.url);
           options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
             if (!response || !response.ok) {
-              emitShortcutReactionState(media, false, null);
+              emitShortcutReactionState(media, false, null, payload.url);
               options.showToast(response?.error || 'Reaction failed.', 'danger');
               return;
             }
@@ -2107,7 +2221,7 @@ declare const chrome: ChromeApi;
               reactionType: newReactionType,
               ts: Date.now(),
             });
-            emitShortcutReactionState(media, false, newReactionType);
+            emitShortcutReactionState(media, false, newReactionType, payload.url);
 
             options.showToast(`Reacted (${reactionType}). Queued download in Atlas.`);
           });
@@ -2155,16 +2269,16 @@ declare const chrome: ChromeApi;
                 download_via: 'yt-dlp',
               };
 
-	              emitShortcutReactionState(media, true, 'dislike');
-	              options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-	                if (!response || !response.ok) {
-	                  emitShortcutReactionState(media, false, null);
-	                  options.showToast(response?.error || 'Reaction failed.', 'danger');
-	                  return;
-	                }
-	                emitShortcutReactionState(media, false, 'dislike');
-	                options.showToast('Disliked.');
-	              });
+              emitShortcutReactionState(media, true, 'dislike', payload.url);
+              options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+                if (!response || !response.ok) {
+                  emitShortcutReactionState(media, false, null, payload.url);
+                  options.showToast(response?.error || 'Reaction failed.', 'danger');
+                  return;
+                }
+                emitShortcutReactionState(media, false, 'dislike', payload.url);
+                options.showToast('Disliked.');
+              });
 
               return;
             }
@@ -2190,16 +2304,16 @@ declare const chrome: ChromeApi;
           source: sourceFromMediaUrl(item.url),
         };
 
-	        emitShortcutReactionState(media, true, 'dislike');
-	        options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
-	          if (!response || !response.ok) {
-	            emitShortcutReactionState(media, false, null);
-	            options.showToast(response?.error || 'Reaction failed.', 'danger');
-	            return;
-	          }
-	          emitShortcutReactionState(media, false, 'dislike');
-	          options.showToast('Disliked.');
-	        });
+        emitShortcutReactionState(media, true, 'dislike', payload.url);
+        options.sendMessageSafe({ type: 'atlas-react', payload }, (response) => {
+          if (!response || !response.ok) {
+            emitShortcutReactionState(media, false, null, payload.url);
+            options.showToast(response?.error || 'Reaction failed.', 'danger');
+            return;
+          }
+          emitShortcutReactionState(media, false, 'dislike', payload.url);
+          options.showToast('Disliked.');
+        });
       },
       true
     );
@@ -2317,6 +2431,26 @@ declare const chrome: ChromeApi;
       }
       syncToolbarButtonState();
     };
+    const emitOverlayReactionState = (
+      pending: boolean,
+      reactionType: string | null,
+      url: string | null
+    ) => {
+      if (!activeMedia) {
+        return;
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('atlas-shortcut-reaction-state', {
+          detail: {
+            media: activeMedia,
+            pending,
+            reactionType,
+            url,
+          },
+        })
+      );
+    };
 
     const cancelHide = () => {
       if (hideTimer) {
@@ -2390,6 +2524,7 @@ declare const chrome: ChromeApi;
             delete payload.force_download;
           }
 
+          emitOverlayReactionState(true, reaction.type, checkKey || null);
           setToolbarBusy(true, reaction.type);
           options.sendMessageSafe(
             {
@@ -2402,6 +2537,7 @@ declare const chrome: ChromeApi;
             (response) => {
               setToolbarBusy(false, null);
               if (!response || !response.ok) {
+                emitOverlayReactionState(false, null, checkKey || null);
                 options.showToast(response?.error || 'Reaction failed.', 'danger');
                 return;
               }
@@ -2427,6 +2563,7 @@ declare const chrome: ChromeApi;
 
               setToolbarActive(newReactionType);
               setToolbarQueued(newReactionType, Boolean(file?.downloaded));
+              emitOverlayReactionState(false, newReactionType, checkKey || null);
 
               if (payload.download_via === 'yt-dlp') {
                 options.showToast(`Reacted (${reaction.label}). Resolving video in Atlas…`);
@@ -2438,7 +2575,7 @@ declare const chrome: ChromeApi;
           );
         };
 
-        fetchAtlasStatus(options.sendMessageSafe, checkKey, (status) => {
+        fetchAtlasStatus(options.sendMessageSafe, checkKey, payload.referrer_url || null, (status) => {
           if (reactionType !== 'dislike' && status?.downloaded) {
             options
               .chooseDialog({
@@ -2561,7 +2698,7 @@ declare const chrome: ChromeApi;
           setToolbarQueued(cached.reactionType, cached.downloaded);
         } else {
           const keyAtRequest = activeKey;
-          fetchAtlasStatus(options.sendMessageSafe, keyAtRequest, (status) => {
+          fetchAtlasStatus(options.sendMessageSafe, keyAtRequest, window.location.href, (status) => {
             if (!status) return;
             if (activeKey !== keyAtRequest) return;
             setToolbarActive(status.reactionType);
