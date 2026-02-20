@@ -30,7 +30,7 @@ describe('items', () => {
     expect(item?.referrer_url).toBe(window.location.href);
   });
 
-  it('filters small raster images but keeps gifs', () => {
+  it('filters small raster images including gifs', () => {
     setLocation('https://example.com/page');
     const small = document.createElement('img');
     small.src = 'https://example.com/foo.png';
@@ -42,9 +42,41 @@ describe('items', () => {
     gif.src = 'https://example.com/foo.gif';
     setImageSize(gif, 200, 200);
 
-    const item = buildItemFromElement(gif, 450);
+    expect(buildItemFromElement(gif, 450)).toBeNull();
+  });
+
+  it('uses wixmp size hints when natural dimensions are unavailable', () => {
+    setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
+
+    const img = document.createElement('img');
+    img.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/8eee0575-fbad-44dc-aafe-d4ebbaa3ce43/dlib667-5de41a77-dec1-4f4a-bd6a-4f6bd2ed7912.png/v1/fit/w_828,h_1212,q_70,strp/orange_hair_squad__go__by_chrisis_ai_dlib667-414w-2x.jpg?token=abc';
+    Object.defineProperty(img, 'naturalWidth', { value: 0, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 0, configurable: true });
+    Object.defineProperty(img, 'clientWidth', { value: 328, configurable: true });
+    Object.defineProperty(img, 'clientHeight', { value: 481, configurable: true });
+
+    const item = buildItemFromElement(img, 200);
     expect(item).not.toBeNull();
-    expect(item?.tag_name).toBe('img');
+    expect(item?.width).toBe(828);
+    expect(item?.height).toBe(1212);
+  });
+
+  it('excludes built-in deviantart noise hosts', () => {
+    setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
+    const img = document.createElement('img');
+    img.src = 'https://st.deviantart.net/eclipse/popups/hover-component/2024/deviation-2x.png';
+    setImageSize(img, 700, 700);
+
+    expect(buildItemFromElement(img, 200)).toBeNull();
+  });
+
+  it('filters images below 200px when min size is 200', () => {
+    setLocation('https://example.com/page');
+    const img = document.createElement('img');
+    img.src = 'https://example.com/tiny.png';
+    setImageSize(img, 199, 400);
+
+    expect(buildItemFromElement(img, 200)).toBeNull();
   });
 
   it('builds video items', () => {

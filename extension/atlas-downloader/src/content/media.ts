@@ -69,9 +69,7 @@ export function isElementInModal(element: Element): boolean {
 }
 
 export function shouldBypassMinSize(img: HTMLImageElement, url: string): boolean {
-  if (isMinSizeExemptImageUrl(url)) {
-    return true;
-  }
+  void url;
 
   if (isElementInModal(img)) {
     return true;
