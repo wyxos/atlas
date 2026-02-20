@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Support\FileTypeDetector;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -34,62 +35,69 @@ class ExternalFileIngestService
         ], fn ($value) => $value !== null && $value !== '');
         $hasUrlHashColumns = $this->hasUrlHashColumns();
         $urlHash = $hasUrlHashColumns ? hash('sha256', $url) : null;
+        $file = null;
+        $isNew = false;
+        $maxSaveAttempts = 3;
 
-        $file = File::query()
-            ->when(
-                $hasUrlHashColumns,
-                fn ($query) => $query->where('url_hash', $urlHash)
-            )
-            ->where('url', $url)
-            ->orderByDesc('downloaded')
-            ->orderByDesc('id')
-            ->first();
+        for ($attempt = 1; $attempt <= $maxSaveAttempts; $attempt++) {
+            $file = $this->findFileByUrl($url, $hasUrlHashColumns, $urlHash);
+            $isNew = $file === null;
 
-        $isNew = $file === null;
-        if (! $file) {
-            $file = new File;
-            $file->source = $payload['source'] ?? 'Extension';
-            $file->source_id = $payload['source_id'] ?? null;
-            $file->filename = $filename;
+            if (! $file) {
+                $file = new File;
+                $file->source = $payload['source'] ?? 'Extension';
+                $file->source_id = $payload['source_id'] ?? null;
+                $file->filename = $filename;
+            }
+
+            $existingMetadata = $file->listing_metadata;
+            if (! is_array($existingMetadata)) {
+                $existingMetadata = [];
+            }
+
+            $mergedMetadata = [
+                ...$existingMetadata,
+                ...$metadata,
+            ];
+            $mergedMetadata = array_filter($mergedMetadata, fn ($value) => $value !== null && $value !== '');
+
+            $updates = array_filter([
+                'url' => $url,
+                'referrer_url' => $referrerUrl,
+                'filename' => $filename,
+                'ext' => $ext,
+                'mime_type' => $mimeType,
+                'title' => $payload['title'] ?? null,
+                'description' => $payload['description'] ?? null,
+                'preview_url' => $payload['preview_url'] ?? null,
+                'size' => $payload['size'] ?? null,
+                'listing_metadata' => $mergedMetadata !== [] ? $mergedMetadata : null,
+            ], fn ($value) => $value !== null && $value !== '');
+
+            // Avoid clobbering known file metadata with null guesses from page URLs.
+            if (empty($ext)) {
+                unset($updates['ext']);
+            }
+            if (empty($mimeType)) {
+                unset($updates['mime_type']);
+            }
+            if (! isset($updates['size']) || ! is_numeric($updates['size']) || (int) $updates['size'] <= 0) {
+                unset($updates['size']);
+            }
+
+            $file->fill($updates);
+
+            try {
+                $file->save();
+                break;
+            } catch (QueryException $exception) {
+                if (! $this->shouldRetryIngestSave($exception) || $attempt === $maxSaveAttempts) {
+                    throw $exception;
+                }
+
+                usleep($attempt * 100_000);
+            }
         }
-
-        $existingMetadata = $file->listing_metadata;
-        if (! is_array($existingMetadata)) {
-            $existingMetadata = [];
-        }
-
-        $mergedMetadata = [
-            ...$existingMetadata,
-            ...$metadata,
-        ];
-        $mergedMetadata = array_filter($mergedMetadata, fn ($value) => $value !== null && $value !== '');
-
-        $updates = array_filter([
-            'url' => $url,
-            'referrer_url' => $referrerUrl,
-            'filename' => $filename,
-            'ext' => $ext,
-            'mime_type' => $mimeType,
-            'title' => $payload['title'] ?? null,
-            'description' => $payload['description'] ?? null,
-            'preview_url' => $payload['preview_url'] ?? null,
-            'size' => $payload['size'] ?? null,
-            'listing_metadata' => $mergedMetadata !== [] ? $mergedMetadata : null,
-        ], fn ($value) => $value !== null && $value !== '');
-
-        // Avoid clobbering known file metadata with null guesses from page URLs.
-        if (empty($ext)) {
-            unset($updates['ext']);
-        }
-        if (empty($mimeType)) {
-            unset($updates['mime_type']);
-        }
-        if (! isset($updates['size']) || ! is_numeric($updates['size']) || (int) $updates['size'] <= 0) {
-            unset($updates['size']);
-        }
-
-        $file->fill($updates);
-        $file->save();
 
         if ($isNew) {
             $metrics = app(MetricsService::class);
@@ -165,5 +173,36 @@ class ExternalFileIngestService
             && Schema::hasColumn('files', 'referrer_url_hash');
 
         return $hasColumns;
+    }
+
+    private function findFileByUrl(string $url, bool $hasUrlHashColumns, ?string $urlHash): ?File
+    {
+        return File::query()
+            ->when(
+                $hasUrlHashColumns,
+                fn ($query) => $query->where('url_hash', $urlHash)
+            )
+            ->where('url', $url)
+            ->orderByDesc('downloaded')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    private function shouldRetryIngestSave(QueryException $exception): bool
+    {
+        $errorInfo = $exception->errorInfo ?? [];
+        $sqlState = strtolower((string) ($errorInfo[0] ?? ''));
+        $driverCode = (int) ($errorInfo[1] ?? 0);
+        $message = strtolower($exception->getMessage());
+
+        if (in_array($sqlState, ['40001', '40p01'], true)) {
+            return true;
+        }
+
+        if (in_array($driverCode, [1205, 1213], true)) {
+            return true;
+        }
+
+        return $driverCode === 1062 && str_contains($message, 'duplicate entry');
     }
 }
