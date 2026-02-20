@@ -1,4 +1,4 @@
-import Pusher from 'pusher-js';
+import Pusher from 'pusher-js/worker';
 
 type AtlasSettings = {
   atlasBaseUrl?: string;
@@ -26,6 +26,7 @@ type ChromeRuntime = {
   reload: () => void;
   requestUpdateCheck?: (callback: (status: string) => void) => void;
   getURL: (path: string) => string;
+  sendMessage: (message: unknown) => void;
 };
 
 type ChromeStorageSync = {
@@ -128,11 +129,25 @@ const MENU_OPEN_OPTIONS = 'atlas-open-options';
 const MENU_OPEN_SITE = 'atlas-open-site';
 const MENU_BLACKLIST_DOMAIN = 'atlas-blacklist-domain';
 const MENU_RELOAD_EXTENSION = 'atlas-reload-extension';
+const MESSAGE_REALTIME_STATUS_REQUEST = 'atlas-realtime-status-request';
+const MESSAGE_REALTIME_STATUS_CHANGED = 'atlas-realtime-status-changed';
 const SOCKET_EVENT_NAMES = [
   'DownloadTransferCreated',
   'DownloadTransferQueued',
   'DownloadTransferProgressUpdated',
 ] as const;
+const SOCKET_META_EVENT_NAMES = [
+  'pusher:subscription_succeeded',
+  'pusher:subscription_error',
+] as const;
+
+type RealtimeConnectionState =
+  | 'not-configured'
+  | 'loading'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'error';
 
 type RealtimeConfig = {
   key: string;
@@ -158,12 +173,27 @@ type DownloadRealtimeEvent = {
   failed: boolean;
 };
 
+type RealtimeConnectionStatus = {
+  state: RealtimeConnectionState;
+  message: string;
+  channel: string | null;
+  host: string | null;
+  updatedAt: number;
+};
+
 let excludedIconImageDataPromise: Promise<Record<number, ImageData> | null> | null = null;
 let realtimeClient: Pusher | null = null;
 let realtimeChannel: Pusher.Channel | null = null;
 let realtimeConfigSignature = '';
 let realtimeReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let realtimeReconnectAttempts = 0;
+let realtimeStatus: RealtimeConnectionStatus = {
+  state: 'not-configured',
+  message: 'Set Atlas base URL and extension token to enable realtime updates.',
+  channel: null,
+  host: null,
+  updatedAt: Date.now(),
+};
 
 chrome.runtime.onInstalled.addListener(() => {
   // Right click on the extension toolbar icon shows this menu (in addition to Chrome's built-ins).
@@ -273,27 +303,43 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const messageType = resolveMessageType(message);
+  if (messageType === MESSAGE_REALTIME_STATUS_REQUEST) {
+    sendResponse({
+      ok: true,
+      status: realtimeStatus,
+    });
+    return;
+  }
+
+  const request = message as {
+    payload?: unknown;
+    payloads?: unknown;
+    type?: string;
+    urls?: unknown;
+  };
+
   if (
-    !message ||
-    (message.type !== 'atlas-download' &&
-      message.type !== 'atlas-download-batch' &&
-      message.type !== 'atlas-check-batch' &&
-      message.type !== 'atlas-react' &&
-      message.type !== 'atlas-delete-download')
+    !request
+    || (request.type !== 'atlas-download' &&
+      request.type !== 'atlas-download-batch' &&
+      request.type !== 'atlas-check-batch' &&
+      request.type !== 'atlas-react' &&
+      request.type !== 'atlas-delete-download')
   ) {
     return;
   }
 
   const promise =
-    message.type === 'atlas-download-batch'
-      ? handleDownloadBatch(message.payloads)
-      : message.type === 'atlas-check-batch'
-        ? handleCheckBatch(message.urls)
-        : message.type === 'atlas-delete-download'
-          ? handleDeleteDownload(message.payload)
-          : message.type === 'atlas-react'
-            ? handleReact(message.payload)
-            : handleDownload(message.payload);
+    request.type === 'atlas-download-batch'
+      ? handleDownloadBatch(request.payloads)
+      : request.type === 'atlas-check-batch'
+        ? handleCheckBatch(request.urls)
+        : request.type === 'atlas-delete-download'
+          ? handleDeleteDownload(request.payload)
+          : request.type === 'atlas-react'
+            ? handleReact(request.payload)
+            : handleDownload(request.payload);
 
   promise
     .then((result) => sendResponse(result))
@@ -543,12 +589,29 @@ async function ensureRealtimeConnection(forceRestart = false) {
 
   if (!baseUrl || !token) {
     teardownRealtimeConnection();
+    updateRealtimeStatus({
+      state: 'not-configured',
+      message: 'Set Atlas base URL and extension token to enable realtime updates.',
+      channel: null,
+      host: null,
+    });
     return;
   }
 
+  const baseHost = resolveHost(baseUrl);
+  updateRealtimeStatus({
+    state: 'loading',
+    message: 'Loading realtime configuration from Atlas.',
+    channel: null,
+    host: baseHost,
+  });
+
   const realtimeConfig = await fetchRealtimeConfig(baseUrl, token);
   if (!realtimeConfig) {
-    scheduleRealtimeReconnect();
+    scheduleRealtimeReconnect('Could not load realtime configuration from Atlas.', {
+      channel: null,
+      host: baseHost,
+    });
     return;
   }
 
@@ -570,6 +633,12 @@ async function ensureRealtimeConnection(forceRestart = false) {
 
   teardownRealtimeConnection();
   realtimeConfigSignature = signature;
+  updateRealtimeStatus({
+    state: 'connecting',
+    message: `Connecting to channel ${realtimeConfig.channel}.`,
+    channel: realtimeConfig.channel,
+    host: realtimeConfig.wsHost,
+  });
 
   const client = new Pusher(realtimeConfig.key, {
     wsHost: realtimeConfig.wsHost,
@@ -592,17 +661,43 @@ async function ensureRealtimeConnection(forceRestart = false) {
       clearTimeout(realtimeReconnectTimer);
       realtimeReconnectTimer = null;
     }
+    updateRealtimeStatus({
+      state: 'connected',
+      message: `Connected to channel ${realtimeConfig.channel}.`,
+      channel: realtimeConfig.channel,
+      host: realtimeConfig.wsHost,
+    });
   });
 
   client.connection.bind('disconnected', () => {
-    scheduleRealtimeReconnect();
+    scheduleRealtimeReconnect('Realtime connection lost.', {
+      channel: realtimeConfig.channel,
+      host: realtimeConfig.wsHost,
+    });
   });
 
   client.connection.bind('error', () => {
-    scheduleRealtimeReconnect();
+    scheduleRealtimeReconnect('Realtime connection error.', {
+      channel: realtimeConfig.channel,
+      host: realtimeConfig.wsHost,
+    });
   });
 
   const channel = client.subscribe(realtimeConfig.channel);
+  channel.bind('pusher:subscription_succeeded', () => {
+    updateRealtimeStatus({
+      state: 'connected',
+      message: `Subscribed to ${realtimeConfig.channel}.`,
+      channel: realtimeConfig.channel,
+      host: realtimeConfig.wsHost,
+    });
+  });
+  channel.bind('pusher:subscription_error', () => {
+    scheduleRealtimeReconnect('Realtime channel subscription failed.', {
+      channel: realtimeConfig.channel,
+      host: realtimeConfig.wsHost,
+    });
+  });
   for (const eventName of SOCKET_EVENT_NAMES) {
     channel.bind(eventName, (payload: unknown) => {
       const normalized = normalizeRealtimeEvent(eventName, payload);
@@ -625,12 +720,15 @@ function teardownRealtimeConnection() {
   }
 
   if (realtimeChannel) {
-    for (const eventName of SOCKET_EVENT_NAMES) {
+    for (const eventName of [...SOCKET_EVENT_NAMES, ...SOCKET_META_EVENT_NAMES]) {
       realtimeChannel.unbind(eventName);
     }
   }
 
   if (realtimeClient) {
+    realtimeClient.connection.unbind('connected');
+    realtimeClient.connection.unbind('disconnected');
+    realtimeClient.connection.unbind('error');
     realtimeClient.disconnect();
   }
 
@@ -639,7 +737,13 @@ function teardownRealtimeConnection() {
   realtimeConfigSignature = '';
 }
 
-function scheduleRealtimeReconnect() {
+function scheduleRealtimeReconnect(
+  reason = 'Realtime connection unavailable.',
+  context: { channel: string | null; host: string | null } = {
+    channel: realtimeStatus.channel,
+    host: realtimeStatus.host,
+  },
+) {
   if (realtimeReconnectTimer) {
     return;
   }
@@ -647,10 +751,53 @@ function scheduleRealtimeReconnect() {
   const exponent = Math.min(realtimeReconnectAttempts, 5);
   const delayMs = Math.min(30_000, 1_000 * 2 ** exponent);
   realtimeReconnectAttempts += 1;
+  updateRealtimeStatus({
+    state: 'reconnecting',
+    message: `${reason} Retrying in ${Math.round(delayMs / 1000)}s.`,
+    channel: context.channel,
+    host: context.host,
+  });
   realtimeReconnectTimer = setTimeout(() => {
     realtimeReconnectTimer = null;
     void ensureRealtimeConnection(true);
   }, delayMs);
+}
+
+function resolveMessageType(message: unknown): string | null {
+  if (!message || typeof message !== 'object') {
+    return null;
+  }
+
+  const type = (message as { type?: unknown }).type;
+  return typeof type === 'string' ? type : null;
+}
+
+function updateRealtimeStatus(
+  next: Omit<RealtimeConnectionStatus, 'updatedAt'>,
+): void {
+  const changed =
+    realtimeStatus.state !== next.state
+    || realtimeStatus.message !== next.message
+    || realtimeStatus.channel !== next.channel
+    || realtimeStatus.host !== next.host;
+
+  realtimeStatus = {
+    ...next,
+    updatedAt: Date.now(),
+  };
+
+  if (!changed) {
+    return;
+  }
+
+  try {
+    chrome.runtime.sendMessage({
+      type: MESSAGE_REALTIME_STATUS_CHANGED,
+      status: realtimeStatus,
+    });
+  } catch {
+    // Ignore when no options page is listening.
+  }
 }
 
 async function fetchRealtimeConfig(baseUrl: string, token: string): Promise<RealtimeConfig | null> {

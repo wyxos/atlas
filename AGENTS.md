@@ -49,7 +49,7 @@ npm run test                # Run Vitest tests
 
 Extension gotcha:
 - `npm run build:extension` starts with `build:extension:clean`, which deletes `extension/atlas-downloader/dist` before rebuilding. If the build fails early, restore tracked dist files with `git restore extension/atlas-downloader/dist` before continuing.
-- Any change under `extension/atlas-downloader/` must also bump `extension/atlas-downloader/manifest.json` `version`, rebuild extension assets (`npm run build:extension`), and regenerate the zip (`php artisan atlas:extension-package --force`) before release.
+- Use `npm run build:extension:release` for extension releases; it auto-bumps `extension/atlas-downloader/manifest.json` patch version, rebuilds extension assets, regenerates the zip, and mirrors the built extension into `ATLAS_EXTENSION_SYNC_DIR` when that env var points to an existing directory.
 
 Database gotcha:
 - For long URL fields on MySQL/MariaDB, do not rely on unique indexes directly on `text`/large `varchar` columns. Use a deterministic hash column (e.g. SHA-256) as the unique/upsert key.
