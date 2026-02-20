@@ -1904,32 +1904,32 @@ declare const chrome: ChromeApi;
     style.id = PAGE_MARKER_STYLE_ID;
     style.textContent = `
 [data-atlas-marked="1"][data-atlas-state="exists"] {
-  outline: 2px solid rgba(148, 163, 184, 0.5) !important;
-  outline-offset: 2px !important;
+  outline: 4px solid rgba(148, 163, 184, 0.5) !important;
+  outline-offset: -4px !important;
 }
 [data-atlas-marked="1"][data-atlas-state="downloaded"] {
-  outline: 2px solid rgba(34, 197, 94, 0.85) !important;
-  outline-offset: 2px !important;
+  outline: 4px solid rgba(34, 197, 94, 0.85) !important;
+  outline-offset: -4px !important;
 }
 [data-atlas-marked="1"][data-atlas-state="blacklisted"] {
-  outline: 2px solid rgba(239, 68, 68, 0.9) !important;
-  outline-offset: 2px !important;
+  outline: 4px solid rgba(239, 68, 68, 0.9) !important;
+  outline-offset: -4px !important;
 }
 [data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="love"] {
-  outline: 2px solid rgba(239, 68, 68, 0.9) !important;
-  outline-offset: 2px !important;
+  outline: 4px solid rgba(239, 68, 68, 0.9) !important;
+  outline-offset: -4px !important;
 }
 [data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="like"] {
-  outline: 2px solid rgba(56, 189, 248, 0.9) !important;
-  outline-offset: 2px !important;
+  outline: 4px solid rgba(56, 189, 248, 0.9) !important;
+  outline-offset: -4px !important;
 }
 [data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="funny"] {
-  outline: 2px solid rgba(234, 179, 8, 0.95) !important;
-  outline-offset: 2px !important;
+  outline: 4px solid rgba(234, 179, 8, 0.95) !important;
+  outline-offset: -4px !important;
 }
 [data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="dislike"] {
-  outline: 2px solid rgba(71, 85, 105, 0.95) !important;
-  outline-offset: 2px !important;
+  outline: 4px solid rgba(71, 85, 105, 0.95) !important;
+  outline-offset: -4px !important;
 }
 `;
 
@@ -2433,6 +2433,10 @@ declare const chrome: ChromeApi;
     toolbar.className = 'atlas-downloader-media-toolbar';
     toolbar.setAttribute('role', 'toolbar');
     toolbar.setAttribute('aria-label', 'Atlas reactions');
+    const resolutionMeta = document.createElement('span');
+    resolutionMeta.className = 'atlas-downloader-media-resolution';
+    resolutionMeta.hidden = true;
+    toolbar.appendChild(resolutionMeta);
 
     let activeMedia: Element | null = null;
     let activeKey: string | null = null;
@@ -2445,6 +2449,35 @@ declare const chrome: ChromeApi;
     let hoverDetectTimer: number | null = null;
 
     const buttonsByType = new Map<string, HTMLButtonElement>();
+    const formatResolution = (
+      width: number | null | undefined,
+      height: number | null | undefined
+    ): string => {
+      const normalizedWidth =
+        typeof width === 'number' && Number.isFinite(width) && width > 0 ? Math.round(width) : null;
+      const normalizedHeight =
+        typeof height === 'number' && Number.isFinite(height) && height > 0 ? Math.round(height) : null;
+
+      if (!normalizedWidth || !normalizedHeight) {
+        return '';
+      }
+
+      return `${normalizedWidth}x${normalizedHeight}`;
+    };
+    const setToolbarResolution = (
+      width: number | null | undefined,
+      height: number | null | undefined
+    ) => {
+      const text = formatResolution(width, height);
+      if (!text) {
+        resolutionMeta.textContent = '';
+        resolutionMeta.hidden = true;
+        return;
+      }
+
+      resolutionMeta.textContent = text;
+      resolutionMeta.hidden = false;
+    };
     const syncToolbarButtonState = () => {
       const locked = toolbarBusy || toolbarQueuedType !== null;
       for (const [type, button] of buttonsByType.entries()) {
@@ -2517,6 +2550,7 @@ declare const chrome: ChromeApi;
       toolbar.classList.remove('open');
       toolbar.style.left = '';
       toolbar.style.top = '';
+      setToolbarResolution(null, null);
       setToolbarActive(null);
     };
 
@@ -2735,6 +2769,7 @@ declare const chrome: ChromeApi;
 
       activeMedia = media;
       activeKey = previewPayload.url || null;
+      setToolbarResolution(previewPayload.width, previewPayload.height);
       toolbar.classList.add('open');
       updatePosition();
 
