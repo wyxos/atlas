@@ -49,7 +49,7 @@ describe('items', () => {
     expect(buildItemFromElement(gif, 450)).toBeNull();
   });
 
-  it('uses wixmp size hints when natural dimensions are larger than rendered size', () => {
+  it('uses wixmp size hints when image looks like a low-res preview', () => {
     setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
 
     const img = document.createElement('img');
@@ -63,6 +63,23 @@ describe('items', () => {
     expect(item).not.toBeNull();
     expect(item?.width).toBe(828);
     expect(item?.height).toBe(1212);
+  });
+
+  it('prefers natural dimensions when url hints are only moderately larger', () => {
+    setLocation('https://www.deviantart.com/dercius/art/Fallen-angel-allure-23-1300553981');
+
+    const img = document.createElement('img');
+    img.src =
+      'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/f787a763-4bec-4de8-8c41-2138c468ba1c/dlibdvh-e859f987-6b04-4c27-a24d-749a87d6a10c.jpg/v1/fit/w_1125,h_2007,q_70,strp/fallen_angel_allure__23_by_dercius_dlibdvh-1125w.jpg?token=abc';
+    Object.defineProperty(img, 'naturalWidth', { value: 800, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 1427, configurable: true });
+    Object.defineProperty(img, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(img, 'clientHeight', { value: 1427, configurable: true });
+
+    const item = buildItemFromElement(img, 200);
+    expect(item).not.toBeNull();
+    expect(item?.width).toBe(800);
+    expect(item?.height).toBe(1427);
   });
 
   it('excludes built-in deviantart noise hosts', () => {
@@ -79,6 +96,17 @@ describe('items', () => {
     const img = document.createElement('img');
     img.src = 'https://example.com/tiny.png';
     setImageSize(img, 199, 400);
+
+    expect(buildItemFromElement(img, 200)).toBeNull();
+  });
+
+  it('does not let 2x thumbnail hints bypass the minimum size filter', () => {
+    setLocation('https://www.deviantart.com/dercius/art/Fallen-angel-allure-23-1300553981');
+
+    const img = document.createElement('img');
+    img.src =
+      'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/f787a763-4bec-4de8-8c41-2138c468ba1c/dl7j39c-c110e568-dd4d-4307-bfff-78f687706ffc.jpg/v1/crop/w_184,h_184,x_0,y_35,scl_0.11057692307692,q_70,strp/angel_allure___23_by_dercius_dl7j39c-92s-2x.jpg?token=abc';
+    setImageSize(img, 92, 92);
 
     expect(buildItemFromElement(img, 200)).toBeNull();
   });
