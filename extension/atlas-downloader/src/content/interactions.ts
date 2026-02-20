@@ -493,6 +493,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   let pointerX = -1;
   let pointerY = -1;
   let hoverDetectTimer: number | null = null;
+  let activeLocationHref = window.location.href;
 
   const buttonsByType = new Map<string, HTMLButtonElement>();
   const formatResolution = (width: number | null | undefined, height: number | null | undefined): string => {
@@ -570,6 +571,22 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       })
     );
   };
+  const clearPendingOverlayState = () => {
+    if (!toolbarBusy) {
+      return;
+    }
+    emitOverlayReactionState(false, null, activeKey || null);
+    setToolbarBusy(false, null);
+  };
+  const handleLocationChange = () => {
+    const currentHref = window.location.href;
+    if (currentHref === activeLocationHref) {
+      return;
+    }
+    activeLocationHref = currentHref;
+    clearPendingOverlayState();
+    hide(true);
+  };
 
   const cancelHide = () => {
     if (hideTimer) {
@@ -578,8 +595,9 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
   };
 
-  const hide = () => {
-    if (toolbarBusy) {
+  const hide = (forceOrEvent?: boolean | Event) => {
+    const force = forceOrEvent === true;
+    if (toolbarBusy && !force) {
       return;
     }
     activeMedia = null;
@@ -735,7 +753,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
     const rect = activeMedia.getBoundingClientRect();
     if (!Number.isFinite(rect.left) || rect.width <= 0 || rect.height <= 0) {
-      hide();
+      clearPendingOverlayState();
+      hide(true);
       return;
     }
 
@@ -801,6 +820,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
 
+    handleLocationChange();
+
     // Validate this media has a usable URL (or is a supported video fallback) before showing.
     const previewPayload = buildOverlayReactionPayload(media, 'like', deps);
     if (!previewPayload) {
@@ -808,8 +829,15 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
 
+    const nextKey = previewPayload.url || null;
+    const switchedContext =
+      Boolean(activeMedia && activeMedia !== media) || Boolean(activeKey && nextKey && activeKey !== nextKey);
+    if (switchedContext) {
+      clearPendingOverlayState();
+    }
+
     activeMedia = media;
-    activeKey = previewPayload.url || null;
+    activeKey = nextKey;
     setToolbarResolution(previewPayload.width, previewPayload.height);
     toolbar.classList.add('open');
     updatePosition();
@@ -915,6 +943,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   document.addEventListener(
     'pointermove',
     (event) => {
+      handleLocationChange();
       pointerX = event.clientX;
       pointerY = event.clientY;
     },
@@ -942,9 +971,12 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
   window.addEventListener('scroll', updatePosition, true);
   window.addEventListener('resize', updatePosition);
+  window.addEventListener('popstate', handleLocationChange, true);
+  window.addEventListener('hashchange', handleLocationChange, true);
   window.addEventListener('blur', hide);
   window.addEventListener('focus', () => scheduleDetectMediaUnderPointer(40), true);
   const observer = new MutationObserver(() => {
+    handleLocationChange();
     scheduleDetectMediaUnderPointer(60);
   });
   observer.observe(document.documentElement, {
