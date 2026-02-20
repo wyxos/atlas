@@ -109,6 +109,7 @@ class DownloadTransferSingleStream implements ShouldQueue
 
             $bytesWritten = 0;
             $bytesSinceBroadcastCheck = 0;
+            $pendingProgressBytes = 0;
 
             while (! $body->eof()) {
                 $buffer = $body->read($bufferSize);
@@ -127,17 +128,19 @@ class DownloadTransferSingleStream implements ShouldQueue
 
                 $bytesWritten += $written;
                 $bytesSinceBroadcastCheck += $written;
-
-                DownloadTransfer::query()->whereKey($transfer->id)->increment('bytes_downloaded', $written);
+                $pendingProgressBytes += $written;
 
                 if ($bytesSinceBroadcastCheck >= (2 * 1024 * 1024)) {
                     $bytesSinceBroadcastCheck = 0;
+                    $this->flushProgress($transfer->id, $pendingProgressBytes);
                     if ($this->shouldStop($transfer->id, $fh)) {
                         return;
                     }
                     $broadcaster->maybeBroadcast($transfer->id);
                 }
             }
+
+            $this->flushProgress($transfer->id, $pendingProgressBytes);
 
             fclose($fh);
             $fh = null;
@@ -211,6 +214,16 @@ class DownloadTransferSingleStream implements ShouldQueue
     private function isValidResponse(Response $response): bool
     {
         return $response->successful();
+    }
+
+    private function flushProgress(int $transferId, int &$pendingBytes): void
+    {
+        if ($pendingBytes <= 0) {
+            return;
+        }
+
+        DownloadTransfer::query()->whereKey($transferId)->increment('bytes_downloaded', $pendingBytes);
+        $pendingBytes = 0;
     }
 
     private function failTransfer(DownloadTransfer $transfer, string $message): void
