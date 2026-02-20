@@ -1,3 +1,5 @@
+import Pusher from 'pusher-js';
+
 type AtlasSettings = {
   atlasBaseUrl?: string;
   atlasToken?: string;
@@ -57,7 +59,7 @@ type ChromeTabs = {
   sendMessage: (tabId: number, message: unknown) => void;
   create: (createProperties: { url: string }) => void;
   get: (tabId: number) => Promise<ChromeTab>;
-  query: (queryInfo: { active: boolean; lastFocusedWindow: boolean }) => Promise<ChromeTab[]>;
+  query: (queryInfo: { active?: boolean; lastFocusedWindow?: boolean }) => Promise<ChromeTab[]>;
   onActivated: {
     addListener: (callback: (activeInfo: { tabId: number }) => void) => void;
   };
@@ -126,8 +128,42 @@ const MENU_OPEN_OPTIONS = 'atlas-open-options';
 const MENU_OPEN_SITE = 'atlas-open-site';
 const MENU_BLACKLIST_DOMAIN = 'atlas-blacklist-domain';
 const MENU_RELOAD_EXTENSION = 'atlas-reload-extension';
+const SOCKET_EVENT_NAMES = [
+  'DownloadTransferCreated',
+  'DownloadTransferQueued',
+  'DownloadTransferProgressUpdated',
+] as const;
+
+type RealtimeConfig = {
+  key: string;
+  wsHost: string;
+  wsPort: number;
+  wssPort: number;
+  forceTLS: boolean;
+  enabledTransports: string[];
+  authEndpoint: string;
+  channel: string;
+};
+
+type DownloadRealtimeEvent = {
+  event: string;
+  transferId: number | null;
+  status: string | null;
+  percent: number | null;
+  original: string | null;
+  referrer_url: string | null;
+  finished_at: string | null;
+  failed_at: string | null;
+  downloaded: boolean;
+  failed: boolean;
+};
 
 let excludedIconImageDataPromise: Promise<Record<number, ImageData> | null> | null = null;
+let realtimeClient: Pusher | null = null;
+let realtimeChannel: Pusher.Channel | null = null;
+let realtimeConfigSignature = '';
+let realtimeReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let realtimeReconnectAttempts = 0;
 
 chrome.runtime.onInstalled.addListener(() => {
   // Right click on the extension toolbar icon shows this menu (in addition to Chrome's built-ins).
@@ -157,10 +193,12 @@ chrome.runtime.onInstalled.addListener(() => {
   }
 
   void refreshActionForActiveTab();
+  void ensureRealtimeConnection(true);
 });
 
 chrome.runtime.onStartup.addListener(() => {
   void refreshActionForActiveTab();
+  void ensureRealtimeConnection(true);
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -220,6 +258,13 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     return;
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(changes, 'atlasBaseUrl')
+    || Object.prototype.hasOwnProperty.call(changes, 'atlasToken')
+  ) {
+    void ensureRealtimeConnection(true);
+  }
+
   if (!Object.prototype.hasOwnProperty.call(changes, 'atlasExcludedDomains')) {
     return;
   }
@@ -263,6 +308,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 void refreshActionForActiveTab();
+void ensureRealtimeConnection();
 
 async function blacklistDomainFromTab(tab?: ChromeTab) {
   const tabId = tab?.id;
@@ -488,6 +534,241 @@ function isHostExcluded(currentHost: string, excludedHosts: string[]): boolean {
   }
 
   return false;
+}
+
+async function ensureRealtimeConnection(forceRestart = false) {
+  const settings = await chrome.storage.sync.get(SETTINGS_KEYS);
+  const baseUrl = normalizeBaseUrl(settings.atlasBaseUrl || '');
+  const token = (settings.atlasToken || '').trim();
+
+  if (!baseUrl || !token) {
+    teardownRealtimeConnection();
+    return;
+  }
+
+  const realtimeConfig = await fetchRealtimeConfig(baseUrl, token);
+  if (!realtimeConfig) {
+    scheduleRealtimeReconnect();
+    return;
+  }
+
+  const signature = JSON.stringify({
+    baseUrl,
+    token,
+    key: realtimeConfig.key,
+    wsHost: realtimeConfig.wsHost,
+    wsPort: realtimeConfig.wsPort,
+    wssPort: realtimeConfig.wssPort,
+    forceTLS: realtimeConfig.forceTLS,
+    authEndpoint: realtimeConfig.authEndpoint,
+    channel: realtimeConfig.channel,
+  });
+
+  if (!forceRestart && realtimeClient && realtimeConfigSignature === signature) {
+    return;
+  }
+
+  teardownRealtimeConnection();
+  realtimeConfigSignature = signature;
+
+  const client = new Pusher(realtimeConfig.key, {
+    wsHost: realtimeConfig.wsHost,
+    wsPort: realtimeConfig.wsPort,
+    wssPort: realtimeConfig.wssPort,
+    forceTLS: realtimeConfig.forceTLS,
+    enabledTransports: (realtimeConfig.enabledTransports || ['ws', 'wss']) as ('ws' | 'wss')[],
+    authEndpoint: realtimeConfig.authEndpoint,
+    auth: {
+      headers: {
+        'X-Atlas-Extension-Token': token,
+      },
+    },
+    cluster: 'mt1',
+  });
+
+  client.connection.bind('connected', () => {
+    realtimeReconnectAttempts = 0;
+    if (realtimeReconnectTimer) {
+      clearTimeout(realtimeReconnectTimer);
+      realtimeReconnectTimer = null;
+    }
+  });
+
+  client.connection.bind('disconnected', () => {
+    scheduleRealtimeReconnect();
+  });
+
+  client.connection.bind('error', () => {
+    scheduleRealtimeReconnect();
+  });
+
+  const channel = client.subscribe(realtimeConfig.channel);
+  for (const eventName of SOCKET_EVENT_NAMES) {
+    channel.bind(eventName, (payload: unknown) => {
+      const normalized = normalizeRealtimeEvent(eventName, payload);
+      if (!normalized) {
+        return;
+      }
+
+      void broadcastDownloadEvent(normalized);
+    });
+  }
+
+  realtimeClient = client;
+  realtimeChannel = channel;
+}
+
+function teardownRealtimeConnection() {
+  if (realtimeReconnectTimer) {
+    clearTimeout(realtimeReconnectTimer);
+    realtimeReconnectTimer = null;
+  }
+
+  if (realtimeChannel) {
+    for (const eventName of SOCKET_EVENT_NAMES) {
+      realtimeChannel.unbind(eventName);
+    }
+  }
+
+  if (realtimeClient) {
+    realtimeClient.disconnect();
+  }
+
+  realtimeClient = null;
+  realtimeChannel = null;
+  realtimeConfigSignature = '';
+}
+
+function scheduleRealtimeReconnect() {
+  if (realtimeReconnectTimer) {
+    return;
+  }
+
+  const exponent = Math.min(realtimeReconnectAttempts, 5);
+  const delayMs = Math.min(30_000, 1_000 * 2 ** exponent);
+  realtimeReconnectAttempts += 1;
+  realtimeReconnectTimer = setTimeout(() => {
+    realtimeReconnectTimer = null;
+    void ensureRealtimeConnection(true);
+  }, delayMs);
+}
+
+async function fetchRealtimeConfig(baseUrl: string, token: string): Promise<RealtimeConfig | null> {
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${baseUrl}/api/extension/realtime`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
+      },
+    });
+  } catch {
+    return null;
+  }
+
+  const data = await safeJson(response);
+  if (!response.ok || !data || typeof data !== 'object') {
+    return null;
+  }
+
+  const config = data as Partial<RealtimeConfig>;
+  if (
+    typeof config.key !== 'string'
+    || typeof config.wsHost !== 'string'
+    || typeof config.wsPort !== 'number'
+    || typeof config.wssPort !== 'number'
+    || typeof config.forceTLS !== 'boolean'
+    || !Array.isArray(config.enabledTransports)
+    || typeof config.authEndpoint !== 'string'
+    || typeof config.channel !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    key: config.key,
+    wsHost: config.wsHost,
+    wsPort: config.wsPort,
+    wssPort: config.wssPort,
+    forceTLS: config.forceTLS,
+    enabledTransports: config.enabledTransports.filter((value): value is string => typeof value === 'string'),
+    authEndpoint: config.authEndpoint,
+    channel: config.channel,
+  };
+}
+
+function normalizeRealtimeEvent(eventName: string, payload: unknown): DownloadRealtimeEvent | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const value = payload as Record<string, unknown>;
+  const transferIdCandidate = value.downloadTransferId ?? value.id;
+  const transferId = typeof transferIdCandidate === 'number'
+    ? transferIdCandidate
+    : Number.isFinite(Number(transferIdCandidate))
+      ? Number(transferIdCandidate)
+      : null;
+
+  const status = typeof value.status === 'string' ? value.status : null;
+  const percentCandidate = value.percent;
+  const percent = typeof percentCandidate === 'number'
+    ? percentCandidate
+    : Number.isFinite(Number(percentCandidate))
+      ? Number(percentCandidate)
+      : null;
+  const original = typeof value.original === 'string'
+    ? value.original
+    : typeof value.url === 'string'
+      ? value.url
+      : null;
+  const referrerUrl = typeof value.referrer_url === 'string' ? value.referrer_url : null;
+  const finishedAt = typeof value.finished_at === 'string' ? value.finished_at : null;
+  const failedAt = typeof value.failed_at === 'string' ? value.failed_at : null;
+
+  const downloaded = status === 'completed' || Boolean(finishedAt) || percent === 100;
+  const failed = status === 'failed' || status === 'canceled' || Boolean(failedAt);
+  if (!transferId && !original && !referrerUrl) {
+    return null;
+  }
+
+  return {
+    event: eventName,
+    transferId,
+    status,
+    percent,
+    original,
+    referrer_url: referrerUrl,
+    finished_at: finishedAt,
+    failed_at: failedAt,
+    downloaded,
+    failed,
+  };
+}
+
+async function broadcastDownloadEvent(payload: DownloadRealtimeEvent): Promise<void> {
+  let tabs: ChromeTab[] = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return;
+  }
+
+  for (const tab of tabs) {
+    if (!tab?.id) {
+      continue;
+    }
+
+    try {
+      chrome.tabs.sendMessage(tab.id, {
+        type: 'atlas-download-event',
+        payload,
+      });
+    } catch {
+      // Ignore tabs without a matching content script.
+    }
+  }
 }
 
 async function handleDownload(payload: unknown) {

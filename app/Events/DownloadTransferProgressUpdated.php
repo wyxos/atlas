@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Services\ExtensionRealtimeChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -41,9 +42,13 @@ class DownloadTransferProgressUpdated implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        return [
-            new PrivateChannel('downloads'),
-        ];
+        $channels = [new PrivateChannel('downloads')];
+        $extensionChannel = ExtensionRealtimeChannel::channelName();
+        if ($extensionChannel) {
+            $channels[] = new PrivateChannel($extensionChannel);
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string
