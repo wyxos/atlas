@@ -1,4 +1,4 @@
-import { resolveAbsoluteUrl, shouldBypassMinSize } from './media';
+import { resolveAbsoluteUrl } from './media';
 
 type MediaItem = {
   tag_name: 'img' | 'video';
@@ -11,10 +11,27 @@ type MediaItem = {
   download_via?: string;
 };
 
-const DEFAULT_NOISE_MEDIA_HOSTS = ['st.deviantart.net'];
+type NoiseFilterRule =
+  | { kind: 'host'; host: string }
+  | { kind: 'urlPattern'; regex: RegExp }
+  | { kind: 'urlContains'; needle: string };
+
+const DEFAULT_MEDIA_NOISE_FILTERS = [
+  'host:st.deviantart.net',
+  'url:*wixmp.com*/crop/w_92,h_92*',
+  'url:*wixmp.com*/crop/w_150,h_150*',
+  'url:*wixmp.com*/fit/w_150,h_150*',
+];
+
+const defaultNoiseRules = parseNoiseFilterRules(DEFAULT_MEDIA_NOISE_FILTERS.join('\n'));
+let customNoiseRules: NoiseFilterRule[] = [];
 
 export function safeUrl(value: string): string {
   return resolveAbsoluteUrl(value, window.location.href);
+}
+
+export function configureMediaNoiseFilters(rawFilters: unknown): void {
+  customNoiseRules = parseNoiseFilterRules(rawFilters);
 }
 
 export function getVideoUrl(video: HTMLVideoElement): string {
@@ -54,10 +71,8 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
     const minFilterWidth = width ?? toPositiveDimension(img.clientWidth);
     const minFilterHeight = height ?? toPositiveDimension(img.clientHeight);
 
-    if (!shouldBypassMinSize(img, url || rawSrc)) {
-      if ((minFilterWidth && minFilterWidth < minSize) || (minFilterHeight && minFilterHeight < minSize)) {
-        return null;
-      }
+    if ((minFilterWidth && minFilterWidth < minSize) || (minFilterHeight && minFilterHeight < minSize)) {
+      return null;
     }
 
     if (!url) {
@@ -352,24 +367,13 @@ function resolveImageDimensions(
 ): { width: number | null; height: number | null } {
   const naturalWidth = toPositiveDimension(img.naturalWidth);
   const naturalHeight = toPositiveDimension(img.naturalHeight);
-  if (naturalWidth || naturalHeight) {
-    return {
-      width: naturalWidth,
-      height: naturalHeight,
-    };
-  }
-
   const hinted = extractDimensionsFromUrl(url);
-  if (hinted.width || hinted.height) {
-    return hinted;
-  }
-
   const attrWidth = parseDimensionAttr(img.getAttribute('width'));
   const attrHeight = parseDimensionAttr(img.getAttribute('height'));
 
   return {
-    width: attrWidth,
-    height: attrHeight,
+    width: maxDimension(naturalWidth, hinted.width, attrWidth),
+    height: maxDimension(naturalHeight, hinted.height, attrHeight),
   };
 }
 
@@ -446,12 +450,35 @@ function toPositiveDimension(value: unknown): number | null {
 }
 
 function isExcludedNoiseMediaUrl(url: string): boolean {
-  const hostname = safeHostname(url);
-  if (!hostname) {
+  const normalizedUrl = (url || '').trim().toLowerCase();
+  if (!normalizedUrl) {
     return false;
   }
 
-  return DEFAULT_NOISE_MEDIA_HOSTS.some((blockedHost) => hostMatches(hostname, blockedHost));
+  const rules = [...defaultNoiseRules, ...customNoiseRules];
+  const hostname = safeHostname(normalizedUrl);
+
+  for (const rule of rules) {
+    if (rule.kind === 'host') {
+      if (hostMatches(hostname, rule.host)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (rule.kind === 'urlPattern') {
+      if (rule.regex.test(normalizedUrl)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (normalizedUrl.includes(rule.needle)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function safeHostname(url: string): string {
@@ -470,4 +497,103 @@ function hostMatches(currentHost: string, blockedHost: string): boolean {
   }
 
   return current === blocked || current.endsWith(`.${blocked}`);
+}
+
+function parseNoiseFilterRules(rawFilters: unknown): NoiseFilterRule[] {
+  if (!rawFilters || typeof rawFilters !== 'string') {
+    return [];
+  }
+
+  return rawFilters
+    .split(/[\n,]/g)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '' && !entry.startsWith('#'))
+    .map((entry) => toNoiseFilterRule(entry))
+    .filter((rule): rule is NoiseFilterRule => rule !== null);
+}
+
+function toNoiseFilterRule(rawEntry: string): NoiseFilterRule | null {
+  const entry = rawEntry.trim();
+  if (!entry) {
+    return null;
+  }
+
+  const lower = entry.toLowerCase();
+  if (lower.startsWith('host:')) {
+    const host = resolveHostLike(entry.slice(5));
+    return host ? { kind: 'host', host } : null;
+  }
+
+  if (lower.startsWith('url:')) {
+    return buildUrlNoiseRule(entry.slice(4));
+  }
+
+  const host = resolveHostLike(entry);
+  if (host) {
+    return { kind: 'host', host };
+  }
+
+  return buildUrlNoiseRule(entry);
+}
+
+function buildUrlNoiseRule(rawPattern: string): NoiseFilterRule | null {
+  const value = rawPattern.trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+
+  if (!value.includes('*')) {
+    return { kind: 'urlContains', needle: value };
+  }
+
+  const source = wildcardToRegexSource(value);
+  try {
+    return { kind: 'urlPattern', regex: new RegExp(source, 'i') };
+  } catch {
+    return null;
+  }
+}
+
+function wildcardToRegexSource(pattern: string): string {
+  return pattern
+    .split('*')
+    .map((part) => escapeRegex(part))
+    .join('.*');
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function resolveHostLike(value: string): string {
+  const trimmed = (value || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const withoutWildcardPrefix = trimmed.startsWith('*.') ? trimmed.slice(2) : trimmed;
+  const withScheme = /^https?:\/\//i.test(withoutWildcardPrefix)
+    ? withoutWildcardPrefix
+    : `https://${withoutWildcardPrefix}`;
+
+  try {
+    return new URL(withScheme).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function maxDimension(...values: Array<number | null>): number | null {
+  let max: number | null = null;
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+
+    if (max === null || value > max) {
+      max = value;
+    }
+  }
+
+  return max;
 }
