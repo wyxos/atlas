@@ -14,6 +14,7 @@ type Settings = {
   atlasBaseUrl?: string;
   atlasToken?: string;
   atlasExcludedDomains?: string;
+  atlasMediaNoiseFilters?: string;
 };
 
 type ChromeStorageSync = {
@@ -85,11 +86,20 @@ const realtimeStatus = ref<RealtimeConnectionStatus>({
 
 const addDomain = ref('');
 const domains = ref<EditableDomain[]>([]);
+const addNoiseFilter = ref('');
+const noiseFilters = ref<EditableDomain[]>([]);
 let realtimePollTimer: ReturnType<typeof setInterval> | null = null;
 let realtimeMessageListener: ((message: unknown) => void) | null = null;
 
 const excludedDomainsString = computed(() =>
   domains.value
+    .map((d) => d.value)
+    .filter(Boolean)
+    .join('\n')
+);
+
+const mediaNoiseFiltersString = computed(() =>
+  noiseFilters.value
     .map((d) => d.value)
     .filter(Boolean)
     .join('\n')
@@ -246,6 +256,108 @@ function removeDomain(index: number): void {
   domains.value.splice(index, 1);
 }
 
+function parseNoiseFilters(raw: string): string[] {
+  if (!raw) return [];
+  return raw
+    .split(/[\n,]/g)
+    .map((v) => v.trim())
+    .filter((v) => v && !v.startsWith('#'))
+    .map(normalizeNoiseFilter)
+    .filter(Boolean);
+}
+
+function normalizeNoiseFilter(input: string): string {
+  const raw = (input || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const lower = raw.toLowerCase();
+  if (lower.startsWith('host:')) {
+    const host = normalizeDomain(raw.slice(5));
+    return host ? `host:${host}` : '';
+  }
+
+  if (lower.startsWith('url:')) {
+    const pattern = raw.slice(4).trim().toLowerCase();
+    return pattern ? `url:${pattern}` : '';
+  }
+
+  const host = normalizeDomain(raw);
+  if (host) {
+    return `host:${host}`;
+  }
+
+  const pattern = raw.toLowerCase();
+  return pattern ? `url:${pattern}` : '';
+}
+
+function addNoiseFiltersFromInput(): void {
+  const parts = (addNoiseFilter.value || '')
+    .split(/[\n, ]+/g)
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map(normalizeNoiseFilter)
+    .filter(Boolean);
+
+  if (parts.length === 0) return;
+
+  const existing = new Set(noiseFilters.value.map((d) => d.value));
+  let added = 0;
+
+  for (const part of parts) {
+    if (existing.has(part)) continue;
+    noiseFilters.value.push({value: part, isEditing: false, draft: part});
+    existing.add(part);
+    added += 1;
+  }
+
+  noiseFilters.value.sort((a, b) => a.value.localeCompare(b.value));
+  addNoiseFilter.value = '';
+  if (added > 0) setStatus(`Added ${added} media noise filter${added === 1 ? '' : 's'}.`);
+}
+
+function startNoiseFilterEdit(index: number): void {
+  const item = noiseFilters.value[index];
+  if (!item) return;
+  item.isEditing = true;
+  item.draft = item.value;
+}
+
+function cancelNoiseFilterEdit(index: number): void {
+  const item = noiseFilters.value[index];
+  if (!item) return;
+  item.isEditing = false;
+  item.draft = item.value;
+}
+
+function saveNoiseFilterEdit(index: number): void {
+  const item = noiseFilters.value[index];
+  if (!item) return;
+
+  const next = normalizeNoiseFilter(item.draft);
+  item.isEditing = false;
+
+  if (!next) {
+    noiseFilters.value.splice(index, 1);
+    return;
+  }
+
+  const existsAt = noiseFilters.value.findIndex((d, i) => d.value === next && i !== index);
+  if (existsAt !== -1) {
+    noiseFilters.value.splice(index, 1);
+    return;
+  }
+
+  item.value = next;
+  item.draft = next;
+  noiseFilters.value.sort((a, b) => a.value.localeCompare(b.value));
+}
+
+function removeNoiseFilter(index: number): void {
+  noiseFilters.value.splice(index, 1);
+}
+
 function parseRealtimeStatus(value: unknown): RealtimeConnectionStatus | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -307,8 +419,9 @@ async function saveSettings(): Promise<void> {
   const atlasBaseUrl = baseUrl.value.trim();
   const atlasToken = token.value.trim();
   const atlasExcludedDomains = excludedDomainsString.value.trim();
+  const atlasMediaNoiseFilters = mediaNoiseFiltersString.value.trim();
 
-  chrome.storage.sync.set({atlasBaseUrl, atlasToken, atlasExcludedDomains}, () => {
+  chrome.storage.sync.set({atlasBaseUrl, atlasToken, atlasExcludedDomains, atlasMediaNoiseFilters}, () => {
     setStatus('Settings saved.');
     requestRealtimeStatus();
   });
@@ -321,12 +434,17 @@ onMounted(() => {
     extensionVersion.value = '';
   }
 
-  chrome.storage.sync.get(['atlasBaseUrl', 'atlasToken', 'atlasExcludedDomains'], (data) => {
+  chrome.storage.sync.get(['atlasBaseUrl', 'atlasToken', 'atlasExcludedDomains', 'atlasMediaNoiseFilters'], (data) => {
     baseUrl.value = data.atlasBaseUrl || '';
     token.value = data.atlasToken || '';
 
     const parsed = parseDomains(data.atlasExcludedDomains || '');
     domains.value = parsed
+      .sort((a, b) => a.localeCompare(b))
+      .map((v) => ({value: v, isEditing: false, draft: v}));
+
+    const parsedNoiseFilters = parseNoiseFilters(data.atlasMediaNoiseFilters || '');
+    noiseFilters.value = parsedNoiseFilters
       .sort((a, b) => a.localeCompare(b))
       .map((v) => ({value: v, isEditing: false, draft: v}));
   });
@@ -535,6 +653,99 @@ onUnmounted(() => {
 
             <p class="mt-2 text-xs text-slate-400">
               Tip: paste a comma/newline-separated list into the add box and click +.
+            </p>
+          </div>
+
+          <div>
+            <label for="addNoiseFilter" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Media noise filters
+            </label>
+            <div class="flex items-center gap-2">
+              <input
+                id="addNoiseFilter"
+                v-model="addNoiseFilter"
+                class="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
+                placeholder="host:st.deviantart.net or url:*w_92,h_92*"
+                @keydown.enter.prevent="addNoiseFiltersFromInput"
+              />
+              <button
+                type="button"
+                class="grid size-10 place-items-center rounded-xl bg-sky-400 text-slate-950 hover:bg-sky-300"
+                @click="addNoiseFiltersFromInput"
+                aria-label="Add noise filter"
+                title="Add noise filter"
+              >
+                <Plus class="size-5" />
+              </button>
+            </div>
+
+            <div class="mt-3 overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-950/25">
+              <div v-if="noiseFilters.length === 0" class="px-3 py-3 text-xs text-slate-400">
+                No custom media noise filters.
+              </div>
+              <ul v-else class="divide-y divide-slate-700/50">
+                <li v-for="(filter, i) in noiseFilters" :key="filter.value" class="flex items-center gap-2 px-3 py-2.5">
+                  <template v-if="filter.isEditing">
+                    <input
+                      v-model="filter.draft"
+                      class="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
+                      aria-label="Edit media noise filter"
+                      @keydown.enter.prevent="saveNoiseFilterEdit(i)"
+                      @keydown.esc.prevent="cancelNoiseFilterEdit(i)"
+                    />
+                    <div class="flex gap-2">
+                      <button
+                        type="button"
+                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                        @click="saveNoiseFilterEdit(i)"
+                        aria-label="Save"
+                        title="Save"
+                      >
+                        <Check class="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                        @click="cancelNoiseFilterEdit(i)"
+                        aria-label="Cancel"
+                        title="Cancel"
+                      >
+                        <X class="size-4" />
+                      </button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="min-w-0 flex-1 truncate font-mono text-sm text-slate-100" :title="filter.value">
+                      {{ filter.value }}
+                    </div>
+                    <div class="flex gap-2">
+                      <button
+                        type="button"
+                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                        @click="startNoiseFilterEdit(i)"
+                        aria-label="Edit"
+                        title="Edit"
+                      >
+                        <Pencil class="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        class="grid size-9 place-items-center rounded-xl border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70"
+                        @click="removeNoiseFilter(i)"
+                        aria-label="Delete"
+                        title="Delete"
+                      >
+                        <Trash2 class="size-4" />
+                      </button>
+                    </div>
+                  </template>
+                </li>
+              </ul>
+            </div>
+
+            <p class="mt-2 text-xs text-slate-400">
+              Format: <span class="font-mono">host:example.com</span> or <span class="font-mono">url:*pattern*</span>.
+              Bare domains are normalized to <span class="font-mono">host:</span>.
             </p>
           </div>
         </div>

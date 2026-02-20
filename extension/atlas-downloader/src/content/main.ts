@@ -1,6 +1,11 @@
 import './content.css';
 import { registrableDomainFromUrl } from '../shared/domain';
-import { buildDirectPageCandidate, buildItemFromElement, collectLookupKeysForNode } from './items';
+import {
+  buildDirectPageCandidate,
+  buildItemFromElement,
+  collectLookupKeysForNode,
+  configureMediaNoiseFilters,
+} from './items';
 import { installHotkeys, installMediaReactionOverlay } from './interactions';
 import { isHostExcluded, isHostMatch, parseExcludedDomains, resolveHost, stripHash } from './network';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
@@ -9,6 +14,7 @@ import { createDialogChooser, createToastFn, ensurePageMarkerStyles } from './ui
 type ContentSettings = {
   atlasBaseUrl?: string;
   atlasExcludedDomains?: string;
+  atlasMediaNoiseFilters?: string;
 };
 
 type ChromeStorageSync = {
@@ -162,7 +168,9 @@ declare const chrome: ChromeApi;
     }
 
     try {
-      chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
+      chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains', 'atlasMediaNoiseFilters'], (data) => {
+        configureMediaNoiseFilters(data.atlasMediaNoiseFilters || '');
+
         const baseHost = resolveHost(data.atlasBaseUrl || '');
         if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
           return;
@@ -181,7 +189,9 @@ declare const chrome: ChromeApi;
     }
   });
 
-  chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains'], (data) => {
+  chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains', 'atlasMediaNoiseFilters'], (data) => {
+    configureMediaNoiseFilters(data.atlasMediaNoiseFilters || '');
+
     const baseHost = resolveHost(data.atlasBaseUrl || '');
     if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
       return;

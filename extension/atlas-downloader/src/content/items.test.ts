@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
-import { buildItemFromElement, collectLookupKeysForNode } from './items';
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildItemFromElement, collectLookupKeysForNode, configureMediaNoiseFilters } from './items';
 
 function setLocation(url: string) {
   const next = new URL(url, window.location.origin);
@@ -18,6 +18,10 @@ function setVideoSize(video: HTMLVideoElement, width: number, height: number) {
 }
 
 describe('items', () => {
+  afterEach(() => {
+    configureMediaNoiseFilters('');
+  });
+
   it('builds image items with page referrer and absolute urls', () => {
     setLocation('/havenpoint/art/Adoptable-123#atlas');
     const img = document.createElement('img');
@@ -45,13 +49,13 @@ describe('items', () => {
     expect(buildItemFromElement(gif, 450)).toBeNull();
   });
 
-  it('uses wixmp size hints when natural dimensions are unavailable', () => {
+  it('uses wixmp size hints when natural dimensions are larger than rendered size', () => {
     setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
 
     const img = document.createElement('img');
     img.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/8eee0575-fbad-44dc-aafe-d4ebbaa3ce43/dlib667-5de41a77-dec1-4f4a-bd6a-4f6bd2ed7912.png/v1/fit/w_828,h_1212,q_70,strp/orange_hair_squad__go__by_chrisis_ai_dlib667-414w-2x.jpg?token=abc';
-    Object.defineProperty(img, 'naturalWidth', { value: 0, configurable: true });
-    Object.defineProperty(img, 'naturalHeight', { value: 0, configurable: true });
+    Object.defineProperty(img, 'naturalWidth', { value: 328, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 481, configurable: true });
     Object.defineProperty(img, 'clientWidth', { value: 328, configurable: true });
     Object.defineProperty(img, 'clientHeight', { value: 481, configurable: true });
 
@@ -75,6 +79,31 @@ describe('items', () => {
     const img = document.createElement('img');
     img.src = 'https://example.com/tiny.png';
     setImageSize(img, 199, 400);
+
+    expect(buildItemFromElement(img, 200)).toBeNull();
+  });
+
+  it('does not bypass minimum size for modal-contained thumbnails', () => {
+    setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
+
+    const modal = document.createElement('div');
+    modal.className = 'lightbox-modal';
+    const img = document.createElement('img');
+    img.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/example/v1/fit/w_150,h_150,q_70,strp/thumb.jpg';
+    setImageSize(img, 150, 150);
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+
+    expect(buildItemFromElement(img, 200)).toBeNull();
+  });
+
+  it('applies custom media noise filters', () => {
+    setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
+    configureMediaNoiseFilters('url:*orange_hair_squad__go*');
+
+    const img = document.createElement('img');
+    img.src = 'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/8eee0575-fbad-44dc-aafe-d4ebbaa3ce43/dlib667-5de41a77-dec1-4f4a-bd6a-4f6bd2ed7912.png/v1/fit/w_828,h_1212,q_70,strp/orange_hair_squad__go__by_chrisis_ai_dlib667-414w-2x.jpg?token=abc';
+    setImageSize(img, 828, 1212);
 
     expect(buildItemFromElement(img, 200)).toBeNull();
   });
