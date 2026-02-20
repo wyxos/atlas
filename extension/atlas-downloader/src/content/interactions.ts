@@ -2,6 +2,8 @@ import { buildItemFromElement } from './items';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
 import type { DialogChooser } from './ui';
 
+const LOCATION_CHANGE_EVENT = 'atlas-location-change';
+
 type AtlasStatus = {
   exists: boolean;
   downloaded: boolean;
@@ -423,10 +425,40 @@ type OverlayOptions = {
   chooseDialog: DialogChooser;
 };
 
+type AtlasWindow = Window & {
+  __atlasLocationObserverInstalled?: boolean;
+};
+
 function clamp(value: number, min: number, max: number) {
   if (value < min) return min;
   if (value > max) return max;
   return value;
+}
+
+function installLocationChangeObserver() {
+  const atlasWindow = window as AtlasWindow;
+  if (atlasWindow.__atlasLocationObserverInstalled) {
+    return;
+  }
+  atlasWindow.__atlasLocationObserverInstalled = true;
+
+  const emit = () => {
+    window.dispatchEvent(new Event(LOCATION_CHANGE_EVENT));
+  };
+
+  const wrapHistoryMethod = (method: 'pushState' | 'replaceState') => {
+    const original = history[method].bind(history);
+    history[method] = ((...args: Parameters<History[typeof method]>) => {
+      const result = original(...args);
+      emit();
+      return result;
+    }) as History[typeof method];
+  };
+
+  wrapHistoryMethod('pushState');
+  wrapHistoryMethod('replaceState');
+  window.addEventListener('popstate', emit, true);
+  window.addEventListener('hashchange', emit, true);
 }
 
 function buildOverlayReactionPayload(
@@ -475,6 +507,8 @@ function buildOverlayReactionPayload(
 }
 
 export function installMediaReactionOverlay(options: OverlayOptions, deps: InteractionDependencies) {
+  installLocationChangeObserver();
+
   const toolbar = document.createElement('div');
   toolbar.className = 'atlas-downloader-media-toolbar';
   toolbar.setAttribute('role', 'toolbar');
@@ -971,8 +1005,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
   window.addEventListener('scroll', updatePosition, true);
   window.addEventListener('resize', updatePosition);
-  window.addEventListener('popstate', handleLocationChange, true);
-  window.addEventListener('hashchange', handleLocationChange, true);
+  window.addEventListener(LOCATION_CHANGE_EVENT, handleLocationChange, true);
   window.addEventListener('blur', hide);
   window.addEventListener('focus', () => scheduleDetectMediaUnderPointer(40), true);
   const observer = new MutationObserver(() => {
