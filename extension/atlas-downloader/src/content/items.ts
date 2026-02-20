@@ -370,10 +370,16 @@ function resolveImageDimensions(
   const hinted = extractDimensionsFromUrl(url);
   const attrWidth = parseDimensionAttr(img.getAttribute('width'));
   const attrHeight = parseDimensionAttr(img.getAttribute('height'));
+  const shouldPromoteHinted = shouldPreferHintedDimensions(
+    naturalWidth,
+    naturalHeight,
+    hinted.width,
+    hinted.height
+  );
 
   return {
-    width: maxDimension(naturalWidth, hinted.width, attrWidth),
-    height: maxDimension(naturalHeight, hinted.height, attrHeight),
+    width: pickDimensionValue(naturalWidth, hinted.width, attrWidth, shouldPromoteHinted),
+    height: pickDimensionValue(naturalHeight, hinted.height, attrHeight, shouldPromoteHinted),
   };
 }
 
@@ -438,6 +444,57 @@ function parseDimensionAttr(value: string | null): number | null {
   }
 
   return toPositiveDimension(parseInt(numericPrefix, 10));
+}
+
+function shouldPreferHintedDimensions(
+  naturalWidth: number | null,
+  naturalHeight: number | null,
+  hintedWidth: number | null,
+  hintedHeight: number | null
+): boolean {
+  if (!naturalWidth || !naturalHeight || !hintedWidth || !hintedHeight) {
+    return false;
+  }
+
+  if (hintedWidth <= naturalWidth || hintedHeight <= naturalHeight) {
+    return false;
+  }
+
+  const widthRatio = hintedWidth / naturalWidth;
+  const heightRatio = hintedHeight / naturalHeight;
+  const ratioDelta = Math.abs(widthRatio - heightRatio);
+
+  // Only trust hints when the loaded raster is clearly a low-res preview.
+  return (
+    naturalWidth <= 480 &&
+    naturalHeight <= 800 &&
+    hintedWidth >= 600 &&
+    hintedHeight >= 900 &&
+    widthRatio >= 1.8 &&
+    heightRatio >= 1.8 &&
+    ratioDelta <= 0.2
+  );
+}
+
+function pickDimensionValue(
+  natural: number | null,
+  hinted: number | null,
+  attr: number | null,
+  preferHinted: boolean
+): number | null {
+  if (preferHinted && hinted) {
+    return hinted;
+  }
+
+  if (natural) {
+    return natural;
+  }
+
+  if (hinted) {
+    return hinted;
+  }
+
+  return attr;
 }
 
 function toPositiveDimension(value: unknown): number | null {
@@ -581,19 +638,4 @@ function resolveHostLike(value: string): string {
   } catch {
     return '';
   }
-}
-
-function maxDimension(...values: Array<number | null>): number | null {
-  let max: number | null = null;
-  for (const value of values) {
-    if (!value) {
-      continue;
-    }
-
-    if (max === null || value > max) {
-      max = value;
-    }
-  }
-
-  return max;
 }
