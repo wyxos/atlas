@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onMounted, ref} from 'vue';
+import {computed, onMounted, onUnmounted, ref} from 'vue';
 import {
   Check,
   Eye,
@@ -24,6 +24,11 @@ type ChromeStorageSync = {
 type ChromeApi = {
   runtime?: {
     getManifest?: () => { version?: string };
+    sendMessage?: (message: unknown, callback?: (response: unknown) => void) => void;
+    onMessage?: {
+      addListener: (callback: (message: unknown) => void) => void;
+      removeListener: (callback: (message: unknown) => void) => void;
+    };
   };
   storage: {
     sync: ChromeStorageSync;
@@ -38,14 +43,50 @@ type EditableDomain = {
   draft: string;
 };
 
+type RealtimeConnectionState =
+  | 'not-configured'
+  | 'loading'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'error';
+
+type RealtimeConnectionStatus = {
+  state: RealtimeConnectionState;
+  message: string;
+  channel: string | null;
+  host: string | null;
+  updatedAt: number;
+};
+
+const MESSAGE_REALTIME_STATUS_REQUEST = 'atlas-realtime-status-request';
+const MESSAGE_REALTIME_STATUS_CHANGED = 'atlas-realtime-status-changed';
+const REALTIME_STATES: RealtimeConnectionState[] = [
+  'not-configured',
+  'loading',
+  'connecting',
+  'connected',
+  'reconnecting',
+  'error',
+];
+
 const baseUrl = ref('');
 const token = ref('');
 const tokenVisible = ref(false);
 const status = ref('');
 const extensionVersion = ref('');
+const realtimeStatus = ref<RealtimeConnectionStatus>({
+  state: 'loading',
+  message: 'Checking realtime connection.',
+  channel: null,
+  host: null,
+  updatedAt: Date.now(),
+});
 
 const addDomain = ref('');
 const domains = ref<EditableDomain[]>([]);
+let realtimePollTimer: ReturnType<typeof setInterval> | null = null;
+let realtimeMessageListener: ((message: unknown) => void) | null = null;
 
 const excludedDomainsString = computed(() =>
   domains.value
@@ -53,6 +94,55 @@ const excludedDomainsString = computed(() =>
     .filter(Boolean)
     .join('\n')
 );
+
+const realtimeStateLabel = computed(() => {
+  switch (realtimeStatus.value.state) {
+    case 'connected':
+      return 'Connected';
+    case 'connecting':
+      return 'Connecting';
+    case 'reconnecting':
+      return 'Reconnecting';
+    case 'error':
+      return 'Error';
+    case 'not-configured':
+      return 'Not configured';
+    default:
+      return 'Checking';
+  }
+});
+
+const realtimeBadgeClasses = computed(() => {
+  switch (realtimeStatus.value.state) {
+    case 'connected':
+      return 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200';
+    case 'error':
+      return 'border-rose-500/50 bg-rose-500/10 text-rose-200';
+    case 'reconnecting':
+      return 'border-amber-500/50 bg-amber-500/10 text-amber-200';
+    case 'connecting':
+    case 'loading':
+      return 'border-sky-500/50 bg-sky-500/10 text-sky-200';
+    default:
+      return 'border-slate-600/60 bg-slate-700/20 text-slate-300';
+  }
+});
+
+const realtimeDotClasses = computed(() => {
+  switch (realtimeStatus.value.state) {
+    case 'connected':
+      return 'bg-emerald-400';
+    case 'error':
+      return 'bg-rose-400';
+    case 'reconnecting':
+      return 'bg-amber-400';
+    case 'connecting':
+    case 'loading':
+      return 'bg-sky-400 animate-pulse';
+    default:
+      return 'bg-slate-400';
+  }
+});
 
 function setStatus(message: string): void {
   status.value = message;
@@ -156,6 +246,63 @@ function removeDomain(index: number): void {
   domains.value.splice(index, 1);
 }
 
+function parseRealtimeStatus(value: unknown): RealtimeConnectionStatus | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const payload = value as {
+    channel?: unknown;
+    host?: unknown;
+    message?: unknown;
+    state?: unknown;
+    updatedAt?: unknown;
+  };
+  if (
+    typeof payload.state !== 'string'
+    || !REALTIME_STATES.includes(payload.state as RealtimeConnectionState)
+    || typeof payload.message !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    state: payload.state as RealtimeConnectionState,
+    message: payload.message,
+    channel: typeof payload.channel === 'string' ? payload.channel : null,
+    host: typeof payload.host === 'string' ? payload.host : null,
+    updatedAt: typeof payload.updatedAt === 'number' ? payload.updatedAt : Date.now(),
+  };
+}
+
+function applyRealtimeStatus(value: unknown): void {
+  const parsed = parseRealtimeStatus(value);
+  if (!parsed) {
+    return;
+  }
+
+  realtimeStatus.value = parsed;
+}
+
+function requestRealtimeStatus(): void {
+  if (!chrome.runtime?.sendMessage) {
+    return;
+  }
+
+  try {
+    chrome.runtime.sendMessage({type: MESSAGE_REALTIME_STATUS_REQUEST}, (response) => {
+      if (!response || typeof response !== 'object') {
+        return;
+      }
+
+      const statusPayload = (response as { status?: unknown }).status;
+      applyRealtimeStatus(statusPayload);
+    });
+  } catch {
+    // Ignore transient messaging errors.
+  }
+}
+
 async function saveSettings(): Promise<void> {
   const atlasBaseUrl = baseUrl.value.trim();
   const atlasToken = token.value.trim();
@@ -163,6 +310,7 @@ async function saveSettings(): Promise<void> {
 
   chrome.storage.sync.set({atlasBaseUrl, atlasToken, atlasExcludedDomains}, () => {
     setStatus('Settings saved.');
+    requestRealtimeStatus();
   });
 }
 
@@ -182,6 +330,38 @@ onMounted(() => {
       .sort((a, b) => a.localeCompare(b))
       .map((v) => ({value: v, isEditing: false, draft: v}));
   });
+
+  realtimeMessageListener = (message: unknown) => {
+    if (!message || typeof message !== 'object') {
+      return;
+    }
+
+    const payload = message as { status?: unknown; type?: unknown };
+    if (payload.type !== MESSAGE_REALTIME_STATUS_CHANGED) {
+      return;
+    }
+
+    applyRealtimeStatus(payload.status);
+  };
+
+  if (chrome.runtime?.onMessage?.addListener) {
+    chrome.runtime.onMessage.addListener(realtimeMessageListener);
+  }
+
+  requestRealtimeStatus();
+  realtimePollTimer = setInterval(requestRealtimeStatus, 10_000);
+});
+
+onUnmounted(() => {
+  if (realtimePollTimer) {
+    clearInterval(realtimePollTimer);
+    realtimePollTimer = null;
+  }
+
+  if (realtimeMessageListener && chrome.runtime?.onMessage?.removeListener) {
+    chrome.runtime.onMessage.removeListener(realtimeMessageListener);
+    realtimeMessageListener = null;
+  }
 });
 </script>
 
@@ -201,6 +381,24 @@ onMounted(() => {
           </div>
           <p class="mt-0.5 text-xs text-slate-400">
             Configure where downloads are sent and which sites are ignored.
+          </p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <div
+              class="inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+              :class="realtimeBadgeClasses"
+            >
+              <span class="size-2 rounded-full" :class="realtimeDotClasses" />
+              <span>{{ realtimeStateLabel }}</span>
+            </div>
+            <span v-if="realtimeStatus.channel" class="text-[11px] font-mono text-slate-300">
+              {{ realtimeStatus.channel }}
+            </span>
+            <span v-if="realtimeStatus.host" class="text-[11px] text-slate-400">
+              {{ realtimeStatus.host }}
+            </span>
+          </div>
+          <p class="mt-1 text-xs text-slate-400">
+            {{ realtimeStatus.message }}
           </p>
         </div>
       </header>
