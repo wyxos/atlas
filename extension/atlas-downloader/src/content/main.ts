@@ -52,6 +52,7 @@ declare const chrome: ChromeApi;
   })();
 
   let openSheet: (() => void) | null = null;
+  let handleRealtimeDownloadEvent: ((payload: unknown) => void) | null = null;
 
   const ATLAS_STATUS_TTL_MS = 30_000;
   const atlasStatusCache = new Map<
@@ -216,7 +217,12 @@ declare const chrome: ChromeApi;
       return;
     }
 
-    const msg = message as { type?: unknown };
+    const msg = message as { type?: unknown; payload?: unknown };
+    if (msg.type === 'atlas-download-event') {
+      handleRealtimeDownloadEvent?.(msg.payload);
+      return;
+    }
+
     if (msg.type !== 'atlas-open-sheet') {
       return;
     }
@@ -469,9 +475,117 @@ declare const chrome: ChromeApi;
     let reactingItemUrl: string | null = null;
     let debugTargetUrl: string | null = null;
     let markerSyncTimer: number | null = null;
+    const queuedLookupUrls = new Set<string>();
+    const lookupByTransferId = new Map<number, string>();
     // Enable hotkeys immediately after UI mounts; event delegation makes it work for dynamic content too.
     const hotkeysEnabled = true;
     let hotkeysHintShown = false;
+
+    handleRealtimeDownloadEvent = (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') {
+        return;
+      }
+
+      const data = payload as {
+        transferId?: unknown;
+        status?: unknown;
+        original?: unknown;
+        referrer_url?: unknown;
+        downloaded?: unknown;
+        failed?: unknown;
+        finished_at?: unknown;
+        failed_at?: unknown;
+      };
+
+      const transferId = Number.isFinite(Number(data.transferId)) ? Number(data.transferId) : null;
+      const status = typeof data.status === 'string' ? data.status : '';
+      const downloaded = Boolean(data.downloaded) || status === 'completed' || typeof data.finished_at === 'string';
+      const failed = Boolean(data.failed) || status === 'failed' || status === 'canceled' || typeof data.failed_at === 'string';
+
+      const lookupCandidates = new Set<string>();
+      const originalLookup = typeof data.original === 'string' ? stripHash(data.original.trim()) : '';
+      const referrerLookup = typeof data.referrer_url === 'string' ? stripHash(data.referrer_url.trim()) : '';
+      if (originalLookup) {
+        lookupCandidates.add(originalLookup);
+      }
+      if (referrerLookup) {
+        lookupCandidates.add(referrerLookup);
+      }
+
+      const mappedLookup = transferId ? lookupByTransferId.get(transferId) ?? '' : '';
+      if (mappedLookup) {
+        lookupCandidates.add(mappedLookup);
+      }
+
+      if (lookupCandidates.size === 0) {
+        return;
+      }
+
+      const primaryLookup = originalLookup || mappedLookup || referrerLookup || '';
+      if (transferId && primaryLookup && !downloaded && !failed) {
+        lookupByTransferId.set(transferId, primaryLookup);
+      }
+
+      let changed = false;
+      for (const lookup of lookupCandidates) {
+        const cached = getCachedAtlasStatus(lookup);
+        atlasStatusCache.set(lookup, {
+          exists: true,
+          downloaded,
+          blacklisted: cached ? Boolean(cached.blacklisted) : false,
+          reactionType: cached?.reactionType ?? null,
+          ts: Date.now(),
+        });
+      }
+
+      for (const item of items) {
+        const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
+        if (!lookup || !lookupCandidates.has(lookup)) {
+          continue;
+        }
+
+        if (!queuedLookupUrls.has(lookup) && item.status !== 'Queued') {
+          continue;
+        }
+
+        item.atlas = {
+          exists: true,
+          downloaded,
+          blacklisted: item.atlas?.blacklisted ?? false,
+          file_id: item.atlas?.file_id ?? null,
+          reaction: item.atlas?.reaction ?? null,
+        };
+
+        if (downloaded) {
+          item.status = '';
+          item.statusClass = '';
+          item.reactionQueued = null;
+          queuedLookupUrls.delete(lookup);
+        } else if (failed) {
+          item.status = 'Failed';
+          item.statusClass = 'err';
+          item.reactionQueued = null;
+          queuedLookupUrls.delete(lookup);
+        } else {
+          item.status = 'Queued';
+          item.statusClass = 'queued';
+        }
+
+        changed = true;
+      }
+
+      if (transferId && (downloaded || failed)) {
+        lookupByTransferId.delete(transferId);
+      }
+
+      if (!changed) {
+        return;
+      }
+
+      renderList();
+      setReady(summaryText());
+      applyPageMarkers(items);
+    };
 
     toggle.addEventListener('click', (event) => {
       event.preventDefault();
@@ -1150,8 +1264,10 @@ declare const chrome: ChromeApi;
           };
           if (item.atlas.exists && !item.atlas.downloaded && item.atlas.reaction?.type && item.atlas.reaction.type !== 'dislike') {
             item.reactionQueued = item.atlas.reaction.type;
+            queuedLookupUrls.add(lookup);
           } else {
             item.reactionQueued = null;
+            queuedLookupUrls.delete(lookup);
           }
 
           atlasStatusCache.set(lookup, {
@@ -1241,10 +1357,16 @@ declare const chrome: ChromeApi;
             item.status = 'Queued';
             item.statusClass = 'queued';
             item.reactionQueued = options.blacklist ? BLACKLIST_ACTION.type : type;
+            if (lookup) {
+              queuedLookupUrls.add(lookup);
+            }
           } else {
             item.status = '';
             item.statusClass = '';
             item.reactionQueued = null;
+            if (lookup) {
+              queuedLookupUrls.delete(lookup);
+            }
           }
           renderList();
           setReady(summaryText());
@@ -1254,9 +1376,6 @@ declare const chrome: ChromeApi;
             closeModal();
           }
 
-          if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
-            pollUntilDownloaded([lookup], 0);
-          }
         });
       };
 
@@ -1427,7 +1546,6 @@ declare const chrome: ChromeApi;
           }
 
           const results = Array.isArray(response.results) ? response.results : [];
-          const urlsToPoll = [];
           for (let i = 0; i < selected.length; i += 1) {
             const item = selected[i];
             const result = results[i];
@@ -1449,11 +1567,18 @@ declare const chrome: ChromeApi;
                 if (item.atlas?.reaction?.type && item.atlas.reaction.type !== 'dislike') {
                   item.reactionQueued = item.atlas.reaction.type;
                 }
-                urlsToPoll.push(itemLookupUrl(item) || item.url);
+                const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
+                if (lookup) {
+                  queuedLookupUrls.add(lookup);
+                }
               } else {
                 item.status = '';
                 item.statusClass = '';
                 item.reactionQueued = null;
+                const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
+                if (lookup) {
+                  queuedLookupUrls.delete(lookup);
+                }
               }
             } else {
               item.status = result?.error || 'Failed';
@@ -1470,81 +1595,9 @@ declare const chrome: ChromeApi;
           } else {
             showToast(response.error || 'Some requests failed.', 'danger');
           }
-
-            if (urlsToPoll.length > 0) {
-              pollUntilDownloaded(urlsToPoll, 0);
-            }
           }
         );
       }
-    }
-
-    function pollUntilDownloaded(urls, attempt) {
-      if (attempt > 15) {
-        return;
-      }
-
-      setTimeout(() => {
-        sendMessageSafe({ type: 'atlas-check-batch', urls }, (response) => {
-          if (!response || !response.ok) {
-            pollUntilDownloaded(urls, attempt + 1);
-            return;
-          }
-
-          const results = Array.isArray(response.data?.results) ? response.data.results : [];
-          const byUrl = new Map(
-            results
-              .filter((r) => typeof r?.url === 'string' && r.url.trim() !== '')
-              .map((r) => [stripHash(String(r.url)), r])
-          );
-
-          let remaining = 0;
-          for (const item of items) {
-            const lookup = itemLookupUrl(item) || item.url;
-            const match = byUrl.get(stripHash(lookup));
-            if (!match) {
-              continue;
-            }
-
-            item.atlas = {
-              exists: Boolean(match.exists),
-              downloaded: Boolean(match.downloaded),
-              blacklisted: Boolean(match.blacklisted),
-              file_id: match.file_id ?? null,
-              reaction: match.reaction ?? null,
-            };
-            if (lookup) {
-              atlasStatusCache.set(stripHash(lookup), {
-                exists: Boolean(match.exists),
-                downloaded: Boolean(match.downloaded),
-                blacklisted: Boolean(match.blacklisted),
-                reactionType: match.reaction?.type ? String(match.reaction.type) : null,
-                ts: Date.now(),
-              });
-            }
-            if (item.atlas.exists && !item.atlas.downloaded && item.atlas.reaction?.type && item.atlas.reaction.type !== 'dislike') {
-              item.reactionQueued = item.atlas.reaction.type;
-            } else {
-              item.reactionQueued = null;
-            }
-
-            if (!match.downloaded) {
-              remaining += 1;
-            } else if (item.status === 'Queued') {
-              item.status = '';
-              item.statusClass = '';
-            }
-          }
-
-          renderList();
-          setReady(summaryText());
-          applyPageMarkers(items);
-
-          if (remaining > 0) {
-            pollUntilDownloaded(urls, attempt + 1);
-          }
-        });
-      }, 2000);
     }
 
     function applyPageMarkers(sheetItems = items) {
