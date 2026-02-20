@@ -11,6 +11,8 @@ type MediaItem = {
   download_via?: string;
 };
 
+const DEFAULT_NOISE_MEDIA_HOSTS = ['st.deviantart.net'];
+
 export function safeUrl(value: string): string {
   return resolveAbsoluteUrl(value, window.location.href);
 }
@@ -42,13 +44,18 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
 
   if (element.tagName === 'IMG') {
     const img = element as HTMLImageElement;
-    const width = img.naturalWidth || img.width || img.clientWidth || null;
-    const height = img.naturalHeight || img.height || img.clientHeight || null;
     const rawSrc = (img.currentSrc || img.src || img.getAttribute('src') || '').trim();
     const url = safeUrl(rawSrc);
+    if (url && isExcludedNoiseMediaUrl(url)) {
+      return null;
+    }
+
+    const { width, height } = resolveImageDimensions(img, url || rawSrc);
+    const minFilterWidth = width ?? toPositiveDimension(img.clientWidth);
+    const minFilterHeight = height ?? toPositiveDimension(img.clientHeight);
 
     if (!shouldBypassMinSize(img, url || rawSrc)) {
-      if (width && height && (width < minSize || height < minSize)) {
+      if ((minFilterWidth && minFilterWidth < minSize) || (minFilterHeight && minFilterHeight < minSize)) {
         return null;
       }
     }
@@ -56,6 +63,9 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
     if (!url) {
       const fallback = safeUrl(document.referrer) || safeUrl(window.location.href) || '';
       if (!fallback || (!rawSrc.toLowerCase().startsWith('blob:') && !rawSrc.toLowerCase().startsWith('data:'))) {
+        return null;
+      }
+      if (isExcludedNoiseMediaUrl(fallback)) {
         return null;
       }
 
@@ -90,6 +100,9 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
     }
 
     const url = getVideoUrl(video);
+    if (url && isExcludedNoiseMediaUrl(url)) {
+      return null;
+    }
     if (!url) {
       const rawSrc = (video.currentSrc || video.src || '').trim().toLowerCase();
       if (rawSrc.startsWith('blob:') || rawSrc.startsWith('data:')) {
@@ -331,4 +344,130 @@ function findPlayableUrl(value: unknown, depth: number): string {
   }
 
   return '';
+}
+
+function resolveImageDimensions(
+  img: HTMLImageElement,
+  url: string
+): { width: number | null; height: number | null } {
+  const naturalWidth = toPositiveDimension(img.naturalWidth);
+  const naturalHeight = toPositiveDimension(img.naturalHeight);
+  if (naturalWidth || naturalHeight) {
+    return {
+      width: naturalWidth,
+      height: naturalHeight,
+    };
+  }
+
+  const hinted = extractDimensionsFromUrl(url);
+  if (hinted.width || hinted.height) {
+    return hinted;
+  }
+
+  const attrWidth = parseDimensionAttr(img.getAttribute('width'));
+  const attrHeight = parseDimensionAttr(img.getAttribute('height'));
+
+  return {
+    width: attrWidth,
+    height: attrHeight,
+  };
+}
+
+function extractDimensionsFromUrl(rawUrl: string): { width: number | null; height: number | null } {
+  const text = (rawUrl || '').trim();
+  if (!text) {
+    return { width: null, height: null };
+  }
+
+  const widthToken = firstDimensionToken(text, [/(?:^|[/,?&_=-])w_(\d{2,5})(?=$|[/,?&_=-])/i]);
+  const heightToken = firstDimensionToken(text, [/(?:^|[/,?&_=-])h_(\d{2,5})(?=$|[/,?&_=-])/i]);
+
+  let width = widthToken;
+  const height = heightToken;
+
+  // Common CDN suffix: `-414w-2x` means effective width 828.
+  const retinaWidthMatch = text.match(/-(\d{2,5})w-(\d)x(?=$|[./?&_-])/i);
+  if (retinaWidthMatch) {
+    const baseWidth = parseInt(retinaWidthMatch[1], 10);
+    const scale = parseInt(retinaWidthMatch[2], 10);
+    const scaledWidth = toPositiveDimension(baseWidth * scale);
+    if (scaledWidth && (!width || scaledWidth > width)) {
+      width = scaledWidth;
+    }
+  }
+
+  return {
+    width: width ?? null,
+    height: height ?? null,
+  };
+}
+
+function firstDimensionToken(text: string, patterns: RegExp[]): number | null {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match || !match[1]) {
+      continue;
+    }
+
+    const parsed = toPositiveDimension(parseInt(match[1], 10));
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseDimensionAttr(value: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const numericPrefix = trimmed.match(/^\d+/)?.[0] ?? '';
+  if (!numericPrefix) {
+    return null;
+  }
+
+  return toPositiveDimension(parseInt(numericPrefix, 10));
+}
+
+function toPositiveDimension(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const rounded = Math.round(value);
+  return rounded > 0 ? rounded : null;
+}
+
+function isExcludedNoiseMediaUrl(url: string): boolean {
+  const hostname = safeHostname(url);
+  if (!hostname) {
+    return false;
+  }
+
+  return DEFAULT_NOISE_MEDIA_HOSTS.some((blockedHost) => hostMatches(hostname, blockedHost));
+}
+
+function safeHostname(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function hostMatches(currentHost: string, blockedHost: string): boolean {
+  const current = (currentHost || '').trim().toLowerCase();
+  const blocked = (blockedHost || '').trim().toLowerCase();
+  if (!current || !blocked) {
+    return false;
+  }
+
+  return current === blocked || current.endsWith(`.${blocked}`);
 }

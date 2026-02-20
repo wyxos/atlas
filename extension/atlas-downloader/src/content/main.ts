@@ -34,7 +34,7 @@ type ChromeApi = {
 declare const chrome: ChromeApi;
 
 (() => {
-  const MIN_SIZE = 250;
+  const MIN_SIZE = 200;
   // Keep extension metadata short; some Atlas deployments validate at 500 chars.
   const MAX_METADATA_LEN = 500;
   const ROOT_ID = 'atlas-downloader-root';

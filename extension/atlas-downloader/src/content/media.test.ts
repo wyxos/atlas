@@ -46,10 +46,10 @@ describe('media utils', () => {
     expect(isElementInModal(img)).toBe(true);
   });
 
-  it('bypasses min size for gif/webp and modal images', () => {
+  it('only bypasses min size for modal images', () => {
     const img = document.createElement('img');
     img.src = 'https://example.com/foo.gif';
-    expect(shouldBypassMinSize(img, img.src)).toBe(true);
+    expect(shouldBypassMinSize(img, img.src)).toBe(false);
 
     const modal = document.createElement('div');
     modal.className = 'lightbox-modal';
