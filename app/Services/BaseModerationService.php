@@ -65,6 +65,8 @@ abstract class BaseModerationService
             return $this->emptyResult();
         }
 
+        $reactedFileIds = $this->resolveReactedFileIdsForCurrentUser($files);
+
         foreach ($files as $file) {
             // Skip files already auto-disliked or blacklisted
             if ($file->auto_disliked || $file->blacklisted_at !== null) {
@@ -73,18 +75,8 @@ abstract class BaseModerationService
 
             // If the current user already reacted to this file, do not auto-moderate it.
             // This prevents the UI from starting an auto-dislike countdown on already-reacted items.
-            if (Auth::check()) {
-                $hasUserReaction = $file->relationLoaded('reaction') && $file->getRelation('reaction');
-                if (! $hasUserReaction) {
-                    $hasUserReaction = Reaction::query()
-                        ->where('file_id', $file->id)
-                        ->where('user_id', Auth::id())
-                        ->exists();
-                }
-
-                if ($hasUserReaction) {
-                    continue;
-                }
+            if (isset($reactedFileIds[(int) $file->id])) {
+                continue;
             }
 
             // Check if file should be skipped (e.g., no prompt, no containers)
@@ -233,6 +225,62 @@ abstract class BaseModerationService
         }
 
         return array_merge($this->autoDislikeFileIds, $this->blacklistFileIds);
+    }
+
+    /**
+     * Build a lookup of file IDs that the current user has reacted to.
+     *
+     * @return array<int, true>
+     */
+    protected function resolveReactedFileIdsForCurrentUser(Collection $files): array
+    {
+        if (! Auth::check()) {
+            return [];
+        }
+
+        $userId = Auth::id();
+        if (! is_int($userId)) {
+            return [];
+        }
+
+        $reactedFileIds = [];
+        $fileIdsToQuery = [];
+
+        foreach ($files as $file) {
+            if (! ($file instanceof File)) {
+                continue;
+            }
+
+            // Keep this consistent with process() where already-processed files are skipped.
+            if ($file->auto_disliked || $file->blacklisted_at !== null) {
+                continue;
+            }
+
+            if ($file->relationLoaded('reaction')) {
+                if ($file->getRelation('reaction')) {
+                    $reactedFileIds[(int) $file->id] = true;
+                }
+
+                continue;
+            }
+
+            $fileIdsToQuery[] = (int) $file->id;
+        }
+
+        if ($fileIdsToQuery === []) {
+            return $reactedFileIds;
+        }
+
+        $queriedIds = Reaction::query()
+            ->where('user_id', $userId)
+            ->whereIn('file_id', $fileIdsToQuery)
+            ->pluck('file_id');
+
+        foreach ($queriedIds as $fileId) {
+            $reactedFileIds[(int) $fileId] = true;
+        }
+
+        return $reactedFileIds;
     }
 
     /**
