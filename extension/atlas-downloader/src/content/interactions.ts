@@ -62,6 +62,83 @@ export type HotkeysOptions = {
   getHintShown?: () => boolean;
 };
 
+function isOwnUiElement(element: Element, rootId: string): boolean {
+  return Boolean(element.closest?.(`#${rootId}`));
+}
+
+function pickLargestMediaDescendantAtPoint(
+  candidate: Element,
+  x: number,
+  y: number
+): { media: Element; area: number } | null {
+  const descendants = candidate.querySelectorAll?.('img, video');
+  if (!descendants || descendants.length === 0) {
+    return null;
+  }
+
+  let best: { media: Element; area: number } | null = null;
+  for (const descendant of descendants) {
+    const rect = descendant.getBoundingClientRect();
+    if (
+      rect.width <= 0 ||
+      rect.height <= 0 ||
+      x < rect.left ||
+      x > rect.right ||
+      y < rect.top ||
+      y > rect.bottom
+    ) {
+      continue;
+    }
+
+    const area = rect.width * rect.height;
+    if (!best || area > best.area) {
+      best = { media: descendant, area };
+    }
+  }
+
+  return best;
+}
+
+export function resolveMediaAtPoint(x: number, y: number, rootId: string): Element | null {
+  const rawStack = document.elementsFromPoint?.(x, y) ?? [];
+  const stack = rawStack.filter((node): node is Element => node instanceof Element);
+  if (stack.length === 0) {
+    const fallback = document.elementFromPoint?.(x, y);
+    if (fallback instanceof Element) {
+      stack.push(fallback);
+    }
+  }
+
+  for (const node of stack) {
+    if (isOwnUiElement(node, rootId)) {
+      continue;
+    }
+
+    if (node.matches('img, video')) {
+      return node;
+    }
+
+    const closest = node.closest?.('img, video');
+    if (closest instanceof Element && !isOwnUiElement(closest, rootId)) {
+      return closest;
+    }
+  }
+
+  let best: { media: Element; area: number } | null = null;
+  for (const node of stack) {
+    if (isOwnUiElement(node, rootId)) {
+      continue;
+    }
+
+    const nested = pickLargestMediaDescendantAtPoint(node, x, y);
+    if (nested && (!best || nested.area > best.area)) {
+      best = nested;
+    }
+  }
+
+  return best?.media ?? null;
+}
+
 export function installHotkeys(options: HotkeysOptions, deps: InteractionDependencies) {
   const enabled = options.enabled ?? true;
   const getHintShown = options.getHintShown ?? (() => false);
@@ -95,6 +172,15 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
     const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
     return path.some((p) => p instanceof HTMLElement && p.id === deps.rootId);
   };
+  const resolveEventMedia = (event: MouseEvent): Element | null => {
+    const target = event.target instanceof Element ? event.target : null;
+    const direct = target?.closest?.('img, video') ?? null;
+    if (direct instanceof Element) {
+      return direct;
+    }
+
+    return resolveMediaAtPoint(event.clientX, event.clientY, deps.rootId);
+  };
 
   // Some sites (especially video players) trigger actions on click/pointerup even if mousedown is prevented.
   // Swallow the click when we're handling a hotkey so play/pause/seek doesn't fire.
@@ -107,8 +193,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       if (options.isSheetOpen()) return;
       if (isOwnUiEvent(e)) return;
 
-      const target = e.target instanceof Element ? e.target : null;
-      const media = target?.closest?.('img, video') ?? null;
+      const media = resolveEventMedia(e);
       if (!media) return;
 
       e.preventDefault();
@@ -127,8 +212,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       if (options.isSheetOpen()) return;
       if (isOwnUiEvent(e)) return;
 
-      const target = e.target instanceof Element ? e.target : null;
-      const media = target?.closest?.('img, video') ?? null;
+      const media = resolveEventMedia(e);
       if (!media) return;
 
       const reactionType = e.button === 0 ? 'like' : e.button === 1 ? 'love' : null;
@@ -337,8 +421,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       if (options.isSheetOpen()) return;
       if (isOwnUiEvent(e)) return;
 
-      const target = e.target instanceof Element ? e.target : null;
-      const media = target?.closest?.('img, video') ?? null;
+      const media = resolveEventMedia(e);
       if (!media) return;
 
       maybeHint();
@@ -412,6 +495,25 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
         emitShortcutReactionState(media, false, 'dislike', payload.url);
         options.showToast('Disliked.');
       });
+    },
+    true
+  );
+
+  document.addEventListener(
+    'auxclick',
+    (e) => {
+      if (!enabled) return;
+      if (!(e instanceof MouseEvent)) return;
+      if (!e.altKey || e.button !== 1) return;
+      if (options.isSheetOpen()) return;
+      if (isOwnUiEvent(e)) return;
+
+      const media = resolveEventMedia(e);
+      if (!media) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
     },
     true
   );
@@ -798,55 +900,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     toolbar.style.left = `${left}px`;
   };
 
-  const findMediaAtPoint = (x: number, y: number): Element | null => {
-    const pickFromCandidate = (candidate: Element): Element | null => {
-      if (candidate.matches('img, video')) {
-        return candidate;
-      }
-
-      const closest = candidate.closest?.('img, video');
-      if (closest instanceof Element) {
-        return closest;
-      }
-
-      const descendants = candidate.querySelectorAll?.('img, video');
-      if (!descendants || descendants.length === 0) {
-        return null;
-      }
-
-      for (const descendant of descendants) {
-        const rect = descendant.getBoundingClientRect();
-        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-          return descendant;
-        }
-      }
-
-      return null;
-    };
-
-    const stack = document.elementsFromPoint?.(x, y) ?? [];
-    for (const node of stack) {
-      if (!(node instanceof Element)) {
-        continue;
-      }
-
-      if (node.closest?.(`#${deps.rootId}`)) {
-        continue;
-      }
-
-      const media = pickFromCandidate(node);
-      if (media) {
-        return media;
-      }
-    }
-
-    const fallback = document.elementFromPoint?.(x, y);
-    if (fallback instanceof Element && !fallback.closest?.(`#${deps.rootId}`)) {
-      return pickFromCandidate(fallback);
-    }
-
-    return null;
-  };
+  const findMediaAtPoint = (x: number, y: number): Element | null => resolveMediaAtPoint(x, y, deps.rootId);
 
   const showFor = (media: Element) => {
     if (options.isSheetOpen()) {
@@ -980,6 +1034,19 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       handleLocationChange();
       pointerX = event.clientX;
       pointerY = event.clientY;
+    },
+    true
+  );
+
+  document.addEventListener(
+    'click',
+    (event) => {
+      if (!(event instanceof MouseEvent)) return;
+      if (options.isSheetOpen()) return;
+      if (isOwnUiEvent(event)) return;
+
+      scheduleDetectMediaUnderPointer(40);
+      window.setTimeout(() => scheduleDetectMediaUnderPointer(220), 220);
     },
     true
   );
