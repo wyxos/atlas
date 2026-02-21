@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { choosePromotedMediaCandidate, resolveMediaAtPoint } from './interactions';
+import { choosePromotedMediaCandidate, installHotkeys, resolveMediaAtPoint } from './interactions';
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
   const right = left + width;
@@ -91,6 +91,27 @@ describe('resolveMediaAtPoint', () => {
     const resolved = resolveMediaAtPoint(100, 100, 'atlas-downloader-root');
     expect(resolved).toBe(realImg);
   });
+
+  it('prefers modal media over non-modal media when both are stacked at pointer', () => {
+    const small = document.createElement('img');
+    document.body.appendChild(small);
+    setRect(small, rect(0, 0, 400, 600));
+
+    const modal = document.createElement('div');
+    modal.className = 'lightbox-modal';
+    const large = document.createElement('img');
+    modal.appendChild(large);
+    document.body.appendChild(modal);
+    setRect(large, rect(0, 0, 360, 520));
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [small, large],
+      configurable: true,
+    });
+
+    const resolved = resolveMediaAtPoint(100, 100, 'atlas-downloader-root');
+    expect(resolved).toBe(large);
+  });
 });
 
 describe('choosePromotedMediaCandidate', () => {
@@ -120,5 +141,70 @@ describe('choosePromotedMediaCandidate', () => {
 
     const promoted = choosePromotedMediaCandidate(current, 'atlas-downloader-root');
     expect(promoted).toBeNull();
+  });
+});
+
+describe('installHotkeys', () => {
+  it('uses the event target media over pointer stack fallback for reactions', () => {
+    const small = document.createElement('img');
+    small.src = 'https://example.com/small.jpg';
+    document.body.appendChild(small);
+    setRect(small, rect(0, 0, 500, 700));
+    Object.defineProperty(small, 'naturalWidth', { value: 500, configurable: true });
+    Object.defineProperty(small, 'naturalHeight', { value: 700, configurable: true });
+
+    const modal = document.createElement('div');
+    modal.className = 'lightbox-modal';
+    const large = document.createElement('img');
+    large.src = 'https://example.com/large.jpg';
+    modal.appendChild(large);
+    document.body.appendChild(modal);
+    setRect(large, rect(0, 0, 400, 560));
+    Object.defineProperty(large, 'naturalWidth', { value: 400, configurable: true });
+    Object.defineProperty(large, 'naturalHeight', { value: 560, configurable: true });
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [small],
+      configurable: true,
+    });
+
+    let reactedUrl: string | null = null;
+    const sendMessageSafe = (message: unknown, callback: (response: { ok?: boolean; data?: unknown }) => void) => {
+      const payload = (message as { payload?: { url?: string } }).payload;
+      reactedUrl = payload?.url ?? null;
+      callback({ ok: true, data: {} });
+    };
+
+    installHotkeys(
+      {
+        showToast: () => {},
+        sendMessageSafe,
+        isSheetOpen: () => false,
+        chooseDialog: async () => 'cancel',
+      },
+      {
+        rootId: 'atlas-downloader-root',
+        minSize: 200,
+        maxMetadataLen: 255,
+        limitString: (value) => String(value ?? ''),
+        sourceFromMediaUrl: () => 'web',
+        fetchAtlasStatus: (_send, _url, _referrer, callback) => callback(null),
+        atlasStatusCache: new Map(),
+        getCachedAtlasStatus: () => null,
+      }
+    );
+
+    large.dispatchEvent(
+      new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        altKey: true,
+        button: 1,
+        clientX: 12,
+        clientY: 14,
+      })
+    );
+
+    expect(reactedUrl).toBe('https://example.com/large.jpg');
   });
 });
