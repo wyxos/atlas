@@ -100,6 +100,32 @@ function pickLargestMediaDescendantAtPoint(
   return best;
 }
 
+type PointMediaCandidate = {
+  media: Element;
+  area: number;
+  stackIndex: number;
+  inModal: boolean;
+};
+
+function selectPreferredPointCandidate(
+  current: PointMediaCandidate | null,
+  next: PointMediaCandidate
+): PointMediaCandidate {
+  if (!current) {
+    return next;
+  }
+
+  if (current.inModal !== next.inModal) {
+    return next.inModal ? next : current;
+  }
+
+  if (next.area !== current.area) {
+    return next.area > current.area ? next : current;
+  }
+
+  return next.stackIndex < current.stackIndex ? next : current;
+}
+
 export function resolveMediaAtPoint(x: number, y: number, rootId: string): Element | null {
   const rawStack = document.elementsFromPoint?.(x, y) ?? [];
   const stack = rawStack.filter((node): node is Element => node instanceof Element);
@@ -110,34 +136,43 @@ export function resolveMediaAtPoint(x: number, y: number, rootId: string): Eleme
     }
   }
 
-  for (const node of stack) {
+  let best: PointMediaCandidate | null = null;
+
+  for (const [stackIndex, node] of stack.entries()) {
     if (isOwnUiElement(node, rootId)) {
       continue;
     }
 
     if (node.matches('img, video')) {
-      return node;
-    }
-
-    const closest = node.closest?.('img, video');
-    if (closest instanceof Element && !isOwnUiElement(closest, rootId)) {
-      return closest;
+      const rect = node.getBoundingClientRect();
+      best = selectPreferredPointCandidate(best, {
+        media: node,
+        area: Math.max(rect.width * rect.height, 1),
+        stackIndex,
+        inModal: isElementInModal(node),
+      });
     }
   }
 
-  let best: { media: Element; area: number } | null = null;
-  for (const node of stack) {
+  for (const [stackIndex, node] of stack.entries()) {
     if (isOwnUiElement(node, rootId)) {
       continue;
     }
 
     const nested = pickLargestMediaDescendantAtPoint(node, x, y);
-    if (nested && (!best || nested.area > best.area)) {
-      best = nested;
+    if (!nested) {
+      continue;
     }
+
+    best = selectPreferredPointCandidate(best, {
+      media: nested.media,
+      area: nested.area,
+      stackIndex,
+      inModal: isElementInModal(nested.media),
+    });
   }
 
-  return best?.media ?? null;
+  return best ? best.media : null;
 }
 
 function getElementViewportArea(element: Element): number {
@@ -234,12 +269,17 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
   };
   const resolveEventMedia = (event: MouseEvent): Element | null => {
     const target = event.target instanceof Element ? event.target : null;
-    const direct = target?.closest?.('img, video') ?? null;
-    if (direct instanceof Element) {
-      return direct;
+    const byTarget = target?.closest?.('img, video') ?? null;
+    if (byTarget instanceof Element && !isOwnUiElement(byTarget, deps.rootId)) {
+      return byTarget;
     }
 
-    return resolveMediaAtPoint(event.clientX, event.clientY, deps.rootId);
+    const byPoint = resolveMediaAtPoint(event.clientX, event.clientY, deps.rootId);
+    if (byPoint) {
+      return byPoint;
+    }
+
+    return null;
   };
 
   // Some sites (especially video players) trigger actions on click/pointerup even if mousedown is prevented.
@@ -682,14 +722,14 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
   let activeMedia: Element | null = null;
   let activeKey: string | null = null;
-  let hideTimer: number | null = null;
+  let hideFrameA: number | null = null;
+  let hideFrameB: number | null = null;
   let toolbarBusy = false;
   let toolbarQueuedType: string | null = null;
   let toolbarPendingType: string | null = null;
   let pointerX = -1;
   let pointerY = -1;
-  let hoverDetectTimer: number | null = null;
-  let promoteDetectTimer: number | null = null;
+  let refreshMediaContextFrame: number | null = null;
   let activeLocationHref = window.location.href;
 
   const buttonsByType = new Map<string, HTMLButtonElement>();
@@ -786,9 +826,13 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   };
 
   const cancelHide = () => {
-    if (hideTimer) {
-      window.clearTimeout(hideTimer);
-      hideTimer = null;
+    if (hideFrameA !== null) {
+      window.cancelAnimationFrame(hideFrameA);
+      hideFrameA = null;
+    }
+    if (hideFrameB !== null) {
+      window.cancelAnimationFrame(hideFrameB);
+      hideFrameB = null;
     }
   };
 
@@ -808,10 +852,15 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
   const scheduleHide = () => {
     cancelHide();
-    hideTimer = window.setTimeout(() => {
-      if (toolbar.matches(':hover')) return;
-      hide();
-    }, 140);
+    hideFrameA = window.requestAnimationFrame(() => {
+      hideFrameA = null;
+      hideFrameB = window.requestAnimationFrame(() => {
+        hideFrameB = null;
+        if (toolbar.matches(':hover')) return;
+        if (activeMedia instanceof Element && activeMedia.matches(':hover')) return;
+        hide();
+      });
+    });
   };
 
   const swallow = (event: Event) => {
@@ -1015,46 +1064,37 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     return reactionType === 'blacklist' ? 'blacklist' : reactionType;
   };
 
-  const detectMediaUnderPointer = () => {
-    if (pointerX < 0 || pointerY < 0 || options.isSheetOpen()) {
+  const refreshMediaContext = () => {
+    if (options.isSheetOpen()) {
       return;
     }
-    const resolved = findMediaAtPoint(pointerX, pointerY);
-    if (!resolved) {
-      return;
-    }
-    if (resolved.closest?.(`#${deps.rootId}`)) {
-      return;
-    }
-    cancelHide();
-    showFor(resolved);
-  };
 
-  const scheduleDetectMediaUnderPointer = (delayMs = 80) => {
-    if (hoverDetectTimer !== null) {
-      window.clearTimeout(hoverDetectTimer);
+    if (pointerX >= 0 && pointerY >= 0) {
+      const resolved = findMediaAtPoint(pointerX, pointerY);
+      if (resolved && !resolved.closest?.(`#${deps.rootId}`)) {
+        cancelHide();
+        showFor(resolved);
+        return;
+      }
     }
-    hoverDetectTimer = window.setTimeout(() => {
-      hoverDetectTimer = null;
-      detectMediaUnderPointer();
-    }, delayMs);
+
+    const promoted = choosePromotedMediaCandidate(activeMedia, deps.rootId);
+    if (!promoted) {
+      return;
+    }
+
+    cancelHide();
+    showFor(promoted);
   };
-  const schedulePromotedMediaDetect = (delayMs = 120) => {
-    if (promoteDetectTimer !== null) {
-      window.clearTimeout(promoteDetectTimer);
+  const scheduleMediaContextRefresh = () => {
+    if (refreshMediaContextFrame !== null) {
+      return;
     }
-    promoteDetectTimer = window.setTimeout(() => {
-      promoteDetectTimer = null;
-      if (options.isSheetOpen()) {
-        return;
-      }
-      const promoted = choosePromotedMediaCandidate(activeMedia, deps.rootId);
-      if (!promoted) {
-        return;
-      }
-      cancelHide();
-      showFor(promoted);
-    }, delayMs);
+
+    refreshMediaContextFrame = window.requestAnimationFrame(() => {
+      refreshMediaContextFrame = null;
+      refreshMediaContext();
+    });
   };
 
   document.addEventListener(
@@ -1123,10 +1163,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       if (options.isSheetOpen()) return;
       if (isOwnUiEvent(event)) return;
 
-      scheduleDetectMediaUnderPointer(40);
-      window.setTimeout(() => scheduleDetectMediaUnderPointer(220), 220);
-      schedulePromotedMediaDetect(140);
-      window.setTimeout(() => schedulePromotedMediaDetect(260), 260);
+      scheduleMediaContextRefresh();
     },
     true
   );
@@ -1154,13 +1191,10 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   window.addEventListener('resize', updatePosition);
   window.addEventListener(LOCATION_CHANGE_EVENT, handleLocationChange, true);
   window.addEventListener('blur', hide);
-  window.addEventListener('focus', () => scheduleDetectMediaUnderPointer(40), true);
+  window.addEventListener('focus', scheduleMediaContextRefresh, true);
   const observer = new MutationObserver(() => {
     handleLocationChange();
-    scheduleDetectMediaUnderPointer(60);
-    if (activeMedia) {
-      schedulePromotedMediaDetect(90);
-    }
+    scheduleMediaContextRefresh();
   });
   observer.observe(document.documentElement, {
     childList: true,
