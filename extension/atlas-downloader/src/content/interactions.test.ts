@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveMediaAtPoint } from './interactions';
+import { choosePromotedMediaCandidate, resolveMediaAtPoint } from './interactions';
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
   const right = left + width;
@@ -90,5 +90,35 @@ describe('resolveMediaAtPoint', () => {
 
     const resolved = resolveMediaAtPoint(100, 100, 'atlas-downloader-root');
     expect(resolved).toBe(realImg);
+  });
+});
+
+describe('choosePromotedMediaCandidate', () => {
+  it('promotes larger modal media when current media is a smaller thumbnail', () => {
+    const thumb = document.createElement('img');
+    document.body.appendChild(thumb);
+    setRect(thumb, rect(20, 20, 180, 180));
+
+    const modal = document.createElement('div');
+    modal.className = 'lightbox-modal';
+    const large = document.createElement('img');
+    modal.appendChild(large);
+    document.body.appendChild(modal);
+    setRect(large, rect(300, 40, 620, 980));
+
+    const promoted = choosePromotedMediaCandidate(thumb, 'atlas-downloader-root');
+    expect(promoted).toBe(large);
+  });
+
+  it('does not promote when no significantly larger candidate exists', () => {
+    const current = document.createElement('img');
+    const nearby = document.createElement('img');
+    document.body.append(current, nearby);
+
+    setRect(current, rect(10, 10, 320, 320));
+    setRect(nearby, rect(360, 10, 330, 330));
+
+    const promoted = choosePromotedMediaCandidate(current, 'atlas-downloader-root');
+    expect(promoted).toBeNull();
   });
 });
