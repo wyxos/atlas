@@ -100,6 +100,9 @@ Downloads gotcha:
 - If the backend returns `params`, use `params`. Don't map it to `queryParams` unless absolutely necessary.
 - Align the backend to return what's needed instead of transforming in the frontend.
 
+**6. Virtual Lists**
+- For long fixed-height lists, reuse `resources/js/components/VirtualList.vue` instead of re-implementing scroll windowing math per page/component.
+
 ### Code edit instructions
 
 After you've finished editing
