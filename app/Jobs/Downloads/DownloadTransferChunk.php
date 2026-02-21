@@ -13,6 +13,7 @@ use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -81,9 +82,24 @@ class DownloadTransferChunk implements ShouldQueue
                 ->get($transfer->url);
 
             if (! $this->isValidRangeResponse($response)) {
+                if ($this->shouldRetryStatus($response->status())) {
+                    $this->scheduleRetry($transfer, $chunk, "Received HTTP {$response->status()} for {$rangeHeader}.");
+
+                    return;
+                }
+
                 $this->failTransfer($transfer, $chunk, "Invalid range response for {$rangeHeader} (status {$response->status()}).");
 
                 return;
+            }
+
+            if ($transfer->error !== null || $transfer->failed_at !== null) {
+                DownloadTransfer::query()->whereKey($transfer->id)->update([
+                    'failed_at' => null,
+                    'error' => null,
+                    'updated_at' => now(),
+                ]);
+                $transfer->refresh();
             }
 
             $disk = Storage::disk(config('downloads.disk'));
@@ -161,6 +177,12 @@ class DownloadTransferChunk implements ShouldQueue
             }
 
             if ($transfer) {
+                if ($this->shouldRetryException($e)) {
+                    $this->scheduleRetry($transfer, $chunk, $e->getMessage());
+
+                    return;
+                }
+
                 $this->failTransfer($transfer, $chunk, $e->getMessage());
             }
         }
@@ -235,5 +257,80 @@ class DownloadTransferChunk implements ShouldQueue
         }
 
         PumpDomainDownloads::dispatch($transfer->domain);
+    }
+
+    private function shouldRetryStatus(int $status): bool
+    {
+        if ($this->attempts() >= $this->tries) {
+            return false;
+        }
+
+        return $status === 408
+            || $status === 425
+            || $status === 429
+            || ($status >= 500 && $status <= 599);
+    }
+
+    private function shouldRetryException(Throwable $e): bool
+    {
+        if ($this->attempts() >= $this->tries) {
+            return false;
+        }
+
+        if ($e instanceof ConnectionException) {
+            return true;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'timed out')
+            || str_contains($message, 'curl error 28')
+            || str_contains($message, 'connection refused')
+            || str_contains($message, 'temporarily unavailable');
+    }
+
+    private function scheduleRetry(DownloadTransfer $transfer, ?DownloadChunk $chunk, string $reason): void
+    {
+        $delay = max(1, (int) $this->backoff);
+        $attempt = max(1, $this->attempts());
+        $message = $this->retryMessage($attempt, $delay, $reason);
+
+        if ($chunk) {
+            DownloadChunk::query()->whereKey($chunk->id)->update([
+                'status' => DownloadChunkStatus::PENDING,
+                'failed_at' => null,
+                'error' => $message,
+                'updated_at' => now(),
+            ]);
+        }
+
+        DownloadTransfer::query()->whereKey($transfer->id)->update([
+            'failed_at' => null,
+            'error' => $message,
+            'updated_at' => now(),
+        ]);
+
+        $updated = DownloadTransfer::query()->find($transfer->id);
+        if ($updated) {
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
+                ));
+            } catch (Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+        }
+
+        $this->release($delay);
+    }
+
+    private function retryMessage(int $attempt, int $delay, string $reason): string
+    {
+        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $reason));
+        if ($cleanReason === '') {
+            $cleanReason = 'Transient network error.';
+        }
+
+        return "Retry {$attempt}/{$this->tries} scheduled in {$delay}s: {$cleanReason}";
     }
 }

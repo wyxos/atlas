@@ -22,6 +22,7 @@ final class DownloadTransferPayload
             'finished_at' => $transfer->finished_at?->toISOString(),
             'failed_at' => $transfer->failed_at?->toISOString(),
             'percent' => (int) ($transfer->last_broadcast_percent ?? 0),
+            'error' => $transfer->error,
         ];
     }
 
@@ -57,9 +58,11 @@ final class DownloadTransferPayload
             'status' => $transfer->status,
             'percent' => $percent,
             'created_at' => $transfer->created_at?->toISOString(),
+            'queued_at' => $transfer->queued_at?->toISOString(),
             'started_at' => $transfer->started_at?->toISOString(),
             'finished_at' => $transfer->finished_at?->toISOString(),
             'failed_at' => $transfer->failed_at?->toISOString(),
+            'error' => $transfer->error,
         ];
 
         if ($transfer->isTerminal()) {

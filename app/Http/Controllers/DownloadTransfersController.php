@@ -21,6 +21,7 @@ class DownloadTransfersController extends Controller
                 'finished_at',
                 'failed_at',
                 'last_broadcast_percent',
+                'error',
             ])
             ->orderByDesc('id')
             ->get()

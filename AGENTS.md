@@ -58,6 +58,9 @@ Database gotcha:
 - `files` is large (million+ rows). Expect `ALTER TABLE`/dedupe migrations to run for a long time in production; start them once, monitor separately, and keep the deploy shell non-blocking while they finish.
 - In moderation services, never do per-file `Reaction::exists()` checks. Batch current-user reaction lookups with a single `whereIn('file_id', ...)` query before iterating files.
 
+Downloads gotcha:
+- In queued download jobs, catching `Throwable` and writing `FAILED` prevents Laravel queue retries/backoff from running. For transient network errors (timeouts/5xx/connection issues), update transfer state to retry-visible metadata and call `$this->release($delay)` instead.
+
 ---
 
 ## Universal Conventions

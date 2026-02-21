@@ -56,3 +56,33 @@ it('disables pause and cancel when progress is complete', async () => {
     expect(pauseButton.attributes('disabled')).toBeDefined();
     expect(cancelButton.attributes('disabled')).toBeDefined();
 });
+
+it('shows retry context when a download is queued for retry', async () => {
+    window.axios.get = vi.fn().mockResolvedValue({
+        data: {
+            items: [
+                {
+                    id: 12,
+                    status: 'queued',
+                    created_at: null,
+                    queued_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    failed_at: null,
+                    percent: 0,
+                    error: 'Retry 1/3 scheduled in 30s: cURL error 28 timeout',
+                },
+            ],
+        },
+    });
+
+    const wrapper = mount(DownloadsQueue);
+    await flushPromises();
+
+    const container = wrapper.find('.flex-1.overflow-auto');
+    Object.defineProperty(container.element, 'clientHeight', { value: 600, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain('Retry 1/3 scheduled in 30s');
+});

@@ -12,6 +12,7 @@ use App\Services\Downloads\FileDownloadFinalizer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -63,9 +64,24 @@ class DownloadTransferSingleStream implements ShouldQueue
                 ->get($transfer->url);
 
             if (! $this->isValidResponse($response)) {
+                if ($this->shouldRetryStatus($response->status())) {
+                    $this->scheduleRetry($transfer, "Received HTTP {$response->status()} while downloading.");
+
+                    return;
+                }
+
                 $this->failTransfer($transfer, "Invalid download response (status {$response->status()}).");
 
                 return;
+            }
+
+            if ($transfer->error !== null || $transfer->failed_at !== null) {
+                $transfer->update([
+                    'failed_at' => null,
+                    'error' => null,
+                    'updated_at' => now(),
+                ]);
+                $transfer->refresh();
             }
 
             if (! $transfer->bytes_total) {
@@ -193,6 +209,12 @@ class DownloadTransferSingleStream implements ShouldQueue
                 fclose($fh);
             }
 
+            if ($this->shouldRetryException($e)) {
+                $this->scheduleRetry($transfer, $e->getMessage());
+
+                return;
+            }
+
             $this->failTransfer($transfer, $e->getMessage());
         }
     }
@@ -246,6 +268,72 @@ class DownloadTransferSingleStream implements ShouldQueue
         }
 
         PumpDomainDownloads::dispatch($transfer->domain);
+    }
+
+    private function shouldRetryStatus(int $status): bool
+    {
+        if ($this->attempts() >= $this->tries) {
+            return false;
+        }
+
+        return $status === 408
+            || $status === 425
+            || $status === 429
+            || ($status >= 500 && $status <= 599);
+    }
+
+    private function shouldRetryException(Throwable $e): bool
+    {
+        if ($this->attempts() >= $this->tries) {
+            return false;
+        }
+
+        if ($e instanceof ConnectionException) {
+            return true;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'timed out')
+            || str_contains($message, 'curl error 28')
+            || str_contains($message, 'connection refused')
+            || str_contains($message, 'temporarily unavailable');
+    }
+
+    private function scheduleRetry(DownloadTransfer $transfer, string $reason): void
+    {
+        $delay = max(1, (int) $this->backoff);
+        $attempt = max(1, $this->attempts());
+        $message = $this->retryMessage($attempt, $delay, $reason);
+
+        DownloadTransfer::query()->whereKey($transfer->id)->update([
+            'failed_at' => null,
+            'error' => $message,
+            'updated_at' => now(),
+        ]);
+
+        $updated = DownloadTransfer::query()->find($transfer->id);
+        if ($updated) {
+            try {
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
+                ));
+            } catch (Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+        }
+
+        $this->release($delay);
+    }
+
+    private function retryMessage(int $attempt, int $delay, string $reason): string
+    {
+        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $reason));
+        if ($cleanReason === '') {
+            $cleanReason = 'Transient network error.';
+        }
+
+        return "Retry {$attempt}/{$this->tries} scheduled in {$delay}s: {$cleanReason}";
     }
 
     // Progress broadcasting is handled by DownloadTransferProgressBroadcaster.

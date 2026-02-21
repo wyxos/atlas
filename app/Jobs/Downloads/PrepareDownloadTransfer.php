@@ -5,12 +5,14 @@ namespace App\Jobs\Downloads;
 use App\Enums\DownloadChunkStatus;
 use App\Enums\DownloadTransferStatus;
 use App\Events\DownloadTransferProgressUpdated;
+use App\Events\DownloadTransferQueued;
 use App\Models\DownloadChunk;
 use App\Models\DownloadTransfer;
 use App\Services\Downloads\DownloadTransferPayload;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
@@ -55,6 +57,8 @@ class PrepareDownloadTransfer implements ShouldQueue
                     'last_broadcast_percent' => 0,
                     'status' => DownloadTransferStatus::DOWNLOADING,
                     'started_at' => $transfer->started_at ?? now(),
+                    'failed_at' => null,
+                    'error' => null,
                 ]);
 
                 $transfer->refresh();
@@ -73,6 +77,8 @@ class PrepareDownloadTransfer implements ShouldQueue
 
             $transfer->update([
                 'status' => DownloadTransferStatus::PREPARING,
+                'failed_at' => null,
+                'error' => null,
             ]);
 
             $transfer->refresh();
@@ -137,6 +143,8 @@ class PrepareDownloadTransfer implements ShouldQueue
                         'last_broadcast_percent' => 0,
                         'status' => DownloadTransferStatus::DOWNLOADING,
                         'started_at' => $transfer->started_at ?? now(),
+                        'failed_at' => null,
+                        'error' => null,
                     ]);
 
                     $transfer->refresh();
@@ -173,6 +181,8 @@ class PrepareDownloadTransfer implements ShouldQueue
                     'last_broadcast_percent' => 0,
                     'status' => DownloadTransferStatus::DOWNLOADING,
                     'started_at' => $transfer->started_at ?? now(),
+                    'failed_at' => null,
+                    'error' => null,
                 ]);
 
                 $transfer->refresh();
@@ -201,6 +211,8 @@ class PrepareDownloadTransfer implements ShouldQueue
                 'last_broadcast_percent' => 0,
                 'status' => DownloadTransferStatus::DOWNLOADING,
                 'started_at' => $transfer->started_at ?? now(),
+                'failed_at' => null,
+                'error' => null,
             ]);
 
             $transfer->refresh();
@@ -281,6 +293,12 @@ class PrepareDownloadTransfer implements ShouldQueue
                 'batch_id' => $batch->id,
             ]);
         } catch (Throwable $e) {
+            if ($this->shouldRetry($e)) {
+                $this->scheduleRetry($transfer, $e->getMessage());
+
+                return;
+            }
+
             $this->failTransfer($transfer, $e->getMessage());
         }
     }
@@ -322,5 +340,67 @@ class PrepareDownloadTransfer implements ShouldQueue
         }
 
         PumpDomainDownloads::dispatch($transfer->domain);
+    }
+
+    private function shouldRetry(Throwable $e): bool
+    {
+        if ($this->attempts() >= $this->tries) {
+            return false;
+        }
+
+        if ($e instanceof ConnectionException) {
+            return true;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'timed out')
+            || str_contains($message, 'curl error 28')
+            || str_contains($message, 'connection refused')
+            || str_contains($message, 'temporarily unavailable');
+    }
+
+    private function scheduleRetry(DownloadTransfer $transfer, string $reason): void
+    {
+        $delay = max(1, $this->retryDelaySeconds());
+        $attempt = max(1, $this->attempts());
+        $message = $this->retryMessage($attempt, $delay, $reason);
+
+        DownloadTransfer::query()->whereKey($transfer->id)->update([
+            'status' => DownloadTransferStatus::QUEUED,
+            'queued_at' => now(),
+            'failed_at' => null,
+            'error' => $message,
+            'updated_at' => now(),
+        ]);
+
+        $updated = DownloadTransfer::query()->with('file')->find($transfer->id);
+        if ($updated) {
+            try {
+                event(new DownloadTransferQueued(DownloadTransferPayload::forQueued($updated)));
+                event(new DownloadTransferProgressUpdated(
+                    DownloadTransferPayload::forProgress($updated, (int) ($updated->last_broadcast_percent ?? 0))
+                ));
+            } catch (Throwable) {
+                // Broadcast errors shouldn't fail downloads.
+            }
+        }
+
+        $this->release($delay);
+    }
+
+    private function retryDelaySeconds(): int
+    {
+        return (int) $this->backoff;
+    }
+
+    private function retryMessage(int $attempt, int $delay, string $reason): string
+    {
+        $cleanReason = trim(str_replace(["\r", "\n"], ' ', $reason));
+        if ($cleanReason === '') {
+            $cleanReason = 'Transient network error.';
+        }
+
+        return "Retry {$attempt}/{$this->tries} scheduled in {$delay}s: {$cleanReason}";
     }
 }

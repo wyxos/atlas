@@ -34,7 +34,7 @@ const FILTERS = ['all', ...STATUSES] as const;
 type FilterStatus = typeof FILTERS[number];
 type DownloadItem = Pick<
     DownloadTransfer,
-    'id' | 'status' | 'created_at' | 'queued_at' | 'started_at' | 'finished_at' | 'failed_at' | 'percent'
+    'id' | 'status' | 'created_at' | 'queued_at' | 'started_at' | 'finished_at' | 'failed_at' | 'percent' | 'error'
 >;
 
 type SortKey = 'createdAt' | 'queuedAt' | 'startedAt' | 'completedAt' | 'progress';
@@ -99,9 +99,11 @@ type DownloadProgressPayload = {
     status: string;
     percent: number;
     created_at?: string | null;
+    queued_at?: string | null;
     started_at?: string | null;
     finished_at?: string | null;
     failed_at?: string | null;
+    error?: string | null;
     path?: string | null;
     absolute_path?: string | null;
     original?: string | null;
@@ -577,6 +579,7 @@ function applyQueuedPayload(payload: DownloadQueuedPayload) {
         finished_at: payload.finished_at ?? null,
         failed_at: payload.failed_at ?? null,
         percent: payload.percent ?? 0,
+        error: payload.error ?? existing?.error ?? null,
     };
 
     upsertDownload(item);
@@ -603,9 +606,11 @@ function applyProgressPayload(payload: DownloadProgressPayload) {
         status: payload.status,
         percent: normalizeProgress(payload.percent),
         created_at: payload.created_at ?? current.created_at ?? null,
-        started_at: payload.started_at ?? null,
-        finished_at: payload.finished_at ?? null,
-        failed_at: payload.failed_at ?? null,
+        queued_at: payload.queued_at ?? current.queued_at ?? null,
+        started_at: payload.started_at ?? current.started_at ?? null,
+        finished_at: payload.finished_at ?? current.finished_at ?? null,
+        failed_at: payload.failed_at ?? current.failed_at ?? null,
+        error: payload.error ?? current.error ?? null,
     }));
     if (
         payload.path !== undefined
@@ -999,7 +1004,14 @@ watch(downloads, () => {
                                                 <a :href="detailsById[item.id]?.referrer_url" target="_blank">{{
                                                     detailsById[item.id]?.referrer_url }}</a>
                                             </div>
-                                            <Skeleton v-else class="mt-1 h-3 w-48 bg-prussian-blue-500/60" />
+                                            <Skeleton v-if="!detailsById[item.id]" class="mt-1 h-3 w-48 bg-prussian-blue-500/60" />
+                                            <div
+                                                v-if="item.error"
+                                                class="mt-0.5 truncate text-[11px] text-warning-300"
+                                                :title="item.error"
+                                            >
+                                                {{ item.error }}
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-4">
