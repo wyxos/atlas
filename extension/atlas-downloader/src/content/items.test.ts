@@ -49,7 +49,7 @@ describe('items', () => {
     expect(buildItemFromElement(gif, 450)).toBeNull();
   });
 
-  it('uses wixmp size hints when image looks like a low-res preview', () => {
+  it('prefers real loaded image dimensions over wixmp hints', () => {
     setLocation('https://www.deviantart.com/chrisis-ai/art/Orange-hair-squad-go-1300543999#image-1');
 
     const img = document.createElement('img');
@@ -61,8 +61,8 @@ describe('items', () => {
 
     const item = buildItemFromElement(img, 200);
     expect(item).not.toBeNull();
-    expect(item?.width).toBe(828);
-    expect(item?.height).toBe(1212);
+    expect(item?.width).toBe(328);
+    expect(item?.height).toBe(481);
   });
 
   it('prefers natural dimensions when url hints are only moderately larger', () => {
@@ -109,6 +109,23 @@ describe('items', () => {
     setImageSize(img, 92, 92);
 
     expect(buildItemFromElement(img, 200)).toBeNull();
+  });
+
+  it('falls back to wixmp hints only when real image dimensions are unavailable', () => {
+    setLocation('https://www.deviantart.com/dercius/art/Fallen-angel-allure-23-1300553981');
+
+    const img = document.createElement('img');
+    img.src =
+      'https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/f787a763-4bec-4de8-8c41-2138c468ba1c/dlibdvh-e859f987-6b04-4c27-a24d-749a87d6a10c.jpg/v1/fit/w_1125,h_2007,q_70,strp/fallen_angel_allure__23_by_dercius_dlibdvh-1125w.jpg?token=abc';
+    Object.defineProperty(img, 'naturalWidth', { value: 0, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 0, configurable: true });
+    Object.defineProperty(img, 'clientWidth', { value: 0, configurable: true });
+    Object.defineProperty(img, 'clientHeight', { value: 0, configurable: true });
+
+    const item = buildItemFromElement(img, 200);
+    expect(item).not.toBeNull();
+    expect(item?.width).toBe(1125);
+    expect(item?.height).toBe(2007);
   });
 
   it('does not bypass minimum size for modal-contained thumbnails', () => {
