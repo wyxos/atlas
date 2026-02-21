@@ -13,6 +13,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import VirtualList from '@/components/VirtualList.vue';
 import { formatFileSize } from '@/utils/file';
 import type { DownloadTransfer } from '@/types/downloadTransfer';
 import downloadTransfers from '@/routes/api/download-transfers';
@@ -52,9 +53,8 @@ const ITEM_HEIGHT = 64;
 const SCROLL_IDLE_MS = 180;
 const SOCKET_CHANNEL = 'downloads';
 
-const containerRef = ref<HTMLElement | null>(null);
-const scrollTop = ref(0);
-const containerHeight = ref(0);
+const virtualListRef = ref<{ resetScroll: () => void } | null>(null);
+const visibleIds = ref<DownloadItem[]>([]);
 const selectedStatus = ref<FilterStatus>('all');
 const actionBusy = ref<Record<number, boolean>>({});
 const selectedIds = ref<Set<number>>(new Set());
@@ -187,19 +187,6 @@ const sortedIds = computed(() => {
     const direction = sortKey.value ? sortDirection.value : DEFAULT_SORT.direction;
     return baseFilteredIds.value.slice().sort((a, b) => compareItems(a, b, key, direction));
 });
-
-const totalHeight = computed(() => sortedIds.value.length * ITEM_HEIGHT);
-const startIndex = computed(() =>
-    Math.max(0, Math.floor(scrollTop.value / ITEM_HEIGHT)),
-);
-const endIndex = computed(() =>
-    Math.min(
-        sortedIds.value.length,
-        Math.ceil((scrollTop.value + containerHeight.value) / ITEM_HEIGHT),
-    ),
-);
-const visibleIds = computed(() => sortedIds.value.slice(startIndex.value, endIndex.value));
-const offsetY = computed(() => startIndex.value * ITEM_HEIGHT);
 
 const STATUS_STYLES: Record<Status, string> = {
     pending: 'bg-warning-600 border border-warning-500 text-warning-100',
@@ -676,6 +663,16 @@ function queueFetchAfterIdle() {
     }, SCROLL_IDLE_MS);
 }
 
+function handleVisibleItemsChange(items: unknown[]) {
+    visibleIds.value = items as DownloadItem[];
+    queueFetchAfterIdle();
+}
+
+function handleVirtualListScroll() {
+    cancelActiveRequest();
+    queueFetchAfterIdle();
+}
+
 async function fetchVisibleDetails() {
     const itemsToFetch = visibleIds.value;
 
@@ -718,20 +715,6 @@ async function fetchVisibleDetails() {
     }
 }
 
-function onScroll(event: Event) {
-    const target = event.target as HTMLElement | null;
-    if (!target) return;
-    scrollTop.value = target.scrollTop;
-    cancelActiveRequest();
-    queueFetchAfterIdle();
-}
-
-function updateContainerHeight() {
-    if (!containerRef.value) return;
-    containerHeight.value = containerRef.value.clientHeight;
-    queueFetchAfterIdle();
-}
-
 async function loadDownloads() {
     isInitialLoading.value = true;
     try {
@@ -745,14 +728,11 @@ async function loadDownloads() {
 }
 
 onMounted(async () => {
-    updateContainerHeight();
-    window.addEventListener('resize', updateContainerHeight);
     await loadDownloads();
     startEchoListeners();
 });
 
 onBeforeUnmount(() => {
-    window.removeEventListener('resize', updateContainerHeight);
     if (idleTimeout) {
         clearTimeout(idleTimeout);
     }
@@ -761,10 +741,7 @@ onBeforeUnmount(() => {
 });
 
 watch(selectedStatus, (next, prev) => {
-    scrollTop.value = 0;
-    if (containerRef.value) {
-        containerRef.value.scrollTop = 0;
-    }
+    virtualListRef.value?.resetScroll();
     if (next === 'completed') {
         lastNonCompletedSort.value = { key: sortKey.value, direction: sortDirection.value };
         sortKey.value = 'completedAt';
@@ -950,18 +927,22 @@ watch(downloads, () => {
                         <span class="w-80 text-right">Actions</span>
                     </div>
                 </div>
-                <div
-                    ref="containerRef"
-                    class="flex-1 overflow-auto"
-                    @scroll="onScroll"
-                >
+                <div class="flex-1 min-h-0">
                     <div v-if="isInitialLoading" class="px-4 py-12 text-center text-sm text-blue-slate-300">
                         Loading downloads...
                     </div>
-                    <div v-else class="relative w-full" :style="{ height: `${totalHeight}px` }">
-                        <div class="absolute left-0 right-0" :style="{ transform: `translateY(${offsetY}px)` }">
+                    <VirtualList
+                        v-else
+                        ref="virtualListRef"
+                        :items="sortedIds"
+                        :item-height="ITEM_HEIGHT"
+                        container-class="flex-1 h-full overflow-auto"
+                        @scroll="handleVirtualListScroll"
+                        @visible-items-change="handleVisibleItemsChange"
+                    >
+                        <template #default="{ items }">
                             <div
-                                v-for="item in visibleIds"
+                                v-for="item in items"
                                 :key="item.id"
                                 class="flex h-16 min-w-[1320px] items-center justify-between border-b border-twilight-indigo-500/20 px-4 text-sm text-twilight-indigo-100 transition-colors hover:bg-prussian-blue-600/60 cursor-pointer"
                                 :class="isSelected(item.id)
@@ -1109,8 +1090,8 @@ watch(downloads, () => {
                                         </div>
                                     </div>
                             </div>
-                        </div>
-                    </div>
+                        </template>
+                    </VirtualList>
                     <div v-if="!sortedIds.length && !isInitialLoading" class="px-4 py-12 text-center text-sm text-blue-slate-300">
                         No downloads found.
                     </div>

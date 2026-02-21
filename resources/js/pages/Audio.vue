@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
+import VirtualList from '../components/VirtualList.vue';
 
 type AudioIdsResponse = {
     ids: number[];
@@ -121,15 +122,24 @@ onUnmounted(() => {
                 <div v-if="!isLoading && audioIds.length === 0" class="p-4 text-twilight-indigo-100">
                     No audio files found.
                 </div>
-                <ul v-else class="max-h-[70vh] overflow-y-auto divide-y divide-twilight-indigo-500">
-                    <li
-                        v-for="audioId in audioIds"
-                        :key="audioId"
-                        class="h-12 px-4 font-mono text-sm text-twilight-indigo-100 flex items-center"
-                    >
-                        {{ audioId }}
-                    </li>
-                </ul>
+                <VirtualList
+                    v-else
+                    :items="audioIds"
+                    :item-height="48"
+                    container-class="max-h-[70vh] overflow-y-auto"
+                >
+                    <template #default="{ items }">
+                        <ul class="divide-y divide-twilight-indigo-500">
+                            <li
+                                v-for="audioId in items"
+                                :key="audioId"
+                                class="h-12 px-4 font-mono text-sm text-twilight-indigo-100 flex items-center"
+                            >
+                                {{ audioId }}
+                            </li>
+                        </ul>
+                    </template>
+                </VirtualList>
             </div>
         </div>
     </PageLayout>
