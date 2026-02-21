@@ -49,7 +49,7 @@ class ExternalFilesController extends Controller
         }
 
         if ($forceDownload && $reactionType !== 'dislike') {
-            $downloadedFileReset->reset($file);
+            $downloadedFileReset->reset($file, false);
             $file = $file->refresh();
         }
 
@@ -223,7 +223,7 @@ class ExternalFilesController extends Controller
         }
 
         if ($forceDownload && $validated['type'] !== 'dislike') {
-            $downloadedFileReset->reset($file);
+            $downloadedFileReset->reset($file, false);
             $file = $file->refresh();
         }
         if ($clearDownload) {

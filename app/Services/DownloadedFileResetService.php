@@ -13,7 +13,7 @@ class DownloadedFileResetService
      * This is intentionally destructive: it clears the stored paths and deletes
      * existing assets from disk so DownloadFile will run again.
      */
-    public function reset(File $file): void
+    public function reset(File $file, bool $clearDerivedMetadata = true): void
     {
         if (! $file->downloaded) {
             return;
@@ -36,17 +36,22 @@ class DownloadedFileResetService
             }
         }
 
-        $file->forceFill([
+        $updates = [
             'downloaded' => false,
             'downloaded_at' => null,
             'download_progress' => 0,
             'path' => null,
             'preview_path' => null,
             'poster_path' => null,
-            'size' => null,
-            'mime_type' => null,
-            'ext' => null,
             'not_found' => false,
-        ])->save();
+        ];
+
+        if ($clearDerivedMetadata) {
+            $updates['size'] = null;
+            $updates['mime_type'] = null;
+            $updates['ext'] = null;
+        }
+
+        $file->forceFill($updates)->save();
     }
 }

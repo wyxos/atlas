@@ -67,6 +67,7 @@ const removeMode = ref<'single' | 'selection' | 'all' | null>(null);
 const removeAlsoFromDisk = ref(false);
 const batchIsPausing = ref(false);
 const batchIsCanceling = ref(false);
+const batchIsRetryingFailed = ref(false);
 const removeCount = computed(() => removeTargetIds.value.length);
 const removeTitle = computed(() => (removeMode.value === 'single' ? 'Remove download' : 'Remove downloads'));
 const removeLabel = computed(() => {
@@ -138,6 +139,12 @@ const selectedInFilterCount = computed(() =>
     filteredIds.value.filter((id) => selectedIds.value.has(id)).length,
 );
 const selectedIdsList = computed(() => Array.from(selectedIds.value));
+const failedIds = computed(() =>
+    downloads.value.filter((item) => item.status === 'failed').map((item) => item.id),
+);
+const completedIds = computed(() =>
+    downloads.value.filter((item) => item.status === 'completed').map((item) => item.id),
+);
 const allFilteredSelected = computed(() =>
     filteredIds.value.length > 0 && selectedInFilterCount.value === filteredIds.value.length,
 );
@@ -474,6 +481,25 @@ async function cancelSelection(): Promise<void> {
     }
 }
 
+async function retryFailedDownloads(): Promise<void> {
+    if (batchIsRetryingFailed.value) return;
+    const ids = failedIds.value;
+    if (!ids.length) return;
+
+    batchIsRetryingFailed.value = true;
+    try {
+        await Promise.allSettled(
+            ids.map((id) => window.axios.post(downloadTransfers.restart.url(id))),
+        );
+    } finally {
+        batchIsRetryingFailed.value = false;
+    }
+}
+
+function removeCompletedDownloads(): void {
+    openRemoveDialog('all', completedIds.value);
+}
+
 async function pauseDownload(item: DownloadItem) {
     if (!canPause(item) || isActionBusy(item.id)) return;
     setActionBusy(item.id, true);
@@ -801,7 +827,23 @@ watch(downloads, () => {
                     <span v-if="selectedCount">
                         Selected: {{ selectedCount }} | In filter: {{ selectedInFilterCount }}
                     </span>
-                    <div v-if="selectedCount || filteredIds.length" class="flex items-center gap-2">
+                    <div
+                        v-if="selectedCount || filteredIds.length || failedIds.length || completedIds.length"
+                        class="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            :disabled="batchIsRetryingFailed || failedIds.length === 0"
+                            @click="retryFailedDownloads">
+                            {{ batchIsRetryingFailed ? 'Retrying failed...' : `Retry failed (${failedIds.length})` }}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            :disabled="removeIsDeleting || completedIds.length === 0"
+                            @click="removeCompletedDownloads">
+                            {{ `Remove completed (${completedIds.length})` }}
+                        </Button>
                         <Button
                             v-if="selectedCount"
                             variant="outline"

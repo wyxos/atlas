@@ -25,35 +25,6 @@
   font: inherit;
 }
 
-.atlas-shadow-root .atlas-downloader-toggle {
-  position: fixed;
-  top: calc(50% - 22px);
-  right: 16px;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(15, 23, 42, 0.92);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-  pointer-events: auto;
-}
-
-.atlas-shadow-root .atlas-downloader-toggle:hover {
-  transform: translateY(-1px);
-}
-
-.atlas-shadow-root .atlas-downloader-toggle img {
-  width: 22px;
-  height: 22px;
-  display: block;
-}
-
 .atlas-shadow-root .atlas-downloader-overlay {
   position: fixed;
   inset: 0;
