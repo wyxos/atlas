@@ -1,4 +1,5 @@
 import { buildItemFromElement } from './items';
+import { isElementInModal } from './media';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
 import type { DialogChooser } from './ui';
 
@@ -137,6 +138,65 @@ export function resolveMediaAtPoint(x: number, y: number, rootId: string): Eleme
   }
 
   return best?.media ?? null;
+}
+
+function getElementViewportArea(element: Element): number {
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return 0;
+  }
+
+  const left = Math.max(rect.left, 0);
+  const top = Math.max(rect.top, 0);
+  const right = Math.min(rect.right, window.innerWidth);
+  const bottom = Math.min(rect.bottom, window.innerHeight);
+  const width = right - left;
+  const height = bottom - top;
+  if (width <= 0 || height <= 0) {
+    return 0;
+  }
+
+  return width * height;
+}
+
+export function choosePromotedMediaCandidate(currentMedia: Element | null, rootId: string): Element | null {
+  const candidates = Array.from(document.querySelectorAll('img, video')).filter((media) => !isOwnUiElement(media, rootId));
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const currentArea = currentMedia ? getElementViewportArea(currentMedia) : 0;
+  const currentIsModal = currentMedia ? isElementInModal(currentMedia) : false;
+
+  let bestModal: { media: Element; area: number } | null = null;
+  let bestAny: { media: Element; area: number } | null = null;
+
+  for (const media of candidates) {
+    const area = getElementViewportArea(media);
+    if (area <= 0) {
+      continue;
+    }
+
+    if (!bestAny || area > bestAny.area) {
+      bestAny = { media, area };
+    }
+
+    if (isElementInModal(media) && (!bestModal || area > bestModal.area)) {
+      bestModal = { media, area };
+    }
+  }
+
+  if (bestModal && bestModal.media !== currentMedia) {
+    if (!currentIsModal || bestModal.area > currentArea * 1.1) {
+      return bestModal.media;
+    }
+  }
+
+  if (bestAny && bestAny.media !== currentMedia && bestAny.area > currentArea * 1.6) {
+    return bestAny.media;
+  }
+
+  return null;
 }
 
 export function installHotkeys(options: HotkeysOptions, deps: InteractionDependencies) {
@@ -629,6 +689,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   let pointerX = -1;
   let pointerY = -1;
   let hoverDetectTimer: number | null = null;
+  let promoteDetectTimer: number | null = null;
   let activeLocationHref = window.location.href;
 
   const buttonsByType = new Map<string, HTMLButtonElement>();
@@ -978,6 +1039,23 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       detectMediaUnderPointer();
     }, delayMs);
   };
+  const schedulePromotedMediaDetect = (delayMs = 120) => {
+    if (promoteDetectTimer !== null) {
+      window.clearTimeout(promoteDetectTimer);
+    }
+    promoteDetectTimer = window.setTimeout(() => {
+      promoteDetectTimer = null;
+      if (options.isSheetOpen()) {
+        return;
+      }
+      const promoted = choosePromotedMediaCandidate(activeMedia, deps.rootId);
+      if (!promoted) {
+        return;
+      }
+      cancelHide();
+      showFor(promoted);
+    }, delayMs);
+  };
 
   document.addEventListener(
     'pointerover',
@@ -1047,6 +1125,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
       scheduleDetectMediaUnderPointer(40);
       window.setTimeout(() => scheduleDetectMediaUnderPointer(220), 220);
+      schedulePromotedMediaDetect(140);
+      window.setTimeout(() => schedulePromotedMediaDetect(260), 260);
     },
     true
   );
@@ -1078,6 +1158,9 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   const observer = new MutationObserver(() => {
     handleLocationChange();
     scheduleDetectMediaUnderPointer(60);
+    if (activeMedia) {
+      schedulePromotedMediaDetect(90);
+    }
   });
   observer.observe(document.documentElement, {
     childList: true,
