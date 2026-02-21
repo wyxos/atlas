@@ -1,9 +1,11 @@
 <?php
 
 use App\Models\File;
+use App\Models\ModerationRule;
 use App\Models\Tab;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -141,4 +143,43 @@ test('items maintain file order based on pivot position', function () {
     expect($data['tab']['items'][0]['id'])->toBe($file3->id);
     expect($data['tab']['items'][1]['id'])->toBe($file1->id);
     expect($data['tab']['items'][2]['id'])->toBe($file2->id);
+});
+
+test('tab show batches current-user reaction lookup during moderation', function () {
+    $user = User::factory()->create();
+    $file1 = File::factory()->create(['referrer_url' => 'https://example.com/file1.jpg']);
+    $file2 = File::factory()->create(['referrer_url' => 'https://example.com/file2.jpg']);
+    $file3 = File::factory()->create(['referrer_url' => 'https://example.com/file3.jpg']);
+
+    $tab = Tab::factory()->for($user)->withFiles([$file1->id, $file2->id, $file3->id])->create();
+
+    // Enable moderation path so BaseModerationService runs reaction checks.
+    ModerationRule::factory()->create([
+        'active' => true,
+        'op' => 'any',
+        'terms' => ['no-match-needed-for-this-test'],
+    ]);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $response = $this->actingAs($user)->getJson("/api/tabs/{$tab->id}");
+
+    $response->assertSuccessful();
+
+    $queries = collect(DB::getQueryLog())
+        ->pluck('query')
+        ->map(static fn (string $query) => strtolower($query));
+
+    $nPlusOneExistsQueries = $queries->filter(static fn (string $query) => str_contains($query, 'exists(select * from')
+        && str_contains($query, 'reactions')
+        && str_contains($query, 'user_id'));
+
+    $batchedReactionQueries = $queries->filter(static fn (string $query) => str_contains($query, ' from ')
+        && str_contains($query, 'reactions')
+        && str_contains($query, 'user_id')
+        && str_contains($query, ' in '));
+
+    expect($nPlusOneExistsQueries)->toHaveCount(0);
+    expect($batchedReactionQueries)->toHaveCount(1);
 });

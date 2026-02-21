@@ -56,6 +56,7 @@ Database gotcha:
 - For large `files` table backfills, prefer set-based SQL updates over PHP `chunkById` loops to avoid very long deploy-time migrations.
 - For large tables (especially `files`), do not put row-by-row PHP loops or queued backfill jobs inside migrations. Keep migrations schema-first (fast), and run heavy backfills as separate post-deploy commands/jobs.
 - `files` is large (million+ rows). Expect `ALTER TABLE`/dedupe migrations to run for a long time in production; start them once, monitor separately, and keep the deploy shell non-blocking while they finish.
+- In moderation services, never do per-file `Reaction::exists()` checks. Batch current-user reaction lookups with a single `whereIn('file_id', ...)` query before iterating files.
 
 ---
 
