@@ -89,6 +89,12 @@ type ChromeAction = {
   setTitle: (details: { tabId?: number; title: string }) => void;
 };
 
+type ChromeCommands = {
+  onCommand: {
+    addListener: (callback: (command: string) => void) => void;
+  };
+};
+
 type ChromeContextMenus = {
   create: (createProperties: {
     id: string;
@@ -110,6 +116,7 @@ type ChromeApi = {
   };
   tabs: ChromeTabs;
   action: ChromeAction;
+  commands: ChromeCommands;
   contextMenus: ChromeContextMenus;
 };
 
@@ -269,6 +276,26 @@ chrome.action.onClicked.addListener((tab) => {
 
   // Left click on the toolbar icon asks the content script to open the sheet.
   chrome.tabs.sendMessage(tabId, { type: 'atlas-open-sheet' });
+});
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== 'toggle-sheet') {
+    return;
+  }
+
+  chrome.tabs
+    .query({ active: true, lastFocusedWindow: true })
+    .then((tabs) => {
+      const tabId = tabs[0]?.id;
+      if (!tabId) {
+        return;
+      }
+
+      chrome.tabs.sendMessage(tabId, { type: 'atlas-open-sheet' });
+    })
+    .catch(() => {
+      // Ignore tab query/send errors on restricted pages.
+    });
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {

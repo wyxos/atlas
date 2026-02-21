@@ -147,7 +147,7 @@ declare const chrome: ChromeApi;
     });
   }
 
-  // Allow the toolbar icon (background script) to open the sheet.
+  // Allow background-triggered actions (toolbar click / command shortcut) to toggle the sheet.
   chrome.runtime.onMessage.addListener((message: unknown) => {
     if (!message || typeof message !== 'object') {
       return;
@@ -346,17 +346,6 @@ declare const chrome: ChromeApi;
       }
     };
 
-    const toggle = document.createElement('button');
-    toggle.className = 'atlas-downloader-toggle';
-    toggle.type = 'button';
-    toggle.setAttribute('aria-label', 'Atlas Downloader');
-    toggle.title = 'Atlas Downloader';
-
-    const icon = document.createElement('img');
-    icon.alt = '';
-    icon.src = chrome.runtime.getURL('icon.svg');
-    toggle.appendChild(icon);
-
     const overlay = document.createElement('div');
     overlay.className = 'atlas-downloader-overlay';
 
@@ -420,7 +409,6 @@ declare const chrome: ChromeApi;
     modal.appendChild(meta);
     modal.appendChild(list);
 
-    root.appendChild(toggle);
     root.appendChild(overlay);
     root.appendChild(modal);
     shadow.appendChild(root);
@@ -546,23 +534,10 @@ declare const chrome: ChromeApi;
       applyPageMarkers(items);
     };
 
-    toggle.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleModal();
-    });
-
     overlay.addEventListener('click', () => closeModal());
     close.addEventListener('click', () => closeModal());
 
     document.addEventListener('keydown', (event) => {
-      const key = event.key.toLowerCase();
-      if (event.altKey && event.shiftKey && key === 'a') {
-        event.preventDefault();
-        toggleModal();
-        return;
-      }
-
       if (event.key === 'Escape' && root.classList.contains(OPEN_CLASS)) {
         closeModal();
         return;

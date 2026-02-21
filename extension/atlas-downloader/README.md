@@ -10,4 +10,5 @@ Load this folder as an unpacked extension in Chrome/Brave.
    - Extension token (must match `ATLAS_EXTENSION_TOKEN` in `.env`)
    - (Optional) Excluded domains (one per line) to disable the content script on specific sites
 
-When browsing, click the Atlas icon (top-right of the page) to open the picker, select items, and queue downloads in your Atlas instance.
+When browsing, press `Alt+A` to toggle the Atlas picker, select items, and queue downloads in your Atlas instance.
+You can customize this shortcut in `chrome://extensions/shortcuts` (or `brave://extensions/shortcuts`).

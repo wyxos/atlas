@@ -20,6 +20,15 @@
       "48": "icon-48.png"
     }
   },
+  "commands": {
+    "toggle-sheet": {
+      "suggested_key": {
+        "default": "Alt+A",
+        "mac": "Alt+A"
+      },
+      "description": "Toggle Atlas sheet on the current page"
+    }
+  },
   "icons": {
     "16": "icon-16.png",
     "32": "icon-32.png",
