@@ -95,7 +95,7 @@ class ExternalFilesController extends Controller
                 $filesByUrlQuery->whereIn('url', $normalizedUrls);
             }
 
-            $filesByUrl = $filesByUrlQuery->get(['id', 'url', 'referrer_url', 'downloaded', 'downloaded_at', 'download_progress', 'blacklisted_at']);
+            $filesByUrl = $filesByUrlQuery->get(['id', 'url', 'referrer_url', 'downloaded', 'downloaded_at', 'download_progress', 'updated_at', 'blacklisted_at']);
 
             foreach ($filesByUrl as $file) {
                 $fileUrl = $this->stripFragment(is_string($file->url) ? trim($file->url) : '');
@@ -122,7 +122,7 @@ class ExternalFilesController extends Controller
                 $filesByReferrerQuery->whereIn('referrer_url', $referrerCandidates);
             }
 
-            $filesByReferrer = $filesByReferrerQuery->get(['id', 'url', 'referrer_url', 'downloaded', 'downloaded_at', 'download_progress', 'blacklisted_at']);
+            $filesByReferrer = $filesByReferrerQuery->get(['id', 'url', 'referrer_url', 'downloaded', 'downloaded_at', 'download_progress', 'updated_at', 'blacklisted_at']);
             foreach ($filesByReferrer as $file) {
                 $referrerUrl = $this->stripFragment(is_string($file->referrer_url) ? trim($file->referrer_url) : '');
                 if ($referrerUrl !== '' && isset($normalizedLookupSet[$referrerUrl])) {
@@ -159,6 +159,13 @@ class ExternalFilesController extends Controller
             $lookupUrl = $this->stripFragment(trim($url));
             /** @var Collection<int, File> $candidates */
             $candidates = collect($filesByLookup[$lookupUrl] ?? []);
+            $downloadedCandidate = $candidates->first(fn (File $candidate): bool => (bool) $candidate->downloaded);
+            $downloadedAt = optional(
+                $candidates
+                    ->filter(fn (File $candidate): bool => $candidate->downloaded_at !== null)
+                    ->sortByDesc(fn (File $candidate): int => $candidate->downloaded_at?->getTimestamp() ?? 0)
+                    ->first()
+            )->downloaded_at?->toIso8601String();
             $file = $this->pickBestCheckMatch($candidates, $lookupUrl, $reactionsByFileId);
             $reaction = $file ? $reactionsByFileId->get($file->id) : null;
             if (! $reaction) {
@@ -179,12 +186,7 @@ class ExternalFilesController extends Controller
                 'url' => $url,
                 'exists' => $candidates->isNotEmpty(),
                 'downloaded' => $candidates->contains(fn (File $candidate): bool => (bool) $candidate->downloaded),
-                'downloaded_at' => optional(
-                    $candidates
-                        ->filter(fn (File $candidate): bool => $candidate->downloaded_at !== null)
-                        ->sortByDesc(fn (File $candidate): int => $candidate->downloaded_at?->getTimestamp() ?? 0)
-                        ->first()
-                )->downloaded_at?->toIso8601String(),
+                'downloaded_at' => $downloadedAt ?: $downloadedCandidate?->updated_at?->toIso8601String(),
                 'download_progress' => (int) $candidates->max(fn (File $candidate): int => (int) ($candidate->download_progress ?? 0)),
                 'blacklisted' => $candidates->contains(fn (File $candidate): bool => $candidate->blacklisted_at !== null),
                 'file_id' => $file?->id,

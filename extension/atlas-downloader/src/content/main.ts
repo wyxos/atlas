@@ -115,10 +115,13 @@ declare const chrome: ChromeApi;
   }
 
   function getCachedAtlasStatus(url: string) {
-    const cached = atlasStatusCache.get(url);
+    const rawKey = (url || '').trim();
+    const fallbackKey = stripHash(rawKey);
+    const cached = atlasStatusCache.get(rawKey) ?? atlasStatusCache.get(fallbackKey);
     if (!cached) return null;
     if (Date.now() - cached.ts > ATLAS_STATUS_TTL_MS) {
-      atlasStatusCache.delete(url);
+      atlasStatusCache.delete(rawKey);
+      atlasStatusCache.delete(fallbackKey);
       return null;
     }
     return cached;

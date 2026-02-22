@@ -104,10 +104,12 @@ function parseFileStatusMeta(file: unknown): { downloadProgress: number | null; 
     };
   }
 
-  const value = file as { download_progress?: unknown; downloaded_at?: unknown };
+  const value = file as { download_progress?: unknown; downloaded_at?: unknown; updated_at?: unknown; downloaded?: unknown };
+  const downloaded = Boolean(value.downloaded);
+  const downloadedAt = normalizeDownloadedAt(value.downloaded_at);
   return {
     downloadProgress: normalizeProgress(value.download_progress),
-    downloadedAt: normalizeDownloadedAt(value.downloaded_at),
+    downloadedAt: downloadedAt ?? (downloaded ? normalizeDownloadedAt(value.updated_at) : null),
   };
 }
 
@@ -150,6 +152,26 @@ export function formatOverlayDownloadMeta(status: AtlasStatus | null): string {
   }
 
   return '';
+}
+
+export function resolveOverlayProgressPercent(status: AtlasStatus | null): number | null {
+  if (!status) {
+    return null;
+  }
+
+  if (status.downloaded) {
+    return 100;
+  }
+
+  if (status.blacklisted || status.reactionType === 'dislike') {
+    return null;
+  }
+
+  if (!status.exists || !status.reactionType) {
+    return null;
+  }
+
+  return normalizeProgress(status.downloadProgress) ?? 0;
 }
 
 function pickLargestMediaDescendantAtPoint(
@@ -819,6 +841,15 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   const statusMeta = document.createElement('span');
   statusMeta.className = 'atlas-downloader-media-status';
   statusMeta.hidden = true;
+  const progressMeta = document.createElement('div');
+  progressMeta.className = 'atlas-downloader-media-progress';
+  progressMeta.hidden = true;
+  const progressBar = document.createElement('span');
+  progressBar.className = 'atlas-downloader-media-progress-bar';
+  const progressFill = document.createElement('span');
+  progressFill.className = 'atlas-downloader-media-progress-fill';
+  progressBar.appendChild(progressFill);
+  progressMeta.appendChild(progressBar);
 
   let activeMedia: Element | null = null;
   let activeKey: string | null = null;
@@ -858,14 +889,26 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   };
   const setToolbarStatusMeta = (status: AtlasStatus | null) => {
     const text = formatOverlayDownloadMeta(status);
+    const progress = resolveOverlayProgressPercent(status);
+
     if (!text) {
       statusMeta.textContent = '';
       statusMeta.hidden = true;
+    } else {
+      statusMeta.textContent = text;
+      statusMeta.hidden = false;
+    }
+
+    if (progress === null) {
+      progressMeta.hidden = true;
+      progressMeta.removeAttribute('data-state');
+      progressFill.style.width = '0%';
       return;
     }
 
-    statusMeta.textContent = text;
-    statusMeta.hidden = false;
+    progressMeta.hidden = false;
+    progressMeta.dataset.state = progress <= 0 ? 'queued' : progress >= 100 ? 'done' : 'active';
+    progressFill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
   };
   const syncToolbarButtonState = () => {
     const locked = toolbarBusy || toolbarQueuedType !== null;
@@ -1107,6 +1150,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     toolbar.appendChild(button);
   }
   toolbar.appendChild(statusMeta);
+  toolbar.appendChild(progressMeta);
 
   options.root.appendChild(toolbar);
 
