@@ -468,6 +468,40 @@
   white-space: nowrap;
 }
 
+.atlas-shadow-root .atlas-downloader-media-progress {
+  display: block;
+  flex: 1 0 100%;
+  padding: 0 4px 2px;
+}
+
+.atlas-shadow-root .atlas-downloader-media-progress-bar {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.3);
+}
+
+.atlas-shadow-root .atlas-downloader-media-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8 0%, #7dd3fc 100%);
+  transition: width 180ms ease;
+}
+
+.atlas-shadow-root .atlas-downloader-media-progress[data-state='queued'] .atlas-downloader-media-progress-fill {
+  width: 28% !important;
+  animation: atlas-progress-indeterminate 1s ease-in-out infinite;
+}
+
+.atlas-shadow-root .atlas-downloader-media-progress[data-state='done'] .atlas-downloader-media-progress-fill {
+  background: linear-gradient(90deg, #22c55e 0%, #86efac 100%);
+}
+
 .atlas-shadow-root .atlas-downloader-media-toolbar .atlas-downloader-reaction-btn {
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -545,6 +579,18 @@
 @keyframes atlas-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes atlas-progress-indeterminate {
+  0% {
+    transform: translateX(-60%);
+  }
+  50% {
+    transform: translateX(120%);
+  }
+  100% {
+    transform: translateX(-60%);
   }
 }
 

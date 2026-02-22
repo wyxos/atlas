@@ -5,6 +5,7 @@ import {
   formatDownloadedAtUtc,
   formatOverlayDownloadMeta,
   installHotkeys,
+  resolveOverlayProgressPercent,
   resolveMediaAtPoint,
 } from './interactions';
 
@@ -256,5 +257,41 @@ describe('formatDownloadedAtUtc', () => {
   it('returns empty string for invalid values', () => {
     expect(formatDownloadedAtUtc(null)).toBe('');
     expect(formatDownloadedAtUtc('not-a-date')).toBe('');
+  });
+});
+
+describe('resolveOverlayProgressPercent', () => {
+  it('returns active progress values and queued defaults', () => {
+    expect(
+      resolveOverlayProgressPercent({
+        exists: true,
+        downloaded: false,
+        blacklisted: false,
+        reactionType: 'like',
+        downloadProgress: 52,
+      })
+    ).toBe(52);
+
+    expect(
+      resolveOverlayProgressPercent({
+        exists: true,
+        downloaded: false,
+        blacklisted: false,
+        reactionType: 'like',
+      })
+    ).toBe(0);
+  });
+
+  it('returns null for dislike/blacklisted/no-status states', () => {
+    expect(
+      resolveOverlayProgressPercent({
+        exists: true,
+        downloaded: false,
+        blacklisted: true,
+        reactionType: 'dislike',
+      })
+    ).toBeNull();
+
+    expect(resolveOverlayProgressPercent(null)).toBeNull();
   });
 });

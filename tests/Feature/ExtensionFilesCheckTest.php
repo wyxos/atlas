@@ -240,3 +240,28 @@ it('includes download progress and downloaded_at in extension check results', fu
     $response->assertJsonPath('results.1.download_progress', 100);
     $response->assertJsonPath('results.1.downloaded_at', $downloadedAt->toIso8601String());
 });
+
+it('falls back to updated_at when downloaded_at is missing', function () {
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $file = File::factory()->create([
+        'url' => 'https://images.example.com/media/legacy-downloaded.jpg',
+        'referrer_url' => 'https://example.com/art/legacy',
+        'downloaded' => true,
+        'downloaded_at' => null,
+    ]);
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/check', [
+            'urls' => [
+                'https://images.example.com/media/legacy-downloaded.jpg',
+            ],
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('results.0.downloaded', true);
+    $response->assertJsonPath('results.0.downloaded_at', $file->updated_at?->toIso8601String());
+});
