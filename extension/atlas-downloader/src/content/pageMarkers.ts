@@ -25,12 +25,18 @@ type SheetItem = {
 
 const PAGE_VISITED_BADGE_ID = 'atlas-downloader-page-visited-badge';
 const REACTION_BADGE_LAYER_ID = 'atlas-downloader-reaction-badge-layer';
+const OPEN_TAB_BADGE_LAYER_ID = 'atlas-downloader-open-tab-badge-layer';
+const OPEN_TAB_ICON_PATHS = [
+  'M8 7V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2',
+  'M5 8h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z',
+];
 
 export function clearNodeMarkerAttributes(nodes: Iterable<Element>): void {
   for (const node of nodes) {
     node.removeAttribute('data-atlas-marked');
     node.removeAttribute('data-atlas-state');
     node.removeAttribute('data-atlas-reaction');
+    node.removeAttribute('data-atlas-open-tab');
   }
 }
 
@@ -164,6 +170,47 @@ export function syncReactionIconBadges(reactedNodes: Element[]): void {
     badge.style.left = `${Math.round(rect.left + window.scrollX + rect.width - 21)}px`;
     badge.style.top = `${Math.round(rect.top + window.scrollY + rect.height - 21)}px`;
     badge.appendChild(createSvgIcon(reaction.pathDs));
+    layer.appendChild(badge);
+  }
+
+  if (!layer.hasChildNodes()) {
+    layer.remove();
+  }
+}
+
+export function syncOpenTabIconBadges(openTabNodes: Element[]): void {
+  const existingLayer = document.getElementById(OPEN_TAB_BADGE_LAYER_ID);
+  if (openTabNodes.length === 0) {
+    existingLayer?.remove();
+    return;
+  }
+
+  const layer =
+    existingLayer
+    || (() => {
+      const next = document.createElement('div');
+      next.id = OPEN_TAB_BADGE_LAYER_ID;
+      (document.body || document.documentElement).appendChild(next);
+      return next;
+    })();
+
+  layer.replaceChildren();
+
+  for (const node of openTabNodes) {
+    if (node.getAttribute('data-atlas-state') === 'reacted') {
+      continue;
+    }
+
+    const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      continue;
+    }
+
+    const badge = document.createElement('span');
+    badge.className = 'atlas-downloader-open-tab-badge';
+    badge.style.left = `${Math.round(rect.left + window.scrollX + rect.width - 21)}px`;
+    badge.style.top = `${Math.round(rect.top + window.scrollY + rect.height - 21)}px`;
+    badge.appendChild(createSvgIcon(OPEN_TAB_ICON_PATHS));
     layer.appendChild(badge);
   }
 

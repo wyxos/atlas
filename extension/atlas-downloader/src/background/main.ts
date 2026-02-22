@@ -4,6 +4,7 @@ import {
   normalizeTabUrlForDuplicateCheck,
   pickDuplicateNoticeTargetTabId,
 } from './duplicates';
+import { collectOpenTabUrls } from './openTabs';
 
 type AtlasSettings = {
   atlasBaseUrl?: string;
@@ -84,6 +85,14 @@ type ChromeTabs = {
       ) => void
     ) => void;
   };
+  onRemoved: {
+    addListener: (
+      callback: (
+        tabId: number,
+        removeInfo: { windowId: number; isWindowClosing: boolean },
+      ) => void
+    ) => void;
+  };
 };
 
 type ChromeAction = {
@@ -150,6 +159,8 @@ const MENU_RELOAD_EXTENSION = 'atlas-reload-extension';
 const MESSAGE_REALTIME_STATUS_REQUEST = 'atlas-realtime-status-request';
 const MESSAGE_REALTIME_STATUS_CHANGED = 'atlas-realtime-status-changed';
 const MESSAGE_DUPLICATE_TAB_BLOCKED = 'atlas-duplicate-tab-blocked';
+const MESSAGE_OPEN_TABS_REQUEST = 'atlas-open-tabs-request';
+const MESSAGE_OPEN_TABS_UPDATED = 'atlas-open-tabs-updated';
 const SOCKET_EVENT_NAMES = [
   'DownloadTransferCreated',
   'DownloadTransferQueued',
@@ -208,6 +219,7 @@ let realtimeReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let realtimeReconnectAttempts = 0;
 const recentlyCreatedTabIds = new Set<number>();
 const recentlyCreatedTabOpeners = new Map<number, number | null>();
+let openTabsBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
 let realtimeStatus: RealtimeConnectionStatus = {
   state: 'not-configured',
   message: 'Set Atlas base URL and extension token to enable realtime updates.',
@@ -245,11 +257,13 @@ chrome.runtime.onInstalled.addListener(() => {
 
   void refreshActionForActiveTab();
   void ensureRealtimeConnection(true);
+  scheduleOpenTabsBroadcast(80);
 });
 
 chrome.runtime.onStartup.addListener(() => {
   void refreshActionForActiveTab();
   void ensureRealtimeConnection(true);
+  scheduleOpenTabsBroadcast(80);
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -324,6 +338,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   recentlyCreatedTabIds.add(tab.id);
   recentlyCreatedTabOpeners.set(tab.id, typeof tab.openerTabId === 'number' ? tab.openerTabId : null);
   void enforceUniqueTab(tab.id, tab.url || '', tab.openerTabId);
+  scheduleOpenTabsBroadcast(120);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -342,6 +357,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 
   void refreshActionForTab(tabId, tab?.url || changeInfo.url || '');
+
+  if (typeof changeInfo.url === 'string' || changeInfo.status === 'complete') {
+    scheduleOpenTabsBroadcast(100);
+  }
+});
+
+chrome.tabs.onRemoved.addListener(() => {
+  scheduleOpenTabsBroadcast(70);
 });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -371,6 +394,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       status: realtimeStatus,
     });
     return;
+  }
+  if (messageType === MESSAGE_OPEN_TABS_REQUEST) {
+    void queryOpenTabUrls()
+      .then((urls) => {
+        sendResponse({
+          ok: true,
+          urls,
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          ok: false,
+          urls: [],
+        });
+      });
+    return true;
   }
 
   const request = message as {
@@ -416,6 +455,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 void refreshActionForActiveTab();
 void ensureRealtimeConnection();
+scheduleOpenTabsBroadcast(100);
 
 async function blacklistDomainFromTab(tab?: ChromeTab) {
   const tabId = tab?.id;
@@ -562,6 +602,53 @@ async function enforceUniqueTab(
     });
   } catch {
     // Ignore if content script cannot receive messages on this page.
+  }
+}
+
+function scheduleOpenTabsBroadcast(delayMs = 100): void {
+  if (openTabsBroadcastTimer) {
+    clearTimeout(openTabsBroadcastTimer);
+  }
+
+  openTabsBroadcastTimer = setTimeout(() => {
+    openTabsBroadcastTimer = null;
+    void broadcastOpenTabsState();
+  }, delayMs);
+}
+
+async function queryOpenTabUrls(): Promise<string[]> {
+  let tabs: ChromeTab[] = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return [];
+  }
+
+  return collectOpenTabUrls(tabs);
+}
+
+async function broadcastOpenTabsState(): Promise<void> {
+  const urls = await queryOpenTabUrls();
+  let tabs: ChromeTab[] = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return;
+  }
+
+  for (const tab of tabs) {
+    if (!tab?.id) {
+      continue;
+    }
+
+    try {
+      chrome.tabs.sendMessage(tab.id, {
+        type: MESSAGE_OPEN_TABS_UPDATED,
+        urls,
+      });
+    } catch {
+      // Ignore tabs without a matching content script.
+    }
   }
 }
 
