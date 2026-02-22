@@ -428,6 +428,7 @@
   transform: translateX(-100%);
   display: none;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 6px;
   border-radius: 14px;
@@ -451,6 +452,19 @@
   font-weight: 600;
   letter-spacing: 0.03em;
   line-height: 1;
+  white-space: nowrap;
+}
+
+.atlas-shadow-root .atlas-downloader-media-status {
+  display: block;
+  flex: 1 0 100%;
+  margin-top: 1px;
+  padding: 0 4px 2px;
+  color: #bfdbfe;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   white-space: nowrap;
 }
 

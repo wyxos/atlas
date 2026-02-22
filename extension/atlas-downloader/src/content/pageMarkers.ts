@@ -34,8 +34,8 @@ export function clearNodeMarkerAttributes(nodes: Iterable<Element>): void {
   }
 }
 
-export function buildStatusMapFromCache(
-  atlasStatusCache: Map<string, CacheEntry>,
+export function buildStatusMapFromCache<T extends CacheEntry>(
+  atlasStatusCache: Map<string, T>,
   ttlMs: number,
   stripHash: (value: string) => string
 ): Map<string, MarkerStatus> {
