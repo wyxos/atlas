@@ -1,5 +1,9 @@
 import Pusher from 'pusher-js/worker';
-import { findDuplicateTabId, normalizeTabUrlForDuplicateCheck } from './duplicates';
+import {
+  findDuplicateTabId,
+  normalizeTabUrlForDuplicateCheck,
+  pickDuplicateNoticeTargetTabId,
+} from './duplicates';
 
 type AtlasSettings = {
   atlasBaseUrl?: string;
@@ -55,6 +59,7 @@ type ChromeTab = {
   id?: number;
   url?: string;
   active?: boolean;
+  openerTabId?: number;
 };
 
 type ChromeTabs = {
@@ -202,6 +207,7 @@ let realtimeConfigSignature = '';
 let realtimeReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let realtimeReconnectAttempts = 0;
 const recentlyCreatedTabIds = new Set<number>();
+const recentlyCreatedTabOpeners = new Map<number, number | null>();
 let realtimeStatus: RealtimeConnectionStatus = {
   state: 'not-configured',
   message: 'Set Atlas base URL and extension token to enable realtime updates.',
@@ -316,7 +322,8 @@ chrome.tabs.onCreated.addListener((tab) => {
   }
 
   recentlyCreatedTabIds.add(tab.id);
-  void enforceUniqueTab(tab.id, tab.url || '');
+  recentlyCreatedTabOpeners.set(tab.id, typeof tab.openerTabId === 'number' ? tab.openerTabId : null);
+  void enforceUniqueTab(tab.id, tab.url || '', tab.openerTabId);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -324,8 +331,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const candidateUrl = tab?.url || changeInfo.url || '';
     if (changeInfo.status === 'complete' && !normalizeTabUrlForDuplicateCheck(candidateUrl)) {
       recentlyCreatedTabIds.delete(tabId);
+      recentlyCreatedTabOpeners.delete(tabId);
     } else {
-      void enforceUniqueTab(tabId, candidateUrl);
+      void enforceUniqueTab(tabId, candidateUrl, recentlyCreatedTabOpeners.get(tabId) ?? tab.openerTabId);
     }
   }
 
@@ -505,7 +513,11 @@ async function refreshActionForTab(tabId: number, tabUrl: string) {
   setActionDefault(tabId);
 }
 
-async function enforceUniqueTab(tabId: number, tabUrl: string) {
+async function enforceUniqueTab(
+  tabId: number,
+  tabUrl: string,
+  openerTabId?: number | null,
+) {
   const normalizedUrl = normalizeTabUrlForDuplicateCheck(tabUrl);
   if (!normalizedUrl) {
     return;
@@ -520,10 +532,18 @@ async function enforceUniqueTab(tabId: number, tabUrl: string) {
 
   const duplicateTabId = findDuplicateTabId(tabs, tabId, normalizedUrl);
   recentlyCreatedTabIds.delete(tabId);
+  recentlyCreatedTabOpeners.delete(tabId);
 
   if (!duplicateTabId) {
     return;
   }
+
+  const noticeTabId = pickDuplicateNoticeTargetTabId(
+    tabs,
+    tabId,
+    duplicateTabId,
+    openerTabId,
+  );
 
   try {
     await chrome.tabs.remove(tabId);
@@ -531,14 +551,12 @@ async function enforceUniqueTab(tabId: number, tabUrl: string) {
     return;
   }
 
-  try {
-    await chrome.tabs.update(duplicateTabId, { active: true });
-  } catch {
-    // Ignore focus issues if the tab disappears.
+  if (typeof noticeTabId !== 'number') {
+    return;
   }
 
   try {
-    chrome.tabs.sendMessage(duplicateTabId, {
+    chrome.tabs.sendMessage(noticeTabId, {
       type: MESSAGE_DUPLICATE_TAB_BLOCKED,
       url: normalizedUrl,
     });

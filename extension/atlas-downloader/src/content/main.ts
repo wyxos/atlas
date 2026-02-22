@@ -18,7 +18,12 @@ import {
 } from './pageMarkers';
 import { shouldIgnoreMutationBatch } from './mutationGuard';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
-import { createDialogChooser, createToastFn, ensurePageMarkerStyles } from './ui';
+import {
+  createDialogChooser,
+  createToastFn,
+  ensurePageMarkerStyles,
+  showDuplicateTabBlockedModal,
+} from './ui';
 
 type ContentSettings = {
   atlasBaseUrl?: string;
@@ -205,11 +210,7 @@ declare const chrome: ChromeApi;
       }
 
       const duplicateUrl = typeof msg.url === 'string' ? msg.url : '';
-      window.alert(
-        duplicateUrl
-          ? `This page is already open in another tab.\n${duplicateUrl}`
-          : 'This page is already open in another tab.'
-      );
+      showDuplicateTabBlockedModal(duplicateUrl);
       return;
     }
 

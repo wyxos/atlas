@@ -1,6 +1,7 @@
 type BrowserTab = {
   id?: number;
   url?: string;
+  active?: boolean;
 };
 
 export function normalizeTabUrlForDuplicateCheck(rawUrl: string): string {
@@ -46,6 +47,29 @@ export function findDuplicateTabId(
     if (normalizeTabUrlForDuplicateCheck(tab.url || '') === normalizedCandidate) {
       return tab.id;
     }
+  }
+
+  return null;
+}
+
+export function pickDuplicateNoticeTargetTabId(
+  tabs: BrowserTab[],
+  candidateTabId: number,
+  duplicateTabId: number,
+  openerTabId: number | null | undefined,
+): number | null {
+  if (
+    typeof openerTabId === 'number'
+    && openerTabId > 0
+    && openerTabId !== candidateTabId
+    && openerTabId !== duplicateTabId
+  ) {
+    return openerTabId;
+  }
+
+  const activeTab = tabs.find((tab) => tab?.active && typeof tab.id === 'number' && tab.id !== candidateTabId);
+  if (typeof activeTab?.id === 'number') {
+    return activeTab.id;
   }
 
   return null;
