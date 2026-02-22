@@ -8,6 +8,14 @@ import {
 } from './items';
 import { installHotkeys, installMediaReactionOverlay } from './interactions';
 import { isHostExcluded, isHostMatch, parseExcludedDomains, resolveHost, stripHash } from './network';
+import {
+  buildStatusMapFromCache,
+  clearNodeMarkerAttributes,
+  findStatusForLookupKeys,
+  mergeSheetItemStatuses,
+  syncPageVisitedBadge,
+  syncReactionIconBadges,
+} from './pageMarkers';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
 import { createDialogChooser, createToastFn, ensurePageMarkerStyles } from './ui';
 
@@ -153,9 +161,23 @@ declare const chrome: ChromeApi;
       return;
     }
 
-    const msg = message as { type?: unknown; payload?: unknown };
+    const msg = message as { type?: unknown; payload?: unknown; url?: unknown };
     if (msg.type === 'atlas-download-event') {
       handleRealtimeDownloadEvent?.(msg.payload);
+      return;
+    }
+
+    if (msg.type === 'atlas-duplicate-tab-blocked') {
+      if (!IS_TOP_WINDOW) {
+        return;
+      }
+
+      const duplicateUrl = typeof msg.url === 'string' ? msg.url : '';
+      window.alert(
+        duplicateUrl
+          ? `This page is already open in another tab.\n${duplicateUrl}`
+          : 'This page is already open in another tab.'
+      );
       return;
     }
 
@@ -707,6 +729,26 @@ declare const chrome: ChromeApi;
         syncAtlasStatusForPageMarkers();
       }, delayMs);
     };
+    let reactionBadgeSyncFrame: number | null = null;
+    const syncReactionBadgesFromDom = () => {
+      syncReactionIconBadges(
+        Array.from(
+          document.querySelectorAll(
+            '[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction]'
+          )
+        )
+      );
+    };
+    const scheduleReactionBadgeSync = () => {
+      if (reactionBadgeSyncFrame !== null) {
+        return;
+      }
+
+      reactionBadgeSyncFrame = window.requestAnimationFrame(() => {
+        reactionBadgeSyncFrame = null;
+        syncReactionBadgesFromDom();
+      });
+    };
 
     const mutationObserver = new MutationObserver(() => {
       applyPageMarkers(items);
@@ -720,11 +762,14 @@ declare const chrome: ChromeApi;
     });
 
     window.addEventListener('pageshow', () => scheduleMarkerSync(80), true);
+    window.addEventListener('scroll', scheduleReactionBadgeSync, true);
+    window.addEventListener('resize', scheduleReactionBadgeSync, true);
     document.addEventListener(
       'visibilitychange',
       () => {
         if (document.visibilityState === 'visible') {
           scheduleMarkerSync(120);
+          scheduleReactionBadgeSync();
         }
       },
       true
@@ -1573,58 +1618,10 @@ declare const chrome: ChromeApi;
     function applyPageMarkers(sheetItems = items) {
       ensurePageMarkerStyles();
 
-      const marked = document.querySelectorAll('[data-atlas-marked="1"]');
-      for (const node of marked) {
-        node.removeAttribute('data-atlas-marked');
-        node.removeAttribute('data-atlas-state');
-        node.removeAttribute('data-atlas-reaction');
-      }
+      clearNodeMarkerAttributes(document.querySelectorAll('[data-atlas-marked="1"]'));
 
-      const statusByUrl = new Map<
-        string,
-        { exists: boolean; downloaded: boolean; blacklisted: boolean; reactionType: string | null }
-      >();
-
-      for (const [url, cached] of atlasStatusCache.entries()) {
-        if (Date.now() - cached.ts > ATLAS_STATUS_TTL_MS) {
-          atlasStatusCache.delete(url);
-          continue;
-        }
-
-        statusByUrl.set(url, {
-          exists: Boolean(cached.exists),
-          downloaded: Boolean(cached.downloaded),
-          blacklisted: Boolean(cached.blacklisted),
-          reactionType: cached.reactionType ? String(cached.reactionType) : null,
-        });
-        statusByUrl.set(stripHash(url), {
-          exists: Boolean(cached.exists),
-          downloaded: Boolean(cached.downloaded),
-          blacklisted: Boolean(cached.blacklisted),
-          reactionType: cached.reactionType ? String(cached.reactionType) : null,
-        });
-      }
-
-      for (const item of sheetItems) {
-        if (!item?.url || !item?.atlas) {
-          continue;
-        }
-
-        const reactionType = item.atlas?.reaction?.type ? String(item.atlas.reaction.type) : null;
-        const status = {
-          exists: Boolean(item.atlas.exists),
-          downloaded: Boolean(item.atlas.downloaded),
-          blacklisted: Boolean(item.atlas.blacklisted),
-          reactionType,
-        };
-
-        statusByUrl.set(item.url, status);
-        statusByUrl.set(stripHash(item.url), status);
-      }
-
-      if (statusByUrl.size === 0) {
-        return;
-      }
+      const statusByUrl = buildStatusMapFromCache(atlasStatusCache, ATLAS_STATUS_TTL_MS, stripHash);
+      mergeSheetItemStatuses(statusByUrl, sheetItems, stripHash);
 
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
@@ -1633,12 +1630,7 @@ declare const chrome: ChromeApi;
           continue;
         }
 
-        const status =
-          lookupKeys
-            .map((key) => statusByUrl.get(key) || statusByUrl.get(stripHash(key)))
-            .find((value) =>
-              Boolean(value && (value.exists || value.downloaded || value.blacklisted || value.reactionType))
-            ) ?? null;
+        const status = findStatusForLookupKeys(lookupKeys, statusByUrl, stripHash);
         if (!status) {
           continue;
         }
@@ -1658,10 +1650,19 @@ declare const chrome: ChromeApi;
           node.setAttribute('data-atlas-reaction', status.reactionType);
         }
       }
+
+      syncReactionBadgesFromDom();
+      syncPageVisitedBadge(window.location.href, statusByUrl, stripHash);
     }
 
     function collectPageMarkerUrls() {
       const urls = new Set<string>();
+      const pageUrl = (window.location.href || '').trim();
+      if (pageUrl) {
+        urls.add(pageUrl);
+        urls.add(stripHash(pageUrl));
+      }
+
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
         for (const key of collectLookupKeysForNode(node)) {
