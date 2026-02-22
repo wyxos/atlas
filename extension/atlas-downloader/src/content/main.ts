@@ -6,7 +6,7 @@ import {
   collectLookupKeysForNode,
   configureMediaNoiseFilters,
 } from './items';
-import { installHotkeys, installMediaReactionOverlay } from './interactions';
+import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from './interactions';
 import { isHostExcluded, isHostMatch, parseExcludedDomains, resolveHost, stripHash } from './network';
 import {
   buildStatusMapFromCache,
@@ -71,18 +71,10 @@ declare const chrome: ChromeApi;
 
   let openSheet: (() => void) | null = null;
   let handleRealtimeDownloadEvent: ((payload: unknown) => void) | null = null;
+  const STATUS_CACHE_UPDATED_EVENT = 'atlas-status-cache-updated';
 
   const ATLAS_STATUS_TTL_MS = 30_000;
-  const atlasStatusCache = new Map<
-    string,
-    {
-      exists: boolean;
-      downloaded: boolean;
-      blacklisted: boolean;
-      reactionType: string | null;
-      ts: number;
-    }
-  >();
+  const atlasStatusCache = new Map<string, AtlasStatusCacheEntry>();
 
   function limitString(value, max) {
     const v = typeof value === 'string' ? value : '';
@@ -92,6 +84,33 @@ declare const chrome: ChromeApi;
 
   function sourceFromMediaUrl(url) {
     return registrableDomainFromUrl(url) || 'Extension';
+  }
+
+  function normalizeProgress(value: unknown): number | null {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+
+    return Math.max(0, Math.min(100, parsed));
+  }
+
+  function normalizeDownloadedAt(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const date = new Date(trimmed);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return trimmed;
   }
 
   function getCachedAtlasStatus(url: string) {
@@ -109,7 +128,14 @@ declare const chrome: ChromeApi;
     url: string,
     _referrerUrl: string | null,
     callback: (
-      status: { exists: boolean; downloaded: boolean; blacklisted: boolean; reactionType: string | null } | null
+      status: {
+        exists: boolean;
+        downloaded: boolean;
+        blacklisted: boolean;
+        reactionType: string | null;
+        downloadProgress?: number | null;
+        downloadedAt?: string | null;
+      } | null
     ) => void
   ) {
     const lookupUrl = stripHash((url || '').trim());
@@ -147,6 +173,8 @@ declare const chrome: ChromeApi;
         downloaded: Boolean(match.downloaded),
         blacklisted: Boolean(match.blacklisted),
         reactionType: match.reaction?.type ? String(match.reaction.type) : null,
+        downloadProgress: normalizeProgress(match.download_progress),
+        downloadedAt: normalizeDownloadedAt(match.downloaded_at),
         ts: Date.now(),
       };
 
@@ -458,6 +486,7 @@ declare const chrome: ChromeApi;
       const data = payload as {
         transferId?: unknown;
         status?: unknown;
+        percent?: unknown;
         original?: unknown;
         referrer_url?: unknown;
         downloaded?: unknown;
@@ -468,8 +497,10 @@ declare const chrome: ChromeApi;
 
       const transferId = Number.isFinite(Number(data.transferId)) ? Number(data.transferId) : null;
       const status = typeof data.status === 'string' ? data.status : '';
+      const progress = normalizeProgress(data.percent);
       const downloaded = Boolean(data.downloaded) || status === 'completed' || typeof data.finished_at === 'string';
       const failed = Boolean(data.failed) || status === 'failed' || status === 'canceled' || typeof data.failed_at === 'string';
+      const downloadedAt = downloaded ? normalizeDownloadedAt(data.finished_at) : null;
 
       const lookupCandidates = new Set<string>();
       const originalLookup = typeof data.original === 'string' ? stripHash(data.original.trim()) : '';
@@ -496,6 +527,7 @@ declare const chrome: ChromeApi;
       }
 
       let changed = false;
+      let cacheUpdated = false;
       for (const lookup of lookupCandidates) {
         const cached = getCachedAtlasStatus(lookup);
         atlasStatusCache.set(lookup, {
@@ -503,8 +535,11 @@ declare const chrome: ChromeApi;
           downloaded,
           blacklisted: cached ? Boolean(cached.blacklisted) : false,
           reactionType: cached?.reactionType ?? null,
+          downloadProgress: downloaded ? 100 : failed ? 0 : progress ?? cached?.downloadProgress ?? null,
+          downloadedAt: downloadedAt ?? cached?.downloadedAt ?? null,
           ts: Date.now(),
         });
+        cacheUpdated = true;
       }
 
       for (const item of items) {
@@ -545,6 +580,10 @@ declare const chrome: ChromeApi;
 
       if (transferId && (downloaded || failed)) {
         lookupByTransferId.delete(transferId);
+      }
+
+      if (cacheUpdated) {
+        window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
       }
 
       if (!changed) {
@@ -1281,6 +1320,8 @@ declare const chrome: ChromeApi;
             downloaded: Boolean(match.downloaded),
             blacklisted: Boolean(match.blacklisted),
             reactionType: match.reaction?.type ? String(match.reaction.type) : null,
+            downloadProgress: normalizeProgress(match.download_progress),
+            downloadedAt: normalizeDownloadedAt(match.downloaded_at),
             ts: Date.now(),
           });
 
@@ -1291,6 +1332,7 @@ declare const chrome: ChromeApi;
         renderList();
         setReady(summaryText());
         applyPageMarkers(items);
+        window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
 
         if (!silent) {
           showToast(`Atlas check: ${downloadedCount}/${existsCount} downloaded.`);
@@ -1358,6 +1400,8 @@ declare const chrome: ChromeApi;
             downloaded: item.atlas.downloaded,
             blacklisted: item.atlas.blacklisted,
             reactionType: item.atlas.reaction?.type ? String(item.atlas.reaction.type) : null,
+            downloadProgress: normalizeProgress(file?.download_progress),
+            downloadedAt: normalizeDownloadedAt(file?.downloaded_at),
             ts: Date.now(),
           });
 
@@ -1379,6 +1423,7 @@ declare const chrome: ChromeApi;
           renderList();
           setReady(summaryText());
           applyPageMarkers(items);
+          window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
 
           if (options.closeOnSuccess) {
             closeModal();
@@ -1485,6 +1530,8 @@ declare const chrome: ChromeApi;
               downloaded: item.atlas.downloaded,
               blacklisted: item.atlas.blacklisted,
               reactionType: null,
+              downloadProgress: normalizeProgress(file?.download_progress),
+              downloadedAt: normalizeDownloadedAt(file?.downloaded_at),
               ts: Date.now(),
             });
             item.status = '';
@@ -1492,6 +1539,7 @@ declare const chrome: ChromeApi;
             renderList();
             setReady(summaryText());
             applyPageMarkers(items);
+            window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
             showToast('Download deleted.');
           }
         );
@@ -1575,6 +1623,18 @@ declare const chrome: ChromeApi;
                 file_id: file?.id ?? null,
                 reaction: item.atlas?.reaction ?? null,
               };
+              const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
+              if (lookup) {
+                atlasStatusCache.set(lookup, {
+                  exists: item.atlas.exists,
+                  downloaded: item.atlas.downloaded,
+                  blacklisted: item.atlas.blacklisted,
+                  reactionType: item.atlas.reaction?.type ? String(item.atlas.reaction.type) : null,
+                  downloadProgress: normalizeProgress(file?.download_progress),
+                  downloadedAt: normalizeDownloadedAt(file?.downloaded_at),
+                  ts: Date.now(),
+                });
+              }
 
               if (data?.queued) {
                 item.status = 'Queued';
@@ -1582,7 +1642,6 @@ declare const chrome: ChromeApi;
                 if (item.atlas?.reaction?.type && item.atlas.reaction.type !== 'dislike') {
                   item.reactionQueued = item.atlas.reaction.type;
                 }
-                const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
                 if (lookup) {
                   queuedLookupUrls.add(lookup);
                 }
@@ -1590,7 +1649,6 @@ declare const chrome: ChromeApi;
                 item.status = '';
                 item.statusClass = '';
                 item.reactionQueued = null;
-                const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
                 if (lookup) {
                   queuedLookupUrls.delete(lookup);
                 }
@@ -1604,6 +1662,7 @@ declare const chrome: ChromeApi;
           renderList();
           setReady(summaryText());
           applyPageMarkers(items);
+          window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
 
           if (response.ok) {
             showToast(`Queued ${selected.length} download(s) in Atlas.`);
@@ -1706,11 +1765,14 @@ declare const chrome: ChromeApi;
             downloaded: Boolean(match.downloaded),
             blacklisted: Boolean(match.blacklisted),
             reactionType: match.reaction?.type ? String(match.reaction.type) : null,
+            downloadProgress: normalizeProgress(match.download_progress),
+            downloadedAt: normalizeDownloadedAt(match.downloaded_at),
             ts: Date.now(),
           });
         }
 
         applyPageMarkers(items);
+        window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
       });
     }
   }

@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { choosePromotedMediaCandidate, installHotkeys, resolveMediaAtPoint } from './interactions';
+import {
+  choosePromotedMediaCandidate,
+  formatDownloadedAtUtc,
+  formatOverlayDownloadMeta,
+  installHotkeys,
+  resolveMediaAtPoint,
+} from './interactions';
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
   const right = left + width;
@@ -206,5 +212,49 @@ describe('installHotkeys', () => {
     );
 
     expect(reactedUrl).toBe('https://example.com/large.jpg');
+  });
+});
+
+describe('formatOverlayDownloadMeta', () => {
+  it('formats downloading progress for active transfers', () => {
+    expect(
+      formatOverlayDownloadMeta({
+        exists: true,
+        downloaded: false,
+        blacklisted: false,
+        reactionType: 'like',
+        downloadProgress: 37,
+      })
+    ).toBe('Downloading 37%');
+  });
+
+  it('formats downloaded with UTC timestamp when available', () => {
+    expect(
+      formatOverlayDownloadMeta({
+        exists: true,
+        downloaded: true,
+        blacklisted: false,
+        reactionType: 'like',
+        downloadedAt: '2026-02-22T04:45:00+00:00',
+      })
+    ).toBe('Downloaded 2026-02-22 04:45 UTC');
+  });
+
+  it('falls back to queued when download metadata is unavailable', () => {
+    expect(
+      formatOverlayDownloadMeta({
+        exists: true,
+        downloaded: false,
+        blacklisted: false,
+        reactionType: 'like',
+      })
+    ).toBe('Queued');
+  });
+});
+
+describe('formatDownloadedAtUtc', () => {
+  it('returns empty string for invalid values', () => {
+    expect(formatDownloadedAtUtc(null)).toBe('');
+    expect(formatDownloadedAtUtc('not-a-date')).toBe('');
   });
 });

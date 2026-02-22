@@ -201,3 +201,42 @@ it('does not leak reaction state across files when checking by media urls', func
     $response->assertJsonPath('results.1.downloaded', false);
     $response->assertJsonPath('results.1.reaction', null);
 });
+
+it('includes download progress and downloaded_at in extension check results', function () {
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $downloadedAt = now()->subHour()->startOfMinute();
+
+    File::factory()->create([
+        'url' => 'https://images.example.com/media/progress.jpg',
+        'referrer_url' => 'https://example.com/art/progress',
+        'downloaded' => false,
+        'download_progress' => 42,
+        'downloaded_at' => null,
+    ]);
+
+    File::factory()->create([
+        'url' => 'https://images.example.com/media/done.jpg',
+        'referrer_url' => 'https://example.com/art/done',
+        'downloaded' => true,
+        'download_progress' => 100,
+        'downloaded_at' => $downloadedAt,
+    ]);
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/check', [
+            'urls' => [
+                'https://images.example.com/media/progress.jpg',
+                'https://images.example.com/media/done.jpg',
+            ],
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('results.0.download_progress', 42);
+    $response->assertJsonPath('results.0.downloaded_at', null);
+    $response->assertJsonPath('results.1.download_progress', 100);
+    $response->assertJsonPath('results.1.downloaded_at', $downloadedAt->toIso8601String());
+});

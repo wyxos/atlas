@@ -10,6 +10,8 @@ type AtlasStatus = {
   downloaded: boolean;
   blacklisted: boolean;
   reactionType: string | null;
+  downloadProgress?: number | null;
+  downloadedAt?: string | null;
 };
 
 export type AtlasStatusCacheEntry = AtlasStatus & {
@@ -65,6 +67,89 @@ export type HotkeysOptions = {
 
 function isOwnUiElement(element: Element, rootId: string): boolean {
   return Boolean(element.closest?.(`#${rootId}`));
+}
+
+function normalizeProgress(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return clamp(parsed, 0, 100);
+}
+
+function normalizeDownloadedAt(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function parseFileStatusMeta(file: unknown): { downloadProgress: number | null; downloadedAt: string | null } {
+  if (!file || typeof file !== 'object') {
+    return {
+      downloadProgress: null,
+      downloadedAt: null,
+    };
+  }
+
+  const value = file as { download_progress?: unknown; downloaded_at?: unknown };
+  return {
+    downloadProgress: normalizeProgress(value.download_progress),
+    downloadedAt: normalizeDownloadedAt(value.downloaded_at),
+  };
+}
+
+export function formatDownloadedAtUtc(downloadedAt: string | null | undefined): string {
+  if (!downloadedAt) {
+    return '';
+  }
+
+  const date = new Date(downloadedAt);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  const month = pad(date.getUTCMonth() + 1);
+  const day = pad(date.getUTCDate());
+  const hour = pad(date.getUTCHours());
+  const minute = pad(date.getUTCMinutes());
+  return `${year}-${month}-${day} ${hour}:${minute} UTC`;
+}
+
+export function formatOverlayDownloadMeta(status: AtlasStatus | null): string {
+  if (!status) {
+    return '';
+  }
+
+  if (status.downloaded) {
+    const downloadedAt = formatDownloadedAtUtc(status.downloadedAt ?? null);
+    return downloadedAt ? `Downloaded ${downloadedAt}` : 'Downloaded';
+  }
+
+  const progress = normalizeProgress(status.downloadProgress);
+  if (progress !== null && progress > 0 && progress < 100) {
+    return `Downloading ${Math.round(progress)}%`;
+  }
+
+  if (status.exists && status.reactionType && status.reactionType !== 'dislike') {
+    return 'Queued';
+  }
+
+  return '';
 }
 
 function pickLargestMediaDescendantAtPoint(
@@ -377,11 +462,14 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
                       const newReactionType = data?.reaction?.type
                         ? String(data.reaction.type)
                         : reactionType;
+                      const fileMeta = parseFileStatusMeta(file);
                       deps.atlasStatusCache.set(payload.url, {
                         exists: Boolean(file),
                         downloaded: Boolean(file?.downloaded),
                         blacklisted: Boolean(file?.blacklisted_at),
                         reactionType: newReactionType,
+                        downloadProgress: fileMeta.downloadProgress,
+                        downloadedAt: fileMeta.downloadedAt,
                         ts: Date.now(),
                       });
                       emitShortcutReactionState(media, false, newReactionType, payload.url);
@@ -404,11 +492,14 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
                 const newReactionType = data?.reaction?.type
                   ? String(data.reaction.type)
                   : reactionType;
+                const fileMeta = parseFileStatusMeta(file);
                 deps.atlasStatusCache.set(payload.url, {
                   exists: Boolean(file),
                   downloaded: Boolean(file?.downloaded),
                   blacklisted: Boolean(file?.blacklisted_at),
                   reactionType: newReactionType,
+                  downloadProgress: fileMeta.downloadProgress,
+                  downloadedAt: fileMeta.downloadedAt,
                   ts: Date.now(),
                 });
                 emitShortcutReactionState(media, false, newReactionType, payload.url);
@@ -471,11 +562,14 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
                 const data = response.data || null;
                 const file = data?.file || null;
                 const newReactionType = data?.reaction?.type ? String(data.reaction.type) : reactionType;
+                const fileMeta = parseFileStatusMeta(file);
                 deps.atlasStatusCache.set(payload.url, {
                   exists: Boolean(file),
                   downloaded: Boolean(file?.downloaded),
                   blacklisted: Boolean(file?.blacklisted_at),
                   reactionType: newReactionType,
+                  downloadProgress: fileMeta.downloadProgress,
+                  downloadedAt: fileMeta.downloadedAt,
                   ts: Date.now(),
                 });
                 emitShortcutReactionState(media, false, newReactionType, payload.url);
@@ -496,11 +590,14 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
           const data = response.data || null;
           const file = data?.file || null;
           const newReactionType = data?.reaction?.type ? String(data.reaction.type) : reactionType;
+          const fileMeta = parseFileStatusMeta(file);
           deps.atlasStatusCache.set(payload.url, {
             exists: Boolean(file),
             downloaded: Boolean(file?.downloaded),
             blacklisted: Boolean(file?.blacklisted_at),
             reactionType: newReactionType,
+            downloadProgress: fileMeta.downloadProgress,
+            downloadedAt: fileMeta.downloadedAt,
             ts: Date.now(),
           });
           emitShortcutReactionState(media, false, newReactionType, payload.url);
@@ -719,6 +816,9 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   resolutionMeta.className = 'atlas-downloader-media-resolution';
   resolutionMeta.hidden = true;
   toolbar.appendChild(resolutionMeta);
+  const statusMeta = document.createElement('span');
+  statusMeta.className = 'atlas-downloader-media-status';
+  statusMeta.hidden = true;
 
   let activeMedia: Element | null = null;
   let activeKey: string | null = null;
@@ -755,6 +855,17 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
     resolutionMeta.textContent = text;
     resolutionMeta.hidden = false;
+  };
+  const setToolbarStatusMeta = (status: AtlasStatus | null) => {
+    const text = formatOverlayDownloadMeta(status);
+    if (!text) {
+      statusMeta.textContent = '';
+      statusMeta.hidden = true;
+      return;
+    }
+
+    statusMeta.textContent = text;
+    statusMeta.hidden = false;
   };
   const syncToolbarButtonState = () => {
     const locked = toolbarBusy || toolbarQueuedType !== null;
@@ -847,6 +958,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     toolbar.style.left = '';
     toolbar.style.top = '';
     setToolbarResolution(null, null);
+    setToolbarStatusMeta(null);
     setToolbarActive(null);
   };
 
@@ -933,6 +1045,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
               : reaction.type === BLACKLIST_ACTION.type
                 ? 'dislike'
                 : reaction.type;
+            const fileMeta = parseFileStatusMeta(file);
 
             if (checkKey) {
               deps.atlasStatusCache.set(checkKey, {
@@ -940,12 +1053,22 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
                 downloaded: Boolean(file?.downloaded),
                 blacklisted: Boolean(file?.blacklisted_at),
                 reactionType: newReactionType,
+                downloadProgress: fileMeta.downloadProgress,
+                downloadedAt: fileMeta.downloadedAt,
                 ts: Date.now(),
               });
             }
 
             setToolbarActive(newReactionType);
             setToolbarQueued(newReactionType, Boolean(file?.downloaded));
+            setToolbarStatusMeta({
+              exists: Boolean(file),
+              downloaded: Boolean(file?.downloaded),
+              blacklisted: Boolean(file?.blacklisted_at),
+              reactionType: newReactionType,
+              downloadProgress: fileMeta.downloadProgress,
+              downloadedAt: fileMeta.downloadedAt,
+            });
             emitOverlayReactionState(false, newReactionType, checkKey || null);
 
             if (payload.download_via === 'yt-dlp') {
@@ -983,6 +1106,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
     toolbar.appendChild(button);
   }
+  toolbar.appendChild(statusMeta);
 
   options.root.appendChild(toolbar);
 
@@ -1042,11 +1166,13 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
     setToolbarActive(null);
     setToolbarQueued(null, null);
+    setToolbarStatusMeta(null);
     if (activeKey) {
       const cached = deps.getCachedAtlasStatus(activeKey);
       if (cached) {
         setToolbarActive(cached.reactionType);
         setToolbarQueued(cached.reactionType, cached.downloaded);
+        setToolbarStatusMeta(cached);
       } else {
         const keyAtRequest = activeKey;
         deps.fetchAtlasStatus(options.sendMessageSafe, keyAtRequest, window.location.href, (status) => {
@@ -1054,6 +1180,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
           if (activeKey !== keyAtRequest) return;
           setToolbarActive(status.reactionType);
           setToolbarQueued(status.reactionType, status.downloaded);
+          setToolbarStatusMeta(status);
         });
       }
     }
@@ -1142,7 +1269,26 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         setToolbarActive(nextType);
         const cached = activeKey ? deps.getCachedAtlasStatus(activeKey) : null;
         setToolbarQueued(nextType, cached?.downloaded ?? null);
+        setToolbarStatusMeta(cached);
       }
+    },
+    true
+  );
+  window.addEventListener(
+    'atlas-status-cache-updated',
+    () => {
+      if (!activeKey) {
+        return;
+      }
+
+      const cached = deps.getCachedAtlasStatus(activeKey);
+      if (!cached) {
+        return;
+      }
+
+      setToolbarActive(cached.reactionType);
+      setToolbarQueued(cached.reactionType, cached.downloaded);
+      setToolbarStatusMeta(cached);
     },
     true
   );
