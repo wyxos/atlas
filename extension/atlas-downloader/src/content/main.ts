@@ -16,6 +16,7 @@ import {
   syncPageVisitedBadge,
   syncReactionIconBadges,
 } from './pageMarkers';
+import { shouldIgnoreMutationBatch } from './mutationGuard';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
 import { createDialogChooser, createToastFn, ensurePageMarkerStyles } from './ui';
 
@@ -789,7 +790,11 @@ declare const chrome: ChromeApi;
       });
     };
 
-    const mutationObserver = new MutationObserver(() => {
+    const mutationObserver = new MutationObserver((mutations) => {
+      if (shouldIgnoreMutationBatch(mutations, ROOT_ID)) {
+        return;
+      }
+
       applyPageMarkers(items);
       scheduleMarkerSync(450);
     });
