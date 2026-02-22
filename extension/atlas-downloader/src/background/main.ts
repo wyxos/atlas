@@ -1,4 +1,5 @@
 import Pusher from 'pusher-js/worker';
+import { findDuplicateTabId, normalizeTabUrlForDuplicateCheck } from './duplicates';
 
 type AtlasSettings = {
   atlasBaseUrl?: string;
@@ -59,8 +60,13 @@ type ChromeTab = {
 type ChromeTabs = {
   sendMessage: (tabId: number, message: unknown) => void;
   create: (createProperties: { url: string }) => void;
+  remove: (tabIds: number | number[]) => Promise<void>;
+  update: (tabId: number, updateProperties: { active?: boolean }) => Promise<ChromeTab>;
   get: (tabId: number) => Promise<ChromeTab>;
   query: (queryInfo: { active?: boolean; lastFocusedWindow?: boolean }) => Promise<ChromeTab[]>;
+  onCreated: {
+    addListener: (callback: (tab: ChromeTab) => void) => void;
+  };
   onActivated: {
     addListener: (callback: (activeInfo: { tabId: number }) => void) => void;
   };
@@ -138,6 +144,7 @@ const MENU_BLACKLIST_DOMAIN = 'atlas-blacklist-domain';
 const MENU_RELOAD_EXTENSION = 'atlas-reload-extension';
 const MESSAGE_REALTIME_STATUS_REQUEST = 'atlas-realtime-status-request';
 const MESSAGE_REALTIME_STATUS_CHANGED = 'atlas-realtime-status-changed';
+const MESSAGE_DUPLICATE_TAB_BLOCKED = 'atlas-duplicate-tab-blocked';
 const SOCKET_EVENT_NAMES = [
   'DownloadTransferCreated',
   'DownloadTransferQueued',
@@ -194,6 +201,7 @@ let realtimeChannel: Pusher.Channel | null = null;
 let realtimeConfigSignature = '';
 let realtimeReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let realtimeReconnectAttempts = 0;
+const recentlyCreatedTabIds = new Set<number>();
 let realtimeStatus: RealtimeConnectionStatus = {
   state: 'not-configured',
   message: 'Set Atlas base URL and extension token to enable realtime updates.',
@@ -302,7 +310,25 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
   void refreshActionForTabId(activeInfo.tabId);
 });
 
+chrome.tabs.onCreated.addListener((tab) => {
+  if (typeof tab.id !== 'number') {
+    return;
+  }
+
+  recentlyCreatedTabIds.add(tab.id);
+  void enforceUniqueTab(tab.id, tab.url || '');
+});
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (recentlyCreatedTabIds.has(tabId)) {
+    const candidateUrl = tab?.url || changeInfo.url || '';
+    if (changeInfo.status === 'complete' && !normalizeTabUrlForDuplicateCheck(candidateUrl)) {
+      recentlyCreatedTabIds.delete(tabId);
+    } else {
+      void enforceUniqueTab(tabId, candidateUrl);
+    }
+  }
+
   if (!tab?.active && typeof changeInfo.url !== 'string' && changeInfo.status !== 'complete') {
     return;
   }
@@ -477,6 +503,48 @@ async function refreshActionForTab(tabId: number, tabUrl: string) {
   }
 
   setActionDefault(tabId);
+}
+
+async function enforceUniqueTab(tabId: number, tabUrl: string) {
+  const normalizedUrl = normalizeTabUrlForDuplicateCheck(tabUrl);
+  if (!normalizedUrl) {
+    return;
+  }
+
+  let tabs: ChromeTab[] = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return;
+  }
+
+  const duplicateTabId = findDuplicateTabId(tabs, tabId, normalizedUrl);
+  recentlyCreatedTabIds.delete(tabId);
+
+  if (!duplicateTabId) {
+    return;
+  }
+
+  try {
+    await chrome.tabs.remove(tabId);
+  } catch {
+    return;
+  }
+
+  try {
+    await chrome.tabs.update(duplicateTabId, { active: true });
+  } catch {
+    // Ignore focus issues if the tab disappears.
+  }
+
+  try {
+    chrome.tabs.sendMessage(duplicateTabId, {
+      type: MESSAGE_DUPLICATE_TAB_BLOCKED,
+      url: normalizedUrl,
+    });
+  } catch {
+    // Ignore if content script cannot receive messages on this page.
+  }
 }
 
 function setActionDefault(tabId: number) {
