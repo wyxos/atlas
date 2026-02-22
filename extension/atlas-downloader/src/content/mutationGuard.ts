@@ -1,5 +1,7 @@
 const REACTION_BADGE_CLASS = 'atlas-downloader-reaction-badge';
 const REACTION_LAYER_ID = 'atlas-downloader-reaction-badge-layer';
+const OPEN_TAB_BADGE_CLASS = 'atlas-downloader-open-tab-badge';
+const OPEN_TAB_LAYER_ID = 'atlas-downloader-open-tab-badge-layer';
 const PAGE_BADGE_ID = 'atlas-downloader-page-visited-badge';
 
 function isElement(node: Node | null): node is Element {
@@ -11,15 +13,22 @@ function isAtlasMarkerElement(element: Element, rootId: string): boolean {
     return true;
   }
 
-  if (element.id === REACTION_LAYER_ID || element.id === PAGE_BADGE_ID) {
+  if (
+    element.id === REACTION_LAYER_ID
+    || element.id === OPEN_TAB_LAYER_ID
+    || element.id === PAGE_BADGE_ID
+  ) {
     return true;
   }
 
-  if (element.classList.contains(REACTION_BADGE_CLASS)) {
+  if (element.classList.contains(REACTION_BADGE_CLASS) || element.classList.contains(OPEN_TAB_BADGE_CLASS)) {
     return true;
   }
 
-  return Boolean(element.closest?.(`#${REACTION_LAYER_ID}`));
+  return Boolean(
+    element.closest?.(`#${REACTION_LAYER_ID}`)
+    || element.closest?.(`#${OPEN_TAB_LAYER_ID}`)
+  );
 }
 
 function isAtlasMarkerNode(node: Node | null, rootId: string): boolean {

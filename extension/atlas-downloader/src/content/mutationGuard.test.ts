@@ -45,6 +45,16 @@ describe('shouldIgnoreMutationBatch', () => {
 
     expect(shouldIgnoreMutationBatch([childListMutation([layer])], 'atlas-downloader-root')).toBe(true);
     expect(shouldIgnoreMutationBatch([childListMutation([], [badge])], 'atlas-downloader-root')).toBe(true);
+
+    const openTabLayer = document.createElement('div');
+    openTabLayer.id = 'atlas-downloader-open-tab-badge-layer';
+
+    const openTabBadge = document.createElement('span');
+    openTabBadge.className = 'atlas-downloader-open-tab-badge';
+    openTabLayer.appendChild(openTabBadge);
+
+    expect(shouldIgnoreMutationBatch([childListMutation([openTabLayer])], 'atlas-downloader-root')).toBe(true);
+    expect(shouldIgnoreMutationBatch([childListMutation([], [openTabBadge])], 'atlas-downloader-root')).toBe(true);
   });
 
   it('ignores marker attribute mutations', () => {

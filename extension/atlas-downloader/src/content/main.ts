@@ -15,6 +15,7 @@ import {
   mergeSheetItemStatuses,
   syncPageVisitedBadge,
   syncReactionIconBadges,
+  syncOpenTabIconBadges,
 } from './pageMarkers';
 import { shouldIgnoreMutationBatch } from './mutationGuard';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
@@ -77,10 +78,13 @@ declare const chrome: ChromeApi;
 
   let openSheet: (() => void) | null = null;
   let handleRealtimeDownloadEvent: ((payload: unknown) => void) | null = null;
+  let syncOpenTabMarkers: (() => void) | null = null;
   const STATUS_CACHE_UPDATED_EVENT = 'atlas-status-cache-updated';
+  const OPEN_TABS_UPDATED_EVENT = 'atlas-open-tabs-updated';
 
   const ATLAS_STATUS_TTL_MS = 30_000;
   const atlasStatusCache = new Map<string, AtlasStatusCacheEntry>();
+  const openTabUrlSet = new Set<string>();
 
   function limitString(value, max) {
     const v = typeof value === 'string' ? value : '';
@@ -90,6 +94,59 @@ declare const chrome: ChromeApi;
 
   function sourceFromMediaUrl(url) {
     return registrableDomainFromUrl(url) || 'Extension';
+  }
+
+  function normalizeOpenTabUrl(value: unknown): string {
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+
+    try {
+      const parsed = new URL(trimmed);
+      const protocol = parsed.protocol.toLowerCase();
+      if (protocol !== 'http:' && protocol !== 'https:') {
+        return '';
+      }
+
+      parsed.hash = '';
+      parsed.hostname = parsed.hostname.toLowerCase();
+      return parsed.toString();
+    } catch {
+      return '';
+    }
+  }
+
+  function applyOpenTabUrls(urls: unknown): boolean {
+    const next = new Set<string>();
+    const entries = Array.isArray(urls) ? urls : [];
+    for (const entry of entries) {
+      const normalized = normalizeOpenTabUrl(entry);
+      if (!normalized) {
+        continue;
+      }
+
+      next.add(normalized);
+      next.add(stripHash(normalized));
+    }
+
+    const changed =
+      next.size !== openTabUrlSet.size
+      || [...next].some((url) => !openTabUrlSet.has(url));
+    if (!changed) {
+      return false;
+    }
+
+    openTabUrlSet.clear();
+    for (const url of next) {
+      openTabUrlSet.add(url);
+    }
+
+    return true;
   }
 
   function normalizeProgress(value: unknown): number | null {
@@ -198,9 +255,16 @@ declare const chrome: ChromeApi;
       return;
     }
 
-    const msg = message as { type?: unknown; payload?: unknown; url?: unknown };
+    const msg = message as { type?: unknown; payload?: unknown; url?: unknown; urls?: unknown };
     if (msg.type === 'atlas-download-event') {
       handleRealtimeDownloadEvent?.(msg.payload);
+      return;
+    }
+
+    if (msg.type === OPEN_TABS_UPDATED_EVENT) {
+      if (applyOpenTabUrls(msg.urls)) {
+        syncOpenTabMarkers?.();
+      }
       return;
     }
 
@@ -783,6 +847,15 @@ declare const chrome: ChromeApi;
         )
       );
     };
+    const syncOpenTabBadgesFromDom = () => {
+      syncOpenTabIconBadges(
+        Array.from(
+          document.querySelectorAll(
+            '[data-atlas-open-tab="1"]:not([data-atlas-state="reacted"])'
+          )
+        )
+      );
+    };
     const scheduleReactionBadgeSync = () => {
       if (reactionBadgeSyncFrame !== null) {
         return;
@@ -791,6 +864,7 @@ declare const chrome: ChromeApi;
       reactionBadgeSyncFrame = window.requestAnimationFrame(() => {
         reactionBadgeSyncFrame = null;
         syncReactionBadgesFromDom();
+        syncOpenTabBadgesFromDom();
       });
     };
 
@@ -823,6 +897,16 @@ declare const chrome: ChromeApi;
       true
     );
     scheduleMarkerSync(120);
+    sendMessageSafe({ type: 'atlas-open-tabs-request' }, (response) => {
+      const payload = response as { ok?: unknown; urls?: unknown } | null;
+      if (!payload || payload.ok !== true) {
+        return;
+      }
+
+      if (applyOpenTabUrls(payload.urls)) {
+        applyPageMarkers(items);
+      }
+    });
 
     function makeButton(label, onClick, options) {
       const button = document.createElement('button');
@@ -1686,10 +1770,13 @@ declare const chrome: ChromeApi;
     function applyPageMarkers(sheetItems = items) {
       ensurePageMarkerStyles();
 
-      clearNodeMarkerAttributes(document.querySelectorAll('[data-atlas-marked="1"]'));
+      clearNodeMarkerAttributes(
+        document.querySelectorAll('[data-atlas-marked="1"],[data-atlas-open-tab="1"]')
+      );
 
       const statusByUrl = buildStatusMapFromCache(atlasStatusCache, ATLAS_STATUS_TTL_MS, stripHash);
       mergeSheetItemStatuses(statusByUrl, sheetItems, stripHash);
+      const openTabBadgeNodes: Element[] = [];
 
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
@@ -1699,29 +1786,49 @@ declare const chrome: ChromeApi;
         }
 
         const status = findStatusForLookupKeys(lookupKeys, statusByUrl, stripHash);
-        if (!status) {
+        const isOpenInTab = lookupKeys.some((key) => {
+          const normalized = normalizeOpenTabUrl(key);
+          if (!normalized) {
+            return false;
+          }
+
+          return openTabUrlSet.has(normalized) || openTabUrlSet.has(stripHash(normalized));
+        });
+
+        if (!status && !isOpenInTab) {
           continue;
         }
 
-        node.setAttribute('data-atlas-marked', '1');
-        if (status.blacklisted) {
-          node.setAttribute('data-atlas-state', 'blacklisted');
-        } else if (status.reactionType) {
-          node.setAttribute('data-atlas-state', 'reacted');
-        } else if (status.downloaded) {
-          node.setAttribute('data-atlas-state', 'downloaded');
-        } else if (status.exists) {
-          node.setAttribute('data-atlas-state', 'exists');
+        if (status) {
+          node.setAttribute('data-atlas-marked', '1');
+          if (status.blacklisted) {
+            node.setAttribute('data-atlas-state', 'blacklisted');
+          } else if (status.reactionType) {
+            node.setAttribute('data-atlas-state', 'reacted');
+          } else if (status.downloaded) {
+            node.setAttribute('data-atlas-state', 'downloaded');
+          } else if (status.exists) {
+            node.setAttribute('data-atlas-state', 'exists');
+          }
         }
 
-        if (status.reactionType) {
+        if (status?.reactionType) {
           node.setAttribute('data-atlas-reaction', status.reactionType);
+        }
+
+        if (isOpenInTab) {
+          node.setAttribute('data-atlas-open-tab', '1');
+          if (!status?.reactionType) {
+            openTabBadgeNodes.push(node);
+          }
         }
       }
 
       syncReactionBadgesFromDom();
+      syncOpenTabIconBadges(openTabBadgeNodes);
       syncPageVisitedBadge(window.location.href, statusByUrl, stripHash);
     }
+    syncOpenTabMarkers = () => applyPageMarkers(items);
 
     function collectPageMarkerUrls() {
       const urls = new Set<string>();
