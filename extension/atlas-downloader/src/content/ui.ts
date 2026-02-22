@@ -1,4 +1,7 @@
 const PAGE_MARKER_STYLE_ID = 'atlas-downloader-page-markers';
+const DUPLICATE_MODAL_STYLE_ID = 'atlas-downloader-duplicate-modal-style';
+const DUPLICATE_MODAL_ID = 'atlas-downloader-duplicate-modal';
+let closeDuplicateModal: (() => void) | null = null;
 
 export type DialogChoice = 'confirm' | 'cancel' | 'alternate';
 
@@ -114,6 +117,95 @@ export function createDialogChooser(root: HTMLElement): DialogChooser {
     });
 }
 
+export function showDuplicateTabBlockedModal(duplicateUrl: string) {
+  ensureDuplicateModalStyles();
+
+  closeDuplicateModal?.();
+  closeDuplicateModal = null;
+  document.getElementById(DUPLICATE_MODAL_ID)?.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.id = DUPLICATE_MODAL_ID;
+  backdrop.className = 'atlas-downloader-duplicate-backdrop';
+
+  const panel = document.createElement('div');
+  panel.className = 'atlas-downloader-duplicate-dialog';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-label', 'Duplicate tab blocked');
+
+  const title = document.createElement('h3');
+  title.className = 'atlas-downloader-duplicate-title';
+  title.textContent = 'Duplicate tab blocked';
+
+  const message = document.createElement('p');
+  message.className = 'atlas-downloader-duplicate-message';
+  message.textContent = 'This page is already open in another tab.';
+
+  const url = (duplicateUrl || '').trim();
+  const urlNode = document.createElement('code');
+  urlNode.className = 'atlas-downloader-duplicate-url';
+  if (url) {
+    urlNode.textContent = url;
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'atlas-downloader-duplicate-actions';
+
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.className = 'atlas-downloader-duplicate-btn';
+  ok.textContent = 'OK';
+  actions.appendChild(ok);
+
+  let finished = false;
+  const finish = () => {
+    if (finished) {
+      return;
+    }
+
+    finished = true;
+    document.removeEventListener('keydown', handleEscape, true);
+    backdrop.remove();
+    if (closeDuplicateModal === finish) {
+      closeDuplicateModal = null;
+    }
+  };
+
+  const handleEscape = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    finish();
+  };
+
+  ok.addEventListener('click', () => finish());
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) {
+      finish();
+    }
+  });
+
+  panel.appendChild(title);
+  panel.appendChild(message);
+  if (url) {
+    panel.appendChild(urlNode);
+  }
+  panel.appendChild(actions);
+  backdrop.appendChild(panel);
+
+  (document.body || document.documentElement).appendChild(backdrop);
+  document.addEventListener('keydown', handleEscape, true);
+  closeDuplicateModal = finish;
+
+  requestAnimationFrame(() => {
+    ok.focus();
+  });
+}
+
 export function ensurePageMarkerStyles() {
   if (document.getElementById(PAGE_MARKER_STYLE_ID)) {
     return;
@@ -205,6 +297,81 @@ export function ensurePageMarkerStyles() {
 }
 .atlas-downloader-reaction-badge.dislike {
   background: rgba(51, 65, 85, 0.95);
+}
+`;
+
+  (document.head || document.documentElement).appendChild(style);
+}
+
+function ensureDuplicateModalStyles() {
+  if (document.getElementById(DUPLICATE_MODAL_STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement('style');
+  style.id = DUPLICATE_MODAL_STYLE_ID;
+  style.textContent = `
+.atlas-downloader-duplicate-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.62);
+}
+.atlas-downloader-duplicate-dialog {
+  width: min(460px, calc(100vw - 32px));
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: #0f172a;
+  box-shadow: 0 18px 46px rgba(2, 6, 23, 0.45);
+  padding: 16px;
+  color: #e2e8f0;
+}
+.atlas-downloader-duplicate-title {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #f8fafc;
+}
+.atlas-downloader-duplicate-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.atlas-downloader-duplicate-url {
+  display: block;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(15, 23, 42, 0.86);
+  color: #bae6fd;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.atlas-downloader-duplicate-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.atlas-downloader-duplicate-btn {
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+  color: #f8fafc;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.atlas-downloader-duplicate-btn:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.9);
+  outline-offset: 2px;
 }
 `;
 

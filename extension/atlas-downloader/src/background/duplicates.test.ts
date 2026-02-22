@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { findDuplicateTabId, normalizeTabUrlForDuplicateCheck } from './duplicates';
+import {
+  findDuplicateTabId,
+  normalizeTabUrlForDuplicateCheck,
+  pickDuplicateNoticeTargetTabId,
+} from './duplicates';
 
 describe('normalizeTabUrlForDuplicateCheck', () => {
   it('keeps http and https urls while stripping hash', () => {
@@ -34,5 +38,36 @@ describe('findDuplicateTabId', () => {
     ];
 
     expect(findDuplicateTabId(tabs, 21, 'https://example.com/gamma')).toBeNull();
+  });
+});
+
+describe('pickDuplicateNoticeTargetTabId', () => {
+  it('prefers opener tab when available', () => {
+    const tabs = [
+      { id: 100, active: true },
+      { id: 101, active: false },
+      { id: 102, active: false },
+    ];
+
+    expect(pickDuplicateNoticeTargetTabId(tabs, 102, 101, 100)).toBe(100);
+  });
+
+  it('falls back to active tab when opener is unavailable', () => {
+    const tabs = [
+      { id: 200, active: false },
+      { id: 201, active: true },
+      { id: 202, active: false },
+    ];
+
+    expect(pickDuplicateNoticeTargetTabId(tabs, 202, 200, null)).toBe(201);
+  });
+
+  it('returns null when no suitable tab exists', () => {
+    const tabs = [
+      { id: 301, active: false },
+      { id: 302, active: false },
+    ];
+
+    expect(pickDuplicateNoticeTargetTabId(tabs, 302, 301, null)).toBeNull();
   });
 });
