@@ -18,7 +18,23 @@ type AudioIdsResponse = {
     };
 };
 
+type AudioDetailsResponse = {
+    items: Array<{
+        id: number;
+        title: string | null;
+        artists: string[];
+        albums: string[];
+    }>;
+};
+
+type AudioDetail = {
+    title: string | null;
+    artists: string[];
+    albums: string[];
+};
+
 const PER_PAGE = 100;
+const SCROLL_IDLE_MS = 180;
 
 const audioIds = ref<number[]>([]);
 const loadedPages = ref(0);
@@ -26,6 +42,8 @@ const totalPages = ref(0);
 const totalAudioFiles = ref(0);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
+const visibleIds = ref<number[]>([]);
+const detailsById = ref<Record<number, AudioDetail>>({});
 
 const progressPercent = computed(() => {
     if (totalPages.value === 0) {
@@ -36,6 +54,9 @@ const progressPercent = computed(() => {
 });
 
 let isDisposed = false;
+let activeRequestToken = 0;
+let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+let detailsAbortController: AbortController | null = null;
 
 async function fetchChunk(afterId: number, maxId: number | null): Promise<AudioIdsResponse> {
     const params = {
@@ -57,6 +78,8 @@ async function loadAllAudioIds(): Promise<void> {
     loadedPages.value = 0;
     totalPages.value = 0;
     totalAudioFiles.value = 0;
+    visibleIds.value = [];
+    detailsById.value = {};
 
     try {
         let afterId = 0;
@@ -89,6 +112,120 @@ async function loadAllAudioIds(): Promise<void> {
     } finally {
         if (!isDisposed) {
             isLoading.value = false;
+            queueFetchAfterIdle();
+        }
+    }
+}
+
+function detailTitle(audioId: number): string {
+    const title = detailsById.value[audioId]?.title;
+
+    return title && title.trim() !== '' ? title : `Audio #${audioId}`;
+}
+
+function detailSubtitle(audioId: number): string {
+    const details = detailsById.value[audioId];
+    if (!details) {
+        return 'Loading metadata...';
+    }
+
+    const artists = details.artists.length > 0 ? details.artists.join(', ') : 'Unknown artist';
+    const albums = details.albums.length > 0 ? details.albums.join(', ') : 'Unknown album';
+
+    return `${artists} • ${albums}`;
+}
+
+function cancelActiveRequest() {
+    if (detailsAbortController) {
+        detailsAbortController.abort();
+        detailsAbortController = null;
+    }
+    activeRequestToken += 1;
+}
+
+function queueFetchAfterIdle() {
+    if (isLoading.value) {
+        return;
+    }
+
+    if (idleTimeout) {
+        clearTimeout(idleTimeout);
+    }
+
+    idleTimeout = setTimeout(() => {
+        idleTimeout = null;
+        void fetchVisibleDetails();
+    }, SCROLL_IDLE_MS);
+}
+
+function handleVisibleItemsChange(items: unknown[]) {
+    visibleIds.value = items
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item > 0);
+    queueFetchAfterIdle();
+}
+
+function handleVirtualListScroll() {
+    cancelActiveRequest();
+    queueFetchAfterIdle();
+}
+
+async function fetchVisibleDetails(): Promise<void> {
+    const ids = Array.from(new Set(visibleIds.value));
+    const idsToFetch = ids.filter((id) => detailsById.value[id] === undefined);
+
+    if (idsToFetch.length === 0) {
+        return;
+    }
+
+    cancelActiveRequest();
+    const requestToken = activeRequestToken;
+    const controller = new AbortController();
+    detailsAbortController = controller;
+
+    try {
+        const { data } = await window.axios.post<AudioDetailsResponse>('/api/audio/details', {
+            ids: idsToFetch,
+        }, {
+            signal: controller.signal,
+        });
+
+        if (requestToken !== activeRequestToken) {
+            return;
+        }
+
+        const nextDetails = { ...detailsById.value };
+        const returnedIds = new Set<number>();
+
+        for (const item of data.items) {
+            returnedIds.add(item.id);
+            nextDetails[item.id] = {
+                title: item.title,
+                artists: item.artists,
+                albums: item.albums,
+            };
+        }
+
+        for (const id of idsToFetch) {
+            if (returnedIds.has(id)) {
+                continue;
+            }
+
+            nextDetails[id] = {
+                title: null,
+                artists: [],
+                albums: [],
+            };
+        }
+
+        detailsById.value = nextDetails;
+    } catch {
+        if (controller.signal.aborted) {
+            return;
+        }
+    } finally {
+        if (detailsAbortController === controller) {
+            detailsAbortController = null;
         }
     }
 }
@@ -99,6 +236,10 @@ onMounted(() => {
 
 onUnmounted(() => {
     isDisposed = true;
+    if (idleTimeout) {
+        clearTimeout(idleTimeout);
+    }
+    cancelActiveRequest();
 });
 </script>
 
@@ -138,17 +279,22 @@ onUnmounted(() => {
                 <VirtualList
                     v-else
                     :items="audioIds"
-                    :item-height="48"
+                    :item-height="64"
+                    :overscan="4"
                     container-class="max-h-[70vh] overflow-y-auto"
+                    @scroll="handleVirtualListScroll"
+                    @visible-items-change="handleVisibleItemsChange"
                 >
                     <template #default="{ items }">
                         <ul class="divide-y divide-twilight-indigo-500">
                             <li
                                 v-for="audioId in items"
                                 :key="audioId"
-                                class="h-12 px-4 font-mono text-sm text-twilight-indigo-100 flex items-center"
+                                class="h-16 px-4 text-twilight-indigo-100 flex flex-col justify-center gap-1"
                             >
-                                {{ audioId }}
+                                <p class="font-mono text-xs text-blue-slate-300">#{{ audioId }}</p>
+                                <p class="truncate text-sm">{{ detailTitle(audioId) }}</p>
+                                <p class="truncate text-xs text-blue-slate-300">{{ detailSubtitle(audioId) }}</p>
                             </li>
                         </ul>
                     </template>

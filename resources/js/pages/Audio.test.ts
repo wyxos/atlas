@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import Audio from './Audio.vue';
+import VirtualList from '../components/VirtualList.vue';
 
 type AudioIdsResponse = {
     ids: number[];
@@ -15,6 +16,15 @@ type AudioIdsResponse = {
         total: number | null;
         total_pages: number | null;
     };
+};
+
+type AudioDetailsResponse = {
+    items: Array<{
+        id: number;
+        title: string | null;
+        artists: string[];
+        albums: string[];
+    }>;
 };
 
 function createDeferred<T>() {
@@ -35,14 +45,20 @@ function createDeferred<T>() {
 
 const mockAxios = {
     get: vi.fn(),
+    post: vi.fn(),
 };
 
 beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     Object.assign(global.window, {
         axios: mockAxios,
     });
+});
+
+afterEach(() => {
+    vi.useRealTimers();
 });
 
 describe('Audio', () => {
@@ -81,6 +97,16 @@ describe('Audio', () => {
             }
 
             return Promise.reject(new Error(`Unexpected cursor: ${String(afterId)}`));
+        });
+
+        mockAxios.post.mockResolvedValue({
+            data: {
+                items: [
+                    { id: 101, title: 'Track 101', artists: ['Artist A'], albums: ['Album A'] },
+                    { id: 202, title: 'Track 202', artists: ['Artist B'], albums: ['Album B'] },
+                    { id: 303, title: 'Track 303', artists: ['Artist C'], albums: ['Album C'] },
+                ],
+            } satisfies AudioDetailsResponse,
         });
 
         const wrapper = mount(Audio);
@@ -154,7 +180,74 @@ describe('Audio', () => {
         expect(wrapper.text()).toContain('Pages: 3 / 3');
         expect(wrapper.text()).toContain('100%');
         expect(wrapper.text()).toContain('IDs loaded: 3 / 3');
-        expect(wrapper.findAll('li').map((row) => row.text())).toEqual(['101', '202', '303']);
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        expect(mockAxios.post).toHaveBeenCalledWith('/api/audio/details', {
+            ids: [101, 202, 303],
+        }, expect.objectContaining({
+            signal: expect.any(AbortSignal),
+        }));
+        expect(wrapper.text()).toContain('Track 101');
+        expect(wrapper.text()).toContain('Artist A');
+        expect(wrapper.text()).toContain('Album A');
+    });
+
+    it('debounces scroll and fetches unseen visible item details only', async () => {
+        const ids = Array.from({ length: 20 }, (_, index) => index + 1);
+
+        mockAxios.get.mockResolvedValue({
+            data: {
+                ids,
+                cursor: {
+                    after_id: 0,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 20,
+                },
+                pagination: {
+                    per_page: 100,
+                    total: 20,
+                    total_pages: 1,
+                },
+            } satisfies AudioIdsResponse,
+        });
+
+        mockAxios.post.mockImplementation(async (_url: string, payload: { ids: number[] }) => ({
+            data: {
+                items: payload.ids.map((id) => ({
+                    id,
+                    title: `Track ${id}`,
+                    artists: [`Artist ${id}`],
+                    albums: [`Album ${id}`],
+                })),
+            } satisfies AudioDetailsResponse,
+        }));
+
+        const wrapper = mount(Audio);
+        await flushPromises();
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        expect(mockAxios.post).toHaveBeenCalledTimes(1);
+        const initialIds = (mockAxios.post.mock.calls[0]?.[1] as { ids: number[] }).ids;
+        expect(initialIds).toContain(1);
+        expect(initialIds).not.toContain(20);
+
+        const virtualList = wrapper.findComponent(VirtualList);
+        virtualList.vm.$emit('visible-items-change', [20]);
+        virtualList.vm.$emit('scroll', 500);
+        virtualList.vm.$emit('scroll', 700);
+
+        vi.advanceTimersByTime(180);
+        await flushPromises();
+
+        expect(mockAxios.post).toHaveBeenCalledTimes(2);
+        expect(mockAxios.post.mock.calls[1]?.[1]).toEqual({
+            ids: [20],
+        });
     });
 
     it('shows an error when loading ids fails', async () => {

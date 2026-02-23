@@ -98,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/dashboard/metrics', DashboardMetricsController::class)->name('api.dashboard.metrics');
     Route::get('/api/files', [\App\Http\Controllers\FilesController::class, 'index'])->name('api.files.index');
     Route::get('/api/audio/ids', [\App\Http\Controllers\AudioController::class, 'ids'])->name('api.audio.ids');
+    Route::post('/api/audio/details', [\App\Http\Controllers\AudioController::class, 'details'])->name('api.audio.details');
     Route::get('/api/files/{file}', [\App\Http\Controllers\FilesController::class, 'show'])->name('api.files.show');
     Route::get('/api/files/{file}/serve', [\App\Http\Controllers\FilesController::class, 'serve'])->name('api.files.serve');
     Route::get('/api/files/{file}/downloaded', [\App\Http\Controllers\FilesController::class, 'serveDownloaded'])->name('api.files.downloaded');
