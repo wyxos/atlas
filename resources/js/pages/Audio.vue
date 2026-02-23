@@ -5,15 +5,20 @@ import VirtualList from '../components/VirtualList.vue';
 
 type AudioIdsResponse = {
     ids: number[];
+    cursor: {
+        after_id: number;
+        next_after_id: number | null;
+        has_more: boolean;
+        max_id: number;
+    };
     pagination: {
-        page: number;
         per_page: number;
-        total: number;
-        total_pages: number;
+        total: number | null;
+        total_pages: number | null;
     };
 };
 
-const PER_PAGE = 500;
+const PER_PAGE = 100;
 
 const audioIds = ref<number[]>([]);
 const loadedPages = ref(0);
@@ -32,12 +37,14 @@ const progressPercent = computed(() => {
 
 let isDisposed = false;
 
-async function fetchPage(page: number): Promise<AudioIdsResponse> {
+async function fetchChunk(afterId: number, maxId: number | null): Promise<AudioIdsResponse> {
+    const params = {
+        after_id: afterId,
+        per_page: PER_PAGE,
+        ...(maxId !== null ? { max_id: maxId } : {}),
+    };
     const { data } = await window.axios.get<AudioIdsResponse>('/api/audio/ids', {
-        params: {
-            page,
-            per_page: PER_PAGE,
-        },
+        params,
     });
 
     return data;
@@ -52,24 +59,29 @@ async function loadAllAudioIds(): Promise<void> {
     totalAudioFiles.value = 0;
 
     try {
-        const firstPage = await fetchPage(1);
-        if (isDisposed) {
-            return;
-        }
+        let afterId = 0;
+        let maxId: number | null = null;
+        let hasMore = true;
 
-        totalPages.value = firstPage.pagination.total_pages;
-        totalAudioFiles.value = firstPage.pagination.total;
-        audioIds.value.push(...firstPage.ids);
-        loadedPages.value = 1;
-
-        for (let page = 2; page <= totalPages.value; page += 1) {
-            const nextPage = await fetchPage(page);
+        while (hasMore) {
+            const nextChunk = await fetchChunk(afterId, maxId);
             if (isDisposed) {
                 return;
             }
 
-            audioIds.value.push(...nextPage.ids);
-            loadedPages.value = page;
+            if (maxId === null) {
+                maxId = nextChunk.cursor.max_id;
+                totalAudioFiles.value = nextChunk.pagination.total ?? 0;
+                totalPages.value = nextChunk.pagination.total_pages ?? (totalAudioFiles.value > 0 ? 1 : 0);
+            }
+
+            audioIds.value.push(...nextChunk.ids);
+            if (totalPages.value > 0) {
+                loadedPages.value = Math.min(totalPages.value, loadedPages.value + 1);
+            }
+
+            afterId = nextChunk.cursor.next_after_id ?? afterId;
+            hasMore = nextChunk.cursor.has_more && nextChunk.cursor.next_after_id !== null;
         }
     } catch (loadError) {
         console.error('Failed to load audio IDs:', loadError);
@@ -119,7 +131,8 @@ onUnmounted(() => {
                 {{ error }}
             </div>
             <div v-else class="rounded-lg border border-twilight-indigo-500 bg-prussian-blue-700">
-                <div v-if="!isLoading && audioIds.length === 0" class="p-4 text-twilight-indigo-100">
+                <div v-if="isLoading" class="p-4 text-twilight-indigo-100">Preparing full audio index...</div>
+                <div v-else-if="audioIds.length === 0" class="p-4 text-twilight-indigo-100">
                     No audio files found.
                 </div>
                 <VirtualList
