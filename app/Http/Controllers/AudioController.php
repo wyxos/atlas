@@ -16,9 +16,11 @@ class AudioController extends Controller
      */
     public function ids(Request $request, AudioIdListingService $listing): JsonResponse
     {
-        $page = max(1, $request->integer('page', 1));
-        $perPage = min(1000, max(1, $request->integer('per_page', 500)));
+        $afterId = max(0, $request->integer('after_id', 0));
+        $maxId = $request->query('max_id');
+        $maxId = is_numeric($maxId) ? max(0, (int) $maxId) : null;
+        $perPage = min(1000, max(1, $request->integer('per_page', 100)));
 
-        return response()->json($listing->fetch($page, $perPage));
+        return response()->json($listing->fetch($afterId, $perPage, $maxId));
     }
 }

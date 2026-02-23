@@ -6,7 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('authenticated user can fetch paginated audio ids only', function () {
+test('authenticated user can fetch cursor-paginated audio ids only', function () {
     $user = User::factory()->create();
 
     $audioOne = File::factory()->create(['mime_type' => 'audio/mpeg']);
@@ -14,28 +14,40 @@ test('authenticated user can fetch paginated audio ids only', function () {
     $audioTwo = File::factory()->create(['mime_type' => 'audio/ogg']);
     $audioThree = File::factory()->create(['mime_type' => 'audio/wav']);
 
-    $response = $this->actingAs($user)->getJson('/api/audio/ids?page=1&per_page=2');
+    $response = $this->actingAs($user)->getJson('/api/audio/ids?after_id=0&per_page=2');
 
     $response->assertSuccessful();
     $response->assertJson([
         'ids' => [$audioOne->id, $audioTwo->id],
+        'cursor' => [
+            'after_id' => 0,
+            'next_after_id' => $audioTwo->id,
+            'has_more' => true,
+            'max_id' => $audioThree->id,
+        ],
         'pagination' => [
-            'page' => 1,
             'per_page' => 2,
             'total' => 3,
             'total_pages' => 2,
         ],
     ]);
 
-    $pageTwo = $this->actingAs($user)->getJson('/api/audio/ids?page=2&per_page=2');
-    $pageTwo->assertSuccessful();
-    $pageTwo->assertJson([
+    $cursor = $response->json('cursor');
+
+    $nextChunk = $this->actingAs($user)->getJson('/api/audio/ids?after_id='.$cursor['next_after_id'].'&max_id='.$cursor['max_id'].'&per_page=2');
+    $nextChunk->assertSuccessful();
+    $nextChunk->assertJson([
         'ids' => [$audioThree->id],
+        'cursor' => [
+            'after_id' => $audioTwo->id,
+            'next_after_id' => null,
+            'has_more' => false,
+            'max_id' => $audioThree->id,
+        ],
         'pagination' => [
-            'page' => 2,
             'per_page' => 2,
-            'total' => 3,
-            'total_pages' => 2,
+            'total' => null,
+            'total_pages' => null,
         ],
     ]);
 });

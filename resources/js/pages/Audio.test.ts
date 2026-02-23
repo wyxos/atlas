@@ -4,11 +4,16 @@ import Audio from './Audio.vue';
 
 type AudioIdsResponse = {
     ids: number[];
+    cursor: {
+        after_id: number;
+        next_after_id: number | null;
+        has_more: boolean;
+        max_id: number;
+    };
     pagination: {
-        page: number;
         per_page: number;
-        total: number;
-        total_pages: number;
+        total: number | null;
+        total_pages: number | null;
     };
 };
 
@@ -41,20 +46,25 @@ beforeEach(() => {
 });
 
 describe('Audio', () => {
-    it('loads page 1 first, then appends ids as later pages resolve', async () => {
+    it('loads ids with cursor pagination and renders list only after all chunks are loaded', async () => {
         const pageTwo = createDeferred<{ data: AudioIdsResponse }>();
         const pageThree = createDeferred<{ data: AudioIdsResponse }>();
 
-        mockAxios.get.mockImplementation((_url: string, config?: { params?: { page?: number } }) => {
-            const page = config?.params?.page;
+        mockAxios.get.mockImplementation((_url: string, config?: { params?: { after_id?: number; max_id?: number } }) => {
+            const afterId = config?.params?.after_id;
 
-            if (page === 1) {
+            if (afterId === 0) {
                 return Promise.resolve({
                     data: {
                         ids: [101],
+                        cursor: {
+                            after_id: 0,
+                            next_after_id: 101,
+                            has_more: true,
+                            max_id: 303,
+                        },
                         pagination: {
-                            page: 1,
-                            per_page: 500,
+                            per_page: 100,
                             total: 3,
                             total_pages: 3,
                         },
@@ -62,15 +72,15 @@ describe('Audio', () => {
                 });
             }
 
-            if (page === 2) {
+            if (afterId === 101) {
                 return pageTwo.promise;
             }
 
-            if (page === 3) {
+            if (afterId === 202) {
                 return pageThree.promise;
             }
 
-            return Promise.reject(new Error(`Unexpected page: ${String(page)}`));
+            return Promise.reject(new Error(`Unexpected cursor: ${String(afterId)}`));
         });
 
         const wrapper = mount(Audio);
@@ -78,29 +88,35 @@ describe('Audio', () => {
 
         expect(mockAxios.get).toHaveBeenNthCalledWith(1, '/api/audio/ids', {
             params: {
-                page: 1,
-                per_page: 500,
+                after_id: 0,
+                per_page: 100,
             },
         });
         expect(mockAxios.get).toHaveBeenNthCalledWith(2, '/api/audio/ids', {
             params: {
-                page: 2,
-                per_page: 500,
+                after_id: 101,
+                max_id: 303,
+                per_page: 100,
             },
         });
         expect(wrapper.text()).toContain('Pages: 1 / 3');
         expect(wrapper.text()).toContain('IDs loaded: 1 / 3');
-        expect(wrapper.findAll('li')).toHaveLength(1);
-        expect(wrapper.find('li').text()).toBe('101');
+        expect(wrapper.findAll('li')).toHaveLength(0);
+        expect(wrapper.text()).toContain('Preparing full audio index...');
 
         pageTwo.resolve({
             data: {
                 ids: [202],
+                cursor: {
+                    after_id: 101,
+                    next_after_id: 202,
+                    has_more: true,
+                    max_id: 303,
+                },
                 pagination: {
-                    page: 2,
-                    per_page: 500,
-                    total: 3,
-                    total_pages: 3,
+                    per_page: 100,
+                    total: null,
+                    total_pages: null,
                 },
             },
         });
@@ -108,22 +124,28 @@ describe('Audio', () => {
 
         expect(mockAxios.get).toHaveBeenNthCalledWith(3, '/api/audio/ids', {
             params: {
-                page: 3,
-                per_page: 500,
+                after_id: 202,
+                max_id: 303,
+                per_page: 100,
             },
         });
         expect(wrapper.text()).toContain('Pages: 2 / 3');
         expect(wrapper.text()).toContain('IDs loaded: 2 / 3');
-        expect(wrapper.findAll('li').map((row) => row.text())).toEqual(['101', '202']);
+        expect(wrapper.findAll('li')).toHaveLength(0);
 
         pageThree.resolve({
             data: {
                 ids: [303],
+                cursor: {
+                    after_id: 202,
+                    next_after_id: null,
+                    has_more: false,
+                    max_id: 303,
+                },
                 pagination: {
-                    page: 3,
-                    per_page: 500,
-                    total: 3,
-                    total_pages: 3,
+                    per_page: 100,
+                    total: null,
+                    total_pages: null,
                 },
             },
         });
