@@ -23,4 +23,17 @@ class AudioController extends Controller
 
         return response()->json($listing->fetch($afterId, $perPage, $maxId));
     }
+
+    /**
+     * Return batched audio details for a list of file IDs.
+     */
+    public function details(Request $request, AudioIdListingService $listing): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['required', 'integer', 'min:1'],
+        ]);
+
+        return response()->json($listing->fetchDetails($validated['ids']));
+    }
 }

@@ -57,3 +57,44 @@ test('guest cannot fetch audio ids', function () {
 
     $response->assertUnauthorized();
 });
+
+test('authenticated user can fetch audio details batch for ids', function () {
+    $user = User::factory()->create();
+
+    $audio = File::factory()->create([
+        'mime_type' => 'audio/mpeg',
+        'title' => null,
+        'filename' => 'fallback-track.mp3',
+    ]);
+    $audio->metadata()->create([
+        'payload' => [
+            'title' => 'Song Title',
+            'artist' => ['Artist A', 'Artist B'],
+            'album' => 'Album Name',
+        ],
+    ]);
+
+    $response = $this->actingAs($user)->postJson('/api/audio/details', [
+        'ids' => [$audio->id],
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJson([
+        'items' => [
+            [
+                'id' => $audio->id,
+                'title' => 'Song Title',
+                'artists' => ['Artist A', 'Artist B'],
+                'albums' => ['Album Name'],
+            ],
+        ],
+    ]);
+});
+
+test('guest cannot fetch audio details', function () {
+    $response = $this->postJson('/api/audio/details', [
+        'ids' => [1],
+    ]);
+
+    $response->assertUnauthorized();
+});
