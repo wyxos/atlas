@@ -3,6 +3,7 @@
 use App\Models\File;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -264,4 +265,46 @@ it('falls back to updated_at when downloaded_at is missing', function () {
     $response->assertOk();
     $response->assertJsonPath('results.0.downloaded', true);
     $response->assertJsonPath('results.0.downloaded_at', $file->updated_at?->toIso8601String());
+});
+
+it('chunks url hash lookups for large extension check batches', function () {
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $matchUrl = 'https://images.example.com/media/chunked-hit.jpg';
+    File::factory()->create([
+        'url' => $matchUrl,
+        'referrer_url' => 'https://example.com/art/chunked-hit',
+        'downloaded' => true,
+    ]);
+
+    $urls = collect(range(1, 120))
+        ->map(fn (int $index): string => "https://images.example.com/media/chunked-miss-{$index}.jpg")
+        ->all();
+    $urls[] = $matchUrl;
+
+    $executedSql = [];
+    DB::listen(function ($query) use (&$executedSql): void {
+        $executedSql[] = strtolower((string) $query->sql);
+    });
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/check', [
+            'urls' => $urls,
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('results.120.url', $matchUrl);
+    $response->assertJsonPath('results.120.exists', true);
+    $response->assertJsonPath('results.120.downloaded', true);
+
+    $hashLookupQueryCount = collect($executedSql)
+        ->filter(fn (string $query): bool => str_contains($query, 'from "files"')
+            && str_contains($query, 'url_hash')
+            && str_contains($query, ' in '))
+        ->count();
+
+    expect($hashLookupQueryCount)->toBeGreaterThan(1);
 });
