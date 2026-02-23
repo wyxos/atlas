@@ -6,7 +6,6 @@ use App\Models\Container;
 use App\Models\File;
 use App\Models\FileMetadata;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class BrowsePersister
 {
@@ -18,14 +17,13 @@ class BrowsePersister
         if (empty($transformedItems)) {
             return [];
         }
-        $hasUrlHashColumns = $this->hasUrlHashColumns();
 
         $normalized = array_values(array_filter($transformedItems, function ($item) {
             return isset($item['file']) && isset($item['metadata']);
         }));
 
         $preparedItems = collect($normalized)
-            ->map(function (array $item) use ($hasUrlHashColumns): array {
+            ->map(function (array $item): array {
                 $file = $item['file'];
                 $canonicalUrl = $this->resolveCanonicalUrlFromFileRow($file);
                 if ($canonicalUrl !== '') {
@@ -35,10 +33,8 @@ class BrowsePersister
                 $referrerUrl = trim((string) ($file['referrer_url'] ?? ''));
                 $file['referrer_url'] = $referrerUrl !== '' ? $referrerUrl : null;
 
-                if ($hasUrlHashColumns) {
-                    $file['url_hash'] = $canonicalUrl !== '' ? hash('sha256', $canonicalUrl) : null;
-                    $file['referrer_url_hash'] = $referrerUrl !== '' ? hash('sha256', $referrerUrl) : null;
-                }
+                $file['url_hash'] = $canonicalUrl !== '' ? hash('sha256', $canonicalUrl) : null;
+                $file['referrer_url_hash'] = $referrerUrl !== '' ? hash('sha256', $referrerUrl) : null;
 
                 if (array_key_exists('listing_metadata', $file) && is_array($file['listing_metadata'])) {
                     $file['listing_metadata'] = json_encode($file['listing_metadata']);
@@ -63,13 +59,13 @@ class BrowsePersister
             ->unique()
             ->values()
             ->all();
-        $urlHashes = $hasUrlHashColumns
-            ? collect($urls)->map(fn (string $url): string => hash('sha256', $url))->unique()->values()->all()
-            : [];
+        $urlHashes = collect($urls)
+            ->map(fn (string $url): string => hash('sha256', $url))
+            ->unique()
+            ->values()
+            ->all();
         $existingUrls = ! empty($urls)
-            ? ($hasUrlHashColumns
-                ? File::query()->whereIn('url_hash', $urlHashes)->pluck('url')->all()
-                : File::query()->whereIn('url', $urls)->pluck('url')->all())
+            ? File::query()->whereIn('url_hash', $urlHashes)->pluck('url')->all()
             : [];
         $newFileCount = 0;
         if (! empty($urls)) {
@@ -77,10 +73,7 @@ class BrowsePersister
         }
 
         $fileRows = collect($preparedItems)->pluck('file')->all();
-        $upsertUpdateColumns = ['url', 'referrer_url', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at'];
-        if ($hasUrlHashColumns) {
-            $upsertUpdateColumns = ['url', 'url_hash', 'referrer_url', 'referrer_url_hash', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at'];
-        }
+        $upsertUpdateColumns = ['url', 'url_hash', 'referrer_url', 'referrer_url_hash', 'filename', 'ext', 'mime_type', 'description', 'preview_url', 'size', 'listing_metadata', 'updated_at'];
 
         File::upsert(
             $fileRows,
@@ -95,11 +88,7 @@ class BrowsePersister
         }
 
         $fileMap = File::query()
-            ->when(
-                $hasUrlHashColumns,
-                fn ($query) => $query->whereIn('url_hash', $urlHashes),
-                fn ($query) => $query->whereIn('url', $urls)
-            )
+            ->whereIn('url_hash', $urlHashes)
             ->get()
             ->keyBy('url');
 
@@ -137,11 +126,7 @@ class BrowsePersister
         }
 
         $allFiles = File::with('metadata')
-            ->when(
-                $hasUrlHashColumns,
-                fn ($query) => $query->whereIn('url_hash', $urlHashes),
-                fn ($query) => $query->whereIn('url', $urls)
-            )
+            ->whereIn('url_hash', $urlHashes)
             ->get();
 
         // Create containers and attach files in batch
@@ -168,20 +153,6 @@ class BrowsePersister
         }
 
         return '';
-    }
-
-    private function hasUrlHashColumns(): bool
-    {
-        static $hasColumns;
-
-        if ($hasColumns !== null) {
-            return $hasColumns;
-        }
-
-        $hasColumns = Schema::hasColumn('files', 'url_hash')
-            && Schema::hasColumn('files', 'referrer_url_hash');
-
-        return $hasColumns;
     }
 
     /**

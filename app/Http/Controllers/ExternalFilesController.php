@@ -15,10 +15,28 @@ use App\Services\ExternalFileIngestService;
 use App\Services\FileReactionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 
 class ExternalFilesController extends Controller
 {
+    /**
+     * Keep hash lookups small enough for consistent indexed query plans.
+     */
+    private const CHECK_HASH_LOOKUP_CHUNK_SIZE = 50;
+
+    /**
+     * @var list<string>
+     */
+    private const CHECK_QUERY_COLUMNS = [
+        'id',
+        'url',
+        'referrer_url',
+        'downloaded',
+        'downloaded_at',
+        'download_progress',
+        'updated_at',
+        'blacklisted_at',
+    ];
+
     public function store(
         StoreExternalFileRequest $request,
         ExternalFileIngestService $service,
@@ -78,30 +96,19 @@ class ExternalFilesController extends Controller
             ->unique()
             ->values()
             ->all();
-        $hasUrlHashColumns = $this->hasUrlHashColumns();
-        $normalizedUrlHashes = $hasUrlHashColumns
-            ? array_values(array_unique(array_map(fn (string $url): string => hash('sha256', $url), $normalizedUrls)))
-            : [];
+        $normalizedUrlHashes = array_values(array_unique(array_map(
+            fn (string $url): string => hash('sha256', $url),
+            $normalizedUrls
+        )));
 
         $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
         $filesByLookup = [];
 
-        $filesByUrl = collect();
-        if ($normalizedUrls !== []) {
-            $filesByUrlQuery = File::query();
-            if ($hasUrlHashColumns) {
-                $filesByUrlQuery->whereIn('url_hash', $normalizedUrlHashes);
-            } else {
-                $filesByUrlQuery->whereIn('url', $normalizedUrls);
-            }
-
-            $filesByUrl = $filesByUrlQuery->get(['id', 'url', 'referrer_url', 'downloaded', 'downloaded_at', 'download_progress', 'updated_at', 'blacklisted_at']);
-
-            foreach ($filesByUrl as $file) {
-                $fileUrl = $this->stripFragment(is_string($file->url) ? trim($file->url) : '');
-                if ($fileUrl !== '' && isset($normalizedLookupSet[$fileUrl])) {
-                    $filesByLookup[$fileUrl][] = $file;
-                }
+        $filesByUrl = $this->lookupFilesByHash('url_hash', $normalizedUrlHashes);
+        foreach ($filesByUrl as $file) {
+            $fileUrl = $this->stripFragment(is_string($file->url) ? trim($file->url) : '');
+            if ($fileUrl !== '' && isset($normalizedLookupSet[$fileUrl])) {
+                $filesByLookup[$fileUrl][] = $file;
             }
         }
 
@@ -109,25 +116,15 @@ class ExternalFilesController extends Controller
             $normalizedUrls,
             fn (string $url): bool => $this->looksLikePageUrl($url)
         ));
-        $referrerHashes = $hasUrlHashColumns
-            ? array_values(array_unique(array_map(fn (string $url): string => hash('sha256', $url), $referrerCandidates)))
-            : [];
-
-        $filesByReferrer = collect();
-        if ($referrerCandidates !== []) {
-            $filesByReferrerQuery = File::query();
-            if ($hasUrlHashColumns) {
-                $filesByReferrerQuery->whereIn('referrer_url_hash', $referrerHashes);
-            } else {
-                $filesByReferrerQuery->whereIn('referrer_url', $referrerCandidates);
-            }
-
-            $filesByReferrer = $filesByReferrerQuery->get(['id', 'url', 'referrer_url', 'downloaded', 'downloaded_at', 'download_progress', 'updated_at', 'blacklisted_at']);
-            foreach ($filesByReferrer as $file) {
-                $referrerUrl = $this->stripFragment(is_string($file->referrer_url) ? trim($file->referrer_url) : '');
-                if ($referrerUrl !== '' && isset($normalizedLookupSet[$referrerUrl])) {
-                    $filesByLookup[$referrerUrl][] = $file;
-                }
+        $referrerHashes = array_values(array_unique(array_map(
+            fn (string $url): string => hash('sha256', $url),
+            $referrerCandidates
+        )));
+        $filesByReferrer = $this->lookupFilesByHash('referrer_url_hash', $referrerHashes);
+        foreach ($filesByReferrer as $file) {
+            $referrerUrl = $this->stripFragment(is_string($file->referrer_url) ? trim($file->referrer_url) : '');
+            if ($referrerUrl !== '' && isset($normalizedLookupSet[$referrerUrl])) {
+                $filesByLookup[$referrerUrl][] = $file;
             }
         }
         $files = $filesByUrl->concat($filesByReferrer)->unique('id')->values();
@@ -276,10 +273,7 @@ class ExternalFilesController extends Controller
         );
 
         $file = File::query()
-            ->when(
-                $this->hasUrlHashColumns(),
-                fn ($query) => $query->where('url_hash', hash('sha256', $canonicalUrl))
-            )
+            ->where('url_hash', hash('sha256', $canonicalUrl))
             ->where('url', $canonicalUrl)
             ->first();
 
@@ -407,17 +401,23 @@ class ExternalFilesController extends Controller
         return false;
     }
 
-    private function hasUrlHashColumns(): bool
+    /**
+     * @param  list<string>  $hashes
+     * @return Collection<int, File>
+     */
+    private function lookupFilesByHash(string $hashColumn, array $hashes): Collection
     {
-        static $hasColumns;
-
-        if ($hasColumns !== null) {
-            return $hasColumns;
+        if ($hashes === []) {
+            return collect();
         }
 
-        $hasColumns = Schema::hasColumn('files', 'url_hash')
-            && Schema::hasColumn('files', 'referrer_url_hash');
-
-        return $hasColumns;
+        return collect($hashes)
+            ->chunk(self::CHECK_HASH_LOOKUP_CHUNK_SIZE)
+            ->flatMap(fn (Collection $hashChunk) => File::query()
+                ->whereIn($hashColumn, $hashChunk->all())
+                ->get(self::CHECK_QUERY_COLUMNS)
+                ->all())
+            ->unique('id')
+            ->values();
     }
 }

@@ -6,7 +6,6 @@ use App\Jobs\DownloadFile;
 use App\Models\File;
 use App\Support\FileTypeDetector;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class ExternalFileIngestService
@@ -33,14 +32,13 @@ class ExternalFileIngestService
             'height' => $payload['height'] ?? null,
             'download_via' => $downloadVia,
         ], fn ($value) => $value !== null && $value !== '');
-        $hasUrlHashColumns = $this->hasUrlHashColumns();
-        $urlHash = $hasUrlHashColumns ? hash('sha256', $url) : null;
+        $urlHash = hash('sha256', $url);
         $file = null;
         $isNew = false;
         $maxSaveAttempts = 3;
 
         for ($attempt = 1; $attempt <= $maxSaveAttempts; $attempt++) {
-            $file = $this->findFileByUrl($url, $hasUrlHashColumns, $urlHash);
+            $file = $this->findFileByUrl($url, $urlHash);
             $isNew = $file === null;
 
             if (! $file) {
@@ -161,27 +159,10 @@ class ExternalFileIngestService
         return substr($url, 0, $hashPos);
     }
 
-    private function hasUrlHashColumns(): bool
-    {
-        static $hasColumns;
-
-        if ($hasColumns !== null) {
-            return $hasColumns;
-        }
-
-        $hasColumns = Schema::hasColumn('files', 'url_hash')
-            && Schema::hasColumn('files', 'referrer_url_hash');
-
-        return $hasColumns;
-    }
-
-    private function findFileByUrl(string $url, bool $hasUrlHashColumns, ?string $urlHash): ?File
+    private function findFileByUrl(string $url, string $urlHash): ?File
     {
         return File::query()
-            ->when(
-                $hasUrlHashColumns,
-                fn ($query) => $query->where('url_hash', $urlHash)
-            )
+            ->where('url_hash', $urlHash)
             ->where('url', $url)
             ->orderByDesc('downloaded')
             ->orderByDesc('id')
