@@ -1805,8 +1805,20 @@ declare const chrome: ChromeApi;
       mergeSheetItemStatuses(statusByUrl, sheetItems, stripHash);
       const openTabBadgeNodes: Element[] = [];
 
+      const shouldMarkNode = (node: Element): boolean => {
+        if (!(node instanceof HTMLAnchorElement)) {
+          return true;
+        }
+
+        return node.querySelector('img, video') !== null;
+      };
+
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
+        if (!shouldMarkNode(node)) {
+          continue;
+        }
+
         const lookupKeys = collectLookupKeysForNode(node);
         if (lookupKeys.length === 0) {
           continue;
@@ -1865,8 +1877,20 @@ declare const chrome: ChromeApi;
         urls.add(stripHash(pageUrl));
       }
 
+      const shouldMarkNode = (node: Element): boolean => {
+        if (!(node instanceof HTMLAnchorElement)) {
+          return true;
+        }
+
+        return node.querySelector('img, video') !== null;
+      };
+
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
+        if (!shouldMarkNode(node)) {
+          continue;
+        }
+
         for (const key of collectLookupKeysForNode(node)) {
           urls.add(key);
           urls.add(stripHash(key));
