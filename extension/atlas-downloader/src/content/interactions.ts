@@ -1,4 +1,10 @@
 import { buildItemFromElement } from './items';
+import {
+  resolveBestDeviantArtPostDownloadUrl,
+  resolveDeviantArtPostContext,
+  resolveWixAssetKey,
+  type DeviantArtPostContext,
+} from './deviantartPost';
 import { isElementInModal } from './media';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
 import type { DialogChooser } from './ui';
@@ -111,6 +117,29 @@ function parseFileStatusMeta(file: unknown): { downloadProgress: number | null; 
     downloadProgress: normalizeProgress(value.download_progress),
     downloadedAt: downloadedAt ?? (downloaded ? normalizeDownloadedAt(value.updated_at) : null),
   };
+}
+
+type AtlasBatchResult = {
+  ok?: boolean;
+  error?: string;
+  data?: {
+    file?: {
+      downloaded?: boolean;
+      blacklisted_at?: unknown;
+    } | null;
+  } | null;
+};
+
+type AtlasBatchResponse = {
+  ok?: boolean;
+  error?: string;
+  results?: AtlasBatchResult[];
+};
+
+function sendMessageSafeAsync(sendMessageSafe: SendMessageSafe, message: unknown): Promise<unknown> {
+  return new Promise((resolve) => {
+    sendMessageSafe(message, (response) => resolve(response));
+  });
 }
 
 export function formatDownloadedAtUtc(downloadedAt: string | null | undefined): string {
@@ -838,6 +867,13 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   resolutionMeta.className = 'atlas-downloader-media-resolution';
   resolutionMeta.hidden = true;
   toolbar.appendChild(resolutionMeta);
+  const postIndicator = document.createElement('button');
+  postIndicator.type = 'button';
+  postIndicator.className = 'atlas-downloader-post-indicator';
+  postIndicator.textContent = 'POST';
+  postIndicator.title = 'DeviantArt post: Alt + click to queue all post images';
+  postIndicator.hidden = true;
+  toolbar.appendChild(postIndicator);
   const statusMeta = document.createElement('span');
   statusMeta.className = 'atlas-downloader-media-status';
   statusMeta.hidden = true;
@@ -862,6 +898,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   let pointerY = -1;
   let refreshMediaContextFrame: number | null = null;
   let activeLocationHref = window.location.href;
+  let activePostContext: DeviantArtPostContext | null = null;
+  let postDownloadBusy = false;
 
   const buttonsByType = new Map<string, HTMLButtonElement>();
   const formatResolution = (width: number | null | undefined, height: number | null | undefined): string => {
@@ -910,12 +948,28 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     progressMeta.dataset.state = progress <= 0 ? 'queued' : progress >= 100 ? 'done' : 'active';
     progressFill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
   };
+  const syncPostIndicatorState = () => {
+    const count = activePostContext?.entries.length ?? 0;
+    const visible = count > 1;
+    postIndicator.hidden = !visible;
+    postIndicator.disabled = !visible || postDownloadBusy || toolbarBusy;
+    postIndicator.classList.toggle('pending', postDownloadBusy);
+    if (!visible) {
+      postIndicator.textContent = 'POST';
+      postIndicator.removeAttribute('data-count');
+      return;
+    }
+
+    postIndicator.dataset.count = String(count);
+    postIndicator.textContent = `POST x${count}`;
+  };
   const syncToolbarButtonState = () => {
     const locked = toolbarBusy || toolbarQueuedType !== null;
     for (const [type, button] of buttonsByType.entries()) {
       button.disabled = locked;
       button.classList.toggle('pending', toolbarBusy && toolbarPendingType === type);
     }
+    syncPostIndicatorState();
   };
   const setToolbarBusy = (busy: boolean, pendingType: string | null = null) => {
     toolbarBusy = busy;
@@ -975,6 +1029,9 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
     activeLocationHref = currentHref;
+    activePostContext = null;
+    postDownloadBusy = false;
+    syncPostIndicatorState();
     clearPendingOverlayState();
     hide(true);
   };
@@ -997,12 +1054,14 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
     activeMedia = null;
     activeKey = null;
+    activePostContext = null;
     toolbar.classList.remove('open');
     toolbar.style.left = '';
     toolbar.style.top = '';
     setToolbarResolution(null, null);
     setToolbarStatusMeta(null);
     setToolbarActive(null);
+    syncPostIndicatorState();
   };
 
   const scheduleHide = () => {
@@ -1024,6 +1083,134 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     // @ts-expect-error stopImmediatePropagation exists on MouseEvent/PointerEvent.
     event.stopImmediatePropagation?.();
   };
+
+  const queueActivePostDownloads = async () => {
+    if (postDownloadBusy) {
+      return;
+    }
+
+    const context = activePostContext;
+    if (!context || context.entries.length <= 1) {
+      options.showToast('No DeviantArt post images found.');
+      return;
+    }
+
+    const payloads = context.entries.map((entry) => {
+      const url = resolveBestDeviantArtPostDownloadUrl(entry) || entry.baseUrl;
+      return {
+        url,
+        referrer_url: window.location.href,
+        page_title: deps.limitString(document.title, deps.maxMetadataLen),
+        tag_name: 'img',
+        width: entry.maxWidth ?? entry.width ?? null,
+        height: entry.maxHeight ?? entry.height ?? null,
+        alt: '',
+        preview_url: entry.previewUrl || entry.baseUrl || '',
+        source: deps.sourceFromMediaUrl(url),
+        reaction_type: 'like',
+      };
+    });
+
+    if (payloads.length === 0) {
+      options.showToast('No downloadable post images found.');
+      return;
+    }
+
+    postDownloadBusy = true;
+    syncPostIndicatorState();
+
+    try {
+      const response = (await sendMessageSafeAsync(options.sendMessageSafe, {
+        type: 'atlas-download-batch',
+        payloads,
+      })) as AtlasBatchResponse | null | undefined;
+
+      const rawResults = Array.isArray(response?.results) ? response.results : [];
+      const okResults = rawResults.filter((result) => Boolean(result?.ok));
+      const successCount = rawResults.length > 0 ? okResults.length : response?.ok ? payloads.length : 0;
+
+      if (successCount <= 0) {
+        options.showToast(response?.error || 'Batch download failed.', 'danger');
+        return;
+      }
+
+      const now = Date.now();
+      const cacheCount = rawResults.length > 0 ? Math.min(rawResults.length, payloads.length) : payloads.length;
+      for (let index = 0; index < cacheCount; index += 1) {
+        const result = rawResults[index];
+        if (rawResults.length > 0 && !result?.ok) {
+          continue;
+        }
+
+        const payload = payloads[index];
+        if (!payload?.url) {
+          continue;
+        }
+
+        const file = result?.data?.file || null;
+        const fileMeta = parseFileStatusMeta(file);
+        deps.atlasStatusCache.set(payload.url, {
+          exists: true,
+          downloaded: Boolean(file?.downloaded),
+          blacklisted: Boolean(file?.blacklisted_at),
+          reactionType: 'like',
+          downloadProgress: fileMeta.downloadProgress,
+          downloadedAt: fileMeta.downloadedAt,
+          ts: now,
+        });
+      }
+
+      window.dispatchEvent(new Event('atlas-status-cache-updated'));
+      if (activeKey) {
+        const cached = deps.getCachedAtlasStatus(activeKey);
+        setToolbarStatusMeta(cached);
+        setToolbarQueued(cached?.reactionType ?? null, cached?.downloaded ?? null);
+      }
+
+      if (successCount < payloads.length) {
+        options.showToast(`Queued ${successCount}/${payloads.length} post image downloads in Atlas.`);
+        return;
+      }
+
+      options.showToast(`Queued ${successCount} post image download(s) in Atlas.`);
+    } finally {
+      postDownloadBusy = false;
+      syncPostIndicatorState();
+    }
+  };
+
+  postIndicator.addEventListener('pointerdown', swallow, true);
+  postIndicator.addEventListener('mousedown', (event) => {
+    if (!event.altKey || (event.button !== 0 && event.button !== 1)) {
+      return;
+    }
+
+    swallow(event);
+    void queueActivePostDownloads();
+  });
+  postIndicator.addEventListener('contextmenu', (event) => {
+    if (!event.altKey) {
+      return;
+    }
+
+    swallow(event);
+    void queueActivePostDownloads();
+  });
+  postIndicator.addEventListener('auxclick', (event) => {
+    if (!event.altKey || event.button !== 1) {
+      return;
+    }
+
+    swallow(event);
+  });
+  postIndicator.addEventListener('click', (event) => {
+    swallow(event);
+    if (event.altKey) {
+      return;
+    }
+
+    options.showToast('Use Alt + Left/Middle/Right click on POST to queue all post images.');
+  });
 
   for (const reaction of [...REACTIONS, BLACKLIST_ACTION]) {
     const button = document.createElement('button');
@@ -1205,6 +1392,14 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     activeMedia = media;
     activeKey = nextKey;
     setToolbarResolution(previewPayload.width, previewPayload.height);
+    const activeAssetKey = resolveWixAssetKey(previewPayload.url || '');
+    const postContext = resolveDeviantArtPostContext(window.location.href);
+    if (postContext && activeAssetKey && postContext.entryByAssetKey.has(activeAssetKey)) {
+      activePostContext = postContext;
+    } else {
+      activePostContext = null;
+    }
+    syncPostIndicatorState();
     toolbar.classList.add('open');
     updatePosition();
 
