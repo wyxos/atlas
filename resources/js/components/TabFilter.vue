@@ -288,11 +288,11 @@ const localPresets = computed<LocalPreset[]>(() => {
             value: 'disliked_blacklisted_auto',
             filters: {
                 downloaded: 'any',
-                reaction_mode: 'types',
-                reaction: ['dislike'],
-                blacklisted: 'yes',
-                blacklist_type: 'auto',
+                reaction_mode: 'any',
+                blacklisted: 'any',
+                blacklist_type: 'any',
                 auto_disliked: 'any',
+                moderation_union: 'auto_disliked_or_blacklisted_auto',
                 include_total: true,
                 max_previewed_count: moderatedCap,
                 // Newest blacklisted first.
@@ -526,6 +526,9 @@ function applyLocalPreset(value: string): void {
     if (!preset) {
         return;
     }
+
+    // Presets may define hidden filter flags that should not leak across presets.
+    delete form.data.serviceFilters.moderation_union;
 
     // Apply only the preset keys; user may already have other serviceFilters.
     form.data.serviceFilters = {

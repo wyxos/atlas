@@ -118,6 +118,73 @@ test('local browse can filter blacklisted files by manual or auto type', functio
     expect($autoIds)->not->toContain($manual->id);
 });
 
+test('local browse moderation union includes auto-disliked or auto-blacklisted files', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $autoDisliked = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => true,
+        'blacklisted_at' => null,
+        'blacklist_reason' => null,
+        'source' => 'CivitAI',
+    ]);
+
+    $autoBlacklisted = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => false,
+        'blacklisted_at' => now(),
+        'blacklist_reason' => null,
+        'source' => 'CivitAI',
+    ]);
+
+    $both = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => true,
+        'blacklisted_at' => now(),
+        'blacklist_reason' => null,
+        'source' => 'CivitAI',
+    ]);
+
+    $manualDisliked = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => false,
+        'blacklisted_at' => null,
+        'blacklist_reason' => null,
+        'source' => 'CivitAI',
+    ]);
+
+    $manualBlacklisted = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => false,
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'manual reason',
+        'source' => 'CivitAI',
+    ]);
+
+    foreach ([$autoDisliked, $both, $manualDisliked] as $file) {
+        Reaction::create([
+            'file_id' => $file->id,
+            'user_id' => $user->id,
+            'type' => 'dislike',
+        ]);
+    }
+
+    $response = $this->actingAs($user)->getJson(
+        "/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&sort=blacklisted_at&moderation_union=auto_disliked_or_blacklisted_auto"
+    );
+    $response->assertSuccessful();
+
+    $ids = collect($response->json('items'))->pluck('id')->all();
+    expect($ids)->toContain($autoDisliked->id);
+    expect($ids)->toContain($autoBlacklisted->id);
+    expect($ids)->toContain($both->id);
+    expect($ids)->not->toContain($manualDisliked->id);
+    expect($ids)->not->toContain($manualBlacklisted->id);
+});
+
 test('local browse can cap previewed_count', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create([
