@@ -99,6 +99,53 @@ describe('resolveDeviantArtPostContext', () => {
 
     expect(resolveDeviantArtPostContext('https://example.com/not-deviantart')).toBeNull();
   });
+
+  it('prefers scoped gallery roots and excludes unrelated same-collection images', () => {
+    const token = makeToken(1280, 1920);
+    const primary = makeWixUrl('dl6jv53-1111', 'w_300,h_300', token);
+    const child = makeWixUrl('dl6jv53-2222', 'w_300,h_300', token);
+    const unrelated = makeWixUrl('dl6jv53-9999', 'w_300,h_300', token);
+
+    const ogImage = document.createElement('meta');
+    ogImage.setAttribute('property', 'og:image');
+    ogImage.setAttribute('content', primary);
+    document.head.appendChild(ogImage);
+
+    const mainImage = document.createElement('img');
+    mainImage.setAttribute('src', primary);
+    document.body.appendChild(mainImage);
+
+    const galleryRoot = document.createElement('div');
+    galleryRoot.className = 'IUfj2J qeNdP5 bOFPMd';
+    const itemA = document.createElement('div');
+    itemA.className = 'NpoINo';
+    const itemAImage = document.createElement('img');
+    itemAImage.setAttribute('src', primary);
+    itemA.appendChild(itemAImage);
+    const itemB = document.createElement('div');
+    itemB.className = 'NpoINo';
+    const itemBImage = document.createElement('img');
+    itemBImage.setAttribute('src', child);
+    itemB.appendChild(itemBImage);
+    galleryRoot.append(itemA, itemB);
+    document.body.appendChild(galleryRoot);
+
+    const unrelatedBlock = document.createElement('div');
+    const unrelatedImage = document.createElement('img');
+    unrelatedImage.setAttribute('src', unrelated);
+    unrelatedBlock.appendChild(unrelatedImage);
+    document.body.appendChild(unrelatedBlock);
+
+    const context = resolveDeviantArtPostContext(
+      'https://www.deviantart.com/user/art/example-123456789',
+      mainImage
+    );
+    expect(context).not.toBeNull();
+    expect(context?.entries).toHaveLength(2);
+    expect(context?.entryByAssetKey.has('dl6jv53-1111')).toBe(true);
+    expect(context?.entryByAssetKey.has('dl6jv53-2222')).toBe(true);
+    expect(context?.entryByAssetKey.has('dl6jv53-9999')).toBe(false);
+  });
 });
 
 describe('resolveBestDeviantArtPostDownloadUrl', () => {

@@ -3,6 +3,9 @@ import { resolveAbsoluteUrl } from './media';
 const DEV_HOST_RE = /(^|\.)deviantart\.com$/i;
 const WIX_ASSET_RE =
   /^https?:\/\/[^/]*wixmp\.com\/f\/([^/]+)\/([a-z0-9]+-[^/?#]+?)\.(?:jpg|jpeg|png|webp|gif|bmp|avif)(?:[/?#]|$)/i;
+const WIX_IMAGE_SELECTOR = 'img[src*="wixmp.com/f/"], img[srcset*="wixmp.com/f/"]';
+const KNOWN_GALLERY_ROOT_SELECTOR = '.IUfj2J.qeNdP5.bOFPMd, .IUfj2J.E95sX1.qeNdP5.bOFPMd';
+const KNOWN_GALLERY_ITEM_SELECTOR = '.NpoINo';
 
 type WixUrlInfo = {
   normalizedUrl: string;
@@ -107,12 +110,15 @@ export function deriveLargestWixmpUrl(url: string, maxWidth: number, maxHeight: 
   return normalized;
 }
 
-export function resolveDeviantArtPostContext(locationHref: string = window.location.href): DeviantArtPostContext | null {
+export function resolveDeviantArtPostContext(
+  locationHref: string = window.location.href,
+  activeMedia: Element | null = null
+): DeviantArtPostContext | null {
   if (!isDeviantArtDeviationUrl(locationHref)) {
     return null;
   }
 
-  const collected = collectWixCandidates(locationHref);
+  const collected = collectWixCandidates(locationHref, activeMedia);
   if (collected.length === 0) {
     return null;
   }
@@ -230,7 +236,103 @@ function resolvePrimaryCollectionKey(candidates: WixCandidate[], locationHref: s
   return bestGroupKey;
 }
 
-function collectWixCandidates(locationHref: string): WixCandidate[] {
+function collectWixCandidates(locationHref: string, activeMedia: Element | null = null): WixCandidate[] {
+  const scopedRoot = resolveScopedGalleryRoot(activeMedia);
+  const rawUrls = scopedRoot
+    ? collectRawWixUrlsFromRoot(scopedRoot)
+    : collectRawWixUrlsFromDocument();
+
+  if (scopedRoot && rawUrls.length <= 1) {
+    rawUrls.push(...collectRawWixUrlsFromDocument());
+  }
+
+  const uniqueUrls = new Set<string>();
+  const candidates: WixCandidate[] = [];
+  for (const [order, rawUrl] of rawUrls.entries()) {
+    const info = parseWixUrlInfo(rawUrl, locationHref);
+    if (!info) {
+      continue;
+    }
+
+    if (uniqueUrls.has(info.normalizedUrl)) {
+      continue;
+    }
+    uniqueUrls.add(info.normalizedUrl);
+    candidates.push({
+      ...info,
+      order,
+    });
+  }
+
+  return candidates;
+}
+
+function resolveScopedGalleryRoot(activeMedia: Element | null): Element | null {
+  const knownRoots = Array.from(document.querySelectorAll(KNOWN_GALLERY_ROOT_SELECTOR));
+  const viableKnownRoots = knownRoots.filter((root) => countWixImages(root) > 1);
+  if (viableKnownRoots.length > 0) {
+    const fromKnown = pickNearestRoot(viableKnownRoots, activeMedia);
+    if (fromKnown) {
+      return fromKnown;
+    }
+  }
+
+  if (!activeMedia) {
+    return null;
+  }
+
+  let current: Element | null = activeMedia.parentElement;
+  while (current && current !== document.body && current !== document.documentElement) {
+    const count = countWixImages(current);
+    if (count >= 2 && count <= 24) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
+function pickNearestRoot(roots: Element[], activeMedia: Element | null): Element | null {
+  if (roots.length === 0) {
+    return null;
+  }
+
+  if (!activeMedia) {
+    return roots[0] || null;
+  }
+
+  for (const root of roots) {
+    if (root.contains(activeMedia)) {
+      return root;
+    }
+  }
+
+  const mediaRect = activeMedia.getBoundingClientRect();
+  let best: { root: Element; distance: number } | null = null;
+  for (const root of roots) {
+    const rect = root.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      continue;
+    }
+
+    const verticalDistance =
+      rect.top >= mediaRect.bottom ? rect.top - mediaRect.bottom : Math.abs(rect.top - mediaRect.top) + 200;
+    const horizontalDistance = Math.abs(rect.left - mediaRect.left);
+    const distance = verticalDistance * 10 + horizontalDistance;
+    if (!best || distance < best.distance) {
+      best = { root, distance };
+    }
+  }
+
+  return best?.root || roots[0] || null;
+}
+
+function countWixImages(root: Element): number {
+  return root.querySelectorAll(WIX_IMAGE_SELECTOR).length;
+}
+
+function collectRawWixUrlsFromDocument(): string[] {
   const rawUrls: string[] = [];
 
   const addSrcset = (value: string | null) => {
@@ -254,31 +356,44 @@ function collectWixCandidates(locationHref: string): WixCandidate[] {
     addSrcset(link.getAttribute('imageSrcSet'));
   }
 
-  const mediaImages = document.querySelectorAll('img[src*="wixmp.com/f/"], img[srcset*="wixmp.com/f/"]');
+  const mediaImages = document.querySelectorAll(WIX_IMAGE_SELECTOR);
   for (const image of mediaImages) {
     rawUrls.push((image.getAttribute('src') || '').trim());
     addSrcset(image.getAttribute('srcset'));
   }
 
-  const uniqueUrls = new Set<string>();
-  const candidates: WixCandidate[] = [];
-  for (const [order, rawUrl] of rawUrls.entries()) {
-    const info = parseWixUrlInfo(rawUrl, locationHref);
-    if (!info) {
-      continue;
+  return rawUrls;
+}
+
+function collectRawWixUrlsFromRoot(root: Element): string[] {
+  const rawUrls: string[] = [];
+
+  const addSrcset = (value: string | null) => {
+    const srcset = (value || '').trim();
+    if (!srcset) {
+      return;
     }
 
-    if (uniqueUrls.has(info.normalizedUrl)) {
-      continue;
+    for (const part of srcset.split(',')) {
+      const candidate = part.trim().split(/\s+/)[0] || '';
+      if (candidate) {
+        rawUrls.push(candidate);
+      }
     }
-    uniqueUrls.add(info.normalizedUrl);
-    candidates.push({
-      ...info,
-      order,
-    });
+  };
+
+  const itemRoots = root.querySelectorAll(KNOWN_GALLERY_ITEM_SELECTOR);
+  const rootsToScan = itemRoots.length > 1 ? Array.from(itemRoots) : [root];
+
+  for (const scope of rootsToScan) {
+    const images = scope.querySelectorAll(WIX_IMAGE_SELECTOR);
+    for (const image of images) {
+      rawUrls.push((image.getAttribute('src') || '').trim());
+      addSrcset(image.getAttribute('srcset'));
+    }
   }
 
-  return candidates;
+  return rawUrls;
 }
 
 function parseWixUrlInfo(rawUrl: string, locationHref: string): WixUrlInfo | null {
