@@ -2,10 +2,11 @@ import { resolveAbsoluteUrl } from './media';
 
 const DEV_HOST_RE = /(^|\.)deviantart\.com$/i;
 const WIX_ASSET_RE =
-  /^https?:\/\/[^/]*wixmp\.com\/f\/[^/]+\/([a-z0-9]+-[^/?#]+?)\.(?:jpg|jpeg|png|webp|gif|bmp|avif)(?:[/?#]|$)/i;
+  /^https?:\/\/[^/]*wixmp\.com\/f\/([^/]+)\/([a-z0-9]+-[^/?#]+?)\.(?:jpg|jpeg|png|webp|gif|bmp|avif)(?:[/?#]|$)/i;
 
 type WixUrlInfo = {
   normalizedUrl: string;
+  collectionKey: string;
   assetKey: string;
   assetPrefix: string;
   width: number | null;
@@ -31,7 +32,7 @@ export type DeviantArtPostEntry = {
 };
 
 export type DeviantArtPostContext = {
-  assetPrefix: string;
+  groupKey: string;
   entries: DeviantArtPostEntry[];
   entryByAssetKey: Map<string, DeviantArtPostEntry>;
 };
@@ -43,7 +44,17 @@ export function resolveWixAssetKey(url: string): string {
   }
 
   const match = normalized.match(WIX_ASSET_RE);
-  return match?.[1] || '';
+  return match?.[2] || '';
+}
+
+function resolveWixCollectionKey(url: string): string {
+  const normalized = normalizeHttpUrl(url, window.location.href);
+  if (!normalized) {
+    return '';
+  }
+
+  const match = normalized.match(WIX_ASSET_RE);
+  return (match?.[1] || '').toLowerCase();
 }
 
 export function resolveWixAssetPrefix(url: string): string {
@@ -106,14 +117,14 @@ export function resolveDeviantArtPostContext(locationHref: string = window.locat
     return null;
   }
 
-  const prefix = resolvePrimaryAssetPrefix(collected, locationHref);
-  if (!prefix) {
+  const groupKey = resolvePrimaryCollectionKey(collected, locationHref);
+  if (!groupKey) {
     return null;
   }
 
   const grouped = new Map<string, WixCandidate[]>();
   for (const candidate of collected) {
-    if (candidate.assetPrefix !== prefix) {
+    if (candidate.collectionKey !== groupKey) {
       continue;
     }
 
@@ -164,7 +175,7 @@ export function resolveDeviantArtPostContext(locationHref: string = window.locat
 
   const entryByAssetKey = new Map(entries.map((entry) => [entry.assetKey, entry]));
   return {
-    assetPrefix: prefix,
+    groupKey,
     entries,
     entryByAssetKey,
   };
@@ -183,11 +194,11 @@ function isDeviantArtDeviationUrl(locationHref: string): boolean {
   }
 }
 
-function resolvePrimaryAssetPrefix(candidates: WixCandidate[], locationHref: string): string {
+function resolvePrimaryCollectionKey(candidates: WixCandidate[], locationHref: string): string {
   const ogTag = document.querySelector('meta[property="og:image"]');
-  const ogPrefix = resolveWixAssetPrefix(ogTag?.getAttribute('content') || '');
-  if (ogPrefix) {
-    return ogPrefix;
+  const ogGroupKey = resolveWixCollectionKey(ogTag?.getAttribute('content') || '');
+  if (ogGroupKey) {
+    return ogGroupKey;
   }
 
   const canonical = document.querySelector('link[rel="canonical"]')?.getAttribute('href') || locationHref;
@@ -198,25 +209,25 @@ function resolvePrimaryAssetPrefix(candidates: WixCandidate[], locationHref: str
   if (deviationId) {
     const matching = candidates.find((candidate) => candidate.normalizedUrl.includes(deviationId));
     if (matching) {
-      return matching.assetPrefix;
+      return matching.collectionKey;
     }
   }
 
   const counts = new Map<string, number>();
   for (const candidate of candidates) {
-    counts.set(candidate.assetPrefix, (counts.get(candidate.assetPrefix) || 0) + 1);
+    counts.set(candidate.collectionKey, (counts.get(candidate.collectionKey) || 0) + 1);
   }
 
-  let bestPrefix = '';
+  let bestGroupKey = '';
   let bestCount = 0;
-  for (const [prefix, count] of counts.entries()) {
+  for (const [groupKey, count] of counts.entries()) {
     if (count > bestCount) {
-      bestPrefix = prefix;
+      bestGroupKey = groupKey;
       bestCount = count;
     }
   }
 
-  return bestPrefix;
+  return bestGroupKey;
 }
 
 function collectWixCandidates(locationHref: string): WixCandidate[] {
@@ -277,13 +288,14 @@ function parseWixUrlInfo(rawUrl: string, locationHref: string): WixUrlInfo | nul
   }
 
   const assetMatch = normalizedUrl.match(WIX_ASSET_RE);
-  if (!assetMatch || !assetMatch[1]) {
+  if (!assetMatch || !assetMatch[1] || !assetMatch[2]) {
     return null;
   }
 
-  const assetKey = assetMatch[1];
+  const collectionKey = assetMatch[1].toLowerCase();
+  const assetKey = assetMatch[2];
   const assetPrefix = assetKey.split('-')[0] || '';
-  if (!assetPrefix) {
+  if (!collectionKey || !assetPrefix) {
     return null;
   }
 
@@ -298,6 +310,7 @@ function parseWixUrlInfo(rawUrl: string, locationHref: string): WixUrlInfo | nul
 
   return {
     normalizedUrl,
+    collectionKey,
     assetKey,
     assetPrefix,
     width,

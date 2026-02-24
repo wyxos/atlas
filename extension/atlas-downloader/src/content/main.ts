@@ -8,6 +8,7 @@ import {
 } from './items';
 import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from './interactions';
 import { isHostExcluded, isHostMatch, parseExcludedDomains, resolveHost, stripHash } from './network';
+import { isOpenTabHighlightEligibleUrl, normalizeOpenTabUrl } from './openTabUrl';
 import {
   buildStatusMapFromCache,
   clearNodeMarkerAttributes,
@@ -97,37 +98,12 @@ declare const chrome: ChromeApi;
     return registrableDomainFromUrl(url) || 'Extension';
   }
 
-  function normalizeOpenTabUrl(value: unknown): string {
-    if (typeof value !== 'string') {
-      return '';
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return '';
-    }
-
-    try {
-      const parsed = new URL(trimmed);
-      const protocol = parsed.protocol.toLowerCase();
-      if (protocol !== 'http:' && protocol !== 'https:') {
-        return '';
-      }
-
-      parsed.hash = '';
-      parsed.hostname = parsed.hostname.toLowerCase();
-      return parsed.toString();
-    } catch {
-      return '';
-    }
-  }
-
   function applyOpenTabUrls(urls: unknown): boolean {
     const next = new Set<string>();
     const entries = Array.isArray(urls) ? urls : [];
     for (const entry of entries) {
       const normalized = normalizeOpenTabUrl(entry);
-      if (!normalized) {
+      if (!normalized || !isOpenTabHighlightEligibleUrl(normalized)) {
         continue;
       }
 
@@ -1839,7 +1815,7 @@ declare const chrome: ChromeApi;
         const status = findStatusForLookupKeys(lookupKeys, statusByUrl, stripHash);
         const isOpenInTab = lookupKeys.some((key) => {
           const normalized = normalizeOpenTabUrl(key);
-          if (!normalized) {
+          if (!normalized || !isOpenTabHighlightEligibleUrl(normalized)) {
             return false;
           }
 
