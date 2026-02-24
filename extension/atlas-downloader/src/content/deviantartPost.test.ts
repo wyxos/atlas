@@ -22,8 +22,8 @@ function makeToken(maxWidth: number, maxHeight: number): string {
   return `${header}.${payload}.sig`;
 }
 
-function makeWixUrl(assetKey: string, size: string, token: string): string {
-  return `https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/abc123/${assetKey}.jpg/v1/fit/${size},q_70,strp/${assetKey}.jpg?token=${token}`;
+function makeWixUrl(assetKey: string, size: string, token: string, folderId = 'abc123'): string {
+  return `https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/${folderId}/${assetKey}.jpg/v1/fit/${size},q_70,strp/${assetKey}.jpg?token=${token}`;
 }
 
 function appendPreload(href: string) {
@@ -52,7 +52,7 @@ describe('resolveDeviantArtPostContext', () => {
     const token = makeToken(1280, 1920);
     const primary = makeWixUrl('dl6jv53-1111', 'w_150,h_150', token);
     const child = makeWixUrl('dl6jv53-2222', 'w_150,h_150', token);
-    const unrelated = makeWixUrl('dk8ebq8-3333', 'w_150,h_150', token);
+    const unrelated = makeWixUrl('dk8ebq8-3333', 'w_150,h_150', token, 'other123');
 
     const ogImage = document.createElement('meta');
     ogImage.setAttribute('property', 'og:image');
@@ -68,6 +68,28 @@ describe('resolveDeviantArtPostContext', () => {
     expect(context?.entries).toHaveLength(2);
     expect(context?.entryByAssetKey.has('dl6jv53-1111')).toBe(true);
     expect(context?.entryByAssetKey.has('dl6jv53-2222')).toBe(true);
+  });
+
+  it('groups child images that share wix collection id even when prefixes differ', () => {
+    const token = makeToken(1280, 1920);
+    const primary = makeWixUrl('dl6jv53-1111', 'w_150,h_150', token);
+    const childDifferentPrefix = makeWixUrl('dljlgm8-2222', 'w_150,h_150', token);
+    const unrelated = makeWixUrl('dk8ebq8-3333', 'w_150,h_150', token, 'other123');
+
+    const ogImage = document.createElement('meta');
+    ogImage.setAttribute('property', 'og:image');
+    ogImage.setAttribute('content', primary);
+    document.head.appendChild(ogImage);
+
+    appendPreload(primary);
+    appendPreload(childDifferentPrefix);
+    appendPreload(unrelated);
+
+    const context = resolveDeviantArtPostContext('https://www.deviantart.com/user/art/example-123456789');
+    expect(context).not.toBeNull();
+    expect(context?.entries).toHaveLength(2);
+    expect(context?.entryByAssetKey.has('dl6jv53-1111')).toBe(true);
+    expect(context?.entryByAssetKey.has('dljlgm8-2222')).toBe(true);
   });
 
   it('returns null outside deviantart deviation pages', () => {
