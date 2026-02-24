@@ -15,11 +15,27 @@ return new class extends Migration
             $driver = DB::connection()->getDriverName();
 
             if (in_array($driver, ['mysql', 'mariadb'], true)) {
-                // Build the index with online DDL to avoid long blocking locks on large files tables.
-                DB::statement(sprintf(
-                    'ALTER TABLE files ADD INDEX %s (mime_type, id), ALGORITHM=INPLACE, LOCK=NONE',
-                    self::INDEX_NAME
-                ));
+                // Prefer online DDL for large files tables, but fall back if storage engine constraints disallow it.
+                try {
+                    DB::statement(sprintf(
+                        'ALTER TABLE files ADD INDEX %s (mime_type, id), ALGORITHM=INPLACE, LOCK=NONE',
+                        self::INDEX_NAME
+                    ));
+                } catch (\Throwable $e) {
+                    if ($this->isDuplicateIndexError($e)) {
+                        return;
+                    }
+
+                    if (! $this->isOnlineDdlUnsupportedError($e)) {
+                        throw $e;
+                    }
+
+                    // Fallback path for servers that cannot combine INPLACE/LOCK=NONE with table features.
+                    DB::statement(sprintf(
+                        'ALTER TABLE files ADD INDEX %s (mime_type, id), ALGORITHM=COPY',
+                        self::INDEX_NAME
+                    ));
+                }
 
                 return;
             }
@@ -54,5 +70,14 @@ return new class extends Migration
         return str_contains($message, 'duplicate key name')
             || str_contains($message, 'already exists')
             || str_contains($message, 'duplicate index');
+    }
+
+    private function isOnlineDdlUnsupportedError(\Throwable $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'algorithm=inplace is not supported')
+            || str_contains($message, 'feature not supported: 1846')
+            || str_contains($message, 'try algorithm=copy');
     }
 };
