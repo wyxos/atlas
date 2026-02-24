@@ -244,3 +244,4 @@ After any code changes, always run frontend linting and report the result:
 - If binaries/services are not available in WSL PATH, use Windows/Herd-aware invocation paths as needed.
 - For DB/service operations, confirm whether runtime/services are Windows-hosted before executing maintenance/debug commands.
 - Playwright browser runs in WSL require system Chromium deps; if launch fails with missing `libnspr4.so` (or similar), install required packages before relying on browser automation.
+- `flux pull` in WSL may fail local MySQL CLI detection even when Herd MariaDB exists on Windows. In WSL, set `FLUX_MYSQL_CLI` to the WSL path of `mariadb.exe` (discover with `cmd.exe /C where mariadb` + `wslpath -u`) before running Flux.
