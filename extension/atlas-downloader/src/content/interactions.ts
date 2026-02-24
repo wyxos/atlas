@@ -1092,7 +1092,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     let context = activePostContext;
     if (!context || context.entries.length <= 1) {
       options.showToast('Scanning post media…');
-      const refreshedContext = resolveDeviantArtPostContext(window.location.href);
+      const refreshedContext = resolveDeviantArtPostContext(window.location.href, activeMedia);
       if (refreshedContext) {
         activePostContext = refreshedContext;
         context = refreshedContext;
@@ -1406,7 +1406,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     activeKey = nextKey;
     setToolbarResolution(previewPayload.width, previewPayload.height);
     const activeAssetKey = resolveWixAssetKey(previewPayload.url || '');
-    const postContext = resolveDeviantArtPostContext(window.location.href);
+    const postContext = resolveDeviantArtPostContext(window.location.href, media);
     if (postContext && activeAssetKey && postContext.entryByAssetKey.has(activeAssetKey)) {
       activePostContext = postContext;
     } else {
