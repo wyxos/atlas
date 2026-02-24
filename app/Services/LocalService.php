@@ -62,6 +62,7 @@ class LocalService extends BaseService
         $reactionMode = is_string($params['reaction_mode'] ?? null) ? (string) $params['reaction_mode'] : 'any';
         $autoDisliked = is_string($params['auto_disliked'] ?? null) ? (string) $params['auto_disliked'] : 'any';
         $moderationUnion = is_string($params['moderation_union'] ?? null) ? (string) $params['moderation_union'] : 'none';
+        $localPreset = is_string($params['local_preset'] ?? null) ? (string) $params['local_preset'] : '';
         $reaction = $params['reaction'] ?? null;
         $includeTotal = filter_var($params['include_total'] ?? null, FILTER_VALIDATE_BOOLEAN);
 
@@ -101,6 +102,22 @@ class LocalService extends BaseService
                     'total' => 0,
                 ],
             ];
+        }
+
+        $isLegacyDislikedBlacklistedAutoIntersection = $reactionMode === 'types'
+            && is_array($reactionTypes)
+            && in_array('dislike', $reactionTypes, true)
+            && $blacklisted === 'yes'
+            && $blacklistType === 'auto';
+
+        if (
+            $moderationUnion === 'none'
+            && ($localPreset === 'disliked_blacklisted_auto' || $isLegacyDislikedBlacklistedAutoIntersection)
+        ) {
+            // Back-compat: old tabs/URLs stored this view as an intersection.
+            // Normalize to OR semantics so users don't need to reset filters manually.
+            $moderationUnion = self::MODERATION_UNION_AUTO_DISLIKED_OR_BLACKLISTED_AUTO;
+            $this->params['moderation_union'] = $moderationUnion;
         }
 
         // "Reacted" is defined as positive reactions only (love/like/funny), excluding dislikes.

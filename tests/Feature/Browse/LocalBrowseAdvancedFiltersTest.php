@@ -185,6 +185,53 @@ test('local browse moderation union includes auto-disliked or auto-blacklisted f
     expect($ids)->not->toContain($manualBlacklisted->id);
 });
 
+test('local browse legacy disliked + blacklisted auto params are treated as moderation union', function () {
+    $user = User::factory()->create();
+    $tab = Tab::factory()->for($user)->create([
+        'params' => ['feed' => 'local'],
+    ]);
+
+    $autoDisliked = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => true,
+        'blacklisted_at' => null,
+        'blacklist_reason' => null,
+        'source' => 'CivitAI',
+    ]);
+
+    $autoBlacklisted = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => false,
+        'blacklisted_at' => now(),
+        'blacklist_reason' => null,
+        'source' => 'CivitAI',
+    ]);
+
+    $manualBlacklisted = File::factory()->create([
+        'downloaded' => true,
+        'auto_disliked' => false,
+        'blacklisted_at' => now(),
+        'blacklist_reason' => 'manual reason',
+        'source' => 'CivitAI',
+    ]);
+
+    Reaction::create([
+        'file_id' => $autoDisliked->id,
+        'user_id' => $user->id,
+        'type' => 'dislike',
+    ]);
+
+    $response = $this->actingAs($user)->getJson(
+        "/api/browse?tab_id={$tab->id}&feed=local&source=all&limit=50&sort=blacklisted_at&reaction_mode=types&reaction[]=dislike&blacklisted=yes&blacklist_type=auto"
+    );
+    $response->assertSuccessful();
+
+    $ids = collect($response->json('items'))->pluck('id')->all();
+    expect($ids)->toContain($autoDisliked->id);
+    expect($ids)->toContain($autoBlacklisted->id);
+    expect($ids)->not->toContain($manualBlacklisted->id);
+});
+
 test('local browse can cap previewed_count', function () {
     $user = User::factory()->create();
     $tab = Tab::factory()->for($user)->create([
