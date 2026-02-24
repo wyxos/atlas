@@ -9,6 +9,7 @@ export const LOCAL_PRESET_LABEL_BY_VALUE: Record<string, string> = {
   blacklisted_any: "Blacklisted (Any)",
   blacklisted_manual: "Blacklisted (Manual)",
   blacklisted_auto: "Blacklisted (Auto)",
+  disliked_blacklisted_auto: "Disliked + Blacklisted (Auto)",
 }
 
 export function getLocalPresetLabel(value: unknown): string | null {
