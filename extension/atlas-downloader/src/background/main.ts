@@ -32,7 +32,7 @@ type ChromeRuntime = {
   reload: () => void;
   requestUpdateCheck?: (callback: (status: string) => void) => void;
   getURL: (path: string) => string;
-  sendMessage: (message: unknown) => void;
+  sendMessage: (message: unknown) => void | Promise<unknown>;
 };
 
 type ChromeStorageSync = {
@@ -70,7 +70,7 @@ type ChromeRuntimeMessageSender = {
 };
 
 type ChromeTabs = {
-  sendMessage: (tabId: number, message: unknown) => void;
+  sendMessage: (tabId: number, message: unknown) => void | Promise<unknown>;
   create: (createProperties: { url: string }) => void;
   remove: (tabIds: number | number[]) => Promise<void>;
   update: (tabId: number, updateProperties: { active?: boolean }) => Promise<ChromeTab>;
@@ -109,7 +109,7 @@ type ChromeAction = {
     tabId?: number;
     path?: Record<string | number, string>;
     imageData?: Record<string | number, ImageData>;
-  }) => void;
+  }) => void | Promise<void>;
   setBadgeText: (details: { tabId?: number; text: string }) => void;
   setBadgeBackgroundColor: (details: { tabId?: number; color: string }) => void;
   setTitle: (details: { tabId?: number; title: string }) => void;
@@ -151,11 +151,12 @@ declare const chrome: ChromeApi;
 const SETTINGS_KEYS = ['atlasBaseUrl', 'atlasToken'];
 const REQUEST_TIMEOUT_MS = 25_000;
 const DEFAULT_ACTION_TITLE = 'Atlas Downloader';
-const DEFAULT_ICON_PATHS: Record<number, string> = {
+const DEFAULT_ICON_FILES: Record<number, string> = {
   16: 'icon-16.png',
   32: 'icon-32.png',
   48: 'icon-48.png',
 };
+const DEFAULT_ICON_PATHS = resolveIconPaths(DEFAULT_ICON_FILES);
 const RED_TINT = 'rgba(220, 38, 38, 0.78)';
 
 const MENU_OPEN_OPTIONS = 'atlas-open-options';
@@ -244,6 +245,53 @@ let realtimeStatus: RealtimeConnectionStatus = {
   updatedAt: Date.now(),
 };
 
+function resolveIconPaths(paths: Record<number, string>): Record<number, string> {
+  const resolved: Record<number, string> = {};
+  for (const [size, path] of Object.entries(paths)) {
+    resolved[Number(size)] = chrome.runtime.getURL(path);
+  }
+
+  return resolved;
+}
+
+function settleAsyncResult(result: unknown): void {
+  if (!result || typeof result !== 'object' || !('catch' in result)) {
+    return;
+  }
+
+  (result as Promise<unknown>).catch(() => {
+    // Ignore one-way messaging/action update failures on restricted tabs/pages.
+  });
+}
+
+function sendTabMessage(tabId: number, message: unknown): void {
+  try {
+    settleAsyncResult(chrome.tabs.sendMessage(tabId, message));
+  } catch {
+    // Ignore tabs without a matching content script.
+  }
+}
+
+function sendRuntimeMessage(message: unknown): void {
+  try {
+    settleAsyncResult(chrome.runtime.sendMessage(message));
+  } catch {
+    // Ignore runtime listeners not being available.
+  }
+}
+
+function setActionIcon(details: {
+  tabId?: number;
+  path?: Record<string | number, string>;
+  imageData?: Record<string | number, ImageData>;
+}): void {
+  try {
+    settleAsyncResult(chrome.action.setIcon(details));
+  } catch {
+    // Ignore icon updates on transient/restricted tabs.
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   // Right click on the extension toolbar icon shows this menu (in addition to Chrome's built-ins).
   try {
@@ -319,7 +367,7 @@ chrome.action.onClicked.addListener((tab) => {
   }
 
   // Left click on the toolbar icon asks the content script to open the sheet.
-  chrome.tabs.sendMessage(tabId, { type: 'atlas-open-sheet' });
+  sendTabMessage(tabId, { type: 'atlas-open-sheet' });
 });
 
 chrome.commands.onCommand.addListener((command) => {
@@ -335,7 +383,7 @@ chrome.commands.onCommand.addListener((command) => {
         return;
       }
 
-      chrome.tabs.sendMessage(tabId, { type: 'atlas-open-sheet' });
+      sendTabMessage(tabId, { type: 'atlas-open-sheet' });
     })
     .catch(() => {
       // Ignore tab query/send errors on restricted pages.
@@ -625,7 +673,7 @@ async function enforceUniqueTab(
   }
 
   try {
-    chrome.tabs.sendMessage(noticeTabId, {
+    sendTabMessage(noticeTabId, {
       type: MESSAGE_DUPLICATE_TAB_BLOCKED,
       url: normalizedUrl,
     });
@@ -671,7 +719,7 @@ async function broadcastOpenTabsState(): Promise<void> {
     }
 
     try {
-      chrome.tabs.sendMessage(tab.id, {
+      sendTabMessage(tab.id, {
         type: MESSAGE_OPEN_TABS_UPDATED,
         urls,
       });
@@ -682,7 +730,7 @@ async function broadcastOpenTabsState(): Promise<void> {
 }
 
 function setActionDefault(tabId: number) {
-  chrome.action.setIcon({ tabId, path: DEFAULT_ICON_PATHS });
+  setActionIcon({ tabId, path: DEFAULT_ICON_PATHS });
   chrome.action.setBadgeText({ tabId, text: '' });
   chrome.action.setTitle({ tabId, title: DEFAULT_ACTION_TITLE });
 }
@@ -690,7 +738,7 @@ function setActionDefault(tabId: number) {
 async function setActionExcluded(tabId: number) {
   const redIcon = await getExcludedIconImageData();
   if (redIcon) {
-    chrome.action.setIcon({
+    setActionIcon({
       tabId,
       imageData: {
         16: redIcon[16],
@@ -701,7 +749,7 @@ async function setActionExcluded(tabId: number) {
     chrome.action.setBadgeText({ tabId, text: '' });
   } else {
     // Fallback for environments that don't support dynamic icon imageData.
-    chrome.action.setIcon({ tabId, path: DEFAULT_ICON_PATHS });
+    setActionIcon({ tabId, path: DEFAULT_ICON_PATHS });
     chrome.action.setBadgeBackgroundColor({ tabId, color: '#dc2626' });
     chrome.action.setBadgeText({ tabId, text: 'OFF' });
   }
@@ -727,7 +775,7 @@ async function buildExcludedIconImageData(): Promise<Record<number, ImageData> |
     const result: Record<number, ImageData> = {};
     for (const size of [16, 32, 48]) {
       const iconPath = DEFAULT_ICON_PATHS[size];
-      const response = await fetch(chrome.runtime.getURL(iconPath));
+      const response = await fetch(iconPath);
       if (!response.ok) {
         return null;
       }
@@ -1020,7 +1068,7 @@ function updateRealtimeStatus(
   }
 
   try {
-    chrome.runtime.sendMessage({
+    sendRuntimeMessage({
       type: MESSAGE_REALTIME_STATUS_CHANGED,
       status: realtimeStatus,
     });
@@ -1137,7 +1185,7 @@ async function broadcastDownloadEvent(payload: DownloadRealtimeEvent): Promise<v
     }
 
     try {
-      chrome.tabs.sendMessage(tab.id, {
+      sendTabMessage(tab.id, {
         type: 'atlas-download-event',
         payload,
       });
@@ -1216,7 +1264,7 @@ async function broadcastReactionEvent(payload: ReactionBroadcastEvent, senderTab
     }
 
     try {
-      chrome.tabs.sendMessage(tab.id, {
+      sendTabMessage(tab.id, {
         type: MESSAGE_REACTION_UPDATED,
         payload,
       });

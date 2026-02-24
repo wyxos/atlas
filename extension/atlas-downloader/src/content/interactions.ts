@@ -1089,7 +1089,17 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
 
-    const context = activePostContext;
+    let context = activePostContext;
+    if (!context || context.entries.length <= 1) {
+      options.showToast('Scanning post media…');
+      const refreshedContext = resolveDeviantArtPostContext(window.location.href);
+      if (refreshedContext) {
+        activePostContext = refreshedContext;
+        context = refreshedContext;
+        syncPostIndicatorState();
+      }
+    }
+
     if (!context || context.entries.length <= 1) {
       options.showToast('No DeviantArt post images found.');
       return;
@@ -1179,15 +1189,18 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
   };
 
-  postIndicator.addEventListener('pointerdown', swallow, true);
-  postIndicator.addEventListener('mousedown', (event) => {
-    if (!event.altKey || (event.button !== 0 && event.button !== 1)) {
-      return;
-    }
+  postIndicator.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (!event.altKey || (event.button !== 0 && event.button !== 1)) {
+        return;
+      }
 
-    swallow(event);
-    void queueActivePostDownloads();
-  });
+      swallow(event);
+      void queueActivePostDownloads();
+    },
+    true
+  );
   postIndicator.addEventListener('contextmenu', (event) => {
     if (!event.altKey) {
       return;
