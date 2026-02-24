@@ -81,6 +81,7 @@ declare const chrome: ChromeApi;
   let syncOpenTabMarkers: (() => void) | null = null;
   const STATUS_CACHE_UPDATED_EVENT = 'atlas-status-cache-updated';
   const OPEN_TABS_UPDATED_EVENT = 'atlas-open-tabs-updated';
+  const REACTION_UPDATED_EVENT = 'atlas-reaction-updated';
 
   const ATLAS_STATUS_TTL_MS = 30_000;
   const atlasStatusCache = new Map<string, AtlasStatusCacheEntry>();
@@ -176,6 +177,48 @@ declare const chrome: ChromeApi;
     return trimmed;
   }
 
+  function applyReactionStatusUpdateFromPayload(payload: unknown): boolean {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+
+    const value = payload as {
+      url?: unknown;
+      reactionType?: unknown;
+      downloaded?: unknown;
+      blacklisted?: unknown;
+      downloadProgress?: unknown;
+      downloadedAt?: unknown;
+    };
+    const rawUrl = typeof value.url === 'string' ? value.url.trim() : '';
+    const lookupUrl = stripHash(rawUrl);
+    if (!lookupUrl) {
+      return false;
+    }
+
+    const reactionTypeRaw = value.reactionType;
+    const reactionType =
+      typeof reactionTypeRaw === 'string' && reactionTypeRaw.trim() !== ''
+        ? reactionTypeRaw.trim()
+        : null;
+    const nextStatus = {
+      exists: true,
+      downloaded: Boolean(value.downloaded),
+      blacklisted: Boolean(value.blacklisted),
+      reactionType,
+      downloadProgress: normalizeProgress(value.downloadProgress),
+      downloadedAt: normalizeDownloadedAt(value.downloadedAt),
+      ts: Date.now(),
+    };
+
+    atlasStatusCache.set(lookupUrl, nextStatus);
+    if (rawUrl && rawUrl !== lookupUrl) {
+      atlasStatusCache.set(rawUrl, nextStatus);
+    }
+
+    return true;
+  }
+
   function getCachedAtlasStatus(url: string) {
     const rawKey = (url || '').trim();
     const fallbackKey = stripHash(rawKey);
@@ -258,6 +301,14 @@ declare const chrome: ChromeApi;
     const msg = message as { type?: unknown; payload?: unknown; url?: unknown; urls?: unknown };
     if (msg.type === 'atlas-download-event') {
       handleRealtimeDownloadEvent?.(msg.payload);
+      return;
+    }
+
+    if (msg.type === REACTION_UPDATED_EVENT) {
+      if (applyReactionStatusUpdateFromPayload(msg.payload)) {
+        syncOpenTabMarkers?.();
+        window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
+      }
       return;
     }
 

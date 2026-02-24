@@ -63,6 +63,12 @@ type ChromeTab = {
   openerTabId?: number;
 };
 
+type ChromeRuntimeMessageSender = {
+  tab?: {
+    id?: number;
+  };
+};
+
 type ChromeTabs = {
   sendMessage: (tabId: number, message: unknown) => void;
   create: (createProperties: { url: string }) => void;
@@ -161,6 +167,7 @@ const MESSAGE_REALTIME_STATUS_CHANGED = 'atlas-realtime-status-changed';
 const MESSAGE_DUPLICATE_TAB_BLOCKED = 'atlas-duplicate-tab-blocked';
 const MESSAGE_OPEN_TABS_REQUEST = 'atlas-open-tabs-request';
 const MESSAGE_OPEN_TABS_UPDATED = 'atlas-open-tabs-updated';
+const MESSAGE_REACTION_UPDATED = 'atlas-reaction-updated';
 const SOCKET_EVENT_NAMES = [
   'DownloadTransferCreated',
   'DownloadTransferQueued',
@@ -201,6 +208,15 @@ type DownloadRealtimeEvent = {
   failed_at: string | null;
   downloaded: boolean;
   failed: boolean;
+};
+
+type ReactionBroadcastEvent = {
+  url: string;
+  reactionType: string | null;
+  downloaded: boolean;
+  blacklisted: boolean;
+  downloadProgress: number | null;
+  downloadedAt: string | null;
 };
 
 type RealtimeConnectionStatus = {
@@ -442,7 +458,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             : handleDownload(request.payload);
 
   promise
-    .then((result) => sendResponse(result))
+    .then((result) => {
+      sendResponse(result);
+      const senderTabId =
+        typeof (sender as ChromeRuntimeMessageSender)?.tab?.id === 'number'
+          ? (sender as ChromeRuntimeMessageSender).tab.id
+          : null;
+
+      if (request.type === 'atlas-react' && result && (result as { ok?: boolean }).ok) {
+        const reactionEvent = buildReactionBroadcastEvent(request.payload, result);
+        if (reactionEvent) {
+          void broadcastReactionEvent(reactionEvent, senderTabId);
+        }
+      }
+    })
     .catch((error) => {
       sendResponse({
         ok: false,
@@ -1110,6 +1139,85 @@ async function broadcastDownloadEvent(payload: DownloadRealtimeEvent): Promise<v
     try {
       chrome.tabs.sendMessage(tab.id, {
         type: 'atlas-download-event',
+        payload,
+      });
+    } catch {
+      // Ignore tabs without a matching content script.
+    }
+  }
+}
+
+function buildReactionBroadcastEvent(requestPayload: unknown, result: unknown): ReactionBroadcastEvent | null {
+  const payload = requestPayload as {
+    url?: unknown;
+    type?: unknown;
+  } | null;
+  const response = result as {
+    data?: {
+      file?: {
+        downloaded?: unknown;
+        blacklisted_at?: unknown;
+        download_progress?: unknown;
+        downloaded_at?: unknown;
+      } | null;
+      reaction?: {
+        type?: unknown;
+      } | null;
+    } | null;
+  } | null;
+
+  const rawUrl = typeof payload?.url === 'string' ? payload.url.trim() : '';
+  if (!rawUrl) {
+    return null;
+  }
+
+  const file = response?.data?.file || null;
+  const downloadProgressRaw = Number(file?.download_progress);
+  const downloadProgress = Number.isFinite(downloadProgressRaw)
+    ? Math.max(0, Math.min(100, downloadProgressRaw))
+    : null;
+  const downloadedAtRaw = typeof file?.downloaded_at === 'string' ? file.downloaded_at.trim() : '';
+
+  const reactionType = (() => {
+    if (typeof response?.data?.reaction?.type === 'string') {
+      return response.data.reaction.type;
+    }
+    if (typeof payload?.type === 'string') {
+      return payload.type;
+    }
+
+    return null;
+  })();
+
+  return {
+    url: rawUrl,
+    reactionType,
+    downloaded: Boolean(file?.downloaded),
+    blacklisted: Boolean(file?.blacklisted_at),
+    downloadProgress,
+    downloadedAt: downloadedAtRaw || null,
+  };
+}
+
+async function broadcastReactionEvent(payload: ReactionBroadcastEvent, senderTabId: number | null): Promise<void> {
+  let tabs: ChromeTab[] = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return;
+  }
+
+  for (const tab of tabs) {
+    if (!tab?.id) {
+      continue;
+    }
+    if (senderTabId !== null && tab.id === senderTabId) {
+      continue;
+    }
+
+    try {
+      chrome.tabs.sendMessage(tab.id, {
+        type: MESSAGE_REACTION_UPDATED,
         payload,
       });
     } catch {
