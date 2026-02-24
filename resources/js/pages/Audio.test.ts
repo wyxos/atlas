@@ -180,6 +180,7 @@ describe('Audio', () => {
         expect(wrapper.text()).toContain('Pages: 3 / 3');
         expect(wrapper.text()).toContain('100%');
         expect(wrapper.text()).toContain('IDs loaded: 3 / 3');
+        expect(wrapper.findAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 
         vi.advanceTimersByTime(180);
         await flushPromises();

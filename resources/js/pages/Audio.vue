@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import PageLayout from '../components/PageLayout.vue';
 import VirtualList from '../components/VirtualList.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type AudioIdsResponse = {
     ids: number[];
@@ -121,6 +122,10 @@ function detailTitle(audioId: number): string {
     const title = detailsById.value[audioId]?.title;
 
     return title && title.trim() !== '' ? title : `Audio #${audioId}`;
+}
+
+function hasDetails(audioId: number): boolean {
+    return detailsById.value[audioId] !== undefined;
 }
 
 function detailSubtitle(audioId: number): string {
@@ -293,8 +298,14 @@ onUnmounted(() => {
                                 class="h-16 px-4 text-twilight-indigo-100 flex flex-col justify-center gap-1"
                             >
                                 <p class="font-mono text-xs text-blue-slate-300">#{{ audioId }}</p>
-                                <p class="truncate text-sm">{{ detailTitle(audioId) }}</p>
-                                <p class="truncate text-xs text-blue-slate-300">{{ detailSubtitle(audioId) }}</p>
+                                <template v-if="hasDetails(audioId)">
+                                    <p class="truncate text-sm">{{ detailTitle(audioId) }}</p>
+                                    <p class="truncate text-xs text-blue-slate-300">{{ detailSubtitle(audioId) }}</p>
+                                </template>
+                                <template v-else>
+                                    <Skeleton class="h-4 w-2/3 bg-prussian-blue-500/60" />
+                                    <Skeleton class="h-3 w-1/2 bg-prussian-blue-500/60" />
+                                </template>
                             </li>
                         </ul>
                     </template>
