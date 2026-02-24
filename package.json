@@ -7,7 +7,8 @@
     "build": "vite build",
     "dev": "vite",
     "extension:release": "node scripts/extension-release.mjs",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run backend:lint && npm run backend:test",
+    "check": "npm run guard:files-table-migrations && npm run lint && npm run typecheck && npm run test && npm run backend:lint && npm run backend:test",
+    "guard:files-table-migrations": "node scripts/guard-files-table-migrations.mjs",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
@@ -22,7 +23,7 @@
     "generate-favicons": "tsx scripts/generate-favicons.ts",
     "build:vibe": "cd ../../vue/vibe && npm run build:lib",
     "release:vibe": "cd ../../vue/vibe && npm run release",
-    "release": "npx @wyxos/zephyr@latest"
+    "release": "npm run guard:files-table-migrations && npx @wyxos/zephyr@latest"
   },
   "devDependencies": {
     "@laravel/echo-vue": "^2.2.7",
