@@ -55,6 +55,7 @@ Database gotcha:
 - For long URL fields on MySQL/MariaDB, do not rely on unique indexes directly on `text`/large `varchar` columns. Use a deterministic hash column (e.g. SHA-256) as the unique/upsert key.
 - Do not call `Schema::hasColumn()`/`Schema::hasColumns()` in hot request/model paths. Those checks hit `information_schema` and can create recurring slow-query issues in production; rely on completed migrations instead.
 - For new indexes on large `files` tables in MySQL/MariaDB, prefer online DDL (`ALTER TABLE ... ADD INDEX ... ALGORITHM=INPLACE, LOCK=NONE`) to reduce blocking during deploy.
+- Some MySQL/MariaDB setups reject `ALGORITHM=INPLACE` (error 1846) for certain table definitions; in migrations, catch that and fallback to `ALGORITHM=COPY` instead of failing deploy.
 - For large `files` table backfills, prefer set-based SQL updates over PHP `chunkById` loops to avoid very long deploy-time migrations.
 - For large tables (especially `files`), do not put row-by-row PHP loops or queued backfill jobs inside migrations. Keep migrations schema-first (fast), and run heavy backfills as separate post-deploy commands/jobs.
 - `files` is large (million+ rows). Expect `ALTER TABLE`/dedupe migrations to run for a long time in production; start them once, monitor separately, and keep the deploy shell non-blocking while they finish.
