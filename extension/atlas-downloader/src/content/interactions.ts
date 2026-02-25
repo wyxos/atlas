@@ -52,7 +52,7 @@ type SourceFromMediaUrl = (url: string) => string;
 
 export type InteractionDependencies = {
   rootId: string;
-  minSize: number;
+  minWidth: number;
   maxMetadataLen: number;
   limitString: LimitString;
   sourceFromMediaUrl: SourceFromMediaUrl;
@@ -460,7 +460,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-      const item = buildItemFromElement(media, deps.minSize);
+      const item = buildItemFromElement(media, deps.minWidth);
       if (!item) {
         if (media instanceof HTMLVideoElement) {
           const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
@@ -678,7 +678,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-      const item = buildItemFromElement(media, deps.minSize);
+      const item = buildItemFromElement(media, deps.minWidth);
       if (!item) {
         if (media instanceof HTMLVideoElement) {
           const rawSrc = (media.currentSrc || media.src || '').trim().toLowerCase();
@@ -816,7 +816,7 @@ function buildOverlayReactionPayload(
   reactionType: string,
   deps: InteractionDependencies
 ) {
-  const item = buildItemFromElement(media, deps.minSize);
+  const item = buildItemFromElement(media, deps.minWidth);
   if (item) {
     return {
       type: reactionType,

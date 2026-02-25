@@ -54,7 +54,7 @@ export function getVideoUrl(video: HTMLVideoElement): string {
   return resolveMetaVideoUrl();
 }
 
-export function buildItemFromElement(element: Element, minSize: number): MediaItem | null {
+export function buildItemFromElement(element: Element, minWidth: number): MediaItem | null {
   if (!(element instanceof Element)) {
     return null;
   }
@@ -69,9 +69,7 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
 
     const { width, height } = resolveImageDimensions(img, url || rawSrc);
     const minFilterWidth = width ?? toPositiveDimension(img.clientWidth);
-    const minFilterHeight = height ?? toPositiveDimension(img.clientHeight);
-
-    if ((minFilterWidth && minFilterWidth < minSize) || (minFilterHeight && minFilterHeight < minSize)) {
+    if (minFilterWidth && minFilterWidth < minWidth) {
       return null;
     }
 
@@ -110,7 +108,7 @@ export function buildItemFromElement(element: Element, minSize: number): MediaIt
     const video = element as HTMLVideoElement;
     const width = video.videoWidth || video.clientWidth || null;
     const height = video.videoHeight || video.clientHeight || null;
-    if (width && height && (width < minSize || height < minSize)) {
+    if (width && width < minWidth) {
       return null;
     }
 
@@ -199,7 +197,14 @@ export function buildDirectPageCandidate(): MediaItem | null {
   return null;
 }
 
-export function collectLookupKeysForNode(node: Element): string[] {
+type CollectLookupKeyOptions = {
+  includeAnchor?: boolean;
+  includePageFallback?: boolean;
+};
+
+export function collectLookupKeysForNode(node: Element, options: CollectLookupKeyOptions = {}): string[] {
+  const includeAnchor = options.includeAnchor ?? true;
+  const includePageFallback = options.includePageFallback ?? true;
   const keys = new Set<string>();
   const pageUrl = safeUrl(window.location.href);
 
@@ -211,6 +216,10 @@ export function collectLookupKeysForNode(node: Element): string[] {
       return getVideoUrl(node) || '';
     }
     if (node instanceof HTMLAnchorElement) {
+      if (!includeAnchor) {
+        return '';
+      }
+
       return resolveAnchorLookupUrl(node.getAttribute('href') || '') || '';
     }
     return '';
@@ -219,13 +228,15 @@ export function collectLookupKeysForNode(node: Element): string[] {
     keys.add(mediaUrl);
   }
 
-  const anchorHref = node.closest('a[href]')?.getAttribute('href') ?? '';
-  const anchorUrl = resolveAnchorLookupUrl(anchorHref);
-  if (anchorUrl) {
-    keys.add(anchorUrl);
+  if (includeAnchor) {
+    const anchorHref = node.closest('a[href]')?.getAttribute('href') ?? '';
+    const anchorUrl = resolveAnchorLookupUrl(anchorHref);
+    if (anchorUrl) {
+      keys.add(anchorUrl);
+    }
   }
 
-  if (pageUrl && isBlobOrDataMediaNode(node)) {
+  if (includePageFallback && pageUrl && isBlobOrDataMediaNode(node)) {
     keys.add(pageUrl);
   }
 
