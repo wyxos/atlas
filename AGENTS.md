@@ -52,7 +52,7 @@ Extension gotcha:
 - Use `npm run build:extension:release` for extension releases; it auto-bumps `extension/atlas-downloader/manifest.json` patch version, rebuilds extension assets, regenerates the zip, and mirrors the built extension into `ATLAS_EXTENSION_SYNC_DIR` when that env var points to an existing directory.
 - DeviantArt multi-image post reactions queued from the overlay `POST` CTA rely on per-image `referrer_url` hashes (`#image-N`). Marker/status refresh must include those referrer lookup keys (not only media URLs), or reacted outlines can disappear after page reload because wixmp URL variants differ.
 - For those DeviantArt `#image-N` keys, do not collapse marker cache/lookups to the hashless page URL; that can cause page-wide false reacted outlines on unrelated thumbnails.
-- Marker rule for outlines: mark standalone `img`/`video` nodes by media URL only (skip media inside anchors), and mark status on `a[href]` only when they contain an image; open-tab anchor markers may target anchors containing `img` or `video`.
+- Marker rule for outlines: mark standalone `img`/`video` nodes by media URL only (skip media inside anchors), and use `a[href]` lookups only when the anchor contains `img`/`video`; apply marker attributes/outlines to the child media element, not the anchor element itself.
 - Overlay hover status lookups on thumbnail media inside anchors must include the anchor URL (resolved absolute, including relative hrefs) and avoid defaulting referrer lookups to the current page URL, otherwise widget state can bleed from the main page media.
 
 Database gotcha:

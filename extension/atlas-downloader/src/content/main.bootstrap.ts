@@ -1882,6 +1882,17 @@ export function runContentScript() {
       };
       const shouldMarkOpenTabNode = (node: Element): boolean =>
         node instanceof HTMLAnchorElement && node.querySelector('img, video') !== null;
+      const resolveMarkerTargetNode = (node: Element): Element | null => {
+        if (node instanceof HTMLAnchorElement) {
+          return node.querySelector('img, video');
+        }
+
+        if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
+          return node;
+        }
+
+        return null;
+      };
 
       const collectStatusLookupKeysForMarkerNode = (node: Element): string[] => {
         if (node instanceof HTMLAnchorElement) {
@@ -1911,6 +1922,11 @@ export function runContentScript() {
 
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
+        const markerTargetNode = resolveMarkerTargetNode(node);
+        if (!markerTargetNode) {
+          continue;
+        }
+
         const statusLookupKeys = shouldMarkStatusNode(node)
           ? collectStatusLookupKeysForMarkerNode(node)
           : [];
@@ -1937,26 +1953,26 @@ export function runContentScript() {
         }
 
         if (status) {
-          node.setAttribute('data-atlas-marked', '1');
+          markerTargetNode.setAttribute('data-atlas-marked', '1');
           if (status.blacklisted) {
-            node.setAttribute('data-atlas-state', 'blacklisted');
+            markerTargetNode.setAttribute('data-atlas-state', 'blacklisted');
           } else if (status.reactionType) {
-            node.setAttribute('data-atlas-state', 'reacted');
+            markerTargetNode.setAttribute('data-atlas-state', 'reacted');
           } else if (status.downloaded) {
-            node.setAttribute('data-atlas-state', 'downloaded');
+            markerTargetNode.setAttribute('data-atlas-state', 'downloaded');
           } else if (status.exists) {
-            node.setAttribute('data-atlas-state', 'exists');
+            markerTargetNode.setAttribute('data-atlas-state', 'exists');
           }
         }
 
         if (status?.reactionType) {
-          node.setAttribute('data-atlas-reaction', status.reactionType);
+          markerTargetNode.setAttribute('data-atlas-reaction', status.reactionType);
         }
 
         if (isOpenInTab) {
-          node.setAttribute('data-atlas-open-tab', '1');
+          markerTargetNode.setAttribute('data-atlas-open-tab', '1');
           if (!status?.reactionType) {
-            openTabBadgeNodes.push(node);
+            openTabBadgeNodes.push(markerTargetNode);
           }
         }
       }
