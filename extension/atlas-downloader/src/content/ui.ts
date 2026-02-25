@@ -214,37 +214,34 @@ export function ensurePageMarkerStyles() {
   const style = document.createElement('style');
   style.id = PAGE_MARKER_STYLE_ID;
   style.textContent = `
-[data-atlas-marked="1"][data-atlas-state="exists"] {
-  outline: 4px solid rgba(148, 163, 184, 0.5) !important;
-  outline-offset: -4px !important;
+[data-atlas-marker-rail="1"] {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
 }
-[data-atlas-marked="1"][data-atlas-state="downloaded"] {
-  outline: 4px solid rgba(34, 197, 94, 0.85) !important;
-  outline-offset: -4px !important;
+[data-atlas-marker-rail="1"].atlas-downloader-marker-rail-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
 }
-[data-atlas-marked="1"][data-atlas-state="blacklisted"] {
-  outline: 4px solid rgba(239, 68, 68, 0.9) !important;
-  outline-offset: -4px !important;
+[data-atlas-marker-rail="1"].atlas-downloader-marker-rail-right {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3px;
 }
-[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="love"] {
-  outline: 4px solid rgba(239, 68, 68, 0.9) !important;
-  outline-offset: -4px !important;
+[data-atlas-marker-rail="1"].atlas-downloader-marker-rail-bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
 }
-[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="like"] {
-  outline: 4px solid rgba(56, 189, 248, 0.9) !important;
-  outline-offset: -4px !important;
-}
-[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="funny"] {
-  outline: 4px solid rgba(234, 179, 8, 0.95) !important;
-  outline-offset: -4px !important;
-}
-[data-atlas-marked="1"][data-atlas-state="reacted"][data-atlas-reaction="dislike"] {
-  outline: 4px solid rgba(71, 85, 105, 0.95) !important;
-  outline-offset: -4px !important;
-}
-[data-atlas-open-tab="1"]:not([data-atlas-state="reacted"]) {
-  outline: 3px solid rgba(16, 185, 129, 0.92) !important;
-  outline-offset: -3px !important;
+[data-atlas-marker-rail="1"].atlas-downloader-marker-rail-left {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
 }
 #atlas-downloader-page-visited-badge {
   position: fixed;
@@ -262,20 +259,14 @@ export function ensurePageMarkerStyles() {
   letter-spacing: 0.02em;
   box-shadow: 0 8px 18px rgba(2, 6, 23, 0.42);
 }
-#atlas-downloader-reaction-badge-layer {
+.atlas-downloader-inline-badge {
   position: absolute;
-  inset: 0;
-  z-index: 2147483645;
-  pointer-events: none;
-}
-#atlas-downloader-open-tab-badge-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 2147483644;
+  right: 3px;
+  bottom: 3px;
+  z-index: 2;
   pointer-events: none;
 }
 .atlas-downloader-reaction-badge {
-  position: absolute;
   width: 20px;
   height: 20px;
   border-radius: 999px;
@@ -309,7 +300,6 @@ export function ensurePageMarkerStyles() {
   background: rgba(51, 65, 85, 0.95);
 }
 .atlas-downloader-open-tab-badge {
-  position: absolute;
   width: 20px;
   height: 20px;
   border-radius: 999px;
