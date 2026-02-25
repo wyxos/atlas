@@ -53,6 +53,7 @@ Extension gotcha:
 - DeviantArt multi-image post reactions queued from the overlay `POST` CTA rely on per-image `referrer_url` hashes (`#image-N`). Marker/status refresh must include those referrer lookup keys (not only media URLs), or reacted outlines can disappear after page reload because wixmp URL variants differ.
 - For those DeviantArt `#image-N` keys, do not collapse marker cache/lookups to the hashless page URL; that can cause page-wide false reacted outlines on unrelated thumbnails.
 - Marker rule for outlines: mark standalone `img`/`video` nodes by media URL only (skip media inside anchors), and mark status on `a[href]` only when they contain an image; open-tab anchor markers may target anchors containing `img` or `video`.
+- Overlay hover status lookups on thumbnail media inside anchors must include the anchor URL (resolved absolute, including relative hrefs) and avoid defaulting referrer lookups to the current page URL, otherwise widget state can bleed from the main page media.
 
 Database gotcha:
 - For long URL fields on MySQL/MariaDB, do not rely on unique indexes directly on `text`/large `varchar` columns. Use a deterministic hash column (e.g. SHA-256) as the unique/upsert key.
