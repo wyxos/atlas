@@ -1871,7 +1871,7 @@ export function runContentScript() {
 
       const shouldMarkStatusNode = (node: Element): boolean => {
         if (node instanceof HTMLAnchorElement) {
-          return node.querySelector('img') !== null;
+          return node.querySelector('img, video') !== null;
         }
 
         if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
@@ -1977,7 +1977,7 @@ export function runContentScript() {
 
       const shouldMarkStatusNode = (node: Element): boolean => {
         if (node instanceof HTMLAnchorElement) {
-          return node.querySelector('img') !== null;
+          return node.querySelector('img, video') !== null;
         }
 
         if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
