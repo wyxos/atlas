@@ -15,6 +15,7 @@ import {
   findStatusForLookupKeys,
   mergeSheetItemStatuses,
   syncPageVisitedBadge,
+  syncMarkerRails,
   syncReactionIconBadges,
   syncOpenTabIconBadges,
 } from './pageMarkers';
@@ -1958,6 +1959,11 @@ export function runContentScript() {
         }
       }
 
+      syncMarkerRails(
+        Array.from(
+          document.querySelectorAll('[data-atlas-marked="1"], [data-atlas-open-tab="1"]')
+        )
+      );
       syncReactionBadgesFromDom();
       syncOpenTabIconBadges(openTabBadgeNodes);
       syncPageVisitedBadge(window.location.href, statusByUrl, stripHash);

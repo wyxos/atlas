@@ -5,6 +5,7 @@ import {
   clearNodeMarkerAttributes,
   findStatusForLookupKeys,
   mergeSheetItemStatuses,
+  syncMarkerRails,
   syncOpenTabIconBadges,
   syncPageVisitedBadge,
   syncReactionIconBadges,
@@ -12,24 +13,6 @@ import {
 
 function stripHash(value: string): string {
   return (value || '').split('#', 1)[0];
-}
-
-function setRect(element: Element, left: number, top: number, width: number, height: number) {
-  Object.defineProperty(element, 'getBoundingClientRect', {
-    value: () =>
-      ({
-        left,
-        top,
-        width,
-        height,
-        right: left + width,
-        bottom: top + height,
-        x: left,
-        y: top,
-        toJSON: () => ({}),
-      }) as DOMRect,
-    configurable: true,
-  });
 }
 
 describe('page markers', () => {
@@ -128,46 +111,73 @@ describe('page markers', () => {
     expect(document.getElementById('atlas-downloader-page-visited-badge')).toBeNull();
   });
 
-  it('renders reaction icon badges at bottom right for reacted nodes', () => {
+  it('renders reaction icon badges inside the marker host', () => {
+    const host = document.createElement('div');
     const img = document.createElement('img');
     img.setAttribute('data-atlas-reaction', 'like');
-    setRect(img, 10, 20, 120, 90);
-    document.body.appendChild(img);
+    host.appendChild(img);
+    document.body.appendChild(host);
 
     syncReactionIconBadges([img]);
 
-    const layer = document.getElementById('atlas-downloader-reaction-badge-layer');
-    expect(layer).not.toBeNull();
-    expect(layer?.querySelectorAll('.atlas-downloader-reaction-badge').length).toBe(1);
-    expect(layer?.querySelector('.atlas-downloader-reaction-badge.like')).not.toBeNull();
+    expect(host.querySelectorAll('[data-atlas-marker-badge="reaction"]')).toHaveLength(1);
+    expect(host.querySelector('.atlas-downloader-reaction-badge.like')).not.toBeNull();
+    expect(document.getElementById('atlas-downloader-reaction-badge-layer')).toBeNull();
   });
 
-  it('renders open-tab icon badges and removes layer when empty', () => {
+  it('renders open-tab icon badges inside the marker host and clears them when empty', () => {
     const link = document.createElement('a');
-    setRect(link, 30, 40, 100, 80);
     document.body.appendChild(link);
 
     syncOpenTabIconBadges([link]);
 
-    const layer = document.getElementById('atlas-downloader-open-tab-badge-layer');
-    expect(layer).not.toBeNull();
-    expect(layer?.querySelectorAll('.atlas-downloader-open-tab-badge').length).toBe(1);
+    expect(link.querySelectorAll('[data-atlas-marker-badge="open-tab"]')).toHaveLength(1);
+    expect(link.querySelectorAll('.atlas-downloader-open-tab-badge')).toHaveLength(1);
+    expect(document.getElementById('atlas-downloader-open-tab-badge-layer')).toBeNull();
 
     syncOpenTabIconBadges([]);
-    expect(document.getElementById('atlas-downloader-open-tab-badge-layer')).toBeNull();
+    expect(link.querySelectorAll('[data-atlas-marker-badge="open-tab"]')).toHaveLength(0);
   });
 
-  it('clears open-tab marker attributes', () => {
+  it('renders four marker rails on the host and forces host to relative', () => {
+    const host = document.createElement('div');
+    const img = document.createElement('img');
+    img.setAttribute('data-atlas-marked', '1');
+    img.setAttribute('data-atlas-state', 'downloaded');
+    host.appendChild(img);
+    document.body.appendChild(host);
+
+    syncMarkerRails([img]);
+
+    expect(host.style.position).toBe('relative');
+    expect(host.querySelectorAll('[data-atlas-marker-rail="1"]')).toHaveLength(4);
+    expect(host.querySelectorAll('.atlas-downloader-marker-rail-top')).toHaveLength(1);
+    expect(host.querySelectorAll('.atlas-downloader-marker-rail-right')).toHaveLength(1);
+    expect(host.querySelectorAll('.atlas-downloader-marker-rail-bottom')).toHaveLength(1);
+    expect(host.querySelectorAll('.atlas-downloader-marker-rail-left')).toHaveLength(1);
+  });
+
+  it('clears marker attributes and marker decorations', () => {
+    const host = document.createElement('div');
     const link = document.createElement('a');
     link.setAttribute('data-atlas-open-tab', '1');
     link.setAttribute('data-atlas-marked', '1');
     link.setAttribute('data-atlas-state', 'exists');
     link.setAttribute('data-atlas-reaction', 'like');
+    host.appendChild(link);
+    document.body.appendChild(host);
+
+    syncMarkerRails([link]);
+    syncReactionIconBadges([link]);
+    syncOpenTabIconBadges([link]);
 
     clearNodeMarkerAttributes([link]);
     expect(link.hasAttribute('data-atlas-open-tab')).toBe(false);
     expect(link.hasAttribute('data-atlas-marked')).toBe(false);
     expect(link.hasAttribute('data-atlas-state')).toBe(false);
     expect(link.hasAttribute('data-atlas-reaction')).toBe(false);
+    expect(host.querySelector('[data-atlas-marker-rail="1"]')).toBeNull();
+    expect(host.querySelector('[data-atlas-marker-badge]')).toBeNull();
+    expect(link.style.position).toBe('');
   });
 });
