@@ -55,6 +55,7 @@ Extension gotcha:
 - Marker rule for outlines: mark standalone `img`/`video` nodes by media URL only (skip media inside anchors), and use `a[href]` lookups only when the anchor contains `img`/`video`; apply marker attributes/outlines to the child media element, not the anchor element itself.
 - Overlay hover status lookups on thumbnail media inside anchors must include the anchor URL (resolved absolute, including relative hrefs) and avoid defaulting referrer lookups to the current page URL, otherwise widget state can bleed from the main page media.
 - If marker rendering injects DOM nodes into page content (for example border spans/badges), update `mutationGuard` so those nodes/hosts are treated as atlas-owned mutations; otherwise the content `MutationObserver` can loop and freeze the tab.
+- If content-script UI is migrated to Vue components, keep `@vitejs/plugin-vue` enabled in `extension/atlas-downloader/vite.content.config.ts`; otherwise `dist/content.js` builds will fail on `.vue` imports.
 
 Database gotcha:
 - For long URL fields on MySQL/MariaDB, do not rely on unique indexes directly on `text`/large `varchar` columns. Use a deterministic hash column (e.g. SHA-256) as the unique/upsert key.

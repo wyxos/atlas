@@ -1,4 +1,5 @@
 import './content.css';
+import { createApp, h, reactive } from 'vue';
 import { registrableDomainFromUrl } from '../shared/domain';
 import {
   buildDirectPageCandidate,
@@ -21,7 +22,7 @@ import {
 } from './pageMarkers';
 import { applyReactionStatusUpdateFromPayload, isHashSpecificReferrerLookupKey } from './statusUpdates';
 import { shouldIgnoreMutationBatch } from './mutationGuard';
-import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
+import { BLACKLIST_ACTION, REACTIONS } from './reactions';
 import {
   createDialogChooser,
   createToastFn,
@@ -30,6 +31,7 @@ import {
 } from './ui';
 import { mountHotkeysOnly as mountHotkeysOnlyModule } from './main/mountHotkeysOnly';
 import { collectCandidates as collectCandidatesModule } from './main/collectCandidates';
+import SheetModal from './ui-vue/SheetModal.vue';
 
 type ContentSettings = {
   atlasBaseUrl?: string;
@@ -77,7 +79,6 @@ export function runContentScript() {
   // Keep extension metadata short; some Atlas deployments validate at 500 chars.
   const MAX_METADATA_LEN = 500;
   const ROOT_ID = 'atlas-downloader-root';
-  const OPEN_CLASS = 'atlas-open';
   const IS_TOP_WINDOW = (() => {
     try {
       return window.top === window.self;
@@ -436,7 +437,8 @@ export function runContentScript() {
     shadow.appendChild(style);
 
     const root = document.createElement('div');
-    root.className = 'atlas-shadow-root';
+    const appMount = document.createElement('div');
+    root.appendChild(appMount);
 
     const showToast = createToastFn(root);
     const sendMessageSafe = (
@@ -469,71 +471,6 @@ export function runContentScript() {
       }
     };
 
-    const overlay = document.createElement('div');
-    overlay.className = 'atlas-downloader-overlay';
-
-    const modal = document.createElement('div');
-    modal.className = 'atlas-downloader-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'Atlas Media Picker');
-
-    const header = document.createElement('div');
-    header.className = 'atlas-downloader-header';
-
-    const title = document.createElement('div');
-    title.className = 'atlas-downloader-title';
-    title.textContent = 'Atlas Media Picker';
-
-    const version = document.createElement('div');
-    version.className = 'atlas-downloader-version';
-    version.textContent = EXT_VERSION ? `v${EXT_VERSION}` : '';
-
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'atlas-downloader-close';
-    close.setAttribute('aria-label', 'Close');
-    close.textContent = 'x';
-
-    header.appendChild(title);
-    header.appendChild(version);
-    header.appendChild(close);
-
-    const toolbar = document.createElement('div');
-    toolbar.className = 'atlas-downloader-toolbar';
-
-    const refresh = makeButton('Rescan', () => refreshList());
-    const checkAtlas = makeButton('Check Atlas', () => checkAtlasStatus(false));
-    const selectAll = makeButton('Select all', () => setAllSelected(true));
-    const selectNone = makeButton('Select none', () => setAllSelected(false));
-
-    const spacer = document.createElement('span');
-    spacer.className = 'spacer';
-
-    const queue = makeButton('Queue selected', () => queueSelected(), {
-      primary: true,
-    });
-
-    toolbar.appendChild(refresh);
-    toolbar.appendChild(checkAtlas);
-    toolbar.appendChild(selectAll);
-    toolbar.appendChild(selectNone);
-    toolbar.appendChild(spacer);
-    toolbar.appendChild(queue);
-
-    const meta = document.createElement('div');
-    meta.className = 'atlas-downloader-meta';
-
-    const list = document.createElement('div');
-    list.className = 'atlas-downloader-list';
-
-    modal.appendChild(header);
-    modal.appendChild(toolbar);
-    modal.appendChild(meta);
-    modal.appendChild(list);
-
-    root.appendChild(overlay);
-    root.appendChild(modal);
     shadow.appendChild(root);
     (document.body || document.documentElement).appendChild(host);
 
@@ -550,6 +487,113 @@ export function runContentScript() {
     // Enable hotkeys immediately after UI mounts; event delegation makes it work for dynamic content too.
     const hotkeysEnabled = true;
     let hotkeysHintShown = false;
+    const sheetState = reactive({
+      open: false,
+      version: EXT_VERSION,
+      metaText: '',
+      items: [] as Array<Record<string, unknown>>,
+      queueDisabled: true,
+      refreshDisabled: true,
+      checkAtlasDisabled: true,
+      selectAllDisabled: true,
+      selectNoneDisabled: true,
+      debugTargetUrl: null as string | null,
+      debugPayloads: {} as Record<string, unknown>,
+    });
+
+    const onCloseModal = () => closeModal();
+    const onRefresh = () => refreshList();
+    const onCheckAtlas = () => checkAtlasStatus(false);
+    const onSelectAll = () => setAllSelected(true);
+    const onSelectNone = () => setAllSelected(false);
+    const onQueueSelected = () => queueSelected();
+    const onToggleRow = (index: number) => {
+      const item = items[index];
+      if (!item) {
+        return;
+      }
+
+      item.selected = !item.selected;
+      renderList();
+      setReady(summaryText());
+    };
+    const onUpdateSelected = (index: number, selected: boolean) => {
+      const item = items[index];
+      if (!item) {
+        return;
+      }
+
+      item.selected = selected;
+      renderList();
+      setReady(summaryText());
+    };
+    const onReact = (index: number, type: string) => {
+      const item = items[index];
+      if (!item) {
+        return;
+      }
+
+      reactToItem(item, type);
+    };
+    const onBlacklist = (index: number) => {
+      const item = items[index];
+      if (!item) {
+        return;
+      }
+
+      reactToItem(item, 'dislike', { blacklist: true });
+    };
+    const onDeleteDownload = (index: number) => {
+      const item = items[index];
+      if (!item) {
+        return;
+      }
+
+      deleteDownloadForItem(item);
+    };
+    const onToggleDebug = (index: number) => {
+      const item = items[index];
+      if (!item) {
+        return;
+      }
+
+      debugTargetUrl = debugTargetUrl === item.url ? null : item.url;
+      renderList();
+      setReady(summaryText());
+    };
+
+    createApp({
+      setup() {
+        return () =>
+          h(SheetModal, {
+            open: sheetState.open,
+            version: sheetState.version,
+            metaText: sheetState.metaText,
+            items: sheetState.items,
+            queueDisabled: sheetState.queueDisabled,
+            refreshDisabled: sheetState.refreshDisabled,
+            checkAtlasDisabled: sheetState.checkAtlasDisabled,
+            selectAllDisabled: sheetState.selectAllDisabled,
+            selectNoneDisabled: sheetState.selectNoneDisabled,
+            debugTargetUrl: sheetState.debugTargetUrl,
+            debugPayloads: sheetState.debugPayloads,
+            reactions: REACTIONS,
+            blacklistAction: BLACKLIST_ACTION,
+            onClose: onCloseModal,
+            onRefresh,
+            onCheckAtlas,
+            onSelectAll,
+            onSelectNone,
+            onQueueSelected,
+            onToggleRow,
+            onUpdateSelected,
+            onReact,
+            onBlacklist,
+            onDeleteDownload,
+            onToggleDebug,
+          });
+      },
+    }).mount(appMount);
 
     handleRealtimeDownloadEvent = (payload: unknown) => {
       if (!payload || typeof payload !== 'object') {
@@ -666,16 +710,13 @@ export function runContentScript() {
       applyPageMarkers(items);
     };
 
-    overlay.addEventListener('click', () => closeModal());
-    close.addEventListener('click', () => closeModal());
-
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && root.classList.contains(OPEN_CLASS)) {
+      if (event.key === 'Escape' && sheetState.open) {
         closeModal();
         return;
       }
 
-      if (!root.classList.contains(OPEN_CLASS)) {
+      if (!sheetState.open) {
         return;
       }
 
@@ -695,12 +736,12 @@ export function runContentScript() {
     });
 
     function openModal() {
-      root.classList.add(OPEN_CLASS);
+      sheetState.open = true;
       refreshList();
     }
 
     function toggleModal() {
-      if (root.classList.contains(OPEN_CLASS)) {
+      if (sheetState.open) {
         closeModal();
         return;
       }
@@ -709,7 +750,7 @@ export function runContentScript() {
     }
 
     function closeModal() {
-      root.classList.remove(OPEN_CLASS);
+      sheetState.open = false;
     }
 
     openSheet = toggleModal;
@@ -717,7 +758,7 @@ export function runContentScript() {
     installHotkeys({
       showToast,
       sendMessageSafe,
-      isSheetOpen: () => root.classList.contains(OPEN_CLASS),
+      isSheetOpen: () => sheetState.open,
       chooseDialog,
       setHintShown: (value) => {
         hotkeysHintShown = value;
@@ -741,7 +782,7 @@ export function runContentScript() {
       root,
       showToast,
       sendMessageSafe,
-      isSheetOpen: () => root.classList.contains(OPEN_CLASS),
+      isSheetOpen: () => sheetState.open,
       chooseDialog,
     }, {
       rootId: ROOT_ID,
@@ -920,37 +961,24 @@ export function runContentScript() {
       }
     });
 
-    function makeButton(label, onClick, options) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `atlas-downloader-btn${options?.primary ? ' primary' : ''}`;
-      button.textContent = label;
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onClick();
-      });
-      return button;
-    }
-
     function setLoading(text) {
-      meta.textContent = text;
-      queue.disabled = true;
-      refresh.disabled = true;
-      checkAtlas.disabled = true;
-      selectAll.disabled = true;
-      selectNone.disabled = true;
+      sheetState.metaText = text;
+      sheetState.queueDisabled = true;
+      sheetState.refreshDisabled = true;
+      sheetState.checkAtlasDisabled = true;
+      sheetState.selectAllDisabled = true;
+      sheetState.selectNoneDisabled = true;
     }
 
     function setReady(text) {
-      meta.textContent = text;
+      sheetState.metaText = text;
       const selectedCount = items.filter((item) => item.selected).length;
       const busy = items.some((item) => Boolean(item.reactionPending)) || reactingItemUrl !== null;
-      queue.disabled = selectedCount === 0 || busy;
-      refresh.disabled = busy;
-      checkAtlas.disabled = items.length === 0 || busy;
-      selectAll.disabled = items.length === 0 || busy;
-      selectNone.disabled = items.length === 0 || busy;
+      sheetState.queueDisabled = selectedCount === 0 || busy;
+      sheetState.refreshDisabled = busy;
+      sheetState.checkAtlasDisabled = items.length === 0 || busy;
+      sheetState.selectAllDisabled = items.length === 0 || busy;
+      sheetState.selectNoneDisabled = items.length === 0 || busy;
     }
 
     function refreshList() {
@@ -958,14 +986,14 @@ export function runContentScript() {
       const currentScan = scanNonce;
       items = [];
       debugTargetUrl = null;
-      list.replaceChildren();
+      renderList();
       setLoading('Scanning this page…');
 
       collectCandidates((progress) => {
         if (scanNonce !== currentScan) {
           return;
         }
-        meta.textContent = `Scanning… ${progress.scanned}/${progress.total}`;
+        sheetState.metaText = `Scanning… ${progress.scanned}/${progress.total}`;
       }).then((found) => {
         if (scanNonce !== currentScan) {
           return;
@@ -1001,169 +1029,24 @@ export function runContentScript() {
     }
 
     function renderList() {
-      list.replaceChildren();
-
-      if (items.length === 0) {
-        const empty = document.createElement('div');
-        empty.style.padding = '10px 12px';
-        empty.style.color = '#94a3b8';
-        empty.style.fontSize = '12px';
-        empty.textContent = 'No matching images/videos found.';
-        list.appendChild(empty);
-        return;
-      }
-
-      for (const item of items) {
-        list.appendChild(renderItemRow(item));
-      }
-    }
-
-    function renderItemRow(item) {
-      const row = document.createElement('div');
-      row.className = `atlas-downloader-item${item.selected ? ' selected' : ''}`;
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = item.selected;
-      checkbox.addEventListener('change', () => {
-        item.selected = checkbox.checked;
-        row.classList.toggle('selected', item.selected);
-        setReady(summaryText());
-      });
-
-      const preview = document.createElement('div');
-      preview.className = 'atlas-downloader-preview';
-      if (item.preview_url) {
-        const img = document.createElement('img');
-        img.loading = 'lazy';
-        img.alt = '';
-        img.src = item.preview_url;
-        preview.appendChild(img);
-      }
-
-      const info = document.createElement('div');
-      info.className = 'atlas-downloader-info';
-
-      const kind = document.createElement('div');
-      kind.className = 'atlas-downloader-kind';
-      kind.textContent = item.tag_name;
-
-      const url = document.createElement('div');
-      url.className = 'atlas-downloader-url';
-      url.textContent = item.url;
-      url.title = item.url;
-
-      const sub = document.createElement('div');
-      sub.className = 'atlas-downloader-sub';
-      sub.textContent = formatSubline(item);
-
-      const reactions = document.createElement('div');
-      reactions.className = 'atlas-downloader-reactions';
-      const currentReaction = item.atlas?.reaction?.type || null;
-      const isBusy = Boolean(item.reactionPending) || Boolean(item.reactionQueued);
-      for (const reaction of REACTIONS) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `atlas-downloader-reaction-btn ${reaction.className}${
-          currentReaction === reaction.type ? ' active' : ''
-        }${item.reactionPending === reaction.type ? ' pending' : ''}${
-          item.reactionQueued === reaction.type ? ' queued' : ''
-        }`.trim();
-        button.setAttribute('aria-label', reaction.label);
-        button.title = reaction.label;
-        button.replaceChildren(createSvgIcon(reaction.pathDs));
-        button.disabled = isBusy;
-        button.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          reactToItem(item, reaction.type);
-        });
-        reactions.appendChild(button);
-      }
-
-      const blacklistButton = document.createElement('button');
-      blacklistButton.type = 'button';
-      blacklistButton.className = `atlas-downloader-reaction-btn ${BLACKLIST_ACTION.className}${
-        item.atlas?.blacklisted ? ' active' : ''
-      }${item.reactionPending === BLACKLIST_ACTION.type ? ' pending' : ''}${
-        item.reactionQueued === BLACKLIST_ACTION.type ? ' queued' : ''
-      }`.trim();
-      blacklistButton.setAttribute('aria-label', BLACKLIST_ACTION.label);
-      blacklistButton.title = BLACKLIST_ACTION.label;
-      blacklistButton.replaceChildren(createSvgIcon(BLACKLIST_ACTION.pathDs));
-      blacklistButton.disabled = isBusy;
-      blacklistButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        reactToItem(item, 'dislike', { blacklist: true });
-      });
-      reactions.appendChild(blacklistButton);
-
-      if (item.atlas?.downloaded) {
-        const deleteButton = document.createElement('button');
-        deleteButton.type = 'button';
-        deleteButton.className = `atlas-downloader-reaction-btn delete${
-          item.reactionPending === 'delete-download' ? ' pending' : ''
-        }`.trim();
-        deleteButton.setAttribute('aria-label', 'Delete download');
-        deleteButton.title = 'Delete download';
-        deleteButton.replaceChildren(
-          createSvgIcon(['M3 6h18', 'M8 6V4h8v2', 'M8 10v8', 'M12 10v8', 'M16 10v8', 'M6 6l1 14h10l1-14'])
-        );
-        deleteButton.disabled = isBusy;
-        deleteButton.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          deleteDownloadForItem(item);
-        });
-        reactions.appendChild(deleteButton);
-      }
-
-      const debugButton = document.createElement('button');
-      debugButton.type = 'button';
-      debugButton.className = `atlas-downloader-debug-toggle${debugTargetUrl === item.url ? ' active' : ''}`;
-      debugButton.textContent = debugTargetUrl === item.url ? 'Hide debug' : 'Debug';
-      debugButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        debugTargetUrl = debugTargetUrl === item.url ? null : item.url;
-        renderList();
-        setReady(summaryText());
-      });
-      reactions.appendChild(debugButton);
-
-      info.appendChild(kind);
-      info.appendChild(url);
-      info.appendChild(sub);
-      info.appendChild(reactions);
-
-      if (debugTargetUrl === item.url) {
-        info.appendChild(renderDebugDetails(item));
-      }
-
-      const status = document.createElement('div');
-      const displayStatus = getDisplayStatus(item);
-      status.className = `atlas-downloader-status ${displayStatus.className}`.trim();
-      status.textContent = displayStatus.text;
-
-      row.addEventListener('click', (event) => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement) {
+      sheetState.items = items.map((item, index) => ({
+        ...item,
+        index,
+      }));
+      sheetState.debugTargetUrl = debugTargetUrl;
+      if (debugTargetUrl) {
+        const target = items.find((item) => item.url === debugTargetUrl);
+        if (target) {
+          sheetState.debugPayloads = {
+            [target.url]: {
+              react: buildReactionPayload(target, target.atlas?.reaction?.type || 'like'),
+              download: buildDownloadPayload(target),
+            },
+          };
           return;
         }
-
-        item.selected = !item.selected;
-        checkbox.checked = item.selected;
-        row.classList.toggle('selected', item.selected);
-        setReady(summaryText());
-      });
-
-      row.appendChild(checkbox);
-      row.appendChild(preview);
-      row.appendChild(info);
-      row.appendChild(status);
-
-      return row;
+      }
+      sheetState.debugPayloads = {};
     }
 
     function buildReactionPayload(item, type) {
@@ -1199,142 +1082,6 @@ export function runContentScript() {
       };
     }
 
-    function renderDebugDetails(item) {
-      const container = document.createElement('details');
-      container.className = 'atlas-downloader-debug';
-      container.open = true;
-
-      const summary = document.createElement('summary');
-      summary.textContent = 'Debug payload';
-      container.appendChild(summary);
-
-      const payload = {
-        react: buildReactionPayload(item, item.atlas?.reaction?.type || 'like'),
-        download: buildDownloadPayload(item),
-      };
-      container.appendChild(renderJsonTree(payload));
-
-      return container;
-    }
-
-    function renderJsonTree(value, depth = 0) {
-      const root = document.createElement('div');
-      root.className = 'atlas-downloader-json-tree';
-      const normalized = normalizeJsonValue(value);
-      if (!isJsonContainer(normalized)) {
-        const primitive = document.createElement('div');
-        primitive.className = 'atlas-downloader-json-line';
-        primitive.textContent = formatJsonPrimitive(normalized);
-        root.appendChild(primitive);
-        return root;
-      }
-
-      const entries = Array.isArray(normalized)
-        ? normalized.map((entry, index) => [String(index), entry])
-        : Object.entries(normalized);
-      for (const [key, child] of entries) {
-        root.appendChild(renderJsonEntry(key, child, depth));
-      }
-
-      return root;
-    }
-
-    function renderJsonEntry(key, value, depth) {
-      const normalized = normalizeJsonValue(value);
-      const line = document.createElement('div');
-      line.className = 'atlas-downloader-json-line';
-      line.style.paddingLeft = `${depth * 12}px`;
-
-      if (!isJsonContainer(normalized)) {
-        line.innerHTML = `<span class="atlas-downloader-json-key">${escapeHtml(
-          key
-        )}</span>: <span class="atlas-downloader-json-value">${escapeHtml(
-          formatJsonPrimitive(normalized)
-        )}</span>`;
-        return line;
-      }
-
-      const details = document.createElement('details');
-      details.className = 'atlas-downloader-json-node';
-      details.open = depth === 0;
-
-      const summary = document.createElement('summary');
-      summary.style.paddingLeft = `${depth * 12}px`;
-      const preview = Array.isArray(normalized)
-        ? `[${normalized.length}]`
-        : `{${Object.keys(normalized).length}}`;
-      summary.innerHTML = `<span class="atlas-downloader-json-key">${escapeHtml(
-        key
-      )}</span>: <span class="atlas-downloader-json-preview">${escapeHtml(preview)}</span>`;
-      details.appendChild(summary);
-
-      const children = Array.isArray(normalized)
-        ? normalized.map((entry, index) => [String(index), entry])
-        : Object.entries(normalized);
-      for (const [childKey, childValue] of children) {
-        details.appendChild(renderJsonEntry(childKey, childValue, depth + 1));
-      }
-
-      return details;
-    }
-
-    function normalizeJsonValue(value) {
-      if (value === undefined) {
-        return null;
-      }
-
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        return value;
-      }
-
-      if (Array.isArray(value)) {
-        return value.map((entry) => normalizeJsonValue(entry));
-      }
-
-      if (!value || typeof value !== 'object') {
-        return null;
-      }
-
-      const normalized = {};
-      for (const [key, entry] of Object.entries(value)) {
-        normalized[key] = normalizeJsonValue(entry);
-      }
-
-      return normalized;
-    }
-
-    function isJsonContainer(value) {
-      return Array.isArray(value) || (value && typeof value === 'object');
-    }
-
-    function formatJsonPrimitive(value) {
-      return JSON.stringify(value);
-    }
-
-    function escapeHtml(value) {
-      return String(value)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-    }
-
-    function formatSubline(item) {
-      const dims =
-        item.width && item.height ? `${item.width}×${item.height}` : 'size unknown';
-      const host = safeHost(item.url);
-      return host ? `${dims} • ${host}` : dims;
-    }
-
-    function safeHost(url) {
-      try {
-        return new URL(url).hostname;
-      } catch {
-        return '';
-      }
-    }
-
     function summaryText() {
       const selectedCount = items.filter((item) => item.selected).length;
       return `${items.length} found • ${selectedCount} selected`;
@@ -1351,29 +1098,6 @@ export function runContentScript() {
 
     function itemLookupUrl(item) {
       return itemLookupKeys(item)[0] || '';
-    }
-
-    function getDisplayStatus(item) {
-      if (item.status) {
-        return {
-          text: item.status,
-          className: item.statusClass || '',
-        };
-      }
-
-      if (item.atlas?.downloaded) {
-        return { text: 'Downloaded', className: 'ok' };
-      }
-
-      if (item.atlas?.blacklisted) {
-        return { text: 'Blacklisted', className: 'err' };
-      }
-
-      if (item.atlas?.exists) {
-        return { text: 'In Atlas', className: '' };
-      }
-
-      return { text: '', className: '' };
     }
 
     function checkAtlasStatus(silent) {
@@ -1733,11 +1457,11 @@ export function runContentScript() {
       runQueueSelected(false);
 
       function runQueueSelected(forceDownload) {
-        queue.disabled = true;
-        refresh.disabled = true;
-        checkAtlas.disabled = true;
-        selectAll.disabled = true;
-        selectNone.disabled = true;
+        sheetState.queueDisabled = true;
+        sheetState.refreshDisabled = true;
+        sheetState.checkAtlasDisabled = true;
+        sheetState.selectAllDisabled = true;
+        sheetState.selectNoneDisabled = true;
 
         for (const item of selected) {
           item.status = 'Sending…';
