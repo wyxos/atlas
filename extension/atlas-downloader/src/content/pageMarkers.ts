@@ -54,11 +54,7 @@ function ensureHostPositioned(host: HTMLElement): void {
     return;
   }
 
-  if (!host.style.position) {
-    host.setAttribute(MARKER_HOST_POSITION_ATTR, '1');
-  }
-
-  host.style.position = 'relative';
+  host.setAttribute(MARKER_HOST_POSITION_ATTR, '1');
 }
 
 function cleanupManagedHostPosition(host: HTMLElement): void {
@@ -70,7 +66,6 @@ function cleanupManagedHostPosition(host: HTMLElement): void {
     return;
   }
 
-  host.style.removeProperty('position');
   host.removeAttribute(MARKER_HOST_POSITION_ATTR);
 }
 
