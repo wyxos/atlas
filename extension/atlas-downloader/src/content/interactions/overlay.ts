@@ -1,4 +1,4 @@
-import { buildItemFromElement } from '../items';
+import { buildItemFromElement, collectLookupKeysForNode } from '../items';
 import {
   resolveBestDeviantArtPostDownloadUrl,
   resolveDeviantArtPostContext,
@@ -678,8 +678,16 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       clearPendingOverlayState();
     }
 
+    const mediaLookupKeys = collectLookupKeysForNode(media, {
+      includeAnchor: true,
+      includePageFallback: true,
+    });
+    const primaryLookupKey = nextKey || mediaLookupKeys[0] || null;
+    const secondaryLookupKey =
+      mediaLookupKeys.find((lookupKey) => lookupKey !== primaryLookupKey) || previewPayload.referrer_url || null;
+
     activeMedia = media;
-    activeLookupKeys = buildLookupKeys(nextKey, previewPayload.referrer_url || window.location.href);
+    activeLookupKeys = buildLookupKeys(primaryLookupKey, secondaryLookupKey);
     activeKey = activeLookupKeys[0] || null;
     setToolbarResolution(previewPayload.width, previewPayload.height);
     const activeAssetKey = resolveWixAssetKey(previewPayload.url || '');
@@ -703,8 +711,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         setToolbarQueued(cached.reactionType, cached.downloaded);
         setToolbarStatusMeta(cached);
       } else {
-        const requestUrl = nextKey || '';
-        const requestReferrer = previewPayload.referrer_url || window.location.href;
+        const requestUrl = primaryLookupKey || '';
+        const requestReferrer = secondaryLookupKey || window.location.href;
         const requestKeys = [...activeLookupKeys];
         deps.fetchAtlasStatus(options.sendMessageSafe, requestUrl, requestReferrer, (status) => {
           if (!status) return;

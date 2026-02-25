@@ -5,6 +5,7 @@ import {
   formatDownloadedAtUtc,
   formatOverlayDownloadMeta,
   installHotkeys,
+  installMediaReactionOverlay,
   resolveOverlayProgressPercent,
   resolveMediaAtPoint,
 } from './interactions';
@@ -30,6 +31,11 @@ function setRect(element: Element, value: DOMRect) {
     value: () => value,
     configurable: true,
   });
+}
+
+function setLocation(url: string) {
+  const next = new URL(url, window.location.origin);
+  window.history.pushState({}, '', `${next.pathname}${next.search}${next.hash}`);
 }
 
 const originalElementsFromPoint = document.elementsFromPoint;
@@ -213,6 +219,69 @@ describe('installHotkeys', () => {
     );
 
     expect(reactedUrl).toBe('https://example.com/large.jpg');
+  });
+});
+
+describe('installMediaReactionOverlay', () => {
+  it('uses hovered anchor href (including relative links) for status referrer lookups', () => {
+    setLocation('/some-file');
+
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+
+    const anchor = document.createElement('a');
+    anchor.setAttribute('href', '/other-file');
+    const img = document.createElement('img');
+    img.src = 'https://cdn.example.com/thumb.jpg';
+    Object.defineProperty(img, 'naturalWidth', { value: 320, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 320, configurable: true });
+    setRect(img, rect(0, 0, 320, 320));
+    anchor.appendChild(img);
+    document.body.appendChild(anchor);
+
+    Object.defineProperty(document, 'elementsFromPoint', {
+      value: () => [img],
+      configurable: true,
+    });
+
+    let capturedUrl: string | null = null;
+    let capturedReferrer: string | null = null;
+    installMediaReactionOverlay(
+      {
+        root,
+        showToast: () => {},
+        sendMessageSafe: (_message, callback) => callback({ ok: true, data: {} }),
+        isSheetOpen: () => false,
+        chooseDialog: async () => 'cancel',
+      },
+      {
+        rootId: 'atlas-downloader-root',
+        minWidth: 0,
+        maxMetadataLen: 255,
+        limitString: (value) => String(value ?? ''),
+        sourceFromMediaUrl: () => 'web',
+        fetchAtlasStatus: (_send, url, referrerUrl, callback) => {
+          capturedUrl = url;
+          capturedReferrer = referrerUrl;
+          callback(null);
+        },
+        atlasStatusCache: new Map(),
+        getCachedAtlasStatus: () => null,
+      }
+    );
+
+    img.dispatchEvent(
+      new MouseEvent('pointerover', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 10,
+        clientY: 10,
+      })
+    );
+
+    expect(capturedUrl).toBe('https://cdn.example.com/thumb.jpg');
+    expect(capturedReferrer).toBe(`${window.location.origin}/other-file`);
+    expect(capturedReferrer).not.toBe(window.location.href);
   });
 });
 
