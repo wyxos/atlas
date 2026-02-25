@@ -32,4 +32,4 @@ test-results/
 /resources/js/routes
 package-lock.json
 .zephyr/
-task.md
+/tasks
