@@ -31,10 +31,16 @@ type ContentSettings = {
   atlasBaseUrl?: string;
   atlasExcludedDomains?: string;
   atlasMediaNoiseFilters?: string;
+  atlasMinMediaWidth?: unknown;
 };
 
 type ChromeStorageSync = {
   get: (keys: string[], callback: (data: ContentSettings) => void) => void;
+};
+
+type ChromeStorageChange = {
+  oldValue?: unknown;
+  newValue?: unknown;
 };
 
 type ChromeRuntime = {
@@ -49,6 +55,9 @@ type ChromeRuntime = {
 type ChromeApi = {
   storage: {
     sync: ChromeStorageSync;
+    onChanged?: {
+      addListener: (callback: (changes: Record<string, ChromeStorageChange>, areaName: string) => void) => void;
+    };
   };
   runtime: ChromeRuntime;
 };
@@ -56,7 +65,8 @@ type ChromeApi = {
 declare const chrome: ChromeApi;
 
 (() => {
-  const MIN_SIZE = 200;
+  const DEFAULT_MIN_MEDIA_WIDTH = 0;
+  const CONTENT_SETTINGS_KEYS = ['atlasBaseUrl', 'atlasExcludedDomains', 'atlasMediaNoiseFilters', 'atlasMinMediaWidth'];
   // Keep extension metadata short; some Atlas deployments validate at 500 chars.
   const MAX_METADATA_LEN = 500;
   const ROOT_ID = 'atlas-downloader-root';
@@ -87,6 +97,7 @@ declare const chrome: ChromeApi;
   const ATLAS_STATUS_TTL_MS = 30_000;
   const atlasStatusCache = new Map<string, AtlasStatusCacheEntry>();
   const openTabUrlSet = new Set<string>();
+  let minMediaWidth = DEFAULT_MIN_MEDIA_WIDTH;
 
   function buildLookupVariants(...values: Array<string | null | undefined>): string[] {
     const keys = new Set<string>();
@@ -111,6 +122,15 @@ declare const chrome: ChromeApi;
 
   function sourceFromMediaUrl(url) {
     return registrableDomainFromUrl(url) || 'Extension';
+  }
+
+  function normalizeMinMediaWidth(value: unknown): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return DEFAULT_MIN_MEDIA_WIDTH;
+    }
+
+    return Math.max(0, Math.floor(parsed));
   }
 
   function applyOpenTabUrls(urls: unknown): boolean {
@@ -352,8 +372,9 @@ declare const chrome: ChromeApi;
     }
 
     try {
-      chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains', 'atlasMediaNoiseFilters'], (data) => {
+      chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
         configureMediaNoiseFilters(data.atlasMediaNoiseFilters || '');
+        minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
         const baseHost = resolveHost(data.atlasBaseUrl || '');
         if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
@@ -373,8 +394,23 @@ declare const chrome: ChromeApi;
     }
   });
 
-  chrome.storage.sync.get(['atlasBaseUrl', 'atlasExcludedDomains', 'atlasMediaNoiseFilters'], (data) => {
+  chrome.storage.onChanged?.addListener((changes, areaName) => {
+    if (areaName !== 'sync') {
+      return;
+    }
+
+    if ('atlasMediaNoiseFilters' in changes) {
+      configureMediaNoiseFilters(changes.atlasMediaNoiseFilters?.newValue || '');
+    }
+
+    if ('atlasMinMediaWidth' in changes) {
+      minMediaWidth = normalizeMinMediaWidth(changes.atlasMinMediaWidth?.newValue);
+    }
+  });
+
+  chrome.storage.sync.get(CONTENT_SETTINGS_KEYS, (data) => {
     configureMediaNoiseFilters(data.atlasMediaNoiseFilters || '');
+    minMediaWidth = normalizeMinMediaWidth(data.atlasMinMediaWidth);
 
     const baseHost = resolveHost(data.atlasBaseUrl || '');
     if (baseHost && isHostMatch(window.location.hostname, baseHost)) {
@@ -453,7 +489,9 @@ declare const chrome: ChromeApi;
       chooseDialog,
     }, {
       rootId: ROOT_ID,
-      minSize: MIN_SIZE,
+      get minWidth() {
+        return minMediaWidth;
+      },
       maxMetadataLen: MAX_METADATA_LEN,
       limitString,
       sourceFromMediaUrl,
@@ -470,7 +508,9 @@ declare const chrome: ChromeApi;
       chooseDialog,
     }, {
       rootId: ROOT_ID,
-      minSize: MIN_SIZE,
+      get minWidth() {
+        return minMediaWidth;
+      },
       maxMetadataLen: MAX_METADATA_LEN,
       limitString,
       sourceFromMediaUrl,
@@ -787,7 +827,9 @@ declare const chrome: ChromeApi;
       enabled: hotkeysEnabled,
     }, {
       rootId: ROOT_ID,
-      minSize: MIN_SIZE,
+      get minWidth() {
+        return minMediaWidth;
+      },
       maxMetadataLen: MAX_METADATA_LEN,
       limitString,
       sourceFromMediaUrl,
@@ -804,7 +846,9 @@ declare const chrome: ChromeApi;
       chooseDialog,
     }, {
       rootId: ROOT_ID,
-      minSize: MIN_SIZE,
+      get minWidth() {
+        return minMediaWidth;
+      },
       maxMetadataLen: MAX_METADATA_LEN,
       limitString,
       sourceFromMediaUrl,
@@ -826,7 +870,7 @@ declare const chrome: ChromeApi;
         const pending = Boolean(custom.detail?.pending);
         const reactionType = custom.detail?.reactionType ? String(custom.detail.reactionType) : null;
         const explicitUrl = typeof custom.detail?.url === 'string' ? custom.detail.url : '';
-        const resolvedUrl = explicitUrl || (custom.detail?.media ? buildItemFromElement(custom.detail.media, MIN_SIZE)?.url || '' : '');
+        const resolvedUrl = explicitUrl || (custom.detail?.media ? buildItemFromElement(custom.detail.media, minMediaWidth)?.url || '' : '');
         const lookupKeys = buildLookupVariants(resolvedUrl);
         const lookupKeySet = new Set(lookupKeys);
         const lookup = lookupKeys[0] || '';
@@ -1913,13 +1957,18 @@ declare const chrome: ChromeApi;
           continue;
         }
 
-        const lookupKeys = collectLookupKeysForNode(node);
-        if (lookupKeys.length === 0) {
-          continue;
-        }
-
-        const status = findStatusForLookupKeys(lookupKeys, statusByUrl, stripHash);
-        const isOpenInTab = lookupKeys.some((key) => {
+        const statusLookupKeys = collectLookupKeysForNode(node, {
+          includeAnchor: false,
+          includePageFallback: false,
+        });
+        const openTabLookupKeys = collectLookupKeysForNode(node, {
+          includeAnchor: true,
+          includePageFallback: false,
+        });
+        const status = statusLookupKeys.length > 0
+          ? findStatusForLookupKeys(statusLookupKeys, statusByUrl, stripHash)
+          : null;
+        const isOpenInTab = openTabLookupKeys.some((key) => {
           const normalized = normalizeOpenTabUrl(key);
           if (!normalized || !isOpenTabHighlightEligibleUrl(normalized)) {
             return false;
@@ -1985,7 +2034,10 @@ declare const chrome: ChromeApi;
           continue;
         }
 
-        for (const key of collectLookupKeysForNode(node)) {
+        for (const key of collectLookupKeysForNode(node, {
+          includeAnchor: false,
+          includePageFallback: false,
+        })) {
           urls.add(key);
           urls.add(stripHash(key));
         }
@@ -2069,7 +2121,7 @@ declare const chrome: ChromeApi;
             continue;
           }
 
-          const item = buildItemFromElement(element, MIN_SIZE);
+          const item = buildItemFromElement(element, minMediaWidth);
           if (item?.url && !seen.has(item.url)) {
             seen.add(item.url);
             items.push(item);

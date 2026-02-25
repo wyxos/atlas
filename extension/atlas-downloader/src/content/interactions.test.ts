@@ -191,7 +191,7 @@ describe('installHotkeys', () => {
       },
       {
         rootId: 'atlas-downloader-root',
-        minSize: 200,
+        minWidth: 200,
         maxMetadataLen: 255,
         limitString: (value) => String(value ?? ''),
         sourceFromMediaUrl: () => 'web',

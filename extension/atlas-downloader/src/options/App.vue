@@ -15,6 +15,7 @@ type Settings = {
   atlasToken?: string;
   atlasExcludedDomains?: string;
   atlasMediaNoiseFilters?: string;
+  atlasMinMediaWidth?: unknown;
 };
 
 type ChromeStorageSync = {
@@ -88,6 +89,7 @@ const addDomain = ref('');
 const domains = ref<EditableDomain[]>([]);
 const addNoiseFilter = ref('');
 const noiseFilters = ref<EditableDomain[]>([]);
+const minMediaWidth = ref('0');
 let realtimePollTimer: ReturnType<typeof setInterval> | null = null;
 let realtimeMessageListener: ((message: unknown) => void) | null = null;
 
@@ -358,6 +360,19 @@ function removeNoiseFilter(index: number): void {
   noiseFilters.value.splice(index, 1);
 }
 
+function normalizeMinMediaWidth(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(parsed));
+}
+
+function normalizeMinMediaWidthInput(): void {
+  minMediaWidth.value = String(normalizeMinMediaWidth(minMediaWidth.value));
+}
+
 function parseRealtimeStatus(value: unknown): RealtimeConnectionStatus | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -420,8 +435,10 @@ async function saveSettings(): Promise<void> {
   const atlasToken = token.value.trim();
   const atlasExcludedDomains = excludedDomainsString.value.trim();
   const atlasMediaNoiseFilters = mediaNoiseFiltersString.value.trim();
+  const atlasMinMediaWidth = normalizeMinMediaWidth(minMediaWidth.value);
+  minMediaWidth.value = String(atlasMinMediaWidth);
 
-  chrome.storage.sync.set({atlasBaseUrl, atlasToken, atlasExcludedDomains, atlasMediaNoiseFilters}, () => {
+  chrome.storage.sync.set({atlasBaseUrl, atlasToken, atlasExcludedDomains, atlasMediaNoiseFilters, atlasMinMediaWidth}, () => {
     setStatus('Settings saved.');
     requestRealtimeStatus();
   });
@@ -434,9 +451,10 @@ onMounted(() => {
     extensionVersion.value = '';
   }
 
-  chrome.storage.sync.get(['atlasBaseUrl', 'atlasToken', 'atlasExcludedDomains', 'atlasMediaNoiseFilters'], (data) => {
+  chrome.storage.sync.get(['atlasBaseUrl', 'atlasToken', 'atlasExcludedDomains', 'atlasMediaNoiseFilters', 'atlasMinMediaWidth'], (data) => {
     baseUrl.value = data.atlasBaseUrl || '';
     token.value = data.atlasToken || '';
+    minMediaWidth.value = String(normalizeMinMediaWidth(data.atlasMinMediaWidth));
 
     const parsed = parseDomains(data.atlasExcludedDomains || '');
     domains.value = parsed
@@ -561,6 +579,25 @@ onUnmounted(() => {
             <p class="mt-2 text-xs text-slate-400">
               This must match <span class="font-semibold">ATLAS_EXTENSION_TOKEN</span> in your Atlas
               <span class="font-semibold">.env</span>.
+            </p>
+          </div>
+
+          <div>
+            <label for="minMediaWidth" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Minimum media width (px)
+            </label>
+            <input
+              id="minMediaWidth"
+              v-model="minMediaWidth"
+              type="number"
+              min="0"
+              step="1"
+              class="w-full rounded-xl border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm outline-none focus:border-sky-400/70"
+              placeholder="0"
+              @blur="normalizeMinMediaWidthInput"
+            />
+            <p class="mt-2 text-xs text-slate-400">
+              Media narrower than this value are ignored. Default is <span class="font-mono">0</span>.
             </p>
           </div>
 
