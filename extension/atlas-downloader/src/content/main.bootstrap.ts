@@ -18,6 +18,7 @@ import {
   syncReactionIconBadges,
   syncOpenTabIconBadges,
 } from './pageMarkers';
+import { applyReactionStatusUpdateFromPayload, isHashSpecificReferrerLookupKey } from './statusUpdates';
 import { shouldIgnoreMutationBatch } from './mutationGuard';
 import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from './reactions';
 import {
@@ -65,6 +66,9 @@ type ChromeApi = {
 };
 
 declare const chrome: ChromeApi;
+type AtlasTestWindow = Window & {
+  __ATLAS_TEST_SHADOW_MODE?: unknown;
+};
 
 export function runContentScript() {
   const DEFAULT_MIN_MEDIA_WIDTH = 0;
@@ -87,6 +91,16 @@ export function runContentScript() {
     } catch {
       return '';
     }
+  })();
+  const SHADOW_MODE = (() => {
+    const override = (window as AtlasTestWindow).__ATLAS_TEST_SHADOW_MODE;
+    if (override === 'open' || override === 'closed') {
+      return override;
+    }
+
+    return document.documentElement.getAttribute('data-atlas-shadow-mode') === 'open'
+      ? 'open'
+      : 'closed';
   })();
 
   let openSheet: (() => void) | null = null;
@@ -188,48 +202,6 @@ export function runContentScript() {
     }
 
     return trimmed;
-  }
-
-  function applyReactionStatusUpdateFromPayload(payload: unknown): boolean {
-    if (!payload || typeof payload !== 'object') {
-      return false;
-    }
-
-    const value = payload as {
-      url?: unknown;
-      reactionType?: unknown;
-      downloaded?: unknown;
-      blacklisted?: unknown;
-      downloadProgress?: unknown;
-      downloadedAt?: unknown;
-    };
-    const rawUrl = typeof value.url === 'string' ? value.url.trim() : '';
-    const lookupUrl = stripHash(rawUrl);
-    if (!lookupUrl) {
-      return false;
-    }
-
-    const reactionTypeRaw = value.reactionType;
-    const reactionType =
-      typeof reactionTypeRaw === 'string' && reactionTypeRaw.trim() !== ''
-        ? reactionTypeRaw.trim()
-        : null;
-    const nextStatus = {
-      exists: true,
-      downloaded: Boolean(value.downloaded),
-      blacklisted: Boolean(value.blacklisted),
-      reactionType,
-      downloadProgress: normalizeProgress(value.downloadProgress),
-      downloadedAt: normalizeDownloadedAt(value.downloadedAt),
-      ts: Date.now(),
-    };
-
-    atlasStatusCache.set(lookupUrl, nextStatus);
-    if (rawUrl && rawUrl !== lookupUrl) {
-      atlasStatusCache.set(rawUrl, nextStatus);
-    }
-
-    return true;
   }
 
   function getCachedAtlasStatus(url: string) {
@@ -341,7 +313,7 @@ export function runContentScript() {
     }
 
     if (msg.type === REACTION_UPDATED_EVENT) {
-      if (applyReactionStatusUpdateFromPayload(msg.payload)) {
+      if (applyReactionStatusUpdateFromPayload(msg.payload, atlasStatusCache)) {
         syncOpenTabMarkers?.();
         window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
       }
@@ -454,7 +426,7 @@ export function runContentScript() {
     const host = document.createElement('div');
     host.id = ROOT_ID;
 
-    const shadow = host.attachShadow({ mode: 'closed' });
+    const shadow = host.attachShadow({ mode: SHADOW_MODE });
 
     // Inject styles into shadow DOM
     const style = document.createElement('link');
@@ -1467,6 +1439,15 @@ export function runContentScript() {
             file_id: match.file_id ?? null,
             reaction: match.reaction ?? null,
           };
+          const reactionType = item.atlas.reaction?.type ? String(item.atlas.reaction.type) : null;
+          const isQueuedReaction = item.atlas.exists && !item.atlas.downloaded && Boolean(reactionType) && reactionType !== 'dislike';
+          const hasTerminalAtlasState = item.atlas.downloaded || item.atlas.blacklisted || !isQueuedReaction;
+
+          if (hasTerminalAtlasState) {
+            item.status = '';
+            item.statusClass = '';
+          }
+
           if (item.atlas.exists && !item.atlas.downloaded && item.atlas.reaction?.type && item.atlas.reaction.type !== 'dislike') {
             item.reactionQueued = item.atlas.reaction.type;
             for (const lookup of lookups) {
@@ -2053,17 +2034,6 @@ export function runContentScript() {
       return [...urls].filter(Boolean);
     }
 
-    function isHashSpecificReferrerLookupKey(value: string): boolean {
-      const trimmed = (value || '').trim();
-      const hashIndex = trimmed.indexOf('#');
-      if (hashIndex < 0) {
-        return false;
-      }
-
-      const fragment = trimmed.slice(hashIndex + 1).toLowerCase();
-      return /^image-\d+$/.test(fragment);
-    }
-
     // collectLookupKeysForNode moved to items.ts
 
     function syncAtlasStatusForPageMarkers() {
@@ -2100,6 +2070,14 @@ export function runContentScript() {
         window.dispatchEvent(new Event(STATUS_CACHE_UPDATED_EVENT));
       });
     }
+
+    window.addEventListener(
+      STATUS_CACHE_UPDATED_EVENT,
+      () => {
+        applyPageMarkers(items);
+      },
+      true
+    );
   }
 
   function collectCandidates(onProgress) {

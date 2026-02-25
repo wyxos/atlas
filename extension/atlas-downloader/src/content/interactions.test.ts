@@ -42,6 +42,7 @@ const originalElementsFromPoint = document.elementsFromPoint;
 const originalElementFromPoint = document.elementFromPoint;
 
 afterEach(() => {
+  document.head.innerHTML = '';
   document.body.innerHTML = '';
   Object.defineProperty(document, 'elementsFromPoint', {
     value: originalElementsFromPoint,
