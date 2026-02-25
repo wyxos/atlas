@@ -871,7 +871,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   postIndicator.type = 'button';
   postIndicator.className = 'atlas-downloader-post-indicator';
   postIndicator.textContent = 'POST';
-  postIndicator.title = 'DeviantArt post: Alt + click to queue all post images';
+  postIndicator.title = 'DeviantArt post: Alt+Left=Like, Alt+Middle=Love (favorite) queue';
   postIndicator.hidden = true;
   toolbar.appendChild(postIndicator);
   const statusMeta = document.createElement('span');
@@ -889,6 +889,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
   let activeMedia: Element | null = null;
   let activeKey: string | null = null;
+  let activeLookupKeys: string[] = [];
   let hideFrameA: number | null = null;
   let hideFrameB: number | null = null;
   let toolbarBusy = false;
@@ -902,6 +903,33 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   let postDownloadBusy = false;
 
   const buttonsByType = new Map<string, HTMLButtonElement>();
+  const buildLookupKeys = (...values: Array<string | null | undefined>): string[] => {
+    const keys = new Set<string>();
+    for (const value of values) {
+      const raw = (value || '').trim();
+      if (!raw) {
+        continue;
+      }
+
+      keys.add(raw);
+      const hashlessIndex = raw.indexOf('#');
+      if (hashlessIndex > 0) {
+        keys.add(raw.slice(0, hashlessIndex));
+      }
+    }
+
+    return [...keys];
+  };
+  const getCachedForActiveKeys = (): AtlasStatus | null => {
+    for (const key of activeLookupKeys) {
+      const cached = deps.getCachedAtlasStatus(key);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    return null;
+  };
   const formatResolution = (width: number | null | undefined, height: number | null | undefined): string => {
     const normalizedWidth =
       typeof width === 'number' && Number.isFinite(width) && width > 0 ? Math.round(width) : null;
@@ -1054,6 +1082,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
     activeMedia = null;
     activeKey = null;
+    activeLookupKeys = [];
     activePostContext = null;
     toolbar.classList.remove('open');
     toolbar.style.left = '';
@@ -1084,7 +1113,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     event.stopImmediatePropagation?.();
   };
 
-  const queueActivePostDownloads = async () => {
+  const queueActivePostDownloads = async (reactionType: 'like' | 'love' | 'funny' = 'like') => {
     if (postDownloadBusy) {
       return;
     }
@@ -1105,11 +1134,13 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
 
-    const payloads = context.entries.map((entry) => {
+    const basePageUrl = window.location.href.split('#')[0] || window.location.href;
+    const payloads = context.entries.map((entry, index) => {
       const url = resolveBestDeviantArtPostDownloadUrl(entry) || entry.baseUrl;
+      const referrerHash = `${basePageUrl}#image-${index + 1}`;
       return {
         url,
-        referrer_url: window.location.href,
+        referrer_url: referrerHash,
         page_title: deps.limitString(document.title, deps.maxMetadataLen),
         tag_name: 'img',
         width: entry.maxWidth ?? entry.width ?? null,
@@ -1117,7 +1148,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         alt: '',
         preview_url: entry.previewUrl || entry.baseUrl || '',
         source: deps.sourceFromMediaUrl(url),
-        reaction_type: 'like',
+        reaction_type: reactionType,
       };
     });
 
@@ -1159,20 +1190,23 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
         const file = result?.data?.file || null;
         const fileMeta = parseFileStatusMeta(file);
-        deps.atlasStatusCache.set(payload.url, {
+        const nextStatus = {
           exists: true,
           downloaded: Boolean(file?.downloaded),
           blacklisted: Boolean(file?.blacklisted_at),
-          reactionType: 'like',
+          reactionType: String(payload.reaction_type || 'like'),
           downloadProgress: fileMeta.downloadProgress,
           downloadedAt: fileMeta.downloadedAt,
           ts: now,
-        });
+        };
+        for (const key of buildLookupKeys(payload.url, payload.preview_url, payload.referrer_url)) {
+          deps.atlasStatusCache.set(key, nextStatus);
+        }
       }
 
       window.dispatchEvent(new Event('atlas-status-cache-updated'));
-      if (activeKey) {
-        const cached = deps.getCachedAtlasStatus(activeKey);
+      if (activeLookupKeys.length > 0) {
+        const cached = getCachedForActiveKeys();
         setToolbarStatusMeta(cached);
         setToolbarQueued(cached?.reactionType ?? null, cached?.downloaded ?? null);
       }
@@ -1197,7 +1231,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       }
 
       swallow(event);
-      void queueActivePostDownloads();
+      const postReaction = event.button === 1 ? 'love' : 'like';
+      void queueActivePostDownloads(postReaction);
     },
     true
   );
@@ -1207,7 +1242,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
 
     swallow(event);
-    void queueActivePostDownloads();
+    void queueActivePostDownloads('like');
   });
   postIndicator.addEventListener('auxclick', (event) => {
     if (!event.altKey || event.button !== 1) {
@@ -1222,7 +1257,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       return;
     }
 
-    options.showToast('Use Alt + Left/Middle/Right click on POST to queue all post images.');
+    options.showToast('POST: Alt+Left queues as Like, Alt+Middle queues as Love.');
   });
 
   for (const reaction of [...REACTIONS, BLACKLIST_ACTION]) {
@@ -1403,7 +1438,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
 
     activeMedia = media;
-    activeKey = nextKey;
+    activeLookupKeys = buildLookupKeys(nextKey, previewPayload.referrer_url || window.location.href);
+    activeKey = activeLookupKeys[0] || null;
     setToolbarResolution(previewPayload.width, previewPayload.height);
     const activeAssetKey = resolveWixAssetKey(previewPayload.url || '');
     const postContext = resolveDeviantArtPostContext(window.location.href, media);
@@ -1419,17 +1455,20 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     setToolbarActive(null);
     setToolbarQueued(null, null);
     setToolbarStatusMeta(null);
-    if (activeKey) {
-      const cached = deps.getCachedAtlasStatus(activeKey);
+    if (activeLookupKeys.length > 0) {
+      const cached = getCachedForActiveKeys();
       if (cached) {
         setToolbarActive(cached.reactionType);
         setToolbarQueued(cached.reactionType, cached.downloaded);
         setToolbarStatusMeta(cached);
       } else {
-        const keyAtRequest = activeKey;
-        deps.fetchAtlasStatus(options.sendMessageSafe, keyAtRequest, window.location.href, (status) => {
+        const requestUrl = nextKey || '';
+        const requestReferrer = previewPayload.referrer_url || window.location.href;
+        const requestKeys = [...activeLookupKeys];
+        deps.fetchAtlasStatus(options.sendMessageSafe, requestUrl, requestReferrer, (status) => {
           if (!status) return;
-          if (activeKey !== keyAtRequest) return;
+          if (requestKeys.length !== activeLookupKeys.length) return;
+          if (requestKeys.some((key, index) => key !== activeLookupKeys[index])) return;
           setToolbarActive(status.reactionType);
           setToolbarQueued(status.reactionType, status.downloaded);
           setToolbarStatusMeta(status);
@@ -1519,7 +1558,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       if (reactionType) {
         const nextType = reactionType === 'blacklist' ? 'dislike' : reactionType;
         setToolbarActive(nextType);
-        const cached = activeKey ? deps.getCachedAtlasStatus(activeKey) : null;
+        const cached = getCachedForActiveKeys();
         setToolbarQueued(nextType, cached?.downloaded ?? null);
         setToolbarStatusMeta(cached);
       }
@@ -1529,11 +1568,11 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   window.addEventListener(
     'atlas-status-cache-updated',
     () => {
-      if (!activeKey) {
+      if (activeLookupKeys.length === 0) {
         return;
       }
 
-      const cached = deps.getCachedAtlasStatus(activeKey);
+      const cached = getCachedForActiveKeys();
       if (!cached) {
         return;
       }
