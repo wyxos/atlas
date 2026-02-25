@@ -50,6 +50,7 @@ npm run test                # Run Vitest tests
 Extension gotcha:
 - `npm run build:extension` starts with `build:extension:clean`, which deletes `extension/atlas-downloader/dist` before rebuilding. If the build fails early, restore tracked dist files with `git restore extension/atlas-downloader/dist` before continuing.
 - Use `npm run build:extension:release` for extension releases; it auto-bumps `extension/atlas-downloader/manifest.json` patch version, rebuilds extension assets, regenerates the zip, and mirrors the built extension into `ATLAS_EXTENSION_SYNC_DIR` when that env var points to an existing directory.
+- DeviantArt multi-image post reactions queued from the overlay `POST` CTA rely on per-image `referrer_url` hashes (`#image-N`). Marker/status refresh must include those referrer lookup keys (not only media URLs), or reacted outlines can disappear after page reload because wixmp URL variants differ.
 
 Database gotcha:
 - For long URL fields on MySQL/MariaDB, do not rely on unique indexes directly on `text`/large `varchar` columns. Use a deterministic hash column (e.g. SHA-256) as the unique/upsert key.

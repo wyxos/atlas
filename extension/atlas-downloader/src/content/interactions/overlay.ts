@@ -58,6 +58,7 @@ function buildOverlayReactionPayload(
 ) {
   const item = buildItemFromElement(media, deps.minWidth);
   if (item) {
+    const sourceLookupUrl = item.referrer_url || window.location.href || item.url;
     return {
       type: reactionType,
       url: item.url,
@@ -68,7 +69,7 @@ function buildOverlayReactionPayload(
       height: item.height,
       alt: deps.limitString(item.alt || '', deps.maxMetadataLen),
       preview_url: item.preview_url || '',
-      source: deps.sourceFromMediaUrl(item.url),
+      source: deps.sourceFromMediaUrl(sourceLookupUrl),
     };
   }
 
@@ -387,7 +388,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         height: entry.maxHeight ?? entry.height ?? null,
         alt: '',
         preview_url: entry.previewUrl || entry.baseUrl || '',
-        source: deps.sourceFromMediaUrl(url),
+        source: deps.sourceFromMediaUrl(referrerHash || basePageUrl || url),
         reaction_type: reactionType,
       };
     });

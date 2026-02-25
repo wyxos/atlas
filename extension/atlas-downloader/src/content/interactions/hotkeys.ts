@@ -54,6 +54,8 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
 
     return null;
   };
+  const resolveSourceLookupUrl = (url: string, referrerUrl: string | null | undefined): string =>
+    (referrerUrl || '').trim() || window.location.href || url;
 
   // Some sites (especially video players) trigger actions on click/pointerup even if mousedown is prevented.
   // Swallow the click when we're handling a hotkey so play/pause/seek doesn't fire.
@@ -217,7 +219,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
         height: item.height,
         alt: deps.limitString(item.alt || '', deps.maxMetadataLen),
         preview_url: item.preview_url || '',
-        source: deps.sourceFromMediaUrl(item.url),
+        source: deps.sourceFromMediaUrl(resolveSourceLookupUrl(item.url, item.referrer_url)),
       };
 
       deps.fetchAtlasStatus(options.sendMessageSafe, payload.url, payload.referrer_url || null, (status) => {
@@ -367,7 +369,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
         height: item.height,
         alt: deps.limitString(item.alt || '', deps.maxMetadataLen),
         preview_url: item.preview_url || '',
-        source: deps.sourceFromMediaUrl(item.url),
+        source: deps.sourceFromMediaUrl(resolveSourceLookupUrl(item.url, item.referrer_url)),
       };
 
       emitShortcutReactionState(media, true, 'dislike', payload.url);
