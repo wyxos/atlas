@@ -6,6 +6,7 @@ const WIX_ASSET_RE =
 const WIX_IMAGE_SELECTOR = 'img[src*="wixmp.com/f/"], img[srcset*="wixmp.com/f/"]';
 const KNOWN_GALLERY_ROOT_SELECTOR = '.IUfj2J.qeNdP5.bOFPMd, .IUfj2J.E95sX1.qeNdP5.bOFPMd';
 const KNOWN_GALLERY_ITEM_SELECTOR = '.NpoINo';
+const MAX_SCOPED_IMAGE_COUNT = 12;
 
 type WixUrlInfo = {
   normalizedUrl: string;
@@ -240,9 +241,9 @@ function collectWixCandidates(locationHref: string, activeMedia: Element | null 
   const scopedRoot = resolveScopedGalleryRoot(activeMedia);
   const rawUrls = scopedRoot
     ? collectRawWixUrlsFromRoot(scopedRoot)
-    : collectRawWixUrlsFromDocument();
+    : activeMedia ? [] : collectRawWixUrlsFromDocument();
 
-  if (scopedRoot && rawUrls.length <= 1) {
+  if (!activeMedia && scopedRoot && rawUrls.length <= 1) {
     rawUrls.push(...collectRawWixUrlsFromDocument());
   }
 
@@ -281,16 +282,61 @@ function resolveScopedGalleryRoot(activeMedia: Element | null): Element | null {
     return null;
   }
 
+  const nearbyRoot = resolveNearbyGalleryRoot(activeMedia);
+  if (nearbyRoot) {
+    return nearbyRoot;
+  }
+
   let current: Element | null = activeMedia.parentElement;
   while (current && current !== document.body && current !== document.documentElement) {
     const count = countWixImages(current);
-    if (count >= 2 && count <= 24) {
+    if (count >= 2 && count <= MAX_SCOPED_IMAGE_COUNT) {
       return current;
     }
     current = current.parentElement;
   }
 
   return null;
+}
+
+function resolveNearbyGalleryRoot(activeMedia: Element): Element | null {
+  const candidateRoots = new Set<Element>();
+  const wixCountCache = new Map<Element, number>();
+  const getWixCount = (root: Element): number => {
+    if (wixCountCache.has(root)) {
+      return wixCountCache.get(root) || 0;
+    }
+
+    const count = countWixImages(root);
+    wixCountCache.set(root, count);
+    return count;
+  };
+
+  const wixImages = Array.from(document.querySelectorAll(WIX_IMAGE_SELECTOR));
+  for (const image of wixImages) {
+    if (!(image instanceof Element)) {
+      continue;
+    }
+
+    if (image === activeMedia || activeMedia.contains(image) || image.contains(activeMedia)) {
+      continue;
+    }
+
+    let current: Element | null = image.parentElement;
+    let depth = 0;
+    while (current && current !== document.body && current !== document.documentElement && depth < 5) {
+      const wixCount = getWixCount(current);
+      const galleryItemCount = current.querySelectorAll(KNOWN_GALLERY_ITEM_SELECTOR).length;
+      if ((wixCount >= 2 && wixCount <= MAX_SCOPED_IMAGE_COUNT) || galleryItemCount > 1) {
+        candidateRoots.add(current);
+      }
+      current = current.parentElement;
+      depth += 1;
+    }
+  }
+
+  const roots = [...candidateRoots].filter((root) => !root.contains(activeMedia) && getWixCount(root) > 1);
+  return pickNearestRoot(roots, activeMedia);
 }
 
 function pickNearestRoot(roots: Element[], activeMedia: Element | null): Element | null {

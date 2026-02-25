@@ -34,6 +34,23 @@ function appendPreload(href: string) {
   document.head.appendChild(link);
 }
 
+function setRect(element: Element, left: number, top: number, width: number, height: number) {
+  Object.defineProperty(element, 'getBoundingClientRect', {
+    value: () => ({
+      x: left,
+      y: top,
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+      toJSON: () => ({}),
+    }),
+    configurable: true,
+  });
+}
+
 afterEach(() => {
   document.head.innerHTML = '';
   document.body.innerHTML = '';
@@ -145,6 +162,63 @@ describe('resolveDeviantArtPostContext', () => {
     expect(context?.entryByAssetKey.has('dl6jv53-1111')).toBe(true);
     expect(context?.entryByAssetKey.has('dl6jv53-2222')).toBe(true);
     expect(context?.entryByAssetKey.has('dl6jv53-9999')).toBe(false);
+  });
+
+  it('prefers nearby thumbnail rail when broad ancestors include unrelated wix images', () => {
+    const token = makeToken(1280, 1920);
+    const primary = makeWixUrl('dl6jv53-1111', 'w_300,h_300', token);
+    const childA = makeWixUrl('dl6jv53-2222', 'w_300,h_300', token);
+    const childB = makeWixUrl('dl6jv53-3333', 'w_300,h_300', token);
+    const childC = makeWixUrl('dl6jv53-4444', 'w_300,h_300', token);
+    const unrelated = Array.from({ length: 11 }, (_, index) =>
+      makeWixUrl(`dl6jv53-unrelated-${index + 1}`, 'w_300,h_300', token)
+    );
+
+    const ogImage = document.createElement('meta');
+    ogImage.setAttribute('property', 'og:image');
+    ogImage.setAttribute('content', primary);
+    document.head.appendChild(ogImage);
+
+    const pageRoot = document.createElement('div');
+    document.body.appendChild(pageRoot);
+
+    const mainSection = document.createElement('div');
+    const mainImage = document.createElement('img');
+    mainImage.setAttribute('src', primary);
+    mainSection.appendChild(mainImage);
+    pageRoot.appendChild(mainSection);
+
+    const thumbRail = document.createElement('div');
+    for (const url of [primary, childA, childB, childC]) {
+      const img = document.createElement('img');
+      img.setAttribute('src', url);
+      thumbRail.appendChild(img);
+    }
+    pageRoot.appendChild(thumbRail);
+
+    const unrelatedBlock = document.createElement('div');
+    for (const url of unrelated) {
+      const img = document.createElement('img');
+      img.setAttribute('src', url);
+      unrelatedBlock.appendChild(img);
+    }
+    pageRoot.appendChild(unrelatedBlock);
+
+    setRect(mainImage, 80, 100, 640, 640);
+    setRect(thumbRail, 80, 760, 640, 140);
+    setRect(unrelatedBlock, 80, 1040, 640, 500);
+
+    const context = resolveDeviantArtPostContext(
+      'https://www.deviantart.com/user/art/example-123456789',
+      mainImage
+    );
+    expect(context).not.toBeNull();
+    expect(context?.entries).toHaveLength(4);
+    expect(context?.entryByAssetKey.has('dl6jv53-1111')).toBe(true);
+    expect(context?.entryByAssetKey.has('dl6jv53-2222')).toBe(true);
+    expect(context?.entryByAssetKey.has('dl6jv53-3333')).toBe(true);
+    expect(context?.entryByAssetKey.has('dl6jv53-4444')).toBe(true);
+    expect(context?.entryByAssetKey.has('dl6jv53-unrelated-1')).toBe(false);
   });
 });
 
