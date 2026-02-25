@@ -191,6 +191,27 @@ describe('items', () => {
     expect(keys).not.toContain(`${window.location.origin}/artist/art/Example-1#hash`);
   });
 
+  it('can collect media-only lookup keys without anchor/referrer fallback', () => {
+    setLocation('/artist/art/Example-1#hash');
+
+    const anchor = document.createElement('a');
+    anchor.href = '/artist/art/Example-1';
+    const img = document.createElement('img');
+    img.src = 'https://images.example.com/foo.jpg';
+    setImageSize(img, 1200, 1200);
+    anchor.appendChild(img);
+    document.body.appendChild(anchor);
+
+    const keys = collectLookupKeysForNode(img, {
+      includeAnchor: false,
+      includePageFallback: false,
+    });
+
+    expect(keys).toContain('https://images.example.com/foo.jpg');
+    expect(keys).not.toContain(`${window.location.origin}/artist/art/Example-1`);
+    expect(keys).not.toContain(window.location.href);
+  });
+
   it('ignores hash-only anchor href values for lookup keys', () => {
     setLocation('/artist/art/Example-1#hash');
 
