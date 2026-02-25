@@ -36,6 +36,9 @@ type MountHotkeysOnlyDeps = {
     downloadedAt?: string | null;
   } | null;
 };
+type AtlasTestWindow = Window & {
+  __ATLAS_TEST_SHADOW_MODE?: unknown;
+};
 
 export function mountHotkeysOnly(deps: MountHotkeysOnlyDeps) {
   if (document.getElementById(deps.rootId)) {
@@ -45,7 +48,17 @@ export function mountHotkeysOnly(deps: MountHotkeysOnlyDeps) {
   const host = document.createElement('div');
   host.id = deps.rootId;
 
-  const shadow = host.attachShadow({ mode: 'closed' });
+  const shadowMode = (() => {
+    const override = (window as AtlasTestWindow).__ATLAS_TEST_SHADOW_MODE;
+    if (override === 'open' || override === 'closed') {
+      return override;
+    }
+
+    return document.documentElement.getAttribute('data-atlas-shadow-mode') === 'open'
+      ? 'open'
+      : 'closed';
+  })();
+  const shadow = host.attachShadow({ mode: shadowMode });
 
   const style = document.createElement('link');
   style.rel = 'stylesheet';
