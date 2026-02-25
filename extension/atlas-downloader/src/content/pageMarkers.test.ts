@@ -149,7 +149,7 @@ describe('page markers', () => {
 
     syncMarkerRails([img]);
 
-    expect(host.style.position).toBe('relative');
+    expect(host.getAttribute('data-atlas-marker-host-position')).toBe('1');
     expect(host.querySelectorAll('[data-atlas-marker-rail="1"]')).toHaveLength(4);
     expect(host.querySelectorAll('.atlas-downloader-marker-rail-top')).toHaveLength(1);
     expect(host.querySelectorAll('.atlas-downloader-marker-rail-right')).toHaveLength(1);
@@ -178,6 +178,6 @@ describe('page markers', () => {
     expect(link.hasAttribute('data-atlas-reaction')).toBe(false);
     expect(host.querySelector('[data-atlas-marker-rail="1"]')).toBeNull();
     expect(host.querySelector('[data-atlas-marker-badge]')).toBeNull();
-    expect(link.style.position).toBe('');
+    expect(link.hasAttribute('data-atlas-marker-host-position')).toBe(false);
   });
 });

@@ -64,6 +64,24 @@ describe('shouldIgnoreMutationBatch', () => {
     expect(shouldIgnoreMutationBatch([attributesMutation(badge)], 'atlas-downloader-root')).toBe(true);
   });
 
+  it('ignores inline marker rail and badge mutations', () => {
+    const host = document.createElement('div');
+    host.setAttribute('data-atlas-marker-host-position', '1');
+
+    const rail = document.createElement('span');
+    rail.className = 'atlas-downloader-marker-rail atlas-downloader-marker-rail-top';
+    rail.setAttribute('data-atlas-marker-rail', '1');
+    host.appendChild(rail);
+
+    const badge = document.createElement('span');
+    badge.className = 'atlas-downloader-inline-badge atlas-downloader-reaction-badge like';
+    badge.setAttribute('data-atlas-marker-badge', 'reaction');
+    host.appendChild(badge);
+
+    expect(shouldIgnoreMutationBatch([childListMutation([rail, badge])], 'atlas-downloader-root')).toBe(true);
+    expect(shouldIgnoreMutationBatch([attributesMutation(host)], 'atlas-downloader-root')).toBe(true);
+  });
+
   it('does not ignore page content mutations', () => {
     const img = document.createElement('img');
     expect(shouldIgnoreMutationBatch([childListMutation([img])], 'atlas-downloader-root')).toBe(false);

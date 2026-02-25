@@ -219,6 +219,9 @@ export function ensurePageMarkerStyles() {
   pointer-events: none;
   z-index: 1;
 }
+[data-atlas-marker-host-position="1"] {
+  position: relative !important;
+}
 [data-atlas-marker-rail="1"].atlas-downloader-marker-rail-top {
   top: 0;
   left: 0;
