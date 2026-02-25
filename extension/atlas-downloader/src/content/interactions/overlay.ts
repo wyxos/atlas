@@ -1,11 +1,13 @@
 import { buildItemFromElement, collectLookupKeysForNode } from '../items';
+import { createApp, h, reactive } from 'vue';
 import {
   resolveBestDeviantArtPostDownloadUrl,
   resolveDeviantArtPostContext,
   resolveWixAssetKey,
   type DeviantArtPostContext,
 } from '../deviantartPost';
-import { BLACKLIST_ACTION, REACTIONS, createSvgIcon } from '../reactions';
+import { BLACKLIST_ACTION, REACTIONS } from '../reactions';
+import OverlayToolbar from '../ui-vue/OverlayToolbar.vue';
 import {
   LOCATION_CHANGE_EVENT,
   choosePromotedMediaCandidate,
@@ -100,33 +102,8 @@ function buildOverlayReactionPayload(
 export function installMediaReactionOverlay(options: OverlayOptions, deps: InteractionDependencies) {
   installLocationChangeObserver();
 
-  const toolbar = document.createElement('div');
-  toolbar.className = 'atlas-downloader-media-toolbar';
-  toolbar.setAttribute('role', 'toolbar');
-  toolbar.setAttribute('aria-label', 'Atlas reactions');
-  const resolutionMeta = document.createElement('span');
-  resolutionMeta.className = 'atlas-downloader-media-resolution';
-  resolutionMeta.hidden = true;
-  toolbar.appendChild(resolutionMeta);
-  const postIndicator = document.createElement('button');
-  postIndicator.type = 'button';
-  postIndicator.className = 'atlas-downloader-post-indicator';
-  postIndicator.textContent = 'POST';
-  postIndicator.title = 'DeviantArt post: Alt+Left=Like, Alt+Middle=Love (favorite) queue';
-  postIndicator.hidden = true;
-  toolbar.appendChild(postIndicator);
-  const statusMeta = document.createElement('span');
-  statusMeta.className = 'atlas-downloader-media-status';
-  statusMeta.hidden = true;
-  const progressMeta = document.createElement('div');
-  progressMeta.className = 'atlas-downloader-media-progress';
-  progressMeta.hidden = true;
-  const progressBar = document.createElement('span');
-  progressBar.className = 'atlas-downloader-media-progress-bar';
-  const progressFill = document.createElement('span');
-  progressFill.className = 'atlas-downloader-media-progress-fill';
-  progressBar.appendChild(progressFill);
-  progressMeta.appendChild(progressBar);
+  const toolbarMount = document.createElement('div');
+  options.root.appendChild(toolbarMount);
 
   let activeMedia: Element | null = null;
   let activeKey: string | null = null;
@@ -142,8 +119,37 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   let activeLocationHref = window.location.href;
   let activePostContext: DeviantArtPostContext | null = null;
   let postDownloadBusy = false;
+  let toolbarHovered = false;
 
-  const buttonsByType = new Map<string, HTMLButtonElement>();
+  const overlayState = reactive({
+    open: false,
+    left: null as number | null,
+    top: null as number | null,
+    resolutionText: '',
+    statusText: '',
+    progressVisible: false,
+    progressPercent: 0,
+    progressState: null as 'queued' | 'active' | 'done' | null,
+    postVisible: false,
+    postDisabled: true,
+    postPending: false,
+    postCount: 0,
+    buttons: [...REACTIONS, BLACKLIST_ACTION].map((reaction) => ({
+      type: reaction.type,
+      className: reaction.className,
+      label: reaction.label,
+      pathDs: reaction.pathDs,
+      active: false,
+      pending: false,
+      queued: false,
+      disabled: false,
+    })),
+  });
+
+  const buttonsByType = new Map<string, (typeof overlayState.buttons)[number]>();
+  for (const button of overlayState.buttons) {
+    buttonsByType.set(button.type, button);
+  }
   const buildLookupKeys = (...values: Array<string | null | undefined>): string[] => {
     const keys = new Set<string>();
     for (const value of values) {
@@ -185,58 +191,37 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
   };
   const setToolbarResolution = (width: number | null | undefined, height: number | null | undefined) => {
     const text = formatResolution(width, height);
-    if (!text) {
-      resolutionMeta.textContent = '';
-      resolutionMeta.hidden = true;
-      return;
-    }
-
-    resolutionMeta.textContent = text;
-    resolutionMeta.hidden = false;
+    overlayState.resolutionText = text;
   };
   const setToolbarStatusMeta = (status: AtlasStatus | null) => {
     const text = formatOverlayDownloadMeta(status);
     const progress = resolveOverlayProgressPercent(status);
-
-    if (!text) {
-      statusMeta.textContent = '';
-      statusMeta.hidden = true;
-    } else {
-      statusMeta.textContent = text;
-      statusMeta.hidden = false;
-    }
+    overlayState.statusText = text || '';
 
     if (progress === null) {
-      progressMeta.hidden = true;
-      progressMeta.removeAttribute('data-state');
-      progressFill.style.width = '0%';
+      overlayState.progressVisible = false;
+      overlayState.progressState = null;
+      overlayState.progressPercent = 0;
       return;
     }
 
-    progressMeta.hidden = false;
-    progressMeta.dataset.state = progress <= 0 ? 'queued' : progress >= 100 ? 'done' : 'active';
-    progressFill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    overlayState.progressVisible = true;
+    overlayState.progressState = progress <= 0 ? 'queued' : progress >= 100 ? 'done' : 'active';
+    overlayState.progressPercent = Math.max(0, Math.min(100, progress));
   };
   const syncPostIndicatorState = () => {
     const count = activePostContext?.entries.length ?? 0;
     const visible = count > 1;
-    postIndicator.hidden = !visible;
-    postIndicator.disabled = !visible || postDownloadBusy || toolbarBusy;
-    postIndicator.classList.toggle('pending', postDownloadBusy);
-    if (!visible) {
-      postIndicator.textContent = 'POST';
-      postIndicator.removeAttribute('data-count');
-      return;
-    }
-
-    postIndicator.dataset.count = String(count);
-    postIndicator.textContent = `POST x${count}`;
+    overlayState.postVisible = visible;
+    overlayState.postDisabled = !visible || postDownloadBusy || toolbarBusy;
+    overlayState.postPending = postDownloadBusy;
+    overlayState.postCount = visible ? count : 0;
   };
   const syncToolbarButtonState = () => {
     const locked = toolbarBusy || toolbarQueuedType !== null;
     for (const [type, button] of buttonsByType.entries()) {
       button.disabled = locked;
-      button.classList.toggle('pending', toolbarBusy && toolbarPendingType === type);
+      button.pending = toolbarBusy && toolbarPendingType === type;
     }
     syncPostIndicatorState();
   };
@@ -253,7 +238,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         reaction.type === BLACKLIST_ACTION.type
           ? reactionType === 'dislike'
           : reactionType === reaction.type;
-      btn.classList.toggle('active', isActive);
+      btn.active = isActive;
     }
   };
   const setToolbarQueued = (reactionType: string | null, downloaded: boolean | null) => {
@@ -265,7 +250,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         reaction.type === BLACKLIST_ACTION.type
           ? toolbarQueuedType === 'dislike'
           : toolbarQueuedType === reaction.type;
-      btn.classList.toggle('queued', isQueued);
+      btn.queued = isQueued;
     }
     syncToolbarButtonState();
   };
@@ -325,9 +310,10 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     activeKey = null;
     activeLookupKeys = [];
     activePostContext = null;
-    toolbar.classList.remove('open');
-    toolbar.style.left = '';
-    toolbar.style.top = '';
+    toolbarHovered = false;
+    overlayState.open = false;
+    overlayState.left = null;
+    overlayState.top = null;
     setToolbarResolution(null, null);
     setToolbarStatusMeta(null);
     setToolbarActive(null);
@@ -340,18 +326,11 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       hideFrameA = null;
       hideFrameB = window.requestAnimationFrame(() => {
         hideFrameB = null;
-        if (toolbar.matches(':hover')) return;
+        if (toolbarHovered) return;
         if (activeMedia instanceof Element && activeMedia.matches(':hover')) return;
         hide();
       });
     });
-  };
-
-  const swallow = (event: Event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    // @ts-expect-error stopImmediatePropagation exists on MouseEvent/PointerEvent.
-    event.stopImmediatePropagation?.();
   };
 
   const queueActivePostDownloads = async (reactionType: 'like' | 'love' | 'funny' = 'like') => {
@@ -464,171 +443,156 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     }
   };
 
-  postIndicator.addEventListener(
-    'pointerdown',
-    (event) => {
-      if (!event.altKey || (event.button !== 0 && event.button !== 1)) {
-        return;
-      }
-
-      swallow(event);
-      const postReaction = event.button === 1 ? 'love' : 'like';
-      void queueActivePostDownloads(postReaction);
-    },
-    true
-  );
-  postIndicator.addEventListener('contextmenu', (event) => {
-    if (!event.altKey) {
+  const handleToolbarReaction = (reactionType: string) => {
+    if (toolbarBusy) {
       return;
     }
 
-    swallow(event);
-    void queueActivePostDownloads('like');
-  });
-  postIndicator.addEventListener('auxclick', (event) => {
-    if (!event.altKey || event.button !== 1) {
+    if (!activeMedia) {
+      options.showToast('No media selected.');
       return;
     }
 
-    swallow(event);
-  });
-  postIndicator.addEventListener('click', (event) => {
-    swallow(event);
-    if (event.altKey) {
+    const reaction = [...REACTIONS, BLACKLIST_ACTION].find((entry) => entry.type === reactionType);
+    if (!reaction) {
       return;
     }
 
-    options.showToast('POST: Alt+Left queues as Like, Alt+Middle queues as Love.');
-  });
+    const atlasReactionType = reaction.type === BLACKLIST_ACTION.type ? 'dislike' : reaction.type;
+    const payload = buildOverlayReactionPayload(activeMedia, atlasReactionType, deps);
+    if (!payload) {
+      options.showToast('No valid media URL found.');
+      return;
+    }
 
-  for (const reaction of [...REACTIONS, BLACKLIST_ACTION]) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `atlas-downloader-reaction-btn ${reaction.className}`.trim();
-    button.setAttribute('aria-label', reaction.label);
-    button.title = reaction.label;
-    button.replaceChildren(createSvgIcon(reaction.pathDs));
-    buttonsByType.set(reaction.type, button);
+    const checkKey = payload.url || '';
 
-    button.addEventListener('pointerdown', swallow, true);
-    button.addEventListener('mousedown', swallow, true);
-    button.addEventListener('click', (event) => {
-      swallow(event);
-      if (toolbarBusy) {
-        return;
+    const submitReaction = (forceDownload = false) => {
+      if (forceDownload) {
+        payload.force_download = true;
+      } else if ('force_download' in payload) {
+        delete payload.force_download;
       }
 
-      if (!activeMedia) {
-        options.showToast('No media selected.');
-        return;
-      }
-
-      const reactionType = reaction.type === BLACKLIST_ACTION.type ? 'dislike' : reaction.type;
-      const payload = buildOverlayReactionPayload(activeMedia, reactionType, deps);
-      if (!payload) {
-        options.showToast('No valid media URL found.');
-        return;
-      }
-
-      const checkKey = payload.url || '';
-
-      const submitReaction = (forceDownload = false) => {
-        if (forceDownload) {
-          payload.force_download = true;
-        } else if ('force_download' in payload) {
-          delete payload.force_download;
-        }
-
-        emitOverlayReactionState(true, reaction.type, checkKey || null);
-        setToolbarBusy(true, reaction.type);
-        options.sendMessageSafe(
-          {
-            type: 'atlas-react',
-            payload: {
-              ...payload,
-              ...(reaction.type === BLACKLIST_ACTION.type ? { blacklist: true } : {}),
-            },
+      emitOverlayReactionState(true, reaction.type, checkKey || null);
+      setToolbarBusy(true, reaction.type);
+      options.sendMessageSafe(
+        {
+          type: 'atlas-react',
+          payload: {
+            ...payload,
+            ...(reaction.type === BLACKLIST_ACTION.type ? { blacklist: true } : {}),
           },
-          (response) => {
-            setToolbarBusy(false, null);
-            if (!response || !response.ok) {
-              emitOverlayReactionState(false, null, checkKey || null);
-              options.showToast(response?.error || 'Reaction failed.', 'danger');
-              return;
-            }
+        },
+        (response) => {
+          setToolbarBusy(false, null);
+          if (!response || !response.ok) {
+            emitOverlayReactionState(false, null, checkKey || null);
+            options.showToast(response?.error || 'Reaction failed.', 'danger');
+            return;
+          }
 
-            const data = response.data || null;
-            const file = data?.file || null;
-            const newReactionType = data?.reaction?.type
-              ? String(data.reaction.type)
-              : reaction.type === BLACKLIST_ACTION.type
-                ? 'dislike'
-                : reaction.type;
-            const fileMeta = parseFileStatusMeta(file);
+          const data = response.data || null;
+          const file = data?.file || null;
+          const newReactionType = data?.reaction?.type
+            ? String(data.reaction.type)
+            : reaction.type === BLACKLIST_ACTION.type
+              ? 'dislike'
+              : reaction.type;
+          const fileMeta = parseFileStatusMeta(file);
 
-            if (checkKey) {
-              deps.atlasStatusCache.set(checkKey, {
-                exists: Boolean(file),
-                downloaded: Boolean(file?.downloaded),
-                blacklisted: Boolean(file?.blacklisted_at),
-                reactionType: newReactionType,
-                downloadProgress: fileMeta.downloadProgress,
-                downloadedAt: fileMeta.downloadedAt,
-                ts: Date.now(),
-              });
-            }
-
-            setToolbarActive(newReactionType);
-            setToolbarQueued(newReactionType, Boolean(file?.downloaded));
-            setToolbarStatusMeta({
+          if (checkKey) {
+            deps.atlasStatusCache.set(checkKey, {
               exists: Boolean(file),
               downloaded: Boolean(file?.downloaded),
               blacklisted: Boolean(file?.blacklisted_at),
               reactionType: newReactionType,
               downloadProgress: fileMeta.downloadProgress,
               downloadedAt: fileMeta.downloadedAt,
+              ts: Date.now(),
             });
-            emitOverlayReactionState(false, newReactionType, checkKey || null);
+          }
 
-            if (payload.download_via === 'yt-dlp') {
-              options.showToast(`Reacted (${reaction.label}). Resolving video in Atlas…`);
+          setToolbarActive(newReactionType);
+          setToolbarQueued(newReactionType, Boolean(file?.downloaded));
+          setToolbarStatusMeta({
+            exists: Boolean(file),
+            downloaded: Boolean(file?.downloaded),
+            blacklisted: Boolean(file?.blacklisted_at),
+            reactionType: newReactionType,
+            downloadProgress: fileMeta.downloadProgress,
+            downloadedAt: fileMeta.downloadedAt,
+          });
+          emitOverlayReactionState(false, newReactionType, checkKey || null);
+
+          if (payload.download_via === 'yt-dlp') {
+            options.showToast(`Reacted (${reaction.label}). Resolving video in Atlas…`);
+            return;
+          }
+
+          options.showToast(`Reacted (${reaction.label}). Queued download in Atlas.`);
+        }
+      );
+    };
+
+    deps.fetchAtlasStatus(options.sendMessageSafe, checkKey, payload.referrer_url || null, (status) => {
+      if (atlasReactionType !== 'dislike' && status?.downloaded) {
+        options
+          .chooseDialog({
+            title: 'Already downloaded',
+            message: 'Re-download before updating the reaction?',
+            confirmLabel: 'Re-download',
+            cancelLabel: 'Keep existing file',
+            alternateLabel: 'Cancel',
+          })
+          .then((choice) => {
+            if (choice === 'alternate') {
+              options.showToast('Cancelled.');
               return;
             }
-
-            options.showToast(`Reacted (${reaction.label}). Queued download in Atlas.`);
-          }
-        );
-      };
-
-      deps.fetchAtlasStatus(options.sendMessageSafe, checkKey, payload.referrer_url || null, (status) => {
-        if (reactionType !== 'dislike' && status?.downloaded) {
-          options
-            .chooseDialog({
-              title: 'Already downloaded',
-              message: 'Re-download before updating the reaction?',
-              confirmLabel: 'Re-download',
-              cancelLabel: 'Keep existing file',
-              alternateLabel: 'Cancel',
-            })
-            .then((choice) => {
-              if (choice === 'alternate') {
-                options.showToast('Cancelled.');
-                return;
-              }
-              submitReaction(choice === 'confirm');
-            });
-          return;
-        }
-        submitReaction(false);
-      });
+            submitReaction(choice === 'confirm');
+          });
+        return;
+      }
+      submitReaction(false);
     });
+  };
 
-    toolbar.appendChild(button);
-  }
-  toolbar.appendChild(statusMeta);
-  toolbar.appendChild(progressMeta);
-
-  options.root.appendChild(toolbar);
+  createApp({
+    setup() {
+      return () =>
+        h(OverlayToolbar, {
+          open: overlayState.open,
+          left: overlayState.left,
+          top: overlayState.top,
+          resolutionText: overlayState.resolutionText,
+          statusText: overlayState.statusText,
+          progressVisible: overlayState.progressVisible,
+          progressPercent: overlayState.progressPercent,
+          progressState: overlayState.progressState,
+          postVisible: overlayState.postVisible,
+          postDisabled: overlayState.postDisabled,
+          postPending: overlayState.postPending,
+          postCount: overlayState.postCount,
+          buttons: overlayState.buttons,
+          onPointerEnter: () => {
+            toolbarHovered = true;
+            cancelHide();
+          },
+          onPointerLeave: () => {
+            toolbarHovered = false;
+            scheduleHide();
+          },
+          onReaction: handleToolbarReaction,
+          onPostQueue: (reactionType: 'like' | 'love' | 'funny') => {
+            void queueActivePostDownloads(reactionType);
+          },
+          onPostHint: () => {
+            options.showToast('POST: Alt+Left queues as Like, Alt+Middle queues as Love.');
+          },
+        });
+    },
+  }).mount(toolbarMount);
 
   const isOwnUiEvent = (event: Event) => {
     const composedPath =
@@ -650,8 +614,8 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
 
     const top = clamp(rect.top + 8, 8, window.innerHeight - 8);
     const left = clamp(rect.right - 8, 8, window.innerWidth - 8);
-    toolbar.style.top = `${top}px`;
-    toolbar.style.left = `${left}px`;
+    overlayState.top = top;
+    overlayState.left = left;
   };
 
   const findMediaAtPoint = (x: number, y: number): Element | null => resolveMediaAtPoint(x, y, deps.rootId);
@@ -698,7 +662,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
       activePostContext = null;
     }
     syncPostIndicatorState();
-    toolbar.classList.add('open');
+    overlayState.open = true;
     updatePosition();
 
     setToolbarActive(null);
@@ -869,9 +833,6 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     },
     true
   );
-
-  toolbar.addEventListener('pointerenter', cancelHide, true);
-  toolbar.addEventListener('pointerleave', scheduleHide, true);
 
   window.addEventListener('scroll', updatePosition, true);
   window.addEventListener('resize', updatePosition);
