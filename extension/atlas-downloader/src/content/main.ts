@@ -88,6 +88,21 @@ declare const chrome: ChromeApi;
   const atlasStatusCache = new Map<string, AtlasStatusCacheEntry>();
   const openTabUrlSet = new Set<string>();
 
+  function buildLookupVariants(...values: Array<string | null | undefined>): string[] {
+    const keys = new Set<string>();
+    for (const value of values) {
+      const raw = (value || '').trim();
+      if (!raw) {
+        continue;
+      }
+
+      keys.add(raw);
+      keys.add(stripHash(raw));
+    }
+
+    return [...keys].filter(Boolean);
+  }
+
   function limitString(value, max) {
     const v = typeof value === 'string' ? value : '';
     if (v.length <= max) return v;
@@ -211,7 +226,7 @@ declare const chrome: ChromeApi;
   function fetchAtlasStatus(
     sendMessageSafe: (message: unknown, callback: (response: unknown) => void) => void,
     url: string,
-    _referrerUrl: string | null,
+    referrerUrl: string | null,
     callback: (
       status: {
         exists: boolean;
@@ -223,31 +238,52 @@ declare const chrome: ChromeApi;
       } | null
     ) => void
   ) {
-    const lookupUrl = stripHash((url || '').trim());
-    if (!lookupUrl) {
+    const lookupCandidates = buildLookupVariants(url, referrerUrl || '');
+    if (lookupCandidates.length === 0) {
       callback(null);
       return;
     }
 
-    const cached = getCachedAtlasStatus(lookupUrl);
-    if (cached) {
-      callback(cached);
-      return;
+    for (const lookup of lookupCandidates) {
+      const cached = getCachedAtlasStatus(lookup);
+      if (cached) {
+        callback(cached);
+        return;
+      }
     }
 
-    sendMessageSafe({ type: 'atlas-check-batch', urls: [lookupUrl] }, (response) => {
+    sendMessageSafe({ type: 'atlas-check-batch', urls: lookupCandidates }, (response) => {
       if (!response || !response.ok) {
         callback(null);
         return;
       }
 
       const results = Array.isArray(response.data?.results) ? response.data.results : [];
-      const byUrl = new Map(
-        results
-          .filter((r) => typeof r?.url === 'string' && r.url.trim() !== '')
-          .map((r) => [stripHash(String(r.url)), r])
-      );
-      const match = byUrl.get(lookupUrl) ?? null;
+      const byUrl = new Map<string, unknown>();
+      for (const result of results) {
+        const resultUrl = typeof result?.url === 'string' ? String(result.url) : '';
+        if (!resultUrl) {
+          continue;
+        }
+        for (const key of buildLookupVariants(resultUrl)) {
+          if (!byUrl.has(key)) {
+            byUrl.set(key, result);
+          }
+        }
+      }
+
+      const match = lookupCandidates
+        .map((lookup) => byUrl.get(lookup))
+        .find((value) => Boolean(value)) as
+        | {
+          exists?: unknown;
+          downloaded?: unknown;
+          blacklisted?: unknown;
+          reaction?: { type?: unknown } | null;
+          download_progress?: unknown;
+          downloaded_at?: unknown;
+        }
+        | null;
       if (!match) {
         callback(null);
         return;
@@ -263,7 +299,9 @@ declare const chrome: ChromeApi;
         ts: Date.now(),
       };
 
-      atlasStatusCache.set(lookupUrl, status);
+      for (const lookup of lookupCandidates) {
+        atlasStatusCache.set(lookup, status);
+      }
       callback(status);
     });
   }
@@ -598,19 +636,13 @@ declare const chrome: ChromeApi;
       const failed = Boolean(data.failed) || status === 'failed' || status === 'canceled' || typeof data.failed_at === 'string';
       const downloadedAt = downloaded ? normalizeDownloadedAt(data.finished_at) : null;
 
-      const lookupCandidates = new Set<string>();
-      const originalLookup = typeof data.original === 'string' ? stripHash(data.original.trim()) : '';
-      const referrerLookup = typeof data.referrer_url === 'string' ? stripHash(data.referrer_url.trim()) : '';
-      if (originalLookup) {
-        lookupCandidates.add(originalLookup);
-      }
-      if (referrerLookup) {
-        lookupCandidates.add(referrerLookup);
-      }
+      const originalLookup = typeof data.original === 'string' ? data.original.trim() : '';
+      const referrerLookup = typeof data.referrer_url === 'string' ? data.referrer_url.trim() : '';
+      const lookupCandidates = new Set<string>(buildLookupVariants(originalLookup, referrerLookup));
 
-      const mappedLookup = transferId ? lookupByTransferId.get(transferId) ?? '' : '';
-      if (mappedLookup) {
-        lookupCandidates.add(mappedLookup);
+      const mappedLookup = transferId ? (lookupByTransferId.get(transferId) ?? '') : '';
+      for (const lookup of buildLookupVariants(mappedLookup)) {
+        lookupCandidates.add(lookup);
       }
 
       if (lookupCandidates.size === 0) {
@@ -639,12 +671,12 @@ declare const chrome: ChromeApi;
       }
 
       for (const item of items) {
-        const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
-        if (!lookup || !lookupCandidates.has(lookup)) {
+        const itemLookups = itemLookupKeys(item);
+        if (itemLookups.length === 0 || !itemLookups.some((lookup) => lookupCandidates.has(lookup))) {
           continue;
         }
 
-        if (!queuedLookupUrls.has(lookup) && item.status !== 'Queued') {
+        if (!itemLookups.some((lookup) => queuedLookupUrls.has(lookup)) && item.status !== 'Queued') {
           continue;
         }
 
@@ -660,12 +692,16 @@ declare const chrome: ChromeApi;
           item.status = '';
           item.statusClass = '';
           item.reactionQueued = null;
-          queuedLookupUrls.delete(lookup);
+          for (const lookup of itemLookups) {
+            queuedLookupUrls.delete(lookup);
+          }
         } else if (failed) {
           item.status = 'Failed';
           item.statusClass = 'err';
           item.reactionQueued = null;
-          queuedLookupUrls.delete(lookup);
+          for (const lookup of itemLookups) {
+            queuedLookupUrls.delete(lookup);
+          }
         } else {
           item.status = 'Queued';
           item.statusClass = 'queued';
@@ -791,13 +827,16 @@ declare const chrome: ChromeApi;
         const reactionType = custom.detail?.reactionType ? String(custom.detail.reactionType) : null;
         const explicitUrl = typeof custom.detail?.url === 'string' ? custom.detail.url : '';
         const resolvedUrl = explicitUrl || (custom.detail?.media ? buildItemFromElement(custom.detail.media, MIN_SIZE)?.url || '' : '');
-        const lookup = resolvedUrl ? stripHash(resolvedUrl) : '';
+        const lookupKeys = buildLookupVariants(resolvedUrl);
+        const lookupKeySet = new Set(lookupKeys);
+        const lookup = lookupKeys[0] || '';
 
         if (pending) {
           reactingItemUrl = lookup || '__external-reaction__';
           reactingItemType = reactionType || reactingItemType || 'like';
           for (const item of items) {
-            if (lookup && (itemLookupUrl(item) || stripHash(String(item.url || ''))) !== lookup) {
+            const itemKeys = itemLookupKeys(item);
+            if (lookupKeySet.size > 0 && !itemKeys.some((key) => lookupKeySet.has(key))) {
               continue;
             }
             item.reactionPending = reactionType || item.reactionPending || 'like';
@@ -810,7 +849,8 @@ declare const chrome: ChromeApi;
         reactingItemUrl = null;
         reactingItemType = null;
         for (const item of items) {
-          if (lookup && (itemLookupUrl(item) || stripHash(String(item.url || ''))) !== lookup) {
+          const itemKeys = itemLookupKeys(item);
+          if (lookupKeySet.size > 0 && !itemKeys.some((key) => lookupKeySet.has(key))) {
             continue;
           }
 
@@ -820,8 +860,10 @@ declare const chrome: ChromeApi;
 
           const cached =
             (lookup ? getCachedAtlasStatus(lookup) : null) ??
-            getCachedAtlasStatus(itemLookupUrl(item)) ??
-            getCachedAtlasStatus(stripHash(String(item.url || '')));
+            itemKeys
+              .map((key) => getCachedAtlasStatus(key))
+              .find((value) => Boolean(value)) ??
+            null;
 
           if (cached) {
             item.atlas = {
@@ -995,7 +1037,7 @@ declare const chrome: ChromeApi;
           reactionPending:
             reactingItemUrl
             && reactingItemUrl !== '__external-reaction__'
-            && (itemLookupUrl(item) || stripHash(String(item.url || ''))) === reactingItemUrl
+            && itemLookupKeys(item).includes(reactingItemUrl)
               ? reactingItemType || 'like'
               : null,
           reactionQueued: null,
@@ -1355,9 +1397,17 @@ declare const chrome: ChromeApi;
       return `${items.length} found • ${selectedCount} selected`;
     }
 
+    function itemLookupKeys(item) {
+      const url = (item?.url || '').trim();
+      const referrerUrl = (item?.referrer_url || '').trim();
+      const prioritizeReferrer = referrerUrl.includes('#image-');
+      return prioritizeReferrer
+        ? buildLookupVariants(referrerUrl, url)
+        : buildLookupVariants(url, referrerUrl);
+    }
+
     function itemLookupUrl(item) {
-      const preferred = (item?.url || item?.referrer_url || '').trim();
-      return preferred ? stripHash(preferred) : '';
+      return itemLookupKeys(item)[0] || '';
     }
 
     function getDisplayStatus(item) {
@@ -1384,7 +1434,7 @@ declare const chrome: ChromeApi;
     }
 
     function checkAtlasStatus(silent) {
-      const urls = [...new Set(items.map((item) => itemLookupUrl(item)).filter(Boolean))];
+      const urls = [...new Set(items.flatMap((item) => itemLookupKeys(item)).filter(Boolean))];
       if (urls.length === 0) {
         return;
       }
@@ -1405,17 +1455,37 @@ declare const chrome: ChromeApi;
         }
 
         const results = Array.isArray(response.data?.results) ? response.data.results : [];
-        const byUrl = new Map(
-          results
-            .filter((r) => typeof r?.url === 'string' && r.url.trim() !== '')
-            .map((r) => [stripHash(String(r.url)), r])
-        );
+        const byUrl = new Map<string, unknown>();
+        for (const result of results) {
+          const resultUrl = typeof result?.url === 'string' ? String(result.url) : '';
+          if (!resultUrl) {
+            continue;
+          }
+
+          for (const key of buildLookupVariants(resultUrl)) {
+            if (!byUrl.has(key)) {
+              byUrl.set(key, result);
+            }
+          }
+        }
 
         let existsCount = 0;
         let downloadedCount = 0;
         for (const item of items) {
-          const lookup = itemLookupUrl(item);
-          const match = byUrl.get(lookup);
+          const lookups = itemLookupKeys(item);
+          const match = lookups
+            .map((lookup) => byUrl.get(lookup))
+            .find((value) => Boolean(value)) as
+            | {
+              exists?: unknown;
+              downloaded?: unknown;
+              blacklisted?: unknown;
+              file_id?: unknown;
+              reaction?: { type?: unknown } | null;
+              download_progress?: unknown;
+              downloaded_at?: unknown;
+            }
+            | undefined;
           if (!match) {
             continue;
           }
@@ -1429,13 +1499,17 @@ declare const chrome: ChromeApi;
           };
           if (item.atlas.exists && !item.atlas.downloaded && item.atlas.reaction?.type && item.atlas.reaction.type !== 'dislike') {
             item.reactionQueued = item.atlas.reaction.type;
-            queuedLookupUrls.add(lookup);
+            for (const lookup of lookups) {
+              queuedLookupUrls.add(lookup);
+            }
           } else {
             item.reactionQueued = null;
-            queuedLookupUrls.delete(lookup);
+            for (const lookup of lookups) {
+              queuedLookupUrls.delete(lookup);
+            }
           }
 
-          atlasStatusCache.set(lookup, {
+          const status = {
             exists: Boolean(match.exists),
             downloaded: Boolean(match.downloaded),
             blacklisted: Boolean(match.blacklisted),
@@ -1443,7 +1517,10 @@ declare const chrome: ChromeApi;
             downloadProgress: normalizeProgress(match.download_progress),
             downloadedAt: normalizeDownloadedAt(match.downloaded_at),
             ts: Date.now(),
-          });
+          };
+          for (const lookup of lookups) {
+            atlasStatusCache.set(lookup, status);
+          }
 
           if (match.exists) existsCount += 1;
           if (match.downloaded) downloadedCount += 1;
@@ -1514,8 +1591,8 @@ declare const chrome: ChromeApi;
             reaction: data?.reaction ?? null,
           };
 
-          const lookup = itemLookupUrl(item) || item.url;
-          atlasStatusCache.set(lookup, {
+          const lookupKeys = itemLookupKeys(item);
+          const status = {
             exists: item.atlas.exists,
             downloaded: item.atlas.downloaded,
             blacklisted: item.atlas.blacklisted,
@@ -1523,21 +1600,28 @@ declare const chrome: ChromeApi;
             downloadProgress: normalizeProgress(file?.download_progress),
             downloadedAt: normalizeDownloadedAt(file?.downloaded_at),
             ts: Date.now(),
-          });
+          };
+          for (const key of lookupKeys) {
+            atlasStatusCache.set(key, status);
+          }
 
           if (item.atlas.exists && !item.atlas.downloaded && type !== 'dislike') {
             item.status = 'Queued';
             item.statusClass = 'queued';
             item.reactionQueued = options.blacklist ? BLACKLIST_ACTION.type : type;
-            if (lookup) {
-              queuedLookupUrls.add(lookup);
+            if (lookupKeys.length > 0) {
+              for (const key of lookupKeys) {
+                queuedLookupUrls.add(key);
+              }
             }
           } else {
             item.status = '';
             item.statusClass = '';
             item.reactionQueued = null;
-            if (lookup) {
-              queuedLookupUrls.delete(lookup);
+            if (lookupKeys.length > 0) {
+              for (const key of lookupKeys) {
+                queuedLookupUrls.delete(key);
+              }
             }
           }
           renderList();
@@ -1644,8 +1728,8 @@ declare const chrome: ChromeApi;
               reaction: null,
             };
             item.reactionQueued = null;
-            const lookup = itemLookupUrl(item) || item.url;
-            atlasStatusCache.set(lookup, {
+            const lookupKeys = itemLookupKeys(item);
+            const status = {
               exists: item.atlas.exists,
               downloaded: item.atlas.downloaded,
               blacklisted: item.atlas.blacklisted,
@@ -1653,7 +1737,10 @@ declare const chrome: ChromeApi;
               downloadProgress: normalizeProgress(file?.download_progress),
               downloadedAt: normalizeDownloadedAt(file?.downloaded_at),
               ts: Date.now(),
-            });
+            };
+            for (const key of lookupKeys) {
+              atlasStatusCache.set(key, status);
+            }
             item.status = '';
             item.statusClass = '';
             renderList();
@@ -1743,9 +1830,9 @@ declare const chrome: ChromeApi;
                 file_id: file?.id ?? null,
                 reaction: item.atlas?.reaction ?? null,
               };
-              const lookup = itemLookupUrl(item) || stripHash(String(item.url || ''));
-              if (lookup) {
-                atlasStatusCache.set(lookup, {
+              const lookupKeys = itemLookupKeys(item);
+              if (lookupKeys.length > 0) {
+                const status = {
                   exists: item.atlas.exists,
                   downloaded: item.atlas.downloaded,
                   blacklisted: item.atlas.blacklisted,
@@ -1753,7 +1840,10 @@ declare const chrome: ChromeApi;
                   downloadProgress: normalizeProgress(file?.download_progress),
                   downloadedAt: normalizeDownloadedAt(file?.downloaded_at),
                   ts: Date.now(),
-                });
+                };
+                for (const key of lookupKeys) {
+                  atlasStatusCache.set(key, status);
+                }
               }
 
               if (data?.queued) {
@@ -1762,15 +1852,19 @@ declare const chrome: ChromeApi;
                 if (item.atlas?.reaction?.type && item.atlas.reaction.type !== 'dislike') {
                   item.reactionQueued = item.atlas.reaction.type;
                 }
-                if (lookup) {
-                  queuedLookupUrls.add(lookup);
+                if (lookupKeys.length > 0) {
+                  for (const key of lookupKeys) {
+                    queuedLookupUrls.add(key);
+                  }
                 }
               } else {
                 item.status = '';
                 item.statusClass = '';
                 item.reactionQueued = null;
-                if (lookup) {
-                  queuedLookupUrls.delete(lookup);
+                if (lookupKeys.length > 0) {
+                  for (const key of lookupKeys) {
+                    queuedLookupUrls.delete(key);
+                  }
                 }
               }
             } else {

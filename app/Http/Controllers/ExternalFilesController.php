@@ -90,7 +90,13 @@ class ExternalFilesController extends Controller
     public function check(CheckExternalFilesRequest $request): JsonResponse
     {
         $urls = $request->validated()['urls'];
-        $normalizedUrls = collect($urls)
+        $rawUrls = collect($urls)
+            ->map(fn (string $url) => trim($url))
+            ->filter(fn (string $url) => $url !== '')
+            ->unique()
+            ->values()
+            ->all();
+        $normalizedUrls = collect($rawUrls)
             ->map(fn (string $url) => $this->stripFragment(trim($url)))
             ->filter(fn (string $url) => $url !== '')
             ->unique()
@@ -101,36 +107,48 @@ class ExternalFilesController extends Controller
             $normalizedUrls
         )));
 
+        $rawLookupSet = array_fill_keys($rawUrls, true);
         $normalizedLookupSet = array_fill_keys($normalizedUrls, true);
+        $allowedLookupSet = $rawLookupSet + $normalizedLookupSet;
         $filesByLookup = [];
 
         $filesByUrl = $this->lookupFilesByHash('url_hash', $normalizedUrlHashes);
         foreach ($filesByUrl as $file) {
-            $fileUrl = $this->stripFragment(is_string($file->url) ? trim($file->url) : '');
-            if ($fileUrl !== '' && isset($normalizedLookupSet[$fileUrl])) {
+            $fileUrlRaw = is_string($file->url) ? trim($file->url) : '';
+            $fileUrl = $this->stripFragment($fileUrlRaw);
+            if ($fileUrl !== '' && isset($allowedLookupSet[$fileUrl])) {
                 $filesByLookup[$fileUrl][] = $file;
             }
         }
 
         $referrerCandidates = array_values(array_filter(
-            $normalizedUrls,
+            $rawUrls,
             fn (string $url): bool => $this->looksLikePageUrl($url)
         ));
+        $normalizedReferrerCandidates = array_values(array_unique(array_map(
+            fn (string $url): string => $this->stripFragment($url),
+            $referrerCandidates
+        )));
         $referrerHashes = array_values(array_unique(array_map(
             fn (string $url): string => hash('sha256', $url),
-            $referrerCandidates
+            array_merge($referrerCandidates, $normalizedReferrerCandidates)
         )));
         $filesByReferrer = $this->lookupFilesByHash('referrer_url_hash', $referrerHashes);
         foreach ($filesByReferrer as $file) {
-            $referrerUrl = $this->stripFragment(is_string($file->referrer_url) ? trim($file->referrer_url) : '');
-            if ($referrerUrl !== '' && isset($normalizedLookupSet[$referrerUrl])) {
+            $referrerRaw = is_string($file->referrer_url) ? trim($file->referrer_url) : '';
+            if ($referrerRaw !== '' && isset($allowedLookupSet[$referrerRaw])) {
+                $filesByLookup[$referrerRaw][] = $file;
+            }
+
+            $referrerUrl = $this->stripFragment($referrerRaw);
+            if ($referrerUrl !== '' && isset($allowedLookupSet[$referrerUrl])) {
                 $filesByLookup[$referrerUrl][] = $file;
             }
         }
         $files = $filesByUrl->concat($filesByReferrer)->unique('id')->values();
 
         foreach ($filesByLookup as $lookup => $candidates) {
-            if (! isset($normalizedLookupSet[$lookup])) {
+            if (! isset($allowedLookupSet[$lookup])) {
                 unset($filesByLookup[$lookup]);
             }
         }
@@ -153,9 +171,14 @@ class ExternalFilesController extends Controller
         }
 
         $results = array_map(function (string $url) use ($filesByLookup, $reactionsByFileId): array {
-            $lookupUrl = $this->stripFragment(trim($url));
+            $rawLookupUrl = trim($url);
+            $lookupUrl = $this->stripFragment($rawLookupUrl);
+            /** @var Collection<int, File> $exactCandidates */
+            $exactCandidates = collect($filesByLookup[$rawLookupUrl] ?? [])->unique('id')->values();
             /** @var Collection<int, File> $candidates */
-            $candidates = collect($filesByLookup[$lookupUrl] ?? []);
+            $candidates = $exactCandidates->isNotEmpty()
+                ? $exactCandidates
+                : collect($filesByLookup[$lookupUrl] ?? [])->unique('id')->values();
             $downloadedCandidate = $candidates->first(fn (File $candidate): bool => (bool) $candidate->downloaded);
             $downloadedAt = optional(
                 $candidates
@@ -163,7 +186,7 @@ class ExternalFilesController extends Controller
                     ->sortByDesc(fn (File $candidate): int => $candidate->downloaded_at?->getTimestamp() ?? 0)
                     ->first()
             )->downloaded_at?->toIso8601String();
-            $file = $this->pickBestCheckMatch($candidates, $lookupUrl, $reactionsByFileId);
+            $file = $this->pickBestCheckMatch($candidates, $rawLookupUrl, $lookupUrl, $reactionsByFileId);
             $reaction = $file ? $reactionsByFileId->get($file->id) : null;
             if (! $reaction) {
                 foreach ($candidates as $candidate) {
@@ -359,20 +382,29 @@ class ExternalFilesController extends Controller
 
     /**
      * Pick the most relevant file when a lookup URL can match many rows.
-     * Priority: direct URL match, downloaded, has current-user reaction, newest row.
+     * Priority: direct URL match, exact referrer match, normalized referrer match,
+     * downloaded, has current-user reaction, newest row.
      */
-    private function pickBestCheckMatch(Collection $candidates, string $lookupUrl, Collection $reactionsByFileId): ?File
-    {
+    private function pickBestCheckMatch(
+        Collection $candidates,
+        string $rawLookupUrl,
+        string $lookupUrl,
+        Collection $reactionsByFileId
+    ): ?File {
         $best = null;
-        $bestScore = [-1, -1, -1, -1];
+        $bestScore = [-1, -1, -1, -1, -1, -1];
 
         foreach ($candidates as $candidate) {
             if (! $candidate instanceof File) {
                 continue;
             }
 
+            $candidateReferrer = is_string($candidate->referrer_url) ? trim($candidate->referrer_url) : '';
+            $candidateReferrerNormalized = $this->stripFragment($candidateReferrer);
             $score = [
                 (int) ($candidate->url === $lookupUrl),
+                (int) ($candidateReferrer !== '' && $candidateReferrer === $rawLookupUrl),
+                (int) ($candidateReferrerNormalized !== '' && $candidateReferrerNormalized === $lookupUrl),
                 (int) ((bool) $candidate->downloaded),
                 (int) $reactionsByFileId->has($candidate->id),
                 (int) $candidate->id,

@@ -242,6 +242,55 @@ it('includes download progress and downloaded_at in extension check results', fu
     $response->assertJsonPath('results.1.downloaded_at', $downloadedAt->toIso8601String());
 });
 
+it('matches hash-specific referrer urls before normalized fallback', function () {
+    config()->set('downloads.extension_token', 'test-token');
+    $user = User::factory()->create();
+    config()->set('downloads.extension_user_id', $user->id);
+
+    $first = File::factory()->create([
+        'url' => 'https://images.example.com/media/hash-one.jpg',
+        'referrer_url' => 'https://example.com/art/hash-post#image-1',
+        'downloaded' => false,
+        'download_progress' => 28,
+    ]);
+    $second = File::factory()->create([
+        'url' => 'https://images.example.com/media/hash-two.jpg',
+        'referrer_url' => 'https://example.com/art/hash-post#image-2',
+        'downloaded' => true,
+        'download_progress' => 100,
+    ]);
+
+    \App\Models\Reaction::query()->create([
+        'file_id' => $first->id,
+        'user_id' => $user->id,
+        'type' => 'like',
+    ]);
+    \App\Models\Reaction::query()->create([
+        'file_id' => $second->id,
+        'user_id' => $user->id,
+        'type' => 'love',
+    ]);
+
+    $response = $this
+        ->withHeader('X-Atlas-Extension-Token', 'test-token')
+        ->postJson('/api/extension/files/check', [
+            'urls' => [
+                'https://example.com/art/hash-post#image-1',
+                'https://example.com/art/hash-post#image-2',
+            ],
+        ]);
+
+    $response->assertOk();
+    $response->assertJsonPath('results.0.exists', true);
+    $response->assertJsonPath('results.0.reaction.type', 'like');
+    $response->assertJsonPath('results.0.downloaded', false);
+    $response->assertJsonPath('results.0.download_progress', 28);
+    $response->assertJsonPath('results.1.exists', true);
+    $response->assertJsonPath('results.1.reaction.type', 'love');
+    $response->assertJsonPath('results.1.downloaded', true);
+    $response->assertJsonPath('results.1.download_progress', 100);
+});
+
 it('falls back to updated_at when downloaded_at is missing', function () {
     config()->set('downloads.extension_token', 'test-token');
     $user = User::factory()->create();
