@@ -31,6 +31,17 @@ const OPEN_TAB_ICON_PATHS = [
   'M5 8h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z',
 ];
 
+function isHashSpecificReferrerLookupKey(value: string): boolean {
+  const trimmed = (value || '').trim();
+  const hashIndex = trimmed.indexOf('#');
+  if (hashIndex < 0) {
+    return false;
+  }
+
+  const fragment = trimmed.slice(hashIndex + 1).toLowerCase();
+  return /^image-\d+$/.test(fragment);
+}
+
 export function clearNodeMarkerAttributes(nodes: Iterable<Element>): void {
   for (const node of nodes) {
     node.removeAttribute('data-atlas-marked');
@@ -61,7 +72,9 @@ export function buildStatusMapFromCache<T extends CacheEntry>(
     };
 
     statusByUrl.set(url, status);
-    statusByUrl.set(stripHash(url), status);
+    if (!isHashSpecificReferrerLookupKey(url)) {
+      statusByUrl.set(stripHash(url), status);
+    }
   }
 
   return statusByUrl;

@@ -64,6 +64,26 @@ describe('page markers', () => {
     expect(cache.has('https://example.com/stale')).toBe(false);
   });
 
+  it('keeps #image-N cache entries hash-specific to avoid page-wide marker bleed', () => {
+    const now = Date.now();
+    const cache = new Map([
+      [
+        'https://www.deviantart.com/user/art/example-123#image-1',
+        {
+          exists: true,
+          downloaded: false,
+          blacklisted: false,
+          reactionType: 'like',
+          ts: now,
+        },
+      ],
+    ]);
+
+    const statusByUrl = buildStatusMapFromCache(cache, 30_000, stripHash);
+    expect(statusByUrl.has('https://www.deviantart.com/user/art/example-123#image-1')).toBe(true);
+    expect(statusByUrl.has('https://www.deviantart.com/user/art/example-123')).toBe(false);
+  });
+
   it('merges sheet statuses and resolves lookups', () => {
     const statusByUrl = new Map();
     mergeSheetItemStatuses(

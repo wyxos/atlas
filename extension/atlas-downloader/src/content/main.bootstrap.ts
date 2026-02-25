@@ -6,7 +6,6 @@ import {
   collectLookupKeysForNode,
   configureMediaNoiseFilters,
 } from './items';
-import { resolveDeviantArtPostContext, resolveWixAssetKey } from './deviantartPost';
 import { installHotkeys, installMediaReactionOverlay, type AtlasStatusCacheEntry } from './interactions';
 import { isHostExcluded, isHostMatch, parseExcludedDomains, resolveHost, stripHash } from './network';
 import { isOpenTabHighlightEligibleUrl, normalizeOpenTabUrl } from './openTabUrl';
@@ -1868,31 +1867,59 @@ export function runContentScript() {
 
       const statusByUrl = buildStatusMapFromCache(atlasStatusCache, ATLAS_STATUS_TTL_MS, stripHash);
       mergeSheetItemStatuses(statusByUrl, sheetItems, stripHash);
-      const deviantArtPostReferrerLookupByAssetKey = buildDeviantArtPostReferrerLookupByAssetKey();
       const openTabBadgeNodes: Element[] = [];
 
-      const shouldMarkNode = (node: Element): boolean => {
-        if (!(node instanceof HTMLAnchorElement)) {
-          return true;
+      const shouldMarkStatusNode = (node: Element): boolean => {
+        if (node instanceof HTMLAnchorElement) {
+          return node.querySelector('img') !== null;
         }
 
-        return node.querySelector('img, video') !== null;
+        if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
+          return node.closest('a[href]') === null;
+        }
+
+        return false;
+      };
+      const shouldMarkOpenTabNode = (node: Element): boolean =>
+        node instanceof HTMLAnchorElement && node.querySelector('img, video') !== null;
+
+      const collectStatusLookupKeysForMarkerNode = (node: Element): string[] => {
+        if (node instanceof HTMLAnchorElement) {
+          if (!shouldMarkStatusNode(node)) {
+            return [];
+          }
+
+          return collectLookupKeysForNode(node, {
+            includeAnchor: true,
+            includePageFallback: false,
+          });
+        }
+
+        if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
+          if (!shouldMarkStatusNode(node)) {
+            return [];
+          }
+
+          return collectLookupKeysForNode(node, {
+            includeAnchor: false,
+            includePageFallback: false,
+          });
+        }
+
+        return [];
       };
 
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
-        if (!shouldMarkNode(node)) {
-          continue;
-        }
-
-        const statusLookupKeys = addDeviantArtPostLookupKeys(
-          collectLookupKeysForNode(node),
-          deviantArtPostReferrerLookupByAssetKey
-        );
-        const openTabLookupKeys = collectLookupKeysForNode(node, {
-          includeAnchor: true,
-          includePageFallback: false,
-        });
+        const statusLookupKeys = shouldMarkStatusNode(node)
+          ? collectStatusLookupKeysForMarkerNode(node)
+          : [];
+        const openTabLookupKeys = shouldMarkOpenTabNode(node)
+          ? collectLookupKeysForNode(node, {
+            includeAnchor: true,
+            includePageFallback: false,
+          })
+          : [];
         const status = statusLookupKeys.length > 0
           ? findStatusForLookupKeys(statusLookupKeys, statusByUrl, stripHash)
           : null;
@@ -1942,34 +1969,62 @@ export function runContentScript() {
 
     function collectPageMarkerUrls() {
       const urls = new Set<string>();
-      const deviantArtPostReferrerLookupByAssetKey = buildDeviantArtPostReferrerLookupByAssetKey();
       const pageUrl = (window.location.href || '').trim();
       if (pageUrl) {
         urls.add(pageUrl);
         urls.add(stripHash(pageUrl));
       }
 
-      const shouldMarkNode = (node: Element): boolean => {
-        if (!(node instanceof HTMLAnchorElement)) {
-          return true;
+      const shouldMarkStatusNode = (node: Element): boolean => {
+        if (node instanceof HTMLAnchorElement) {
+          return node.querySelector('img') !== null;
         }
 
-        return node.querySelector('img, video') !== null;
+        if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
+          return node.closest('a[href]') === null;
+        }
+
+        return false;
+      };
+
+      const collectStatusLookupKeysForMarkerNode = (node: Element): string[] => {
+        if (node instanceof HTMLAnchorElement) {
+          if (!shouldMarkStatusNode(node)) {
+            return [];
+          }
+
+          return collectLookupKeysForNode(node, {
+            includeAnchor: true,
+            includePageFallback: false,
+          });
+        }
+
+        if (node instanceof HTMLImageElement || node instanceof HTMLVideoElement) {
+          if (!shouldMarkStatusNode(node)) {
+            return [];
+          }
+
+          return collectLookupKeysForNode(node, {
+            includeAnchor: false,
+            includePageFallback: false,
+          });
+        }
+
+        return [];
       };
 
       const nodes = document.querySelectorAll('img, video, a[href]');
       for (const node of nodes) {
-        if (!shouldMarkNode(node)) {
+        if (!shouldMarkStatusNode(node)) {
           continue;
         }
 
-        const statusLookupKeys = addDeviantArtPostLookupKeys(
-          collectLookupKeysForNode(node),
-          deviantArtPostReferrerLookupByAssetKey
-        );
+        const statusLookupKeys = collectStatusLookupKeysForMarkerNode(node);
         for (const key of statusLookupKeys) {
           urls.add(key);
-          urls.add(stripHash(key));
+          if (!isHashSpecificReferrerLookupKey(key)) {
+            urls.add(stripHash(key));
+          }
         }
       }
 
@@ -1982,63 +2037,15 @@ export function runContentScript() {
       return [...urls].filter(Boolean);
     }
 
-    function buildDeviantArtPostReferrerLookupByAssetKey(): Map<string, string[]> {
-      const context = resolveDeviantArtPostContext(window.location.href);
-      if (!context || context.entries.length <= 1) {
-        return new Map<string, string[]>();
+    function isHashSpecificReferrerLookupKey(value: string): boolean {
+      const trimmed = (value || '').trim();
+      const hashIndex = trimmed.indexOf('#');
+      if (hashIndex < 0) {
+        return false;
       }
 
-      const pageBaseUrl = stripHash(window.location.href);
-      if (!pageBaseUrl) {
-        return new Map<string, string[]>();
-      }
-
-      const lookupByAssetKey = new Map<string, string[]>();
-      for (let index = 0; index < context.entries.length; index += 1) {
-        const entry = context.entries[index];
-        const assetKey = (entry?.assetKey || '').trim();
-        if (!assetKey) {
-          continue;
-        }
-
-        lookupByAssetKey.set(assetKey, [`${pageBaseUrl}#image-${index + 1}`, pageBaseUrl]);
-      }
-
-      return lookupByAssetKey;
-    }
-
-    function addDeviantArtPostLookupKeys(
-      lookupKeys: string[],
-      referrerLookupByAssetKey: Map<string, string[]>
-    ): string[] {
-      if (referrerLookupByAssetKey.size === 0 || lookupKeys.length === 0) {
-        return lookupKeys;
-      }
-
-      const merged = new Set<string>(lookupKeys);
-      for (const lookupKey of lookupKeys) {
-        const assetKey = resolveWixAssetKey(lookupKey);
-        if (!assetKey) {
-          continue;
-        }
-
-        const referrerKeys = referrerLookupByAssetKey.get(assetKey);
-        if (!referrerKeys || referrerKeys.length === 0) {
-          continue;
-        }
-
-        for (const referrerKey of referrerKeys) {
-          const normalized = (referrerKey || '').trim();
-          if (!normalized) {
-            continue;
-          }
-
-          merged.add(normalized);
-          merged.add(stripHash(normalized));
-        }
-      }
-
-      return [...merged];
+      const fragment = trimmed.slice(hashIndex + 1).toLowerCase();
+      return /^image-\d+$/.test(fragment);
     }
 
     // collectLookupKeysForNode moved to items.ts
