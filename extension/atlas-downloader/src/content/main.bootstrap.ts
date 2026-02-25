@@ -1883,10 +1883,7 @@ export function runContentScript() {
           continue;
         }
 
-        const statusLookupKeys = collectLookupKeysForNode(node, {
-          includeAnchor: false,
-          includePageFallback: false,
-        });
+        const statusLookupKeys = collectLookupKeysForNode(node);
         const openTabLookupKeys = collectLookupKeysForNode(node, {
           includeAnchor: true,
           includePageFallback: false,
@@ -1960,10 +1957,7 @@ export function runContentScript() {
           continue;
         }
 
-        for (const key of collectLookupKeysForNode(node, {
-          includeAnchor: false,
-          includePageFallback: false,
-        })) {
+        for (const key of collectLookupKeysForNode(node)) {
           urls.add(key);
           urls.add(stripHash(key));
         }
