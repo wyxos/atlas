@@ -68,6 +68,9 @@ class FileResource extends JsonResource
             ? $this->metadata->payload
             : (is_string($this->metadata?->payload) ? json_decode($this->metadata->payload, true) : []);
         $listingMetadata = is_array($this->listing_metadata) ? $this->listing_metadata : [];
+        if (array_key_exists('auth_context', $listingMetadata)) {
+            unset($listingMetadata['auth_context']);
+        }
         $detailMetadata = is_array($this->detail_metadata) ? $this->detail_metadata : [];
 
         $normalizeDimension = function (mixed $value): ?int {
@@ -195,7 +198,7 @@ class FileResource extends JsonResource
             'downloaded_at' => $this->downloaded_at?->toIso8601String(),
             'download_progress' => $this->download_progress,
             'not_found' => $this->not_found,
-            'listing_metadata' => $this->listing_metadata,
+            'listing_metadata' => $listingMetadata,
             'detail_metadata' => $this->detail_metadata,
             'metadata' => $this->metadata ? ['payload' => $this->metadata->payload] : null,
             'created_at' => $this->created_at->toIso8601String(),

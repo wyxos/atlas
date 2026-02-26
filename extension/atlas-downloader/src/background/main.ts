@@ -4,6 +4,7 @@ import {
   normalizeTabUrlForDuplicateCheck,
   pickDuplicateNoticeTargetTabId,
 } from './duplicates';
+import { attachAuthContextToPayload, type BrowserCookie } from './authContext';
 import { collectOpenTabUrls } from './openTabs';
 import { buildReactionBroadcastEvent, type ReactionBroadcastEvent } from './reactionEvent';
 
@@ -141,6 +142,10 @@ type ChromeContextMenus = {
   };
 };
 
+type ChromeCookies = {
+  getAll: (details: { url: string }) => Promise<BrowserCookie[]>;
+};
+
 type ChromeApi = {
   runtime: ChromeRuntime;
   storage: {
@@ -151,6 +156,7 @@ type ChromeApi = {
   action: ChromeAction;
   commands: ChromeCommands;
   contextMenus: ChromeContextMenus;
+  cookies: ChromeCookies;
 };
 
 declare const chrome: ChromeApi;
@@ -1166,6 +1172,8 @@ async function handleDownloadWithSettings(payload: unknown, settings: AtlasSetti
     };
   }
 
+  const payloadWithAuth = await attachAuthContext(payload);
+
   let response: Response;
   try {
     response = await fetchWithTimeout(`${baseUrl}/api/extension/files`, {
@@ -1175,7 +1183,7 @@ async function handleDownloadWithSettings(payload: unknown, settings: AtlasSetti
         Accept: 'application/json',
         ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payloadWithAuth),
     });
   } catch (error) {
     return {
@@ -1218,6 +1226,8 @@ async function handleReactWithSettings(payload: unknown, settings: AtlasSettings
     };
   }
 
+  const payloadWithAuth = await attachAuthContext(payload);
+
   let response: Response;
   try {
     response = await fetchWithTimeout(`${baseUrl}/api/extension/files/react`, {
@@ -1227,7 +1237,7 @@ async function handleReactWithSettings(payload: unknown, settings: AtlasSettings
         Accept: 'application/json',
         ...(token ? { 'X-Atlas-Extension-Token': token } : {}),
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payloadWithAuth),
     });
   } catch (error) {
     return {
@@ -1257,6 +1267,19 @@ async function handleReactWithSettings(payload: unknown, settings: AtlasSettings
     ok: true,
     data,
   };
+}
+
+async function attachAuthContext(payload: unknown): Promise<unknown> {
+  return attachAuthContextToPayload(payload, {
+    getCookies: async (url: string) => {
+      try {
+        return await chrome.cookies.getAll({ url });
+      } catch {
+        return [];
+      }
+    },
+    userAgent: globalThis.navigator?.userAgent || 'Mozilla/5.0',
+  });
 }
 
 async function handleDeleteDownloadWithSettings(payload: unknown, settings: AtlasSettings) {

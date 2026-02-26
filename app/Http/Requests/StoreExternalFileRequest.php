@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ValidatesExtensionAuthContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreExternalFileRequest extends FormRequest
 {
+    use ValidatesExtensionAuthContext;
+
     public function authorize(): bool
     {
         $expected = (string) config('downloads.extension_token');
@@ -50,6 +53,7 @@ class StoreExternalFileRequest extends FormRequest
             'alt' => ['nullable', 'string', 'max:2000'],
             'download_via' => ['nullable', 'string', 'in:yt-dlp'],
             'force_download' => ['nullable', 'boolean'],
+            ...$this->extensionAuthContextRules(),
         ];
     }
 

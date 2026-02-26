@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ValidatesExtensionAuthContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ReactExternalFileRequest extends FormRequest
 {
+    use ValidatesExtensionAuthContext;
+
     public function authorize(): bool
     {
         $expected = (string) config('downloads.extension_token');
@@ -50,6 +53,7 @@ class ReactExternalFileRequest extends FormRequest
             'force_download' => ['nullable', 'boolean'],
             'clear_download' => ['nullable', 'boolean'],
             'blacklist' => ['nullable', 'boolean'],
+            ...$this->extensionAuthContextRules(),
         ];
     }
 }
