@@ -5,12 +5,15 @@ namespace App\Services\Downloads;
 class YtDlpCommandBuilder
 {
     /**
+     * @param  array{cookies_path?: string, user_agent?: string}  $runtimeOptions
      * @return array<int, string>
      */
-    public function build(string $url, string $outputTemplate): array
+    public function build(string $url, string $outputTemplate, array $runtimeOptions = []): array
     {
         $ytDlp = (string) config('downloads.yt_dlp_path', 'yt-dlp');
         $ffmpeg = (string) config('downloads.ffmpeg_path', 'ffmpeg');
+        $runtimeCookiesPath = trim((string) ($runtimeOptions['cookies_path'] ?? ''));
+        $runtimeUserAgent = trim((string) ($runtimeOptions['user_agent'] ?? ''));
         $cookiesPath = trim((string) config('downloads.yt_dlp_cookies_path', ''));
         $cookiesFromBrowser = trim((string) config('downloads.yt_dlp_cookies_from_browser', ''));
 
@@ -25,12 +28,20 @@ class YtDlpCommandBuilder
             $args[] = $ffmpeg;
         }
 
-        if ($cookiesPath !== '') {
+        if ($runtimeCookiesPath !== '') {
+            $args[] = '--cookies';
+            $args[] = $runtimeCookiesPath;
+        } elseif ($cookiesPath !== '') {
             $args[] = '--cookies';
             $args[] = $cookiesPath;
         } elseif ($cookiesFromBrowser !== '') {
             $args[] = '--cookies-from-browser';
             $args[] = $cookiesFromBrowser;
+        }
+
+        if ($runtimeUserAgent !== '') {
+            $args[] = '--user-agent';
+            $args[] = $runtimeUserAgent;
         }
 
         // Prefer mp4+m4a when available (usually browser-friendly), otherwise fall back to "best".

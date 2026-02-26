@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\DownloadFile;
 use App\Models\File;
+use App\Support\ExtensionAuthContext;
 use App\Support\FileTypeDetector;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
@@ -15,6 +16,7 @@ class ExternalFileIngestService
         $url = trim((string) $payload['url']);
         $pageUrl = trim((string) ($payload['referrer_url'] ?? ''));
         $downloadVia = $payload['download_via'] ?? null;
+        $authContext = ExtensionAuthContext::sanitize($payload['auth_context'] ?? null);
 
         // Canonical file identity is url. referrer_url is provenance and may be non-unique.
         $url = $this->stripFragment($url);
@@ -31,6 +33,7 @@ class ExternalFileIngestService
             'width' => $payload['width'] ?? null,
             'height' => $payload['height'] ?? null,
             'download_via' => $downloadVia,
+            'auth_context' => $authContext,
         ], fn ($value) => $value !== null && $value !== '');
         $urlHash = hash('sha256', $url);
         $file = null;

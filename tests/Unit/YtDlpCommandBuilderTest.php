@@ -46,3 +46,28 @@ it('adds cookies-from-browser when cookies path is not configured', function () 
     expect($args)->toContain('firefox');
     expect($args)->not->toContain('--cookies');
 });
+
+it('prefers runtime cookies and user agent over global cookie config', function () {
+    config()->set('downloads.yt_dlp_path', 'yt-dlp');
+    config()->set('downloads.ffmpeg_path', 'ffmpeg');
+    config()->set('downloads.yt_dlp_cookies_path', '/etc/atlas/global-cookies.txt');
+    config()->set('downloads.yt_dlp_cookies_from_browser', 'firefox');
+
+    $builder = new YtDlpCommandBuilder;
+
+    $args = $builder->build(
+        'https://x.com/devops_nk/status/1',
+        '/tmp/download.%(ext)s',
+        [
+            'cookies_path' => '/tmp/runtime-cookies.txt',
+            'user_agent' => 'AtlasTestAgent/1.0',
+        ],
+    );
+
+    expect($args)->toContain('--cookies');
+    expect($args)->toContain('/tmp/runtime-cookies.txt');
+    expect($args)->not->toContain('/etc/atlas/global-cookies.txt');
+    expect($args)->not->toContain('--cookies-from-browser');
+    expect($args)->toContain('--user-agent');
+    expect($args)->toContain('AtlasTestAgent/1.0');
+});

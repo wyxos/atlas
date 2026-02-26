@@ -69,6 +69,7 @@ Database gotcha:
 
 Downloads gotcha:
 - In queued download jobs, catching `Throwable` and writing `FAILED` prevents Laravel queue retries/backoff from running. For transient network errors (timeouts/5xx/connection issues), update transfer state to retry-visible metadata and call `$this->release($delay)` instead.
+- For auth-gated yt-dlp sources (X/Facebook), the extension now sends per-request `auth_context` (cookies + user agent) with react/download payloads; consume it only for that transfer and clear `listing_metadata.auth_context` after the yt-dlp attempt.
 
 ---
 
