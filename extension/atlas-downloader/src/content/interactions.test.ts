@@ -224,6 +224,37 @@ describe('installHotkeys', () => {
 });
 
 describe('installMediaReactionOverlay', () => {
+  it('mounts the floating toolbar inside the styled atlas shadow root wrapper', () => {
+    const root = document.createElement('div');
+    const styledRoot = document.createElement('div');
+    styledRoot.className = 'atlas-shadow-root';
+    root.appendChild(styledRoot);
+    document.body.appendChild(root);
+
+    installMediaReactionOverlay(
+      {
+        root,
+        showToast: () => {},
+        sendMessageSafe: (_message, callback) => callback({ ok: true, data: {} }),
+        isSheetOpen: () => false,
+        chooseDialog: async () => 'cancel',
+      },
+      {
+        rootId: 'atlas-downloader-root',
+        minWidth: 0,
+        maxMetadataLen: 255,
+        limitString: (value) => String(value ?? ''),
+        sourceFromMediaUrl: () => 'web',
+        fetchAtlasStatus: (_send, _url, _referrerUrl, callback) => callback(null),
+        atlasStatusCache: new Map(),
+        getCachedAtlasStatus: () => null,
+      }
+    );
+
+    const toolbar = styledRoot.querySelector('.atlas-downloader-media-toolbar');
+    expect(toolbar).toBeTruthy();
+  });
+
   it('uses hovered anchor href (including relative links) for status referrer lookups', () => {
     setLocation('/some-file');
 
