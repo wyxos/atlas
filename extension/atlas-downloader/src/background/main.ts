@@ -34,6 +34,9 @@ type ChromeRuntime = {
   requestUpdateCheck?: (callback: (status: string) => void) => void;
   getURL: (path: string) => string;
   sendMessage: (message: unknown) => void | Promise<unknown>;
+  lastError?: {
+    message?: string;
+  };
 };
 
 type ChromeStorageSync = {
@@ -71,7 +74,11 @@ type ChromeRuntimeMessageSender = {
 };
 
 type ChromeTabs = {
-  sendMessage: (tabId: number, message: unknown) => void | Promise<unknown>;
+  sendMessage: (
+    tabId: number,
+    message: unknown,
+    responseCallback?: (response: unknown) => void
+  ) => void | Promise<unknown>;
   create: (createProperties: { url: string }) => void;
   remove: (tabIds: number | number[]) => Promise<void>;
   update: (tabId: number, updateProperties: { active?: boolean }) => Promise<ChromeTab>;
@@ -258,7 +265,10 @@ function settleAsyncResult(result: unknown): void {
 
 function sendTabMessage(tabId: number, message: unknown): void {
   try {
-    settleAsyncResult(chrome.tabs.sendMessage(tabId, message));
+    chrome.tabs.sendMessage(tabId, message, () => {
+      // Read and ignore callback errors to avoid noisy "Unchecked runtime.lastError".
+      void chrome.runtime.lastError;
+    });
   } catch {
     // Ignore tabs without a matching content script.
   }
