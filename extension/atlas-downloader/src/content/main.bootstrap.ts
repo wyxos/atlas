@@ -441,7 +441,8 @@ export function runContentScript() {
     const appMount = document.createElement('div');
     root.appendChild(appMount);
 
-    const showToast = createToastFn(root);
+    let showToast = createToastFn(root);
+    let chooseDialog = createDialogChooser(root);
     const sendMessageSafe = (
       message: unknown,
       callback: (response: unknown) => void
@@ -474,8 +475,6 @@ export function runContentScript() {
 
     shadow.appendChild(root);
     (document.body || document.documentElement).appendChild(host);
-
-    const chooseDialog = createDialogChooser(root);
 
     let items = [];
     let scanNonce = 0;
@@ -595,6 +594,12 @@ export function runContentScript() {
           });
       },
     }).mount(appMount);
+
+    const styledRoot = root.querySelector('.atlas-shadow-root');
+    if (styledRoot instanceof HTMLElement) {
+      showToast = createToastFn(styledRoot);
+      chooseDialog = createDialogChooser(styledRoot);
+    }
 
     handleRealtimeDownloadEvent = (payload: unknown) => {
       if (!payload || typeof payload !== 'object') {

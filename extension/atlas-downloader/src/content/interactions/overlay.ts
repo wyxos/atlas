@@ -654,18 +654,24 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
     const primaryLookupKey = nextKey || mediaLookupKeys[0] || null;
     const secondaryLookupKey =
       mediaLookupKeys.find((lookupKey) => lookupKey !== primaryLookupKey) || previewPayload.referrer_url || null;
+    const pageBaseUrl = window.location.href.split('#')[0] || window.location.href;
+    let postReferrerLookupKey: string | null = null;
 
     activeMedia = media;
-    activeLookupKeys = buildLookupKeys(primaryLookupKey, secondaryLookupKey);
-    activeKey = activeLookupKeys[0] || null;
-    setToolbarResolution(previewPayload.width, previewPayload.height);
     const activeAssetKey = resolveWixAssetKey(previewPayload.url || '');
     const postContext = resolveDeviantArtPostContext(window.location.href, media);
     if (postContext && activeAssetKey && postContext.entryByAssetKey.has(activeAssetKey)) {
       activePostContext = postContext;
+      const postIndex = postContext.entries.findIndex((entry) => entry.assetKey === activeAssetKey);
+      if (postIndex >= 0) {
+        postReferrerLookupKey = `${pageBaseUrl}#image-${postIndex + 1}`;
+      }
     } else {
       activePostContext = null;
     }
+    activeLookupKeys = buildLookupKeys(primaryLookupKey, secondaryLookupKey, postReferrerLookupKey);
+    activeKey = activeLookupKeys[0] || null;
+    setToolbarResolution(previewPayload.width, previewPayload.height);
     syncPostIndicatorState();
     overlayState.open = true;
     updatePosition();
@@ -681,7 +687,7 @@ export function installMediaReactionOverlay(options: OverlayOptions, deps: Inter
         setToolbarStatusMeta(cached);
       } else {
         const requestUrl = primaryLookupKey || '';
-        const requestReferrer = secondaryLookupKey || window.location.href;
+        const requestReferrer = postReferrerLookupKey || secondaryLookupKey || window.location.href;
         const requestKeys = [...activeLookupKeys];
         deps.fetchAtlasStatus(options.sendMessageSafe, requestUrl, requestReferrer, (status) => {
           if (!status) return;
