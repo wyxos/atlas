@@ -42,19 +42,59 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
     return path.some((p) => p instanceof HTMLElement && p.id === deps.rootId);
   };
 
-  const resolveEventMedia = (event: MouseEvent): Element | null => {
+  const resolveEventMediaCandidates = (event: MouseEvent): Element[] => {
+    const candidates: Element[] = [];
+    const seen = new Set<Element>();
+    const addCandidate = (candidate: Element | null) => {
+      if (!(candidate instanceof Element)) {
+        return;
+      }
+
+      if (seen.has(candidate)) {
+        return;
+      }
+
+      seen.add(candidate);
+      candidates.push(candidate);
+    };
+
     const target = event.target instanceof Element ? event.target : null;
     const byTarget = target?.closest?.('img, video') ?? null;
     if (byTarget instanceof Element && !isOwnUiElement(byTarget, deps.rootId)) {
-      return byTarget;
+      addCandidate(byTarget);
     }
 
     const byPoint = resolveMediaAtPoint(event.clientX, event.clientY, deps.rootId);
     if (byPoint) {
-      return byPoint;
+      addCandidate(byPoint);
     }
 
-    return null;
+    return candidates;
+  };
+
+  const resolveEventMedia = (event: MouseEvent): Element | null => {
+    return resolveEventMediaCandidates(event)[0] ?? null;
+  };
+
+  const resolveEventReactionTarget = (
+    event: MouseEvent,
+    reactionType: string
+  ): {
+    media: Element | null;
+    payload: ReturnType<typeof buildReactionPayloadFromMedia>;
+  } => {
+    const candidates = resolveEventMediaCandidates(event);
+    for (const candidate of candidates) {
+      const payload = buildReactionPayloadFromMedia(candidate, reactionType, deps);
+      if (payload) {
+        return { media: candidate, payload };
+      }
+    }
+
+    return {
+      media: candidates[0] ?? null,
+      payload: null,
+    };
   };
 
   const cacheReactionStatus = (
@@ -197,11 +237,12 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       if (options.isSheetOpen()) return;
       if (isOwnUiEvent(e)) return;
 
-      const media = resolveEventMedia(e);
-      if (!media) return;
-
       const reactionType = e.button === 0 ? 'like' : e.button === 1 ? 'love' : null;
       if (!reactionType) return;
+
+      const resolved = resolveEventReactionTarget(e, reactionType);
+      const media = resolved.media;
+      if (!media) return;
 
       maybeHint();
 
@@ -209,7 +250,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-      const payload = buildReactionPayloadFromMedia(media, reactionType, deps);
+      const payload = resolved.payload;
       if (!payload) {
         if (media instanceof HTMLVideoElement) {
           options.showToast('No direct video URL found.');
@@ -236,7 +277,8 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       if (options.isSheetOpen()) return;
       if (isOwnUiEvent(e)) return;
 
-      const media = resolveEventMedia(e);
+      const resolved = resolveEventReactionTarget(e, 'dislike');
+      const media = resolved.media;
       if (!media) return;
 
       maybeHint();
@@ -245,7 +287,7 @@ export function installHotkeys(options: HotkeysOptions, deps: InteractionDepende
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-      const payload = buildReactionPayloadFromMedia(media, 'dislike', deps);
+      const payload = resolved.payload;
       if (!payload) {
         if (media instanceof HTMLVideoElement) {
           options.showToast('No direct video URL found.');
